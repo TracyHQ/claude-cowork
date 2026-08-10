@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="package" method="upgrade">
+    <name>Joomla Claude Cowork</name>
+    <packagename>claudecowork</packagename>
+    <author>Tracy</author>
+    <creationDate>2026-08-10</creationDate>
+    <version>0.1.0</version>
+    <description>PKG_CLAUDECOWORK_XML_DESCRIPTION</description>
+
+    <!-- A package around a single component looks like overkill today and is not.
+         Changing an extension's install shape later is visible on every customer site
+         already running it: they must uninstall and reinstall. A package manifest costs one
+         file now and makes adding a plugin later a normal update. -->
+    <files folder="packages">
+        <file type="component" id="com_claudecowork">com_claudecowork.zip</file>
+    </files>
+</extension>

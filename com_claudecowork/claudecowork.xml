@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="component" method="upgrade">
+    <name>COM_CLAUDECOWORK</name>
+    <author>Tracy</author>
+    <creationDate>2026-08-10</creationDate>
+    <version>0.1.0</version>
+    <description>COM_CLAUDECOWORK_XML_DESCRIPTION</description>
+
+    <namespace path="src">Tracy\Component\ClaudeCowork</namespace>
+
+    <!-- Front-end. The API lives here, not under administrator/, on purpose: this endpoint
+         authenticates with its own token, and a backend URL would additionally demand a
+         Joomla admin session that the caller does not have and should not need. -->
+    <files folder="site">
+        <folder>services</folder>
+        <folder>src</folder>
+    </files>
+
+    <administration>
+        <files folder="administrator">
+            <folder>services</folder>
+            <folder>src</folder>
+            <!-- The engine — no Joomla dependency, unit tested on its own. Under
+                 administrator/ rather than media/ because media/ is served over HTTP and
+                 these are PHP files; same placement Akeeba uses for its own engine. -->
+            <folder>lib</folder>
+        </files>
+        <languages folder="administrator/language">
+            <language tag="en-GB">en-GB/com_claudecowork.ini</language>
+            <language tag="en-GB">en-GB/com_claudecowork.sys.ini</language>
+        </languages>
+        <!-- No <menu> element: this component has no admin screens yet, and an empty menu
+             entry that opens a blank page is worse than no entry. -->
+    </administration>
+
+    <config>
+        <fields name="params">
+            <fieldset name="component">
+                <field
+                    name="token"
+                    type="password"
+                    label="COM_CLAUDECOWORK_CONFIG_TOKEN_LABEL"
+                    description="COM_CLAUDECOWORK_CONFIG_TOKEN_DESC"
+                    default=""
+                />
+                <field
+                    name="webroot"
+                    type="text"
+                    label="COM_CLAUDECOWORK_CONFIG_WEBROOT_LABEL"
+                    description="COM_CLAUDECOWORK_CONFIG_WEBROOT_DESC"
+                    default=""
+                />
+            </fieldset>
+        </fields>
+    </config>
+</extension>
