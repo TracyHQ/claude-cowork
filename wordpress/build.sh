@@ -13,6 +13,11 @@ cd "$(dirname "$0")"
 
 ENGINE=lib
 
+# The plugin file is the whole point of the package and the engine is only its cargo. A zip
+# holding lib/ and nothing else installs, activates, and answers nothing — and it is 4 KB
+# smaller, which is exactly the kind of difference nobody notices. Refuse to build one.
+[ -f claude-cowork/claude-cowork.php ] || { echo "claude-cowork/claude-cowork.php is missing" >&2; exit 1; }
+
 rm -rf build dist && mkdir -p build dist
 
 # Created, not assumed: the copy is gitignored, so a fresh clone does not have this directory
@@ -22,5 +27,9 @@ cp "$ENGINE"/*.php claude-cowork/lib/
 
 cp -R claude-cowork build/claude-cowork
 ( cd build && zip -qr ../dist/claude-cowork.zip claude-cowork -x '*.DS_Store' )
+
+unzip -l dist/claude-cowork.zip | grep -q 'claude-cowork/claude-cowork.php' || {
+  echo "built a package with no plugin file in it" >&2; exit 1
+}
 
 echo "dist/claude-cowork.zip  ($(du -h dist/claude-cowork.zip | cut -f1))"
