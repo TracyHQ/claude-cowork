@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Builds the installable plugin zip.
 #
-# The engine comes from ../joomla/lib — ONE source of truth for both platforms, copied in at
-# build time and never edited in place under claude-cowork/. Editing the copy is how the two
-# silently diverge, which is the whole reason lib/ knows nothing about either CMS.
+# The engine is THIS platform's own, under wordpress/lib. It began as a copy of the Joomla one
+# and is expected to drift: WordPress spans versions with their own quirks, and a shared engine
+# would mean every tuning for an old WordPress is a change Joomla has to survive too. Copied
+# into claude-cowork/ at build time and never edited in place there.
 #
 # The zip's top folder must be the plugin slug: WordPress installs an uploaded archive by
 # unpacking it straight into wp-content/plugins/, so the folder inside IS the install path.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-ENGINE=../joomla/lib
+ENGINE=lib
 
 rm -rf build dist && mkdir -p build dist
 

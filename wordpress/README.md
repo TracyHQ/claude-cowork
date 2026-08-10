@@ -11,12 +11,21 @@ POST /wp-admin/admin-ajax.php?action=claude_cowork
 
 | Path | What |
 | --- | --- |
-| `../joomla/lib/` | The engine. **No CMS dependency**, shared with Joomla, unit tested on its own. |
+| `lib/` | The engine. **No CMS dependency**, unit tested on its own (`tests/run.php`). |
 | `claude-cowork/claude-cowork.php` | The endpoint, the settings screen, and nothing else. |
 
-The engine lives under `joomla/` for now because that is where it was written and moving it is a
-rename that would touch both platforms at once; `build.sh` copies it in. Never edit the copy —
-that is how the two silently diverge.
+`lib/` is the source of truth for this platform; `build.sh` copies it into the plugin folder.
+Never edit the copy — that is how the two silently diverge.
+
+## Why this platform keeps its own engine
+
+It began as a copy of the Joomla one, and it is meant to drift. WordPress spans generations with
+their own quirks — what an old PHP on an old WordPress tolerates is not what Joomla 5 needs — and
+a shared engine makes every tuning for one platform a change the other has to survive. The two
+started identical, and each is free to stop being so without asking the other's permission.
+
+What IS shared is the layer below: the fleet host, the provisioning, DNS, the tunnel and the
+door in front of a copy. A server does not care which CMS wrote the files on it.
 
 ## Build and test
 

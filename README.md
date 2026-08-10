@@ -22,10 +22,11 @@ so Claude, ChatGPT, Gemini or something you wrote yourself all use it the same w
 | [`wordpress/`](./wordpress) | WordPress | Reads a site; the Migrate around it is not written yet |
 | `shopify/` | Shopify | Not started |
 
-One repository rather than one per platform: the platforms differ in how an extension is
-packaged and almost not at all in what the engine has to do, so the interesting decisions — how
-work is cut into resumable pieces, how a cursor survives a request being killed — are worth
-keeping side by side where they can be compared.
+One repository rather than one per platform, and **one engine per platform inside it**. Each
+folder owns its own `lib/`: they start as copies of each other and are expected to drift, because
+tuning for an old WordPress must not be a change Joomla has to survive. Side by side in one
+repository is what keeps the interesting decisions — how work is cut into resumable pieces, how a
+cursor survives a request being killed — comparable while they diverge.
 
 ## What it is for
 
