@@ -56,6 +56,33 @@ class ApiController extends BaseController
     }
 
     /**
+     * This component's own version, read from the manifest Joomla copied in when it installed.
+     *
+     * Read rather than held as a constant so there is one place a version lives and nothing to
+     * keep in step. It exists because a caller has to be able to tell an old copy from a new
+     * one: an already-installed component is deliberately not reinstalled on every run — doing
+     * that answers HTTP 500 with no message at all — and without a version, "already installed"
+     * silently means "will never be updated", so every action added later is dead code on every
+     * site that already has this.
+     *
+     * Null when the manifest cannot be read. The caller treats that as "too old to say", which
+     * is what it is.
+     */
+    private static function installedVersion(): ?string
+    {
+        $manifest = JPATH_ADMINISTRATOR . '/components/com_claudecowork/claudecowork.xml';
+        if (!is_file($manifest)) {
+            return null;
+        }
+        $xml = @simplexml_load_file($manifest);
+        if ($xml === false) {
+            return null;
+        }
+        $version = trim((string) $xml->version);
+        return $version === '' ? null : $version;
+    }
+
+    /**
      * The single entry point: `index.php?option=com_claudecowork&task=api.exec&format=json`.
      */
     public function exec(): void
@@ -73,7 +100,11 @@ class ApiController extends BaseController
 
         $engine = new \Engine(
             $token === '' ? null : $token,
-            ['php' => PHP_VERSION, 'joomla' => \defined('JVERSION') ? JVERSION : null],
+            [
+                'php'       => PHP_VERSION,
+                'joomla'    => \defined('JVERSION') ? JVERSION : null,
+                'component' => self::installedVersion(),
+            ],
             $this->buildDumper(),
             $this->buildWalker($params),
             new \CurlUploader(120)
