@@ -5,3 +5,7 @@ dist/
 # Built copy of joomla/lib/ — joomla/lib/ is the source of truth and build.sh copies it in.
 # Committing the copy is how the two silently diverge.
 joomla/com_claudecowork/administrator/lib/
+
+# Built copy of joomla/lib/ — the engine is shared, and committing a second copy is how
+# the two silently diverge.
+wordpress/claude-cowork/lib/

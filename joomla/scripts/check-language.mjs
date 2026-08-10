@@ -27,7 +27,11 @@ const THRESHOLD = 2
  * of the words it forbids. Left in scope it fails on its own source — which it did, the first
  * time it was run from a clean clone after being committed.
  */
-const SKIP = /^(LICENSE\.txt|dist\/|\.git\/|node_modules\/|scripts\/check-language\.mjs$)/
+// Anchored on the SEGMENT, not on the start of the path: the same file is `scripts/…` when the
+// checker runs inside `joomla/` and `joomla/scripts/…` when it runs from the repository root,
+// and a rule that only matched the first shape made the checker fail on its own word list the
+// moment a second platform gave anyone a reason to run it from the root.
+const SKIP = /(^|\/)(LICENSE\.txt$|dist\/|\.git\/|node_modules\/|scripts\/check-language\.mjs$)/
 
 /**
  * Tracked files, plus whatever the build produced.
