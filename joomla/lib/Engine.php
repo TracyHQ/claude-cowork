@@ -160,6 +160,7 @@ final class Engine
         $offset = max(0, (int) ($p['offset'] ?? 0));
         $limit = (int) ($p['limit'] ?? 1000);
         $limit = max(1, min($limit, self::MAX_DB_LIMIT));
+
         try {
             $chunk = $this->dumper->dumpChunk($table, $offset, $limit);
         } catch (Throwable $e) {
@@ -225,9 +226,10 @@ final class Engine
         $target = (int) ($p['target_bytes'] ?? self::MIN_PART_BYTES);
         $target = max(self::MIN_PART_BYTES, min($target, self::MAX_PART_BYTES));
         $path   = isset($p['path']) && is_string($p['path']) ? $p['path'] : '';
-        $offset = max(0, (int) ($p['offset'] ?? 0));
-        // The size this file's header already declared, handed back by the caller with the rest
-        // of the cursor. See where it is used for why re-reading it would be wrong.
+        // Bytes already emitted of the ENTRY this cursor is inside — header, then content, then
+        // padding. Not an offset within the file: a part must be able to stop inside a header.
+        $entryOffset = max(0, (int) ($p['offset'] ?? 0));
+        // The size that entry's header declared, handed back with the rest of the cursor.
         $declared = max(0, (int) ($p['size'] ?? 0));
 
         try {
@@ -244,7 +246,18 @@ final class Engine
             $files = 0;
             $done  = false;
 
-            while (true) {
+            // Every part is EXACTLY $target bytes, except the last.
+            //
+            // Not a nicety: R2 refuses to assemble an upload whose non-trailing parts differ in
+            // length ("All non-trailing parts must have the same length"), which S3 permits. The
+            // only way to hit an exact size every time is to be able to stop anywhere — including
+            // halfway through a 512-byte header — so the cursor counts bytes within an ENTRY
+            // (header + content + padding) rather than bytes within a file.
+            //
+            // That also makes the older bug structurally impossible rather than guarded against:
+            // a header can no longer be written twice, because a part that ends inside one
+            // resumes inside it.
+            while (strlen($buf) < $target) {
                 $path = $queue[$qi] ?? '';
                 if ($path === '') {
                     // Out of files: the two empty blocks that close an archive, and only ever
@@ -254,93 +267,92 @@ final class Engine
                     break;
                 }
 
-                // Stop BEFORE writing a header unless there is room for the header AND at
-                // least one byte after it.
-                //
-                // Writing a header and only then noticing the part is full means the content
-                // loop never runs, so $offset stays 0, so the returned cursor points back at
-                // this same file at offset 0 — and the next call writes its header a SECOND
-                // time. That spare 512 bytes shifts everything after it: tar finds content
-                // where a header should be, loses an entry, and exits non-zero.
-                //
-                // The room for the header is the part this originally missed. Testing only
-                // `strlen($buf) >= $target` catches a part that was ALREADY full and not one
-                // that the header itself fills — which is the same bug one step earlier, and it
-                // fires whenever a file's header happens to land within 512 bytes of the
-                // boundary. On a real 11.205-file webroot that was twice in one run, at exactly
-                // 48 MiB and 160 MiB. A fixture of five small files never reaches either edge.
-                if ($offset === 0 && strlen($buf) + TarStream::BLOCK_BYTES >= $target) {
-                    break;
-                }
-
-                $abs  = $this->walker->absolutePath($path);
+                $abs = $this->walker->absolutePath($path);
 
                 // A tar entry must be EXACTLY as long as its own header says, and the header for
-                // a file spanning parts was written in an earlier request. A webroot is not
+                // an entry spanning parts was written in an earlier request. A webroot is not
                 // frozen while a pack runs — it takes minutes on a real site, and a log grows, a
-                // cache file is rewritten, a session is dropped. Re-reading filesize() on the
-                // second part therefore streams a different number of bytes than the header
-                // declared, and everything after that entry shifts by the difference: tar finds
-                // content where a header should be, reports "Skipping to next header", loses an
-                // entry and exits non-zero. Measured on a real WordPress site (2026-08-10):
-                // 11.203 of 11.204 entries survived, the break exactly at a part seam. The same
-                // engine runs here, so the same hole was here — unmeasured, not absent.
-                $size = ($offset > 0 && $declared > 0) ? $declared : (int) filesize($abs);
+                // cache file is rewritten, a session is dropped. Re-reading filesize() on a later
+                // part would stream a different number of bytes than the header declared, and
+                // everything after that entry would shift.
+                $size = ($entryOffset > 0 && $declared > 0) ? $declared : (int) filesize($abs);
+                $declared = $size;
+                $headerEnd  = TarStream::BLOCK_BYTES;
+                $contentEnd = $headerEnd + $size;
+                $entryEnd   = $contentEnd + strlen(TarStream::pad($size));
 
-                if ($offset === 0) {
-                    $buf .= TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
-                    $files++;
-                }
-
-                // Read in pieces, stopping the moment the part is full. The whole file is
-                // never loaded.
-                $fh = fopen($abs, 'rb');
-                if ($fh === false) {
-                    return $this->err('read_failed', "cannot open {$path}");
-                }
-                if ($offset > 0) {
-                    fseek($fh, $offset);
-                }
-                while ($offset < $size && strlen($buf) < $target) {
-                    $want  = min(self::READ_CHUNK, $size - $offset, $target - strlen($buf));
-                    $chunk = fread($fh, $want);
-                    if ($chunk === false || $chunk === '') {
-                        // The file is now SHORTER than its header declared — truncated or
-                        // rewritten while the pack was running. Zero-fill the remainder rather
-                        // than stopping short: the entry has to match its header, and an archive
-                        // holding a file padded with nulls is recoverable where a shifted one is
-                        // not.
-                        $fill = min($size - $offset, $target - strlen($buf));
-                        $buf    .= str_repeat("\0", $fill);
-                        $offset += $fill;
+                // ── the header, possibly a slice of it ──────────────────────────────────────
+                if ($entryOffset < $headerEnd) {
+                    if ($entryOffset === 0) {
+                        $files++;
+                    }
+                    $header = TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
+                    $take   = min($headerEnd - $entryOffset, $target - strlen($buf));
+                    $buf         .= substr($header, $entryOffset, $take);
+                    $entryOffset += $take;
+                    if (strlen($buf) >= $target) {
                         break;
                     }
-                    $buf    .= $chunk;
-                    $offset += strlen($chunk);
                 }
-                fclose($fh);
 
-                if ($offset >= $size) {
-                    $buf .= TarStream::pad($size);
-                    $qi++;
-                    $offset = 0;
-                    // The look-ahead ran out but the tree has not: ask for more, starting after
-                    // the file just finished.
-                    if ($qi >= count($queue)) {
-                        $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
-                        if ($more !== []) {
-                            $queue = $more;
-                            $qi = 0;
+                // ── the content ────────────────────────────────────────────────────────────
+                if ($entryOffset < $contentEnd) {
+                    $fh = fopen($abs, 'rb');
+                    if ($fh === false) {
+                        return $this->err('read_failed', "cannot open {$path}");
+                    }
+                    fseek($fh, $entryOffset - $headerEnd);
+                    while ($entryOffset < $contentEnd && strlen($buf) < $target) {
+                        $want  = min(self::READ_CHUNK, $contentEnd - $entryOffset, $target - strlen($buf));
+                        $chunk = fread($fh, $want);
+                        if ($chunk === false || $chunk === '') {
+                            // The file is now SHORTER than its header declared — truncated or
+                            // rewritten while the pack was running. Zero-fill the remainder
+                            // rather than stopping short: the entry has to match its header, and
+                            // an archive holding a file padded with nulls is recoverable where a
+                            // shifted one is not.
+                            $buf         .= str_repeat("\0", $want);
+                            $entryOffset += $want;
+                            continue;
                         }
+                        $buf         .= $chunk;
+                        $entryOffset += strlen($chunk);
+                    }
+                    fclose($fh);
+                    if (strlen($buf) >= $target) {
+                        break;
                     }
                 }
 
-                // Full, so stop — but only in the middle of a file ($offset > 0, header already
-                // written). Having just finished one, the loop goes round and leaves at the check
-                // above instead, which keeps the cursor on the next file at offset 0.
-                if ($offset > 0 && strlen($buf) >= $target) {
-                    break;
+                // ── the padding that rounds the entry to a whole block ──────────────────────
+                if ($entryOffset < $entryEnd) {
+                    $take = min($entryEnd - $entryOffset, $target - strlen($buf));
+                    $buf         .= str_repeat("\0", $take);
+                    $entryOffset += $take;
+                    if (strlen($buf) >= $target) {
+                        break;
+                    }
                 }
+
+                // Entry finished: move on, and forget the size it declared.
+                $qi++;
+                $entryOffset = 0;
+                $declared    = 0;
+                // The look-ahead ran out but the tree has not: ask for more, starting after the
+                // file just finished.
+                if ($qi >= count($queue)) {
+                    $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
+                    if ($more !== []) {
+                        $queue = $more;
+                        $qi = 0;
+                    }
+                }
+            }
+
+            // A part that stopped exactly at an entry boundary carries no entry into the next
+            // one, so the cursor names the file that is about to start.
+            if ($entryOffset === 0 && !$done) {
+                $path = $queue[$qi] ?? $path;
             }
         } catch (Throwable $e) {
             return $this->err('pack_failed', $e->getMessage());
@@ -360,9 +372,9 @@ final class Engine
             'sha256'      => $sha,
             'etag'        => $put['etag'],
             'next_path'   => $path,
-            'next_offset' => $offset,
-            // Only meaningful mid-file, which is the only time the caller must hand it back.
-            'next_size'   => $offset > 0 ? $size : 0,
+            'next_offset' => $entryOffset,
+            // Only meaningful mid-entry, which is the only time the caller must hand it back.
+            'next_size'   => $entryOffset > 0 ? $declared : 0,
             'done'        => $done,
         ]);
     }

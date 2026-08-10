@@ -364,5 +364,39 @@ exec('tar -tf ' . escapeshellarg($edgeTar) . ' 2>&1', $edgeList, $edgeStatus);
 check('a header landing on a part boundary does not duplicate', $edgeStatus, 0);
 check('all three entries survive', count(array_filter($edgeList, fn($l) => strpos($l, 'tar:') !== 0)), 3);
 
+// ── every non-trailing part is exactly the same length ──────────────────────────────────────
+//
+// R2 refuses to assemble an upload whose non-trailing parts differ ("All non-trailing parts must
+// have the same length"), where S3 tolerates it. Measured against the real store on 2026-08-10,
+// after 21 parts and 167 MB had already been sent — the whole upload thrown away at the last
+// call. It is the reason the cursor counts bytes within an entry rather than within a file.
+$evenTmp = sys_get_temp_dir() . '/tracy_pack_even_' . bin2hex(random_bytes(4));
+mkdir($evenTmp);
+// Sizes chosen to land headers all over the place relative to the part boundary.
+foreach ([3_000_000, 17, 2_500_000, 900_000, 1_048_576, 33, 4_000_000] as $i => $bytes) {
+    file_put_contents(sprintf('%s/f%02d.bin', $evenTmp, $i), str_repeat(chr(65 + $i), $bytes));
+}
+$evenTarget = 5 * 1024 * 1024;
+$evenCapture = new CapturingUploader();
+$evenEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($evenTmp), $evenCapture);
+$c = ['put_url' => 'https://example.test/1', 'target_bytes' => $evenTarget];
+for ($i = 0; $i < 20; $i++) {
+    $r = $evenEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => $c]);
+    if (!$r['ok'] || $r['done']) { break; }
+    $c = ['put_url' => 'https://example.test/' . ($i + 2), 'target_bytes' => $evenTarget,
+          'path' => $r['next_path'], 'offset' => $r['next_offset'], 'size' => $r['next_size']];
+}
+$sizes = array_map('strlen', $evenCapture->parts);
+$nonTrailing = array_slice($sizes, 0, -1);
+checkTrue('more than one part, or the case is not exercised', count($sizes) > 1);
+check('every non-trailing part is exactly the target size', array_unique($nonTrailing), [$evenTarget]);
+checkTrue('the trailing part is no larger than the target', end($sizes) <= $evenTarget + 1024);
+
+$evenTar = "$evenTmp.tar";
+file_put_contents($evenTar, implode('', $evenCapture->parts));
+exec('tar -tf ' . escapeshellarg($evenTar) . ' 2>&1', $evenList, $evenStatus);
+check('and the archive is still whole', $evenStatus, 0);
+check('with every file in it', count(array_filter($evenList, fn($l) => strpos($l, 'tar:') !== 0)), 7);
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
