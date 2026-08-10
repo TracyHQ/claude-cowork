@@ -22,7 +22,12 @@ const WORDS = [
 /** Two hits on one line is prose; one can be a variable name or a foreign product name. */
 const THRESHOLD = 2
 
-const SKIP = /^(LICENSE\.txt|dist\/|\.git\/|node_modules\/)/
+/**
+ * `check-language.mjs` excludes itself: the list of words it looks for is, necessarily, a list
+ * of the words it forbids. Left in scope it fails on its own source — which it did, the first
+ * time it was run from a clean clone after being committed.
+ */
+const SKIP = /^(LICENSE\.txt|dist\/|\.git\/|node_modules\/|scripts\/check-language\.mjs$)/
 
 /**
  * Tracked files, plus whatever the build produced.

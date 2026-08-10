@@ -9,6 +9,10 @@ cd "$(dirname "$0")"
 
 rm -rf build dist && mkdir -p build/packages dist
 
+# Created, not assumed: the copy is gitignored, so a fresh clone does not have this directory
+# and `cp` into a missing one fails. It only ever worked here because the directory survived
+# from before it was ignored — the first clone of this repository is what found that out.
+mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
