@@ -24,6 +24,7 @@
                  administrator/ rather than media/ because media/ is served over HTTP and
                  these are PHP files; same placement Akeeba uses for its own engine. -->
             <folder>lib</folder>
+            <filename>config.xml</filename>
         </files>
         <languages folder="administrator/language">
             <language tag="en-GB">en-GB/com_claudecowork.ini</language>
@@ -33,24 +34,4 @@
              entry that opens a blank page is worse than no entry. -->
     </administration>
 
-    <config>
-        <fields name="params">
-            <fieldset name="component">
-                <field
-                    name="token"
-                    type="password"
-                    label="COM_CLAUDECOWORK_CONFIG_TOKEN_LABEL"
-                    description="COM_CLAUDECOWORK_CONFIG_TOKEN_DESC"
-                    default=""
-                />
-                <field
-                    name="webroot"
-                    type="text"
-                    label="COM_CLAUDECOWORK_CONFIG_WEBROOT_LABEL"
-                    description="COM_CLAUDECOWORK_CONFIG_WEBROOT_DESC"
-                    default=""
-                />
-            </fieldset>
-        </fields>
-    </config>
 </extension>

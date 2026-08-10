@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Component options live in this file, NOT in a <config> block inside the manifest — that
+    is the plugin convention, and a component that uses it renders an empty Options dialog
+    with no error to explain why. Verified against Joomla core, which ships the same shape at
+    administrator/components/com_content/config.xml.
+-->
+<config>
+    <fieldset name="claudecowork" label="COM_CLAUDECOWORK">
+        <field
+            name="token"
+            type="password"
+            label="COM_CLAUDECOWORK_CONFIG_TOKEN_LABEL"
+            description="COM_CLAUDECOWORK_CONFIG_TOKEN_DESC"
+            default=""
+        />
+        <field
+            name="webroot"
+            type="text"
+            label="COM_CLAUDECOWORK_CONFIG_WEBROOT_LABEL"
+            description="COM_CLAUDECOWORK_CONFIG_WEBROOT_DESC"
+            default=""
+        />
+    </fieldset>
+</config>
