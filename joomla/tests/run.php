@@ -246,5 +246,88 @@ rmdir("$tmp/images");
 rmdir("$tmp/cache");
 rmdir($tmp);
 
+// ── files.pack across parts, when the site is not standing still ────────────────────────────
+//
+// A webroot is not a frozen thing: a log grows, a cache file is rewritten, a session is
+// dropped — all while the pack is running, which on a real site takes minutes. The header for
+// an entry declares its size, and everything after that entry is positioned by that number, so
+// an entry whose content does not match its own header shifts the rest of the archive by the
+// difference. `tar` then finds content where a header should be, reports "Skipping to next
+// header", loses an entry, and exits non-zero.
+//
+// Measured on beta.tracy.ai (2026-08-10): 11.203 of 11.204 entries survived, the break at the
+// seam between two parts. This reproduces the mechanism at a size a test can afford.
+$growTmp = sys_get_temp_dir() . '/tracy_pack_grow_' . bin2hex(random_bytes(4));
+mkdir($growTmp);
+// Bigger than one part, so it must span two of them.
+file_put_contents("$growTmp/big.bin", str_repeat('A', 6 * 1024 * 1024));
+file_put_contents("$growTmp/zz-after.txt", 'the entry that gets lost');
+
+final class CapturingUploader implements Uploader
+{
+    public array $parts = [];
+    public function put(string $url, string $body): array
+    {
+        $this->parts[] = $body;
+        return ['ok' => true, 'etag' => '"' . md5($body) . '"'];
+    }
+}
+
+$capture = new CapturingUploader();
+$growEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($growTmp), $capture);
+
+$part1 = $growEngine->handle([
+    'token' => 'a-token-at-least-16',
+    'action' => 'files.pack',
+    'params' => ['put_url' => 'https://example.test/part1', 'target_bytes' => 5 * 1024 * 1024],
+]);
+checkTrue('pack part 1 succeeded', $part1['ok'] === true);
+checkTrue('pack part 1 stopped mid-file', $part1['next_offset'] > 0 && $part1['done'] === false);
+
+// The site keeps living between the two calls.
+file_put_contents("$growTmp/big.bin", str_repeat('A', 6 * 1024 * 1024) . str_repeat('B', 4096));
+
+$part2 = $growEngine->handle([
+    'token' => 'a-token-at-least-16',
+    'action' => 'files.pack',
+    'params' => [
+        'put_url' => 'https://example.test/part2',
+        'target_bytes' => 5 * 1024 * 1024,
+        'path' => $part1['next_path'],
+        'offset' => $part1['next_offset'],
+        'size' => $part1['next_size'] ?? 0,
+    ],
+]);
+checkTrue('pack part 2 succeeded', $part2['ok'] === true);
+
+$archive = implode('', $capture->parts);
+$tarFile = "$growTmp.tar";
+file_put_contents($tarFile, $archive);
+exec('tar -tf ' . escapeshellarg($tarFile) . ' 2>&1', $listed, $status);
+check('a growing file does not corrupt the archive', $status, 0);
+check('every entry survives', count(array_filter($listed, fn($l) => strpos($l, 'tar:') !== 0)), 2);
+
+// And the other direction: a file TRUNCATED mid-pack. Stopping short would shift the archive
+// exactly as growing does, so the remainder is zero-filled to the size the header declared.
+$shrinkTmp = sys_get_temp_dir() . '/tracy_pack_shrink_' . bin2hex(random_bytes(4));
+mkdir($shrinkTmp);
+file_put_contents("$shrinkTmp/big.bin", str_repeat('A', 6 * 1024 * 1024));
+file_put_contents("$shrinkTmp/zz-after.txt", 'still here');
+
+$shrinkCapture = new CapturingUploader();
+$shrinkEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($shrinkTmp), $shrinkCapture);
+$s1 = $shrinkEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack',
+    'params' => ['put_url' => 'https://example.test/p1', 'target_bytes' => 5 * 1024 * 1024]]);
+file_put_contents("$shrinkTmp/big.bin", str_repeat('A', 1024)); // the log got rotated
+$s2 = $shrinkEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack',
+    'params' => ['put_url' => 'https://example.test/p2', 'target_bytes' => 5 * 1024 * 1024,
+                 'path' => $s1['next_path'], 'offset' => $s1['next_offset'], 'size' => $s1['next_size']]]);
+checkTrue('pack survives a file that shrank', $s2['ok'] === true);
+$shrinkTar = "$shrinkTmp.tar";
+file_put_contents($shrinkTar, implode('', $shrinkCapture->parts));
+exec('tar -tf ' . escapeshellarg($shrinkTar) . ' 2>&1', $shrunkList, $shrunkStatus);
+check('a truncated file does not corrupt the archive', $shrunkStatus, 0);
+check('the entry after it is still there', count(array_filter($shrunkList, fn($l) => strpos($l, 'tar:') !== 0)), 2);
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

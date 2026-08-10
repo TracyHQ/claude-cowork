@@ -226,6 +226,9 @@ final class Engine
         $target = max(self::MIN_PART_BYTES, min($target, self::MAX_PART_BYTES));
         $path   = isset($p['path']) && is_string($p['path']) ? $p['path'] : '';
         $offset = max(0, (int) ($p['offset'] ?? 0));
+        // The size this file's header already declared, handed back by the caller with the rest
+        // of the cursor. See where it is used for why re-reading it would be wrong.
+        $declared = max(0, (int) ($p['size'] ?? 0));
 
         try {
             // Fetched once and walked in memory. The loop used to ask the walker for "the next
@@ -263,7 +266,18 @@ final class Engine
                 }
 
                 $abs  = $this->walker->absolutePath($path);
-                $size = (int) filesize($abs);
+
+                // A tar entry must be EXACTLY as long as its own header says, and the header for
+                // a file spanning parts was written in an earlier request. A webroot is not
+                // frozen while a pack runs — it takes minutes on a real site, and a log grows, a
+                // cache file is rewritten, a session is dropped. Re-reading filesize() on the
+                // second part therefore streams a different number of bytes than the header
+                // declared, and everything after that entry shifts by the difference: tar finds
+                // content where a header should be, reports "Skipping to next header", loses an
+                // entry and exits non-zero. Measured on a real WordPress site (2026-08-10):
+                // 11.203 of 11.204 entries survived, the break exactly at a part seam. The same
+                // engine runs here, so the same hole was here — unmeasured, not absent.
+                $size = ($offset > 0 && $declared > 0) ? $declared : (int) filesize($abs);
 
                 if ($offset === 0) {
                     $buf .= TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
@@ -283,6 +297,14 @@ final class Engine
                     $want  = min(self::READ_CHUNK, $size - $offset, $target - strlen($buf));
                     $chunk = fread($fh, $want);
                     if ($chunk === false || $chunk === '') {
+                        // The file is now SHORTER than its header declared — truncated or
+                        // rewritten while the pack was running. Zero-fill the remainder rather
+                        // than stopping short: the entry has to match its header, and an archive
+                        // holding a file padded with nulls is recoverable where a shifted one is
+                        // not.
+                        $fill = min($size - $offset, $target - strlen($buf));
+                        $buf    .= str_repeat("\0", $fill);
+                        $offset += $fill;
                         break;
                     }
                     $buf    .= $chunk;
@@ -331,6 +353,8 @@ final class Engine
             'etag'        => $put['etag'],
             'next_path'   => $path,
             'next_offset' => $offset,
+            // Only meaningful mid-file, which is the only time the caller must hand it back.
+            'next_size'   => $offset > 0 ? $size : 0,
             'done'        => $done,
         ]);
     }
