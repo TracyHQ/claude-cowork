@@ -1,31 +1,31 @@
 <?php
 /**
- * TarStream — sinh byte tar (USTAR) theo dong chay, KHONG ghi file tam.
+ * TarStream — tar (USTAR) bytes produced as they flow, with no temporary file.
  *
- * Vi sao tu viet thay vi PharData: PharData chi dong goi tu file co san tren dia va
- * `phar.readonly` bat mac dinh tren nhieu shared hosting -> tat ngay tu dau. Dinh dang
- * USTAR lai rat don gian (header 512 byte + noi dung padding boi 512), nen tu viet vua
- * ngan vua chay duoc o moi noi, va quan trong nhat: **stream duoc**, khong can cho du
- * ca archive roi moi gui.
+ * Written by hand rather than using PharData for two reasons: PharData packs from files already
+ * on disk, and `phar.readonly` is on by default across shared hosting, which rules it out before
+ * anything else is considered. USTAR itself is small enough to be worth owning — a 512-byte
+ * header, then the content padded to a multiple of 512 — and owning it buys the thing that
+ * matters: the archive can be streamed, instead of having to exist in full before any of it moves.
  *
- * Vi sao khong can file tam: Akeeba phai ghi nguyen archive ra dia khach truoc khi tai
- * ve (161 MB voi wisdeaf.org) — tren hosting co quota do la mot kieu chet that. O day
- * byte sinh ra toi dau day len R2 toi do, buffer bao nhieu thi giu bay nhieu.
+ * Why no temporary file: the usual approach writes the whole archive onto the customer's own
+ * disk before sending it, which on a host with a quota is a way to take the site down. Here the
+ * bytes go out as they are produced, and memory holds one buffer rather than one archive.
  *
- * KHONG phu thuoc Joomla — unit test duoc doc lap (xem tests/run.php).
+ * No Joomla dependency, so it can be tested on its own (see tests/run.php).
  */
 
 final class TarStream
 {
     private const BLOCK = 512;
 
-    /** Header cua mot file thuong trong USTAR. */
+    /** The header for an ordinary file. */
     public static function fileHeader(string $path, int $size, int $mode = 0644, int $mtime = 0): string
     {
         return self::header($path, $size, $mode, $mtime, '0');
     }
 
-    /** Header cua mot thu muc. */
+    /** The header for a directory. */
     public static function dirHeader(string $path, int $mode = 0755, int $mtime = 0): string
     {
         $path = rtrim($path, '/') . '/';
@@ -33,11 +33,12 @@ final class TarStream
     }
 
     /**
-     * @param string $typeflag '0' = file thuong, '5' = thu muc
+     * @param string $typeflag '0' for an ordinary file, '5' for a directory
      */
     private static function header(string $path, int $size, int $mode, int $mtime, string $typeflag): string
     {
-        // USTAR: name 100 byte, con duong dai hon thi tach sang truong `prefix` 155 byte.
+        // USTAR gives the name 100 bytes; anything longer is split, with the leading
+        // directories moved into the 155-byte `prefix` field.
         $prefix = '';
         $name   = $path;
         if (strlen($path) > 100) {
@@ -58,7 +59,7 @@ final class TarStream
             . pack('a8', sprintf("%07o", 0))          // gid
             . pack('a12', sprintf("%011o", $size))
             . pack('a12', sprintf("%011o", $mtime))
-            . str_repeat(' ', 8)                       // checksum: tinh sau, tam thoi 8 dau cach
+            . str_repeat(' ', 8)                       // checksum, filled in below
             . $typeflag
             . pack('a100', '')                         // linkname
             . pack('a6', 'ustar') . pack('a2', '00')
@@ -67,7 +68,8 @@ final class TarStream
             . pack('a155', $prefix)
             . pack('a12', '');
 
-        // Checksum = tong byte cua header voi truong checksum coi nhu 8 dau cach (dung chuan).
+        // The checksum is the sum of every byte of the header, with the checksum field itself
+        // counted as eight spaces. That is the standard's own definition, not a convention.
         $sum = 0;
         for ($i = 0, $n = strlen($header); $i < $n; $i++) {
             $sum += ord($header[$i]);
@@ -76,14 +78,14 @@ final class TarStream
         return substr_replace($header, pack('a8', sprintf("%06o\0", $sum)), 148, 8);
     }
 
-    /** Padding de noi dung tron khoi 512. */
+    /** Padding that rounds the content up to a whole 512-byte block. */
     public static function pad(int $size): string
     {
         $rem = $size % self::BLOCK;
         return $rem === 0 ? '' : str_repeat("\0", self::BLOCK - $rem);
     }
 
-    /** Hai khoi rong ket thuc archive — chi ghi o chunk CUOI CUNG. */
+    /** The two empty blocks that end an archive. Written only by the final chunk. */
     public static function endOfArchive(): string
     {
         return str_repeat("\0", self::BLOCK * 2);

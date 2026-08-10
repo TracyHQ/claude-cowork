@@ -2,6 +2,6 @@ build/
 dist/
 .DS_Store
 
-# Built copy of lib/ — lib/ at the repo root is the source of truth, and build.sh copies it
-# in. Committing the copy is how the two silently diverge.
-com_claudecowork/administrator/lib/
+# Built copy of joomla/lib/ — joomla/lib/ is the source of truth and build.sh copies it in.
+# Committing the copy is how the two silently diverge.
+joomla/com_claudecowork/administrator/lib/

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  joomla:
+    runs-on: ubuntu-latest
+    # Every step below is about the Joomla extension. A second platform gets its own job rather
+    # than more conditionals in this one.
+    defaults:
+      run:
+        working-directory: joomla
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      # 8.1 is the floor Joomla 5 itself sets, so it is the floor this has to run on.
+      - name: Lint every PHP file
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Engine tests
+        run: php tests/run.php
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # After the build, not before: a language check that only sees source files cannot see
+      # what a build step generates, and generated strings are exactly where this slipped once.
+      - name: Build the package
+        run: ./build.sh
+
+      - name: Language check
+        run: node scripts/check-language.mjs

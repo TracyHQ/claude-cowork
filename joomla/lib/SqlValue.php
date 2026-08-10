@@ -1,15 +1,17 @@
 <?php
 /**
- * SqlValue — escape gia tri thanh string literal MySQL theo dung quy uoc mysqldump.
+ * SqlValue — turns a value into a MySQL string literal, byte for byte as mysqldump would.
  *
- * Phai KHOP tung byte voi bo unescape ben Python (local-mirror-proto/sql_dump_rewrite.py)
- * de dump nay -> rewrite domain -> re-import chay tron ven. Cung bang escape:
- *   0x00->\0  0x0A->\n  0x0D->\r  0x1A->\Z  '->\'  \->\\  "->\"  con lai giu nguyen byte.
- * NULL phat ra bare NULL (khong nhay). So van boc nhay nhu chuoi — MySQL nhan '123' vao
- * cot INT binh thuong, va boc nhay an toan hon cho cot nhi phan; mysqldump de so tran,
- * nhung tuong duong ngu nghia khi import.
+ * The escaping table has to match whatever unescapes it later, or a dump that is rewritten and
+ * re-imported comes back subtly wrong. It is:
+ *   0x00 -> \0   0x0A -> \n   0x0D -> \r   0x1A -> \Z   ' -> \'   \ -> \\   " -> \"
+ * and every other byte is passed through untouched.
  *
- * KHONG phu thuoc Joomla — test duoc offline.
+ * NULL is emitted bare, without quotes, so it stays distinct from the string "NULL". Numbers are
+ * quoted like everything else: MySQL accepts '123' into an INT column, and quoting is the safer
+ * choice for binary columns. mysqldump leaves numbers unquoted; on import the two are equivalent.
+ *
+ * No Joomla dependency, so it can be tested on its own.
  */
 
 final class SqlValue
@@ -25,7 +27,7 @@ final class SqlValue
         0x22 => '\\"',   // "
     ];
 
-    /** bytes tho -> phan giua hai dau nhay (chua boc nhay). */
+    /** Raw bytes to what belongs between the quotes. Does not add the quotes itself. */
     public static function escape(string $raw): string
     {
         $out = '';
@@ -37,7 +39,7 @@ final class SqlValue
         return $out;
     }
 
-    /** mot gia tri o -> literal SQL. null => NULL; con lai => 'escaped'. */
+    /** One cell to a SQL literal: null becomes NULL, anything else becomes 'escaped'. */
     public static function literal(?string $raw): string
     {
         if ($raw === null) {
@@ -47,7 +49,7 @@ final class SqlValue
     }
 
     /**
-     * Mot dong -> "(v1,v2,...)".
+     * One row to "(v1,v2,...)".
      * @param array<int,?string> $row
      */
     public static function rowTuple(array $row): string
@@ -60,7 +62,8 @@ final class SqlValue
     }
 
     /**
-     * Mot lo dong -> mot cau INSERT extended (nhieu tuple, gon byte hon tung dong).
+     * A batch of rows to one extended INSERT. Many tuples in one statement rather than one
+     * statement each: fewer bytes to move, and far fewer statements for MySQL to parse on import.
      * @param array<int,array<int,?string>> $rows
      */
     public static function insert(string $table, array $rows): string

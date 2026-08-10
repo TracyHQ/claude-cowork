@@ -1,13 +1,18 @@
 <?php
 /**
- * Engine — dieu phoi mot HTTP call thanh mot mieng viec BOUNDED, tra JSON-able array.
+ * Engine — turns one HTTP call into one bounded piece of work and answers with a plain array.
  *
- * "Plugin ngu, Tracy khon": engine khong giu vong lap, khong giu trang thai giua cac
- * call. Moi call: kiem token -> route action -> lam ≤1 chunk -> tra ket qua + con tro.
- * Tracy giu con tro va lai vong. Loi tra ve dang {ok:false, error} chu khong nem ra HTTP
- * 500, de Tracy retry theo ma loi.
+ * The guiding split is that this side stays simple and the caller stays clever. The engine holds
+ * no loop and remembers nothing between calls: check the token, route the action, do at most one
+ * chunk, return the result and where to carry on from. The caller keeps the cursor and comes
+ * back. That is what lets an arbitrarily large site finish on a host that stops PHP after thirty
+ * seconds, and it is why nothing here has to be restarted from the beginning when a request dies.
  *
- * KHONG phu thuoc Joomla. Plugin adapter (tracymigration.php) bom deps that vao.
+ * Failures come back as {ok:false, error} rather than an HTTP 500, so a caller can tell a wrong
+ * token from a missing table and retry only what is worth retrying.
+ *
+ * No Joomla dependency: the component wires the real implementations in, and the tests wire
+ * fakes, which is why the whole engine can be exercised without a web server or a database.
  */
 
 require_once __DIR__ . '/Token.php';
@@ -19,7 +24,7 @@ require_once __DIR__ . '/Uploader.php';
 final class Engine
 {
     private ?string $token;
-    /** @var array<string,mixed> thong tin moi truong cho action 'info' */
+    /** @var array<string,mixed> What the host says about itself, returned by the 'info' action. */
     private array $info;
     private ?DbDumper $dumper;
     private ?FileWalker $walker;
@@ -27,14 +32,14 @@ final class Engine
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
-    private const MAX_READ_BYTES = 8388608; // 8 MiB/1 file cho duong pull prototype
-    /** S3/R2 doi moi part (tru part cuoi) >= 5 MiB — day la san, khong phai tuy chon. */
+    private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
+    /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
     private const MIN_PART_BYTES = 5242880;
-    /** Tran buffer giu trong RAM. Shared hosting hay dat memory_limit 128M. */
+    /** The ceiling on what is held in memory at once. Shared hosts commonly allow 128M in total. */
     private const MAX_PART_BYTES = 33554432; // 32 MiB
-    /** Doc file theo mieng, de mot file lon khong bao gio nam tron trong RAM. */
+    /** Files are read in pieces, so a large one is never resident in memory in full. */
     private const READ_CHUNK = 1048576;
-    /** So duong dan lay san moi call, de khong phai hoi walker theo tung file. */
+    /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
 
     public function __construct(
@@ -68,6 +73,8 @@ final class Engine
         switch ($action) {
             case 'info':
                 return $this->ok(['info' => $this->info]);
+            case 'site.stats':
+                return $this->siteStats();
             case 'db.tables':
                 return $this->dbTables();
             case 'db.dump':
@@ -84,9 +91,49 @@ final class Engine
     }
 
     /**
-     * Liet ke ten bang — de Tracy (orchestrator) tu kham pha schema thay vi phai biet
-     * truoc ten tung bang. Tra ve cung so dong hien co, de orchestrator uoc luong tien do
-     * truoc khi dump tung bang.
+     * What this site is made of, before anything is copied: how many files and bytes, when the
+     * newest file changed, and how many tables and rows there are.
+     *
+     * Everything here is a measurement, not a copy. It answers the two questions a caller has to
+     * settle before committing anyone to a wait: how long will this take, and has the site moved
+     * since the last time it was read.
+     *
+     * Each half is optional. A site whose database is unreachable can still be sized by its
+     * files, and reporting what could be measured beats refusing to answer at all.
+     */
+    private function siteStats(): array
+    {
+        $out = [];
+
+        if ($this->walker !== null) {
+            try {
+                $out['files'] = $this->walker->stats();
+            } catch (Throwable $e) {
+                $out['files_error'] = $e->getMessage();
+            }
+        }
+
+        if ($this->dumper !== null) {
+            try {
+                $tables = $this->dumper->tableStats();
+                $rows = 0;
+                $bytes = 0;
+                foreach ($tables as $t) {
+                    $rows += $t['rows'];
+                    $bytes += $t['bytes'];
+                }
+                $out['db'] = ['tables' => count($tables), 'rows' => $rows, 'bytes' => $bytes];
+            } catch (Throwable $e) {
+                $out['db_error'] = $e->getMessage();
+            }
+        }
+
+        return $this->ok($out);
+    }
+
+    /**
+     * The table names, so the caller discovers the schema instead of having to know it in
+     * advance. Table prefixes are chosen at install time and cannot be assumed.
      */
     private function dbTables(): array
     {
@@ -145,19 +192,20 @@ final class Engine
     }
 
     /**
-     * Dong goi MOT PART tar roi day thang len presigned URL — khong ghi file tam, khong
-     * cam credential.
+     * Packs ONE part of a tar and sends it straight to a signed URL. No temporary file, and no
+     * credential held here.
      *
-     * Vi sao khong dung presigned PUT mot phat cho ca archive: PHP timeout giua chung khi
-     * day 300 MB tren shared host la LAM LAI TU DAU — dung cai benh ma plugin nay sinh ra
-     * de tranh. S3/R2 multipart cho phep moi part mot URL rieng, nen moi call la mot mieng
-     * bounded, resume duoc. Tracy giu uploadId + danh sach ETag roi goi
-     * CompleteMultipartUpload; plugin khong biet gi ve chuyen do.
+     * Not one signed PUT for the whole archive: PHP being stopped halfway through sending 300 MB
+     * on a shared host means starting again from nothing, which is the exact failure this design
+     * exists to avoid. Multipart gives each part its own URL, so every call is bounded and
+     * resumable. The caller keeps the upload id and the list of ETags and completes the upload
+     * itself; this side knows nothing about any of that.
      *
-     * Con tro co HAI phan — `path` va `offset` (so byte NOI DUNG cua path da gui). Nho
-     * offset ma mot file lon hon ca part van chay duoc: header ghi o part truoc, noi dung
-     * trai qua nhieu part, va RAM chi giu toi da mot part. Neu chi co con tro theo file
-     * thi mot file 500 MB se ep ca part vao RAM — chet tren shared hosting.
+     * The cursor has TWO parts — `path` and `offset`, the number of content bytes of that path
+     * already sent. The offset is what lets a file larger than a whole part work: its header goes
+     * in one part, its content spans several, and memory still holds only one part. With a
+     * per-file cursor a 500 MB file would force an entire part into memory, which is fatal on
+     * exactly the hosting this is built for.
      *
      * @param array<string,mixed> $p
      */
@@ -180,10 +228,10 @@ final class Engine
         $offset = max(0, (int) ($p['offset'] ?? 0));
 
         try {
-            // Lay danh sach MOT LAN roi duyet trong bo nho. Truoc do vong lap hoi walker
-            // "file ke tiep la gi" cho TUNG file, ma moi lan hoi la mot array_search tren
-            // ca danh sach -> O(n^2). Tren webroot that (19.971 file) PHP chet o 30 giay
-            // ngay part dau; bo test 5 file khong he lo ra.
+            // Fetched once and walked in memory. The loop used to ask the walker for "the next
+            // file" per file, and each of those was a search across the whole list — quadratic.
+            // On a real webroot of 19,971 files PHP hit its thirty-second limit during the first
+            // part. A fixture of five files never came close.
             $queue = $path === ''
                 ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
                 : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
@@ -196,19 +244,20 @@ final class Engine
             while (true) {
                 $path = $queue[$qi] ?? '';
                 if ($path === '') {
-                    // Het file: hai khoi rong dong archive, CHI o part cuoi.
+                    // Out of files: the two empty blocks that close an archive, and only ever
+                    // on the final part.
                     $buf .= TarStream::endOfArchive();
                     $done = true;
                     break;
                 }
 
-                // Dung TRUOC khi ghi header neu part da day. Neu ghi header roi moi phat
-                // hien day, vong doc noi dung khong chay lan nao -> $offset van 0 -> con tro
-                // tra ve tro lai chinh file nay voi offset 0 -> call sau ghi header LAN HAI.
-                // Do la mot header thua 512 byte lam lech ca dong tar: `tar` bao "Damaged
-                // tar archive" va file do giai nen ra bat dau bang chinh duong dan cua no.
-                // Bug that, tim duoc khi chay tren webroot 19.941 file — bo test 5 file cho
-                // qua vi khong bao gio cham dung bien nay.
+                // Stop BEFORE writing a header when the part is already full. Writing the
+                // header first and only then noticing means the content loop never runs, so
+                // $offset stays 0, so the returned cursor points back at this same file at
+                // offset 0 — and the next call writes its header a SECOND time. That spare 512
+                // bytes shifts everything after it: `tar` reports "Damaged tar archive", and the
+                // file extracts with its own path as the first bytes of its content. A real bug,
+                // found on a 19,941-file webroot; a five-file fixture never reaches this edge.
                 if ($offset === 0 && strlen($buf) >= $target) {
                     break;
                 }
@@ -221,7 +270,8 @@ final class Engine
                     $files++;
                 }
 
-                // Doc theo mieng, dung ngay khi day part — khong bao gio nap ca file.
+                // Read in pieces, stopping the moment the part is full. The whole file is
+                // never loaded.
                 $fh = fopen($abs, 'rb');
                 if ($fh === false) {
                     return $this->err('read_failed', "cannot open {$path}");
@@ -244,7 +294,8 @@ final class Engine
                     $buf .= TarStream::pad($size);
                     $qi++;
                     $offset = 0;
-                    // Danh sach nhin truoc da het nhung cay chua het: xin tiep tu file vua xong.
+                    // The look-ahead ran out but the tree has not: ask for more, starting after
+                    // the file just finished.
                     if ($qi >= count($queue)) {
                         $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
                         if ($more !== []) {
@@ -254,9 +305,9 @@ final class Engine
                     }
                 }
 
-                // Day thi dung — nhung chi khi dang do mot file ($offset > 0, header da ghi).
-                // Neu vua xong mot file, vong lap quay len dau va thoat o cho kiem tra trước
-                // header, giu con tro o file ke tiep voi offset 0.
+                // Full, so stop — but only in the middle of a file ($offset > 0, header already
+                // written). Having just finished one, the loop goes round and leaves at the check
+                // above instead, which keeps the cursor on the next file at offset 0.
                 if ($offset > 0 && strlen($buf) >= $target) {
                     break;
                 }
@@ -268,7 +319,8 @@ final class Engine
         $sha = hash('sha256', $buf);
         $put = $this->uploader->put($putUrl, $buf);
         if (!$put['ok']) {
-            // KHONG nhich con tro khi day that bai — Tracy ky lai URL va goi lai dung part nay.
+            // The cursor does not move when the upload fails: the caller signs a fresh URL and
+            // asks for this same part again.
             return $this->err('upload_failed', $put['error']);
         }
 

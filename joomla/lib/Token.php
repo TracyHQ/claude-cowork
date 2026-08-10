@@ -1,10 +1,10 @@
 <?php
 /**
- * Token — so sanh token thoi-gian-hang-so, va coi endpoint la TAT MAC DINH.
+ * Token — a constant-time comparison, and an endpoint that is OFF until configured.
  *
- * Token rong (chua cau hinh) => endpoint chua bat => tu choi het. Day la lan can:
- * cai plugin len xong ma chua dan token thi khong ai goi vao duoc. Token dung mot lan,
- * go plugin sau khi migrate xong.
+ * An empty token means the component was installed but never given one, and every request is
+ * refused. That is the neighbourly default: putting the extension on a site does not, by itself,
+ * open anything. The token is issued per site and can be revoked by clearing the setting.
  */
 final class Token
 {
@@ -13,7 +13,7 @@ final class Token
         return is_string($expected) && strlen($expected) >= 16;
     }
 
-    /** true chi khi expected da cau hinh VA khop (hash_equals chong timing attack). */
+    /** True only when a token is configured AND matches. `hash_equals` defeats timing attacks. */
     public static function check(?string $expected, ?string $provided): bool
     {
         if (!self::isConfigured($expected)) {

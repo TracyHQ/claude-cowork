@@ -1,16 +1,16 @@
 <?php
 /**
- * DbDumper — dump DB PHP-thuan theo CHUNK, resume duoc.
+ * DbDumper — a database dump written in plain PHP, one resumable chunk at a time.
  *
- * Vi sao PHP-thuan (khong exec mysqldump): shared hosting hay tat exec/shell. Day la
- * duong di duy nhat song duoc o do; co exec thi Tracy uu tien duong exec o cap
- * orchestration, dumper nay la fallback bat buoc.
+ * Plain PHP rather than shelling out to mysqldump because shared hosts routinely disable exec()
+ * and shell_exec(), and those are exactly the hosts this has to work on. There is no fallback to
+ * fall back to.
  *
- * Moi lan goi dumpChunk() lam mot mieng BOUNDED: doc <=limit dong cua MOT bang tu
- * offset, tra ra SQL + con tro tiep theo. Tracy giu con tro va goi lai — plugin khong
- * giu vong lap. Chunk dau cua moi bang (offset 0) kem DROP + CREATE de dump restore duoc.
- *
- * Output di qua SqlValue nen khop byte voi bo rewrite domain ben Python.
+ * Every call to dumpChunk() does one bounded piece of work: read at most `limit` rows of ONE
+ * table from `offset`, return the SQL and where to carry on from. The caller keeps the cursor and
+ * calls again; this side holds no loop and no state, which is what lets a table of any size
+ * finish on a host that stops PHP after thirty seconds. The first chunk of each table (offset 0)
+ * carries DROP and CREATE, so the dump can rebuild the schema as well as fill it.
  */
 
 require_once __DIR__ . '/SqlValue.php';
@@ -25,16 +25,25 @@ final class DbDumper
         $this->src = $src;
     }
 
-    /** Danh sach ten bang — de orchestrator tu kham pha schema. @return string[] */
+    /** Table names, so the caller discovers the schema rather than being told it. @return string[] */
     public function tables(): array
     {
         return $this->src->tables();
     }
 
     /**
-     * @param string $table ten bang
-     * @param int    $offset dong bat dau
-     * @param int    $limit  so dong toi da chunk nay
+     * Row counts and sizes per table, for sizing a dump before running it.
+     * @return array<string,array{rows:int,bytes:int}>
+     */
+    public function tableStats(): array
+    {
+        return $this->src->tableStats();
+    }
+
+    /**
+     * @param string $table  which table
+     * @param int    $offset the row to start at
+     * @param int    $limit  the most rows this chunk may read
      * @return array{sql:string, next_offset:int, done:bool, rows:int, total:int}
      */
     public function dumpChunk(string $table, int $offset, int $limit): array
@@ -59,7 +68,8 @@ final class DbDumper
 
         $read = count($rows);
         $next = $offset + $read;
-        // done khi da qua het total, HOAC lo doc ve rong (bang het dong / bang rong)
+        // Done when the cursor has passed the last row, or when a batch comes back empty —
+        // which covers both a table that has run out and one that was empty to begin with.
         $done = ($read === 0) || ($next >= $total);
 
         return [

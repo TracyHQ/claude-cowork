@@ -1,6 +1,6 @@
 <?php
 /**
- * Test runner khong phu thuoc PHPUnit (moi truong prototype khong co composer).
+ * A test runner with no PHPUnit, because the hosts this code targets have no composer either.
  * Chay: php tests/run.php
  */
 declare(strict_types=1);
@@ -57,7 +57,8 @@ check('table name with backtick escaped', SqlValue::insert('a`b', [['1']]), "INS
 // round-trip vs Python unescape logic (spot check the same byte mapping)
 $raw = "quote:' backslash:\\ nul:\x00 nl:\n cr:\r sub:\x1a dq:\" plain";
 $escaped = SqlValue::escape($raw);
-// tu giai ma bang tay theo dung bang cua Python sql_unescape de doi chieu
+// Unescaped by hand, against the same table the escaper uses, so the round trip is checked
+// rather than assumed.
 $map = ['0' => "\x00", "'" => "'", '"' => '"', 'b' => "\x08", 'n' => "\n", 'r' => "\r", 't' => "\t", 'Z' => "\x1a", '\\' => '\\'];
 $decoded = '';
 $n = strlen($escaped);
@@ -104,7 +105,7 @@ check('empty table done immediately', $emptyChunk['done'], true);
 check('empty table rows', $emptyChunk['rows'], 0);
 checkTrue('empty table still emits DROP+CREATE', str_contains($emptyChunk['sql'], 'DROP TABLE'));
 
-// resume tu offset bat ky khong lap lai DROP, va cong don du het dong
+// Resuming from any offset must not repeat DROP, and the chunks must add up to every row.
 $r1 = $dumper->dumpChunk('jos_menu', 0, 1);
 $r2 = $dumper->dumpChunk('jos_menu', $r1['next_offset'], 1);
 $r3 = $dumper->dumpChunk('jos_menu', $r2['next_offset'], 1);
@@ -218,6 +219,23 @@ check('engine file.read traversal error code', $frTraversal['error'], 'read_fail
 $engineNoDeps = new Engine($goodToken);
 $noDump = $engineNoDeps->handle(['token' => $goodToken, 'action' => 'db.dump', 'params' => ['table' => 'x']]);
 check('engine without dumper wired -> unavailable', $noDump['error'], 'unavailable');
+
+// ---- site.stats -------------------------------------------------------------------------
+// The two questions a caller settles before committing anyone to a wait: how big is this, and
+// has it moved since last time.
+$stats = $engine->handle(['token' => $goodToken, 'action' => 'site.stats']);
+check('site.stats succeeds', $stats['ok'], true);
+check('site.stats counts the files it would pack', $stats['files']['files'], 3);
+check('site.stats reports a newest mtime', $stats['files']['newest'] > 0, true);
+check('site.stats sums the bytes', $stats['files']['bytes'] > 0, true);
+check('site.stats counts tables', $stats['db']['tables'], 2);
+// Skipped directories are not work, so they must not appear in an estimate of the work.
+check('site.stats leaves out skipped directories', $stats['files']['files'], 3);
+
+// Half an answer beats none: a site whose database cannot be reached is still worth sizing.
+$statsNoDb = $engineNoDeps->handle(['token' => $goodToken, 'action' => 'site.stats']);
+check('site.stats without deps still succeeds', $statsNoDb['ok'], true);
+check('site.stats without deps reports no db', isset($statsNoDb['db']), false);
 
 // cleanup
 unlink("$tmp/index.php");

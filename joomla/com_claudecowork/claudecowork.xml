@@ -2,7 +2,13 @@
 <extension type="component" method="upgrade">
     <name>COM_CLAUDECOWORK</name>
     <author>Tracy</author>
+    <authorUrl>https://tracy.ai</authorUrl>
     <creationDate>2026-08-10</creationDate>
+    <copyright>Copyright (C) 2026 Tracy. All rights reserved.</copyright>
+    <!-- GPL because Joomla is: an extension built against Joomla's own API is a derivative
+         work of GPL-2.0-or-later code, so this is the licence it has to carry, not one
+         chosen from taste. -->
+    <license>GNU General Public License version 2 or later; see LICENSE.txt</license>
     <version>0.1.0</version>
     <description>COM_CLAUDECOWORK_XML_DESCRIPTION</description>
 

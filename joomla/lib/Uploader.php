@@ -1,11 +1,11 @@
 <?php
 /**
- * Uploader — day mot part len URL da ky san (presigned).
+ * Uploader — sends one part to a URL that was signed elsewhere.
  *
- * Tach thanh interface vi hai ly do: (1) test duoc Engine ma khong can mang, (2) plugin
- * KHONG BAO GIO cam credential R2 — no chi nhan mot URL da ky, dung han, cho dung mot part.
- * Viec ky URL nam o Tracy/relay (spec fleet Item 4: "relay chi mint presigned URL, khong
- * thay byte nao").
+ * An interface for two reasons. It lets the engine be tested without a network. And it keeps the
+ * shape of the trust: this component never holds an object-store credential. It receives one
+ * signed URL, good for one part and expiring shortly, and it could not upload anywhere else if
+ * it wanted to. The signing belongs to the caller.
  */
 interface Uploader
 {
@@ -16,8 +16,8 @@ interface Uploader
 }
 
 /**
- * Ban chay that bang cURL. Khong dung file_get_contents(): nhieu shared hosting tat
- * allow_url_fopen, trong khi ext/curl gan nhu luon co (Joomla cung yeu cau no).
+ * The real one, over cURL. Not file_get_contents(): shared hosts commonly disable
+ * allow_url_fopen, while ext/curl is all but always present — Joomla itself requires it.
  */
 final class CurlUploader implements Uploader
 {
@@ -41,7 +41,8 @@ final class CurlUploader implements Uploader
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER         => true,
             CURLOPT_TIMEOUT        => $this->timeout,
-            // Presigned URL da mang chu ky trong query string; them header la hong chu ky.
+            // The signature covers a specific set of headers. Adding one that was not signed
+            // for invalidates it, so both of these are cleared rather than left to cURL.
             CURLOPT_HTTPHEADER     => ['Content-Type:', 'Expect:'],
         ]);
         $raw    = curl_exec($ch);
@@ -67,13 +68,15 @@ final class CurlUploader implements Uploader
                 'ok'     => false,
                 'status' => $status,
                 'etag'   => '',
-                // S3/R2 tra loi bang XML — cat ngan de khong nhoi log cua khach.
+                // The store answers failures with XML. Truncated, because this ends up in the
+                // customer's own log and a wall of it helps nobody.
                 'error'  => 'HTTP ' . $status . ': ' . substr(trim($bodyText), 0, 300),
             ];
         }
 
-        // ETag la thu Tracy phai gom lai de goi CompleteMultipartUpload; thieu no la
-        // khong ket thuc duoc upload, nen bao loi ngay thay vi de phat hien o buoc cuoi.
+        // The caller collects these to finish the multipart upload. A part that landed without
+        // one cannot be completed later, so it is reported here rather than at the end, when the
+        // only remedy left would be to start over.
         if ($etag === '') {
             return ['ok' => false, 'status' => $status, 'etag' => '', 'error' => 'response carried no ETag'];
         }

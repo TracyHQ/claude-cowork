@@ -1,18 +1,19 @@
 <?php
 /**
- * FileWalker — duyet webroot CO THU TU, resume duoc, loc thu muc vo nghia/nhay cam.
+ * FileWalker — an ordered, resumable walk of the webroot that leaves out what nobody wants.
  *
- * Tra ve tung LO duong file (tuong doi so voi webroot) + size + sha1. Tracy giu con tro
- * (duong file cuoi cua lo truoc) va goi lai — plugin khong giu trang thai duyet. Thu tu
- * on dinh (sort) de resume xac dinh.
+ * Returns one batch of paths at a time, relative to the webroot, with size and sha1. The caller
+ * keeps the cursor — the last path of the previous batch — and asks again; nothing about the
+ * walk is remembered between requests. The order is sorted and therefore stable, which is what
+ * makes resuming from a path mean anything at all.
  *
- * readFile() la cong doc mot file cho Tracy KEO ve (prototype dung pull; ban production
- * lat sang push len presigned URL). CO CHAN PATH TRAVERSAL: duong phai nam trong webroot.
+ * Every path that leaves this class has been checked to be inside the webroot, so a caller
+ * cannot reach `../../etc/passwd` and a symlink cannot lead out.
  */
 final class FileWalker
 {
     private string $root;
-    /** @var string[] ten thu muc bo qua (khop bat ky cap nao) */
+    /** @var string[] Directories left out, given as paths relative to the webroot. */
     private array $skipDirs;
 
     public function __construct(string $webroot, ?array $skipDirs = null)
@@ -22,9 +23,9 @@ final class FileWalker
             throw new InvalidArgumentException("webroot not a dir: {$webroot}");
         }
         $this->root = $real;
-        // Duong tuong doi tu goc webroot, khong phai ten thu muc. 'log' bien mat khoi danh
-        // sach vi khong co /log o goc Joomla, trong khi co nhieu thu muc ten 'log' o sau
-        // (psr/log, plugins/system/log) la code that phai giu.
+        // Paths from the webroot, never bare directory names. 'log' is absent from this list
+        // because Joomla has no /log at its root, while it does have several directories called
+        // 'log' further down (psr/log, plugins/system/log) that are code the site needs.
         $this->skipDirs = $skipDirs ?? [
             'cache', 'tmp', 'logs', '.git', 'administrator/cache', 'administrator/logs',
             'node_modules', 'administrator/components/com_akeebabackup/backup',
@@ -32,16 +33,16 @@ final class FileWalker
     }
 
     /**
-     * Toan bo duong file tuong doi, da loc, da sort — NHO LAI trong doi song cua object.
+     * Every path, filtered and sorted, remembered for as long as this object lives.
      *
-     * Truoc do moi lan goi la mot lan duyet lai ca cay. Trong vong dong goi tar, moi file
-     * lai hoi "file ke tiep la gi", nen thanh O(n^2): tren webroot that cua wisdeaf.org
-     * (19.971 file) PHP chet vi "Maximum execution time of 30 seconds exceeded" ngay o
-     * part dau. Bo test 5 file khong bao gio lo ra dieu nay.
+     * It did not always: each call used to walk the tree again. Inside the tar loop that means
+     * asking "what comes after this file?" once per file, which is quadratic — and on a real
+     * webroot of 19,971 files, PHP died with "Maximum execution time of 30 seconds exceeded"
+     * during the very first part. A fixture of five files never showed it.
      *
-     * Nho lai chi trong MOT request — moi HTTP call van duyet lai mot lan, dung y do:
-     * site khach co the doi file giua cac call, va con tro la duong dan chu khong phai
-     * chi so, nen mot lan duyet moi la cai giu cho con tro con dung nghia.
+     * Remembered within ONE request only. Each HTTP call walks afresh, deliberately: the site
+     * can change between calls, and because the cursor is a path rather than an index, a fresh
+     * walk is exactly what keeps that cursor meaning what it meant.
      *
      * @var string[]|null
      */
@@ -61,13 +62,14 @@ final class FileWalker
                     if ($current->isDir()) {
                         $rel = $this->relative($current->getPathname());
                         foreach ($this->skipDirs as $skip) {
-                            // CHI khop duong tuong doi tu goc webroot. Truoc day con khop ca
-                            // getFilename() — tuc la BAT KY thu muc nao ten 'cache'/'log'/'tmp'
-                            // o BAT KY cap nao cung bi bo. Tren site that no nuot mat
-                            // libraries/vendor/psr/log va psr/cache (PSR-3/PSR-6, Joomla BAT
-                            // BUOC phai co) cung plugins/system/log va plugins/system/cache —
-                            // 273 file, va site dung tu ban do se fatal error. Bo test tren cay
-                            // thu muc tu tao khong bao gio co nhung duong dan nhu vay.
+                            // Matched against the path from the webroot, and nothing else. It
+                            // used to also match the bare directory name, so ANY directory
+                            // called 'cache' or 'log' or 'tmp' at ANY depth was dropped. On a
+                            // real site that silently swallowed libraries/vendor/psr/log and
+                            // psr/cache — PSR-3 and PSR-6, which Joomla requires — along with
+                            // plugins/system/log and plugins/system/cache: 273 files, and a
+                            // site rebuilt from the result fatals on boot. A fixture tree
+                            // invented for a test never contains paths shaped like that.
                             if ($rel === $skip) {
                                 return false;
                             }
@@ -95,7 +97,7 @@ final class FileWalker
     }
 
     /**
-     * Mot lo file sau con tro $after (duong tuong doi; '' = tu dau).
+     * One batch of files after the cursor $after (a relative path; '' starts from the beginning).
      * @return array{files:array<int,array{path:string,size:int,sha1:string}>, next_cursor:?string, done:bool}
      */
     public function listBatch(string $after, int $limit): array
@@ -129,11 +131,41 @@ final class FileWalker
     }
 
     /**
-     * Chi ten file sau con tro — KHONG stat, KHONG sha1.
+     * How many files, how many bytes, and when the newest of them changed.
      *
-     * listBatch() bam sha1_file() moi file, tuc la doc het noi dung chi de bam. Voi
-     * files.list (Tracy can checksum de doi chieu) thi dung; voi vong dong goi tar thi
-     * la doc moi file HAI lan. Day la ban nhe cho duong pack.
+     * Two jobs in one walk. It sizes the work, so a caller can say "about eleven minutes" before
+     * starting rather than leaving someone watching an unmarked bar. And the three numbers
+     * together are a cheap fingerprint of the tree: an archive made earlier still describes this
+     * site if they have not moved, whatever the clock says, and does not if they have.
+     *
+     * No sha1 here, deliberately. Hashing means reading every byte of every file, which is the
+     * expensive thing this is meant to let a caller avoid.
+     *
+     * @return array{files:int,bytes:int,newest:int}
+     */
+    public function stats(): array
+    {
+        $files = 0;
+        $bytes = 0;
+        $newest = 0;
+        foreach ($this->allPaths() as $rel) {
+            $abs = $this->root . '/' . $rel;
+            $files++;
+            $bytes += (int) filesize($abs);
+            $mtime = (int) filemtime($abs);
+            if ($mtime > $newest) {
+                $newest = $mtime;
+            }
+        }
+        return ['files' => $files, 'bytes' => $bytes, 'newest' => $newest];
+    }
+
+    /**
+     * Paths only, after the cursor. No stat, no sha1.
+     *
+     * listBatch() hashes every file, which means reading all of it just to hash it. That is what
+     * a caller comparing checksums wants, and exactly what the tar loop does not: there it would
+     * read every file twice. This is the cheap door for packing.
      *
      * @return string[]
      */
@@ -151,7 +183,7 @@ final class FileWalker
         return array_slice($all, $start, $limit);
     }
 
-    /** Duong tuyet doi cua mot file tuong doi, da chan thoat webroot. */
+    /** The absolute path of a relative one, having checked it does not leave the webroot. */
     public function absolutePath(string $rel): string
     {
         $rel = ltrim(str_replace('\\', '/', $rel), '/');
@@ -165,7 +197,7 @@ final class FileWalker
         return $abs;
     }
 
-    /** Doc noi dung mot file (tuong doi). Chan thoat webroot. */
+    /** Reads one file, by relative path. Refuses anything outside the webroot. */
     public function readFile(string $rel): string
     {
         $rel = ltrim(str_replace('\\', '/', $rel), '/');
@@ -173,7 +205,8 @@ final class FileWalker
         if ($abs === false) {
             throw new RuntimeException("not found: {$rel}");
         }
-        // phai nam trong webroot (chong ../../etc/passwd va symlink thoat)
+        // Inside the webroot or nothing: this is what stops both `../../etc/passwd` and a
+        // symlink that points out of the tree.
         if ($abs !== $this->root && strpos($abs, $this->root . DIRECTORY_SEPARATOR) !== 0) {
             throw new RuntimeException("path escapes webroot: {$rel}");
         }

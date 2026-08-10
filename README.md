@@ -1,52 +1,44 @@
-# Joomla Claude Cowork
+# Tracy Claude Cowork
 
-A Joomla component that lets Tracy read a site — its database and its files — over one
-token-authenticated endpoint. Read-only: nothing here writes to the site.
+The extension Tracy installs on a site so an AI assistant can read it — its database, its files
+and what it has installed — over one token-authenticated endpoint.
 
-```
-index.php?option=com_claudecowork&task=api.exec&format=json
-```
+**It reads. It never writes.** Every action returns data; none of them changes a row, a file or a
+setting. That is a design decision rather than a stage: publishing back to a site goes through
+the platform's own API on a different credential, and does not pass through here. A token stolen
+from this extension cannot alter the site it is installed on.
 
-## Layout
+The name is for the way of working, not for a vendor. The endpoint is plain HTTP behind a token,
+so Claude, ChatGPT, Gemini or something you wrote yourself all use it the same way.
 
-| Path | What |
-| --- | --- |
-| `lib/` | The engine. **No Joomla dependency**, unit tested on its own (`tests/run.php`). |
-| `com_claudecowork/site/` | The endpoint: one thin controller that hands a request to the engine. |
-| `com_claudecowork/administrator/` | Enough for Joomla to install it and show its Options, where the token is set. |
-| `pkg_claudecowork.xml` | Package wrapper. |
+## Platforms
 
-`lib/` at the repo root is the source of truth; `build.sh` copies it into the component. Never
-edit the copy — that is how the two silently diverge.
+| Folder | Platform | State |
+| --- | --- | --- |
+| [`joomla/`](./joomla) | Joomla 4 and 5 | In use |
+| `wordpress/` | WordPress | Not started |
+| `shopify/` | Shopify | Not started |
 
-## Build and test
+One repository rather than one per platform: the platforms differ in how an extension is
+packaged and almost not at all in what the engine has to do, so the interesting decisions — how
+work is cut into resumable pieces, how a cursor survives a request being killed — are worth
+keeping side by side where they can be compared.
 
-```bash
-./build.sh                                    # → dist/pkg_claudecowork.zip
-docker run --rm -v "$PWD":/w -w /w php:8.3-cli php tests/run.php
-```
+## What it is for
 
-## Why a component, not a plugin
+Tracy keeps a git repository of a site: every article, page and template as files, with a
+history you can read, compare and roll back. This extension is how the site gets in there.
 
-This started as `plg_ajax_tracymigration`, reached through `com_ajax`. That works, but
-`com_ajax` only exists from **Joomla 3.2** — verified against the Joomla repository: absent at
-tags 2.5.0, 3.0.0 and 3.1.5, present at 3.2.0 — so it cannot cover the generations
-ADR 0032
-commits to. `index.php?option=com_x&task=y` is Joomla's oldest routing contract and is stable
-from 1.5 through 6. A component needs nobody's permission for an entry point; `com_ajax`
-exists precisely to lend one to plugins, which have none of their own.
+Getting anything back out to the running site is a separate act, deliberately: coworkers draft
+and review in the repository, and only an administrator can approve what goes live.
 
-A component also has somewhere to grow: its own admin screens, ACL and tables, none of which
-a plugin can hold.
+## Licence
 
-## Design
+GPL-2.0-or-later — see [LICENSE.txt](./LICENSE.txt). An extension built against Joomla's own API
+is a derivative work of GPL code, so this is the licence it must carry rather than one picked by
+preference.
 
-The engine does **one bounded piece of work per call** and returns a cursor; the caller keeps
-the cursor and loops. Shared hosting kills PHP at `max_execution_time`, so anything that
-cannot resume never finishes on a large site.
+---
 
-The component never holds object-storage credentials. For uploads it receives a presigned URL
-good for exactly one part.
-
-Procedure, traps and the plugin contract:
-the internal migration notes.
+*Claude is a trademark of Anthropic PBC. This is built by [Tracy](https://tracy.ai) and is not
+affiliated with, endorsed by or sponsored by Anthropic.*
