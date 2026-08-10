@@ -4,7 +4,7 @@
  * Plugin Name: Tracy Claude Cowork
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant read this site over one token-authenticated endpoint: its database, its files and what it has installed. This plugin only reads. Your work happens on a private copy, and nothing reaches this site unless you approve it.
- * Version:     0.1.1
+ * Version:     0.1.2
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork

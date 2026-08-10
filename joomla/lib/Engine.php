@@ -254,14 +254,22 @@ final class Engine
                     break;
                 }
 
-                // Stop BEFORE writing a header when the part is already full. Writing the
-                // header first and only then noticing means the content loop never runs, so
-                // $offset stays 0, so the returned cursor points back at this same file at
-                // offset 0 — and the next call writes its header a SECOND time. That spare 512
-                // bytes shifts everything after it: `tar` reports "Damaged tar archive", and the
-                // file extracts with its own path as the first bytes of its content. A real bug,
-                // found on a 19,941-file webroot; a five-file fixture never reaches this edge.
-                if ($offset === 0 && strlen($buf) >= $target) {
+                // Stop BEFORE writing a header unless there is room for the header AND at
+                // least one byte after it.
+                //
+                // Writing a header and only then noticing the part is full means the content
+                // loop never runs, so $offset stays 0, so the returned cursor points back at
+                // this same file at offset 0 — and the next call writes its header a SECOND
+                // time. That spare 512 bytes shifts everything after it: tar finds content
+                // where a header should be, loses an entry, and exits non-zero.
+                //
+                // The room for the header is the part this originally missed. Testing only
+                // `strlen($buf) >= $target` catches a part that was ALREADY full and not one
+                // that the header itself fills — which is the same bug one step earlier, and it
+                // fires whenever a file's header happens to land within 512 bytes of the
+                // boundary. On a real 11.205-file webroot that was twice in one run, at exactly
+                // 48 MiB and 160 MiB. A fixture of five small files never reaches either edge.
+                if ($offset === 0 && strlen($buf) + TarStream::BLOCK_BYTES >= $target) {
                     break;
                 }
 

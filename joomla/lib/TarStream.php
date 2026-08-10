@@ -19,6 +19,15 @@ final class TarStream
 {
     private const BLOCK = 512;
 
+    /**
+     * One tar block, which is also exactly the size of one header.
+     *
+     * Public because the caller has to reserve room for a header before deciding to write one —
+     * see the boundary check in Engine::filesPack. Everything else about the format stays in
+     * here.
+     */
+    public const BLOCK_BYTES = self::BLOCK;
+
     /** The header for an ordinary file. */
     public static function fileHeader(string $path, int $size, int $mode = 0644, int $mtime = 0): string
     {

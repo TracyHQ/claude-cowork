@@ -329,5 +329,39 @@ exec('tar -tf ' . escapeshellarg($shrinkTar) . ' 2>&1', $shrunkList, $shrunkStat
 check('a truncated file does not corrupt the archive', $shrunkStatus, 0);
 check('the entry after it is still there', count(array_filter($shrunkList, fn($l) => strpos($l, 'tar:') !== 0)), 2);
 
+// ── files.pack when the HEADER is what fills the part ────────────────────────────────────────
+//
+// The guard above stops before writing a header into a part that is ALREADY full. It does not
+// stop when writing the header is what fills it: the read loop then never runs, $offset stays 0,
+// and the cursor points back at this same file at offset 0 — so the next part writes its header
+// a SECOND time. 512 spare bytes, and everything after them shifted.
+//
+// Measured on beta.tracy.ai (2026-08-10) at two seams, both at exact multiples of the 8 MiB part
+// size: one extra block of content, tar losing an entry each time. The fixture below lands a
+// header exactly on the boundary on purpose.
+$edgeTmp = sys_get_temp_dir() . '/tracy_pack_edge_' . bin2hex(random_bytes(4));
+mkdir($edgeTmp);
+$target = 5 * 1024 * 1024;
+// header (512) + content = target - 512, so the NEXT header lands exactly on the target.
+file_put_contents("$edgeTmp/a-big.bin", str_repeat('A', $target - 1024));
+file_put_contents("$edgeTmp/b-on-the-seam.txt", 'the entry whose header lands on the boundary');
+file_put_contents("$edgeTmp/c-after.txt", 'and the one after it');
+
+$edgeCapture = new CapturingUploader();
+$edgeEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($edgeTmp), $edgeCapture);
+$cursor = ['put_url' => 'https://example.test/e1', 'target_bytes' => $target];
+for ($i = 0; $i < 5; $i++) {
+    $r = $edgeEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => $cursor]);
+    if (!$r['ok']) { break; }
+    if ($r['done']) { break; }
+    $cursor = ['put_url' => "https://example.test/e" . ($i + 2), 'target_bytes' => $target,
+               'path' => $r['next_path'], 'offset' => $r['next_offset'], 'size' => $r['next_size']];
+}
+$edgeTar = "$edgeTmp.tar";
+file_put_contents($edgeTar, implode('', $edgeCapture->parts));
+exec('tar -tf ' . escapeshellarg($edgeTar) . ' 2>&1', $edgeList, $edgeStatus);
+check('a header landing on a part boundary does not duplicate', $edgeStatus, 0);
+check('all three entries survive', count(array_filter($edgeList, fn($l) => strpos($l, 'tar:') !== 0)), 3);
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
