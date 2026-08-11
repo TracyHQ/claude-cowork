@@ -94,6 +94,17 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
         $app     = $this->getApplication();
         $current = $app->getIdentity();
 
+        // The tier the fleet-bar Worker vouched for. An editor gets a backend session; a viewer
+        // (and anyone the Worker did not mark editor — a missing header means no seat) reads the
+        // front-end as a guest and gets none. If they were an editor a moment ago and just lost
+        // it, end the session now rather than let a stale login outlive the downgrade.
+        if ($this->tier() !== 'editor') {
+            if ($current instanceof User && !$current->guest && strtolower((string) $current->email) === $email) {
+                $app->logout($current->id, ['clientid' => $app->isClient('administrator') ? 1 : 0]);
+            }
+            return;
+        }
+
         // Already this person: nothing to do. Re-verifying every request is cheap; re-logging in
         // every request is not, and would churn the session needlessly.
         if ($current instanceof User && !$current->guest && strtolower((string) $current->email) === $email) {
@@ -157,6 +168,19 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
     {
         $token = $_SERVER['HTTP_CF_ACCESS_JWT_ASSERTION'] ?? '';
         return is_string($token) && $token !== '' ? $token : null;
+    }
+
+    /**
+     * The CMS tier the fleet-bar Worker vouched for: 'editor' (may sign in to the backend) or
+     * 'viewer' (read-only). Read from `x-tracy-tier`, which only the Worker can set — it strips any
+     * client value before the request reaches origin, so this is trusted the way the Access
+     * assertion is. Anything that is not exactly 'editor' — a viewer, or a missing header meaning no
+     * seat — is treated as viewer, the safe side: a stray header never mints a backend login.
+     */
+    private function tier(): string
+    {
+        $value = strtolower(trim((string) ($_SERVER['HTTP_X_TRACY_TIER'] ?? '')));
+        return $value === 'editor' ? 'editor' : 'viewer';
     }
 
     /**

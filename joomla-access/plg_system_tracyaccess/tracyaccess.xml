@@ -5,7 +5,7 @@
     <creationDate>2026-08</creationDate>
     <copyright>(C) 2026 Tracy</copyright>
     <license>GPL-2.0-or-later</license>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <description><![CDATA[
         Signs a coworker in to a Tracy fleet clone as themselves, from the Cloudflare Access token
         that already proved they hold a seat. Installed only on a clone, never on a live site.
