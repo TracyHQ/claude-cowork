@@ -118,18 +118,19 @@ check('dumper tables() lists what the source knows', $dumper->tables(), ['jos_me
 
 $tmp = sys_get_temp_dir() . '/tracy_migration_test_' . bin2hex(random_bytes(4));
 mkdir($tmp);
-mkdir("$tmp/cache");
+mkdir("$tmp/wp-content", 0777, true);
+mkdir("$tmp/wp-content/cache");
 mkdir("$tmp/images");
 file_put_contents("$tmp/index.php", '<?php echo "hi";');
 file_put_contents("$tmp/configuration.php", '<?php $host="localhost";');
 file_put_contents("$tmp/images/logo.png", "PNGDATA");
-file_put_contents("$tmp/cache/should_skip.dat", "nope");
+file_put_contents("$tmp/wp-content/cache/should_skip.dat", "nope");
 
 $walker = new FileWalker($tmp);
 $batch1 = $walker->listBatch('', 2);
 check('batch1 count', count($batch1['files']), 2);
 check('batch1 not done', $batch1['done'], false);
-checkTrue('cache dir excluded from listing', !in_array('cache/should_skip.dat', array_map(fn($f) => $f['path'], $batch1['files']), true));
+checkTrue('wp-content/cache excluded from listing', !in_array('wp-content/cache/should_skip.dat', array_map(fn($f) => $f['path'], $batch1['files']), true));
 
 $batch2 = $walker->listBatch($batch1['next_cursor'], 2);
 check('batch2 done (only 3 real files: index.php, configuration.php, images/logo.png)', $batch2['done'], true);
@@ -139,7 +140,7 @@ $allPaths = array_merge(
     array_map(fn($f) => $f['path'], $batch2['files'])
 );
 sort($allPaths);
-check('walked files exclude cache/', $allPaths, ['configuration.php', 'images/logo.png', 'index.php']);
+check('walked files exclude wp-content/cache/', $allPaths, ['configuration.php', 'images/logo.png', 'index.php']);
 
 $read = $walker->readFile('images/logo.png');
 check('readFile content matches', $read, 'PNGDATA');
@@ -241,9 +242,10 @@ check('site.stats without deps reports no db', isset($statsNoDb['db']), false);
 unlink("$tmp/index.php");
 unlink("$tmp/configuration.php");
 unlink("$tmp/images/logo.png");
-unlink("$tmp/cache/should_skip.dat");
+unlink("$tmp/wp-content/cache/should_skip.dat");
 rmdir("$tmp/images");
-rmdir("$tmp/cache");
+rmdir("$tmp/wp-content/cache");
+rmdir("$tmp/wp-content");
 rmdir($tmp);
 
 

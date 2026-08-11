@@ -23,12 +23,23 @@ final class FileWalker
             throw new InvalidArgumentException("webroot not a dir: {$webroot}");
         }
         $this->root = $real;
-        // Paths from the webroot, never bare directory names. 'log' is absent from this list
-        // because Joomla has no /log at its root, while it does have several directories called
-        // 'log' further down (psr/log, plugins/system/log) that are code the site needs.
+        // Paths from the webroot, never bare directory names — and WordPress's own, not Joomla's.
+        // (This walker was seeded from the Joomla one and carried its `administrator/...` paths,
+        // which mean nothing under a WordPress root and let WordPress's real bloat through.)
+        //
+        // What must not reach a clone: caching-plugin output and, above all, backup-plugin
+        // archives — multi-hundred-MB dumps a plugin writes INTO wp-content and rewrites while a
+        // backup runs, the same trap Akeeba is on the Joomla side. `wp-content/uploads` itself is
+        // the media library and stays; only the backup subtrees some plugins put under it are cut.
         $this->skipDirs = $skipDirs ?? [
-            'cache', 'tmp', 'logs', '.git', 'administrator/cache', 'administrator/logs',
-            'node_modules', 'administrator/components/com_akeebabackup/backup',
+            '.git', 'node_modules',
+            'wp-content/cache',            // W3 Total Cache, WP Super Cache, WP Rocket, LiteSpeed
+            'wp-content/upgrade',          // WordPress's own temp dir for core/plugin updates
+            'wp-content/updraft',          // UpdraftPlus
+            'wp-content/ai1wm-backups',    // All-in-One WP Migration
+            'wp-content/backups-dup-lite', // Duplicator
+            'wp-content/uploads/backwpup',  // BackWPup
+            'wp-content/uploads/backup-guard', // Backup Guard
         ];
     }
 

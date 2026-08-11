@@ -124,12 +124,24 @@ file_put_contents("$tmp/index.php", '<?php echo "hi";');
 file_put_contents("$tmp/configuration.php", '<?php $host="localhost";');
 file_put_contents("$tmp/images/logo.png", "PNGDATA");
 file_put_contents("$tmp/cache/should_skip.dat", "nope");
+// Akeeba Backup writes multi-hundred-MB archives here (com_akeeba is 7.x and earlier); a live
+// backup of www.joomlart.com left a 603 MB .sql that bloated and shifted the tar (2026-08-11).
+mkdir("$tmp/administrator/components/com_akeeba/backup", 0777, true);
+file_put_contents("$tmp/administrator/components/com_akeeba/backup/site-backup.sql", "SELECT 1;");
 
 $walker = new FileWalker($tmp);
 $batch1 = $walker->listBatch('', 2);
 check('batch1 count', count($batch1['files']), 2);
 check('batch1 not done', $batch1['done'], false);
 checkTrue('cache dir excluded from listing', !in_array('cache/should_skip.dat', array_map(fn($f) => $f['path'], $batch1['files']), true));
+checkTrue(
+    'akeeba backup excluded from listing',
+    !in_array(
+        'administrator/components/com_akeeba/backup/site-backup.sql',
+        array_map(fn($f) => $f['path'], array_merge($batch1['files'], $walker->listBatch($batch1['next_cursor'], 50)['files'])),
+        true
+    )
+);
 
 $batch2 = $walker->listBatch($batch1['next_cursor'], 2);
 check('batch2 done (only 3 real files: index.php, configuration.php, images/logo.png)', $batch2['done'], true);
@@ -242,6 +254,11 @@ unlink("$tmp/index.php");
 unlink("$tmp/configuration.php");
 unlink("$tmp/images/logo.png");
 unlink("$tmp/cache/should_skip.dat");
+unlink("$tmp/administrator/components/com_akeeba/backup/site-backup.sql");
+rmdir("$tmp/administrator/components/com_akeeba/backup");
+rmdir("$tmp/administrator/components/com_akeeba");
+rmdir("$tmp/administrator/components");
+rmdir("$tmp/administrator");
 rmdir("$tmp/images");
 rmdir("$tmp/cache");
 rmdir($tmp);

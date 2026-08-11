@@ -28,7 +28,15 @@ final class FileWalker
         // 'log' further down (psr/log, plugins/system/log) that are code the site needs.
         $this->skipDirs = $skipDirs ?? [
             'cache', 'tmp', 'logs', '.git', 'administrator/cache', 'administrator/logs',
-            'node_modules', 'administrator/components/com_akeebabackup/backup',
+            'node_modules',
+            // Akeeba Backup's output — multi-hundred-MB .jpa/.sql archives of the site, written
+            // INTO the webroot, and rewritten while a backup runs. Useless in a clone (it is the
+            // site's own backup of itself) and the worst possible thing to tar: on
+            // www.joomlart.com a live backup left a 603 MB .sql in here that bloated the archive
+            // and shifted it (2026-08-11). BOTH component names: com_akeeba is Akeeba 7.x and
+            // earlier — the one joomlart.com runs — and com_akeebabackup is 9.x+.
+            'administrator/components/com_akeeba/backup',
+            'administrator/components/com_akeebabackup/backup',
         ];
     }
 
