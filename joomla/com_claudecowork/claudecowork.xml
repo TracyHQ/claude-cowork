@@ -9,7 +9,7 @@
          work of GPL-2.0-or-later code, so this is the licence it has to carry, not one
          chosen from taste. -->
     <license>GNU General Public License version 2 or later; see LICENSE.txt</license>
-    <version>0.5.2</version>
+    <version>0.6.0</version>
     <description>COM_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <namespace path="src">Tracy\Component\ClaudeCowork</namespace>
@@ -19,17 +19,31 @@
 
     <!-- Front-end. The API lives here, not under administrator/, on purpose: this endpoint
          authenticates with its own token, and a backend URL would additionally demand a
-         Joomla admin session that the caller does not have and should not need. -->
+         Joomla admin session that the caller does not have and should not need.
+
+         Two dispatch styles ship side by side. Joomla 4+ routes through services/provider.php
+         and the namespaced src/ controllers; Joomla 3 ignores those and uses the legacy entry
+         file claudecowork.php plus controller.php / controllers/, which 4+ ignores in turn.
+         Each generation runs the half it understands, over one shared lib/ engine. -->
     <files folder="site">
         <folder>services</folder>
         <folder>src</folder>
+        <folder>controllers</folder>
+        <filename>claudecowork.php</filename>
+        <filename>controller.php</filename>
     </files>
 
     <administration>
         <files folder="administrator">
+            <!-- Joomla 4+ admin dispatch. -->
             <folder>services</folder>
             <folder>src</folder>
             <folder>tmpl</folder>
+            <!-- Joomla 3 admin dispatch: the legacy entry, controller and view render the same
+                 connect screen. Ignored by Joomla 4+, which uses services/ + src/ above. -->
+            <folder>views</folder>
+            <filename>claudecowork.php</filename>
+            <filename>controller.php</filename>
             <!-- The engine — no Joomla dependency, unit tested on its own. Under
                  administrator/ rather than media/ because media/ is served over HTTP and
                  these are PHP files; same placement Akeeba uses for its own engine. -->

@@ -9,74 +9,68 @@
 \defined('_JEXEC') or die;
 
 use Joomla\CMS\Factory;
-use Joomla\CMS\Installer\InstallerAdapter;
-use Joomla\CMS\Installer\InstallerScriptInterface;
-use Joomla\Database\DatabaseInterface;
 use Joomla\Registry\Registry;
 
 /**
- * Gives the component a token of its own the moment it is installed.
+ * Seeds a token on install and puts the component in the Components menu.
  *
- * Without this, a site owner who installs by hand has to invent a random string themselves,
- * type it into Options, and type the same string again wherever they are pairing the site —
- * a step that is easy to get wrong and pointless to ask for. With it, the token is simply
- * there to be copied, and installing by hand becomes a first-class way to connect a site:
- * the owner signs in to their own admin however their site demands (passkey, MFA, SSO,
- * whatever their host puts in front of it), installs this, and copies one string out.
+ * Written to run on BOTH Joomla 3 and Joomla 4+, which is why it is a plainly-named class
+ * (`com_claudecoworkInstallerScript`) and not the `return new class` an installer-script
+ * interface would allow: Joomla 3 resolves the script by that exact name (verified against
+ * `InstallerAdapter::getScriptClassName`) and cannot see an anonymous one. It implements no
+ * interface — the interface is Joomla 4.4+ only, and requiring it is what made an earlier
+ * build fatal on Joomla 3 the moment the file was included.
  *
- * Generated here rather than by whoever installs it, because a shared package must never
- * carry a usable token — the same reason Tracy mints a fresh one when IT does the install.
- *
- * An existing token is never overwritten. Upgrades run this too, and replacing the token on
- * upgrade would break every caller already using it.
+ * Every Joomla API used here is one that exists on both generations, or is chosen at runtime:
+ * `Factory::getDbo()` and `Joomla\Registry\Registry` are shared, and the menu table is picked
+ * per version below.
  */
-return new class () implements InstallerScriptInterface {
+class com_claudecoworkInstallerScript
+{
     /** 24 bytes, hex — comfortably past the 16-character floor the engine enforces. */
     private const TOKEN_BYTES = 24;
 
-    public function install(InstallerAdapter $adapter): bool
+    public function install($parent)
     {
         return true;
     }
 
-    public function update(InstallerAdapter $adapter): bool
+    public function update($parent)
     {
         return true;
     }
 
-    public function uninstall(InstallerAdapter $adapter): bool
+    public function uninstall($parent)
     {
         return true;
     }
 
-    public function preflight(string $type, InstallerAdapter $adapter): bool
+    public function preflight($route, $parent)
     {
         return true;
     }
 
     /**
-     * Runs after the files are in place, which is when the extension row exists and its
-     * params can be written.
-     *
-     * Never fatal: a component that installed correctly must not be reported as failed
-     * because a setting could not be seeded. The owner can still type a token in by hand,
-     * which is exactly the state this replaces.
+     * Joomla 3 calls this `postflight($route, $parent)`, Joomla 4+ the same — the two arguments
+     * line up, so one signature serves both. Runs after the files are in place, when the
+     * extension row exists and its params can be written.
      */
-    public function postflight(string $type, InstallerAdapter $adapter): bool
+    public function postflight($route, $parent)
     {
-        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        $db = Factory::getDbo();
 
         // Two independent jobs, each in its own try: a token that could not be seeded must not
         // stop the menu being created, nor the other way round.
         try {
             $this->seedToken($db);
         } catch (\Throwable $e) {
-            // Deliberately swallowed — see the class note.
+            // Swallowed: a component that installed correctly must not report failure because a
+            // setting could not be seeded — a token can still be typed in by hand.
         }
         try {
             $this->ensureAdminMenu($db);
         } catch (\Throwable $e) {
-            // Deliberately swallowed — the screen is still reachable by URL without a menu item.
+            // Swallowed: the screen is still reachable without a menu item.
         }
 
         return true;
@@ -112,10 +106,10 @@ return new class () implements InstallerScriptInterface {
     /**
      * Puts the component in the admin's Components menu, if it is not already there.
      *
-     * The manifest's `<menu>` element does this — but ONLY on a fresh install. An upgrade from
-     * a version that had no menu (0.4.0 shipped without one) never gets the entry, so the screen
-     * exists and answers but appears nowhere. This closes that gap, and is a no-op on a fresh
-     * install where the manifest already made the row.
+     * The manifest's `<menu>` element does this — but only on a fresh install, and only on
+     * Joomla 4+. An upgrade from a version that had no menu, or any install on Joomla 3 (whose
+     * legacy admin dispatch this component does not carry an admin view for), leaves no entry.
+     * This closes both gaps.
      */
     private function ensureAdminMenu($db): void
     {
@@ -131,29 +125,38 @@ return new class () implements InstallerScriptInterface {
             return;
         }
 
+        // The same link on every generation: the connect screen answers at `option=com_claudecowork`
+        // on both, through the namespaced admin view on Joomla 4+ and the legacy admin view on
+        // Joomla 3. So there is nothing to branch on here.
+        $link = 'index.php?option=com_claudecowork';
+
         $exists = (int) $db->setQuery(
             $db->getQuery(true)
                 ->select('COUNT(*)')
                 ->from($db->quoteName('#__menu'))
                 ->where($db->quoteName('client_id') . ' = 1')
                 ->where($db->quoteName('type') . ' = ' . $db->quote('component'))
-                ->where($db->quoteName('link') . ' = ' . $db->quote('index.php?option=com_claudecowork'))
+                ->where($db->quoteName('link') . ' = ' . $db->quote($link))
         )->loadResult();
 
         if ($exists > 0) {
             return;
         }
 
-        // The Menu table rebuilds the nested set (lft/rgt) on store, so this needs no hand-computed
-        // tree maths — only a parent to sit under. `1` is the admin menu root; Joomla groups every
+        // The Menu table rebuilds the nested set on store, so this needs no hand-computed tree
+        // maths — only a parent to sit under. `1` is the admin menu root; Joomla groups every
         // `type=component` item under the Components heading by itself.
-        $table = new \Joomla\CMS\Table\Menu($db);
+        // Older Joomla 3 (pre-3.8) has no namespaced Menu table; fall back to JTable there.
+        $table = class_exists('\\Joomla\\CMS\\Table\\Menu')
+            ? new \Joomla\CMS\Table\Menu($db)
+            : \JTable::getInstance('menu');
+
         $table->setLocation(1, 'last-child');
         $table->bind([
             'menutype'     => 'main',
             'title'        => 'COM_CLAUDECOWORK',
             'alias'        => 'com-claudecowork',
-            'link'         => 'index.php?option=com_claudecowork',
+            'link'         => $link,
             'type'         => 'component',
             'published'    => 1,
             'parent_id'    => 1,
@@ -166,4 +169,4 @@ return new class () implements InstallerScriptInterface {
             $table->store();
         }
     }
-};
+}
