@@ -9,7 +9,7 @@
          work of GPL-2.0-or-later code, so this is the licence it has to carry, not one
          chosen from taste. -->
     <license>GNU General Public License version 2 or later; see LICENSE.txt</license>
-    <version>0.4.0</version>
+    <version>0.5.0</version>
     <description>COM_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <namespace path="src">Tracy\Component\ClaudeCowork</namespace>
@@ -29,6 +29,7 @@
         <files folder="administrator">
             <folder>services</folder>
             <folder>src</folder>
+            <folder>tmpl</folder>
             <!-- The engine — no Joomla dependency, unit tested on its own. Under
                  administrator/ rather than media/ because media/ is served over HTTP and
                  these are PHP files; same placement Akeeba uses for its own engine. -->
@@ -39,8 +40,8 @@
             <language tag="en-GB">en-GB/com_claudecowork.ini</language>
             <language tag="en-GB">en-GB/com_claudecowork.sys.ini</language>
         </languages>
-        <!-- No <menu> element: this component has no admin screens yet, and an empty menu
-             entry that opens a blank page is worse than no entry. -->
+        <!-- Opens the connect screen: the token to copy, and the endpoint it belongs to. -->
+        <menu link="option=com_claudecowork">COM_CLAUDECOWORK</menu>
     </administration>
 
 </extension>
