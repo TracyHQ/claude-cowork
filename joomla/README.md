@@ -7,6 +7,11 @@ token-authenticated endpoint, and install an extension onto it.
 index.php?option=com_claudecowork&task=api.exec&format=json
 ```
 
+Installing it generates a token and stores it in the component's Options (`script.php`). Copy
+that string into whatever is pairing with the site — installing by hand is therefore a complete
+way to connect a site, with no admin session handed to anyone. Clearing the field revokes access:
+an empty token refuses every request.
+
 Everything is read-only except `extension.install`, which takes one `https` `.zip` URL the site
 downloads itself and hands to Joomla's own installer. There is no uninstall, no file write and
 no way to name a local path: a caller holding the token can add to a site, never quietly remove

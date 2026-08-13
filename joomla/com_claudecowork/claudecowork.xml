@@ -9,10 +9,13 @@
          work of GPL-2.0-or-later code, so this is the licence it has to carry, not one
          chosen from taste. -->
     <license>GNU General Public License version 2 or later; see LICENSE.txt</license>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
     <description>COM_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <namespace path="src">Tracy\Component\ClaudeCowork</namespace>
+
+    <!-- Seeds a token on install, so installing by hand needs nobody to invent one. -->
+    <scriptfile>script.php</scriptfile>
 
     <!-- Front-end. The API lives here, not under administrator/, on purpose: this endpoint
          authenticates with its own token, and a backend URL would additionally demand a
