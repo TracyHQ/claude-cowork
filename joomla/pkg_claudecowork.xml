@@ -4,7 +4,7 @@
     <packagename>claudecowork</packagename>
     <author>Tracy</author>
     <creationDate>2026-08-10</creationDate>
-    <version>0.5.0</version>
+    <version>0.5.1</version>
     <description>PKG_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <!-- A package around a single component looks like overkill today and is not.

@@ -13,6 +13,7 @@ namespace Tracy\Component\ClaudeCowork\Administrator\View\Cowork;
 use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use Joomla\CMS\Toolbar\ToolbarHelper;
+use Joomla\CMS\Language\Text;
 use Joomla\CMS\Uri\Uri;
 
 /**
@@ -38,7 +39,7 @@ class HtmlView extends BaseHtmlView
         $this->endpoint = rtrim(Uri::root(), '/')
             . '/index.php?option=com_claudecowork&task=api.exec&format=json';
 
-        ToolbarHelper::title(\JText::_('COM_CLAUDECOWORK'), 'plug');
+        ToolbarHelper::title(Text::_('COM_CLAUDECOWORK_CONNECT_TITLE'), 'link');
 
         parent::display($tpl);
     }
