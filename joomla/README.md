@@ -36,9 +36,8 @@ docker run --rm -v "$PWD":/w -w /w php:8.3-cli php tests/run.php
 
 This started as `plg_ajax_tracymigration`, reached through `com_ajax`. That works, but
 `com_ajax` only exists from **Joomla 3.2** — verified against the Joomla repository: absent at
-tags 2.5.0, 3.0.0 and 3.1.5, present at 3.2.0 — so it cannot cover the generations
-ADR 0032
-commits to. `index.php?option=com_x&task=y` is Joomla's oldest routing contract and is stable
+tags 2.5.0, 3.0.0 and 3.1.5, present at 3.2.0 — so it cannot cover every generation Tracy
+supports. `index.php?option=com_x&task=y` is Joomla's oldest routing contract and is stable
 from 1.5 through 6. A component needs nobody's permission for an entry point; `com_ajax`
 exists precisely to lend one to plugins, which have none of their own.
 
@@ -53,6 +52,3 @@ cannot resume never finishes on a large site.
 
 The component never holds object-storage credentials. For uploads it receives a presigned URL
 good for exactly one part.
-
-Procedure, traps and the plugin contract:
-the internal migration notes.
