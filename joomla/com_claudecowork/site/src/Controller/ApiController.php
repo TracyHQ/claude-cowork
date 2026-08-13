@@ -50,7 +50,7 @@ class ApiController extends BaseController
     {
         $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib';
 
-        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
+        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
             require_once $lib . '/' . $class . '.php';
         }
     }
@@ -107,7 +107,8 @@ class ApiController extends BaseController
             ],
             $this->buildDumper(),
             $this->buildWalker($params),
-            new \CurlUploader(120)
+            new \CurlUploader(120),
+            new JoomlaExtensions()
         );
 
         $app->setHeader('Content-Type', 'application/json', true);

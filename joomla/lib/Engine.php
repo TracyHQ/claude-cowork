@@ -20,6 +20,7 @@ require_once __DIR__ . '/DbDumper.php';
 require_once __DIR__ . '/FileWalker.php';
 require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
+require_once __DIR__ . '/Extensions.php';
 
 final class Engine
 {
@@ -29,6 +30,7 @@ final class Engine
     private ?DbDumper $dumper;
     private ?FileWalker $walker;
     private ?Uploader $uploader;
+    private ?ExtensionManager $extensions;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -47,13 +49,15 @@ final class Engine
         array $info = [],
         ?DbDumper $dumper = null,
         ?FileWalker $walker = null,
-        ?Uploader $uploader = null
+        ?Uploader $uploader = null,
+        ?ExtensionManager $extensions = null
     ) {
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
         $this->walker = $walker;
         $this->uploader = $uploader;
+        $this->extensions = $extensions;
     }
 
     /**
@@ -85,6 +89,10 @@ final class Engine
                 return $this->filesPack($params);
             case 'file.read':
                 return $this->fileRead($params);
+            case 'extension.list':
+                return $this->extensionList();
+            case 'extension.install':
+                return $this->extensionInstall($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -401,6 +409,63 @@ final class Engine
             'size'         => strlen($data),
             'sha1'         => sha1($data),
             'content_b64'  => base64_encode($data),
+        ]);
+    }
+
+    /**
+     * What the site already has. Answered before an install so a caller can decide whether one
+     * is needed at all, and after it to prove the package took.
+     */
+    private function extensionList(): array
+    {
+        if ($this->extensions === null) {
+            return $this->err('unavailable', 'extension manager not wired');
+        }
+        try {
+            $installed = $this->extensions->listInstalled();
+        } catch (Throwable $e) {
+            return $this->err('list_failed', $e->getMessage());
+        }
+        return $this->ok(['extensions' => $installed]);
+    }
+
+    /**
+     * The only action that changes the site.
+     *
+     * Bounded on purpose: one https `.zip`, fetched by the site, installed through Joomla's own
+     * installer. There is no uninstall and no way to name a local path — a caller holding this
+     * token can add to a site, never quietly remove from it or read a file off its disk by
+     * pointing the installer somewhere odd.
+     */
+    private function extensionInstall(array $p): array
+    {
+        if ($this->extensions === null) {
+            return $this->err('unavailable', 'extension manager not wired');
+        }
+        $url = isset($p['url']) && is_string($p['url']) ? trim($p['url']) : '';
+        if ($url === '') {
+            return $this->err('bad_params', 'url required');
+        }
+        $shape = PackageUrl::check($url);
+        if ($shape['ok'] !== true) {
+            return $this->err('bad_params', $shape['error']);
+        }
+
+        try {
+            $result = $this->extensions->installFromUrl($url);
+        } catch (Throwable $e) {
+            return $this->err('install_failed', $e->getMessage());
+        }
+        if (($result['ok'] ?? false) !== true) {
+            return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+        }
+
+        return $this->ok([
+            'installed' => [
+                'name'    => $result['name'] ?? null,
+                'type'    => $result['type'] ?? null,
+                'version' => $result['version'] ?? null,
+            ],
         ]);
     }
 

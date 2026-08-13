@@ -1,11 +1,17 @@
 # Tracy Claude Cowork — Joomla
 
 A Joomla component that lets Tracy read a site — its database and its files — over one
-token-authenticated endpoint. Read-only: nothing here writes to the site.
+token-authenticated endpoint, and install an extension onto it.
 
 ```
 index.php?option=com_claudecowork&task=api.exec&format=json
 ```
+
+Everything is read-only except `extension.install`, which takes one `https` `.zip` URL the site
+downloads itself and hands to Joomla's own installer. There is no uninstall, no file write and
+no way to name a local path: a caller holding the token can add to a site, never quietly remove
+from it. `extension.list` reports what is already there, so a caller can tell "already
+installed" from "installed in another version" without guessing.
 
 ## Layout
 

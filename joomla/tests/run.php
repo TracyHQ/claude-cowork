@@ -12,6 +12,7 @@ require_once __DIR__ . '/../lib/FileWalker.php';
 require_once __DIR__ . '/../lib/Token.php';
 require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
+require_once __DIR__ . '/../lib/Extensions.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
@@ -413,6 +414,97 @@ file_put_contents($evenTar, implode('', $evenCapture->parts));
 exec('tar -tf ' . escapeshellarg($evenTar) . ' 2>&1', $evenList, $evenStatus);
 check('and the archive is still whole', $evenStatus, 0);
 check('with every file in it', count(array_filter($evenList, fn($l) => strpos($l, 'tar:') !== 0)), 7);
+
+// ------------------------------------------------------------- Extensions --
+//
+// The only action that writes to a site, so the tests are about what it REFUSES as much as
+// what it does. A fake manager stands in for Joomla's installer: what is checked here is the
+// engine's gate, not Joomla's unzip.
+
+final class FakeExtensions implements ExtensionManager
+{
+    public array $installed = [];
+    public array $asked = [];
+    public bool $refuse = false;
+
+    public function installFromUrl(string $url): array
+    {
+        $this->asked[] = $url;
+        if ($this->refuse) {
+            return ['ok' => false, 'error' => 'JInstaller: :Install: Cannot find Joomla XML setup file'];
+        }
+        return ['ok' => true, 'name' => 'JA Teline V', 'type' => 'template', 'version' => '1.2.3'];
+    }
+
+    public function listInstalled(): array
+    {
+        return $this->installed;
+    }
+}
+
+$TOKEN = 'a-token-at-least-16';
+$fakeExtensions = new FakeExtensions();
+$fakeExtensions->installed = [
+    ['name' => 'Claude Cowork', 'type' => 'component', 'element' => 'com_claudecowork', 'version' => '0.3.0', 'enabled' => true],
+];
+$extEngine = new Engine($TOKEN, [], null, null, null, $fakeExtensions);
+
+$listed = $extEngine->handle(['token' => $TOKEN, 'action' => 'extension.list']);
+check('extension.list returns what the site holds', $listed['extensions'][0]['element'], 'com_claudecowork');
+
+$installedOk = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+checkTrue('a well-formed package installs', $installedOk['ok'] === true);
+check('and reports what went on', $installedOk['installed']['name'], 'JA Teline V');
+
+// Plain HTTP would put a customer's site package on the wire for anyone to replace.
+$http = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'http://example.test/pkg_teline.zip'],
+]);
+check('http is refused before anything is fetched', $http['message'], 'https required');
+
+// Joomla names the download after the URL and reads the archive type from that name, so an
+// address with no .zip on the end fails deep inside the installer with "Unable to detect
+// manifest file" — a message nobody can act on. Refused here instead.
+$noZip = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/download?id=42'],
+]);
+check('a URL that is not a .zip is refused', $noZip['message'], 'package URL must end in .zip');
+
+check('nothing refused was ever fetched', count($fakeExtensions->asked), 1);
+
+$fakeExtensions->refuse = true;
+$refused = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_broken.zip'],
+]);
+// The installer's own words, not "install failed": one of these can be acted on.
+checkTrue('a refused package carries the installer reason', strpos($refused['message'], 'Cannot find Joomla XML setup file') !== false);
+
+// A site that never wired the manager is a site that cannot be written to at all.
+$readOnlyEngine = new Engine($TOKEN, [], null, null, null, null);
+$unwired = $readOnlyEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+check('an unwired site refuses to install anything', $unwired['message'], 'extension manager not wired');
+
+// The token gate covers the new actions exactly as it covers the read ones.
+$noToken = $extEngine->handle([
+    'token' => 'wrong-token-but-long-enough',
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+check('a wrong token installs nothing', $noToken['error'], 'unauthorized');
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
