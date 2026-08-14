@@ -21,6 +21,7 @@ require_once __DIR__ . '/FileWalker.php';
 require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/Extensions.php';
+require_once __DIR__ . '/SiteWriter.php';
 
 final class Engine
 {
@@ -31,6 +32,9 @@ final class Engine
     private ?FileWalker $walker;
     private ?Uploader $uploader;
     private ?ExtensionManager $extensions;
+    private ?SiteWriter $writer;
+    private ?MediaWriter $media;
+    private ?ApplyLog $log;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -41,6 +45,8 @@ final class Engine
     private const MAX_PART_BYTES = 33554432; // 32 MiB
     /** Files are read in pieces, so a large one is never resident in memory in full. */
     private const READ_CHUNK = 1048576;
+    /** A single media upload carried inline as base64. Larger assets belong on the signed-URL path. */
+    private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
 
@@ -50,7 +56,10 @@ final class Engine
         ?DbDumper $dumper = null,
         ?FileWalker $walker = null,
         ?Uploader $uploader = null,
-        ?ExtensionManager $extensions = null
+        ?ExtensionManager $extensions = null,
+        ?SiteWriter $writer = null,
+        ?MediaWriter $media = null,
+        ?ApplyLog $log = null
     ) {
         $this->token = $token;
         $this->info = $info;
@@ -58,6 +67,9 @@ final class Engine
         $this->walker = $walker;
         $this->uploader = $uploader;
         $this->extensions = $extensions;
+        $this->writer = $writer;
+        $this->media = $media;
+        $this->log = $log;
     }
 
     /**
@@ -93,6 +105,14 @@ final class Engine
                 return $this->extensionList();
             case 'extension.install':
                 return $this->extensionInstall($params);
+            case 'content.write':
+                return $this->contentWrite($params);
+            case 'media.write':
+                return $this->mediaWrite($params);
+            case 'apply.revert':
+                return $this->applyRevert($params);
+            case 'apply.list':
+                return $this->applyList($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -467,6 +487,252 @@ final class Engine
                 'version' => $result['version'] ?? null,
             ],
         ]);
+    }
+
+    /**
+     * Apply one edit to the site's content, and remember how to undo it in the same breath.
+     *
+     * The order is deliberate: read the before-state, write, then record the undo. A write that
+     * cannot have its undo recorded is rolled back on the spot rather than left standing — an
+     * un-revertible change is exactly what ADR 0048 forbids an Apply from making. Both the writer
+     * and the log must be wired: a site that can be written but not reverted is not one this action
+     * will touch.
+     */
+    private function contentWrite(array $p): array
+    {
+        if ($this->writer === null || $this->log === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        if (!isset($p['fields']) || !is_array($p['fields']) || $p['fields'] === []) {
+            return $this->err('bad_params', 'fields required');
+        }
+        $id = max(0, (int) ($p['id'] ?? 0));
+
+        try {
+            $before = $this->writer->read($kind, $id); // null => this is an insert, so its undo is a delete
+            $newId = $this->writer->write($kind, $id, $p['fields']);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'before' => $before]);
+        } catch (Throwable $e) {
+            $this->rollbackContent($kind, $newId, $before);
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $e) {
+            // Best-effort by contract: a stale cache is not worth failing a change that landed.
+        }
+
+        return $this->ok(['kind' => $kind, 'id' => $newId, 'created' => $before === null]);
+    }
+
+    /**
+     * Put one file into the site's media folder, carried inline as base64, and remember how to
+     * undo it. Same rollback rule as contentWrite: if the undo cannot be recorded, the upload is
+     * reversed rather than left behind. Anything past the inline ceiling belongs on the signed-URL
+     * path, so the request the relay would have to proxy stays small.
+     */
+    private function mediaWrite(array $p): array
+    {
+        if ($this->media === null || $this->log === null) {
+            return $this->err('unavailable', 'media writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $path = isset($p['path']) && is_string($p['path']) ? $p['path'] : '';
+        if (!self::safeMediaPath($path)) {
+            return $this->err('bad_params', 'unusable media path');
+        }
+        $b64 = isset($p['content_b64']) && is_string($p['content_b64']) ? $p['content_b64'] : '';
+        $bytes = base64_decode($b64, true);
+        if ($bytes === false) {
+            return $this->err('bad_params', 'content_b64 is not valid base64');
+        }
+        if (strlen($bytes) > self::MAX_MEDIA_BYTES) {
+            return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
+        }
+
+        try {
+            $before = $this->media->read($path); // null => new file, so its undo is a delete
+            $this->media->write($path, $bytes);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, ['op' => 'media', 'path' => $path, 'before' => $before]);
+        } catch (Throwable $e) {
+            $this->rollbackMedia($path, $before);
+            return $this->err('write_failed', 'upload was rolled back: could not record its undo');
+        }
+
+        return $this->ok(['path' => $path, 'bytes' => strlen($bytes), 'created' => $before === null]);
+    }
+
+    /**
+     * Undo every step of one Apply, newest first. A step whose before-state was null was an
+     * insert, so it is deleted; otherwise the recorded before-state is written back.
+     *
+     * The Apply is only forgotten when every step came back. A revert that could not finish leaves
+     * the log in place and names what is still standing, so the caller sees the truth rather than
+     * a clean answer over a half-reverted site.
+     */
+    private function applyRevert(array $p): array
+    {
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        try {
+            $entries = $this->log->entries($applyId);
+        } catch (Throwable $e) {
+            return $this->err('revert_failed', $e->getMessage());
+        }
+
+        $reverted = 0;
+        $failed = [];
+        foreach (array_reverse($entries) as $entry) {
+            try {
+                $this->revertOne($entry);
+                $reverted++;
+            } catch (Throwable $e) {
+                $failed[] = ['op' => $entry['op'] ?? '?', 'error' => $e->getMessage()];
+            }
+        }
+
+        if ($this->writer !== null) {
+            try {
+                $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+
+        if ($failed === []) {
+            try {
+                $this->log->clear($applyId);
+            } catch (Throwable $e) {
+                // The site is back; a log row that would not clear is the caller's to reconcile.
+            }
+            return $this->ok(['reverted' => $reverted]);
+        }
+        return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
+    }
+
+    /** What one Apply touched, without the before-payload — enough to verify, not to haul old bytes back. */
+    private function applyList(array $p): array
+    {
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        try {
+            $entries = $this->log->entries($applyId);
+        } catch (Throwable $e) {
+            return $this->err('list_failed', $e->getMessage());
+        }
+        $steps = array_map(static function (array $entry): array {
+            $op = $entry['op'] ?? '';
+            $step = ['op' => $op, 'created' => ($entry['before'] ?? null) === null];
+            if ($op === 'content') {
+                $step['kind'] = $entry['kind'] ?? null;
+                $step['id'] = $entry['id'] ?? null;
+            } elseif ($op === 'media') {
+                $step['path'] = $entry['path'] ?? null;
+            }
+            return $step;
+        }, $entries);
+        return $this->ok(['apply_id' => $applyId, 'steps' => $steps]);
+    }
+
+    /** @param array<string,mixed> $entry */
+    private function revertOne(array $entry): void
+    {
+        $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
+        if ($op === 'content') {
+            if ($this->writer === null) {
+                throw new RuntimeException('site writer not wired');
+            }
+            $this->rollbackContent((string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0), $entry['before'] ?? null);
+            return;
+        }
+        if ($op === 'media') {
+            if ($this->media === null) {
+                throw new RuntimeException('media writer not wired');
+            }
+            $this->rollbackMedia((string) ($entry['path'] ?? ''), $entry['before'] ?? null);
+            return;
+        }
+        throw new RuntimeException("unknown step: {$op}");
+    }
+
+    /** @param array<string,?scalar>|null $before */
+    private function rollbackContent(string $kind, int $id, ?array $before): void
+    {
+        if ($before === null) {
+            $this->writer->delete($kind, $id);
+        } else {
+            $this->writer->write($kind, $id, $before);
+        }
+    }
+
+    private function rollbackMedia(string $path, ?string $before): void
+    {
+        if ($before === null) {
+            $this->media->delete($path);
+        } else {
+            $this->media->write($path, $before);
+        }
+    }
+
+    private function applyId(array $p): ?string
+    {
+        $id = isset($p['apply_id']) && is_string($p['apply_id']) ? trim($p['apply_id']) : '';
+        return $id === '' ? null : $id;
+    }
+
+    /**
+     * A media path is a relative path under the site's media root and nothing else: no leading
+     * slash, no `..`, no drive letter, no null byte, and only a conservative character set. The
+     * real MediaWriter confines writes to the root as well — this is the cheap refusal that keeps a
+     * hostile path from ever reaching it.
+     */
+    private static function safeMediaPath(string $path): bool
+    {
+        if ($path === '' || strlen($path) > 1024) {
+            return false;
+        }
+        if ($path[0] === '/' || $path[0] === '\\') {
+            return false;
+        }
+        if (strpos($path, '..') !== false || strpos($path, "\0") !== false) {
+            return false;
+        }
+        if (preg_match('#^[A-Za-z]:#', $path) === 1) {
+            return false;
+        }
+        return preg_match('#^[\w\-./]+$#', $path) === 1;
     }
 
     /** @param array<string,mixed> $extra */

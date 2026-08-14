@@ -13,6 +13,7 @@ require_once __DIR__ . '/../lib/Token.php';
 require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
 require_once __DIR__ . '/../lib/Extensions.php';
+require_once __DIR__ . '/../lib/SiteWriter.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
@@ -510,6 +511,187 @@ $noToken = $extEngine->handle([
     'params' => ['url' => 'https://example.test/pkg_teline.zip'],
 ]);
 check('a wrong token installs nothing', $noToken['error'], 'unauthorized');
+
+// -------------------------------------------------------- SiteWriter / Apply --
+//
+// The write side and its undo. Fakes stand in for Joomla's tables and media folder; what is
+// checked is the engine's promise — every edit is recorded so the whole Apply can be reversed to
+// exactly what was there, and an edit whose undo cannot be recorded is rolled back rather than
+// left standing (ADR 0048).
+
+final class FakeSiteWriter implements SiteWriter
+{
+    /** @var array<string,array<int,array<string,?scalar>>> */
+    public array $store = [];
+    private int $nextId = 100;
+    public int $purges = 0;
+
+    public function read(string $kind, int $id): ?array
+    {
+        return $this->store[$kind][$id] ?? null;
+    }
+    public function write(string $kind, int $id, array $fields): int
+    {
+        if ($id === 0) {
+            $id = $this->nextId++;
+        }
+        $this->store[$kind][$id] = $fields;
+        return $id;
+    }
+    public function delete(string $kind, int $id): void
+    {
+        unset($this->store[$kind][$id]);
+    }
+    public function purgeCache(): void
+    {
+        $this->purges++;
+    }
+}
+
+final class FakeMediaWriter implements MediaWriter
+{
+    /** @var array<string,string> */
+    public array $store = [];
+    public function read(string $path): ?string
+    {
+        return $this->store[$path] ?? null;
+    }
+    public function write(string $path, string $bytes): void
+    {
+        $this->store[$path] = $bytes;
+    }
+    public function delete(string $path): void
+    {
+        unset($this->store[$path]);
+    }
+}
+
+final class FakeApplyLog implements ApplyLog
+{
+    /** @var array<string,array<int,array<string,mixed>>> */
+    public array $log = [];
+    public function record(string $applyId, array $entry): void
+    {
+        $this->log[$applyId][] = $entry;
+    }
+    public function entries(string $applyId): array
+    {
+        return $this->log[$applyId] ?? [];
+    }
+    public function clear(string $applyId): void
+    {
+        unset($this->log[$applyId]);
+    }
+}
+
+/** A log that cannot record — to prove a write with no recordable undo is rolled back. */
+final class FailingApplyLog implements ApplyLog
+{
+    public function record(string $applyId, array $entry): void
+    {
+        throw new RuntimeException('log write failed');
+    }
+    public function entries(string $applyId): array
+    {
+        return [];
+    }
+    public function clear(string $applyId): void
+    {
+    }
+}
+
+$WTOKEN = 'write-token-at-least-16chars';
+$writer = new FakeSiteWriter();
+$mediaW = new FakeMediaWriter();
+$log = new FakeApplyLog();
+$wEngine = new Engine($WTOKEN, [], null, null, null, null, $writer, $mediaW, $log);
+
+// insert an article
+$ins = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'A1', 'kind' => 'article', 'fields' => ['title' => 'Hello']]]);
+check('content.write inserts', $ins['ok'], true);
+check('an insert reports created', $ins['created'], true);
+$newId = $ins['id'];
+check('the row is now in the site', $writer->read('article', $newId), ['title' => 'Hello']);
+check('the write was logged under its apply', count($log->entries('A1')), 1);
+check('a content write purges cache', $writer->purges, 1);
+
+// revert the insert -> the row is gone
+$rev = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A1']]);
+check('revert reports what it undid', $rev['reverted'], 1);
+check('reverting an insert deletes the row', $writer->read('article', $newId), null);
+check('a reverted apply is forgotten', count($log->entries('A1')), 0);
+
+// update an existing template style, then revert -> the old params come back
+$writer->store['templateStyle'][7] = ['params' => '{"color":"blue"}'];
+$upd = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'A2', 'kind' => 'templateStyle', 'id' => 7, 'fields' => ['params' => '{"color":"red"}']]]);
+check('updating an existing row is not a create', $upd['created'], false);
+check('the new value is live', $writer->read('templateStyle', 7), ['params' => '{"color":"red"}']);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A2']]);
+check('reverting an update restores the before-state', $writer->read('templateStyle', 7), ['params' => '{"color":"blue"}']);
+
+// media: a new file, then revert deletes it
+$mw = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'M1', 'path' => 'images/logo.png', 'content_b64' => base64_encode('PNGDATA')]]);
+check('media.write lands the file', $mediaW->read('images/logo.png'), 'PNGDATA');
+check('a new upload reports created', $mw['created'], true);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M1']]);
+check('reverting a new upload deletes it', $mediaW->read('images/logo.png'), null);
+
+// media: overwrite an existing file, then revert restores the old bytes
+$mediaW->store['images/hero.jpg'] = 'OLDBYTES';
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'M2', 'path' => 'images/hero.jpg', 'content_b64' => base64_encode('NEWBYTES')]]);
+check('overwrite lands the new bytes', $mediaW->read('images/hero.jpg'), 'NEWBYTES');
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M2']]);
+check('reverting an overwrite restores the old bytes', $mediaW->read('images/hero.jpg'), 'OLDBYTES');
+
+// apply.list names what was touched, without the before payload
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'L1', 'kind' => 'module', 'fields' => ['content' => 'x']]]);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'L1', 'path' => 'images/a.png', 'content_b64' => base64_encode('a')]]);
+$list = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.list', 'params' => ['apply_id' => 'L1']]);
+check('apply.list returns every step', count($list['steps']), 2);
+check('apply.list names the content kind', $list['steps'][0]['kind'], 'module');
+checkTrue('apply.list does not leak the before payload', !isset($list['steps'][0]['before']));
+
+// refusals ------------------------------------------------------------------------------------
+$badKind = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'X', 'kind' => 'user', 'fields' => ['a' => 'b']]]);
+check('an unknown kind is refused', $badKind['error'], 'bad_params');
+
+$noApply = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('a write without an apply_id is refused', $noApply['message'], 'apply_id required');
+
+$traversal = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'X', 'path' => '../configuration.php', 'content_b64' => base64_encode('x')]]);
+check('a traversing media path is refused', $traversal['message'], 'unusable media path');
+checkTrue('nothing was written outside the media root', !isset($mediaW->store['../configuration.php']));
+
+$tooBig = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'X', 'path' => 'images/big.bin', 'content_b64' => base64_encode(str_repeat('A', 8 * 1024 * 1024 + 1))]]);
+check('a media upload past the inline ceiling is refused', $tooBig['error'], 'too_large');
+
+$wrongToken = $wEngine->handle(['token' => 'nope-but-long-enough-here', 'action' => 'content.write',
+    'params' => ['apply_id' => 'X', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('a wrong token writes nothing', $wrongToken['error'], 'unauthorized');
+
+// a site with no writer wired cannot be written to at all
+$readOnlyW = new Engine($WTOKEN);
+$unwiredW = $readOnlyW->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'X', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('an unwired site refuses content writes', $unwiredW['error'], 'unavailable');
+
+// the rollback promise: a write whose undo cannot be recorded is undone, not left standing
+$rbWriter = new FakeSiteWriter();
+$rbEngine = new Engine($WTOKEN, [], null, null, null, null, $rbWriter, $mediaW, new FailingApplyLog());
+$rb = $rbEngine->handle(['token' => $WTOKEN, 'action' => 'content.write',
+    'params' => ['apply_id' => 'R1', 'kind' => 'article', 'fields' => ['title' => 'ghost']]]);
+check('a write whose undo cannot be recorded fails', $rb['ok'], false);
+check('and the site holds no orphan for it', $rbWriter->read('article', 100), null);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
