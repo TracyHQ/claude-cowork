@@ -276,7 +276,12 @@ final class Engine
                 // everything after that entry would shift.
                 $size = ($entryOffset > 0 && $declared > 0) ? $declared : (int) filesize($abs);
                 $declared = $size;
-                $headerEnd  = TarStream::BLOCK_BYTES;
+                // Built before it is measured, because it is no longer always one block: a path
+                // USTAR cannot hold arrives as a PAX header, its record, and then the ordinary
+                // header. Counting blocks instead of measuring would put the content at the wrong
+                // offset for exactly the entries this exists to rescue.
+                $header     = TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
+                $headerEnd  = strlen($header);
                 $contentEnd = $headerEnd + $size;
                 $entryEnd   = $contentEnd + strlen(TarStream::pad($size));
 
@@ -285,7 +290,6 @@ final class Engine
                     if ($entryOffset === 0) {
                         $files++;
                     }
-                    $header = TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
                     $take   = min($headerEnd - $entryOffset, $target - strlen($buf));
                     $buf         .= substr($header, $entryOffset, $take);
                     $entryOffset += $take;

@@ -44,6 +44,41 @@ final class FileWalker
     }
 
     /**
+     * Archives that live in the webroot itself rather than under a plugin's directory.
+     *
+     * The list above catches backups a plugin files away tidily. It cannot catch the other habit:
+     * a one-off archive dropped straight in the webroot, named after the site and the day. On
+     * juneflower.vn that was `backup-juneflower.vn-1-19-2026.tar.gz` at 1.6 GB — larger than
+     * everything else on the site put together, and most of the twenty minutes a pack spent before
+     * it (2026-08-14).
+     *
+     * A clone has no use for one. It is a snapshot of the very thing being copied, taken months
+     * earlier, and nothing on the site ever serves it. Matched only at the top level, so a theme
+     * that legitimately ships a `.zip` asset deep in its own folder is untouched.
+     */
+    private const ROOT_ARCHIVE_PATTERNS = [
+        '/^backup[-_.].*\.(tar\.gz|tgz|tar|zip|gz)$/i',
+        '/^.*-backup\.(tar\.gz|tgz|tar|zip|gz)$/i',
+        '/\.(sql|sql\.gz|sql\.zip)$/i',
+        '/\.wpress$/i',           // All-in-One WP Migration
+        '/^wp-content\.(zip|tar\.gz)$/i',
+    ];
+
+    /** Whether a path is an archive sitting loose in the webroot. */
+    private function isRootArchive(string $rel): bool
+    {
+        if (strpos($rel, '/') !== false) {
+            return false;
+        }
+        foreach (self::ROOT_ARCHIVE_PATTERNS as $pattern) {
+            if (preg_match($pattern, $rel) === 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Every path, filtered and sorted, remembered for as long as this object lives.
      *
      * It did not always: each call used to walk the tree again. Inside the tar loop that means
@@ -93,7 +128,11 @@ final class FileWalker
         );
         foreach ($it as $file) {
             if ($file->isFile()) {
-                $out[] = $this->relative($file->getPathname());
+                $rel = $this->relative($file->getPathname());
+                if ($this->isRootArchive($rel)) {
+                    continue;
+                }
+                $out[] = $rel;
             }
         }
         sort($out, SORT_STRING);

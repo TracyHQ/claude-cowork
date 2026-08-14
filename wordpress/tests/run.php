@@ -400,5 +400,54 @@ exec('tar -tf ' . escapeshellarg($evenTar) . ' 2>&1', $evenList, $evenStatus);
 check('and the archive is still whole', $evenStatus, 0);
 check('with every file in it', count(array_filter($evenList, fn($l) => strpos($l, 'tar:') !== 0)), 7);
 
+// ------------------------------------------- long paths and stray backups ---
+//
+// Both learned from one real site (juneflower.vn, 2026-08-14): a webpack chunk shipped by
+// Elementor Pro whose filename alone is 101 characters, and a 1.6 GB backup archive sitting in
+// the webroot that a clone has no use for. The first killed the run outright; the second was
+// most of the twenty minutes it spent before dying.
+
+$longTmp = sys_get_temp_dir() . '/tracy_longpath_' . bin2hex(random_bytes(4));
+mkdir("$longTmp/wp-content/plugins/elementor-pro/assets/js/notes", 0777, true);
+
+// Exactly the file that stopped the real run: 101 characters, no directory boundary to split on.
+$longName = 'vendors-node_modules_radix-ui_react-alert-dialog_dist_index_module_js-node_modules_radix-ui_r-c71607.js';
+$longRel  = "wp-content/plugins/elementor-pro/assets/js/notes/{$longName}";
+file_put_contents("$longTmp/$longRel", 'chunk');
+file_put_contents("$longTmp/index.php", '<?php');
+
+// And a backup archive of the kind plugins drop straight in the webroot.
+file_put_contents("$longTmp/backup-example.com-1-19-2026.tar.gz", 'not a real archive');
+file_put_contents("$longTmp/db-export.sql.gz", 'nor this');
+
+$longWalker = new FileWalker($longTmp);
+$longPaths  = array_map(fn($f) => $f['path'], $longWalker->listBatch('', 50)['files']);
+
+checkTrue('a backup archive in the webroot is left out', !in_array('backup-example.com-1-19-2026.tar.gz', $longPaths, true));
+checkTrue('a loose database dump is left out', !in_array('db-export.sql.gz', $longPaths, true));
+checkTrue('the long-named chunk is still packed', in_array($longRel, $longPaths, true));
+checkTrue('ordinary files are untouched', in_array('index.php', $longPaths, true));
+
+// The archive has to be readable by tar itself, not merely by us.
+$longCapture = new CapturingUploader();
+$longEngine  = new Engine('a-token-at-least-16', [], null, new FileWalker($longTmp), $longCapture);
+$cursor = ''; $offset = 0; $declared = 0; $guard = 0;
+do {
+    $r = $longEngine->handle([
+        'token'  => 'a-token-at-least-16',
+        'action' => 'files.pack',
+        'params' => ['put_url' => 'https://example.test/p', 'target_bytes' => 4096,
+                     'path' => $cursor, 'offset' => $offset, 'size' => $declared],
+    ]);
+    $cursor = $r['next_path'] ?? ''; $offset = $r['next_offset'] ?? 0; $declared = $r['next_size'] ?? 0;
+} while (empty($r['done']) && ++$guard < 60);
+
+$longTar = "$longTmp/out.tar";
+file_put_contents($longTar, implode('', $longCapture->parts));
+exec('tar -tf ' . escapeshellarg($longTar) . ' 2>&1', $longList, $longStatus);
+check('tar reads the archive with a 101-character filename', $longStatus, 0);
+checkTrue('and the long path survives the round trip', in_array($longRel, array_map('trim', $longList), true));
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
