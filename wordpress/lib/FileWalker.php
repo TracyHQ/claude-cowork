@@ -40,8 +40,30 @@ final class FileWalker
             'wp-content/backups-dup-lite', // Duplicator
             'wp-content/uploads/backwpup',  // BackWPup
             'wp-content/uploads/backup-guard', // Backup Guard
+            'wp-content/ew-backup',        // EWWW Image Optimizer — the pre-compression originals
+            'wp-content/wpvivid',          // WPvivid
+            'wp-content/backuply',         // Backuply
+            'wp-content/backup',           // several plugins, and hand-made
+            'wp-content/backups',
+            'wp-content/litespeed',        // LiteSpeed cache
+            'wp-content/et-cache',         // Divi
+            'wp-content/uploads/wp-clone',
         ];
     }
+
+    /**
+     * A clone needs what the LIVE site serves, and nothing else.
+     *
+     * `ew-backup` is the case that taught this: EWWW Image Optimizer compresses what is in
+     * `uploads` and files the untouched original away, so a site with it installed carries a
+     * second, heavier copy of its whole media library that no page ever requests. On
+     * juneflower.vn that sat behind a 1.6 GB webroot archive, and between them they were nearly
+     * the entire copy (2026-08-14).
+     *
+     * The rule the list follows: a directory is cut when nothing the site serves reads from it.
+     * Caches rebuild themselves, backups are snapshots of the very thing being copied, and
+     * originals kept "just in case" are for restoring the source, not for running the clone.
+     */
 
     /**
      * Archives that live in the webroot itself rather than under a plugin's directory.
@@ -59,14 +81,31 @@ final class FileWalker
     private const ROOT_ARCHIVE_PATTERNS = [
         '/^backup[-_.].*\.(tar\.gz|tgz|tar|zip|gz)$/i',
         '/^.*-backup\.(tar\.gz|tgz|tar|zip|gz)$/i',
-        '/\.(sql|sql\.gz|sql\.zip)$/i',
-        '/\.wpress$/i',           // All-in-One WP Migration
         '/^wp-content\.(zip|tar\.gz)$/i',
     ];
 
-    /** Whether a path is an archive sitting loose in the webroot. */
+    /**
+     * Archives no running site reads, wherever they sit.
+     *
+     * A `.tar.gz`, a `.sql` dump or a `.wpress` package is never served to a visitor and never
+     * read by PHP at runtime — they exist to move a site, not to run one. `.zip` is deliberately
+     * NOT here: plugins and themes do ship legitimate ones inside their own folders, so it stays
+     * a top-level-only match under ROOT_ARCHIVE_PATTERNS.
+     */
+    private const DEAD_WEIGHT_PATTERNS = [
+        '/\.(tar\.gz|tgz|tar)$/i',
+        '/\.sql(\.gz|\.zip|\.bz2)?$/i',
+        '/\.wpress$/i',           // All-in-One WP Migration
+    ];
+
+    /** Whether a path is an archive the live site has no use for. */
     private function isRootArchive(string $rel): bool
     {
+        foreach (self::DEAD_WEIGHT_PATTERNS as $pattern) {
+            if (preg_match($pattern, $rel) === 1) {
+                return true;
+            }
+        }
         if (strpos($rel, '/') !== false) {
             return false;
         }

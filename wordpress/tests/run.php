@@ -428,6 +428,21 @@ checkTrue('a loose database dump is left out', !in_array('db-export.sql.gz', $lo
 checkTrue('the long-named chunk is still packed', in_array($longRel, $longPaths, true));
 checkTrue('ordinary files are untouched', in_array('index.php', $longPaths, true));
 
+// The originals EWWW Image Optimizer keeps: a second, heavier copy of the whole media library
+// that no page ever requests. Nearly half of what juneflower.vn was carrying (2026-08-14).
+mkdir("$longTmp/wp-content/ew-backup/2023/03", 0777, true);
+file_put_contents("$longTmp/wp-content/ew-backup/2023/03/IMG_3418-scaled.jpg", 'the untouched original');
+mkdir("$longTmp/wp-content/uploads/2023/03", 0777, true);
+file_put_contents("$longTmp/wp-content/uploads/2023/03/IMG_3418-scaled.jpg", 'the one the site serves');
+// And a dump left somewhere other than the webroot root.
+mkdir("$longTmp/wp-content/uploads/2024", 0777, true);
+file_put_contents("$longTmp/wp-content/uploads/2024/old-site.sql", 'SELECT 1');
+
+$ewPaths = array_map(fn($f) => $f['path'], (new FileWalker($longTmp))->listBatch('', 50)['files']);
+checkTrue('EWWW originals are left out', !in_array('wp-content/ew-backup/2023/03/IMG_3418-scaled.jpg', $ewPaths, true));
+checkTrue('the image the site actually serves is kept', in_array('wp-content/uploads/2023/03/IMG_3418-scaled.jpg', $ewPaths, true));
+checkTrue('a dump buried in uploads is left out too', !in_array('wp-content/uploads/2024/old-site.sql', $ewPaths, true));
+
 // The archive has to be readable by tar itself, not merely by us.
 $longCapture = new CapturingUploader();
 $longEngine  = new Engine('a-token-at-least-16', [], null, new FileWalker($longTmp), $longCapture);
