@@ -73,6 +73,14 @@ class com_claudecoworkInstallerScript
             // Swallowed: the screen is still reachable without a menu item.
         }
 
+        try {
+            $this->ensureApplyLogTable($db);
+        } catch (\Throwable $e) {
+            // Swallowed: the read and connect features work without it; the write actions refuse to
+            // run until the table exists, which a later upgrade will create. A component that
+            // installed correctly must not report failure because one table could not be made.
+        }
+
         return true;
     }
 
@@ -100,6 +108,29 @@ class com_claudecoworkInstallerScript
                 ->set($db->quoteName('params') . ' = ' . $db->quote($params->toString()))
                 ->where($db->quoteName('element') . ' = ' . $db->quote('com_claudecowork'))
                 ->where($db->quoteName('type') . ' = ' . $db->quote('component'))
+        )->execute();
+    }
+
+    /**
+     * Creates the table the write actions record their undo into, if it is not already there.
+     *
+     * `CREATE TABLE IF NOT EXISTS` so it is safe on a fresh install and on an upgrade from a
+     * version that had no write side — the same idempotent shape as seeding the token. The driver
+     * turns `#__` into the site's real prefix. No explicit charset: whatever the site's database
+     * defaults to serves fine, since every value stored here is ASCII (base64 of the before-state).
+     */
+    private function ensureApplyLogTable($db): void
+    {
+        $db->setQuery(
+            'CREATE TABLE IF NOT EXISTS ' . $db->quoteName('#__claudecowork_apply_log') . ' ('
+            . $db->quoteName('id') . ' INT UNSIGNED NOT NULL AUTO_INCREMENT, '
+            . $db->quoteName('apply_id') . ' VARCHAR(191) NOT NULL, '
+            . $db->quoteName('seq') . ' INT UNSIGNED NOT NULL, '
+            . $db->quoteName('entry') . ' LONGTEXT NOT NULL, '
+            . $db->quoteName('created') . ' DATETIME NOT NULL, '
+            . 'PRIMARY KEY (' . $db->quoteName('id') . '), '
+            . 'KEY ' . $db->quoteName('idx_apply_seq') . ' (' . $db->quoteName('apply_id') . ', ' . $db->quoteName('seq') . ')'
+            . ') ENGINE=InnoDB'
         )->execute();
     }
 

@@ -50,7 +50,7 @@ class ApiController extends BaseController
     {
         $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib';
 
-        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
+        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
             require_once $lib . '/' . $class . '.php';
         }
     }
@@ -108,7 +108,10 @@ class ApiController extends BaseController
             $this->buildDumper(),
             $this->buildWalker($params),
             new \CurlUploader(120),
-            new JoomlaExtensions()
+            new JoomlaExtensions(),
+            $this->buildWriter(),
+            $this->buildMedia(),
+            $this->buildLog()
         );
 
         $app->setHeader('Content-Type', 'application/json', true);
@@ -141,6 +144,43 @@ class ApiController extends BaseController
 
         try {
             return new \FileWalker($configured !== '' ? $configured : JPATH_ROOT);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * The write side of an Apply, wired only on Joomla 4+ (this controller). A site whose database
+     * cannot be reached leaves `content.write` reporting 'unavailable', the same honest result the
+     * read side gives — never a fatal.
+     */
+    private function buildWriter(): ?\SiteWriter
+    {
+        try {
+            return new JoomlaSiteWriter(Factory::getContainer()->get(DatabaseInterface::class));
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Media writes land under the same webroot the walker reads; unreadable leaves media.write 'unavailable'. */
+    private function buildMedia(): ?\MediaWriter
+    {
+        try {
+            return new JoomlaMediaWriter(JPATH_ROOT);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * The undo log every write records to. Without it wired, the write actions refuse to run at
+     * all — the engine will not make a change it cannot record how to reverse.
+     */
+    private function buildLog(): ?\ApplyLog
+    {
+        try {
+            return new JoomlaApplyLog(Factory::getContainer()->get(DatabaseInterface::class));
         } catch (\Throwable $e) {
             return null;
         }

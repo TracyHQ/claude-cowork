@@ -20,11 +20,12 @@ use Joomla\CMS\MVC\Controller\BaseController;
  *
  * - The database connection comes from `Factory::getDbo()`, not the DI container Joomla 3 does
  *   not have.
- * - The extension installer is left out (`null`), so `extension.install` answers 'unavailable'
- *   here. That action is for the live sites Tracy manages on current Joomla; a Joomla 3 site is
- *   almost always one being read to be migrated OFF, where the actions that matter are the
- *   reads — the database and the files. Wiring Joomla 3's older installer for a case that does
- *   not arise would be code to carry for no one.
+ * - The extension installer AND the write side (SiteWriter, MediaWriter, ApplyLog) are left out
+ *   (`null`), so `extension.install`, `content.write` and `media.write` answer 'unavailable'
+ *   here. Those actions are for the live sites Tracy manages on current Joomla; a Joomla 3 site
+ *   is almost always one being read to be migrated OFF, where the actions that matter are the
+ *   reads — the database and the files. Wiring Joomla 3's older APIs for a case that does not
+ *   arise would be code to carry for no one.
  *
  * The engine itself (`lib/`) is byte-identical to the Joomla 4 path: the value is shared, only
  * this thin Joomla-facing shell is doubled.
@@ -35,7 +36,7 @@ class ClaudeCoworkControllerApi extends BaseController
     {
         $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib';
 
-        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
+        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
             require_once $lib . '/' . $class . '.php';
         }
 

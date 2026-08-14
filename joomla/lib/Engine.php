@@ -47,6 +47,13 @@ final class Engine
     private const READ_CHUNK = 1048576;
     /** A single media upload carried inline as base64. Larger assets belong on the signed-URL path. */
     private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
+    /**
+     * media.write may only land a file under Joomla's two conventional media trees — never code.
+     * A template's PHP override is not media: it reaches a site as part of an extension package or
+     * through git, not this action. Without this a well-formed path like `configuration.php` passes
+     * every other check and overwrites live code.
+     */
+    private const MEDIA_ROOTS = ['images/', 'media/'];
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
 
@@ -713,10 +720,11 @@ final class Engine
     }
 
     /**
-     * A media path is a relative path under the site's media root and nothing else: no leading
-     * slash, no `..`, no drive letter, no null byte, and only a conservative character set. The
-     * real MediaWriter confines writes to the root as well — this is the cheap refusal that keeps a
-     * hostile path from ever reaching it.
+     * A media path is a relative path under one of the media roots and nothing else: no leading
+     * slash, no `..`, no drive letter, no null byte, a conservative character set, and a first
+     * segment that is a media tree. The real MediaWriter confines writes to the root as well — this
+     * is the cheap refusal that keeps a hostile path from ever reaching it, and the media-root
+     * requirement is what stops a valid-looking `configuration.php` from being treated as an asset.
      */
     private static function safeMediaPath(string $path): bool
     {
@@ -732,7 +740,15 @@ final class Engine
         if (preg_match('#^[A-Za-z]:#', $path) === 1) {
             return false;
         }
-        return preg_match('#^[\w\-./]+$#', $path) === 1;
+        if (preg_match('#^[\w\-./]+$#', $path) !== 1) {
+            return false;
+        }
+        foreach (self::MEDIA_ROOTS as $root) {
+            if (strncmp($path, $root, strlen($root)) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** @param array<string,mixed> $extra */

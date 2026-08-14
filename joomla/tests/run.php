@@ -671,6 +671,12 @@ $traversal = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
 check('a traversing media path is refused', $traversal['message'], 'unusable media path');
 checkTrue('nothing was written outside the media root', !isset($mediaW->store['../configuration.php']));
 
+// A well-formed path that is not under a media tree is live code, not an asset — refused.
+$notMedia = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
+    'params' => ['apply_id' => 'X', 'path' => 'configuration.php', 'content_b64' => base64_encode('x')]]);
+check('a media write outside the media roots is refused', $notMedia['message'], 'unusable media path');
+checkTrue('live code was not touched', !isset($mediaW->store['configuration.php']));
+
 $tooBig = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.write',
     'params' => ['apply_id' => 'X', 'path' => 'images/big.bin', 'content_b64' => base64_encode(str_repeat('A', 8 * 1024 * 1024 + 1))]]);
 check('a media upload past the inline ceiling is refused', $tooBig['error'], 'too_large');
