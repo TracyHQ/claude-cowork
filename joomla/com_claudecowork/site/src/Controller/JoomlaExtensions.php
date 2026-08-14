@@ -52,7 +52,12 @@ final class JoomlaExtensions implements \ExtensionManager
         }
 
         try {
+            // Joomla 4 gave `new Installer()` a database off the global container; Joomla 6 no
+            // longer does, and install() then dies with "Database not set in ...Installer". Set it
+            // explicitly so this works across generations. `Installer::getInstance()` would do the
+            // same on 4, but the shared instance it hands back is not database-aware on 6 either.
             $installer = new Installer();
+            $installer->setDatabase(Factory::getContainer()->get(DatabaseInterface::class));
             $installed = $installer->install($package['dir']);
             if (!$installed) {
                 $message = (string) $installer->getError();
