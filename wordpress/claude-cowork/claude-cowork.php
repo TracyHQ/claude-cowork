@@ -252,6 +252,64 @@ function claude_cowork_exec(): void
 add_action('wp_ajax_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 add_action('wp_ajax_nopriv_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 
+// ---- Telling a watching preview that the site changed ---------------------------------------
+
+/**
+ * Note that the site changed, for whoever is watching it.
+ *
+ * Loads only `ChangeStamp`, not the engine: this runs on ordinary admin requests — a customer
+ * saving a post — and pulling in the dumper, the tar writer and the uploader to record one
+ * timestamp would make every save slower for a feature the request itself does not use.
+ */
+function claude_cowork_note_change(string $reason): void
+{
+    require_once __DIR__ . '/lib/ChangeStamp.php';
+    (new ChangeStamp(ABSPATH))->touch($reason);
+}
+
+/**
+ * Which changes are worth telling a preview about.
+ *
+ * A deliberately short list. WordPress fires `updated_option` constantly — cron schedules,
+ * transients, update checks — and hooking it would have a preview reloading every few seconds
+ * on a site nobody is touching, which is worse than not reloading at all. These four are the
+ * ones a person watching a preview would say "yes, that changed my site":
+ *
+ *   switch_theme        a different theme is live — the whole page looks different
+ *   save_post           a page or post was published or edited
+ *   activated_plugin    something new is running
+ *   deactivated_plugin  something stopped running
+ *
+ * `save_post` fires for autosaves and revisions too, which are not changes anyone can see, so
+ * those are filtered out rather than reloading a preview while its author is still typing.
+ */
+add_action('switch_theme', static function (): void {
+    claude_cowork_note_change('theme');
+});
+
+add_action('save_post', static function ($post_id, $post = null, $update = null): void {
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (function_exists('wp_is_post_revision') && wp_is_post_revision($post_id)) {
+        return;
+    }
+    // A draft is not on the site yet: reloading a preview for one would show the reader nothing
+    // new and interrupt whatever they were looking at.
+    if ($post !== null && isset($post->post_status) && $post->post_status !== 'publish') {
+        return;
+    }
+    claude_cowork_note_change('content');
+}, 10, 3);
+
+add_action('activated_plugin', static function (): void {
+    claude_cowork_note_change('plugin');
+});
+
+add_action('deactivated_plugin', static function (): void {
+    claude_cowork_note_change('plugin');
+});
+
 // ---- The one setting -----------------------------------------------------------------------
 
 /**

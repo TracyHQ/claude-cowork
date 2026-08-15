@@ -13,6 +13,7 @@ require_once __DIR__ . '/../lib/Token.php';
 require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
 require_once __DIR__ . '/../lib/Engine.php';
+require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
 $passed = 0;
@@ -462,6 +463,40 @@ file_put_contents($longTar, implode('', $longCapture->parts));
 exec('tar -tf ' . escapeshellarg($longTar) . ' 2>&1', $longList, $longStatus);
 check('tar reads the archive with a 101-character filename', $longStatus, 0);
 checkTrue('and the long path survives the round trip', in_array($longRel, array_map('trim', $longList), true));
+
+
+// ---- ChangeStamp: the hint a watching preview reads ----------------------------------------
+
+$stampRoot = sys_get_temp_dir() . '/cowork-stamp-' . bin2hex(random_bytes(4));
+mkdir($stampRoot);
+$stamp = new ChangeStamp($stampRoot);
+
+checkTrue('nothing to read before anything changed', $stamp->read() === null);
+
+$stamp->touch('theme');
+$first = $stamp->read();
+checkTrue('a change is recorded', is_array($first) && isset($first['at']));
+check('and says coarsely what kind it was', $first['reason'] ?? null, 'theme');
+
+// One user action fires several hooks. Collapsing them is what keeps a preview from reloading
+// three times for one edit — and a reload mid-edit is worse than a reload a second late.
+$stamp->touch('content');
+check('a second change in the same second does not overwrite the first', $stamp->read()['reason'], 'theme');
+
+// The file is polled every few seconds by something that will parse it. A reader must never
+// catch it half-written, which is why the write goes through a temporary file and a rename.
+checkTrue('no temporary file is left behind', !file_exists($stampRoot . '/' . ChangeStamp::FILENAME . '.tmp'));
+
+// This runs inside a customer's admin request. A hardened host with a read-only webroot must
+// lose the auto-reload, not the admin screen.
+$readOnly = sys_get_temp_dir() . '/cowork-ro-' . bin2hex(random_bytes(4));
+mkdir($readOnly, 0500);
+(new ChangeStamp($readOnly))->touch('theme');
+checkTrue('an unwritable webroot is survived silently', (new ChangeStamp($readOnly))->read() === null);
+@rmdir($readOnly);
+
+array_map('unlink', glob($stampRoot . '/*'));
+@rmdir($stampRoot);
 
 
 echo "\n{$passed} passed, {$failed} failed\n";
