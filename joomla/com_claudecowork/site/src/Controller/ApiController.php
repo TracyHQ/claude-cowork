@@ -151,7 +151,7 @@ class ApiController extends BaseController
 
     /**
      * The write side of an Apply, wired only on Joomla 4+ (this controller). A site whose database
-     * cannot be reached leaves `content.write` reporting 'unavailable', the same honest result the
+     * cannot be reached leaves `content.update` reporting 'unavailable', the same honest result the
      * read side gives — never a fatal.
      */
     private function buildWriter(): ?\SiteWriter
@@ -163,7 +163,7 @@ class ApiController extends BaseController
         }
     }
 
-    /** Media writes land under the same webroot the walker reads; unreadable leaves media.write 'unavailable'. */
+    /** Media writes land under the same webroot the walker reads; unreadable leaves media.upload 'unavailable'. */
     private function buildMedia(): ?\MediaWriter
     {
         try {

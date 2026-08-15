@@ -21,7 +21,7 @@ use Joomla\CMS\MVC\Controller\BaseController;
  * - The database connection comes from `Factory::getDbo()`, not the DI container Joomla 3 does
  *   not have.
  * - The extension installer AND the write side (SiteWriter, MediaWriter, ApplyLog) are left out
- *   (`null`), so `extension.install`, `content.write` and `media.write` answer 'unavailable'
+ *   (`null`), so `extension.install`, `content.update` and `media.upload` answer 'unavailable'
  *   here. Those actions are for the live sites Tracy manages on current Joomla; a Joomla 3 site
  *   is almost always one being read to be migrated OFF, where the actions that matter are the
  *   reads — the database and the files. Wiring Joomla 3's older APIs for a case that does not

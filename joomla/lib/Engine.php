@@ -48,7 +48,7 @@ final class Engine
     /** A single media upload carried inline as base64. Larger assets belong on the signed-URL path. */
     private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
     /**
-     * media.write may only land a file under Joomla's two conventional media trees — never code.
+     * media.upload may only land a file under Joomla's two conventional media trees — never code.
      * A template's PHP override is not media: it reaches a site as part of an extension package or
      * through git, not this action. Without this a well-formed path like `configuration.php` passes
      * every other check and overwrites live code.
@@ -112,10 +112,10 @@ final class Engine
                 return $this->extensionList();
             case 'extension.install':
                 return $this->extensionInstall($params);
-            case 'content.write':
-                return $this->contentWrite($params);
-            case 'media.write':
-                return $this->mediaWrite($params);
+            case 'content.update':
+                return $this->contentUpdate($params);
+            case 'media.upload':
+                return $this->mediaUpload($params);
             case 'apply.revert':
                 return $this->applyRevert($params);
             case 'apply.list':
@@ -505,7 +505,7 @@ final class Engine
      * and the log must be wired: a site that can be written but not reverted is not one this action
      * will touch.
      */
-    private function contentWrite(array $p): array
+    private function contentUpdate(array $p): array
     {
         if ($this->writer === null || $this->log === null) {
             return $this->err('unavailable', 'site writer not wired');
@@ -548,11 +548,11 @@ final class Engine
 
     /**
      * Put one file into the site's media folder, carried inline as base64, and remember how to
-     * undo it. Same rollback rule as contentWrite: if the undo cannot be recorded, the upload is
+     * undo it. Same rollback rule as contentUpdate: if the undo cannot be recorded, the upload is
      * reversed rather than left behind. Anything past the inline ceiling belongs on the signed-URL
      * path, so the request the relay would have to proxy stays small.
      */
-    private function mediaWrite(array $p): array
+    private function mediaUpload(array $p): array
     {
         if ($this->media === null || $this->log === null) {
             return $this->err('unavailable', 'media writer not wired');
