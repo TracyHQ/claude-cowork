@@ -29,6 +29,8 @@ final class Engine
     private ?DbDumper $dumper;
     private ?FileWalker $walker;
     private ?Uploader $uploader;
+    /** Plugins and themes. Null on a site wired for reading only — every write action then refuses. */
+    private $packages;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -47,13 +49,15 @@ final class Engine
         array $info = [],
         ?DbDumper $dumper = null,
         ?FileWalker $walker = null,
-        ?Uploader $uploader = null
+        ?Uploader $uploader = null,
+        $packages = null
     ) {
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
         $this->walker = $walker;
         $this->uploader = $uploader;
+        $this->packages = $packages;
     }
 
     /**
@@ -85,6 +89,18 @@ final class Engine
                 return $this->filesPack($params);
             case 'file.read':
                 return $this->fileRead($params);
+            case 'plugin.list':
+                return $this->pluginList();
+            case 'plugin.install':
+                return $this->pluginInstall($params);
+            case 'plugin.activate':
+                return $this->pluginActivate($params);
+            case 'theme.list':
+                return $this->themeList();
+            case 'theme.install':
+                return $this->themeInstall($params);
+            case 'theme.activate':
+                return $this->themeActivate($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -408,6 +424,140 @@ final class Engine
     }
 
     /** @param array<string,mixed> $extra */
+
+
+    /**
+     * The shape a package URL must have before this site is asked to fetch it: one https `.zip`.
+     *
+     * Checked here rather than only inside the package manager so a caller's mistake is reported
+     * as `bad_params` — something they can fix — instead of `install_failed`, which reads as the
+     * site having tried and failed. The manager checks again; this is the classification.
+     */
+    private function packageUrl(array $p): array
+    {
+        $url = isset($p['url']) && is_string($p['url']) ? trim($p['url']) : '';
+        if ($url === '') {
+            return ['ok' => false, 'error' => 'url required'];
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return ['ok' => false, 'error' => 'not a URL'];
+        }
+        if (strtolower((string) $parts['scheme']) !== 'https') {
+            return ['ok' => false, 'error' => 'https required'];
+        }
+        if (substr(strtolower((string) ($parts['path'] ?? '')), -4) !== '.zip') {
+            return ['ok' => false, 'error' => 'package URL must end in .zip'];
+        }
+        return ['ok' => true, 'url' => $url];
+    }
+
+    // ---- Plugins and themes -----------------------------------------------------------------
+    //
+    // WordPress keeps these apart and so does this: a theme is switched to and replaces the one
+    // before it, a plugin is turned on beside the others. Flattening them into one "extension"
+    // action the way Joomla does would hide that difference behind a `kind` parameter and make
+    // every caller learn it anyway.
+
+    /** @return array<string,mixed> */
+    private function packagesReady(): ?array
+    {
+        return $this->packages === null
+            ? $this->err('unavailable', 'package manager not wired')
+            : null;
+    }
+
+    /** What is installed, before deciding whether an install is needed at all. */
+    private function pluginList(): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        return $this->ok(['plugins' => $this->packages->list_plugins()]);
+    }
+
+    private function themeList(): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        return $this->ok(['themes' => $this->packages->list_themes()]);
+    }
+
+    /**
+     * Install, and stop there.
+     *
+     * Activation is its own action because the two fail differently: a package can install and
+     * still refuse to run (a PHP version it needs, a fatal on load). A site left with something
+     * installed and off is recoverable; one left half-activated is a white screen with no admin
+     * to undo it from.
+     */
+    private function pluginInstall(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $shape = $this->packageUrl($p);
+        if ($shape['ok'] !== true) {
+            return $this->err('bad_params', (string) $shape['error']);
+        }
+        $result = $this->packages->install_plugin($shape['url']);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['installed' => $result])
+            : $this->err('install_failed', (string) ($result['error'] ?? 'install failed'));
+    }
+
+    private function themeInstall(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $shape = $this->packageUrl($p);
+        if ($shape['ok'] !== true) {
+            return $this->err('bad_params', (string) $shape['error']);
+        }
+        $result = $this->packages->install_theme($shape['url']);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['installed' => $result])
+            : $this->err('install_failed', (string) ($result['error'] ?? 'install failed'));
+    }
+
+    private function pluginActivate(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $file = isset($p['file']) && is_string($p['file']) ? trim($p['file']) : '';
+        if ($file === '') {
+            return $this->err('bad_params', 'file required, e.g. akismet/akismet.php');
+        }
+        $result = $this->packages->activate_plugin_file($file);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['activated' => $file])
+            : $this->err('activate_failed', (string) ($result['error'] ?? 'activate failed'));
+    }
+
+    /**
+     * Switch the live theme, and say what it was.
+     *
+     * `previous` is returned so the caller can put it back without having read the site first —
+     * the one piece of state a theme switch destroys, handed over in the same breath.
+     */
+    private function themeActivate(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $stylesheet = isset($p['stylesheet']) && is_string($p['stylesheet']) ? trim($p['stylesheet']) : '';
+        if ($stylesheet === '') {
+            return $this->err('bad_params', 'stylesheet required, e.g. twentytwentytwo');
+        }
+        $result = $this->packages->activate_theme($stylesheet);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['activated' => $stylesheet, 'previous' => $result['previous'] ?? null])
+            : $this->err('activate_failed', (string) ($result['error'] ?? 'activate failed'));
+    }
+
     private function ok(array $extra): array
     {
         return array_merge(['ok' => true], $extra);

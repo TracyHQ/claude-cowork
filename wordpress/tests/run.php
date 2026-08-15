@@ -14,6 +14,7 @@ require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
+require_once __DIR__ . '/FakePackages.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
 $passed = 0;
@@ -497,6 +498,45 @@ checkTrue('an unwritable webroot is survived silently', (new ChangeStamp($readOn
 
 array_map('unlink', glob($stampRoot . '/*'));
 @rmdir($stampRoot);
+
+
+// ---- Plugins and themes: what the engine does with a package manager -----------------------
+
+$pkgEngine = new Engine('a-token-at-least-16', [], null, null, null, new FakePackages());
+$call = static function (string $action, array $params = []) use ($pkgEngine): array {
+    return $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => $action, 'params' => $params]);
+};
+
+// WordPress keeps plugins and themes apart, and so does the action list — no `kind` parameter
+// that every caller has to learn.
+check('plugins are listed under their own action', $call('plugin.list')['plugins'][0]['file'], 'akismet/akismet.php');
+check('themes are listed under theirs', $call('theme.list')['themes'][0]['stylesheet'], 'twentytwentytwo');
+
+// The URL is checked before the site is asked to fetch anything: one https .zip, so the
+// installer can never be pointed at a path on disk.
+check('http is refused', $call('plugin.install', ['url' => 'http://example.test/p.zip'])['message'], 'https required');
+check('a non-zip is refused', $call('theme.install', ['url' => 'https://example.test/p.tar'])['message'], 'package URL must end in .zip');
+check('a missing url is a caller mistake, not a failed install', $call('plugin.install')['error'], 'bad_params');
+check('http is classified the same way', $call('plugin.install', ['url' => 'http://e.test/p.zip'])['error'], 'bad_params');
+
+// Install stops at installed. Activation is separate because they fail differently — a package
+// can install fine and still refuse to run.
+$installed = $call('theme.install', ['url' => 'https://example.test/tt2.zip']);
+check('installing a theme reports what arrived', $installed['installed']['stylesheet'], 'twentytwentytwo');
+checkTrue('and does not switch to it', FakePackages::$active === 'tracy');
+
+// Switching returns the theme it replaced, so a caller can put it back without having read the
+// site first — the one piece of state a switch destroys.
+$switched = $call('theme.activate', ['stylesheet' => 'twentytwentytwo']);
+check('activating a theme says what it replaced', $switched['previous'], 'tracy');
+check('and the site is on the new one', FakePackages::$active, 'twentytwentytwo');
+
+check('a theme that is not there is refused', $call('theme.activate', ['stylesheet' => 'nope'])['error'], 'activate_failed');
+
+// A site wired for reading only must refuse every write action rather than half-answering.
+$readOnlyEngine = new Engine('a-token-at-least-16', []);
+$refused = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'theme.install', 'params' => ['url' => 'https://e.test/x.zip']]);
+check('a read-only site refuses to install', $refused['error'], 'unavailable');
 
 
 echo "\n{$passed} passed, {$failed} failed\n";

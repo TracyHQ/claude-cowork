@@ -3,8 +3,8 @@
 /**
  * Plugin Name: Tracy Claude Cowork
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
- * Description: Lets an AI assistant read this site over one token-authenticated endpoint: its database, its files and what it has installed. This plugin only reads. Your work happens on a private copy, and nothing reaches this site unless you approve it.
- * Version:     0.1.6
+ * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme and turn it on. Nothing else is written. Remove the token to switch it off.
+ * Version:     0.2.0
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -53,6 +53,10 @@ function claude_cowork_load_engine(): void
     foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
+
+    // WordPress names its files `class-*.php`, and the write side is new code written to that
+    // convention rather than to the PSR shape the engine inherited from the Joomla original.
+    require_once $lib . '/class-claude-cowork-packages.php';
 }
 
 /**
@@ -237,7 +241,8 @@ function claude_cowork_exec(): void
         ],
         claude_cowork_build_dumper(),
         claude_cowork_build_walker(),
-        new CurlUploader(120)
+        new CurlUploader(120),
+        new Claude_Cowork_Packages()
     );
 
     $answer = $engine->handle($request);
