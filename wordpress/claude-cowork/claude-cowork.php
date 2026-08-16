@@ -3,8 +3,8 @@
 /**
  * Plugin Name: Tracy Claude Cowork
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
- * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme and turn it on. Nothing else is written. Remove the token to switch it off.
- * Version:     0.2.0
+ * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Every change it makes is recorded so the whole thing can be put back. Remove the token to switch it off.
+ * Version:     0.3.0
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -50,13 +50,14 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'ChangeStamp', 'Engine', 'MysqliRowSource'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
     // WordPress names its files `class-*.php`, and the write side is new code written to that
     // convention rather than to the PSR shape the engine inherited from the Joomla original.
     require_once $lib . '/class-claude-cowork-packages.php';
+    require_once $lib . '/class-claude-cowork-writers.php';
 }
 
 /**
@@ -232,6 +233,13 @@ function claude_cowork_exec(): void
         wp_die('', '', ['response' => null]);
     }
 
+    // The log table is created on activation, but a site upgraded from a version that had no
+    // write side may never run that hook again — and an Apply whose log is missing is an Apply
+    // that cannot be reverted. Cheap enough to confirm on the requests that can write.
+    if (claude_cowork_is_write_action((string) ($request['action'] ?? ''))) {
+        Claude_Cowork_Apply_Log::ensure_table();
+    }
+
     $engine = new Engine(
         $token === '' ? null : $token,
         [
@@ -242,7 +250,11 @@ function claude_cowork_exec(): void
         claude_cowork_build_dumper(),
         claude_cowork_build_walker(),
         new CurlUploader(120),
-        new Claude_Cowork_Packages()
+        new Claude_Cowork_Packages(),
+        new Claude_Cowork_Site_Writer(),
+        new Claude_Cowork_Media_Writer(),
+        new Claude_Cowork_Apply_Log(),
+        new ChangeStamp(ABSPATH)
     );
 
     $answer = $engine->handle($request);
@@ -256,6 +268,29 @@ function claude_cowork_exec(): void
 
 add_action('wp_ajax_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 add_action('wp_ajax_nopriv_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
+
+/** The actions that keep an undo log, and so need the table it lives in. */
+function claude_cowork_is_write_action(string $action): bool
+{
+    foreach (['content.', 'media.', 'apply.'] as $prefix) {
+        if (strpos($action, $prefix) === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Create the undo log on activation.
+ *
+ * Loaded by hand rather than through `claude_cowork_load_engine`: activation runs in wp-admin
+ * with nothing of this plugin loaded, and the table's shape is the only thing needed here.
+ */
+register_activation_hook(__FILE__, static function (): void {
+    require_once __DIR__ . '/lib/SiteWriter.php';
+    require_once __DIR__ . '/lib/class-claude-cowork-writers.php';
+    Claude_Cowork_Apply_Log::ensure_table();
+});
 
 // ---- Telling a watching preview that the site changed ---------------------------------------
 
@@ -364,8 +399,8 @@ function claude_cowork_render_settings_page(): void
         <p>This site answers at
             <code><?php echo esc_html(admin_url('admin-ajax.php?action=' . CLAUDE_COWORK_ACTION)); ?></code>
             for a caller holding the token below. Clear the field to switch the endpoint off.</p>
-        <p>The endpoint only reads. Work on your site happens on a private copy, and reaching this
-            site is a separate step you approve.</p>
+        <p>Work on your site happens on a private copy. Changes reach this site only when you
+            approve them, and every one is recorded so it can be put back.</p>
         <form method="post" action="options.php">
             <?php settings_fields('claude_cowork'); ?>
             <table class="form-table" role="presentation">

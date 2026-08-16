@@ -16,6 +16,10 @@ require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/FakePackages.php';
 require_once __DIR__ . '/FakeRowSource.php';
+require_once __DIR__ . '/FakeWriters.php';
+// Defines ABSPATH, which is what the real writers check before they will load at all.
+require_once __DIR__ . '/FakeWordPress.php';
+require_once __DIR__ . '/../lib/class-claude-cowork-writers.php';
 
 $passed = 0;
 $failed = 0;
@@ -538,6 +542,210 @@ $readOnlyEngine = new Engine('a-token-at-least-16', []);
 $refused = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'theme.install', 'params' => ['url' => 'https://e.test/x.zip']]);
 check('a read-only site refuses to install', $refused['error'], 'unavailable');
 
+// -------------------------------------------------------------- Apply, and its undo --
+//
+// The write side against fakes: what is checked is the engine's promise — every edit is recorded
+// before it counts as done, and an edit whose undo cannot be recorded is rolled back rather than
+// left standing (ADR 0048).
+
+echo "\nApply\n";
+
+$WTOKEN = 'write-token-at-least-16chars';
+$writer = new FakeSiteWriter();
+$mediaW = new FakeMediaWriter();
+$log = new FakeApplyLog();
+$wEngine = new Engine($WTOKEN, [], null, null, null, null, $writer, $mediaW, $log);
+$apply = static function (string $action, array $params) use ($wEngine, $WTOKEN): array {
+    return $wEngine->handle(['token' => $WTOKEN, 'action' => $action, 'params' => $params]);
+};
+
+// A new post, then revert -> it is gone.
+$ins = $apply('content.update', ['apply_id' => 'A1', 'kind' => 'post', 'fields' => ['post_title' => 'Hello']]);
+check('content.update inserts', $ins['ok'], true);
+check('an insert reports created', $ins['created'], true);
+$newId = $ins['id'];
+check('the post is now on the site', $writer->read('post', $newId), ['post_title' => 'Hello']);
+check('the write was logged under its apply', count($log->entries('A1')), 1);
+check('a content write purges cache', $writer->purges, 1);
+
+$rev = $apply('apply.revert', ['apply_id' => 'A1']);
+check('revert reports what it undid', $rev['reverted'], 1);
+check('reverting an insert deletes the post', $writer->read('post', $newId), null);
+check('a reverted apply is forgotten', count($log->entries('A1')), 0);
+
+// An existing post, then revert -> the old words come back.
+$writer->store['post'][7] = ['post_title' => 'Old title'];
+$upd = $apply('content.update', ['apply_id' => 'A2', 'kind' => 'post', 'id' => 7, 'fields' => ['post_title' => 'New title']]);
+check('updating an existing post is not a create', $upd['created'], false);
+check('the new title is live', $writer->read('post', 7), ['post_title' => 'New title']);
+$apply('apply.revert', ['apply_id' => 'A2']);
+check('reverting an update restores the before-state', $writer->read('post', 7), ['post_title' => 'Old title']);
+
+// Post meta: the same bookkeeping, addressed by post id AND key. This is where the SEO plugins
+// keep a description, so it is the kind an Apply reaches for most.
+$meta = $apply('content.update', [
+    'apply_id' => 'A3', 'kind' => 'postmeta', 'id' => 7, 'key' => '_yoast_wpseo_metadesc',
+    'fields' => ['value' => 'A description that fits.'],
+]);
+check('a new meta reports created', $meta['created'], true);
+check('the apply names the key it wrote', $meta['key'], '_yoast_wpseo_metadesc');
+check('the meta is on the post', $writer->read('postmeta', 7, '_yoast_wpseo_metadesc'), ['value' => 'A description that fits.']);
+$apply('apply.revert', ['apply_id' => 'A3']);
+check('reverting a new meta removes it', $writer->read('postmeta', 7, '_yoast_wpseo_metadesc'), null);
+
+// An option is a name with no id at all — the third shape, and the reason `key` exists.
+$writer->store['option']['0:blogname'] = ['value' => 'Old name'];
+$apply('content.update', ['apply_id' => 'A4', 'kind' => 'option', 'key' => 'blogname', 'fields' => ['value' => 'New name']]);
+check('an option write lands', $writer->read('option', 0, 'blogname'), ['value' => 'New name']);
+$apply('apply.revert', ['apply_id' => 'A4']);
+check('reverting an option restores the old value', $writer->read('option', 0, 'blogname'), ['value' => 'Old name']);
+
+// Media: a new file, and the attachment that makes it visible in the library, both undone.
+$mw = $apply('media.upload', [
+    'apply_id' => 'M1', 'path' => 'wp-content/uploads/2026/08/logo.png', 'content_b64' => base64_encode('PNGDATA'),
+]);
+check('media.upload lands the file', $mediaW->read('wp-content/uploads/2026/08/logo.png'), 'PNGDATA');
+check('a new upload reports created', $mw['created'], true);
+checkTrue('a new upload joins the media library', $mw['attachment'] > 0);
+$apply('apply.revert', ['apply_id' => 'M1']);
+check('reverting a new upload deletes the file', $mediaW->read('wp-content/uploads/2026/08/logo.png'), null);
+check('and takes its attachment with it', $mediaW->attachments, []);
+
+// Media: replacing a file keeps the attachment it already had, and the old bytes come back.
+$mediaW->store['wp-content/uploads/hero.jpg'] = 'OLDBYTES';
+$over = $apply('media.upload', [
+    'apply_id' => 'M2', 'path' => 'wp-content/uploads/hero.jpg', 'content_b64' => base64_encode('NEWBYTES'),
+]);
+check('overwrite lands the new bytes', $mediaW->read('wp-content/uploads/hero.jpg'), 'NEWBYTES');
+check('replacing a file creates no second attachment', $over['attachment'], 0);
+$apply('apply.revert', ['apply_id' => 'M2']);
+check('reverting an overwrite restores the old bytes', $mediaW->read('wp-content/uploads/hero.jpg'), 'OLDBYTES');
+
+// apply.list names what was touched, without the before payload.
+$apply('content.update', ['apply_id' => 'L1', 'kind' => 'post', 'fields' => ['post_content' => 'x']]);
+$apply('media.upload', ['apply_id' => 'L1', 'path' => 'wp-content/uploads/a.png', 'content_b64' => base64_encode('a')]);
+$list = $apply('apply.list', ['apply_id' => 'L1']);
+check('apply.list returns every step', count($list['steps']), 2);
+check('apply.list names the content kind', $list['steps'][0]['kind'], 'post');
+checkTrue('apply.list does not leak the before payload', !isset($list['steps'][0]['before']));
+
+// Refusals.
+check(
+    'an unknown kind is refused',
+    $apply('content.update', ['apply_id' => 'X', 'kind' => 'user', 'fields' => ['a' => 'b']])['error'],
+    'bad_params'
+);
+check(
+    'a write without an apply_id is refused',
+    $apply('content.update', ['kind' => 'post', 'fields' => ['post_title' => 'x']])['message'],
+    'apply_id required'
+);
+
+$traversal = $apply('media.upload', ['apply_id' => 'X', 'path' => '../wp-config.php', 'content_b64' => base64_encode('x')]);
+check('a traversing media path is refused', $traversal['message'], 'unusable media path');
+checkTrue('nothing was written outside uploads', !isset($mediaW->store['../wp-config.php']));
+
+// A well-formed path outside uploads is live code, not an asset.
+$notMedia = $apply('media.upload', ['apply_id' => 'X', 'path' => 'wp-content/plugins/evil.php', 'content_b64' => base64_encode('x')]);
+check('a media write outside uploads is refused', $notMedia['message'], 'unusable media path');
+checkTrue('live code was not touched', !isset($mediaW->store['wp-content/plugins/evil.php']));
+
+$tooBig = $apply('media.upload', [
+    'apply_id' => 'X', 'path' => 'wp-content/uploads/big.bin',
+    'content_b64' => base64_encode(str_repeat('A', 8 * 1024 * 1024 + 1)),
+]);
+check('a media upload past the inline ceiling is refused', $tooBig['error'], 'too_large');
+
+$wrongToken = $wEngine->handle(['token' => 'nope-but-long-enough-here', 'action' => 'content.update',
+    'params' => ['apply_id' => 'X', 'kind' => 'post', 'fields' => ['post_title' => 'x']]]);
+check('a wrong token writes nothing', $wrongToken['error'], 'unauthorized');
+
+$unwired = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'content.update',
+    'params' => ['apply_id' => 'X', 'kind' => 'post', 'fields' => ['post_title' => 'x']]]);
+check('an unwired site refuses content writes', $unwired['error'], 'unavailable');
+
+// The rollback promise: a write whose undo cannot be recorded is undone, not left standing.
+$rbWriter = new FakeSiteWriter();
+$rbEngine = new Engine($WTOKEN, [], null, null, null, null, $rbWriter, new FakeMediaWriter(), new FailingApplyLog());
+$rb = $rbEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'R1', 'kind' => 'post', 'fields' => ['post_title' => 'ghost']]]);
+check('a write whose undo cannot be recorded fails', $rb['ok'], false);
+check('and the site does not keep it', $rbWriter->store['post'] ?? [], []);
+
+// ------------------------------------------------ What the real writer will and will not write --
+//
+// The rules above are the engine's. These are the writer's, and they are the ones that decide what
+// reaches a customer's live site: which post fields are accepted, which options are refused.
+
+echo "\nSite writer rules\n";
+
+$siteWriter = new Claude_Cowork_Site_Writer();
+
+WP_Fake::$posts[42] = ['ID' => 42, 'post_title' => 'A page', 'post_author' => 3];
+$siteWriter->write('post', 42, ['post_title' => 'Renamed', 'post_author' => 99]);
+check('a whitelisted field is written', WP_Fake::$posts[42]['post_title'], 'Renamed');
+check('a field outside the whitelist is not', WP_Fake::$posts[42]['post_author'], 3);
+
+$refusedFields = null;
+try {
+    $siteWriter->write('post', 42, ['comment_status' => 'closed']);
+} catch (RuntimeException $e) {
+    $refusedFields = $e->getMessage();
+}
+checkTrue('a write with no writable field is refused, not silently dropped', $refusedFields !== null);
+checkTrue('and the refusal names what was allowed', strpos((string) $refusedFields, 'post_title') !== false);
+
+// A new post is a draft unless the caller says otherwise: a page appearing live on a customer's
+// site because nobody mentioned a status is the one outcome an Apply must not produce.
+$draftId = $siteWriter->write('post', 0, ['post_title' => 'Fresh']);
+check('a new post is not published by default', WP_Fake::$posts[$draftId]['post_status'], 'draft');
+check('and it is a post unless told otherwise', WP_Fake::$posts[$draftId]['post_type'], 'post');
+
+// Post meta, including the underscore keys the SEO plugins use.
+$siteWriter->write('postmeta', 42, ['value' => 'Fits in a SERP.'], '_yoast_wpseo_metadesc');
+check('protected meta keys are writable', WP_Fake::$meta['42:_yoast_wpseo_metadesc'], 'Fits in a SERP.');
+check('a meta reads back as its before-state', $siteWriter->read('postmeta', 42, '_yoast_wpseo_metadesc'), ['value' => 'Fits in a SERP.']);
+check('a meta that was never set reads as absent', $siteWriter->read('postmeta', 42, '_nothing_here'), null);
+
+$noPost = null;
+try {
+    $siteWriter->write('postmeta', 4242, ['value' => 'x'], '_k');
+} catch (RuntimeException $e) {
+    $noPost = $e->getMessage();
+}
+checkTrue('a meta on a post that does not exist is refused', $noPost !== null);
+
+// Options: writable, except the ones that would take the site away from whoever has to fix it.
+$siteWriter->write('option', 0, ['value' => 'Tracy demo'], 'blogname');
+check('an ordinary option is written', WP_Fake::$options['blogname'], 'Tracy demo');
+
+WP_Fake::$options['siteurl'] = 'https://real.test';
+foreach (['siteurl', 'active_plugins', 'claude_cowork_token', '_transient_anything'] as $protected) {
+    $stopped = null;
+    try {
+        $siteWriter->write('option', 0, ['value' => 'hijacked'], $protected);
+    } catch (RuntimeException $e) {
+        $stopped = $e->getMessage();
+    }
+    checkTrue("{$protected} cannot be written", $stopped !== null);
+}
+check('and the protected value is untouched', WP_Fake::$options['siteurl'], 'https://real.test');
+
+// An option that is absent reads as absent, not as false — so its undo is a delete, not a write
+// of the default WordPress happened to hand back.
+check('an option that was never set reads as absent', $siteWriter->read('option', 0, 'never_set_option'), null);
+WP_Fake::$options['stored_false'] = false;
+check('an option legitimately holding false is not mistaken for absent', $siteWriter->read('option', 0, 'stored_false'), ['value' => false]);
+
+// The media writer's own guard, independent of the engine's string check.
+$mediaWriter = new Claude_Cowork_Media_Writer(__DIR__);
+$escaped = null;
+try {
+    $mediaWriter->read('wp-content/uploads/../../../etc/passwd');
+} catch (RuntimeException $e) {
+    $escaped = $e->getMessage();
+}
+checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

@@ -1,11 +1,23 @@
 # Tracy Claude Cowork — WordPress
 
-A WordPress plugin that lets Tracy read a site — its database and its files — over one
-token-authenticated endpoint. It only reads: nothing here writes to the site it is installed on.
+A WordPress plugin that lets Tracy work on a site — read its database and its files, and apply an
+approved change back to it — over one token-authenticated endpoint.
 
 ```
 POST /wp-admin/admin-ajax.php?action=claude_cowork
 ```
+
+## What it can do
+
+| Actions | |
+| --- | --- |
+| `info`, `site.stats`, `site.counts`, `db.*`, `files.*`, `file.read` | Reading, in pieces small enough to finish on a host that stops PHP after 30 seconds. |
+| `plugin.install`, `plugin.activate`, `theme.install`, `theme.activate` | Adding something to the site, through WordPress's own upgraders. Install and activate are separate: they fail differently. |
+| `content.update`, `media.upload` | Editing a post, one of its meta values, or an option; putting a file into `uploads/` and the Media Library. |
+| `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
+
+An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
+uninstall.
 
 ## Layout
 
@@ -71,8 +83,8 @@ site's contents, and a setting that can be read remotely is one more place it ca
 
 ## What is not here yet
 
-Reading works. The rest of a Migrate — installing this plugin from Tracy, and the WordPress
-stack on the fleet — is not written yet. WordPress keeps its own address in the database
+Reading, installing and applying work, and Tracy installs this plugin itself during a Migrate.
+What is still missing is the WordPress stack on the fleet. WordPress keeps its own address in the database
 (`siteurl` and `home`, plus absolute URLs inside serialized options and post content), so
 standing a copy up at another address is a different job from Joomla's, where one line of
 `configuration.php` covers it.

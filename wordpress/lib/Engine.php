@@ -20,6 +20,7 @@ require_once __DIR__ . '/DbDumper.php';
 require_once __DIR__ . '/FileWalker.php';
 require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
+require_once __DIR__ . '/SiteWriter.php';
 
 final class Engine
 {
@@ -31,6 +32,12 @@ final class Engine
     private ?Uploader $uploader;
     /** Plugins and themes. Null on a site wired for reading only — every write action then refuses. */
     private $packages;
+    /** The three halves of an Apply. Null on a site wired for reading only, same as $packages. */
+    private ?SiteWriter $writer;
+    private ?MediaWriter $media;
+    private ?ApplyLog $log;
+    /** Where to say the site moved, when anyone is watching. Null is silence, not an error. */
+    private $stamp;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -43,6 +50,14 @@ final class Engine
     private const READ_CHUNK = 1048576;
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
+    /** The ceiling on a file carried inline as base64. Anything larger belongs on the signed-URL path. */
+    private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
+    /**
+     * Where an Apply may put a file. One root, because WordPress has one: everything a site adds
+     * after installation goes under `uploads/`, and a path outside it is either code or somebody
+     * else's plugin.
+     */
+    private const MEDIA_ROOTS = ['wp-content/uploads/'];
 
     public function __construct(
         ?string $token,
@@ -50,7 +65,11 @@ final class Engine
         ?DbDumper $dumper = null,
         ?FileWalker $walker = null,
         ?Uploader $uploader = null,
-        $packages = null
+        $packages = null,
+        ?SiteWriter $writer = null,
+        ?MediaWriter $media = null,
+        ?ApplyLog $log = null,
+        $stamp = null
     ) {
         $this->token = $token;
         $this->info = $info;
@@ -58,6 +77,10 @@ final class Engine
         $this->walker = $walker;
         $this->uploader = $uploader;
         $this->packages = $packages;
+        $this->writer = $writer;
+        $this->media = $media;
+        $this->log = $log;
+        $this->stamp = $stamp;
     }
 
     /**
@@ -101,6 +124,14 @@ final class Engine
                 return $this->themeInstall($params);
             case 'theme.activate':
                 return $this->themeActivate($params);
+            case 'content.update':
+                return $this->contentUpdate($params);
+            case 'media.upload':
+                return $this->mediaUpload($params);
+            case 'apply.revert':
+                return $this->applyRevert($params);
+            case 'apply.list':
+                return $this->applyList($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -556,6 +587,336 @@ final class Engine
         return ($result['ok'] ?? false) === true
             ? $this->ok(['activated' => $stylesheet, 'previous' => $result['previous'] ?? null])
             : $this->err('activate_failed', (string) ($result['error'] ?? 'activate failed'));
+    }
+
+    // ---- Applying an approved change, and undoing it ------------------------------------------
+    //
+    // Every step here records how to reverse itself BEFORE it is called done, under an apply_id
+    // the caller chose for the whole deliverable. That is what `apply.revert` replays, and it is
+    // the condition ADR 0048 puts on a change being guaranteed at all.
+
+    /**
+     * Edit one piece of the site's content: a post, one of its meta values, or an option.
+     *
+     * Three kinds because WordPress keeps three shapes, not because three seemed like enough. A
+     * post is a row with an id. A meta is a NAMED value hanging off a post — where every SEO
+     * plugin keeps the description somebody is usually here to fix. An option is a name with no id
+     * at all. Hence `key` beside `id`: the Joomla original needed only an id because all three of
+     * its kinds were rows.
+     */
+    private function contentUpdate(array $p): array
+    {
+        if ($this->writer === null || $this->log === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        if (!isset($p['fields']) || !is_array($p['fields']) || $p['fields'] === []) {
+            return $this->err('bad_params', 'fields required');
+        }
+        $id = max(0, (int) ($p['id'] ?? 0));
+        $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+
+        try {
+            $before = $this->writer->read($kind, $id, $key); // null => a create, so its undo is a delete
+            $newId = $this->writer->write($kind, $id, $p['fields'], $key);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, [
+                'op' => 'content',
+                'kind' => $kind,
+                'id' => $newId,
+                'key' => $key,
+                'before' => $before,
+            ]);
+        } catch (Throwable $e) {
+            $this->rollbackContent($kind, $newId, $key, $before);
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $e) {
+            // Best-effort by contract: a stale cache is not worth failing a change that landed.
+        }
+
+        $this->stamped('content');
+
+        return $this->ok([
+            'kind' => $kind,
+            'id' => $newId,
+            'key' => $key === '' ? null : $key,
+            'created' => $before === null,
+        ]);
+    }
+
+    /**
+     * Put one file into the site's uploads folder and into its Media Library, and remember how to
+     * undo both. Same rollback rule as contentUpdate: if the undo cannot be recorded, the upload is
+     * reversed rather than left behind. Anything past the inline ceiling belongs on the signed-URL
+     * path, so the request the relay has to proxy stays small.
+     */
+    private function mediaUpload(array $p): array
+    {
+        if ($this->media === null || $this->log === null) {
+            return $this->err('unavailable', 'media writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $path = isset($p['path']) && is_string($p['path']) ? $p['path'] : '';
+        if (!self::safeMediaPath($path)) {
+            return $this->err('bad_params', 'unusable media path');
+        }
+        $b64 = isset($p['content_b64']) && is_string($p['content_b64']) ? $p['content_b64'] : '';
+        $bytes = base64_decode($b64, true);
+        if ($bytes === false) {
+            return $this->err('bad_params', 'content_b64 is not valid base64');
+        }
+        if (strlen($bytes) > self::MAX_MEDIA_BYTES) {
+            return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
+        }
+
+        try {
+            $before = $this->media->read($path); // null => new file, so its undo is a delete
+            $attachment = $this->media->write($path, $bytes);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, [
+                'op' => 'media',
+                'path' => $path,
+                'attachment' => $attachment,
+                'before' => $before,
+            ]);
+        } catch (Throwable $e) {
+            $this->rollbackMedia($path, $attachment, $before);
+            return $this->err('write_failed', 'upload was rolled back: could not record its undo');
+        }
+
+        $this->stamped('media');
+
+        return $this->ok([
+            'path' => $path,
+            'bytes' => strlen($bytes),
+            'attachment' => $attachment,
+            'created' => $before === null,
+        ]);
+    }
+
+    /**
+     * Undo every step of one Apply, newest first. A step whose before-state was null was a create,
+     * so it is removed; otherwise the recorded before-state is written back.
+     *
+     * The Apply is only forgotten when every step came back. A revert that could not finish leaves
+     * the log in place and names what is still standing, so the caller sees the truth rather than
+     * a clean answer over a half-reverted site.
+     */
+    private function applyRevert(array $p): array
+    {
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        try {
+            $entries = $this->log->entries($applyId);
+        } catch (Throwable $e) {
+            return $this->err('revert_failed', $e->getMessage());
+        }
+
+        $reverted = 0;
+        $failed = [];
+        foreach (array_reverse($entries) as $entry) {
+            try {
+                $this->revertOne($entry);
+                $reverted++;
+            } catch (Throwable $e) {
+                $failed[] = ['op' => $entry['op'] ?? '?', 'error' => $e->getMessage()];
+            }
+        }
+
+        if ($this->writer !== null) {
+            try {
+                $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+
+        if ($reverted > 0) {
+            $this->stamped('revert');
+        }
+
+        if ($failed === []) {
+            try {
+                $this->log->clear($applyId);
+            } catch (Throwable $e) {
+                // The site is back; a log row that would not clear is the caller's to reconcile.
+            }
+            return $this->ok(['reverted' => $reverted]);
+        }
+        return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
+    }
+
+    /** What one Apply touched, without the before-payload — enough to verify, not to haul old bytes back. */
+    private function applyList(array $p): array
+    {
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        try {
+            $entries = $this->log->entries($applyId);
+        } catch (Throwable $e) {
+            return $this->err('list_failed', $e->getMessage());
+        }
+        $steps = array_map(static function (array $entry): array {
+            $op = $entry['op'] ?? '';
+            $step = ['op' => $op, 'created' => ($entry['before'] ?? null) === null];
+            if ($op === 'content') {
+                $step['kind'] = $entry['kind'] ?? null;
+                $step['id'] = $entry['id'] ?? null;
+                $step['key'] = ($entry['key'] ?? '') === '' ? null : $entry['key'];
+            } elseif ($op === 'media') {
+                $step['path'] = $entry['path'] ?? null;
+            }
+            return $step;
+        }, $entries);
+        return $this->ok(['apply_id' => $applyId, 'steps' => $steps]);
+    }
+
+    /**
+     * Say the site moved, if anyone gave us somewhere to say it.
+     *
+     * Called only after a change has actually landed — never on a refusal, and never before the
+     * undo is recorded. A preview reloaded for a change that was rolled back shows the customer
+     * the old site with a fresh timestamp, which reads as "something happened" when nothing did.
+     *
+     * A post edit stamps twice: once through `save_post`, once here. Both write the same file, so
+     * the cost is one extra write and the alternative — leaving this out — would leave a meta or
+     * an option change telling nobody, since neither fires a hook the plugin listens to.
+     */
+    private function stamped(string $reason): void
+    {
+        if ($this->stamp !== null) {
+            $this->stamp->touch($reason);
+        }
+    }
+
+    /** @param array<string,mixed> $entry */
+    private function revertOne(array $entry): void
+    {
+        $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
+        if ($op === 'content') {
+            if ($this->writer === null) {
+                throw new RuntimeException('site writer not wired');
+            }
+            $this->rollbackContent(
+                (string) ($entry['kind'] ?? ''),
+                (int) ($entry['id'] ?? 0),
+                (string) ($entry['key'] ?? ''),
+                $entry['before'] ?? null
+            );
+            return;
+        }
+        if ($op === 'media') {
+            if ($this->media === null) {
+                throw new RuntimeException('media writer not wired');
+            }
+            $this->rollbackMedia(
+                (string) ($entry['path'] ?? ''),
+                (int) ($entry['attachment'] ?? 0),
+                $entry['before'] ?? null
+            );
+            return;
+        }
+        throw new RuntimeException("unknown step: {$op}");
+    }
+
+    /** @param array<string,mixed>|null $before */
+    private function rollbackContent(string $kind, int $id, string $key, ?array $before): void
+    {
+        if ($before === null) {
+            $this->writer->delete($kind, $id, $key);
+        } else {
+            $this->writer->write($kind, $id, $before, $key);
+        }
+    }
+
+    /**
+     * Undo one upload. A file that was new goes away with its attachment — through the attachment
+     * when there is one, because that is what takes the generated thumbnails with it. A file that
+     * replaced another gets the old bytes back and keeps its attachment, whose dimensions the
+     * writer rebuilds.
+     */
+    private function rollbackMedia(string $path, int $attachment, ?string $before): void
+    {
+        if ($before !== null) {
+            $this->media->write($path, $before);
+            return;
+        }
+        if ($attachment > 0) {
+            $this->media->deleteAttachment($attachment);
+        }
+        // Called either way: an attachment delete that left the file, or a file that never had an
+        // attachment, both end here with nothing on disk.
+        $this->media->delete($path);
+    }
+
+    private function applyId(array $p): ?string
+    {
+        $id = isset($p['apply_id']) && is_string($p['apply_id']) ? trim($p['apply_id']) : '';
+        return $id === '' ? null : $id;
+    }
+
+    /**
+     * A media path is a relative path under the uploads folder and nothing else: no leading slash,
+     * no `..`, no drive letter, no null byte, a conservative character set, and a first segment
+     * that is the uploads tree. The real MediaWriter confines writes to the folder as well — this
+     * is the cheap refusal that keeps a hostile path from ever reaching it, and the uploads-root
+     * requirement is what stops a valid-looking `wp-config.php` from being treated as an asset.
+     */
+    private static function safeMediaPath(string $path): bool
+    {
+        if ($path === '' || strlen($path) > 1024) {
+            return false;
+        }
+        if ($path[0] === '/' || $path[0] === '\\') {
+            return false;
+        }
+        if (strpos($path, '..') !== false || strpos($path, "\0") !== false) {
+            return false;
+        }
+        if (preg_match('#^[A-Za-z]:#', $path) === 1) {
+            return false;
+        }
+        if (preg_match('#^[\w\-./]+$#', $path) !== 1) {
+            return false;
+        }
+        foreach (self::MEDIA_ROOTS as $root) {
+            if (strncmp($path, $root, strlen($root)) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function ok(array $extra): array
