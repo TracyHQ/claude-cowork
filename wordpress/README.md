@@ -98,10 +98,17 @@ anything. Clearing the field is how a site owner revokes access without uninstal
 It is deliberately not exposed through the settings REST endpoint: this value is the key to the
 site's contents, and a setting that can be read remotely is one more place it can leak from.
 
-## What is not here yet
+## The whole path, proven
 
-Reading, installing and applying work, and Tracy installs this plugin itself during a Migrate.
-What is still missing is the WordPress stack on the fleet. WordPress keeps its own address in the database
-(`siteurl` and `home`, plus absolute URLs inside serialized options and post content), so
-standing a copy up at another address is a different job from Joomla's, where one line of
-`configuration.php` covers it.
+2026-08-16, on tracy.ai (WordPress 7.0.2): Tracy installed this plugin itself during a Migrate,
+exported the site (11,208 files, 175 MB, 56 tables), and the fleet stood a copy up at its own
+address in about forty seconds. The Apply side ran against the live site under one `apply_id` — a
+post, a post meta, an option, a media file — and one `revert_apply` took all four back, the file
+included.
+
+Two things that surprised nobody but are worth writing down. WordPress keeps its own address in
+the database (`siteurl` and `home`, plus absolute URLs inside serialized options and post
+content), so standing a copy up elsewhere is a different job from Joomla's, where one line of
+`configuration.php` covers it — that rewriting is the fleet's, not this plugin's. And a site whose
+`uploads/` has been made read-only answers every `media.upload` with `could not write`, while every
+content edit succeeds; that is the folder's permissions talking, not this plugin.
