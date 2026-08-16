@@ -3,14 +3,19 @@
 /**
  * Plugin Name: Tracy Claude Cowork
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
+ * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Every change it makes is recorded so the whole thing can be put back. Remove the token to switch it off.
- * Version:     0.3.0
+ * Version:     0.4.0
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
  */
 
 defined('ABSPATH') || exit;
+
+// Update checks. Its own file because it is the one part of this plugin that talks to somebody
+// else's host, and the rest of the plugin must stay readable without it.
+require_once __DIR__ . '/update.php';
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.

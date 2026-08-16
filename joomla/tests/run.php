@@ -756,5 +756,26 @@ check('an unwritable webroot is silent', $readOnlyStamp->read(), null);
 @unlink($stampFile);
 @rmdir($stampRoot);
 
+// ------------------------------------------------------------- update server --
+// "Check For Updates" reads update.xml from the repository and compares it against the manifest
+// of the copy on disk. Three files must agree about one number, and nothing but this notices the
+// day they stop.
+
+$pkg = simplexml_load_file(__DIR__ . '/../pkg_claudecowork.xml');
+$com = simplexml_load_file(__DIR__ . '/../com_claudecowork/claudecowork.xml');
+$upd = simplexml_load_file(__DIR__ . '/../update.xml');
+$pkgVersion = trim((string) $pkg->version);
+
+check('the component carries the package version', trim((string) $com->version), $pkgVersion);
+check('update.xml names that version too', trim((string) $upd->update->version), $pkgVersion);
+check('and points at that version\'s release asset',
+    trim((string) $upd->update->downloads->downloadurl),
+    "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
+// Without a declared server Joomla has nowhere to ask, and the backend never mentions an update.
+check('the package declares where to ask',
+    trim((string) $pkg->updateservers->server),
+    'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

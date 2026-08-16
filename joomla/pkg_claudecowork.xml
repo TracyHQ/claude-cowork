@@ -4,7 +4,7 @@
     <packagename>claudecowork</packagename>
     <author>Tracy</author>
     <creationDate>2026-08-10</creationDate>
-    <version>0.8.0</version>
+    <version>0.8.1</version>
     <description>PKG_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <!-- A package around a single component looks like overkill today and is not.
@@ -14,4 +14,19 @@
     <files folder="packages">
         <file type="component" id="com_claudecowork">com_claudecowork.zip</file>
     </files>
+
+    <!-- What makes "Check For Updates" in the Joomla backend ever say anything about this
+         extension. Joomla only asks servers an extension declared for itself, and it records
+         them at INSTALL time — so a site running a version installed before this block existed
+         has no update site and will not grow one until somebody updates it by hand once.
+
+         Declared on the package and not the component: this ships as a package, and updating
+         the parts separately is how a site ends up with halves from two versions.
+
+         The answer is a file beside the code in the same repository, so cutting a release and
+         announcing it are one commit; `joomla/update.xml` and this manifest must name the same
+         version, and tests/run.php fails when they do not. -->
+    <updateservers>
+        <server type="extension" priority="1" name="Tracy Claude Cowork">https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml</server>
+    </updateservers>
 </extension>

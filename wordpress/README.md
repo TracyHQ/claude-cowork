@@ -58,6 +58,23 @@ curl -s -X POST 'http://localhost:8899/wp-admin/admin-ajax.php?action=claude_cow
 Mount `claude-cowork/` straight into `wp-content/plugins/` — the plugin needs no build step of
 its own beyond the copied engine, so an edit is live on the next request.
 
+## Updates from inside the site
+
+A site administrator sees a new version on the Extensions screen because the extension declares
+where to ask and the answer sits in this repository. Cutting a release is therefore two files, in
+one commit:
+
+1. the version in the extension's own manifest, and
+2. ``wordpress/update.json`` — the version, and the release asset it points at.
+
+`tests/run.php` fails when they disagree, because the failure is otherwise invisible: the site
+asks, gets an older number than it already has, and reports "up to date" forever.
+
+**Joomla and WordPress both record the update address when the extension is INSTALLED.** A site
+running a version cut before this existed has no address to ask, and stays silent until somebody
+updates it once by hand. That first update is the price of adding this late; every one after it
+is a click.
+
 ## Why admin-ajax, not the REST API
 
 The REST API is the modern answer and the wrong one here. It arrived in **WordPress 4.7**

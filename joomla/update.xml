@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What a Joomla site reads when its administrator presses "Check For Updates".
+
+    Reached because `pkg_claudecowork.xml` declares this address as the extension's update server.
+    Joomla records that address when the package is INSTALLED, so only sites running 0.8.1 or
+    later ever ask for this file — an older copy has no update site and must be updated once by
+    hand (or by Tracy Desk) before it can update itself.
+
+    One entry per released version, newest first. Joomla picks the highest version whose
+    targetplatform matches the site it runs on, so leaving old entries in place costs nothing and
+    lets a site on an older Joomla still find the last version that supported it.
+
+    Bump it in the same commit that bumps the manifest: tests/run.php fails if the two disagree.
+-->
+<updates>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.8.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.1</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.8.1/pkg_claudecowork-0.8.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <!-- Joomla 4, 5 and 6 run the namespaced half of the component; Joomla 3 runs the legacy
+             half of the same package. Matching all four generations here keeps one package
+             answering for every site Tracy supports. -->
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+</updates>

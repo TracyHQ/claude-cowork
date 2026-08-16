@@ -747,5 +747,23 @@ try {
 }
 checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
 
+// ------------------------------------------------------------ update manifest --
+// The Plugins screen asks raw.githubusercontent for update.json and compares it against the
+// header of the copy on disk. Two files must therefore agree about one number, and nothing but
+// this check would notice the day they stop.
+
+$pluginHeader = file_get_contents(__DIR__ . '/../claude-cowork/claude-cowork.php');
+preg_match('/^\s*\*\s*Version:\s*(.+)$/m', $pluginHeader, $m);
+$headerVersion = trim($m[1] ?? '');
+$manifest = json_decode(file_get_contents(__DIR__ . '/../update.json'), true);
+
+check('update.json names the version the plugin header does', $manifest['version'] ?? null, $headerVersion);
+checkTrue(
+    'the package it points at is the release asset for that version',
+    ($manifest['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-v{$headerVersion}/claude-cowork-{$headerVersion}.zip"
+);
+// The header selects the filter name: change the host and the hook in update.php is never called.
+checkTrue('the plugin declares an Update URI on github.com', (bool) preg_match('#^\s*\*\s*Update URI:\s*https://github\.com/#m', $pluginHeader));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
