@@ -57,3 +57,9 @@ cannot resume never finishes on a large site.
 
 The component never holds object-storage credentials. For uploads it receives a presigned URL
 good for exactly one part.
+
+After a change lands it writes `tracy-changed.json` at the webroot — a timestamp and a coarse
+reason, nothing else — because a preview watching the site cannot be called back: Tracy Desk runs
+on the customer's machine and has no address. The site writes, whoever is watching reads. Only
+changes made THROUGH this component are stamped; an administrator editing in the Joomla backend
+is not, and covering that needs a system plugin the package manifest was shaped to allow.

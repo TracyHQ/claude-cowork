@@ -50,7 +50,7 @@ class ApiController extends BaseController
     {
         $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib';
 
-        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
+        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'ChangeStamp', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
             require_once $lib . '/' . $class . '.php';
         }
     }
@@ -111,7 +111,10 @@ class ApiController extends BaseController
             new JoomlaExtensions(),
             $this->buildWriter(),
             $this->buildMedia(),
-            $this->buildLog()
+            $this->buildLog(),
+            // JPATH_ROOT and not the configured walker root: the stamp has to sit where the site
+            // is SERVED from, because a preview reads it over HTTP as `/tracy-changed.json`.
+            new \ChangeStamp(JPATH_ROOT)
         );
 
         $app->setHeader('Content-Type', 'application/json', true);

@@ -14,6 +14,7 @@ require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
 require_once __DIR__ . '/../lib/Extensions.php';
 require_once __DIR__ . '/../lib/SiteWriter.php';
+require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
@@ -698,6 +699,62 @@ $rb = $rbEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['apply_id' => 'R1', 'kind' => 'article', 'fields' => ['title' => 'ghost']]]);
 check('a write whose undo cannot be recorded fails', $rb['ok'], false);
 check('and the site holds no orphan for it', $rbWriter->read('article', 100), null);
+
+// ----------------------------------------------------------------- ChangeStamp --
+// The preview watches a file at the webroot because the site cannot call Tracy back. What is
+// tested here is WHEN it is written: after a change that landed, and never after a refusal.
+
+$stampRoot = sys_get_temp_dir() . '/cowork-stamp-' . getmypid();
+@mkdir($stampRoot, 0777, true);
+$stampFile = $stampRoot . '/' . ChangeStamp::FILENAME;
+@unlink($stampFile);
+
+$sWriter = new FakeSiteWriter();
+$sLog = new FakeApplyLog();
+$stamp = new ChangeStamp($stampRoot);
+$sEngine = new Engine($WTOKEN, [], null, null, null, new FakeExtensions(), $sWriter, new FakeMediaWriter(), $sLog, $stamp);
+
+check('no stamp before anything happens', is_file($stampFile), false);
+
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S1', 'kind' => 'article', 'fields' => ['title' => 'Stamped']]]);
+check('a content write stamps the webroot', is_file($stampFile), true);
+$stamped = $stamp->read();
+check('the stamp carries a time', is_int($stamped['at'] ?? null), true);
+check('and a coarse reason', $stamped['reason'] ?? null, 'content');
+
+// A refusal must not move it: the site did not change, and a preview reloaded for nothing shows
+// the customer the same page with a fresh timestamp — which reads as "something happened".
+@unlink($stampFile);
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S2', 'kind' => 'nonsense', 'fields' => ['title' => 'x']]]);
+check('a refused write leaves no stamp', is_file($stampFile), false);
+
+$sEngine->handle(['token' => 'wrong-token-but-long-enough', 'action' => 'content.update',
+    'params' => ['apply_id' => 'S3', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('an unauthorized call leaves no stamp', is_file($stampFile), false);
+
+// One deliverable is several actions; a preview must not reload once per action.
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S4', 'kind' => 'article', 'fields' => ['title' => 'First']]]);
+$firstAt = $stamp->read()['at'];
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S4', 'kind' => 'article', 'fields' => ['title' => 'Second']]]);
+check('a burst of writes coalesces into one stamp', $stamp->read()['at'], $firstAt);
+
+// An engine with no stamp is the ordinary case in tests and on a read-only webroot.
+$noStamp = new Engine($WTOKEN, [], null, null, null, null, new FakeSiteWriter(), new FakeMediaWriter(), new FakeApplyLog());
+$plain = $noStamp->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S5', 'kind' => 'article', 'fields' => ['title' => 'y']]]);
+check('a write still succeeds with no stamp wired', $plain['ok'], true);
+
+// A webroot that cannot be written is a hardened host, not a failure to report.
+$readOnlyStamp = new ChangeStamp($stampRoot . '/does/not/exist');
+$readOnlyStamp->touch('content');
+check('an unwritable webroot is silent', $readOnlyStamp->read(), null);
+
+@unlink($stampFile);
+@rmdir($stampRoot);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

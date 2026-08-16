@@ -22,6 +22,7 @@ require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/Extensions.php';
 require_once __DIR__ . '/SiteWriter.php';
+require_once __DIR__ . '/ChangeStamp.php';
 
 final class Engine
 {
@@ -35,6 +36,8 @@ final class Engine
     private ?SiteWriter $writer;
     private ?MediaWriter $media;
     private ?ApplyLog $log;
+    /** Optional: absent in tests and on a host whose webroot cannot be written. */
+    private ?ChangeStamp $stamp;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -66,7 +69,8 @@ final class Engine
         ?ExtensionManager $extensions = null,
         ?SiteWriter $writer = null,
         ?MediaWriter $media = null,
-        ?ApplyLog $log = null
+        ?ApplyLog $log = null,
+        ?ChangeStamp $stamp = null
     ) {
         $this->token = $token;
         $this->info = $info;
@@ -77,6 +81,7 @@ final class Engine
         $this->writer = $writer;
         $this->media = $media;
         $this->log = $log;
+        $this->stamp = $stamp;
     }
 
     /**
@@ -487,6 +492,8 @@ final class Engine
             return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
         }
 
+        $this->stamped('extension');
+
         return $this->ok([
             'installed' => [
                 'name'    => $result['name'] ?? null,
@@ -543,6 +550,8 @@ final class Engine
             // Best-effort by contract: a stale cache is not worth failing a change that landed.
         }
 
+        $this->stamped('content');
+
         return $this->ok(['kind' => $kind, 'id' => $newId, 'created' => $before === null]);
     }
 
@@ -587,6 +596,8 @@ final class Engine
             $this->rollbackMedia($path, $before);
             return $this->err('write_failed', 'upload was rolled back: could not record its undo');
         }
+
+        $this->stamped('media');
 
         return $this->ok(['path' => $path, 'bytes' => strlen($bytes), 'created' => $before === null]);
     }
@@ -633,6 +644,10 @@ final class Engine
             }
         }
 
+        if ($reverted > 0) {
+            $this->stamped('revert');
+        }
+
         if ($failed === []) {
             try {
                 $this->log->clear($applyId);
@@ -642,6 +657,20 @@ final class Engine
             return $this->ok(['reverted' => $reverted]);
         }
         return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
+    }
+
+    /**
+     * Say the site moved, if anyone gave us somewhere to say it.
+     *
+     * Called only after a change has actually landed — never on a refusal, and never before the
+     * undo is recorded. A preview reloaded for a change that was rolled back shows the customer
+     * the old site with a fresh timestamp, which reads as "something happened" when nothing did.
+     */
+    private function stamped(string $reason): void
+    {
+        if ($this->stamp !== null) {
+            $this->stamp->touch($reason);
+        }
     }
 
     /** What one Apply touched, without the before-payload — enough to verify, not to haul old bytes back. */
