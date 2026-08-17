@@ -2,10 +2,10 @@ build/
 dist/
 .DS_Store
 
-# Built copy of joomla/lib/ — joomla/lib/ is the source of truth and build.sh copies it in.
-# Committing the copy is how the two silently diverge.
-joomla/com_claudecowork/administrator/lib/
+# Built copy of joomla/reader/lib/ — that directory is the source of truth and build.sh copies
+# it in. Committing the copy is how the two silently diverge.
+joomla/reader/com_claudecowork/administrator/lib/
 
-# Built copy of wordpress/lib/ — that directory is the source of truth for this platform's
+# Built copy of wordpress/reader/lib/ — that directory is the source of truth for this platform's
 # engine, and build.sh copies it in. Committing the copy is how the two silently diverge.
-wordpress/claude-cowork/lib/
+wordpress/reader/claude-cowork/lib/

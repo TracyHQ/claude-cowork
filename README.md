@@ -23,10 +23,24 @@ so Claude, ChatGPT, Gemini or something you wrote yourself all use it the same w
 | `shopify/` | Shopify | Not started |
 
 One repository rather than one per platform, and **one engine per platform inside it**. Each
-folder owns its own `lib/`: they start as copies of each other and are expected to drift, because
+reader owns its own `lib/`: they start as copies of each other and are expected to drift, because
 tuning for an old WordPress must not be a change Joomla has to survive. Side by side in one
 repository is what keeps the interesting decisions — how work is cut into resumable pieces, how a
 cursor survives a request being killed — comparable while they diverge.
+
+## Two packages per platform
+
+A platform folder holds two separately built, separately released packages. They are split because
+they are installed in different places, and one of them must never turn up where the other lives:
+
+| Path | What | Installed on |
+| --- | --- | --- |
+| `<platform>/reader/` | Claude Cowork — reads a site over one token-authenticated endpoint | the customer's own site |
+| `<platform>/access/` | Tracy Access — signs a coworker in from the Cloudflare Access identity that already proved their seat | a fleet clone, and nowhere else |
+
+Everything said above about reading is about the reader. Access is the opposite kind of code — it
+creates users and opens sessions — so it is built, versioned and released on its own, and a clone
+is the only machine that ever gets it.
 
 ## What it is for
 

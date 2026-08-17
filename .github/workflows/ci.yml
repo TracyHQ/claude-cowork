@@ -8,11 +8,11 @@ on:
 jobs:
   joomla:
     runs-on: ubuntu-latest
-    # Every step below is about the Joomla extension. A second platform gets its own job rather
-    # than more conditionals in this one.
+    # Every step below is about the Joomla reader. A second platform, or the access package beside
+    # this one, gets its own job rather than more conditionals in this one.
     defaults:
       run:
-        working-directory: joomla
+        working-directory: joomla/reader
     steps:
       - uses: actions/checkout@v4
 

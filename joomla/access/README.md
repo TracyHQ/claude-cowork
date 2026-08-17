@@ -4,7 +4,7 @@ A Joomla system plugin that signs a coworker in to a **fleet clone** as themselv
 Cloudflare Access token that already proved they hold a seat. One authentication — the email code
 Access asks for — and no second password, no shared admin login.
 
-**This is not the reader.** The [Claude Cowork](../joomla) component reads a customer's own site
+**This is not the reader.** The [Claude Cowork](../reader) component reads a customer's own site
 and never writes to it. This plugin does the opposite: it creates users and opens sessions. It
 belongs on a clone and nowhere else, which is why it is a separate package and why provisioning
 installs it only on the clone.
