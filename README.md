@@ -33,19 +33,17 @@ tuning for an old WordPress must not be a change Joomla has to survive. Side by 
 repository is what keeps the interesting decisions — how work is cut into resumable pieces, how a
 cursor survives a request being killed — comparable while they diverge.
 
-## Two packages per platform
+## One package per platform
 
-A platform folder holds two separately built, separately released packages. They are split because
-they are installed in different places, and one of them must never turn up where the other lives:
+`<platform>/cowork/` is the extension a customer installs on their own site, and it is the only
+thing in here. `update.xml` and `update.json` sit beside it at the platform root because a site
+records that address when it installs the package, so those paths are a published contract.
 
-| Path | What | Installed on |
-| --- | --- | --- |
-| `<platform>/cowork/` | Claude Cowork — reads a site and applies approved changes to it, over one token-authenticated endpoint | the customer's own site |
-| `<platform>/access/` | Tracy Access — signs a coworker in from the Cloudflare Access identity that already proved their seat | a fleet clone, and nowhere else |
-
-Everything said above is about the cowork extension. Access is a different kind of code — it
-creates users and opens sessions, on a copy — so it is built, versioned and released on its own,
-and a clone is the only machine that ever gets it.
+A second plugin used to live here — Tracy Access, the auto-login for a Tracy-hosted copy of a
+site. It moved to [tracy-fleet](https://github.com/TracyHQ/tracy-fleet)
+(`provision/access/`) on 2026-08-17: it is installed only by provisioning, on a clone, and it
+creates users and opens sessions — nothing a customer downloads should sit next to. Keeping it
+here also meant maintaining a second copy in the fleet repository, which had already drifted.
 
 ## What it is for
 
