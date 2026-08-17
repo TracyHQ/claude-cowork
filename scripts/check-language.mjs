@@ -40,11 +40,16 @@ const SKIP = /(^|\/)(LICENSE\.txt$|dist\/|\.git\/|node_modules\/|scripts\/check-
  * it — and that copy is precisely where a well-meant edit goes to be forgotten, since editing
  * it appears to work right up until the next build overwrites it. Run this after the build and
  * both the source and what actually ships are covered.
+ *
+ * Scope is the working directory, so each package's job checks its own files by running this
+ * from its own folder. Where the built copy lands differs per package, so it is named on the
+ * command line instead of hardcoded here — one checker for every platform.
  */
 const tracked = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
-const built = existsSync('com_claudecowork/administrator/lib')
-  ? execSync('find com_claudecowork/administrator/lib -type f', { encoding: 'utf8' }).split('\n')
-  : []
+const built = process.argv
+  .slice(2)
+  .filter((dir) => existsSync(dir))
+  .flatMap((dir) => execSync(`find ${dir} -type f`, { encoding: 'utf8' }).split('\n'))
 const files = [...new Set([...tracked, ...built])].filter((f) => f && !SKIP.test(f))
 
 const pattern = new RegExp(`\\b(${WORDS.join('|')})\\b`, 'gi')

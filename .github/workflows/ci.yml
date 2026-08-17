@@ -5,11 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# One job per separately built package. They share no code and drift on purpose, so a failure
+# should name the package that broke rather than send anyone reading a matrix.
 jobs:
   joomla:
     runs-on: ubuntu-latest
-    # Every step below is about the Joomla reader. A second platform, or the access package beside
-    # this one, gets its own job rather than more conditionals in this one.
+    # The Joomla reader — the component installed on a customer's own site.
     defaults:
       run:
         working-directory: joomla/reader
@@ -37,4 +38,68 @@ jobs:
         run: ./build.sh
 
       - name: Language check
-        run: node scripts/check-language.mjs
+        run: node ../../scripts/check-language.mjs com_claudecowork/administrator/lib
+
+  joomla-access:
+    runs-on: ubuntu-latest
+    # The Joomla access plugin — a clone's auto-login. Its own job because it is its own package:
+    # a different install target, its own release, and no code shared with the reader.
+    defaults:
+      run:
+        working-directory: joomla/access
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Lint every PHP file
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      # The tests mint real RSA keys and sign real tokens. A verifier that accepts the wrong one
+      # lets a stranger into a copy of the customer's whole site, so this is the job that matters.
+      - name: Verifier tests
+        run: php tests/run.php
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the package
+        run: ./build.sh
+
+      - name: Language check
+        run: node ../../scripts/check-language.mjs plg_system_tracyaccess/lib
+
+  wordpress:
+    runs-on: ubuntu-latest
+    # Both WordPress packages in one job: the access plugin is a single mu-plugin file with no
+    # build and no tests of its own, so it rides with the reader rather than owning an empty job.
+    defaults:
+      run:
+        working-directory: wordpress
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      # The same 8.1 the Joomla jobs use. WordPress itself still runs on older PHP, so the floor
+      # this plugin must parse on is a decision nobody has made — until it is, do not imply one.
+      - name: Lint every PHP file
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Engine tests
+        run: php reader/tests/run.php
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the package
+        run: ./reader/build.sh
+
+      - name: Language check
+        run: node ../scripts/check-language.mjs reader/claude-cowork/lib
