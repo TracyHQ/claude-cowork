@@ -4,10 +4,11 @@ A Joomla system plugin that signs a coworker in to a **fleet clone** as themselv
 Cloudflare Access token that already proved they hold a seat. One authentication — the email code
 Access asks for — and no second password, no shared admin login.
 
-**This is not the reader.** The [Claude Cowork](../reader) component reads a customer's own site
-and never writes to it. This plugin does the opposite: it creates users and opens sessions. It
-belongs on a clone and nowhere else, which is why it is a separate package and why provisioning
-installs it only on the clone.
+**This is not the cowork extension.** The [Claude Cowork](../cowork) component works on a
+customer's own site, under a token they can revoke. This plugin does something else entirely: it
+creates users and opens sessions on a clone, from a Cloudflare Access identity. It belongs on a
+clone and nowhere else, which is why it is a separate package and why provisioning installs it
+only there.
 
 ```
 Cloudflare Access (email code, seat book) ─► tunnel ─► clone origin
@@ -53,8 +54,9 @@ for a site that genuinely needs more.
 | `plg_system_tracyaccess/` | The system plugin: read the header, verify, log the coworker in. |
 
 `lib/` is the source of truth and `build.sh` copies it into the plugin — never edited in place,
-the same rule the reader follows. RS256 by hand rather than a JWT library because *which* library
-Joomla ships changes between generations, and this plugin runs on whatever a clone happens to be.
+the same rule the cowork extension follows. RS256 by hand rather than a JWT library because
+*which* library Joomla ships changes between generations, and this plugin runs on whatever a
+clone happens to be.
 
 ## Build and test
 

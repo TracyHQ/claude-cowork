@@ -12,14 +12,16 @@ require_once __DIR__ . '/../lib/FileWalker.php';
 require_once __DIR__ . '/../lib/Token.php';
 require_once __DIR__ . '/../lib/TarStream.php';
 require_once __DIR__ . '/../lib/Uploader.php';
-require_once __DIR__ . '/../lib/Engine.php';
+require_once __DIR__ . '/../lib/Extensions.php';
+require_once __DIR__ . '/../lib/SiteWriter.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
-require_once __DIR__ . '/FakePackages.php';
+require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/FakeRowSource.php';
-require_once __DIR__ . '/FakeWriters.php';
-// Defines ABSPATH, which is what the real writers check before they will load at all.
-require_once __DIR__ . '/FakeWordPress.php';
-require_once __DIR__ . '/../lib/class-claude-cowork-writers.php';
+
+// PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
+if (!function_exists('str_contains')) {
+    function str_contains(string $haystack, string $needle): bool { return $needle === '' || strpos($haystack, $needle) !== false; }
+}
 
 $passed = 0;
 $failed = 0;
@@ -124,19 +126,30 @@ check('dumper tables() lists what the source knows', $dumper->tables(), ['jos_me
 
 $tmp = sys_get_temp_dir() . '/tracy_migration_test_' . bin2hex(random_bytes(4));
 mkdir($tmp);
-mkdir("$tmp/wp-content", 0777, true);
-mkdir("$tmp/wp-content/cache");
+mkdir("$tmp/cache");
 mkdir("$tmp/images");
 file_put_contents("$tmp/index.php", '<?php echo "hi";');
 file_put_contents("$tmp/configuration.php", '<?php $host="localhost";');
 file_put_contents("$tmp/images/logo.png", "PNGDATA");
-file_put_contents("$tmp/wp-content/cache/should_skip.dat", "nope");
+file_put_contents("$tmp/cache/should_skip.dat", "nope");
+// Akeeba Backup writes multi-hundred-MB archives here (com_akeeba is 7.x and earlier); a live
+// backup of www.joomlart.com left a 603 MB .sql that bloated and shifted the tar (2026-08-11).
+mkdir("$tmp/administrator/components/com_akeeba/backup", 0777, true);
+file_put_contents("$tmp/administrator/components/com_akeeba/backup/site-backup.sql", "SELECT 1;");
 
 $walker = new FileWalker($tmp);
 $batch1 = $walker->listBatch('', 2);
 check('batch1 count', count($batch1['files']), 2);
 check('batch1 not done', $batch1['done'], false);
-checkTrue('wp-content/cache excluded from listing', !in_array('wp-content/cache/should_skip.dat', array_map(fn($f) => $f['path'], $batch1['files']), true));
+checkTrue('cache dir excluded from listing', !in_array('cache/should_skip.dat', array_map(fn($f) => $f['path'], $batch1['files']), true));
+checkTrue(
+    'akeeba backup excluded from listing',
+    !in_array(
+        'administrator/components/com_akeeba/backup/site-backup.sql',
+        array_map(fn($f) => $f['path'], array_merge($batch1['files'], $walker->listBatch($batch1['next_cursor'], 50)['files'])),
+        true
+    )
+);
 
 $batch2 = $walker->listBatch($batch1['next_cursor'], 2);
 check('batch2 done (only 3 real files: index.php, configuration.php, images/logo.png)', $batch2['done'], true);
@@ -146,7 +159,7 @@ $allPaths = array_merge(
     array_map(fn($f) => $f['path'], $batch2['files'])
 );
 sort($allPaths);
-check('walked files exclude wp-content/cache/', $allPaths, ['configuration.php', 'images/logo.png', 'index.php']);
+check('walked files exclude cache/', $allPaths, ['configuration.php', 'images/logo.png', 'index.php']);
 
 $read = $walker->readFile('images/logo.png');
 check('readFile content matches', $read, 'PNGDATA');
@@ -248,12 +261,15 @@ check('site.stats without deps reports no db', isset($statsNoDb['db']), false);
 unlink("$tmp/index.php");
 unlink("$tmp/configuration.php");
 unlink("$tmp/images/logo.png");
-unlink("$tmp/wp-content/cache/should_skip.dat");
+unlink("$tmp/cache/should_skip.dat");
+unlink("$tmp/administrator/components/com_akeeba/backup/site-backup.sql");
+rmdir("$tmp/administrator/components/com_akeeba/backup");
+rmdir("$tmp/administrator/components/com_akeeba");
+rmdir("$tmp/administrator/components");
+rmdir("$tmp/administrator");
 rmdir("$tmp/images");
-rmdir("$tmp/wp-content/cache");
-rmdir("$tmp/wp-content");
+rmdir("$tmp/cache");
 rmdir($tmp);
-
 
 // ── files.pack across parts, when the site is not standing still ────────────────────────────
 //
@@ -406,368 +422,365 @@ exec('tar -tf ' . escapeshellarg($evenTar) . ' 2>&1', $evenList, $evenStatus);
 check('and the archive is still whole', $evenStatus, 0);
 check('with every file in it', count(array_filter($evenList, fn($l) => strpos($l, 'tar:') !== 0)), 7);
 
-// ------------------------------------------- long paths and stray backups ---
+// ------------------------------------------------------------- Extensions --
 //
-// Both learned from one real site (juneflower.vn, 2026-08-14): a webpack chunk shipped by
-// Elementor Pro whose filename alone is 101 characters, and a 1.6 GB backup archive sitting in
-// the webroot that a clone has no use for. The first killed the run outright; the second was
-// most of the twenty minutes it spent before dying.
+// The only action that writes to a site, so the tests are about what it REFUSES as much as
+// what it does. A fake manager stands in for Joomla's installer: what is checked here is the
+// engine's gate, not Joomla's unzip.
 
-$longTmp = sys_get_temp_dir() . '/tracy_longpath_' . bin2hex(random_bytes(4));
-mkdir("$longTmp/wp-content/plugins/elementor-pro/assets/js/notes", 0777, true);
+final class FakeExtensions implements ExtensionManager
+{
+    public array $installed = [];
+    public array $asked = [];
+    public bool $refuse = false;
 
-// Exactly the file that stopped the real run: 101 characters, no directory boundary to split on.
-$longName = 'vendors-node_modules_radix-ui_react-alert-dialog_dist_index_module_js-node_modules_radix-ui_r-c71607.js';
-$longRel  = "wp-content/plugins/elementor-pro/assets/js/notes/{$longName}";
-file_put_contents("$longTmp/$longRel", 'chunk');
-file_put_contents("$longTmp/index.php", '<?php');
+    public function installFromUrl(string $url): array
+    {
+        $this->asked[] = $url;
+        if ($this->refuse) {
+            return ['ok' => false, 'error' => 'JInstaller: :Install: Cannot find Joomla XML setup file'];
+        }
+        return ['ok' => true, 'name' => 'JA Teline V', 'type' => 'template', 'version' => '1.2.3'];
+    }
 
-// And a backup archive of the kind plugins drop straight in the webroot.
-file_put_contents("$longTmp/backup-example.com-1-19-2026.tar.gz", 'not a real archive');
-file_put_contents("$longTmp/db-export.sql.gz", 'nor this');
+    public function listInstalled(): array
+    {
+        return $this->installed;
+    }
+}
 
-$longWalker = new FileWalker($longTmp);
-$longPaths  = array_map(fn($f) => $f['path'], $longWalker->listBatch('', 50)['files']);
+$TOKEN = 'a-token-at-least-16';
+$fakeExtensions = new FakeExtensions();
+$fakeExtensions->installed = [
+    ['name' => 'Claude Cowork', 'type' => 'component', 'element' => 'com_claudecowork', 'version' => '0.3.0', 'enabled' => true],
+];
+$extEngine = new Engine($TOKEN, [], null, null, null, $fakeExtensions);
 
-checkTrue('a backup archive in the webroot is left out', !in_array('backup-example.com-1-19-2026.tar.gz', $longPaths, true));
-checkTrue('a loose database dump is left out', !in_array('db-export.sql.gz', $longPaths, true));
-checkTrue('the long-named chunk is still packed', in_array($longRel, $longPaths, true));
-checkTrue('ordinary files are untouched', in_array('index.php', $longPaths, true));
+$listed = $extEngine->handle(['token' => $TOKEN, 'action' => 'extension.list']);
+check('extension.list returns what the site holds', $listed['extensions'][0]['element'], 'com_claudecowork');
 
-// The originals EWWW Image Optimizer keeps: a second, heavier copy of the whole media library
-// that no page ever requests. Nearly half of what juneflower.vn was carrying (2026-08-14).
-mkdir("$longTmp/wp-content/ew-backup/2023/03", 0777, true);
-file_put_contents("$longTmp/wp-content/ew-backup/2023/03/IMG_3418-scaled.jpg", 'the untouched original');
-mkdir("$longTmp/wp-content/uploads/2023/03", 0777, true);
-file_put_contents("$longTmp/wp-content/uploads/2023/03/IMG_3418-scaled.jpg", 'the one the site serves');
-// And a dump left somewhere other than the webroot root.
-mkdir("$longTmp/wp-content/uploads/2024", 0777, true);
-file_put_contents("$longTmp/wp-content/uploads/2024/old-site.sql", 'SELECT 1');
+$installedOk = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+checkTrue('a well-formed package installs', $installedOk['ok'] === true);
+check('and reports what went on', $installedOk['installed']['name'], 'JA Teline V');
 
-$ewPaths = array_map(fn($f) => $f['path'], (new FileWalker($longTmp))->listBatch('', 50)['files']);
-checkTrue('EWWW originals are left out', !in_array('wp-content/ew-backup/2023/03/IMG_3418-scaled.jpg', $ewPaths, true));
-checkTrue('the image the site actually serves is kept', in_array('wp-content/uploads/2023/03/IMG_3418-scaled.jpg', $ewPaths, true));
-checkTrue('a dump buried in uploads is left out too', !in_array('wp-content/uploads/2024/old-site.sql', $ewPaths, true));
+// Plain HTTP would put a customer's site package on the wire for anyone to replace.
+$http = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'http://example.test/pkg_teline.zip'],
+]);
+check('http is refused before anything is fetched', $http['message'], 'https required');
 
-// The archive has to be readable by tar itself, not merely by us.
-$longCapture = new CapturingUploader();
-$longEngine  = new Engine('a-token-at-least-16', [], null, new FileWalker($longTmp), $longCapture);
-$cursor = ''; $offset = 0; $declared = 0; $guard = 0;
-do {
-    $r = $longEngine->handle([
-        'token'  => 'a-token-at-least-16',
-        'action' => 'files.pack',
-        'params' => ['put_url' => 'https://example.test/p', 'target_bytes' => 4096,
-                     'path' => $cursor, 'offset' => $offset, 'size' => $declared],
-    ]);
-    $cursor = $r['next_path'] ?? ''; $offset = $r['next_offset'] ?? 0; $declared = $r['next_size'] ?? 0;
-} while (empty($r['done']) && ++$guard < 60);
+// Joomla names the download after the URL and reads the archive type from that name, so an
+// address with no .zip on the end fails deep inside the installer with "Unable to detect
+// manifest file" — a message nobody can act on. Refused here instead.
+$noZip = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/download?id=42'],
+]);
+check('a URL that is not a .zip is refused', $noZip['message'], 'package URL must end in .zip');
 
-$longTar = "$longTmp/out.tar";
-file_put_contents($longTar, implode('', $longCapture->parts));
-exec('tar -tf ' . escapeshellarg($longTar) . ' 2>&1', $longList, $longStatus);
-check('tar reads the archive with a 101-character filename', $longStatus, 0);
-checkTrue('and the long path survives the round trip', in_array($longRel, array_map('trim', $longList), true));
+check('nothing refused was ever fetched', count($fakeExtensions->asked), 1);
 
+$fakeExtensions->refuse = true;
+$refused = $extEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_broken.zip'],
+]);
+// The installer's own words, not "install failed": one of these can be acted on.
+checkTrue('a refused package carries the installer reason', strpos($refused['message'], 'Cannot find Joomla XML setup file') !== false);
 
-// ---- ChangeStamp: the hint a watching preview reads ----------------------------------------
+// A site that never wired the manager is a site that cannot be written to at all.
+$readOnlyEngine = new Engine($TOKEN, [], null, null, null, null);
+$unwired = $readOnlyEngine->handle([
+    'token' => $TOKEN,
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+check('an unwired site refuses to install anything', $unwired['message'], 'extension manager not wired');
 
-$stampRoot = sys_get_temp_dir() . '/cowork-stamp-' . bin2hex(random_bytes(4));
-mkdir($stampRoot);
-$stamp = new ChangeStamp($stampRoot);
+// The token gate covers the new actions exactly as it covers the read ones.
+$noToken = $extEngine->handle([
+    'token' => 'wrong-token-but-long-enough',
+    'action' => 'extension.install',
+    'params' => ['url' => 'https://example.test/pkg_teline.zip'],
+]);
+check('a wrong token installs nothing', $noToken['error'], 'unauthorized');
 
-checkTrue('nothing to read before anything changed', $stamp->read() === null);
-
-$stamp->touch('theme');
-$first = $stamp->read();
-checkTrue('a change is recorded', is_array($first) && isset($first['at']));
-check('and says coarsely what kind it was', $first['reason'] ?? null, 'theme');
-
-// One user action fires several hooks. Collapsing them is what keeps a preview from reloading
-// three times for one edit — and a reload mid-edit is worse than a reload a second late.
-$stamp->touch('content');
-check('a second change in the same second does not overwrite the first', $stamp->read()['reason'], 'theme');
-
-// The file is polled every few seconds by something that will parse it. A reader must never
-// catch it half-written, which is why the write goes through a temporary file and a rename.
-checkTrue('no temporary file is left behind', !file_exists($stampRoot . '/' . ChangeStamp::FILENAME . '.tmp'));
-
-// This runs inside a customer's admin request. A hardened host with a read-only webroot must
-// lose the auto-reload, not the admin screen.
-$readOnly = sys_get_temp_dir() . '/cowork-ro-' . bin2hex(random_bytes(4));
-mkdir($readOnly, 0500);
-(new ChangeStamp($readOnly))->touch('theme');
-checkTrue('an unwritable webroot is survived silently', (new ChangeStamp($readOnly))->read() === null);
-@rmdir($readOnly);
-
-array_map('unlink', glob($stampRoot . '/*'));
-@rmdir($stampRoot);
-
-
-// ---- Plugins and themes: what the engine does with a package manager -----------------------
-
-$pkgEngine = new Engine('a-token-at-least-16', [], null, null, null, new FakePackages());
-$call = static function (string $action, array $params = []) use ($pkgEngine): array {
-    return $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => $action, 'params' => $params]);
-};
-
-// WordPress keeps plugins and themes apart, and so does the action list — no `kind` parameter
-// that every caller has to learn.
-check('plugins are listed under their own action', $call('plugin.list')['plugins'][0]['file'], 'akismet/akismet.php');
-check('themes are listed under theirs', $call('theme.list')['themes'][0]['stylesheet'], 'twentytwentytwo');
-
-// The URL is checked before the site is asked to fetch anything: one https .zip, so the
-// installer can never be pointed at a path on disk.
-check('http is refused', $call('plugin.install', ['url' => 'http://example.test/p.zip'])['message'], 'https required');
-check('a non-zip is refused', $call('theme.install', ['url' => 'https://example.test/p.tar'])['message'], 'package URL must end in .zip');
-check('a missing url is a caller mistake, not a failed install', $call('plugin.install')['error'], 'bad_params');
-check('http is classified the same way', $call('plugin.install', ['url' => 'http://e.test/p.zip'])['error'], 'bad_params');
-
-// Install stops at installed. Activation is separate because they fail differently — a package
-// can install fine and still refuse to run.
-$installed = $call('theme.install', ['url' => 'https://example.test/tt2.zip']);
-check('installing a theme reports what arrived', $installed['installed']['stylesheet'], 'twentytwentytwo');
-checkTrue('and does not switch to it', FakePackages::$active === 'tracy');
-
-// Switching returns the theme it replaced, so a caller can put it back without having read the
-// site first — the one piece of state a switch destroys.
-$switched = $call('theme.activate', ['stylesheet' => 'twentytwentytwo']);
-check('activating a theme says what it replaced', $switched['previous'], 'tracy');
-check('and the site is on the new one', FakePackages::$active, 'twentytwentytwo');
-
-check('a theme that is not there is refused', $call('theme.activate', ['stylesheet' => 'nope'])['error'], 'activate_failed');
-
-// A site wired for reading only must refuse every write action rather than half-answering.
-$readOnlyEngine = new Engine('a-token-at-least-16', []);
-$refused = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'theme.install', 'params' => ['url' => 'https://e.test/x.zip']]);
-check('a read-only site refuses to install', $refused['error'], 'unavailable');
-
-// -------------------------------------------------------------- Apply, and its undo --
+// -------------------------------------------------------- SiteWriter / Apply --
 //
-// The write side against fakes: what is checked is the engine's promise — every edit is recorded
-// before it counts as done, and an edit whose undo cannot be recorded is rolled back rather than
+// The write side and its undo. Fakes stand in for Joomla's tables and media folder; what is
+// checked is the engine's promise — every edit is recorded so the whole Apply can be reversed to
+// exactly what was there, and an edit whose undo cannot be recorded is rolled back rather than
 // left standing (ADR 0048).
 
-echo "\nApply\n";
+final class FakeSiteWriter implements SiteWriter
+{
+    /** @var array<string,array<int,array<string,?scalar>>> */
+    public array $store = [];
+    private int $nextId = 100;
+    public int $purges = 0;
+
+    public function read(string $kind, int $id): ?array
+    {
+        return $this->store[$kind][$id] ?? null;
+    }
+    public function write(string $kind, int $id, array $fields): int
+    {
+        if ($id === 0) {
+            $id = $this->nextId++;
+        }
+        $this->store[$kind][$id] = $fields;
+        return $id;
+    }
+    public function delete(string $kind, int $id): void
+    {
+        unset($this->store[$kind][$id]);
+    }
+    public function purgeCache(): void
+    {
+        $this->purges++;
+    }
+}
+
+final class FakeMediaWriter implements MediaWriter
+{
+    /** @var array<string,string> */
+    public array $store = [];
+    public function read(string $path): ?string
+    {
+        return $this->store[$path] ?? null;
+    }
+    public function write(string $path, string $bytes): void
+    {
+        $this->store[$path] = $bytes;
+    }
+    public function delete(string $path): void
+    {
+        unset($this->store[$path]);
+    }
+}
+
+final class FakeApplyLog implements ApplyLog
+{
+    /** @var array<string,array<int,array<string,mixed>>> */
+    public array $log = [];
+    public function record(string $applyId, array $entry): void
+    {
+        $this->log[$applyId][] = $entry;
+    }
+    public function entries(string $applyId): array
+    {
+        return $this->log[$applyId] ?? [];
+    }
+    public function clear(string $applyId): void
+    {
+        unset($this->log[$applyId]);
+    }
+}
+
+/** A log that cannot record — to prove a write with no recordable undo is rolled back. */
+final class FailingApplyLog implements ApplyLog
+{
+    public function record(string $applyId, array $entry): void
+    {
+        throw new RuntimeException('log write failed');
+    }
+    public function entries(string $applyId): array
+    {
+        return [];
+    }
+    public function clear(string $applyId): void
+    {
+    }
+}
 
 $WTOKEN = 'write-token-at-least-16chars';
 $writer = new FakeSiteWriter();
 $mediaW = new FakeMediaWriter();
 $log = new FakeApplyLog();
 $wEngine = new Engine($WTOKEN, [], null, null, null, null, $writer, $mediaW, $log);
-$apply = static function (string $action, array $params) use ($wEngine, $WTOKEN): array {
-    return $wEngine->handle(['token' => $WTOKEN, 'action' => $action, 'params' => $params]);
-};
 
-// A new post, then revert -> it is gone.
-$ins = $apply('content.update', ['apply_id' => 'A1', 'kind' => 'post', 'fields' => ['post_title' => 'Hello']]);
+// insert an article
+$ins = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'A1', 'kind' => 'article', 'fields' => ['title' => 'Hello']]]);
 check('content.update inserts', $ins['ok'], true);
 check('an insert reports created', $ins['created'], true);
 $newId = $ins['id'];
-check('the post is now on the site', $writer->read('post', $newId), ['post_title' => 'Hello']);
+check('the row is now in the site', $writer->read('article', $newId), ['title' => 'Hello']);
 check('the write was logged under its apply', count($log->entries('A1')), 1);
 check('a content write purges cache', $writer->purges, 1);
 
-$rev = $apply('apply.revert', ['apply_id' => 'A1']);
+// revert the insert -> the row is gone
+$rev = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A1']]);
 check('revert reports what it undid', $rev['reverted'], 1);
-check('reverting an insert deletes the post', $writer->read('post', $newId), null);
+check('reverting an insert deletes the row', $writer->read('article', $newId), null);
 check('a reverted apply is forgotten', count($log->entries('A1')), 0);
 
-// An existing post, then revert -> the old words come back.
-$writer->store['post'][7] = ['post_title' => 'Old title'];
-$upd = $apply('content.update', ['apply_id' => 'A2', 'kind' => 'post', 'id' => 7, 'fields' => ['post_title' => 'New title']]);
-check('updating an existing post is not a create', $upd['created'], false);
-check('the new title is live', $writer->read('post', 7), ['post_title' => 'New title']);
-$apply('apply.revert', ['apply_id' => 'A2']);
-check('reverting an update restores the before-state', $writer->read('post', 7), ['post_title' => 'Old title']);
+// update an existing template style, then revert -> the old params come back
+$writer->store['templateStyle'][7] = ['params' => '{"color":"blue"}'];
+$upd = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'A2', 'kind' => 'templateStyle', 'id' => 7, 'fields' => ['params' => '{"color":"red"}']]]);
+check('updating an existing row is not a create', $upd['created'], false);
+check('the new value is live', $writer->read('templateStyle', 7), ['params' => '{"color":"red"}']);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A2']]);
+check('reverting an update restores the before-state', $writer->read('templateStyle', 7), ['params' => '{"color":"blue"}']);
 
-// Post meta: the same bookkeeping, addressed by post id AND key. This is where the SEO plugins
-// keep a description, so it is the kind an Apply reaches for most.
-$meta = $apply('content.update', [
-    'apply_id' => 'A3', 'kind' => 'postmeta', 'id' => 7, 'key' => '_yoast_wpseo_metadesc',
-    'fields' => ['value' => 'A description that fits.'],
-]);
-check('a new meta reports created', $meta['created'], true);
-check('the apply names the key it wrote', $meta['key'], '_yoast_wpseo_metadesc');
-check('the meta is on the post', $writer->read('postmeta', 7, '_yoast_wpseo_metadesc'), ['value' => 'A description that fits.']);
-$apply('apply.revert', ['apply_id' => 'A3']);
-check('reverting a new meta removes it', $writer->read('postmeta', 7, '_yoast_wpseo_metadesc'), null);
-
-// An option is a name with no id at all — the third shape, and the reason `key` exists.
-$writer->store['option']['0:blogname'] = ['value' => 'Old name'];
-$apply('content.update', ['apply_id' => 'A4', 'kind' => 'option', 'key' => 'blogname', 'fields' => ['value' => 'New name']]);
-check('an option write lands', $writer->read('option', 0, 'blogname'), ['value' => 'New name']);
-$apply('apply.revert', ['apply_id' => 'A4']);
-check('reverting an option restores the old value', $writer->read('option', 0, 'blogname'), ['value' => 'Old name']);
-
-// Media: a new file, and the attachment that makes it visible in the library, both undone.
-$mw = $apply('media.upload', [
-    'apply_id' => 'M1', 'path' => 'wp-content/uploads/2026/08/logo.png', 'content_b64' => base64_encode('PNGDATA'),
-]);
-check('media.upload lands the file', $mediaW->read('wp-content/uploads/2026/08/logo.png'), 'PNGDATA');
+// media: a new file, then revert deletes it
+$mw = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'M1', 'path' => 'images/logo.png', 'content_b64' => base64_encode('PNGDATA')]]);
+check('media.upload lands the file', $mediaW->read('images/logo.png'), 'PNGDATA');
 check('a new upload reports created', $mw['created'], true);
-checkTrue('a new upload joins the media library', $mw['attachment'] > 0);
-$apply('apply.revert', ['apply_id' => 'M1']);
-check('reverting a new upload deletes the file', $mediaW->read('wp-content/uploads/2026/08/logo.png'), null);
-check('and takes its attachment with it', $mediaW->attachments, []);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M1']]);
+check('reverting a new upload deletes it', $mediaW->read('images/logo.png'), null);
 
-// Media: replacing a file keeps the attachment it already had, and the old bytes come back.
-$mediaW->store['wp-content/uploads/hero.jpg'] = 'OLDBYTES';
-$over = $apply('media.upload', [
-    'apply_id' => 'M2', 'path' => 'wp-content/uploads/hero.jpg', 'content_b64' => base64_encode('NEWBYTES'),
-]);
-check('overwrite lands the new bytes', $mediaW->read('wp-content/uploads/hero.jpg'), 'NEWBYTES');
-check('replacing a file creates no second attachment', $over['attachment'], 0);
-$apply('apply.revert', ['apply_id' => 'M2']);
-check('reverting an overwrite restores the old bytes', $mediaW->read('wp-content/uploads/hero.jpg'), 'OLDBYTES');
+// media: overwrite an existing file, then revert restores the old bytes
+$mediaW->store['images/hero.jpg'] = 'OLDBYTES';
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'M2', 'path' => 'images/hero.jpg', 'content_b64' => base64_encode('NEWBYTES')]]);
+check('overwrite lands the new bytes', $mediaW->read('images/hero.jpg'), 'NEWBYTES');
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M2']]);
+check('reverting an overwrite restores the old bytes', $mediaW->read('images/hero.jpg'), 'OLDBYTES');
 
-// apply.list names what was touched, without the before payload.
-$apply('content.update', ['apply_id' => 'L1', 'kind' => 'post', 'fields' => ['post_content' => 'x']]);
-$apply('media.upload', ['apply_id' => 'L1', 'path' => 'wp-content/uploads/a.png', 'content_b64' => base64_encode('a')]);
-$list = $apply('apply.list', ['apply_id' => 'L1']);
+// apply.list names what was touched, without the before payload
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'L1', 'kind' => 'module', 'fields' => ['content' => 'x']]]);
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'L1', 'path' => 'images/a.png', 'content_b64' => base64_encode('a')]]);
+$list = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.list', 'params' => ['apply_id' => 'L1']]);
 check('apply.list returns every step', count($list['steps']), 2);
-check('apply.list names the content kind', $list['steps'][0]['kind'], 'post');
+check('apply.list names the content kind', $list['steps'][0]['kind'], 'module');
 checkTrue('apply.list does not leak the before payload', !isset($list['steps'][0]['before']));
 
-// Refusals.
-check(
-    'an unknown kind is refused',
-    $apply('content.update', ['apply_id' => 'X', 'kind' => 'user', 'fields' => ['a' => 'b']])['error'],
-    'bad_params'
-);
-check(
-    'a write without an apply_id is refused',
-    $apply('content.update', ['kind' => 'post', 'fields' => ['post_title' => 'x']])['message'],
-    'apply_id required'
-);
+// refusals ------------------------------------------------------------------------------------
+$badKind = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'X', 'kind' => 'user', 'fields' => ['a' => 'b']]]);
+check('an unknown kind is refused', $badKind['error'], 'bad_params');
 
-$traversal = $apply('media.upload', ['apply_id' => 'X', 'path' => '../wp-config.php', 'content_b64' => base64_encode('x')]);
+$noApply = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('a write without an apply_id is refused', $noApply['message'], 'apply_id required');
+
+$traversal = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'X', 'path' => '../configuration.php', 'content_b64' => base64_encode('x')]]);
 check('a traversing media path is refused', $traversal['message'], 'unusable media path');
-checkTrue('nothing was written outside uploads', !isset($mediaW->store['../wp-config.php']));
+checkTrue('nothing was written outside the media root', !isset($mediaW->store['../configuration.php']));
 
-// A well-formed path outside uploads is live code, not an asset.
-$notMedia = $apply('media.upload', ['apply_id' => 'X', 'path' => 'wp-content/plugins/evil.php', 'content_b64' => base64_encode('x')]);
-check('a media write outside uploads is refused', $notMedia['message'], 'unusable media path');
-checkTrue('live code was not touched', !isset($mediaW->store['wp-content/plugins/evil.php']));
+// A well-formed path that is not under a media tree is live code, not an asset — refused.
+$notMedia = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'X', 'path' => 'configuration.php', 'content_b64' => base64_encode('x')]]);
+check('a media write outside the media roots is refused', $notMedia['message'], 'unusable media path');
+checkTrue('live code was not touched', !isset($mediaW->store['configuration.php']));
 
-$tooBig = $apply('media.upload', [
-    'apply_id' => 'X', 'path' => 'wp-content/uploads/big.bin',
-    'content_b64' => base64_encode(str_repeat('A', 8 * 1024 * 1024 + 1)),
-]);
+$tooBig = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
+    'params' => ['apply_id' => 'X', 'path' => 'images/big.bin', 'content_b64' => base64_encode(str_repeat('A', 8 * 1024 * 1024 + 1))]]);
 check('a media upload past the inline ceiling is refused', $tooBig['error'], 'too_large');
 
 $wrongToken = $wEngine->handle(['token' => 'nope-but-long-enough-here', 'action' => 'content.update',
-    'params' => ['apply_id' => 'X', 'kind' => 'post', 'fields' => ['post_title' => 'x']]]);
+    'params' => ['apply_id' => 'X', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
 check('a wrong token writes nothing', $wrongToken['error'], 'unauthorized');
 
-$unwired = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'content.update',
-    'params' => ['apply_id' => 'X', 'kind' => 'post', 'fields' => ['post_title' => 'x']]]);
-check('an unwired site refuses content writes', $unwired['error'], 'unavailable');
+// a site with no writer wired cannot be written to at all
+$readOnlyW = new Engine($WTOKEN);
+$unwiredW = $readOnlyW->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'X', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('an unwired site refuses content writes', $unwiredW['error'], 'unavailable');
 
-// The rollback promise: a write whose undo cannot be recorded is undone, not left standing.
+// the rollback promise: a write whose undo cannot be recorded is undone, not left standing
 $rbWriter = new FakeSiteWriter();
-$rbEngine = new Engine($WTOKEN, [], null, null, null, null, $rbWriter, new FakeMediaWriter(), new FailingApplyLog());
+$rbEngine = new Engine($WTOKEN, [], null, null, null, null, $rbWriter, $mediaW, new FailingApplyLog());
 $rb = $rbEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
-    'params' => ['apply_id' => 'R1', 'kind' => 'post', 'fields' => ['post_title' => 'ghost']]]);
+    'params' => ['apply_id' => 'R1', 'kind' => 'article', 'fields' => ['title' => 'ghost']]]);
 check('a write whose undo cannot be recorded fails', $rb['ok'], false);
-check('and the site does not keep it', $rbWriter->store['post'] ?? [], []);
+check('and the site holds no orphan for it', $rbWriter->read('article', 100), null);
 
-// ------------------------------------------------ What the real writer will and will not write --
+// ----------------------------------------------------------------- ChangeStamp --
+// The preview watches a file at the webroot because the site cannot call Tracy back. What is
+// tested here is WHEN it is written: after a change that landed, and never after a refusal.
+
+$stampRoot = sys_get_temp_dir() . '/cowork-stamp-' . getmypid();
+@mkdir($stampRoot, 0777, true);
+$stampFile = $stampRoot . '/' . ChangeStamp::FILENAME;
+@unlink($stampFile);
+
+$sWriter = new FakeSiteWriter();
+$sLog = new FakeApplyLog();
+$stamp = new ChangeStamp($stampRoot);
+$sEngine = new Engine($WTOKEN, [], null, null, null, new FakeExtensions(), $sWriter, new FakeMediaWriter(), $sLog, $stamp);
+
+check('no stamp before anything happens', is_file($stampFile), false);
+
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S1', 'kind' => 'article', 'fields' => ['title' => 'Stamped']]]);
+check('a content write stamps the webroot', is_file($stampFile), true);
+$stamped = $stamp->read();
+check('the stamp carries a time', is_int($stamped['at'] ?? null), true);
+check('and a coarse reason', $stamped['reason'] ?? null, 'content');
+
+// A refusal must not move it: the site did not change, and a preview reloaded for nothing shows
+// the customer the same page with a fresh timestamp — which reads as "something happened".
+@unlink($stampFile);
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S2', 'kind' => 'nonsense', 'fields' => ['title' => 'x']]]);
+check('a refused write leaves no stamp', is_file($stampFile), false);
+
+$sEngine->handle(['token' => 'wrong-token-but-long-enough', 'action' => 'content.update',
+    'params' => ['apply_id' => 'S3', 'kind' => 'article', 'fields' => ['title' => 'x']]]);
+check('an unauthorized call leaves no stamp', is_file($stampFile), false);
+
+// One deliverable is several actions; a preview must not reload once per action.
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S4', 'kind' => 'article', 'fields' => ['title' => 'First']]]);
+$firstAt = $stamp->read()['at'];
+$sEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S4', 'kind' => 'article', 'fields' => ['title' => 'Second']]]);
+check('a burst of writes coalesces into one stamp', $stamp->read()['at'], $firstAt);
+
+// An engine with no stamp is the ordinary case in tests and on a read-only webroot.
+$noStamp = new Engine($WTOKEN, [], null, null, null, null, new FakeSiteWriter(), new FakeMediaWriter(), new FakeApplyLog());
+$plain = $noStamp->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'S5', 'kind' => 'article', 'fields' => ['title' => 'y']]]);
+check('a write still succeeds with no stamp wired', $plain['ok'], true);
+
+// A webroot that cannot be written is a hardened host, not a failure to report.
+$readOnlyStamp = new ChangeStamp($stampRoot . '/does/not/exist');
+$readOnlyStamp->touch('content');
+check('an unwritable webroot is silent', $readOnlyStamp->read(), null);
+
+@unlink($stampFile);
+@rmdir($stampRoot);
+
+// ------------------------------------------------------------- update server --
+// "Check For Updates" reads update.xml from the repository and compares it against the manifest
+// of the copy on disk. Three files must agree about one number, and nothing but this notices the
+// day they stop.
 //
-// The rules above are the engine's. These are the writer's, and they are the ones that decide what
-// reaches a customer's live site: which post fields are accepted, which options are refused.
+// update.xml sits at `joomla/`, not here beside the component it describes, and must stay there: a
+// site records that raw.githubusercontent URL when the package is INSTALLED, so the path is a
+// published address every already-installed site still asks. Tidying it into reader/ would 404
+// them all, and they would report "up to date" forever without a word.
 
-echo "\nSite writer rules\n";
+$pkg = simplexml_load_file(__DIR__ . '/../pkg_claudecowork.xml');
+$com = simplexml_load_file(__DIR__ . '/../com_claudecowork/claudecowork.xml');
+$upd = simplexml_load_file(__DIR__ . '/../../update.xml');
+$pkgVersion = trim((string) $pkg->version);
 
-$siteWriter = new Claude_Cowork_Site_Writer();
-
-WP_Fake::$posts[42] = ['ID' => 42, 'post_title' => 'A page', 'post_author' => 3];
-$siteWriter->write('post', 42, ['post_title' => 'Renamed', 'post_author' => 99]);
-check('a whitelisted field is written', WP_Fake::$posts[42]['post_title'], 'Renamed');
-check('a field outside the whitelist is not', WP_Fake::$posts[42]['post_author'], 3);
-
-$refusedFields = null;
-try {
-    $siteWriter->write('post', 42, ['comment_status' => 'closed']);
-} catch (RuntimeException $e) {
-    $refusedFields = $e->getMessage();
-}
-checkTrue('a write with no writable field is refused, not silently dropped', $refusedFields !== null);
-checkTrue('and the refusal names what was allowed', strpos((string) $refusedFields, 'post_title') !== false);
-
-// A new post is a draft unless the caller says otherwise: a page appearing live on a customer's
-// site because nobody mentioned a status is the one outcome an Apply must not produce.
-$draftId = $siteWriter->write('post', 0, ['post_title' => 'Fresh']);
-check('a new post is not published by default', WP_Fake::$posts[$draftId]['post_status'], 'draft');
-check('and it is a post unless told otherwise', WP_Fake::$posts[$draftId]['post_type'], 'post');
-
-// Post meta, including the underscore keys the SEO plugins use.
-$siteWriter->write('postmeta', 42, ['value' => 'Fits in a SERP.'], '_yoast_wpseo_metadesc');
-check('protected meta keys are writable', WP_Fake::$meta['42:_yoast_wpseo_metadesc'], 'Fits in a SERP.');
-check('a meta reads back as its before-state', $siteWriter->read('postmeta', 42, '_yoast_wpseo_metadesc'), ['value' => 'Fits in a SERP.']);
-check('a meta that was never set reads as absent', $siteWriter->read('postmeta', 42, '_nothing_here'), null);
-
-$noPost = null;
-try {
-    $siteWriter->write('postmeta', 4242, ['value' => 'x'], '_k');
-} catch (RuntimeException $e) {
-    $noPost = $e->getMessage();
-}
-checkTrue('a meta on a post that does not exist is refused', $noPost !== null);
-
-// Options: writable, except the ones that would take the site away from whoever has to fix it.
-$siteWriter->write('option', 0, ['value' => 'Tracy demo'], 'blogname');
-check('an ordinary option is written', WP_Fake::$options['blogname'], 'Tracy demo');
-
-WP_Fake::$options['siteurl'] = 'https://real.test';
-foreach (['siteurl', 'active_plugins', 'claude_cowork_token', '_transient_anything'] as $protected) {
-    $stopped = null;
-    try {
-        $siteWriter->write('option', 0, ['value' => 'hijacked'], $protected);
-    } catch (RuntimeException $e) {
-        $stopped = $e->getMessage();
-    }
-    checkTrue("{$protected} cannot be written", $stopped !== null);
-}
-check('and the protected value is untouched', WP_Fake::$options['siteurl'], 'https://real.test');
-
-// An option that is absent reads as absent, not as false — so its undo is a delete, not a write
-// of the default WordPress happened to hand back.
-check('an option that was never set reads as absent', $siteWriter->read('option', 0, 'never_set_option'), null);
-WP_Fake::$options['stored_false'] = false;
-check('an option legitimately holding false is not mistaken for absent', $siteWriter->read('option', 0, 'stored_false'), ['value' => false]);
-
-// The media writer's own guard, independent of the engine's string check.
-$mediaWriter = new Claude_Cowork_Media_Writer(__DIR__);
-$escaped = null;
-try {
-    $mediaWriter->read('wp-content/uploads/../../../etc/passwd');
-} catch (RuntimeException $e) {
-    $escaped = $e->getMessage();
-}
-checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
-
-// ------------------------------------------------------------ update manifest --
-// The Plugins screen asks raw.githubusercontent for update.json and compares it against the
-// header of the copy on disk. Two files must therefore agree about one number, and nothing but
-// this check would notice the day they stop.
-//
-// update.json sits at `wordpress/`, not here beside the reader it describes, and must stay there:
-// the URL is compiled into every plugin copy already running on a site, so the path is a published
-// address. Tidying it into reader/ would 404 them all, silently.
-
-$pluginHeader = file_get_contents(__DIR__ . '/../claude-cowork/claude-cowork.php');
-preg_match('/^\s*\*\s*Version:\s*(.+)$/m', $pluginHeader, $m);
-$headerVersion = trim($m[1] ?? '');
-$manifest = json_decode(file_get_contents(__DIR__ . '/../../update.json'), true);
-
-check('update.json names the version the plugin header does', $manifest['version'] ?? null, $headerVersion);
-checkTrue(
-    'the package it points at is the release asset for that version',
-    ($manifest['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-v{$headerVersion}/claude-cowork-{$headerVersion}.zip"
-);
-// The header selects the filter name: change the host and the hook in update.php is never called.
-checkTrue('the plugin declares an Update URI on github.com', (bool) preg_match('#^\s*\*\s*Update URI:\s*https://github\.com/#m', $pluginHeader));
+check('the component carries the package version', trim((string) $com->version), $pkgVersion);
+check('update.xml names that version too', trim((string) $upd->update->version), $pkgVersion);
+check('and points at that version\'s release asset',
+    trim((string) $upd->update->downloads->downloadurl),
+    "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
+// Without a declared server Joomla has nowhere to ask, and the backend never mentions an update.
+check('the package declares where to ask',
+    trim((string) $pkg->updateservers->server),
+    'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml');
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

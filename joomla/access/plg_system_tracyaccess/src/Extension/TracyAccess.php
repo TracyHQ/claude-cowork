@@ -27,8 +27,8 @@ use Joomla\Event\SubscriberInterface;
  * proved they hold a seat.
  *
  * This plugin exists ONLY on a clone, installed at provision time. It must never reach a
- * customer's own site: it writes to `#__users`, which is the opposite of everything the reader
- * component is for. Kept in its own package for exactly that reason.
+ * customer's own site: it writes to `#__users`, which is nothing the cowork component does or
+ * should ever do. Kept in its own package for exactly that reason.
  *
  * Why it is safe to trust a request header at the origin: the origin has no public address, only
  * a tunnel, and every request has passed Cloudflare Access. But the network is not the check —

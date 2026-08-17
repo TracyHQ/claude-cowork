@@ -65,7 +65,7 @@ where to ask and the answer sits in this repository. Cutting a release is theref
 one commit:
 
 1. the version in the extension's own manifest, and
-2. ``wordpress/reader/update.json`` — the version, and the release asset it points at.
+2. ``wordpress/update.json`` — the version, and the release asset it points at.
 
 `tests/run.php` fails when they disagree, because the failure is otherwise invisible: the site
 asks, gets an older number than it already has, and reports "up to date" forever.

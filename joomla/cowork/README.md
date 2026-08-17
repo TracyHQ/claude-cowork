@@ -1,7 +1,7 @@
 # Tracy Claude Cowork — Joomla
 
-A Joomla component that lets Tracy read a site — its database and its files — over one
-token-authenticated endpoint, and install an extension onto it.
+A Joomla component that lets Tracy work on a site — read its database and its files, and apply an
+approved change back to it — over one token-authenticated endpoint.
 
 ```
 index.php?option=com_claudecowork&task=api.exec&format=json
@@ -12,11 +12,20 @@ that string into whatever is pairing with the site — installing by hand is the
 way to connect a site, with no admin session handed to anyone. Clearing the field revokes access:
 an empty token refuses every request.
 
-Everything is read-only except `extension.install`, which takes one `https` `.zip` URL the site
-downloads itself and hands to Joomla's own installer. There is no uninstall, no file write and
-no way to name a local path: a caller holding the token can add to a site, never quietly remove
-from it. `extension.list` reports what is already there, so a caller can tell "already
+## What it can do
+
+| Actions | |
+| --- | --- |
+| `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. |
+| `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
+| `content.update`, `media.upload` | Editing an article's fields, a module's content or a template style's params — whitelisted columns only; and putting a file under `images/` or `media/`. |
+| `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
+
+An install is deliberately **not** in the undo log: installing is additive, and Joomla owns the
+uninstall. `extension.list` reports what is already there, so a caller can tell "already
 installed" from "installed in another version" without guessing.
+
+There is no shell, no arbitrary file write, and no action that is not named and bounded above.
 
 ## Layout
 
@@ -44,7 +53,7 @@ where to ask and the answer sits in this repository. Cutting a release is theref
 one commit:
 
 1. the version in the extension's own manifest, and
-2. ``joomla/reader/update.xml`` — the version, and the release asset it points at.
+2. ``joomla/update.xml`` — the version, and the release asset it points at.
 
 `tests/run.php` fails when they disagree, because the failure is otherwise invisible: the site
 asks, gets an older number than it already has, and reports "up to date" forever.

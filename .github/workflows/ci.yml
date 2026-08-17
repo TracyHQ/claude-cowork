@@ -10,10 +10,10 @@ on:
 jobs:
   joomla:
     runs-on: ubuntu-latest
-    # The Joomla reader — the component installed on a customer's own site.
+    # The Joomla cowork extension — the component installed on a customer's own site.
     defaults:
       run:
-        working-directory: joomla/reader
+        working-directory: joomla/cowork
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +43,7 @@ jobs:
   joomla-access:
     runs-on: ubuntu-latest
     # The Joomla access plugin — a clone's auto-login. Its own job because it is its own package:
-    # a different install target, its own release, and no code shared with the reader.
+    # a different install target, its own release, and no code shared with the cowork extension.
     defaults:
       run:
         working-directory: joomla/access
@@ -75,7 +75,7 @@ jobs:
   wordpress:
     runs-on: ubuntu-latest
     # Both WordPress packages in one job: the access plugin is a single mu-plugin file with no
-    # build and no tests of its own, so it rides with the reader rather than owning an empty job.
+    # build and no tests of its own, so it rides with the cowork plugin rather than owning a job.
     defaults:
       run:
         working-directory: wordpress
@@ -92,14 +92,14 @@ jobs:
         run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Engine tests
-        run: php reader/tests/run.php
+        run: php cowork/tests/run.php
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Build the package
-        run: ./reader/build.sh
+        run: ./cowork/build.sh
 
       - name: Language check
-        run: node ../scripts/check-language.mjs reader/claude-cowork/lib
+        run: node ../scripts/check-language.mjs cowork/claude-cowork/lib
