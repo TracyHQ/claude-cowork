@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Every change it makes is recorded so the whole thing can be put back. Remove the token to switch it off.
- * Version:     0.4.0
+ * Version:     0.5.0
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -286,16 +286,44 @@ function claude_cowork_is_write_action(string $action): bool
 }
 
 /**
- * Create the undo log on activation.
+ * Give this site a token of its own, and create the undo log.
  *
- * Loaded by hand rather than through `claude_cowork_load_engine`: activation runs in wp-admin
- * with nothing of this plugin loaded, and the table's shape is the only thing needed here.
+ * The undo log is loaded by hand rather than through `claude_cowork_load_engine`: activation runs
+ * in wp-admin with nothing of this plugin loaded, and the table's shape is the only thing needed
+ * here.
  */
 register_activation_hook(__FILE__, static function (): void {
+    claude_cowork_seed_token();
+
     require_once __DIR__ . '/lib/SiteWriter.php';
     require_once __DIR__ . '/lib/class-claude-cowork-writers.php';
     Claude_Cowork_Apply_Log::ensure_table();
 });
+
+/**
+ * Mints the token this plugin answers on, if it has none.
+ *
+ * The site generates its own rather than being handed one. That is what makes the two ways in
+ * agree: an owner who installed this by hand copies the token off the settings screen below, and
+ * Tracy — which installs the same package through the same admin screens — reads that same field.
+ * One value, one place it comes from. It also means a package that was ever shared carries no
+ * usable token, because the token does not exist until the plugin runs on a site.
+ *
+ * **Never overwrites an existing one.** An upgrade activates the plugin again, and re-minting
+ * would cut off every caller already holding the old value. The Joomla component seeds its token
+ * under the same rule and for the same reason (`seedToken`, com_claudecowork/script.php).
+ *
+ * 24 bytes as hex, matching Joomla: comfortably past the 16-character floor `Token::check`
+ * enforces, and still short enough to copy by hand.
+ */
+function claude_cowork_seed_token(): void
+{
+    if (trim((string) get_option(CLAUDE_COWORK_TOKEN_OPTION, '')) !== '') {
+        return;
+    }
+
+    update_option(CLAUDE_COWORK_TOKEN_OPTION, bin2hex(random_bytes(24)));
+}
 
 // ---- Telling a watching preview that the site changed ---------------------------------------
 
@@ -414,13 +442,33 @@ function claude_cowork_render_settings_page(): void
                     <td>
                         <input type="text" class="regular-text code" id="claude_cowork_token"
                                name="<?php echo esc_attr(CLAUDE_COWORK_TOKEN_OPTION); ?>"
-                               value="<?php echo esc_attr($token); ?>" autocomplete="off">
-                        <p class="description">At least 16 characters. A shorter one is treated as no token at all.</p>
+                               value="<?php echo esc_attr($token); ?>" autocomplete="off"
+                               onclick="this.select()">
+                        <button type="button" class="button" id="claude-cowork-copy-token">
+                            <span class="claude-cowork-copy-label">Copy</span>
+                        </button>
+                        <p class="description">This site made this token when the plugin was
+                            activated, and keeps it across upgrades. Paste it into Tracy when this
+                            server cannot be reached from outside. At least 16 characters: a
+                            shorter one is treated as no token at all.</p>
                     </td>
                 </tr>
             </table>
             <?php submit_button(); ?>
         </form>
     </div>
+    <script>
+        // No build step and no dependency for one button. The copy affordance is what makes the
+        // paste-by-hand route bearable, and it is the same one the Joomla connect screen offers.
+        document.getElementById('claude-cowork-copy-token').addEventListener('click', function () {
+            var field = document.getElementById('claude_cowork_token');
+            field.select();
+            navigator.clipboard.writeText(field.value).then(function () {
+                var label = document.querySelector('#claude-cowork-copy-token .claude-cowork-copy-label');
+                label.textContent = 'Copied';
+                setTimeout(function () { label.textContent = 'Copy'; }, 1500);
+            });
+        });
+    </script>
     <?php
 }

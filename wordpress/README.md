@@ -49,10 +49,10 @@ Against a real WordPress:
 
 ```bash
 docker compose up -d                                       # wordpress + mariadb
-wp plugin activate claude-cowork
-wp option update claude_cowork_token "$(openssl rand -hex 24)"
+wp plugin activate claude-cowork                           # which is also what mints the token
+TOKEN=$(wp option get claude_cowork_token)
 curl -s -X POST 'http://localhost:8899/wp-admin/admin-ajax.php?action=claude_cowork' \
-  -H 'content-type: application/json' -d '{"token":"…","action":"site.stats"}'
+  -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\",\"action\":\"site.stats\"}"
 ```
 
 Mount `claude-cowork/` straight into `wp-content/plugins/` — the plugin needs no build step of
@@ -91,9 +91,21 @@ asked for.
 
 ## The token
 
-Set at **Settings → Claude Cowork**, stored in the `claude_cowork_token` option. An empty or
-short token means every request is refused, so installing the plugin does not by itself open
-anything. Clearing the field is how a site owner revokes access without uninstalling.
+**The site mints its own on activation** and keeps it in the `claude_cowork_token` option: 24
+random bytes as hex, the same shape the Joomla component seeds in its install script. Nothing is
+handed a token from outside, so a package that was ever shared carries none.
+
+That is what makes the two ways in agree. An owner whose server cannot reach GitHub installs the
+zip in their own browser and copies the token off **Settings → Claude Cowork**; Tracy installs the
+same package through the same admin screens and reads the same field. One value, one place it
+comes from.
+
+**An upgrade never re-mints it.** Activation runs again on every upgrade, and a new token would cut
+off every caller already holding the old one.
+
+An empty or short token means every request is refused, so installing the plugin does not by itself
+open anything. Clearing the field is how a site owner revokes access without uninstalling —
+deactivating and activating the plugin again mints a new one, because activation is what mints.
 
 It is deliberately not exposed through the settings REST endpoint: this value is the key to the
 site's contents, and a setting that can be read remotely is one more place it can leak from.
