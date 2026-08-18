@@ -207,7 +207,7 @@ final class Claude_Cowork_Packages {
 	 * a plugin that is on and one whose tables were never created.
 	 *
 	 * @param string $file Plugin file, e.g. `akismet/akismet.php`.
-	 * @return array{ok:bool, error?:string}
+	 * @return array{ok:bool, error?:string, was_active?:bool}
 	 */
 	public function activate_plugin_file( $file ) {
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -216,11 +216,23 @@ final class Claude_Cowork_Packages {
 			return array( 'ok' => false, 'error' => "no such plugin: {$file}" );
 		}
 
+		// Read it BEFORE activating, the way activate_theme reads the live stylesheet: activating
+		// an already-active plugin is a no-op, and once the call returns there is nothing left to
+		// tell the two cases apart. A caller that undoes by deactivating would otherwise switch
+		// off a plugin the site was legitimately running.
+		//
+		// The list read here is the SITE-LOCAL one, which is exactly what `activate_plugin()`
+		// writes to when called without `$network_wide`. `is_plugin_active()` is the wrong probe:
+		// it also answers true for a network-wide activation, and on multisite a plugin can be
+		// network-active while this site has no local entry — the call would then still add one,
+		// and reporting "was already on" would describe a state change as a no-op.
+		$was_active = in_array( $file, (array) get_option( 'active_plugins', array() ), true );
+
 		$result = activate_plugin( $file );
 		if ( is_wp_error( $result ) ) {
 			return array( 'ok' => false, 'error' => $result->get_error_message() );
 		}
-		return array( 'ok' => true );
+		return array( 'ok' => true, 'was_active' => $was_active );
 	}
 
 	/**

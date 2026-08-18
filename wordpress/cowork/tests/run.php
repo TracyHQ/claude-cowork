@@ -537,6 +537,18 @@ check('and the site is on the new one', FakePackages::$active, 'twentytwentytwo'
 
 check('a theme that is not there is refused', $call('theme.activate', ['stylesheet' => 'nope'])['error'], 'activate_failed');
 
+// Switching a plugin on destroys the same kind of state a theme switch does: whether it was
+// already running. What this covers is the ENGINE contract: the prior state the packages layer
+// reports is carried out to the caller. It does NOT cover Claude_Cowork_Packages itself, which
+// no test in this suite reaches - it needs the wp-admin includes, and tests/wp/ does not exist.
+// So the site-local `active_plugins` read added alongside this is unguarded here. Activating an active plugin is a no-op, so a caller that undid it by
+// deactivating would switch off a plugin the site was legitimately running.
+FakePackages::$activePlugins = [];
+$firstOn = $call('plugin.activate', ['file' => 'akismet/akismet.php']);
+checkTrue('activating a plugin reports that it was off before', $firstOn['was_active'] === false);
+$againOn = $call('plugin.activate', ['file' => 'akismet/akismet.php']);
+checkTrue('and reports that it was already on the second time', $againOn['was_active'] === true);
+
 // A site wired for reading only must refuse every write action rather than half-answering.
 $readOnlyEngine = new Engine('a-token-at-least-16', []);
 $refused = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'theme.install', 'params' => ['url' => 'https://e.test/x.zip']]);
