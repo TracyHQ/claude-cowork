@@ -164,6 +164,45 @@ check('walked files exclude cache/', $allPaths, ['configuration.php', 'images/lo
 $read = $walker->readFile('images/logo.png');
 check('readFile content matches', $read, 'PNGDATA');
 
+// --- protected paths --------------------------------------------------------
+// The confinement in readFile() is about DIRECTION: realpath plus a prefix test stops
+// ../../etc/passwd and a symlink pointing out of the tree. It says nothing about a
+// well-formed path that stays inside. The write side already learned this — media.upload
+// carries the same list, and its comment names the case verbatim. The read side did not.
+
+function refusal(FileWalker $w, string $rel): string
+{
+    try {
+        $w->readFile($rel);
+        return '(no refusal)';
+    } catch (RuntimeException $e) {
+        return $e->getMessage();
+    }
+}
+
+file_put_contents("$tmp/configuration.php-2026-01-01", '<?php $host="rotated";');
+file_put_contents("$tmp/.env", "SECRET=1");
+$guarded = new FileWalker($tmp);
+
+foreach (['configuration.php', './configuration.php', 'configuration.php-2026-01-01', '.env'] as $rel) {
+    check("readFile refuses {$rel}", refusal($guarded, $rel), 'refused: protected path');
+}
+
+// A refusal must not echo the path back: the message would otherwise answer
+// "does this file exist?" for anything the caller cares to try.
+checkTrue('refusal message does not repeat the path',
+    strpos(refusal($guarded, 'configuration.php'), 'configuration') === false);
+
+check('readFile still serves ordinary files', $guarded->readFile('index.php'), '<?php echo "hi";');
+
+try {
+    $guarded->absolutePath('configuration.php');
+    $absRefused = '(no refusal)';
+} catch (RuntimeException $e) {
+    $absRefused = $e->getMessage();
+}
+check('absolutePath refuses it too', $absRefused, 'refused: protected path');
+
 $threw = false;
 try {
     $walker->readFile('../../../etc/passwd');

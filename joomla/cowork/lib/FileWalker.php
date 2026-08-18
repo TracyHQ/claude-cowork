@@ -191,9 +191,76 @@ final class FileWalker
         return array_slice($all, $start, $limit);
     }
 
+
+    /**
+     * Files inside the webroot that no read action may return.
+     *
+     * The confinement below is about DIRECTION: realpath plus a prefix test stops
+     * `../../etc/passwd` and a symlink pointing out of the tree. It says nothing about a
+     * well-formed path that stays inside, and the site's own configuration is exactly that
+     * shape.
+     *
+     * The write side already carries this list. `Engine::MEDIA_ROOTS` and the validation
+     * around it exist because, in its own words, "without this a well-formed path like
+     * configuration.php passes every other check and overwrites live code". The read side
+     * had the confinement and not the list.
+     *
+     * Entries ending in '/' are directory prefixes. Everything is compared lowercased, so
+     * the check does not depend on whether the host filesystem is case-sensitive.
+     */
+    public const SECRET_PATHS = [
+        'configuration.php',
+        '.env',
+        '.env.local',
+        '.htpasswd',
+        'administrator/logs/',
+        'logs/',
+        'cli/',
+    ];
+
+    /** The relative path, normalised the one way every check here agrees on. */
+    private function normalise(string $rel): string
+    {
+        $norm = str_replace('\\', '/', $rel);
+        // Strip a leading './' as a PREFIX, not as a character set. ltrim($rel, './')
+        // would eat the leading dot of '.env' and turn it into 'env', which matches
+        // nothing and lets the file straight through.
+        while (strpos($norm, './') === 0) {
+            $norm = substr($norm, 2);
+        }
+        return ltrim($norm, '/');
+    }
+
+    /** True when a relative path is one this component must never hand back. */
+    public function isSecretPath(string $rel): bool
+    {
+        $norm = strtolower($this->normalise($rel));
+        foreach (self::SECRET_PATHS as $deny) {
+            if (substr($deny, -1) === '/') {
+                if (strpos($norm, $deny) === 0) {
+                    return true;
+                }
+                continue;
+            }
+            // A rotated copy keeps the secrets and the stem: configuration.php.bak,
+            // configuration.php.save, configuration.php-2026-01-01.
+            if ($norm === $deny
+                || strpos($norm, $deny . '.') === 0
+                || strpos($norm, $deny . '-') === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The absolute path of a relative one, having checked it does not leave the webroot. */
     public function absolutePath(string $rel): string
     {
+        // Refused before realpath, so a refusal cannot be used to learn what exists. The
+        // message is fixed and does not repeat the path, for the same reason.
+        if ($this->isSecretPath($rel)) {
+            throw new RuntimeException('refused: protected path');
+        }
         $rel = ltrim(str_replace('\\', '/', $rel), '/');
         $abs = realpath($this->root . '/' . $rel);
         if ($abs === false) {
@@ -208,6 +275,11 @@ final class FileWalker
     /** Reads one file, by relative path. Refuses anything outside the webroot. */
     public function readFile(string $rel): string
     {
+        // Refused before realpath, so a refusal cannot be used to learn what exists. The
+        // message is fixed and does not repeat the path, for the same reason.
+        if ($this->isSecretPath($rel)) {
+            throw new RuntimeException('refused: protected path');
+        }
         $rel = ltrim(str_replace('\\', '/', $rel), '/');
         $abs = realpath($this->root . '/' . $rel);
         if ($abs === false) {
