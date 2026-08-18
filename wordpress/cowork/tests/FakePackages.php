@@ -11,6 +11,9 @@ final class FakePackages
     /** @var array<string,bool> stylesheet → exists */
     public static array $themes = ['tracy' => true, 'twentytwentytwo' => false];
 
+    /** Plugin files currently switched on, so the fake can answer was_active. */
+    public static array $activePlugins = [];
+
     public function list_plugins(): array
     {
         return [['file' => 'akismet/akismet.php', 'name' => 'Akismet', 'version' => '5.0', 'active' => true]];
@@ -39,9 +42,14 @@ final class FakePackages
 
     public function activate_plugin_file(string $file): array
     {
-        return $file === 'akismet/akismet.php'
-            ? ['ok' => true]
-            : ['ok' => false, 'error' => "no such plugin: {$file}"];
+        if ($file !== 'akismet/akismet.php') {
+            return ['ok' => false, 'error' => "no such plugin: {$file}"];
+        }
+        $wasActive = in_array($file, self::$activePlugins, true);
+        if (!$wasActive) {
+            self::$activePlugins[] = $file;
+        }
+        return ['ok' => true, 'was_active' => $wasActive];
     }
 
     public function activate_theme(string $stylesheet): array

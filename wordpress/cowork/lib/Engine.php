@@ -564,7 +564,7 @@ final class Engine
         }
         $result = $this->packages->activate_plugin_file($file);
         return ($result['ok'] ?? false) === true
-            ? $this->ok(['activated' => $file])
+            ? $this->ok(['activated' => $file, 'was_active' => $result['was_active'] ?? null])
             : $this->err('activate_failed', (string) ($result['error'] ?? 'activate failed'));
     }
 
