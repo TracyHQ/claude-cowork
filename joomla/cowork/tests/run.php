@@ -458,6 +458,13 @@ mkdir($growTmp);
 // Bigger than one part, so it must span two of them.
 file_put_contents("$growTmp/big.bin", str_repeat('A', 6 * 1024 * 1024));
 file_put_contents("$growTmp/zz-after.txt", 'the entry that gets lost');
+// Every Joomla site has one, and this fixture did not — which is the whole reason a refusal on
+// the read path could stop every real export while the suite stayed green. `cli/` is here for
+// the same reason: it is on the protected list and it is Joomla's own code, so an archive
+// without it is not a copy of the site.
+file_put_contents("$growTmp/configuration.php", '<?php $offset="America/Chicago"; $sef=1;');
+mkdir("$growTmp/cli");
+file_put_contents("$growTmp/cli/joomla.php", '<?php // core cli entry point');
 
 final class CapturingUploader implements Uploader
 {
@@ -501,7 +508,24 @@ $tarFile = "$growTmp.tar";
 file_put_contents($tarFile, $archive);
 exec('tar -tf ' . escapeshellarg($tarFile) . ' 2>&1', $listed, $status);
 check('a growing file does not corrupt the archive', $status, 0);
-check('every entry survives', count(array_filter($listed, fn($l) => strpos($l, 'tar:') !== 0)), 2);
+$entries = array_values(array_filter($listed, fn($l) => strpos($l, 'tar:') !== 0));
+check('every entry survives', count($entries), 4);
+
+// The regression this fixture now carries. `absolutePath()` refuses a protected path, and the
+// packer used to read through it, so ONE such file in the tree ended the whole archive:
+// wisdeaf.org died at 34 MB of 266 with `pack_failed: refused: protected path`, five runs in a
+// row, while this suite stayed green because the fixture was two invented files.
+//
+// A backup that omits the site's own configuration is not a backup: the fleet reads those ~91
+// settings back out to keep the customer's timezone and SEF rules. So the archive carries it,
+// and the door a CALLER knocks on still refuses — the two assertions below are the whole point,
+// and they have to hold together.
+checkTrue('the archive carries the site configuration the fleet reads back',
+    in_array('configuration.php', $entries, true));
+checkTrue('and carries Joomla core code that sits on the protected list',
+    in_array('cli/joomla.php', $entries, true));
+check('while a caller asking for it directly is still refused',
+    refusal(new FileWalker($growTmp), 'configuration.php'), 'refused: protected path');
 
 // And the other direction: a file TRUNCATED mid-pack. Stopping short would shift the archive
 // exactly as growing does, so the remainder is zero-filled to the size the header declared.

@@ -333,7 +333,8 @@ final class Engine
                     break;
                 }
 
-                $abs = $this->walker->absolutePath($path);
+                // For the ARCHIVE, not for a caller — see FileWalker::archivePath.
+                $abs = $this->walker->archivePath($path);
 
                 // A tar entry must be EXACTLY as long as its own header says, and the header for
                 // an entry spanning parts was written in an earlier request. A webroot is not

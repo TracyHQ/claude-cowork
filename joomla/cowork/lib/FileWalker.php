@@ -261,6 +261,33 @@ final class FileWalker
         if ($this->isSecretPath($rel)) {
             throw new RuntimeException('refused: protected path');
         }
+        return $this->archivePath($rel);
+    }
+
+    /**
+     * The same path check, for a file being packed into the site's OWN archive.
+     *
+     * Two questions were being answered by one method, and merging them broke every export.
+     *
+     *   1. May a caller ask this component to hand back `configuration.php`? **No** — that is
+     *      what {@see absolutePath} and {@see readFile} refuse, and the refusal stays.
+     *   2. May the site's own backup contain `configuration.php`? **It must.** The fleet's
+     *      `render_configuration.py` reads the customer's own file out of the archive to keep
+     *      the ~91 settings that are theirs; a site provisioned from a default config comes up
+     *      on the wrong timezone with SEF off, which changes every URL it serves.
+     *
+     * With one method answering both, the packer listed a path the reader then refused, and one
+     * refusal killed the whole archive: on wisdeaf.org, 34 MB of 266 with `pack_failed:
+     * refused: protected path`, five times running. `cli/` alone would have done it — that is
+     * Joomla's own code, not a secret.
+     *
+     * What this does NOT relax: the confinement below. `realpath` plus the prefix test still
+     * stop `../../etc/passwd` and a symlink pointing out of the tree, which is the check that
+     * was always doing the security work here. The caller of this is the packer, and what it
+     * produces goes to a presigned URL — a token holder could already pack the whole site.
+     */
+    public function archivePath(string $rel): string
+    {
         $rel = ltrim(str_replace('\\', '/', $rel), '/');
         $abs = realpath($this->root . '/' . $rel);
         if ($abs === false) {
