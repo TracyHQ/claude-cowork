@@ -4,8 +4,19 @@
  *
  * Follows the engine's guiding split: the part that writes SQL (DbDumper) knows nothing about a
  * driver. The real implementation talks to mysqli; a test hands it rows from an array. Reads are
- * batched with an offset cursor, so one HTTP call only ever does one bounded piece of work and
- * finishes well inside a shared host's execution limit.
+ * batched, so one HTTP call only ever does one bounded piece of work and finishes well inside a
+ * shared host's execution limit.
+ *
+ * Batching is by KEY, not by offset. A dump of a live site reads a table the site is still
+ * writing to, and OFFSET addresses a position in a result set rather than a row: an insert
+ * between chunk N and N+1 pushes every later row back one place, so a row already emitted is
+ * emitted again, and a delete pushes the other way and a row is never emitted at all. Measured
+ * on a real site 2026-08-12: a session table gave 2636 rows of which 2635 were distinct, and the
+ * import died on `ERROR 1062` after the whole 312 MB export had already run.
+ *
+ * `readRows()` is kept because it is the interface a caller with no key can still use, and
+ * because a fake in a test has no concurrency to defend against. Nothing that dumps a live
+ * site should reach for it.
  */
 interface RowSource
 {
@@ -33,7 +44,45 @@ interface RowSource
     /**
      * One batch of rows: LIMIT $limit OFFSET $offset. Each row is an array of column values in
      * column order, where null means SQL NULL.
+     *
+     * Positional, not associative, deliberately: a dump needs the values in the order the
+     * CREATE declares them, and mysqli hands every column back as string|null, which is exactly
+     * the shape SQL wants with no type guessing.
+     *
+     * Unsafe against a table being written to while it is read. See {@see readRowsAfter}.
+     *
      * @return array<int,array<int,?string>>
      */
     public function readRows(string $table, int $offset, int $limit): array;
+
+    /**
+     * The columns that address a row uniquely, in index order, for keyset paging.
+     *
+     * The PRIMARY KEY when there is one. Failing that, any UNIQUE index whose every column is
+     * NOT NULL — unique is what makes the cursor address one row, and NOT NULL is what makes
+     * `>` answer at all, since a comparison against NULL is neither true nor false and the row
+     * would simply drop out of every batch.
+     *
+     * Empty when the table has neither. That is not an error: a caller falls back to offset
+     * paging and accepts the risk, because there is no stable cursor to be had.
+     *
+     * @return string[]
+     */
+    public function keyColumns(string $table): array;
+
+    /**
+     * One batch of rows strictly after $after, ordered by {@see keyColumns}.
+     *
+     * Immune to the site writing during the dump, and that is the whole point: the cursor names
+     * a ROW, so a row inserted behind it is simply never seen by this dump, and one inserted
+     * ahead of it is seen exactly once. Neither can shift what has already been emitted.
+     *
+     * `after` is the key values of the last row of the previous batch, or null to start. It is
+     * carried back as `after` in the return so the caller never has to know which columns the
+     * key is made of.
+     *
+     * @param ?array<int,?string> $after
+     * @return array{rows:array<int,array<int,?string>>, after:?array<int,?string>}
+     */
+    public function readRowsAfter(string $table, ?array $after, int $limit): array;
 }

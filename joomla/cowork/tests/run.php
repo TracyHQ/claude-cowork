@@ -114,13 +114,145 @@ check('empty table rows', $emptyChunk['rows'], 0);
 checkTrue('empty table still emits DROP+CREATE', str_contains($emptyChunk['sql'], 'DROP TABLE'));
 
 // Resuming from any offset must not repeat DROP, and the chunks must add up to every row.
+// Four calls for three rows: `done` is now a short batch and nothing else, so a table whose size
+// is an exact multiple of the batch costs one empty round trip to learn it has ended. That is the
+// deliberate price of never ending early on a table the site is deleting from.
 $r1 = $dumper->dumpChunk('jos_menu', 0, 1);
 $r2 = $dumper->dumpChunk('jos_menu', $r1['next_offset'], 1);
 $r3 = $dumper->dumpChunk('jos_menu', $r2['next_offset'], 1);
-check('resume walks to done across 3 single-row chunks', $r3['done'], true);
-check('resume total rows == 3', $r1['rows'] + $r2['rows'] + $r3['rows'], 3);
+$r4 = $dumper->dumpChunk('jos_menu', $r3['next_offset'], 1);
+check('a full batch is never assumed to be the last', $r3['done'], false);
+check('resume walks to done across 4 single-row chunks', $r4['done'], true);
+check('resume total rows == 3', $r1['rows'] + $r2['rows'] + $r3['rows'] + $r4['rows'], 3);
 
 check('dumper tables() lists what the source knows', $dumper->tables(), ['jos_menu', 'jos_empty']);
+
+
+// -------------------------------------------- DbDumper, keyset paging ------
+//
+// The bug this pages by key to avoid: a dump reads a table the site is still writing to, and
+// OFFSET names a position rather than a row. Measured on a live site 2026-08-12 — `#__session`
+// gave 2636 rows of which 2635 were distinct, and the import died on `ERROR 1062` after the whole
+// 312 MB export had already run. A session id is random, so a new session lands in the MIDDLE of
+// the key order, which is what `insertRow(..., 0)` reproduces here.
+
+/** Every INSERT value in a chunk's SQL, so a test can ask what was actually emitted. */
+function emitted(string $sql): array
+{
+    preg_match_all("/\\('([^']*)'/", $sql, $m);
+    return $m[1];
+}
+
+function sessionSource(): FakeRowSource
+{
+    return new FakeRowSource([
+        'jos_session' => [
+            'create'  => 'CREATE TABLE `jos_session` (`session_id` varchar(32), `data` varchar(255))',
+            'columns' => ['session_id', 'data'],
+            'key'     => ['session_id'],
+            'rows'    => [['b', 'two'], ['c', 'three'], ['d', 'four'], ['e', 'five']],
+        ],
+    ]);
+}
+
+// First, prove the old path really is broken — a test that cannot fail on the bug proves nothing.
+$broken = sessionSource();
+$brokenDumper = new DbDumper($broken);
+$b1 = $brokenDumper->dumpChunk('jos_session', 0, 2);
+$broken->insertRow('jos_session', ['a', 'one'], 0);   // a new session, sorting ahead of the cursor
+$b2 = $brokenDumper->dumpChunk('jos_session', $b1['next_offset'], 2);
+$brokenIds = array_merge(emitted($b1['sql']), emitted($b2['sql']));
+check('offset paging emits a row twice when the site writes mid-dump',
+    count($brokenIds) - count(array_unique($brokenIds)), 1);
+
+// Then the fix: the cursor names the last ROW, so nothing behind it can move.
+$live = sessionSource();
+$liveDumper = new DbDumper($live);
+$k1 = $liveDumper->dumpChunkFrom('jos_session', null, 2);
+checkTrue('keyset first chunk has DROP+CREATE', str_contains($k1['sql'], 'DROP TABLE IF EXISTS `jos_session`'));
+check('keyset first chunk rows', $k1['rows'], 2);
+check('keyset first chunk not done', $k1['done'], false);
+
+$live->insertRow('jos_session', ['a', 'one'], 0);
+$k2 = $liveDumper->dumpChunkFrom('jos_session', $k1['next_cursor'], 2);
+$k3 = $liveDumper->dumpChunkFrom('jos_session', $k2['next_cursor'], 2);
+$keysetIds = array_merge(emitted($k1['sql']), emitted($k2['sql']), emitted($k3['sql']));
+check('keyset paging emits no row twice', count($keysetIds) - count(array_unique($keysetIds)), 0);
+check('keyset paging emits every row that existed when it started', $keysetIds, ['b', 'c', 'd', 'e']);
+check('keyset walks to done', $k3['done'], true);
+checkTrue('keyset resume does not repeat DROP', !str_contains($k2['sql'], 'DROP TABLE'));
+
+// A delete behind the cursor is the worse half of the same bug: offset SKIPS a row, silently.
+$shrinking = sessionSource();
+$shrinkDumper = new DbDumper($shrinking);
+$s1 = $shrinkDumper->dumpChunk('jos_session', 0, 2);
+$shrinking->deleteRow('jos_session', 0);
+$s2 = $shrinkDumper->dumpChunk('jos_session', $s1['next_offset'], 2);
+check('offset paging skips a row when one is deleted mid-dump',
+    array_merge(emitted($s1['sql']), emitted($s2['sql'])), ['b', 'c', 'e']);
+
+$shrinking2 = sessionSource();
+$shrinkDumper2 = new DbDumper($shrinking2);
+$t1 = $shrinkDumper2->dumpChunkFrom('jos_session', null, 2);
+$shrinking2->deleteRow('jos_session', 0);
+$t2 = $shrinkDumper2->dumpChunkFrom('jos_session', $t1['next_cursor'], 2);
+check('keyset loses nothing when a row is deleted behind it',
+    array_merge(emitted($t1['sql']), emitted($t2['sql'])), ['b', 'c', 'd', 'e']);
+
+// A composite key needs no special handling from the caller: the cursor carries both columns.
+$mapSource = new FakeRowSource([
+    'jos_user_usergroup_map' => [
+        'create'  => 'CREATE TABLE `jos_user_usergroup_map` (`user_id` int, `group_id` int)',
+        'columns' => ['user_id', 'group_id'],
+        'key'     => ['user_id', 'group_id'],
+        'rows'    => [['1', '2'], ['1', '3'], ['2', '2']],
+    ],
+]);
+$mapDumper = new DbDumper($mapSource);
+$m1 = $mapDumper->dumpChunkFrom('jos_user_usergroup_map', null, 2);
+$m2 = $mapDumper->dumpChunkFrom('jos_user_usergroup_map', $m1['next_cursor'], 2);
+check('composite key pages without repeating the shared first column',
+    array_merge(emitted($m1['sql']), emitted($m2['sql'])), ['1', '1', '2']);
+check('composite key walks to done', $m2['done'], true);
+
+// No unique NOT NULL key: there is no cursor to be had, so it falls back and SAYS it fell back.
+$keyless = new FakeRowSource([
+    'jos_keyless' => [
+        'create' => 'CREATE TABLE `jos_keyless` (`note` varchar(64))',
+        'rows'   => [['one'], ['two'], ['three']],
+    ],
+]);
+$keylessDumper = new DbDumper($keyless);
+$n1 = $keylessDumper->dumpChunkFrom('jos_keyless', null, 2);
+$n2 = $keylessDumper->dumpChunkFrom('jos_keyless', $n1['next_cursor'], 2);
+checkTrue('keyless table warns in the dump that it was paged by offset',
+    str_contains($n1['sql'], 'paged by offset'));
+check('keyless table still dumps every row', array_merge(emitted($n1['sql']), emitted($n2['sql'])),
+    ['one', 'two', 'three']);
+check('keyless table walks to done', $n2['done'], true);
+
+// An empty table is done on the first call, and still carries its schema.
+$emptyKeyed = new FakeRowSource([
+    'jos_none' => [
+        'create'  => 'CREATE TABLE `jos_none` (`id` int)',
+        'columns' => ['id'],
+        'key'     => ['id'],
+        'rows'    => [],
+    ],
+]);
+$e1 = (new DbDumper($emptyKeyed))->dumpChunkFrom('jos_none', null, 100);
+check('keyset empty table done immediately', $e1['done'], true);
+checkTrue('keyset empty table still emits DROP+CREATE', str_contains($e1['sql'], 'DROP TABLE'));
+
+// The cursor is this class's own business, and a caller that mangles it is told so rather than
+// being handed a dump that quietly starts the table again.
+$threw = false;
+try {
+    (new DbDumper(sessionSource()))->dumpChunkFrom('jos_session', 'not-base64-json!!', 2);
+} catch (InvalidArgumentException $e) {
+    $threw = true;
+}
+checkTrue('a corrupt cursor is refused, not silently restarted', $threw);
 
 // ------------------------------------------------------------ FileWalker ---
 

@@ -204,9 +204,36 @@ final class Engine
         if ($table === '') {
             return $this->err('bad_params', 'table required');
         }
-        $offset = max(0, (int) ($p['offset'] ?? 0));
         $limit = (int) ($p['limit'] ?? 1000);
         $limit = max(1, min($limit, self::MAX_DB_LIMIT));
+
+        // Which paging the caller asked for, decided by whether it mentioned `cursor` AT ALL —
+        // not by whether the value is empty, because an empty cursor is how a new caller says
+        // "start this table". A caller built against the older wire sends only `offset` and gets
+        // the older answer, so a site can be updated before the desk that talks to it is.
+        //
+        // The reverse pairing is the dangerous one and is handled on the desk instead: a NEW
+        // caller against an OLD site gets no `next_cursor` back, and if it kept sending `cursor`
+        // while the site kept reading `offset` (always absent, so always 0) the loop would dump
+        // the first batch forever. The desk checks for `next_cursor` in the answer and falls back.
+        if (array_key_exists('cursor', $p)) {
+            $cursor = is_string($p['cursor']) && $p['cursor'] !== '' ? $p['cursor'] : null;
+            try {
+                $chunk = $this->dumper->dumpChunkFrom($table, $cursor, $limit);
+            } catch (Throwable $e) {
+                return $this->err('dump_failed', $e->getMessage());
+            }
+            return $this->ok([
+                'table'       => $table,
+                'sql_b64'     => base64_encode($chunk['sql']),
+                'next_cursor' => $chunk['next_cursor'],
+                'done'        => $chunk['done'],
+                'rows'        => $chunk['rows'],
+                'total'       => $chunk['total'],
+            ]);
+        }
+
+        $offset = max(0, (int) ($p['offset'] ?? 0));
         try {
             $chunk = $this->dumper->dumpChunk($table, $offset, $limit);
         } catch (Throwable $e) {
