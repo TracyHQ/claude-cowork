@@ -82,7 +82,9 @@ final class JoomlaExtensions implements \ExtensionManager
     {
         $db = Factory::getContainer()->get(DatabaseInterface::class);
         $query = $db->getQuery(true)
-            ->select($db->quoteName(['name', 'type', 'element', 'manifest_cache', 'enabled']))
+            ->select($db->quoteName(
+                ['name', 'type', 'element', 'folder', 'package_id', 'manifest_cache', 'enabled']
+            ))
             ->from($db->quoteName('#__extensions'))
             ->order($db->quoteName('name') . ' ASC');
 
@@ -98,6 +100,15 @@ final class JoomlaExtensions implements \ExtensionManager
                 'name'    => (string) ($row['name'] ?? ''),
                 'type'    => (string) ($row['type'] ?? ''),
                 'element' => (string) ($row['element'] ?? ''),
+                // The plugin group. Two products ship a plugin whose element is `com_k2` —
+                // Xmap's per-product plugin and K2's own — and the group is the only thing in
+                // this table that tells them apart. Empty for every type except plugin.
+                'folder' => (string) ($row['folder'] ?? ''),
+                // Which package installed this row, 0 when nothing did. A package arrives as
+                // many rows and this column is the only record that they were one purchase:
+                // Xmap is eight rows, RSForm! Pro six. Without it a caller counts one product
+                // eight times, in exactly the number a readiness report is built around.
+                'package_id' => (int) ($row['package_id'] ?? 0),
                 'version' => \is_array($cache) && isset($cache['version']) ? (string) $cache['version'] : null,
                 'enabled' => (int) ($row['enabled'] ?? 0) === 1,
             ];
