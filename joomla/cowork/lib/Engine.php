@@ -117,6 +117,10 @@ final class Engine
                 return $this->extensionList();
             case 'extension.install':
                 return $this->extensionInstall($params);
+            case 'content.list':
+                return $this->contentList($params);
+            case 'content.get':
+                return $this->contentGet($params);
             case 'content.update':
                 return $this->contentUpdate($params);
             case 'media.upload':
@@ -539,6 +543,65 @@ final class Engine
      * and the log must be wired: a site that can be written but not reverted is not one this action
      * will touch.
      */
+    /**
+     * One page of a kind's rows, as summaries — the read half of the content mirror (ADR 0071).
+     *
+     * Read-only: no apply_id, nothing recorded, nothing stamped. The page size is capped so a
+     * caller cannot ask a shared host for its whole content table in one request; paging to the
+     * end is the caller's loop. An empty page is the answer "you are past the end", not an error.
+     */
+    private function contentList(array $p): array
+    {
+        if ($this->writer === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : 'article';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        $offset = max(0, (int) ($p['offset'] ?? 0));
+        $limit = min(200, max(1, (int) ($p['limit'] ?? 100)));
+
+        try {
+            $items = $this->writer->list($kind, $offset, $limit);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+
+        return $this->ok(['kind' => $kind, 'offset' => $offset, 'items' => $items]);
+    }
+
+    /**
+     * One full row, exactly as the site holds it right now. The same read the undo log takes
+     * before a write, offered to a caller — which is what makes the mirror's checksum honest:
+     * export and apply hash the same bytes this returns.
+     */
+    private function contentGet(array $p): array
+    {
+        if ($this->writer === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : 'article';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        $id = max(0, (int) ($p['id'] ?? 0));
+        if ($id === 0) {
+            return $this->err('bad_params', 'id required');
+        }
+
+        try {
+            $item = $this->writer->read($kind, $id);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($item === null) {
+            return $this->err('not_found', "no {$kind} with id {$id}");
+        }
+
+        return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
+    }
+
     private function contentUpdate(array $p): array
     {
         if ($this->writer === null || $this->log === null) {

@@ -49,6 +49,21 @@ interface SiteWriter
     public function delete(string $kind, int $id): void;
 
     /**
+     * One bounded page of a kind's rows, as summaries — the read half of the content mirror
+     * (ADR 0071): a caller pages through these, then fetches each full row with read(). Summary
+     * means identity and bookkeeping columns only, never body text, so a page stays small enough
+     * for a shared host's execution limit no matter how big the articles are. The implementation
+     * decides the exact column set per kind; for articles it includes enough of the category
+     * (title and path) to place the row in a folder tree without a second query.
+     *
+     * Rows come back in a stable order (by id) so offset paging never skips or repeats a row
+     * that existed when paging began.
+     *
+     * @return array<int,array<string,?scalar>>
+     */
+    public function list(string $kind, int $offset, int $limit): array;
+
+    /**
      * Drop whatever cache would otherwise keep serving the version just replaced. Best-effort by
      * contract: a cache that could not be cleared must not turn a completed write into a failure,
      * so the implementation swallows its own errors and this returns nothing to report.

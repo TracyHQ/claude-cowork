@@ -746,6 +746,16 @@ final class FakeSiteWriter implements SiteWriter
     {
         unset($this->store[$kind][$id]);
     }
+    public function list(string $kind, int $offset, int $limit): array
+    {
+        $rows = $this->store[$kind] ?? [];
+        ksort($rows);
+        $out = [];
+        foreach (array_slice($rows, $offset, $limit, true) as $id => $fields) {
+            $out[] = ['id' => $id] + $fields;
+        }
+        return $out;
+    }
     public function purgeCache(): void
     {
         $this->purges++;
@@ -834,6 +844,29 @@ check('updating an existing row is not a create', $upd['created'], false);
 check('the new value is live', $writer->read('templateStyle', 7), ['params' => '{"color":"red"}']);
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A2']]);
 check('reverting an update restores the before-state', $writer->read('templateStyle', 7), ['params' => '{"color":"blue"}']);
+
+// the read half of the content mirror (ADR 0071): list pages, get returns the full row
+$writer->store['article'][3] = ['title' => 'First', 'alias' => 'first', 'introtext' => '<p>long body</p>'];
+$writer->store['article'][9] = ['title' => 'Second', 'alias' => 'second', 'introtext' => '<p>x</p>'];
+$lst = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'article']]);
+check('content.list answers', $lst['ok'], true);
+check('content.list returns the rows in id order', array_column($lst['items'], 'id'), [3, 9]);
+$page = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+    'params' => ['kind' => 'article', 'offset' => 1, 'limit' => 1]]);
+check('content.list pages by offset', array_column($page['items'], 'id'), [9]);
+$past = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+    'params' => ['kind' => 'article', 'offset' => 99]]);
+check('a page past the end is empty, not an error', $past['items'], []);
+check('content.list refuses a kind it does not know',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'user']])['error'], 'bad_params');
+$got = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'article', 'id' => 3]]);
+check('content.get returns the full row', $got['item'], $writer->store['article'][3]);
+check('content.get names a missing row',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'article', 'id' => 77]])['error'], 'not_found');
+check('content.get requires an id',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'article']])['error'], 'bad_params');
+check('reads record nothing in the apply log', count($log->entries('A1')), 0);
+unset($writer->store['article'][3], $writer->store['article'][9]);
 
 // media: a new file, then revert deletes it
 $mw = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',

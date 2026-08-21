@@ -105,6 +105,41 @@ final class JoomlaSiteWriter implements \SiteWriter
         return $id;
     }
 
+    /**
+     * The summary columns list() returns per kind — identity and bookkeeping, never body text,
+     * so a page's size is bounded by the row count alone. Articles carry their category's title
+     * and path (one LEFT JOIN) because the mirror files them under a category folder and a
+     * second lookup per row would be N queries on a shared host.
+     *
+     * @var array<string,string[]>
+     */
+    private const LIST_COLUMNS = [
+        'article'       => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified'],
+        'module'        => ['id', 'title', 'position', 'module', 'published', 'language'],
+        'templateStyle' => ['id', 'title', 'template', 'home'],
+    ];
+
+    public function list(string $kind, int $offset, int $limit): array
+    {
+        $table = $this->tableFor($kind);
+        $columns = self::LIST_COLUMNS[$kind];
+
+        $query = $this->db->getQuery(true)
+            ->select(array_map(fn (string $c): string => 'a.' . $this->db->quoteName($c), $columns))
+            ->from($this->db->quoteName($table, 'a'))
+            ->order('a.' . $this->db->quoteName('id') . ' ASC');
+
+        if ($kind === 'article') {
+            $query->select([
+                $this->db->quoteName('c.title', 'category_title'),
+                $this->db->quoteName('c.path', 'category_path'),
+            ])->join('LEFT', $this->db->quoteName('#__categories', 'c'), 'c.id = a.catid');
+        }
+
+        $rows = $this->db->setQuery($query, $offset, $limit)->loadAssocList();
+        return $rows ?? [];
+    }
+
     public function delete(string $kind, int $id): void
     {
         $table = $this->tableFor($kind);
