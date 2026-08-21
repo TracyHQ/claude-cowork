@@ -106,6 +106,12 @@ final class JoomlaSiteWriter implements \SiteWriter
         }
 
         if ($id <= 0) {
+            // A brand-new article stamps its own creation time. The whitelist drops authorship
+            // fields on purpose, and #__content.created has no database default, so an insert
+            // that sets nothing lands as a zero date and the site shows the article as dateless.
+            if ($kind === 'article') {
+                $object->created = Factory::getDate()->toSql();
+            }
             $this->db->insertObject($table, $object, 'id');
             $newId = (int) $object->id;
             if ($tags !== null) {
