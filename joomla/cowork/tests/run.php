@@ -1034,13 +1034,13 @@ final class FakeCoreUpgrader implements CoreUpgrader
     public array $asked = [];
     public bool $refuse = false;
 
-    public function upgrade(string $to): array
+    public function upgrade(string $to, string $step): array
     {
-        $this->asked[] = $to;
+        $this->asked[] = $to . '/' . $step;
         if ($this->refuse) {
             return ['ok' => false, 'error' => 'the updater refused'];
         }
-        return ['ok' => true, 'version' => $to . '.9', 'landed' => true, 'steps' => [['op' => 'upgrade']]];
+        return ['ok' => true, 'step' => $step, 'version' => $to . '.9'];
     }
 }
 
@@ -1048,22 +1048,29 @@ $fakeUp   = new FakeCoreUpgrader();
 $upToken  = 'a-token-at-least-16';
 $upEngine = new Engine($upToken, ['joomla' => '5.4.8'], null, null, null, null, null, null, null, null, $fakeUp);
 
-$upBadTarget = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '7.0']]);
+$upBadTarget = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '7.0', 'step' => 'prepare']]);
 check('a target off the chain is refused', $upBadTarget['error'], 'bad_params');
 check('and nothing was asked of the upgrader', count($fakeUp->asked), 0);
 
-$upOk = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
-checkTrue('a valid hop delegates and succeeds', ($upOk['ok'] ?? false) === true);
-check('the hop reached the upgrader', $fakeUp->asked[0], '6.1');
-check('and the reported version is carried back', $upOk['version'], '6.1.9');
-checkTrue('landed is carried back', ($upOk['landed'] ?? false) === true);
+$upBadStep = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1', 'step' => 'go']]);
+check('an unknown step is refused', $upBadStep['error'], 'bad_params');
+check('and still nothing was asked', count($fakeUp->asked), 0);
+
+$upPrep = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1', 'step' => 'prepare']]);
+checkTrue('prepare delegates and succeeds', ($upPrep['ok'] ?? false) === true);
+check('prepare reached the upgrader as a step', $fakeUp->asked[0], '6.1/prepare');
+check('and the step is carried back', $upPrep['step'], 'prepare');
+
+$upFin = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1', 'step' => 'finalise']]);
+check('finalise reached the upgrader as its own step', $fakeUp->asked[1], '6.1/finalise');
+check('and the reported version is carried back', $upFin['version'], '6.1.9');
 
 $fakeUp->refuse = true;
-$upFail = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
+$upFail = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1', 'step' => 'prepare']]);
 check('an upgrader refusal becomes a clean error, not a 500', $upFail['error'], 'upgrade_failed');
 
 // No upgrader wired: a read-only build must not pretend it can move a version.
-$upNone = (new Engine($upToken))->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
+$upNone = (new Engine($upToken))->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1', 'step' => 'prepare']]);
 check('with no upgrader wired the action is unavailable', $upNone['error'], 'unavailable');
 
 

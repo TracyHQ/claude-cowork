@@ -903,8 +903,12 @@ final class Engine
         if (!\in_array($to, ['4.4', '5.4', '6.1'], true)) {
             return $this->err('bad_params', 'to must be one of: 4.4, 5.4, 6.1');
         }
+        $step = (isset($p['step']) && \is_string($p['step'])) ? $p['step'] : '';
+        if (!\in_array($step, ['prepare', 'finalise'], true)) {
+            return $this->err('bad_params', 'step must be prepare or finalise');
+        }
         try {
-            $result = $this->upgrader->upgrade($to);
+            $result = $this->upgrader->upgrade($to, $step);
         } catch (\Throwable $e) {
             return $this->err('upgrade_failed', $e->getMessage());
         }
@@ -914,9 +918,8 @@ final class Engine
         $this->stamped('core');
         return $this->ok([
             'to'      => $to,
+            'step'    => $step,
             'version' => (string) ($result['version'] ?? ''),
-            'landed'  => (bool) ($result['landed'] ?? false),
-            'steps'   => $result['steps'] ?? [],
         ]);
     }
 
