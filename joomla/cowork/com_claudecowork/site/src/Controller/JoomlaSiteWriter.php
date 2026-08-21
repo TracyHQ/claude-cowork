@@ -116,7 +116,11 @@ final class JoomlaSiteWriter implements \SiteWriter
      * @var array<string,string[]>
      */
     private const LIST_COLUMNS = [
-        'article'       => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified'],
+        // Everything the mirror's file shows about an article. `images` and `metadata` are JSON
+        // columns Joomla stores whole; the caller unpacks them rather than the SQL doing it, so
+        // an article with a malformed value still lists instead of failing the page.
+        'article'       => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified',
+            'created_by', 'created_by_alias', 'featured', 'images', 'metadesc', 'metakey'],
         'module'        => ['id', 'title', 'position', 'module', 'published', 'language'],
         'templateStyle' => ['id', 'title', 'template', 'home'],
     ];
@@ -148,6 +152,15 @@ final class JoomlaSiteWriter implements \SiteWriter
             foreach ($rows as $index => $row) {
                 $rows[$index]['url'] = $this->articleUrl((int) $row['id'], (int) $row['catid'], (string) ($row['language'] ?? '*'));
                 $rows[$index]['has_menu_item'] = $this->categoryHasMenuItem((int) $row['catid']);
+                $rows[$index]['author'] = $this->describeAuthor(
+                    (int) ($row['created_by'] ?? 0),
+                    (string) ($row['created_by_alias'] ?? '')
+                );
+                // The two pictures an article carries: the one on a list page and the one on the
+                // article itself. Unpacked here because `images` is a JSON blob, and a file that
+                // shows a blob is a file nobody edits.
+                $rows[$index]['intro_image'] = $this->imageFrom($row['images'] ?? '', 'image_intro');
+                $rows[$index]['full_image'] = $this->imageFrom($row['images'] ?? '', 'image_fulltext');
             }
         }
         return $rows;
@@ -234,6 +247,55 @@ final class JoomlaSiteWriter implements \SiteWriter
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Who wrote it, as a person.
+     *
+     * `created_by_alias` wins when the article carries one: it is what the site prints under the
+     * title, and an article deliberately bylined to somebody else should not read as the account
+     * that typed it.
+     *
+     * @return array<string,mixed>
+     */
+    private function describeAuthor(int $userId, string $alias): array
+    {
+        $name = '';
+        if ($userId > 0) {
+            try {
+                $user = \Joomla\CMS\Factory::getContainer()
+                    ->get(\Joomla\CMS\User\UserFactoryInterface::class)
+                    ->loadUserById($userId);
+                $name = $user->name ?? '';
+            } catch (\Throwable $e) {
+                $name = '';
+            }
+        }
+        return ['id' => $userId, 'name' => $alias !== '' ? $alias : $name, 'account' => $name];
+    }
+
+    /**
+     * One image out of Joomla's `images` JSON column, with its alt text and caption.
+     *
+     * Null when the article has none. Never throws: a column somebody edited by hand into
+     * invalid JSON is a reason to show no picture, not a reason to fail the export.
+     *
+     * @return array<string,string>|null
+     */
+    private function imageFrom(string $json, string $key): ?array
+    {
+        if ($json === '') {
+            return null;
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || empty($data[$key])) {
+            return null;
+        }
+        return [
+            'src' => (string) $data[$key],
+            'alt' => (string) ($data[$key . '_alt'] ?? ''),
+            'caption' => (string) ($data[$key . '_caption'] ?? ''),
+        ];
     }
 
     private function tableFor(string $kind): string
