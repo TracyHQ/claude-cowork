@@ -6,20 +6,22 @@
  * The engine holds no Joomla; a caller wires the real one in, exactly as with {@see
  * ExtensionManager}. That keeps the routing and the guard testable with a fake, and keeps the
  * one genuinely dangerous operation this component can perform behind an interface small enough
- * to read in a sentence: take a site to `$to`, report the version it actually reached.
+ * to read in a sentence: take a site one hop toward `$to`, report where it landed.
  *
- * One hop, not a chain. The caller (the conductor in JoomlArt-26/joomlart-joomla-ops) decides
- * the order, gates PHP, and takes the snapshot before calling this. This runs the single hop and
- * says where the site landed, so the caller can verify against `$to` and stop or continue.
+ * TWO steps, not one, and the caller makes them as two separate calls. A core upgrade replaces
+ * the code on disk mid-flight, so the process that copied the new files is still running the old
+ * ones: it cannot finalise against class signatures it has not loaded. The web updater solves
+ * this by finalising in a fresh request, and so does this. `prepare` downloads and extracts;
+ * `finalise` runs on the new code the next call loads. The caller (the conductor) calls prepare,
+ * then finalise, then verifies the reported version.
  */
 interface CoreUpgrader
 {
     /**
-     * Move the site one hop, to the launch point named by $to ("4.4", "5.4" or "6.1").
+     * One step of one hop. $step is "prepare" (download + extract the package) or "finalise"
+     * (run the finalise on the freshly extracted code). $to is the launch point ("4.4"|"5.4"|"6.1").
      *
-     * @return array{ok:bool, version?:string, landed?:bool, steps?:array, error?:string}
-     *   `version` is read from the site after the run, not assumed; `landed` is whether it
-     *   starts with $to. A caller trusts the reading, never the request's own success.
+     * @return array{ok:bool, step?:string, version?:string, error?:string}
      */
-    public function upgrade(string $to): array;
+    public function upgrade(string $to, string $step): array;
 }
