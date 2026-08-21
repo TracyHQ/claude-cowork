@@ -23,6 +23,7 @@ require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/Extensions.php';
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/ChangeStamp.php';
+require_once __DIR__ . '/CoreUpgrader.php';
 
 final class Engine
 {
@@ -38,6 +39,7 @@ final class Engine
     private ?ApplyLog $log;
     /** Optional: absent in tests and on a host whose webroot cannot be written. */
     private ?ChangeStamp $stamp;
+    private ?CoreUpgrader $upgrader;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -70,8 +72,8 @@ final class Engine
         ?SiteWriter $writer = null,
         ?MediaWriter $media = null,
         ?ApplyLog $log = null,
-        ?ChangeStamp $stamp = null
-    ) {
+        ?ChangeStamp $stamp = null,
+        ?CoreUpgrader $upgrader = null) {
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
@@ -82,6 +84,7 @@ final class Engine
         $this->media = $media;
         $this->log = $log;
         $this->stamp = $stamp;
+        $this->upgrader = $upgrader;
     }
 
     /**
@@ -129,6 +132,8 @@ final class Engine
                 return $this->applyRevert($params);
             case 'apply.list':
                 return $this->applyList($params);
+            case 'core.upgrade':
+                return $this->coreUpgrade($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -884,6 +889,37 @@ final class Engine
     }
 
     /** @param array<string,mixed> $extra */
+    /**
+     * One hop of a core upgrade. The engine validates the target and delegates the write to the
+     * injected {@see CoreUpgrader}; the site-touching work lives in the real implementation, so
+     * this stays testable with a fake.
+     */
+    private function coreUpgrade(array $p): array
+    {
+        if ($this->upgrader === null) {
+            return $this->err('unavailable', 'core upgrader not wired');
+        }
+        $to = (isset($p['to']) && \is_string($p['to'])) ? $p['to'] : '';
+        if (!\in_array($to, ['4.4', '5.4', '6.1'], true)) {
+            return $this->err('bad_params', 'to must be one of: 4.4, 5.4, 6.1');
+        }
+        try {
+            $result = $this->upgrader->upgrade($to);
+        } catch (\Throwable $e) {
+            return $this->err('upgrade_failed', $e->getMessage());
+        }
+        if (($result['ok'] ?? false) !== true) {
+            return $this->err('upgrade_failed', (string) ($result['error'] ?? 'the upgrader refused'));
+        }
+        $this->stamped('core');
+        return $this->ok([
+            'to'      => $to,
+            'version' => (string) ($result['version'] ?? ''),
+            'landed'  => (bool) ($result['landed'] ?? false),
+            'steps'   => $result['steps'] ?? [],
+        ]);
+    }
+
     private function ok(array $extra): array
     {
         return array_merge(['ok' => true], $extra);

@@ -1025,5 +1025,47 @@ check('the package declares where to ask',
     trim((string) $pkg->updateservers->server),
     'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml');
 
+// --- core.upgrade: the one write that moves a Joomla version --------------------------------
+// The engine validates the target and delegates the site-touching work to a CoreUpgrader, so
+// the routing and the guard are testable with a fake. The real JoomlaCoreUpgrader is proven
+// against a live 5.4.8 -> 6.1.3 in the lab; here we prove the wiring, not the upgrade.
+final class FakeCoreUpgrader implements CoreUpgrader
+{
+    public array $asked = [];
+    public bool $refuse = false;
+
+    public function upgrade(string $to): array
+    {
+        $this->asked[] = $to;
+        if ($this->refuse) {
+            return ['ok' => false, 'error' => 'the updater refused'];
+        }
+        return ['ok' => true, 'version' => $to . '.9', 'landed' => true, 'steps' => [['op' => 'upgrade']]];
+    }
+}
+
+$fakeUp   = new FakeCoreUpgrader();
+$upToken  = 'a-token-at-least-16';
+$upEngine = new Engine($upToken, ['joomla' => '5.4.8'], null, null, null, null, null, null, null, null, $fakeUp);
+
+$upBadTarget = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '7.0']]);
+check('a target off the chain is refused', $upBadTarget['error'], 'bad_params');
+check('and nothing was asked of the upgrader', count($fakeUp->asked), 0);
+
+$upOk = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
+checkTrue('a valid hop delegates and succeeds', ($upOk['ok'] ?? false) === true);
+check('the hop reached the upgrader', $fakeUp->asked[0], '6.1');
+check('and the reported version is carried back', $upOk['version'], '6.1.9');
+checkTrue('landed is carried back', ($upOk['landed'] ?? false) === true);
+
+$fakeUp->refuse = true;
+$upFail = $upEngine->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
+check('an upgrader refusal becomes a clean error, not a 500', $upFail['error'], 'upgrade_failed');
+
+// No upgrader wired: a read-only build must not pretend it can move a version.
+$upNone = (new Engine($upToken))->handle(['token' => $upToken, 'action' => 'core.upgrade', 'params' => ['to' => '6.1']]);
+check('with no upgrader wired the action is unavailable', $upNone['error'], 'unavailable');
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
