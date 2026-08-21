@@ -124,6 +124,10 @@ final class Engine
                 return $this->themeInstall($params);
             case 'theme.activate':
                 return $this->themeActivate($params);
+            case 'content.list':
+                return $this->contentList($params);
+            case 'content.get':
+                return $this->contentGet($params);
             case 'content.update':
                 return $this->contentUpdate($params);
             case 'media.upload':
@@ -631,6 +635,58 @@ final class Engine
      * at all. Hence `key` beside `id`: the Joomla original needed only an id because all three of
      * its kinds were rows.
      */
+    /**
+     * One page of posts, as the content mirror reads them (ADR 0071).
+     *
+     * Read-only: no apply_id, nothing recorded. A page that carries bodies is capped smaller,
+     * because the alternative — one request per post — spends a caller's whole hourly allowance
+     * at the relay on a single site's list.
+     */
+    private function contentList(array $p): array
+    {
+        if ($this->writer === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        if (!method_exists($this->writer, 'list_posts')) {
+            return $this->err('unavailable', 'this plugin is too old to list content');
+        }
+        $offset = max(0, (int) ($p['offset'] ?? 0));
+        $withBody = !empty($p['include_body']);
+        $ceiling = $withBody ? 25 : 200;
+        $limit = min($ceiling, max(1, (int) ($p['limit'] ?? ($withBody ? 25 : 100))));
+
+        try {
+            $items = $this->writer->list_posts($offset, $limit, $withBody);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+
+        return $this->ok(['kind' => 'post', 'offset' => $offset, 'items' => $items]);
+    }
+
+    /** One post, exactly as the site holds it — the same read the undo log takes before a write. */
+    private function contentGet(array $p): array
+    {
+        if ($this->writer === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $id = max(0, (int) ($p['id'] ?? 0));
+        if ($id === 0) {
+            return $this->err('bad_params', 'id required');
+        }
+
+        try {
+            $item = $this->writer->read('post', $id);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($item === null) {
+            return $this->err('not_found', "no post with id {$id}");
+        }
+
+        return $this->ok(['kind' => 'post', 'id' => $id, 'item' => $item]);
+    }
+
     private function contentUpdate(array $p): array
     {
         if ($this->writer === null || $this->log === null) {

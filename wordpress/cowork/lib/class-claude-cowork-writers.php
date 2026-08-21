@@ -102,6 +102,172 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		throw new RuntimeException( "unknown kind: {$kind}" );
 	}
 
+	/**
+	 * One bounded page of posts, as the content mirror reads them (ADR 0071).
+	 *
+	 * A post is not one row: its categories and tags live in a taxonomy, its featured image is a
+	 * meta key pointing at another post, its SEO title belongs to whichever plugin the site runs,
+	 * and its address is whatever the permalink structure says. Assembling that here — once, in
+	 * the place that has WordPress loaded — is the difference between a mirror an editor can use
+	 * and a row dump they have to decode.
+	 *
+	 * Only `post` and `page` travel. Revisions, attachments and menu items are in wp_posts too,
+	 * and a mirror that carried them would bury the twenty articles somebody edits under ten
+	 * thousand rows nobody does.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function list_posts( int $offset, int $limit, bool $with_body ): array {
+		$query = new \WP_Query(
+			array(
+				'post_type'           => array( 'post', 'page' ),
+				'post_status'         => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+				'orderby'             => 'ID',
+				'order'               => 'ASC',
+				'offset'              => $offset,
+				'posts_per_page'      => $limit,
+				'ignore_sticky_posts' => true,
+				'no_found_rows'       => true,
+				'suppress_filters'    => true,
+			)
+		);
+
+		$out = array();
+		foreach ( $query->posts as $post ) {
+			$out[] = $this->describe_post( $post, $with_body );
+		}
+		return $out;
+	}
+
+	/**
+	 * Everything about one post an editor's file should carry.
+	 *
+	 * Split by what an Apply can put back. Identity and content are writable; the address, the
+	 * author's name and the dates are what the site decided, and the mirror reports them so a
+	 * person can see where they are without pretending a file can change them.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function describe_post( \WP_Post $post, bool $with_body ): array {
+		$row = array(
+			'id'             => (int) $post->ID,
+			'type'           => $post->post_type,
+			'title'          => $post->post_title,
+			'slug'           => $post->post_name,
+			'status'         => $post->post_status,
+			'url'            => get_permalink( $post ),
+			'parent'         => (int) $post->post_parent,
+			'menu_order'     => (int) $post->menu_order,
+			'comment_status' => $post->comment_status,
+			'created'        => $post->post_date_gmt,
+			'modified'       => $post->post_modified_gmt,
+			'author'         => $this->describe_author( (int) $post->post_author ),
+			'categories'     => $this->term_slugs( $post->ID, 'category' ),
+			'tags'           => $this->term_slugs( $post->ID, 'post_tag' ),
+			'featured_image' => $this->describe_featured_image( (int) $post->ID ),
+			'template'       => (string) get_page_template_slug( $post ),
+			'seo'            => $this->describe_seo( (int) $post->ID ),
+			'in_menu'        => $this->is_in_a_menu( $post ),
+		);
+		if ( $with_body ) {
+			$row['content'] = $post->post_content;
+			$row['excerpt'] = $post->post_excerpt;
+		}
+		return $row;
+	}
+
+	/** The author as a person rather than a number — a file saying `author: 2` tells nobody anything. */
+	private function describe_author( int $user_id ): array {
+		$user = $user_id > 0 ? get_userdata( $user_id ) : false;
+		return false === $user
+			? array( 'id' => $user_id, 'name' => '', 'slug' => '' )
+			: array( 'id' => $user_id, 'name' => $user->display_name, 'slug' => $user->user_nicename );
+	}
+
+	/** @return string[] */
+	private function term_slugs( int $post_id, string $taxonomy ): array {
+		$terms = get_the_terms( $post_id, $taxonomy );
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		return array_values( array_map( static fn( $term ) => $term->slug, $terms ) );
+	}
+
+	/**
+	 * The featured image, by id AND by address.
+	 *
+	 * The id is what an Apply writes back — it is the only stable handle. The URL is for the
+	 * person reading the file, who cannot tell which picture `_thumbnail_id: 4417` means.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	private function describe_featured_image( int $post_id ): ?array {
+		$thumb_id = (int) get_post_thumbnail_id( $post_id );
+		if ( $thumb_id <= 0 ) {
+			return null;
+		}
+		return array(
+			'id'  => $thumb_id,
+			'url' => (string) wp_get_attachment_url( $thumb_id ),
+			'alt' => (string) get_post_meta( $thumb_id, '_wp_attachment_image_alt', true ),
+		);
+	}
+
+	/**
+	 * The SEO title and description, from whichever plugin the site actually runs.
+	 *
+	 * Read from the meta keys rather than through each plugin's API: a mirror must not require
+	 * Yoast to be loaded to describe a site that uses Rank Math, and the keys are the stable part
+	 * of both. Empty when the site runs neither, which is most sites.
+	 *
+	 * @return array<string,string>
+	 */
+	private function describe_seo( int $post_id ): array {
+		$pairs = array(
+			'title'       => array( '_yoast_wpseo_title', 'rank_math_title', '_aioseo_title' ),
+			'description' => array( '_yoast_wpseo_metadesc', 'rank_math_description', '_aioseo_description' ),
+		);
+		$seo = array();
+		foreach ( $pairs as $field => $keys ) {
+			foreach ( $keys as $key ) {
+				$value = (string) get_post_meta( $post_id, $key, true );
+				if ( '' !== $value ) {
+					$seo[ $field ] = $value;
+					break;
+				}
+			}
+		}
+		return $seo;
+	}
+
+	/**
+	 * Whether any published menu points at this post — the WordPress half of Joomla's Itemid
+	 * question. A page nobody can navigate to still has a URL, and knowing which of the two you
+	 * are looking at is the point.
+	 */
+	private function is_in_a_menu( \WP_Post $post ): bool {
+		$menus = wp_get_nav_menus();
+		if ( ! is_array( $menus ) ) {
+			return false;
+		}
+		foreach ( $menus as $menu ) {
+			$items = wp_get_nav_menu_items( $menu->term_id );
+			if ( ! is_array( $items ) ) {
+				continue;
+			}
+			foreach ( $items as $item ) {
+				if ( (int) $item->object_id === (int) $post->ID && 'post_type' === $item->type ) {
+					return true;
+				}
+				// A category a menu points at carries every post filed under it.
+				if ( 'taxonomy' === $item->type && has_term( (int) $item->object_id, (string) $item->object, $post ) ) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	public function write( string $kind, int $id, array $fields, string $key = '' ): int {
 		if ( 'post' === $kind ) {
 			return $this->write_post( $id, $fields );
@@ -196,7 +362,100 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 
 		$this->touched[ $written ] = $written;
+		$this->write_beyond_the_row( $written, $fields );
 		return $written;
+	}
+
+	/**
+	 * The parts of a post that are not columns of its row.
+	 *
+	 * Categories and tags live in a taxonomy, the featured image is a meta key, the page template
+	 * and the SEO fields are meta too. An Apply that wrote only the row would save an edit and
+	 * silently drop the category the editor moved it to — worse than refusing, because it looks
+	 * like it worked.
+	 *
+	 * Each is written only when the caller mentioned it: a file that says nothing about tags must
+	 * not clear the post's tags.
+	 *
+	 * @param array<string,mixed> $fields
+	 */
+	private function write_beyond_the_row( int $post_id, array $fields ): void {
+		if ( isset( $fields['categories'] ) && is_array( $fields['categories'] ) ) {
+			// By slug, because that is what a person can read and edit in a file; ids belong to
+			// the database. Unknown slugs are dropped rather than created — inventing taxonomy
+			// terms from a typo is not something a content edit should be able to do.
+			$this->set_terms_by_slug( $post_id, 'category', $fields['categories'] );
+		}
+		if ( isset( $fields['tags'] ) && is_array( $fields['tags'] ) ) {
+			$this->set_terms_by_slug( $post_id, 'post_tag', $fields['tags'] );
+		}
+		if ( array_key_exists( 'featured_image_id', $fields ) ) {
+			$thumb = (int) $fields['featured_image_id'];
+			if ( $thumb > 0 ) {
+				set_post_thumbnail( $post_id, $thumb );
+			} else {
+				delete_post_thumbnail( $post_id );
+			}
+		}
+		if ( array_key_exists( 'template', $fields ) ) {
+			$template = (string) $fields['template'];
+			if ( '' === $template ) {
+				delete_post_meta( $post_id, '_wp_page_template' );
+			} else {
+				update_post_meta( $post_id, '_wp_page_template', $template );
+			}
+		}
+		if ( isset( $fields['seo'] ) && is_array( $fields['seo'] ) ) {
+			$this->write_seo( $post_id, $fields['seo'] );
+		}
+	}
+
+	/**
+	 * @param string[] $slugs
+	 */
+	private function set_terms_by_slug( int $post_id, string $taxonomy, array $slugs ): void {
+		$ids = array();
+		foreach ( $slugs as $slug ) {
+			$term = get_term_by( 'slug', (string) $slug, $taxonomy );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$ids[] = (int) $term->term_id;
+			}
+		}
+		wp_set_post_terms( $post_id, $ids, $taxonomy, false );
+	}
+
+	/**
+	 * SEO title and description, written to whichever plugin the site has.
+	 *
+	 * Only to keys that ALREADY exist on this site: writing Yoast's keys to a site running Rank
+	 * Math leaves rows no plugin reads, and the editor's change appears to have vanished.
+	 *
+	 * @param array<string,mixed> $seo
+	 */
+	private function write_seo( int $post_id, array $seo ): void {
+		$families = array(
+			'_yoast_wpseo_' => array( 'title' => '_yoast_wpseo_title', 'description' => '_yoast_wpseo_metadesc' ),
+			'rank_math_'    => array( 'title' => 'rank_math_title', 'description' => 'rank_math_description' ),
+			'_aioseo_'      => array( 'title' => '_aioseo_title', 'description' => '_aioseo_description' ),
+		);
+		foreach ( $families as $keys ) {
+			$present = false;
+			foreach ( $keys as $key ) {
+				if ( '' !== (string) get_post_meta( $post_id, $key, true ) ) {
+					$present = true;
+					break;
+				}
+			}
+			if ( ! $present ) {
+				continue;
+			}
+			foreach ( $keys as $field => $key ) {
+				if ( array_key_exists( $field, $seo ) ) {
+					update_post_meta( $post_id, $key, (string) $seo[ $field ] );
+				}
+			}
+			return;
+		}
 	}
 
 	/**

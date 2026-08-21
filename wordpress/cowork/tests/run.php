@@ -913,5 +913,25 @@ checkTrue(
 // The header selects the filter name: change the host and the hook in update.php is never called.
 checkTrue('the plugin declares an Update URI on github.com', (bool) preg_match('#^\s*\*\s*Update URI:\s*https://github\.com/#m', $pluginHeader));
 
+// the read half of the content mirror (ADR 0071)
+$writer->posts = [
+    ['id' => 7, 'type' => 'post', 'title' => 'Hello', 'slug' => 'hello', 'content' => '<p>Body</p>', 'excerpt' => ''],
+    ['id' => 9, 'type' => 'page', 'title' => 'About', 'slug' => 'about', 'content' => '<p>Us</p>', 'excerpt' => ''],
+];
+$lst = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => []]);
+check('content.list answers', $lst['ok'], true);
+check('content.list returns posts in id order', array_column($lst['items'], 'id'), [7, 9]);
+check('a summary page carries no bodies', isset($lst['items'][0]['content']), false);
+$full = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['include_body' => true]]);
+check('include_body carries the body', $full['items'][0]['content'], '<p>Body</p>');
+check('content.list pages by offset',
+    array_column($wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+        'params' => ['offset' => 1, 'limit' => 1]])['items'], 'id'), [9]);
+check('content.get names a missing row', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
+    'params' => ['id' => 404]])['error'], 'not_found');
+check('content.get requires an id', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
+    'params' => []])['error'], 'bad_params');
+$writer->posts = [];
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
