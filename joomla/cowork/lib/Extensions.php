@@ -30,7 +30,13 @@ interface ExtensionManager
      * What is installed, as the site itself reports it — enough to tell "already there" from
      * "there in another version", which is the question a caller actually has.
      *
-     * @return array<int, array{name:string, type:string, element:string, version:?string, enabled:bool}>
+     * `folder` is the plugin group and `package_id` the package that installed the row, both
+     * straight from `#__extensions`. They are here because a caller cannot reconstruct either
+     * one: two products ship a plugin whose element is `com_k2`, and a package arrives as many
+     * rows with nothing else to say they were one purchase.
+     *
+     * @return array<int, array{name:string, type:string, element:string, folder:string,
+     *                          package_id:int, version:?string, enabled:bool}>
      */
     public function listInstalled(): array;
 }

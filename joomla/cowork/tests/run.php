@@ -647,12 +647,20 @@ final class FakeExtensions implements ExtensionManager
 $TOKEN = 'a-token-at-least-16';
 $fakeExtensions = new FakeExtensions();
 $fakeExtensions->installed = [
-    ['name' => 'Claude Cowork', 'type' => 'component', 'element' => 'com_claudecowork', 'version' => '0.3.0', 'enabled' => true],
+    ['name' => 'Claude Cowork', 'type' => 'component', 'element' => 'com_claudecowork', 'folder' => '', 'package_id' => 0, 'version' => '0.3.0', 'enabled' => true],
+    // Xmap's per-product plugin: same element as K2's own component, told apart only by the
+    // group, and tied to its package only by package_id.
+    ['name' => 'Xmap - K2 Plugin', 'type' => 'plugin', 'element' => 'com_k2', 'folder' => 'xmap', 'package_id' => 42, 'version' => '2.3.3', 'enabled' => true],
 ];
 $extEngine = new Engine($TOKEN, [], null, null, null, $fakeExtensions);
 
 $listed = $extEngine->handle(['token' => $TOKEN, 'action' => 'extension.list']);
 check('extension.list returns what the site holds', $listed['extensions'][0]['element'], 'com_claudecowork');
+// Without the group, one product's row answers to another's claim: `com_k2` under Xmap is
+// Xmap's, and K2's own component is not.
+check('a plugin carries the group that tells it from another product', $listed['extensions'][1]['folder'], 'xmap');
+// Without this, a package that arrives as eight rows is counted as eight products.
+check('and the package that installed it', (string) $listed['extensions'][1]['package_id'], '42');
 
 $installedOk = $extEngine->handle([
     'token' => $TOKEN,
