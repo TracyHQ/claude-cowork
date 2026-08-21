@@ -48,7 +48,10 @@ final class JoomlaSiteWriter implements \SiteWriter
         'article' => [
             'table'   => '#__content',
             'columns' => ['title', 'alias', 'introtext', 'fulltext', 'state', 'catid', 'images',
-                'urls', 'attribs', 'metadata', 'metakey', 'metadesc', 'language', 'featured', 'ordering'],
+                'urls', 'attribs', 'metadata', 'metakey', 'metadesc', 'language', 'featured', 'ordering',
+                // Who may read it, and the window it is visible in. Both are decisions an editor
+                // makes about an article, and both were readable in the row already.
+                'access', 'publish_up', 'publish_down'],
         ],
         'module' => [
             'table'   => '#__modules',
@@ -85,6 +88,11 @@ final class JoomlaSiteWriter implements \SiteWriter
 
     public function write(string $kind, int $id, array $fields): int
     {
+        // Tags are not a column of #__content, so they travel beside the row rather than in it.
+        // Written only when the caller mentioned them: a file silent about tags must not clear
+        // an article's tags.
+        $tags = array_key_exists('tags', $fields) && is_array($fields['tags']) ? $fields['tags'] : null;
+        unset($fields['tags']);
         [$table, $allowed] = [$this->tableFor($kind), self::MAP[$kind]['columns']];
 
         $object = new \stdClass();
@@ -99,12 +107,70 @@ final class JoomlaSiteWriter implements \SiteWriter
 
         if ($id <= 0) {
             $this->db->insertObject($table, $object, 'id');
-            return (int) $object->id;
+            $newId = (int) $object->id;
+            if ($tags !== null) {
+                $this->setTags($newId, $tags);
+            }
+            return $newId;
         }
 
         $object->id = $id;
         $this->db->updateObject($table, $object, 'id');
+        if ($tags !== null) {
+            $this->setTags($id, $tags);
+        }
         return $id;
+    }
+
+    /**
+     * Replace an article's tags with the ones named, by title.
+     *
+     * Titles rather than ids for the same reason WordPress uses slugs: a person editing a file
+     * writes what they read on the site. A title that matches no existing tag is DROPPED, not
+     * created — inventing taxonomy from a typo is not something a content edit should do.
+     *
+     * @param string[] $titles
+     */
+    private function setTags(int $articleId, array $titles): void
+    {
+        $wanted = [];
+        foreach ($titles as $title) {
+            $title = trim((string) $title);
+            if ($title === '') {
+                continue;
+            }
+            $query = $this->db->getQuery(true)
+                ->select($this->db->quoteName('id'))
+                ->from($this->db->quoteName('#__tags'))
+                ->where($this->db->quoteName('title') . ' = :title')
+                ->bind(':title', $title, ParameterType::STRING);
+            $found = $this->db->setQuery($query)->loadResult();
+            if ($found !== null) {
+                $wanted[(int) $found] = (int) $found;
+            }
+        }
+
+        $delete = $this->db->getQuery(true)
+            ->delete($this->db->quoteName('#__contentitem_tag_map'))
+            ->where($this->db->quoteName('type_alias') . ' = ' . $this->db->quote('com_content.article'))
+            ->where($this->db->quoteName('content_item_id') . ' = :id')
+            ->bind(':id', $articleId, ParameterType::INTEGER);
+        $this->db->setQuery($delete)->execute();
+
+        foreach ($wanted as $tagId) {
+            $row = new \stdClass();
+            $row->type_alias = 'com_content.article';
+            $row->core_content_id = 0;
+            $row->content_item_id = $articleId;
+            $row->tag_id = $tagId;
+            $row->tag_date = Factory::getDate()->toSql();
+            $row->type_id = 1;
+            try {
+                $this->db->insertObject('#__contentitem_tag_map', $row);
+            } catch (\Throwable $e) {
+                // One tag that will not attach is not a reason to fail an article's whole save.
+            }
+        }
     }
 
     /**
@@ -120,7 +186,8 @@ final class JoomlaSiteWriter implements \SiteWriter
         // columns Joomla stores whole; the caller unpacks them rather than the SQL doing it, so
         // an article with a malformed value still lists instead of failing the page.
         'article'       => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified',
-            'created_by', 'created_by_alias', 'featured', 'images', 'metadesc', 'metakey'],
+            'created_by', 'created_by_alias', 'featured', 'images', 'metadesc', 'metakey',
+            'access', 'publish_up', 'publish_down'],
         'module'        => ['id', 'title', 'position', 'module', 'published', 'language'],
         'templateStyle' => ['id', 'title', 'template', 'home'],
     ];
@@ -161,6 +228,8 @@ final class JoomlaSiteWriter implements \SiteWriter
                 // shows a blob is a file nobody edits.
                 $rows[$index]['intro_image'] = $this->imageFrom($row['images'] ?? '', 'image_intro');
                 $rows[$index]['full_image'] = $this->imageFrom($row['images'] ?? '', 'image_fulltext');
+                $rows[$index]['tags'] = $this->tagsFor((int) $row['id']);
+                $rows[$index]['access_name'] = $this->accessName((int) ($row['access'] ?? 0));
             }
         }
         return $rows;
@@ -296,6 +365,52 @@ final class JoomlaSiteWriter implements \SiteWriter
             'alt' => (string) ($data[$key . '_alt'] ?? ''),
             'caption' => (string) ($data[$key . '_caption'] ?? ''),
         ];
+    }
+
+    /**
+     * An article's tags, by the name a person typed rather than the id the database keeps.
+     *
+     * Tags are not a column: they live in `#__contentitem_tag_map`, one row per pairing, which is
+     * why they were missing from the mirror while `catid` was there from the start.
+     *
+     * @return string[]
+     */
+    private function tagsFor(int $articleId): array
+    {
+        try {
+            $query = $this->db->getQuery(true)
+                ->select($this->db->quoteName('t.title'))
+                ->from($this->db->quoteName('#__contentitem_tag_map', 'm'))
+                ->join('INNER', $this->db->quoteName('#__tags', 't'), 't.id = m.tag_id')
+                ->where($this->db->quoteName('m.type_alias') . ' = ' . $this->db->quote('com_content.article'))
+                ->where($this->db->quoteName('m.content_item_id') . ' = :id')
+                ->bind(':id', $articleId, ParameterType::INTEGER)
+                ->order($this->db->quoteName('t.title') . ' ASC');
+            return array_values(array_map('strval', $this->db->setQuery($query)->loadColumn() ?: []));
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * The name of an access level, because `access: 3` means nothing to the person reading a file
+     * — `Special` does. The number stays beside it: that is what an Apply writes back.
+     */
+    private function accessName(int $access): string
+    {
+        if ($access <= 0) {
+            return '';
+        }
+        try {
+            $query = $this->db->getQuery(true)
+                ->select($this->db->quoteName('title'))
+                ->from($this->db->quoteName('#__viewlevels'))
+                ->where($this->db->quoteName('id') . ' = :id')
+                ->bind(':id', $access, ParameterType::INTEGER);
+            return (string) ($this->db->setQuery($query)->loadResult() ?? '');
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     private function tableFor(string $kind): string
