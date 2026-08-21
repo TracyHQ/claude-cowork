@@ -24,6 +24,7 @@ require_once __DIR__ . '/Extensions.php';
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
+require_once __DIR__ . '/FilesRestorer.php';
 
 final class Engine
 {
@@ -40,6 +41,7 @@ final class Engine
     /** Optional: absent in tests and on a host whose webroot cannot be written. */
     private ?ChangeStamp $stamp;
     private ?CoreUpgrader $upgrader;
+    private ?FilesRestorer $filesRestorer;
 
     private const MAX_DB_LIMIT = 5000;
     private const MAX_FILE_LIMIT = 500;
@@ -73,7 +75,8 @@ final class Engine
         ?MediaWriter $media = null,
         ?ApplyLog $log = null,
         ?ChangeStamp $stamp = null,
-        ?CoreUpgrader $upgrader = null) {
+        ?CoreUpgrader $upgrader = null,
+        ?FilesRestorer $filesRestorer = null) {
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
@@ -85,6 +88,7 @@ final class Engine
         $this->log = $log;
         $this->stamp = $stamp;
         $this->upgrader = $upgrader;
+        $this->filesRestorer = $filesRestorer;
     }
 
     /**
@@ -134,6 +138,8 @@ final class Engine
                 return $this->applyList($params);
             case 'core.upgrade':
                 return $this->coreUpgrade($params);
+            case 'files.restore':
+                return $this->filesRestore($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -894,6 +900,35 @@ final class Engine
      * injected {@see CoreUpgrader}; the site-touching work lives in the real implementation, so
      * this stays testable with a fake.
      */
+    /**
+     * Lay a files.pack snapshot back over the web root. The reverse of files.pack, and the safe
+     * half of a restore: it touches files, never the database. The engine validates the URL and
+     * delegates the write to the injected {@see FilesRestorer}, so it stays testable with a fake.
+     */
+    private function filesRestore(array $p): array
+    {
+        if ($this->filesRestorer === null) {
+            return $this->err('unavailable', 'files restorer not wired');
+        }
+        $getUrl = (isset($p['get_url']) && \is_string($p['get_url'])) ? $p['get_url'] : '';
+        if ($getUrl === '') {
+            return $this->err('bad_params', 'get_url required');
+        }
+        if (\strncmp($getUrl, 'https://', 8) !== 0 && \strncmp($getUrl, 'http://', 7) !== 0) {
+            return $this->err('bad_params', 'get_url must be http(s)');
+        }
+        try {
+            $result = $this->filesRestorer->restore($getUrl);
+        } catch (\Throwable $e) {
+            return $this->err('restore_failed', $e->getMessage());
+        }
+        if (($result['ok'] ?? false) !== true) {
+            return $this->err('restore_failed', (string) ($result['error'] ?? 'the restorer refused'));
+        }
+        $this->stamped('files');
+        return $this->ok(['files' => (int) ($result['files'] ?? 0)]);
+    }
+
     private function coreUpgrade(array $p): array
     {
         if ($this->upgrader === null) {

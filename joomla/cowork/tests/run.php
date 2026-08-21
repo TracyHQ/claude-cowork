@@ -1074,5 +1074,45 @@ $upNone = (new Engine($upToken))->handle(['token' => $upToken, 'action' => 'core
 check('with no upgrader wired the action is unavailable', $upNone['error'], 'unavailable');
 
 
+// --- files.restore: the safe half of a restore (files, never the database) ------------------
+final class FakeFilesRestorer implements FilesRestorer
+{
+    public array $asked = [];
+    public bool $refuse = false;
+
+    public function restore(string $getUrl): array
+    {
+        $this->asked[] = $getUrl;
+        if ($this->refuse) {
+            return ['ok' => false, 'error' => 'the restorer refused'];
+        }
+        return ['ok' => true, 'files' => 42];
+    }
+}
+
+$fakeRestore = new FakeFilesRestorer();
+$frToken     = 'a-token-at-least-16';
+$frEngine    = new Engine($frToken, [], null, null, null, null, null, null, null, null, null, $fakeRestore);
+
+$frNoUrl = $frEngine->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => []]);
+check('files.restore without a url is refused', $frNoUrl['error'], 'bad_params');
+check('and nothing was asked of the restorer', count($fakeRestore->asked), 0);
+
+$frBadUrl = $frEngine->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => ['get_url' => 'ftp://x/y.tar']]);
+check('a non-http url is refused', $frBadUrl['error'], 'bad_params');
+
+$frOk = $frEngine->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => ['get_url' => 'https://r2.example/snap.tar']]);
+checkTrue('a valid restore delegates and succeeds', ($frOk['ok'] ?? false) === true);
+check('the url reached the restorer', $fakeRestore->asked[0], 'https://r2.example/snap.tar');
+check('and the file count is carried back', $frOk['files'], 42);
+
+$fakeRestore->refuse = true;
+$frFail = $frEngine->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => ['get_url' => 'https://r2.example/snap.tar']]);
+check('a restorer refusal becomes a clean error, not a 500', $frFail['error'], 'restore_failed');
+
+$frNone = (new Engine($frToken))->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => ['get_url' => 'https://r2.example/snap.tar']]);
+check('with no restorer wired the action is unavailable', $frNone['error'], 'unavailable');
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
