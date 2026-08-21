@@ -560,10 +560,23 @@ final class Engine
             return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
         }
         $offset = max(0, (int) ($p['offset'] ?? 0));
-        $limit = min(200, max(1, (int) ($p['limit'] ?? 100)));
+        // Bodies make a page heavy, so a page that carries them is a smaller page. The caller
+        // asks for them because the alternative — one request per row — spends a caller's whole
+        // hourly allowance on a single site's article list.
+        $withBody = !empty($p['include_body']);
+        $ceiling = $withBody ? 25 : 200;
+        $limit = min($ceiling, max(1, (int) ($p['limit'] ?? ($withBody ? 25 : 100))));
 
         try {
             $items = $this->writer->list($kind, $offset, $limit);
+            if ($withBody) {
+                foreach ($items as $index => $row) {
+                    $full = $this->writer->read($kind, (int) $row['id']);
+                    if ($full !== null) {
+                        $items[$index] = $full + $row; // summary keeps category_title/category_path
+                    }
+                }
+            }
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }

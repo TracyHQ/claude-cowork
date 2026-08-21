@@ -857,6 +857,13 @@ check('content.list pages by offset', array_column($page['items'], 'id'), [9]);
 $past = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
     'params' => ['kind' => 'article', 'offset' => 99]]);
 check('a page past the end is empty, not an error', $past['items'], []);
+$withBody = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+    'params' => ['kind' => 'article', 'include_body' => true]]);
+check('include_body carries the row itself, not just its summary',
+    $withBody['items'][0]['introtext'], '<p>long body</p>');
+check('a page carrying bodies is capped smaller',
+    count($wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+        'params' => ['kind' => 'article', 'include_body' => true, 'limit' => 500]])['items']), 2);
 check('content.list refuses a kind it does not know',
     $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'user']])['error'], 'bad_params');
 $got = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'article', 'id' => 3]]);
