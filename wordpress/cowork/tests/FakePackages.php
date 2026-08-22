@@ -24,6 +24,19 @@ final class FakePackages
         return [['stylesheet' => 'twentytwentytwo', 'name' => 'Twenty Twenty-Two', 'version' => '1.9', 'active' => false]];
     }
 
+    public function core_manifest(): array
+    {
+        return [
+            'platform'        => 'wordpress',
+            'platformVersion' => '6.6',
+            'extensions'      => [
+                ['type' => 'theme', 'element' => 'twentytwentytwo', 'core' => true, 'enabled' => false, 'version' => '1.9'],
+                // The case the name-prefix heuristic gets wrong: a child theme wearing the name.
+                ['type' => 'theme', 'element' => 'twentyfive-child', 'core' => false, 'enabled' => true, 'version' => '1.0'],
+            ],
+        ];
+    }
+
     public function install_plugin(string $url): array
     {
         $shape = self::checkUrl($url);

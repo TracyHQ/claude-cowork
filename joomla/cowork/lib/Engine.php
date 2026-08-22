@@ -122,6 +122,8 @@ final class Engine
                 return $this->fileRead($params);
             case 'extension.list':
                 return $this->extensionList();
+            case 'core.manifest':
+                return $this->coreManifest();
             case 'extension.install':
                 return $this->extensionInstall($params);
             case 'content.list':
@@ -501,6 +503,23 @@ final class Engine
             return $this->err('list_failed', $e->getMessage());
         }
         return $this->ok(['extensions' => $installed]);
+    }
+
+    /**
+     * The per-site core source (ADR 0070 addendum): which of this site's extensions ship with
+     * the CMS. Tracy's zone gate reads this instead of a static list, because a static list is
+     * a copy of one install on one day — the site's own records are neither.
+     */
+    private function coreManifest(): array
+    {
+        if ($this->extensions === null) {
+            return $this->err('unavailable', 'extension manager not wired');
+        }
+        try {
+            return $this->ok(['manifest' => $this->extensions->coreManifest()]);
+        } catch (Throwable $e) {
+            return $this->err('manifest_failed', $e->getMessage());
+        }
     }
 
     /**

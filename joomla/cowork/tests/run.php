@@ -642,6 +642,13 @@ final class FakeExtensions implements ExtensionManager
     {
         return $this->installed;
     }
+
+    public array $manifest = ['platform' => 'joomla', 'platformVersion' => '5.1.2', 'extensions' => []];
+
+    public function coreManifest(): array
+    {
+        return $this->manifest;
+    }
 }
 
 $TOKEN = 'a-token-at-least-16';
@@ -656,6 +663,20 @@ $extEngine = new Engine($TOKEN, [], null, null, null, $fakeExtensions);
 
 $listed = $extEngine->handle(['token' => $TOKEN, 'action' => 'extension.list']);
 check('extension.list returns what the site holds', $listed['extensions'][0]['element'], 'com_claudecowork');
+
+// The per-site core source (ADR 0070 addendum): the engine hands the adapter's manifest through
+// verbatim — the core flag is the adapter's verdict, never re-derived here.
+$fakeExtensions->manifest = [
+    'platform'        => 'joomla',
+    'platformVersion' => '5.1.2',
+    'extensions'      => [
+        ['type' => 'component', 'element' => 'com_content', 'folder' => null, 'core' => true, 'enabled' => true, 'version' => '5.1.2'],
+        ['type' => 'component', 'element' => 'com_weblinks', 'folder' => null, 'core' => false, 'enabled' => true, 'version' => '4.4.2'],
+    ],
+];
+$manifested = $extEngine->handle(['token' => $TOKEN, 'action' => 'core.manifest']);
+check('core.manifest answers the platform', $manifested['manifest']['platform'], 'joomla');
+check('core.manifest keeps the adapter verdict', $manifested['manifest']['extensions'][1]['core'], false);
 // Without the group, one product's row answers to another's claim: `com_k2` under Xmap is
 // Xmap's, and K2's own component is not.
 check('a plugin carries the group that tells it from another product', $listed['extensions'][1]['folder'], 'xmap');

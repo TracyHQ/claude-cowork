@@ -648,6 +648,10 @@ $call = static function (string $action, array $params = []) use ($pkgEngine): a
 check('plugins are listed under their own action', $call('plugin.list')['plugins'][0]['file'], 'akismet/akismet.php');
 check('themes are listed under theirs', $call('theme.list')['themes'][0]['stylesheet'], 'twentytwentytwo');
 
+// The per-site core source (ADR 0070 addendum): passed through verbatim, verdicts included.
+check('core.manifest names the platform', $call('core.manifest')['manifest']['platform'], 'wordpress');
+check('core.manifest keeps the child-theme verdict', $call('core.manifest')['manifest']['extensions'][1]['core'], false);
+
 // The URL is checked before the site is asked to fetch anything: one https .zip, so the
 // installer can never be pointed at a path on disk.
 check('http is refused', $call('plugin.install', ['url' => 'http://example.test/p.zip'])['message'], 'https required');

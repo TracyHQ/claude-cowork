@@ -39,6 +39,21 @@ interface ExtensionManager
      *                          package_id:int, version:?string, enabled:bool}>
      */
     public function listInstalled(): array;
+
+    /**
+     * What this install says is core (ADR 0070 addendum: the per-site core source).
+     *
+     * The flag is computed HERE, because only the platform adapter knows its own semantics:
+     * Joomla 4+ marks core rows with `locked` (added in 4.0 precisely because `protected` had
+     * come to mean only "cannot be disabled"), Joomla 3 has only `protected`. A caller gets a
+     * neutral `core` boolean and never re-derives it — measured on a real 3→4→5 site, where
+     * `protected` called com_contact third-party and `locked` was right about every row.
+     *
+     * @return array{platform:string, platformVersion:string,
+     *               extensions: array<int, array{type:string, element:string, folder:?string,
+     *                                            core:bool, enabled:bool, version:?string}>}
+     */
+    public function coreManifest(): array;
 }
 
 /**

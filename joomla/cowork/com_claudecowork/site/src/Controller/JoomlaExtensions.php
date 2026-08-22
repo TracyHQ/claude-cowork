@@ -115,4 +115,52 @@ final class JoomlaExtensions implements \ExtensionManager
         }
         return $out;
     }
+
+    public function coreManifest(): array
+    {
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+
+        // Joomla 4 added `locked` as the honest core marker; `protected` had drifted into
+        // "cannot be disabled" and on upgraded sites disagrees with reality row by row.
+        // A Joomla 3 table has no `locked` column, so the first query fails there and the
+        // second asks the only question that version can answer.
+        $columns = ['type', 'element', 'folder', 'enabled', 'manifest_cache', 'locked'];
+        try {
+            $query = $db->getQuery(true)
+                ->select($db->quoteName($columns))
+                ->from($db->quoteName('#__extensions'));
+            $rows = $db->setQuery($query)->loadAssocList() ?: [];
+            $coreOf = static fn(array $row): bool => (int) ($row['locked'] ?? 0) === 1;
+        } catch (Throwable $e) {
+            $query = $db->getQuery(true)
+                ->select($db->quoteName(['type', 'element', 'folder', 'enabled', 'manifest_cache', 'protected']))
+                ->from($db->quoteName('#__extensions'));
+            $rows = $db->setQuery($query)->loadAssocList() ?: [];
+            $coreOf = static fn(array $row): bool => (int) ($row['protected'] ?? 0) === 1;
+        }
+
+        $extensions = [];
+        foreach ($rows as $row) {
+            $element = (string) ($row['element'] ?? '');
+            if ($element === '') {
+                continue;
+            }
+            $cache = json_decode((string) ($row['manifest_cache'] ?? ''), true);
+            $folder = (string) ($row['folder'] ?? '');
+            $extensions[] = [
+                'type'    => (string) ($row['type'] ?? ''),
+                'element' => $element,
+                'folder'  => $folder === '' ? null : $folder,
+                'core'    => $coreOf($row),
+                'enabled' => (int) ($row['enabled'] ?? 0) === 1,
+                'version' => \is_array($cache) && isset($cache['version']) ? (string) $cache['version'] : null,
+            ];
+        }
+
+        return [
+            'platform'        => 'joomla',
+            'platformVersion' => \defined('JVERSION') ? JVERSION : '',
+            'extensions'      => $extensions,
+        ];
+    }
 }

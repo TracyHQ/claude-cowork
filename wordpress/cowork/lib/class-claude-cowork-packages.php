@@ -94,6 +94,49 @@ final class Claude_Cowork_Packages {
 	}
 
 	/**
+	 * What this install says is core (ADR 0070 addendum: the per-site core source).
+	 *
+	 * WordPress keeps no `locked` column; what it does keep is the theme's own header. A theme
+	 * that ships with WordPress says so there — the WordPress.org author URI and a default-theme
+	 * name — and a child theme named `twentyfive-child` says the opposite, which is exactly the
+	 * case a name-prefix heuristic gets wrong. Computed here, at the source, so the caller gets
+	 * a neutral `core` flag and never re-derives platform semantics.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function core_manifest() {
+		$extensions = array();
+		foreach ( wp_get_themes() as $stylesheet => $theme ) {
+			$author_uri = untrailingslashit( strtolower( (string) $theme->get( 'AuthorURI' ) ) );
+			$shipped    = in_array( $author_uri, array( 'https://wordpress.org', 'http://wordpress.org' ), true );
+			$named_like = ( 1 === preg_match( '/^(twenty[a-z]+|classic|default)$/', $stylesheet ) );
+			$extensions[] = array(
+				'type'    => 'theme',
+				'element' => $stylesheet,
+				'core'    => $shipped && $named_like,
+				'enabled' => ( get_option( 'stylesheet' ) === $stylesheet ),
+				'version' => (string) $theme->get( 'Version' ),
+			);
+		}
+		foreach ( $this->list_plugins() as $plugin ) {
+			// Plugins live in the Add-ons zone structurally; they are listed so the manifest is
+			// a full inventory, never so the gate treats one as core.
+			$extensions[] = array(
+				'type'    => 'plugin',
+				'element' => isset( $plugin['file'] ) ? dirname( (string) $plugin['file'] ) : (string) ( $plugin['name'] ?? '' ),
+				'core'    => false,
+				'enabled' => (bool) ( $plugin['active'] ?? false ),
+				'version' => (string) ( $plugin['version'] ?? '' ),
+			);
+		}
+		return array(
+			'platform'        => 'wordpress',
+			'platformVersion' => (string) get_bloginfo( 'version' ),
+			'extensions'      => $extensions,
+		);
+	}
+
+	/**
 	 * Every theme the site has, and which one is live.
 	 *
 	 * @return array<int, array<string,mixed>>

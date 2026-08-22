@@ -120,6 +120,8 @@ final class Engine
                 return $this->pluginActivate($params);
             case 'theme.list':
                 return $this->themeList();
+            case 'core.manifest':
+                return $this->coreManifest();
             case 'theme.install':
                 return $this->themeInstall($params);
             case 'theme.activate':
@@ -544,6 +546,15 @@ final class Engine
             return $refusal;
         }
         return $this->ok(['themes' => $this->packages->list_themes()]);
+    }
+
+    /** The per-site core source (ADR 0070 addendum) — see Packages::core_manifest. */
+    private function coreManifest(): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        return $this->ok(['manifest' => $this->packages->core_manifest()]);
     }
 
     /**
