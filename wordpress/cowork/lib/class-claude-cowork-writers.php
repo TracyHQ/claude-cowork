@@ -168,6 +168,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			'template'       => (string) get_page_template_slug( $post ),
 			'seo'            => $this->describe_seo( (int) $post->ID ),
 			'in_menu'        => $this->is_in_a_menu( $post ),
+			// The mirror's own checksum — sha256 over the content plus one NUL byte, the exact
+			// bytes the desk's articleChecksum hashes (WordPress keeps the whole body in one
+			// column, so the second half is empty). Present on every row, bodies or not: it is
+			// what turns a summary page into a truthful delta inventory.
+			'checksum'       => hash( 'sha256', $post->post_content . "\0" ),
 		);
 		if ( $with_body ) {
 			$row['content'] = $post->post_content;

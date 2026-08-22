@@ -215,6 +215,17 @@ final class JoomlaSiteWriter implements \SiteWriter
                 $this->db->quoteName('c.title', 'category_title'),
                 $this->db->quoteName('c.path', 'category_path'),
             ])->join('LEFT', $this->db->quoteName('#__categories', 'c'), 'c.id = a.catid');
+            // The mirror's own checksum — sha256 over introtext, one NUL byte, fulltext — computed
+            // by the database so the bodies never leave it. This is what makes a summary page a
+            // truthful delta inventory: the caller compares these against the checksums its files
+            // already carry and fetches bodies only where they disagree. Byte-compatible with the
+            // desk's articleChecksum because the columns are utf8mb4 and sha256 hashes bytes.
+            // `fulltext` is a reserved word — unquoted it is a syntax error, measured on MariaDB.
+            $fulltext = 'a.' . $this->db->quoteName('fulltext');
+            $query->select(
+                "SHA2(CONCAT(COALESCE(a.introtext, ''), CHAR(0), COALESCE({$fulltext}, '')), 256) AS "
+                . $this->db->quoteName('checksum')
+            );
         }
 
         $rows = $this->db->setQuery($query, $offset, $limit)->loadAssocList() ?? [];
