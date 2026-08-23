@@ -501,6 +501,20 @@ final class JoomlaSiteWriter implements \SiteWriter
         if ($kind === 'menuItem' && ($data['type'] ?? '') === 'component') {
             $data['component_id'] = $this->componentIdFor((string) ($data['link'] ?? ''));
         }
+        // Menu aliases are minted by Joomla's admin MODEL, not its Table — Category and Tag
+        // tables slug their own title in check(), Menu::check() only copies alias into path, so
+        // without this a created item lands with a NULL path and the insert is refused. Same
+        // recipe as the model: slug the title, fall back to a timestamp when nothing survives.
+        if ($kind === 'menuItem') {
+            $alias = \Joomla\CMS\Application\ApplicationHelper::stringURLSafe(
+                (string) $data['title'],
+                (string) ($data['language'] ?? '*')
+            );
+            if (trim(str_replace('-', '', $alias)) === '') {
+                $alias = Factory::getDate()->format('Y-m-d-H-i-s');
+            }
+            $data['alias'] = $alias;
+        }
 
         /** @var \Joomla\CMS\Table\Nested $table */
         $table = new $def['class']($this->db);
