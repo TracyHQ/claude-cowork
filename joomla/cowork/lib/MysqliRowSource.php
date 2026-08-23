@@ -193,4 +193,12 @@ final class MysqliRowSource implements RowSource
             throw new RuntimeException($this->db->error ?: 'rename failed');
         }
     }
+
+    public function dropTable(string $table): void
+    {
+        $t = $this->db->real_escape_string($table);
+        if (!$this->db->query("DROP TABLE `{$t}`")) {
+            throw new RuntimeException($this->db->error ?: 'drop failed');
+        }
+    }
 }

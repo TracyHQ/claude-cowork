@@ -116,6 +116,8 @@ final class Engine
                 return $this->dbCleanup($params);
             case 'db.restore':
                 return $this->dbRestore($params);
+            case 'db.purge':
+                return $this->dbPurge($params);
             case 'db.dump':
                 return $this->dbDump($params);
             case 'files.list':
@@ -333,6 +335,45 @@ final class Engine
             $restored[] = $step;
         }
         return $this->ok(['restored' => $restored]);
+    }
+
+    /**
+     * The trash's second step (ADR 0083: purge): DROP, accepted ONLY for `_tracy_trash_*`
+     * names — a plain table name is refused outright, which is what confines the one
+     * destructive operation this engine has to tables a cleanup already parked.
+     */
+    private function dbPurge(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        foreach ($tables as $table) {
+            if (strpos($table, self::TRASH_PREFIX) !== 0) {
+                return $this->err('refused', "table {$table} is not in the trash — purge only empties the trash");
+            }
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+        }
+        $dropped = [];
+        foreach ($tables as $table) {
+            try {
+                $this->dumper->dropTable($table);
+            } catch (Throwable $e) {
+                return $this->err('drop_failed', $e->getMessage(), ['dropped' => $dropped]);
+            }
+            $dropped[] = $table;
+        }
+        return $this->ok(['dropped' => $dropped]);
     }
 
     private function dbDump(array $p): array

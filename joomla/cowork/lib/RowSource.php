@@ -88,7 +88,14 @@ interface RowSource
 
     /**
      * RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). A metadata operation: instant,
-     * no data copied, fully reversible by renaming back. This interface never drops a table.
+     * no data copied, fully reversible by renaming back.
      */
     public function renameTable(string $from, string $to): void;
+
+    /**
+     * DROP TABLE — the trash's second step (ADR 0083: purge). The ONE destructive operation in
+     * this interface, and the engine only ever points it at `_tracy_trash_*` names; everything
+     * else goes through {@see renameTable} first, which is what makes a wrong call recoverable.
+     */
+    public function dropTable(string $table): void;
 }

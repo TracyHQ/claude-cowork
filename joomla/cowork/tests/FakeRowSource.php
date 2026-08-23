@@ -76,6 +76,14 @@ final class FakeRowSource implements RowSource
         unset($this->tables[$from]);
     }
 
+    public function dropTable(string $table): void
+    {
+        if (!isset($this->tables[$table])) {
+            throw new RuntimeException("table {$table} does not exist");
+        }
+        unset($this->tables[$table]);
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $rows = $this->tables[$table]['rows'] ?? [];

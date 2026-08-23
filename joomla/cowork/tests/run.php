@@ -430,6 +430,24 @@ checkTrue('restored table is back in the name list', in_array('jos_sh404sef_urls
 $restorePlain = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.restore', 'params' => ['tables' => ['jos_sh404sef_urls']]]);
 check('db.restore refuses a table not in the trash', $restorePlain['error'], 'bad_params');
 
+$purgePlain = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.purge', 'params' => ['tables' => ['jos_sh404sef_urls']]]);
+check('db.purge refuses a plain table — it only empties the trash', $purgePlain['error'], 'refused');
+
+$reCleanup = $trashEngine->handle([
+    'token' => $goodToken,
+    'action' => 'db.cleanup',
+    'params' => ['tables' => ['jos_sh404sef_urls']]
+]);
+$trashAgain = $reCleanup['renamed'][0]['to'];
+$purge = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.purge', 'params' => ['tables' => [$trashAgain]]]);
+check('db.purge ok', $purge['ok'], true);
+check('db.purge drops the trash table', $purge['dropped'], [$trashAgain]);
+$afterPurge = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.tables']);
+checkTrue('purged table is gone for good', !in_array($trashAgain, $afterPurge['tables'], true));
+
+$purgeMissing = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.purge', 'params' => ['tables' => [$trashAgain]]]);
+check('db.purge refuses a table that no longer exists', $purgeMissing['error'], 'not_found');
+
 $dbResp = $engine->handle(['token' => $goodToken, 'action' => 'db.dump', 'params' => ['table' => 'jos_menu', 'offset' => 0, 'limit' => 2]]);
 check('engine db.dump ok', $dbResp['ok'], true);
 check('engine db.dump rows', $dbResp['rows'], 2);
