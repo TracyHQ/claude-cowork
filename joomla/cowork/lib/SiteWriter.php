@@ -79,6 +79,24 @@ interface SiteWriter
     public function delete(string $kind, int $id): void;
 
     /**
+     * Where a tree node currently sits, precisely enough to put it back: its parent and the
+     * sibling standing immediately before it (`after` 0 when it is the first child). Null when
+     * the kind is not tree-shaped or the id does not exist — which is also how the engine learns
+     * a kind cannot be moved at all.
+     *
+     * @return array{parent_id:int,after:int}|null
+     */
+    public function positionOf(string $kind, int $id): ?array;
+
+    /**
+     * Re-hang one tree node: after the sibling `$after` when it is positive, first child of
+     * `$parentId` when `$after` is 0, last child of `$parentId` otherwise. The implementation
+     * owns everything a move drags along — lft/rgt renumbering, the path chain of the node and
+     * every descendant. Throws on refusal (moving under one's own descendant, unknown target).
+     */
+    public function move(string $kind, int $id, int $parentId, int $after): void;
+
+    /**
      * One bounded page of a kind's rows, as summaries — the read half of the content mirror
      * (ADR 0071): a caller pages through these, then fetches each full row with read(). Summary
      * means identity and bookkeeping columns only, never body text, so a page stays small enough

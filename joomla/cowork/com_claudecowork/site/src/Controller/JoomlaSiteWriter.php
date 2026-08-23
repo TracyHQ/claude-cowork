@@ -527,6 +527,100 @@ final class JoomlaSiteWriter implements \SiteWriter
         return $id;
     }
 
+    public function positionOf(string $kind, int $id): ?array
+    {
+        if (!isset(self::NESTED[$kind])) {
+            return null;
+        }
+        $row = $this->read($kind, $id);
+        if ($row === null || !isset($row['parent_id'], $row['lft'])) {
+            return null;
+        }
+        // The sibling standing immediately before this node: same parent, closed before we open.
+        $lft = (int) $row['lft'];
+        $parentId = (int) $row['parent_id'];
+        $query = $this->db->getQuery(true)
+            ->select($this->db->quoteName('id'))
+            ->from($this->db->quoteName(self::MAP[$kind]['table']))
+            ->where($this->db->quoteName('parent_id') . ' = :parent')
+            ->where($this->db->quoteName('rgt') . ' < :lft')
+            ->order($this->db->quoteName('rgt') . ' DESC')
+            ->bind(':parent', $parentId, ParameterType::INTEGER)
+            ->bind(':lft', $lft, ParameterType::INTEGER);
+        $after = (int) ($this->db->setQuery($query, 0, 1)->loadResult() ?? 0);
+        return ['parent_id' => $parentId, 'after' => $after];
+    }
+
+    public function move(string $kind, int $id, int $parentId, int $after): void
+    {
+        if (!isset(self::NESTED[$kind])) {
+            throw new \RuntimeException("a {$kind} is not tree-shaped and cannot be moved");
+        }
+        // Scope check through read(): an admin-menu item is invisible to this door, so it is
+        // also immovable through it.
+        if ($this->read($kind, $id) === null) {
+            throw new \RuntimeException("no {$kind} with id {$id}");
+        }
+        $class = self::NESTED[$kind]['class'];
+        if (!class_exists($class)) {
+            throw new \RuntimeException("kind {$kind} needs a Joomla table class this site does not ship");
+        }
+        /** @var \Joomla\CMS\Table\Nested $table */
+        $table = new $class($this->db);
+        if (!$table->load($id)) {
+            throw new \RuntimeException($table->getError() ?: "no {$kind} with id {$id}");
+        }
+        // moveByReference is Joomla's own re-hang: it refuses a node moving under its own
+        // descendant and renumbers lft/rgt for everyone affected.
+        $ok = $after > 0
+            ? $table->moveByReference($after, 'after', $id)
+            : $table->moveByReference($parentId, $after === 0 ? 'first-child' : 'last-child', $id);
+        if (!$ok) {
+            throw new \RuntimeException($table->getError() ?: "could not move {$kind} {$id}");
+        }
+        // Paths derive from the alias chain, which just changed for the node and every
+        // descendant. rebuild() recomputes lft/rgt and path for the whole tree from the root —
+        // idempotent, and cheap at the row counts a site's menus and categories reach.
+        $table->rebuild();
+        if ($kind === 'menuItem') {
+            $this->adoptMenutype($id);
+        }
+        // The moved node itself may sit deeper than rebuild()'s default path pass on some
+        // Joomla generations; one targeted rebuildPath is free insurance.
+        $table->rebuildPath($id);
+    }
+
+    /**
+     * After a menu item moves under a parent from another menu, the whole moved branch must
+     * carry the parent's menutype — the tree says where it hangs, but modules render by
+     * menutype, and a mismatch leaves the item hanging in one menu and rendering in another.
+     * Top-level moves (parent 1, the root) keep their menutype: at the root only the menutype
+     * says which menu the item belongs to.
+     */
+    private function adoptMenutype(int $id): void
+    {
+        $row = $this->read('menuItem', $id);
+        if ($row === null || (int) $row['parent_id'] <= 1) {
+            return;
+        }
+        $parent = $this->read('menuItem', (int) $row['parent_id']);
+        if ($parent === null || $parent['menutype'] === $row['menutype']) {
+            return;
+        }
+        $menutype = (string) $parent['menutype'];
+        $lft = (int) $row['lft'];
+        $rgt = (int) $row['rgt'];
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName('#__menu'))
+            ->set($this->db->quoteName('menutype') . ' = :menutype')
+            ->where($this->db->quoteName('lft') . ' >= :lft')
+            ->where($this->db->quoteName('rgt') . ' <= :rgt')
+            ->bind(':menutype', $menutype, ParameterType::STRING)
+            ->bind(':lft', $lft, ParameterType::INTEGER)
+            ->bind(':rgt', $rgt, ParameterType::INTEGER);
+        $this->db->setQuery($query)->execute();
+    }
+
     /** The `#__extensions` id behind a component link, so a created menu item routes like a real one. */
     private function componentIdFor(string $link): int
     {

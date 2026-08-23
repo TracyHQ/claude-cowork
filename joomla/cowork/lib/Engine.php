@@ -660,9 +660,10 @@ final class Engine
         if (!in_array($kind, SiteWriter::KINDS, true)) {
             return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
         }
-        if (!isset($p['fields']) || !is_array($p['fields']) || $p['fields'] === []) {
+        if (!isset($p['fields']) || !is_array($p['fields'])) {
             return $this->err('bad_params', 'fields required');
         }
+        $fields = $p['fields'];
         $id = max(0, (int) ($p['id'] ?? 0));
         if ($id === 0 && !$this->writer->canCreate($kind)) {
             // The refusal must NAME the boundary (ADR 0080 §4): the agent has no other door to
@@ -670,18 +671,70 @@ final class Engine
             return $this->err('unsupported', "a {$kind} cannot be created through Apply — only existing ones can be edited");
         }
 
-        try {
-            $before = $this->writer->read($kind, $id); // null => this is an insert, so its undo is a delete
-            $newId = $this->writer->write($kind, $id, $p['fields']);
-        } catch (Throwable $e) {
-            return $this->err('write_failed', $e->getMessage());
+        // On an EXISTING tree node, parent_id / move_after are a MOVE — re-hanging the node, with
+        // everything that drags along (lft/rgt, the path chain of every descendant) — not columns
+        // to write. Peeled off here so they never reach the raw whitelist; on a create (id 0)
+        // parent_id stays in $fields, where it is placement, not movement. Note flat re-homing
+        // (an article to another category) is NOT this: catid is an ordinary whitelisted column.
+        $moveTo = null;
+        if ($id > 0 && (array_key_exists('parent_id', $fields) || array_key_exists('move_after', $fields))) {
+            $moveTo = [
+                'parent' => (int) ($fields['parent_id'] ?? 0),
+                'after'  => array_key_exists('move_after', $fields) ? (int) $fields['move_after'] : -1,
+            ];
+            unset($fields['parent_id'], $fields['move_after']);
+        }
+        if ($fields === [] && $moveTo === null) {
+            return $this->err('bad_params', 'fields required');
         }
 
-        try {
-            $this->log->record($applyId, ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'before' => $before]);
-        } catch (Throwable $e) {
-            $this->rollbackContent($kind, $newId, $before);
-            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        if ($moveTo !== null) {
+            if ($moveTo['after'] <= 0 && $moveTo['parent'] <= 0) {
+                return $this->err('bad_params', 'moving needs parent_id (the new parent) or move_after (the sibling to follow)');
+            }
+            try {
+                $posBefore = $this->writer->positionOf($kind, $id);
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+            if ($posBefore === null) {
+                return $this->err('unsupported', "a {$kind} cannot be moved — only tree kinds (menuItem, category, tag) with an existing id can");
+            }
+            try {
+                $this->writer->move($kind, $id, $moveTo['parent'], $moveTo['after']);
+            } catch (Throwable $e) {
+                return $this->err('write_failed', $e->getMessage());
+            }
+            try {
+                $this->log->record($applyId, ['op' => 'move', 'kind' => $kind, 'id' => $id, 'before' => $posBefore]);
+            } catch (Throwable $e) {
+                try {
+                    $this->writer->move($kind, $id, (int) $posBefore['parent_id'], (int) $posBefore['after']);
+                } catch (Throwable $undo) {
+                    // The recorder is down and so is the way back — the failure below says so.
+                }
+                return $this->err('write_failed', 'change was rolled back: could not record its undo');
+            }
+        }
+
+        $before = null;
+        $newId = $id;
+        if ($fields !== []) {
+            try {
+                $before = $this->writer->read($kind, $id); // null => this is an insert, so its undo is a delete
+                $newId = $this->writer->write($kind, $id, $fields);
+            } catch (Throwable $e) {
+                return $moveTo !== null
+                    ? $this->err('write_failed', 'the move landed (revert via apply.revert); the field update failed: ' . $e->getMessage())
+                    : $this->err('write_failed', $e->getMessage());
+            }
+
+            try {
+                $this->log->record($applyId, ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'before' => $before]);
+            } catch (Throwable $e) {
+                $this->rollbackContent($kind, $newId, $before);
+                return $this->err('write_failed', 'change was rolled back: could not record its undo');
+            }
         }
 
         try {
@@ -692,7 +745,11 @@ final class Engine
 
         $this->stamped('content');
 
-        return $this->ok(['kind' => $kind, 'id' => $newId, 'created' => $before === null]);
+        $out = ['kind' => $kind, 'id' => $newId, 'created' => $fields !== [] && $before === null && $id === 0];
+        if ($moveTo !== null) {
+            $out['moved'] = true;
+        }
+        return $this->ok($out);
     }
 
     /**
@@ -889,7 +946,7 @@ final class Engine
         $steps = array_map(static function (array $entry): array {
             $op = $entry['op'] ?? '';
             $step = ['op' => $op, 'created' => ($entry['before'] ?? null) === null];
-            if ($op === 'content') {
+            if ($op === 'content' || $op === 'move') {
                 $step['kind'] = $entry['kind'] ?? null;
                 $step['id'] = $entry['id'] ?? null;
             } elseif ($op === 'media') {
@@ -909,6 +966,21 @@ final class Engine
                 throw new RuntimeException('site writer not wired');
             }
             $this->rollbackContent((string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0), $entry['before'] ?? null);
+            return;
+        }
+        if ($op === 'move') {
+            if ($this->writer === null) {
+                throw new RuntimeException('site writer not wired');
+            }
+            $before = is_array($entry['before'] ?? null) ? $entry['before'] : [];
+            // `after` 0 means "it was the first child" — move() turns that into first-child of
+            // the recorded parent, so the node returns to its exact old slot, not just its parent.
+            $this->writer->move(
+                (string) ($entry['kind'] ?? ''),
+                (int) ($entry['id'] ?? 0),
+                (int) ($before['parent_id'] ?? 0),
+                (int) ($before['after'] ?? -1)
+            );
             return;
         }
         if ($op === 'media') {

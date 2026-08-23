@@ -788,6 +788,26 @@ final class FakeSiteWriter implements SiteWriter
     {
         unset($this->store[$kind][$id]);
     }
+    private const TREE = ['menuItem', 'category', 'tag'];
+    /** @var array<string,array<int,array{parent_id:int,after:int}>> */
+    public array $pos = [];
+    public function positionOf(string $kind, int $id): ?array
+    {
+        if (!in_array($kind, self::TREE, true)) {
+            return null;
+        }
+        return $this->pos[$kind][$id] ?? null;
+    }
+    public function move(string $kind, int $id, int $parentId, int $after): void
+    {
+        if (!in_array($kind, self::TREE, true)) {
+            throw new RuntimeException("a {$kind} is not tree-shaped and cannot be moved");
+        }
+        if (!isset($this->pos[$kind][$id])) {
+            throw new RuntimeException("no {$kind} with id {$id}");
+        }
+        $this->pos[$kind][$id] = ['parent_id' => $parentId, 'after' => $after];
+    }
     public function list(string $kind, int $offset, int $limit): array
     {
         $rows = $this->store[$kind] ?? [];
@@ -978,6 +998,45 @@ checkTrue('the reverted node is gone', !isset($writer->store['menuItem'][$create
 $userCreate = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['apply_id' => 'M3', 'kind' => 'user', 'fields' => ['name' => 'Eve']]]);
 check('creating a user is refused', $userCreate['error'], 'unsupported');
+
+// Moving a tree node (0.8.15): parent_id / move_after on an existing node re-hang it, and the
+// revert returns it to its exact old slot — parent AND position, not just parent.
+$writer->store['menuItem'][102] = ['title' => 'Extensions', 'published' => 1];
+$writer->pos['menuItem'][102] = ['parent_id' => 5, 'after' => 7];
+$mv = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'V1', 'kind' => 'menuItem', 'id' => 102, 'fields' => ['parent_id' => 1]]]);
+check('a tree node can be moved', $mv['ok'], true);
+check('the response says moved', $mv['moved'], true);
+check('the node hangs under the new parent', $writer->pos['menuItem'][102]['parent_id'], 1);
+$mvList = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.list', 'params' => ['apply_id' => 'V1']]);
+check('apply.list names the move', $mvList['steps'][0]['op'], 'move');
+$mvRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'V1']]);
+check('a move reverts', $mvRevert['ok'], true);
+check('the node is back under its old parent', $writer->pos['menuItem'][102]['parent_id'], 5);
+check('and back in its old slot', $writer->pos['menuItem'][102]['after'], 7);
+
+// Move and rename in one call: both land, one revert undoes both.
+$mvBoth = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'V2', 'kind' => 'menuItem', 'id' => 102,
+        'fields' => ['title' => 'Add-ons', 'parent_id' => 9]]]);
+check('move plus rename lands', $mvBoth['ok'], true);
+check('the rename landed too', $writer->store['menuItem'][102]['title'], 'Add-ons');
+check('the move landed too', $writer->pos['menuItem'][102]['parent_id'], 9);
+$mvBothRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'V2']]);
+check('one revert undoes both', $mvBothRevert['ok'], true);
+check('title restored', $writer->store['menuItem'][102]['title'], 'Extensions');
+check('position restored', $writer->pos['menuItem'][102]['parent_id'], 5);
+
+// Flat kinds do not move — an article changes category through catid, a plain column write.
+$writer->store['article'][66] = ['title' => 'A post', 'state' => 1];
+$mvFlat = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'V3', 'kind' => 'article', 'id' => 66, 'fields' => ['parent_id' => 2]]]);
+check('moving a flat kind is refused', $mvFlat['error'], 'unsupported');
+
+// A move with nowhere to go is a bad request, not a write.
+$mvNowhere = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'V4', 'kind' => 'menuItem', 'id' => 102, 'fields' => ['move_after' => 0]]]);
+check('a move without a destination is refused', $mvNowhere['error'], 'bad_params');
 
 // content.delete is a trash write (-2), recorded like any edit, so it reverts.
 $writer->store['article'][55] = ['title' => 'Old post', 'state' => 1];
