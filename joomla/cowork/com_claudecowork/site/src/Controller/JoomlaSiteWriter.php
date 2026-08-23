@@ -40,9 +40,28 @@ use Joomla\Database\ParameterType;
 final class JoomlaSiteWriter implements \SiteWriter
 {
     /**
-     * Each kind: the table it lives in and the only columns an Apply may set on it.
+     * The catalog (ADR 0080 §2): each kind declares its table, the only columns an Apply may set,
+     * and how it behaves — so five generic actions cover the whole site instead of a tool per
+     * entity. Column lists are copied from a real Joomla 5 install's SHOW COLUMNS, not guessed.
      *
-     * @var array<string,array{table:string,columns:string[]}>
+     * Per-kind keys beyond table/columns:
+     *  - `pk`     primary-key column when it is not `id` (extensionParams → extension_id).
+     *  - `create` whether id-0 insert is allowed. Tree-shaped kinds (menuItem/category/tag) say
+     *    no: their rows sit in a nested set, and a raw insert corrupts lft/rgt for the whole
+     *    tree — creating them arrives later through Joomla's Table API. `user` says no on
+     *    principle; `extensionParams` rows are made by installers, not applies.
+     *  - `trash`  the soft-delete column (-2), or absent when the kind cannot be deleted through
+     *    Apply (a menutype holds a whole menu; a user is an identity; a template style may be
+     *    the home style).
+     *
+     * Tree-shaped kinds deliberately do NOT whitelist `alias`: path columns across `#__menu`,
+     * `#__categories` and `#__tags` are derived from the alias chain, and a raw alias edit would
+     * leave every descendant's path stale. Renaming a title is safe — paths never contain it.
+     * The `state` column of `#__contact_details` is a POSTAL region, not a workflow state — its
+     * workflow column is `published`, and the geographic one stays off the whitelist so no
+     * caller ever confuses the two.
+     *
+     * @var array<string,array<string,mixed>>
      */
     private const MAP = [
         'article' => [
@@ -52,15 +71,105 @@ final class JoomlaSiteWriter implements \SiteWriter
                 // Who may read it, and the window it is visible in. Both are decisions an editor
                 // makes about an article, and both were readable in the row already.
                 'access', 'publish_up', 'publish_down'],
+            'create'  => true,
+            'trash'   => 'state',
+        ],
+        'category' => [
+            'table'   => '#__categories',
+            'columns' => ['title', 'note', 'description', 'published', 'access', 'language',
+                'params', 'metadesc', 'metakey'],
+            'create'  => false,
+            'trash'   => 'published',
+        ],
+        'tag' => [
+            'table'   => '#__tags',
+            'columns' => ['title', 'note', 'description', 'published', 'access', 'language', 'params'],
+            'create'  => false,
+            'trash'   => 'published',
+        ],
+        'field' => [
+            'table'   => '#__fields',
+            'columns' => ['title', 'label', 'note', 'description', 'default_value', 'required',
+                'state', 'params', 'fieldparams', 'language', 'access'],
+            'create'  => true,
+            'trash'   => 'state',
+        ],
+        'menuItem' => [
+            'table'   => '#__menu',
+            'columns' => ['title', 'note', 'published', 'params'],
+            'create'  => false,
+            'trash'   => 'published',
+            // The admin menu (client_id 1) is Joomla's own furniture — listing or editing it
+            // through a content door would let an Apply reshape the backend.
+            'where'   => ['client_id' => 0],
+        ],
+        'menutype' => [
+            'table'   => '#__menu_types',
+            'columns' => ['title', 'description'],
+            'create'  => true,
+        ],
+        'redirect' => [
+            'table'   => '#__redirect_links',
+            'columns' => ['old_url', 'new_url', 'comment', 'published', 'header'],
+            'create'  => true,
+            'trash'   => 'published',
+        ],
+        'banner' => [
+            'table'   => '#__banners',
+            'columns' => ['name', 'alias', 'catid', 'state', 'clickurl', 'description',
+                'custombannercode', 'sticky', 'ordering', 'params', 'language',
+                'publish_up', 'publish_down'],
+            'create'  => true,
+            'trash'   => 'state',
+        ],
+        'bannerClient' => [
+            'table'   => '#__banner_clients',
+            'columns' => ['name', 'contact', 'email', 'extrainfo', 'state'],
+            'create'  => true,
+            'trash'   => 'state',
+        ],
+        'contact' => [
+            'table'   => '#__contact_details',
+            'columns' => ['name', 'con_position', 'address', 'suburb', 'country', 'postcode',
+                'telephone', 'fax', 'misc', 'email_to', 'mobile', 'webpage', 'published',
+                'catid', 'access', 'ordering', 'params', 'language', 'metadesc', 'metakey',
+                'featured', 'publish_up', 'publish_down'],
+            'create'  => true,
+            'trash'   => 'published',
+        ],
+        'newsfeed' => [
+            'table'   => '#__newsfeeds',
+            'columns' => ['name', 'link', 'description', 'published', 'catid', 'numarticles',
+                'cache_time', 'access', 'language', 'params', 'ordering', 'metadesc', 'metakey'],
+            'create'  => true,
+            'trash'   => 'published',
         ],
         'module' => [
             'table'   => '#__modules',
             'columns' => ['title', 'note', 'content', 'position', 'module', 'access', 'showtitle',
                 'params', 'published', 'language', 'ordering'],
+            'create'  => true,
+            'trash'   => 'published',
         ],
         'templateStyle' => [
             'table'   => '#__template_styles',
             'columns' => ['title', 'params', 'home'],
+            'create'  => false,
+        ],
+        'user' => [
+            'table'   => '#__users',
+            // Identity stays a person's own: no password, no username, no group map, no
+            // activation. Block/unblock and contact details are what a site admin curates.
+            'columns' => ['name', 'email', 'block'],
+            'create'  => false,
+        ],
+        'extensionParams' => [
+            'table'   => '#__extensions',
+            // The one column com_config really edits per extension. Enable/disable stays with
+            // extension tooling; everything else in this row belongs to the installer.
+            'columns' => ['params'],
+            'pk'      => 'extension_id',
+            'create'  => false,
         ],
     ];
 
@@ -69,6 +178,33 @@ final class JoomlaSiteWriter implements \SiteWriter
     public function __construct(DatabaseInterface $db)
     {
         $this->db = $db;
+    }
+
+    public function canCreate(string $kind): bool
+    {
+        $this->tableFor($kind); // validates the kind
+        return (bool) (self::MAP[$kind]['create'] ?? false);
+    }
+
+    public function trashColumn(string $kind): ?string
+    {
+        $this->tableFor($kind);
+        return self::MAP[$kind]['trash'] ?? null;
+    }
+
+    /** The primary-key column of a kind — `id` everywhere except where the schema says otherwise. */
+    private function pkFor(string $kind): string
+    {
+        return self::MAP[$kind]['pk'] ?? 'id';
+    }
+
+    /** Fixed predicates a kind's rows must satisfy (menuItem: site menu only), applied to every read path. */
+    private function applyScope(string $kind, \Joomla\Database\QueryInterface $query, string $alias = ''): void
+    {
+        $prefix = $alias === '' ? '' : $alias . '.';
+        foreach ((self::MAP[$kind]['where'] ?? []) as $column => $value) {
+            $query->where($prefix . $this->db->quoteName($column) . ' = ' . (int) $value);
+        }
     }
 
     public function read(string $kind, int $id): ?array
@@ -80,8 +216,9 @@ final class JoomlaSiteWriter implements \SiteWriter
         $query = $this->db->getQuery(true)
             ->select('*')
             ->from($this->db->quoteName($table))
-            ->where($this->db->quoteName('id') . ' = :id')
+            ->where($this->db->quoteName($this->pkFor($kind)) . ' = :id')
             ->bind(':id', $id, \Joomla\Database\ParameterType::INTEGER);
+        $this->applyScope($kind, $query);
         $row = $this->db->setQuery($query)->loadAssoc();
         return $row === null ? null : $row;
     }
@@ -105,25 +242,35 @@ final class JoomlaSiteWriter implements \SiteWriter
             throw new \RuntimeException("no writable column for kind {$kind}");
         }
 
+        $pk = $this->pkFor($kind);
         if ($id <= 0) {
-            // A brand-new article stamps its own timestamps. The whitelist drops authorship
-            // fields on purpose, and #__content's `created` and `modified` are NOT NULL with no
-            // database default, so an insert that sets neither is refused by the database.
+            if (!$this->canCreate($kind)) {
+                // Tree-shaped rows (menu/category/tag) sit in a nested set a raw insert would
+                // corrupt; identity rows are nobody's to mint through a content door. Refused
+                // here as well as in the engine, because this class is the last hand on the SQL.
+                throw new \RuntimeException("kind {$kind} cannot be created through Apply");
+            }
+            // A brand-new row stamps its own timestamps where the schema demands them. The
+            // whitelist drops authorship fields on purpose, and these columns are NOT NULL with
+            // no database default, so an insert that sets neither is refused by the database.
+            $now = Factory::getDate()->toSql();
             if ($kind === 'article') {
-                $now = Factory::getDate()->toSql();
                 $object->created  = $now;
                 $object->modified = $now;
             }
-            $this->db->insertObject($table, $object, 'id');
-            $newId = (int) $object->id;
+            if ($kind === 'contact' || $kind === 'newsfeed') {
+                $object->created = $now;
+            }
+            $this->db->insertObject($table, $object, $pk);
+            $newId = (int) $object->{$pk};
             if ($tags !== null) {
                 $this->setTags($newId, $tags);
             }
             return $newId;
         }
 
-        $object->id = $id;
-        $this->db->updateObject($table, $object, 'id');
+        $object->{$pk} = $id;
+        $this->db->updateObject($table, $object, $pk);
         if ($tags !== null) {
             $this->setTags($id, $tags);
         }
@@ -193,11 +340,25 @@ final class JoomlaSiteWriter implements \SiteWriter
         // Everything the mirror's file shows about an article. `images` and `metadata` are JSON
         // columns Joomla stores whole; the caller unpacks them rather than the SQL doing it, so
         // an article with a malformed value still lists instead of failing the page.
-        'article'       => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified',
+        'article'         => ['id', 'title', 'alias', 'catid', 'state', 'language', 'created', 'modified',
             'created_by', 'created_by_alias', 'featured', 'images', 'metadesc', 'metakey',
             'access', 'publish_up', 'publish_down'],
-        'module'        => ['id', 'title', 'position', 'module', 'published', 'language'],
-        'templateStyle' => ['id', 'title', 'template', 'home'],
+        'category'        => ['id', 'title', 'alias', 'path', 'parent_id', 'level', 'extension', 'published', 'language'],
+        'tag'             => ['id', 'title', 'alias', 'path', 'parent_id', 'level', 'published', 'language'],
+        'field'           => ['id', 'title', 'name', 'label', 'type', 'context', 'state', 'required', 'language'],
+        'menuItem'        => ['id', 'menutype', 'title', 'alias', 'path', 'link', 'type', 'published',
+            'parent_id', 'level', 'ordering', 'language', 'client_id'],
+        'menutype'        => ['id', 'menutype', 'title', 'description'],
+        'redirect'        => ['id', 'old_url', 'new_url', 'published', 'header', 'hits'],
+        'banner'          => ['id', 'name', 'alias', 'catid', 'state', 'clickurl', 'sticky', 'language'],
+        'bannerClient'    => ['id', 'name', 'contact', 'email', 'state'],
+        'contact'         => ['id', 'name', 'alias', 'con_position', 'email_to', 'published', 'catid', 'language'],
+        'newsfeed'        => ['id', 'name', 'alias', 'link', 'published', 'catid', 'language'],
+        'module'          => ['id', 'title', 'position', 'module', 'published', 'language'],
+        'templateStyle'   => ['id', 'title', 'template', 'home'],
+        // No email in a LIST — identity summaries name the account, the full row is a `get`.
+        'user'            => ['id', 'name', 'username', 'block', 'registerDate', 'lastvisitDate'],
+        'extensionParams' => ['extension_id', 'name', 'type', 'element', 'folder', 'client_id', 'enabled'],
     ];
 
     public function list(string $kind, int $offset, int $limit): array
@@ -208,7 +369,8 @@ final class JoomlaSiteWriter implements \SiteWriter
         $query = $this->db->getQuery(true)
             ->select(array_map(fn (string $c): string => 'a.' . $this->db->quoteName($c), $columns))
             ->from($this->db->quoteName($table, 'a'))
-            ->order('a.' . $this->db->quoteName('id') . ' ASC');
+            ->order('a.' . $this->db->quoteName($this->pkFor($kind)) . ' ASC');
+        $this->applyScope($kind, $query, 'a');
 
         if ($kind === 'article') {
             $query->select([
@@ -262,7 +424,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         }
         $query = $this->db->getQuery(true)
             ->delete($this->db->quoteName($table))
-            ->where($this->db->quoteName('id') . ' = :id')
+            ->where($this->db->quoteName($this->pkFor($kind)) . ' = :id')
             ->bind(':id', $id, \Joomla\Database\ParameterType::INTEGER);
         $this->db->setQuery($query)->execute();
     }
@@ -273,7 +435,13 @@ final class JoomlaSiteWriter implements \SiteWriter
      */
     public function purgeCache(): void
     {
-        foreach (['com_content', 'com_modules', 'com_templates', '_system', 'page'] as $group) {
+        // One group per component the catalog can touch. Cleaning a group that saw no write is
+        // cheap; serving a stale menu after a rename is not.
+        foreach ([
+            'com_content', 'com_modules', 'com_templates', '_system', 'page',
+            'com_menus', 'mod_menu', 'com_categories', 'com_tags', 'com_fields',
+            'com_redirect', 'com_banners', 'com_contact', 'com_newsfeeds', 'com_users', 'com_plugins',
+        ] as $group) {
             try {
                 Factory::getCache($group, '')->clean();
             } catch (CacheExceptionInterface $e) {

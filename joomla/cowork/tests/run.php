@@ -751,6 +751,25 @@ final class FakeSiteWriter implements SiteWriter
     private int $nextId = 100;
     public int $purges = 0;
 
+    /** Mirrors the real catalog's shape: tree/identity kinds refuse create, most kinds trash. */
+    private const NO_CREATE = ['menuItem', 'category', 'tag', 'user', 'extensionParams', 'templateStyle'];
+    private const TRASH = [
+        'article' => 'state', 'field' => 'state', 'banner' => 'state', 'bannerClient' => 'state',
+        'category' => 'published', 'tag' => 'published', 'menuItem' => 'published',
+        'redirect' => 'published', 'contact' => 'published', 'newsfeed' => 'published',
+        'module' => 'published',
+    ];
+
+    public function canCreate(string $kind): bool
+    {
+        return !in_array($kind, self::NO_CREATE, true);
+    }
+
+    public function trashColumn(string $kind): ?string
+    {
+        return self::TRASH[$kind] ?? null;
+    }
+
     public function read(string $kind, int $id): ?array
     {
         return $this->store[$kind][$id] ?? null;
@@ -886,7 +905,7 @@ check('a page carrying bodies is capped smaller',
     count($wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
         'params' => ['kind' => 'article', 'include_body' => true, 'limit' => 500]])['items']), 2);
 check('content.list refuses a kind it does not know',
-    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'user']])['error'], 'bad_params');
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'wombat']])['error'], 'bad_params');
 $got = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'article', 'id' => 3]]);
 check('content.get returns the full row', $got['item'], $writer->store['article'][3]);
 check('content.get names a missing row',
@@ -924,8 +943,46 @@ checkTrue('apply.list does not leak the before payload', !isset($list['steps'][0
 
 // refusals ------------------------------------------------------------------------------------
 $badKind = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
-    'params' => ['apply_id' => 'X', 'kind' => 'user', 'fields' => ['a' => 'b']]]);
+    'params' => ['apply_id' => 'X', 'kind' => 'wombat', 'fields' => ['a' => 'b']]]);
 check('an unknown kind is refused', $badKind['error'], 'bad_params');
+
+// ADR 0080: full catalog — generic actions over kinds ------------------------------------------
+
+// A menu item rename is a content edit: update lands, and revert restores the old title.
+$writer->store['menuItem'][101] = ['title' => 'Home', 'published' => 1];
+$menuUpd = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'M1', 'kind' => 'menuItem', 'id' => 101, 'fields' => ['title' => 'New Home']]]);
+check('a menu item can be renamed', $menuUpd['ok'], true);
+check('the rename landed', $writer->store['menuItem'][101]['title'], 'New Home');
+$menuRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M1']]);
+check('the rename reverts', $menuRevert['ok'], true);
+check('the old title is back', $writer->store['menuItem'][101]['title'], 'Home');
+
+// Tree-shaped kinds cannot be created through Apply — the refusal names the boundary.
+$menuCreate = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'M2', 'kind' => 'menuItem', 'fields' => ['title' => 'Brand new']]]);
+check('creating a menu item is refused', $menuCreate['error'], 'unsupported');
+$userCreate = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'M3', 'kind' => 'user', 'fields' => ['name' => 'Eve']]]);
+check('creating a user is refused', $userCreate['error'], 'unsupported');
+
+// content.delete is a trash write (-2), recorded like any edit, so it reverts.
+$writer->store['article'][55] = ['title' => 'Old post', 'state' => 1];
+$del = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'D1', 'kind' => 'article', 'id' => 55]]);
+check('content.delete trashes', $del['ok'], true);
+check('the row is in the trash, not gone', $writer->store['article'][55]['state'], -2);
+$delRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'D1']]);
+check('a delete reverts', $delRevert['ok'], true);
+check('the article is published again', $writer->store['article'][55]['state'], 1);
+
+// A kind with no trash column cannot be deleted through Apply at all.
+$delMenutype = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'D2', 'kind' => 'menutype', 'id' => 3]]);
+check('deleting a menutype is refused', $delMenutype['error'], 'unsupported');
+$delMissing = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'D3', 'kind' => 'article', 'id' => 9999]]);
+check('deleting a missing row says not_found', $delMissing['error'], 'not_found');
 
 $noApply = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['kind' => 'article', 'fields' => ['title' => 'x']]]);

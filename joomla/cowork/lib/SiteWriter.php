@@ -20,8 +20,37 @@
 
 interface SiteWriter
 {
-    /** The kinds of content an Apply may edit. A caller naming anything else is refused by the engine. */
-    public const KINDS = ['article', 'module', 'templateStyle'];
+    /**
+     * The kinds of content an Apply may edit. A caller naming anything else is refused by the
+     * engine. This is the FULL catalog (ADR 0080 §2): five generic actions × these kinds replace
+     * a tool-per-entity API — adding an entity later is one catalog row here plus one allowlist
+     * line at the relay, not a release train. Which ROLE may touch which kind is the relay's
+     * question (content / code / site toolsets); the component only enforces what a kind's write
+     * may look like.
+     */
+    public const KINDS = [
+        // content — the site's words and editorial structure
+        'article', 'category', 'tag', 'field', 'menuItem', 'menutype', 'redirect',
+        'banner', 'bannerClient', 'contact', 'newsfeed',
+        // code — can change markup/behaviour of the rendered site
+        'module', 'templateStyle',
+        // site — identity and configuration
+        'user', 'extensionParams',
+    ];
+
+    /**
+     * Whether an Apply may create (id 0) this kind. Tree-shaped kinds (menu items, categories,
+     * tags) say no for now — inserting into a nested set means placing a node, and a raw row
+     * insert would corrupt lft/rgt for the whole tree. Identity kinds (user) say no on principle.
+     */
+    public function canCreate(string $kind): bool;
+
+    /**
+     * The column that soft-deletes this kind (Joomla's trash, value -2), or null when the kind
+     * cannot be deleted through Apply at all. `content.delete` is a write to this column — which
+     * is what keeps it revertable through the same undo log as any other field change.
+     */
+    public function trashColumn(string $kind): ?string;
 
     /**
      * The current fields of one target, or null when nothing with that id exists.

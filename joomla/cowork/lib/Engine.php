@@ -132,6 +132,8 @@ final class Engine
                 return $this->contentGet($params);
             case 'content.update':
                 return $this->contentUpdate($params);
+            case 'content.delete':
+                return $this->contentDelete($params);
             case 'media.upload':
                 return $this->mediaUpload($params);
             case 'apply.revert':
@@ -662,6 +664,11 @@ final class Engine
             return $this->err('bad_params', 'fields required');
         }
         $id = max(0, (int) ($p['id'] ?? 0));
+        if ($id === 0 && !$this->writer->canCreate($kind)) {
+            // The refusal must NAME the boundary (ADR 0080 §4): the agent has no other door to
+            // wander to, so this sentence is all it gets to explain itself to the user.
+            return $this->err('unsupported', "a {$kind} cannot be created through Apply — only existing ones can be edited");
+        }
 
         try {
             $before = $this->writer->read($kind, $id); // null => this is an insert, so its undo is a delete
@@ -686,6 +693,64 @@ final class Engine
         $this->stamped('content');
 
         return $this->ok(['kind' => $kind, 'id' => $newId, 'created' => $before === null]);
+    }
+
+    /**
+     * Soft-delete one target: a write of -2 into the kind's trash column (Joomla's own trash),
+     * which is what keeps a delete revertable through the same undo log as any field edit —
+     * `apply.revert` restores the previous state because that column sits on the kind's
+     * whitelist. A kind with no trash column cannot be deleted through Apply at all: a menutype
+     * holds a whole menu, a user is an identity, a template style may be the one serving the
+     * home page. Hard deletes stay off this door on purpose.
+     */
+    private function contentDelete(array $p): array
+    {
+        if ($this->writer === null || $this->log === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        $trash = $this->writer->trashColumn($kind);
+        if ($trash === null) {
+            return $this->err('unsupported', "a {$kind} cannot be deleted through Apply");
+        }
+        $id = (int) ($p['id'] ?? 0);
+        if ($id <= 0) {
+            return $this->err('bad_params', 'id required');
+        }
+
+        try {
+            $before = $this->writer->read($kind, $id);
+            if ($before === null) {
+                return $this->err('not_found', "no {$kind} with id {$id}");
+            }
+            $this->writer->write($kind, $id, [$trash => -2]);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, ['op' => 'content', 'kind' => $kind, 'id' => $id, 'before' => $before]);
+        } catch (Throwable $e) {
+            $this->rollbackContent($kind, $id, $before);
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $e) {
+            // Best-effort by contract.
+        }
+
+        $this->stamped('content');
+
+        return $this->ok(['kind' => $kind, 'id' => $id, 'trashed' => true]);
     }
 
     /**
