@@ -196,7 +196,7 @@ final class JoomlaSiteWriter implements \SiteWriter
             'createColumns' => ['title', 'menutype', 'link', 'type', 'published', 'parent_id',
                 'browserNav', 'access', 'language', 'note', 'params'],
             'defaults'      => ['type' => 'url', 'published' => 1, 'access' => 1, 'language' => '*',
-                'browserNav' => 0, 'note' => '', 'params' => '{}', 'img' => '',
+                'browserNav' => 0, 'note' => '', 'params' => '{}', 'img' => '', 'path' => '',
                 'template_style_id' => 0, 'component_id' => 0, 'client_id' => 0],
             'require'       => ['title', 'menutype', 'link'],
         ],
@@ -206,7 +206,7 @@ final class JoomlaSiteWriter implements \SiteWriter
                 'params', 'metadesc', 'metakey', 'parent_id', 'extension'],
             'defaults'      => ['extension' => 'com_content', 'published' => 1, 'access' => 1,
                 'language' => '*', 'description' => '', 'note' => '', 'params' => '{}',
-                'metadesc' => '', 'metakey' => '', 'metadata' => '{}'],
+                'metadesc' => '', 'metakey' => '', 'metadata' => '{}', 'path' => ''],
             'require'       => ['title'],
         ],
         'tag' => [
@@ -216,7 +216,7 @@ final class JoomlaSiteWriter implements \SiteWriter
             'createColumns' => ['title', 'description', 'note', 'published', 'access', 'language', 'params'],
             'defaults'      => ['published' => 1, 'access' => 1, 'language' => '*',
                 'description' => '', 'note' => '', 'params' => '{}',
-                'metadesc' => '', 'metakey' => '', 'metadata' => '{}'],
+                'metadesc' => '', 'metakey' => '', 'metadata' => '{}', 'path' => ''],
             'require'       => ['title'],
         ],
     ];
