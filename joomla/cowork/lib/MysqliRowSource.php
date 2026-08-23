@@ -184,4 +184,13 @@ final class MysqliRowSource implements RowSource
         }
         return ['rows' => $rows, 'after' => $next];
     }
+
+    public function renameTable(string $from, string $to): void
+    {
+        $f = $this->db->real_escape_string($from);
+        $t = $this->db->real_escape_string($to);
+        if (!$this->db->query("RENAME TABLE `{$f}` TO `{$t}`")) {
+            throw new RuntimeException($this->db->error ?: 'rename failed');
+        }
+    }
 }

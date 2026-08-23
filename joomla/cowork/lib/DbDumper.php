@@ -47,6 +47,12 @@ final class DbDumper
         return $this->src->tableStats();
     }
 
+    /** RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). Never a DROP. */
+    public function renameTable(string $from, string $to): void
+    {
+        $this->src->renameTable($from, $to);
+    }
+
     /**
      * @param string $table  which table
      * @param int    $offset the row to start at

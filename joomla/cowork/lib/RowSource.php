@@ -85,4 +85,10 @@ interface RowSource
      * @return array{rows:array<int,array<int,?string>>, after:?array<int,?string>}
      */
     public function readRowsAfter(string $table, ?array $after, int $limit): array;
+
+    /**
+     * RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). A metadata operation: instant,
+     * no data copied, fully reversible by renaming back. This interface never drops a table.
+     */
+    public function renameTable(string $from, string $to): void;
 }

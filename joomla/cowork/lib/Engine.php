@@ -112,6 +112,10 @@ final class Engine
                 return $this->siteStats();
             case 'db.tables':
                 return $this->dbTables();
+            case 'db.cleanup':
+                return $this->dbCleanup($params);
+            case 'db.restore':
+                return $this->dbRestore($params);
             case 'db.dump':
                 return $this->dbDump($params);
             case 'files.list':
@@ -204,7 +208,131 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('dump_failed', $e->getMessage());
         }
-        return $this->ok(['tables' => $tables]);
+        // `details` rides beside `tables` rather than replacing it (ADR 0083 §4): every desk
+        // already deployed reads `tables: string[]`, and the row estimates are one query.
+        $details = [];
+        try {
+            $stats = $this->dumper->tableStats();
+            foreach ($tables as $name) {
+                $details[] = ['name' => $name, 'rows' => (int) ($stats[$name]['rows'] ?? 0)];
+            }
+        } catch (Throwable $e) {
+            $details = [];
+        }
+        return $this->ok(['tables' => $tables, 'details' => $details]);
+    }
+
+    /**
+     * The trash prefix of ADR 0083. A cleaned table keeps its whole old name after the second
+     * separator, which is what lets db.restore rebuild it without a ledger.
+     */
+    private const TRASH_PREFIX = '_tracy_trash_';
+
+    /**
+     * Core suffixes no cleanup may touch, matched against the end of the table name so the
+     * site's install-time prefix does not matter. Deny-side false positives (a third-party
+     * `foo_users`) are the safe direction: an extension table wrongly refused stays where it
+     * is, while a core table wrongly renamed takes the site down.
+     */
+    private const CORE_TABLE_SUFFIXES = [
+        '_users', '_session', '_extensions', '_assets', '_menu', '_menu_types', '_content',
+        '_categories', '_modules', '_template_styles', '_usergroups', '_user_usergroup_map',
+        '_schemas', '_update_sites', '_updates'
+    ];
+
+    /**
+     * Trash-not-drop cleanup (ADR 0083): each table is RENAMEd to
+     * `_tracy_trash_<YmdHis>__<old name>` — instant, reversible, never a DROP. Mechanics only
+     * are guarded here; whether a table truly is residue is the check's and the person's call.
+     */
+    private function dbCleanup(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        // Validate the WHOLE batch before renaming anything: half a cleanup is a worse state
+        // than no cleanup.
+        foreach ($tables as $table) {
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+            if (strpos($table, self::TRASH_PREFIX) === 0) {
+                return $this->err('bad_params', "table {$table} is already in the trash");
+            }
+            foreach (self::CORE_TABLE_SUFFIXES as $suffix) {
+                if (substr($table, -strlen($suffix)) === $suffix) {
+                    return $this->err('refused', "table {$table} looks like a core table");
+                }
+            }
+        }
+        $stamp = gmdate('YmdHis');
+        $renamed = [];
+        foreach ($tables as $table) {
+            $to = self::TRASH_PREFIX . $stamp . '__' . $table;
+            try {
+                $this->dumper->renameTable($table, $to);
+            } catch (Throwable $e) {
+                // Report exactly how far it got — the caller can restore or retry the rest.
+                return $this->err('rename_failed', $e->getMessage(), ['renamed' => $renamed]);
+            }
+            $renamed[] = ['from' => $table, 'to' => $to];
+        }
+        return $this->ok(['renamed' => $renamed]);
+    }
+
+    /** The way back out of the trash: rename to the original name parsed from the suffix. */
+    private function dbRestore(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        $plan = [];
+        foreach ($tables as $table) {
+            if (strpos($table, self::TRASH_PREFIX) !== 0) {
+                return $this->err('bad_params', "table {$table} is not in the trash");
+            }
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+            $rest = substr($table, strlen(self::TRASH_PREFIX));
+            $sep = strpos($rest, '__');
+            $original = $sep === false ? '' : substr($rest, $sep + 2);
+            if ($original === '') {
+                return $this->err('bad_params', "table {$table} does not carry its original name");
+            }
+            if (isset($existing[$original])) {
+                return $this->err('refused', "table {$original} already exists");
+            }
+            $plan[] = ['from' => $table, 'to' => $original];
+        }
+        $restored = [];
+        foreach ($plan as $step) {
+            try {
+                $this->dumper->renameTable($step['from'], $step['to']);
+            } catch (Throwable $e) {
+                return $this->err('rename_failed', $e->getMessage(), ['restored' => $restored]);
+            }
+            $restored[] = $step;
+        }
+        return $this->ok(['restored' => $restored]);
     }
 
     private function dbDump(array $p): array
@@ -1119,8 +1247,9 @@ final class Engine
         return array_merge(['ok' => true], $extra);
     }
 
-    private function err(string $code, string $message): array
+    /** @param array<string,mixed> $extra facts the caller needs even on failure (e.g. how far a batch got) */
+    private function err(string $code, string $message, array $extra = []): array
     {
-        return ['ok' => false, 'error' => $code, 'message' => $message];
+        return array_merge(['ok' => false, 'error' => $code, 'message' => $message], $extra);
     }
 }

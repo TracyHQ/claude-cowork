@@ -64,6 +64,18 @@ final class FakeRowSource implements RowSource
         return $out;
     }
 
+    public function renameTable(string $from, string $to): void
+    {
+        if (!isset($this->tables[$from])) {
+            throw new RuntimeException("table {$from} does not exist");
+        }
+        if (isset($this->tables[$to])) {
+            throw new RuntimeException("table {$to} already exists");
+        }
+        $this->tables[$to] = $this->tables[$from];
+        unset($this->tables[$from]);
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $rows = $this->tables[$table]['rows'] ?? [];

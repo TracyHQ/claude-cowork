@@ -383,6 +383,53 @@ $dbTablesResp = $engine->handle(['token' => $goodToken, 'action' => 'db.tables']
 check('engine db.tables ok', $dbTablesResp['ok'], true);
 check('engine db.tables lists source tables', $dbTablesResp['tables'], ['jos_menu', 'jos_empty']);
 
+checkTrue('engine db.tables carries row estimates', isset($dbTablesResp['details'][0]['rows']));
+check(
+    'engine db.tables details name their table',
+    array_map(function ($d) { return $d['name']; }, $dbTablesResp['details']),
+    ['jos_menu', 'jos_empty']
+);
+
+// ---- db.cleanup / db.restore (ADR 0083: trash by rename, never drop) ----
+
+$trashSource = new FakeRowSource([
+    'jos_users' => ['create' => 'CREATE TABLE `jos_users` (`id` int)', 'rows' => [['1']]],
+    'jos_sh404sef_urls' => ['create' => 'CREATE TABLE `jos_sh404sef_urls` (`id` int)', 'rows' => [['1'], ['2']]],
+    'jos_sh404sef_pageids' => ['create' => 'CREATE TABLE `jos_sh404sef_pageids` (`id` int)', 'rows' => [['1']]]
+]);
+$trashEngine = new Engine($goodToken, [], new DbDumper($trashSource));
+
+$refuseCore = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.cleanup', 'params' => ['tables' => ['jos_users']]]);
+check('db.cleanup refuses a core-looking table', $refuseCore['error'], 'refused');
+
+$refuseMissing = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.cleanup', 'params' => ['tables' => ['jos_nope']]]);
+check('db.cleanup refuses a missing table', $refuseMissing['error'], 'not_found');
+
+$cleanup = $trashEngine->handle([
+    'token' => $goodToken,
+    'action' => 'db.cleanup',
+    'params' => ['tables' => ['jos_sh404sef_urls', 'jos_sh404sef_pageids']]
+]);
+check('db.cleanup ok', $cleanup['ok'], true);
+check('db.cleanup renames the whole batch', count($cleanup['renamed']), 2);
+$trashName = $cleanup['renamed'][0]['to'];
+checkTrue('db.cleanup trash name carries the prefix', strpos($trashName, '_tracy_trash_') === 0);
+checkTrue('db.cleanup trash name keeps the old name', str_contains($trashName, '__jos_sh404sef_urls'));
+$afterCleanup = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.tables']);
+checkTrue('cleaned table left the name list', !in_array('jos_sh404sef_urls', $afterCleanup['tables'], true));
+
+$reTrash = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.cleanup', 'params' => ['tables' => [$trashName]]]);
+check('db.cleanup refuses a table already in the trash', $reTrash['error'], 'bad_params');
+
+$restore = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.restore', 'params' => ['tables' => [$trashName]]]);
+check('db.restore ok', $restore['ok'], true);
+check('db.restore rebuilds the original name', $restore['restored'][0]['to'], 'jos_sh404sef_urls');
+$afterRestore = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.tables']);
+checkTrue('restored table is back in the name list', in_array('jos_sh404sef_urls', $afterRestore['tables'], true));
+
+$restorePlain = $trashEngine->handle(['token' => $goodToken, 'action' => 'db.restore', 'params' => ['tables' => ['jos_sh404sef_urls']]]);
+check('db.restore refuses a table not in the trash', $restorePlain['error'], 'bad_params');
+
 $dbResp = $engine->handle(['token' => $goodToken, 'action' => 'db.dump', 'params' => ['table' => 'jos_menu', 'offset' => 0, 'limit' => 2]]);
 check('engine db.dump ok', $dbResp['ok'], true);
 check('engine db.dump rows', $dbResp['rows'], 2);
