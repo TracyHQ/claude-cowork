@@ -347,7 +347,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         'tag'             => ['id', 'title', 'alias', 'path', 'parent_id', 'level', 'published', 'language'],
         'field'           => ['id', 'title', 'name', 'label', 'type', 'context', 'state', 'required', 'language'],
         'menuItem'        => ['id', 'menutype', 'title', 'alias', 'path', 'link', 'type', 'published',
-            'parent_id', 'level', 'ordering', 'language', 'client_id'],
+            'parent_id', 'level', 'language', 'client_id'],
         'menutype'        => ['id', 'menutype', 'title', 'description'],
         'redirect'        => ['id', 'old_url', 'new_url', 'published', 'header', 'hits'],
         'banner'          => ['id', 'name', 'alias', 'catid', 'state', 'clickurl', 'sticky', 'language'],
