@@ -751,8 +751,10 @@ final class FakeSiteWriter implements SiteWriter
     private int $nextId = 100;
     public int $purges = 0;
 
-    /** Mirrors the real catalog's shape: tree/identity kinds refuse create, most kinds trash. */
-    private const NO_CREATE = ['menuItem', 'category', 'tag', 'user', 'extensionParams', 'templateStyle'];
+    /** Mirrors the real catalog's shape: identity/installer kinds refuse create, most kinds trash.
+     * Tree kinds (menuItem/category/tag) create since 0.8.14 — the real writer routes them
+     * through Joomla's Table API; here a plain insert stands in for it. */
+    private const NO_CREATE = ['user', 'extensionParams', 'templateStyle'];
     private const TRASH = [
         'article' => 'state', 'field' => 'state', 'banner' => 'state', 'bannerClient' => 'state',
         'category' => 'published', 'tag' => 'published', 'menuItem' => 'published',
@@ -958,10 +960,21 @@ $menuRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 
 check('the rename reverts', $menuRevert['ok'], true);
 check('the old title is back', $writer->store['menuItem'][101]['title'], 'Home');
 
-// Tree-shaped kinds cannot be created through Apply — the refusal names the boundary.
+// Tree-shaped kinds create through the Table path (0.8.14): the insert lands, and reverting
+// deletes the node this run made — the tree returns to exactly its prior shape.
 $menuCreate = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
-    'params' => ['apply_id' => 'M2', 'kind' => 'menuItem', 'fields' => ['title' => 'Brand new']]]);
-check('creating a menu item is refused', $menuCreate['error'], 'unsupported');
+    'params' => ['apply_id' => 'M2', 'kind' => 'menuItem',
+        'fields' => ['title' => 'Tracy', 'menutype' => 'mainmenu', 'link' => 'https://tracy.ai']]]);
+check('creating a menu item lands', $menuCreate['ok'], true);
+checkTrue('the create minted an id', ($menuCreate['id'] ?? 0) > 0);
+check('the create says created', $menuCreate['created'], true);
+$createdId = (int) $menuCreate['id'];
+check('the new item is in the store', $writer->store['menuItem'][$createdId]['title'], 'Tracy');
+$menuCreateRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M2']]);
+check('a create reverts', $menuCreateRevert['ok'], true);
+checkTrue('the reverted node is gone', !isset($writer->store['menuItem'][$createdId]));
+
+// Identity kinds still refuse create — the boundary moved to where it belongs, not away.
 $userCreate = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['apply_id' => 'M3', 'kind' => 'user', 'fields' => ['name' => 'Eve']]]);
 check('creating a user is refused', $userCreate['error'], 'unsupported');

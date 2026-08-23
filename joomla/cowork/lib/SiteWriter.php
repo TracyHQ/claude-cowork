@@ -40,8 +40,9 @@ interface SiteWriter
 
     /**
      * Whether an Apply may create (id 0) this kind. Tree-shaped kinds (menu items, categories,
-     * tags) say no for now — inserting into a nested set means placing a node, and a raw row
-     * insert would corrupt lft/rgt for the whole tree. Identity kinds (user) say no on principle.
+     * tags) say yes since 0.8.14 — the implementation places the node through Joomla's Table
+     * API, never a raw insert, so lft/rgt/path/alias come out as an admin save would make them.
+     * Identity kinds (user) and installer-owned rows (extensionParams) say no on principle.
      */
     public function canCreate(string $kind): bool;
 

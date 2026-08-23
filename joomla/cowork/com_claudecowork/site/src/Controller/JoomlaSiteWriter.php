@@ -46,10 +46,11 @@ final class JoomlaSiteWriter implements \SiteWriter
      *
      * Per-kind keys beyond table/columns:
      *  - `pk`     primary-key column when it is not `id` (extensionParams → extension_id).
-     *  - `create` whether id-0 insert is allowed. Tree-shaped kinds (menuItem/category/tag) say
-     *    no: their rows sit in a nested set, and a raw insert corrupts lft/rgt for the whole
-     *    tree — creating them arrives later through Joomla's Table API. `user` says no on
-     *    principle; `extensionParams` rows are made by installers, not applies.
+     *  - `create` whether id-0 RAW insert is allowed. Tree-shaped kinds (menuItem/category/tag)
+     *    say no here and forever: their rows sit in a nested set a raw insert would corrupt.
+     *    They are still creatable — through {@see self::NESTED}, where Joomla's own Table API
+     *    places the node. `user` says no on principle; `extensionParams` rows are made by
+     *    installers, not applies.
      *  - `trash`  the soft-delete column (-2), or absent when the kind cannot be deleted through
      *    Apply (a menutype holds a whole menu; a user is an identity; a template style may be
      *    the home style).
@@ -173,6 +174,53 @@ final class JoomlaSiteWriter implements \SiteWriter
         ],
     ];
 
+    /**
+     * Tree-shaped kinds and the Joomla Table class that owns their nested set. Creating one goes
+     * through these, never a raw INSERT: the Table computes the lft/rgt placement, generates the
+     * alias from the title, rebuilds the path chain and (for categories) writes the `#__assets`
+     * row — the same code path as an admin saving the same form, which is what makes this safe
+     * on a live tree. `createColumns` is the create-time whitelist, wider than the raw-update
+     * whitelist above because a new node must name its place (parent_id, menutype, link) while a
+     * later update still may not move or re-alias it: moving is a placement decision the Table
+     * must make, and stays a deliberate debt (ADR 0080).
+     *
+     * menuItem keeps `client_id` 0 in defaults and OUT of createColumns, so an Apply can never
+     * mint admin-menu furniture. `component_id` is resolved from the link when type=component —
+     * a menu item pointing at a component renders through that id, not the link string.
+     *
+     * @var array<string,array<string,mixed>>
+     */
+    private const NESTED = [
+        'menuItem' => [
+            'class'         => \Joomla\CMS\Table\Menu::class,
+            'createColumns' => ['title', 'menutype', 'link', 'type', 'published', 'parent_id',
+                'browserNav', 'access', 'language', 'note', 'params'],
+            'defaults'      => ['type' => 'url', 'published' => 1, 'access' => 1, 'language' => '*',
+                'browserNav' => 0, 'note' => '', 'params' => '{}', 'img' => '',
+                'template_style_id' => 0, 'component_id' => 0, 'client_id' => 0],
+            'require'       => ['title', 'menutype', 'link'],
+        ],
+        'category' => [
+            'class'         => \Joomla\CMS\Table\Category::class,
+            'createColumns' => ['title', 'description', 'note', 'published', 'access', 'language',
+                'params', 'metadesc', 'metakey', 'parent_id', 'extension'],
+            'defaults'      => ['extension' => 'com_content', 'published' => 1, 'access' => 1,
+                'language' => '*', 'description' => '', 'note' => '', 'params' => '{}',
+                'metadesc' => '', 'metakey' => '', 'metadata' => '{}'],
+            'require'       => ['title'],
+        ],
+        'tag' => [
+            // Fully-qualified string, not ::class — com_tags is a component and its admin
+            // namespace may be absent on a stripped install; class_exists() gates the attempt.
+            'class'         => 'Joomla\\Component\\Tags\\Administrator\\Table\\TagTable',
+            'createColumns' => ['title', 'description', 'note', 'published', 'access', 'language', 'params'],
+            'defaults'      => ['published' => 1, 'access' => 1, 'language' => '*',
+                'description' => '', 'note' => '', 'params' => '{}',
+                'metadesc' => '', 'metakey' => '', 'metadata' => '{}'],
+            'require'       => ['title'],
+        ],
+    ];
+
     private DatabaseInterface $db;
 
     public function __construct(DatabaseInterface $db)
@@ -183,7 +231,7 @@ final class JoomlaSiteWriter implements \SiteWriter
     public function canCreate(string $kind): bool
     {
         $this->tableFor($kind); // validates the kind
-        return (bool) (self::MAP[$kind]['create'] ?? false);
+        return isset(self::NESTED[$kind]) || (bool) (self::MAP[$kind]['create'] ?? false);
     }
 
     public function trashColumn(string $kind): ?string
@@ -231,6 +279,13 @@ final class JoomlaSiteWriter implements \SiteWriter
         $tags = array_key_exists('tags', $fields) && is_array($fields['tags']) ? $fields['tags'] : null;
         unset($fields['tags']);
         [$table, $allowed] = [$this->tableFor($kind), self::MAP[$kind]['columns']];
+
+        // A new node in a tree is placed by Joomla's Table, not by this class's raw path — and
+        // this branch comes before the raw whitelist because create-time fields (menutype, link,
+        // parent_id) are exactly the ones an update may not touch.
+        if ($id <= 0 && isset(self::NESTED[$kind])) {
+            return $this->createNested($kind, $fields);
+        }
 
         $object = new \stdClass();
         foreach ($fields as $column => $value) {
@@ -416,10 +471,83 @@ final class JoomlaSiteWriter implements \SiteWriter
         return $rows;
     }
 
+    /**
+     * Create one tree node through Joomla's own Table class — bind, check, store, rebuildPath —
+     * so the alias, the lft/rgt placement, the path chain and the assets row all come out exactly
+     * as an admin save would produce them. Throws with the Table's own error text on refusal;
+     * the engine turns that into a failed (and rolled-back) apply.
+     */
+    private function createNested(string $kind, array $fields): int
+    {
+        $def = self::NESTED[$kind];
+        if (!class_exists($def['class'])) {
+            throw new \RuntimeException("kind {$kind} needs a Joomla table class this site does not ship");
+        }
+        foreach ($def['require'] as $column) {
+            if (trim((string) ($fields[$column] ?? '')) === '') {
+                throw new \RuntimeException("creating a {$kind} needs {$column}");
+            }
+        }
+
+        $data = $def['defaults'];
+        foreach ($fields as $column => $value) {
+            if (\in_array($column, $def['createColumns'], true)) {
+                $data[$column] = $value;
+            }
+        }
+        // Root of every Joomla nested set is id 1; a missing or nonsense parent lands there.
+        $parentId = max(1, (int) ($data['parent_id'] ?? 1));
+        unset($data['parent_id']);
+        if ($kind === 'menuItem' && ($data['type'] ?? '') === 'component') {
+            $data['component_id'] = $this->componentIdFor((string) ($data['link'] ?? ''));
+        }
+
+        /** @var \Joomla\CMS\Table\Nested $table */
+        $table = new $def['class']($this->db);
+        $table->setLocation($parentId, 'last-child');
+        if (!$table->bind($data) || !$table->check() || !$table->store()) {
+            throw new \RuntimeException($table->getError() ?: "could not create {$kind}");
+        }
+        $id = (int) $table->id;
+        $table->rebuildPath($id);
+        return $id;
+    }
+
+    /** The `#__extensions` id behind a component link, so a created menu item routes like a real one. */
+    private function componentIdFor(string $link): int
+    {
+        if (!preg_match('/option=([a-z0-9_]+)/i', $link, $m)) {
+            return 0;
+        }
+        $element = $m[1];
+        $query = $this->db->getQuery(true)
+            ->select($this->db->quoteName('extension_id'))
+            ->from($this->db->quoteName('#__extensions'))
+            ->where($this->db->quoteName('type') . ' = ' . $this->db->quote('component'))
+            ->where($this->db->quoteName('element') . ' = :element')
+            ->bind(':element', $element, ParameterType::STRING);
+        return (int) ($this->db->setQuery($query)->loadResult() ?? 0);
+    }
+
     public function delete(string $kind, int $id): void
     {
         $table = $this->tableFor($kind);
         if ($id <= 0) {
+            return;
+        }
+        // A tree node leaves through the Table too: Nested::delete() closes the lft/rgt gap a
+        // raw DELETE would leave open. Only ever called to reverse a create this run made, so
+        // the node has no children. A missing Table class means the create failed the same way
+        // and there is nothing to remove.
+        if (isset(self::NESTED[$kind])) {
+            $class = self::NESTED[$kind]['class'];
+            if (class_exists($class)) {
+                /** @var \Joomla\CMS\Table\Nested $node */
+                $node = new $class($this->db);
+                if ($node->load($id)) {
+                    $node->delete($id);
+                }
+            }
             return;
         }
         $query = $this->db->getQuery(true)
