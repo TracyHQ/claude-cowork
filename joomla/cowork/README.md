@@ -16,10 +16,12 @@ an empty token refuses every request.
 
 | Actions | |
 | --- | --- |
-| `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. |
-| `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
-| `content.update`, `media.upload` | Editing an article's fields, a module's content or a template style's params — whitelisted columns only; and putting a file under `images/` or `media/`. |
+| `info`, `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list`, `core.manifest` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. `core.manifest` is the site's own record of which extensions are CMS core (ADR 0070 addendum). |
+| `content.list`, `content.get` | The read half of the content mirror (ADR 0071): paged summaries with checksums, then full rows — the same bytes an apply will compare against. |
+| `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): fifteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
+| `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
+| `core.upgrade`, `files.restore` | The migration hop (prepare/finalise toward a supported Joomla) and restoring a webroot from a signed URL — operational, outside the undo log like install. |
 
 An install is deliberately **not** in the undo log: installing is additive, and Joomla owns the
 uninstall. `extension.list` reports what is already there, so a caller can tell "already
