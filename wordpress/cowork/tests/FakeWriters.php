@@ -50,6 +50,25 @@ final class FakeSiteWriter implements SiteWriter
         unset($this->store[$kind][$this->slot($id, $key)]);
     }
 
+    /** @var array<int,string> Rows this fake sent to the trash, in order. */
+    public array $trashed = [];
+
+    public function canTrash(string $kind): bool
+    {
+        return in_array($kind, ['post', 'templatePart'], true);
+    }
+
+    public function trash(string $kind, int $id): void
+    {
+        $this->trashed[] = "{$kind}:{$id}";
+        // Trashed, not gone: the row stays where the real WordPress keeps it, with a status a
+        // revert can write back over.
+        $slot = $this->slot($id, '');
+        if (isset($this->store[$kind][$slot])) {
+            $this->store[$kind][$slot]['post_status'] = 'trash';
+        }
+    }
+
     public function purgeCache(): void
     {
         $this->purges++;

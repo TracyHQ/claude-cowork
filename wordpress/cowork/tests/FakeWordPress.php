@@ -31,6 +31,13 @@ final class WP_Fake
     public static int $nextId = 500;
     /** @var array<string,string[]> "postId:taxonomy" => term names */
     public static array $terms = [];
+    /** @var array<int,array<string,mixed>> term_id => row */
+    public static array $termRows = [];
+    /** @var array<int,int> menu item id => menu term id */
+    public static array $menuOf = [];
+    /** @var int[] */
+    public static array $trashed = [];
+    public static int $nextTermId = 900;
     /** The active theme, which is what a template-part override has to be filed under. */
     public static string $stylesheet = 'tracy';
 
@@ -41,6 +48,10 @@ final class WP_Fake
         self::$options = [];
         self::$cleaned = [];
         self::$terms = [];
+        self::$termRows = [];
+        self::$menuOf = [];
+        self::$trashed = [];
+        self::$nextTermId = 900;
         self::$stylesheet = 'tracy';
         self::$nextId = 500;
     }
@@ -222,4 +233,99 @@ function get_posts(array $args = []): array
         $out[] = $post;
     }
     return $out;
+}
+
+// ---- taxonomy terms and menu entries -------------------------------------------------------
+
+function taxonomy_exists(string $taxonomy): bool
+{
+    return in_array($taxonomy, ['category', 'post_tag', 'nav_menu', 'wp_theme', 'wp_template_part_area'], true);
+}
+
+function get_term(int $id, string $taxonomy = '')
+{
+    $row = WP_Fake::$termRows[$id] ?? null;
+    if ($row === null || ('' !== $taxonomy && $row['taxonomy'] !== $taxonomy)) {
+        return null;
+    }
+    return (object) $row;
+}
+
+function get_term_by(string $field, $value, string $taxonomy = '')
+{
+    foreach (WP_Fake::$termRows as $row) {
+        if ('' !== $taxonomy && $row['taxonomy'] !== $taxonomy) {
+            continue;
+        }
+        if (($row[$field] ?? null) === $value) {
+            return (object) $row;
+        }
+    }
+    return false;
+}
+
+function wp_insert_term(string $name, string $taxonomy, array $args = [])
+{
+    $id = WP_Fake::$nextTermId++;
+    WP_Fake::$termRows[$id] = [
+        'term_id' => $id,
+        'name' => $name,
+        'slug' => (string) ($args['slug'] ?? strtolower(str_replace(' ', '-', $name))),
+        'description' => (string) ($args['description'] ?? ''),
+        'parent' => (int) ($args['parent'] ?? 0),
+        'taxonomy' => $taxonomy,
+    ];
+    return ['term_id' => $id];
+}
+
+function wp_update_term(int $id, string $taxonomy, array $args = [])
+{
+    if (!isset(WP_Fake::$termRows[$id])) {
+        return new WP_Error("no such term: {$id}");
+    }
+    foreach (['name', 'slug', 'description', 'parent'] as $f) {
+        if (array_key_exists($f, $args)) {
+            WP_Fake::$termRows[$id][$f] = $args[$f];
+        }
+    }
+    return ['term_id' => $id];
+}
+
+function wp_delete_term(int $id, string $taxonomy): bool
+{
+    unset(WP_Fake::$termRows[$id]);
+    return true;
+}
+
+function wp_trash_post(int $id)
+{
+    if (!isset(WP_Fake::$posts[$id])) {
+        return false;
+    }
+    WP_Fake::$posts[$id]['post_status'] = 'trash';
+    WP_Fake::$trashed[] = $id;
+    return WP_Fake::$posts[$id];
+}
+
+/**
+ * WordPress's own writer for a menu entry, faked down to what the caller can observe: a
+ * `nav_menu_item` post plus the five meta keys that say where it points.
+ */
+function wp_update_nav_menu_item(int $menuId, int $itemId = 0, array $args = [])
+{
+    $id = $itemId > 0 ? $itemId : WP_Fake::$nextId++;
+    WP_Fake::$posts[$id] = [
+        'ID' => $id,
+        'post_type' => 'nav_menu_item',
+        'post_title' => (string) ($args['menu-item-title'] ?? ''),
+        'post_status' => (string) ($args['menu-item-status'] ?? 'draft'),
+        'menu_order' => (int) ($args['menu-item-position'] ?? 0),
+    ];
+    WP_Fake::$meta[$id . ':_menu_item_type'] = (string) ($args['menu-item-type'] ?? 'custom');
+    WP_Fake::$meta[$id . ':_menu_item_object'] = (string) ($args['menu-item-object'] ?? '');
+    WP_Fake::$meta[$id . ':_menu_item_object_id'] = (int) ($args['menu-item-object-id'] ?? 0);
+    WP_Fake::$meta[$id . ':_menu_item_url'] = (string) ($args['menu-item-url'] ?? '');
+    WP_Fake::$meta[$id . ':_menu_item_menu_item_parent'] = (int) ($args['menu-item-parent-id'] ?? 0);
+    WP_Fake::$menuOf[$id] = $menuId;
+    return $id;
 }

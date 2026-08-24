@@ -145,4 +145,24 @@ final class FakeRowSource implements RowSource
         }
         return 0;
     }
+
+    public function renameTable(string $from, string $to): void
+    {
+        if (!isset($this->tables[$from])) {
+            throw new RuntimeException("table {$from} does not exist");
+        }
+        if (isset($this->tables[$to])) {
+            throw new RuntimeException("table {$to} already exists");
+        }
+        $this->tables[$to] = $this->tables[$from];
+        unset($this->tables[$from]);
+    }
+
+    public function dropTable(string $table): void
+    {
+        if (!isset($this->tables[$table])) {
+            throw new RuntimeException("table {$table} does not exist");
+        }
+        unset($this->tables[$table]);
+    }
 }

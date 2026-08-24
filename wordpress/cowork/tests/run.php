@@ -1050,5 +1050,178 @@ checkTrue('and one with no content is refused too',
 WP_Fake::reset();
 
 
+// ---------------------------------------------------------------- content.delete --
+
+// WordPress could create and edit and never remove. Joomla has had `content.delete` from the
+// start; this is the same concept mapped onto the mechanism WordPress actually has — its own
+// trash, which keeps the page recoverable from the admin screens long after this Apply's revert
+// window closes. Tracy is never the only way back from a delete.
+
+$writer->store = [];
+$writer->trashed = [];
+$writer->write('post', 7, ['post_title' => 'Old news', 'post_status' => 'publish']);
+
+$del = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'd1', 'kind' => 'post', 'id' => 7]]);
+check('a post can be deleted', $del['ok'], true);
+check('and it went to the trash rather than being erased', $writer->trashed, ['post:7']);
+
+// The before-state is what makes it reversible, and it is read BEFORE the trash so the undo
+// carries the status the page actually had.
+$entries = $log->entries('d1');
+check('the delete is recorded under its apply_id', count($entries), 1);
+check('with the row as it stood', $entries[0]['before']['post_title'], 'Old news');
+check('including the status a revert has to put back', $entries[0]['before']['post_status'], 'publish');
+
+// Configuration has no trash to sit in. Refused with a sentence rather than throwing halfway.
+$refused = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'd2', 'kind' => 'option', 'key' => 'blogname']]);
+check('an option cannot be deleted', $refused['error'], 'unsupported');
+check('and it says so in words', str_contains((string) $refused['message'], 'cannot be deleted'), true);
+
+$missing = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'd3', 'kind' => 'post', 'id' => 404]]);
+check('deleting something absent is not_found, not a silent success', $missing['error'], 'not_found');
+check('and nothing was trashed for it', $writer->trashed, ['post:7']);
+
+$noId = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.delete',
+    'params' => ['apply_id' => 'd4', 'kind' => 'post']]);
+check('a delete with no id is refused', $noId['ok'], false);
+
+$writer->store = [];
+$writer->trashed = [];
+
+
+// ------------------------------------------------------- term and menuItem --
+
+// Joomla edits a category as a row and a menu as another. WordPress keeps both in taxonomies, so
+// a plugin that only wrote posts and options could rename neither — and a WordPress menu is a
+// `nav_menu` term with `nav_menu_item` posts hanging off it, which is two shapes and therefore
+// two kinds rather than one kind pretending.
+
+WP_Fake::reset();
+$tw = new Claude_Cowork_Site_Writer();
+
+$catId = $tw->write('term', 0, ['name' => 'Guides', 'slug' => 'guides'], 'category');
+checkTrue('a category can be created', $catId > 0);
+check('and reads back with what an undo would restore', $tw->read('term', $catId, 'category'), [
+    'name' => 'Guides', 'slug' => 'guides', 'description' => '', 'parent' => 0,
+]);
+
+$tw->write('term', $catId, ['name' => 'How-to guides'], 'category');
+$renamed = $tw->read('term', $catId, 'category');
+check('renaming keeps the slug, because a slug is an address', $renamed['slug'], 'guides');
+check('and the new name is there', $renamed['name'], 'How-to guides');
+
+// A taxonomy the site never registered is refused. WordPress would happily file a term in a
+// vocabulary nothing reads, and the caller would be told it worked and see nothing anywhere.
+$refused = null;
+try {
+    $tw->write('term', 0, ['name' => 'x'], 'categories');
+} catch (Throwable $e) {
+    $refused = $e->getMessage();
+}
+checkTrue('a mistyped taxonomy is refused, naming it', is_string($refused) && str_contains($refused, 'categories'));
+
+$refused = null;
+try {
+    $tw->write('term', 0, ['slug' => 'nameless'], 'category');
+} catch (Throwable $e) {
+    $refused = $e->getMessage();
+}
+checkTrue('a new term with no name is refused', is_string($refused) && str_contains($refused, 'name'));
+
+// A term cannot be deleted through Apply, and that is a decision rather than an omission:
+// re-creating one mints a NEW id, and every post filed under the old one loses its category.
+check('a term cannot be deleted through Apply', $tw->canTrash('term'), false);
+
+// --- menu entries ---
+
+WP_Fake::$termRows[901] = ['term_id' => 901, 'name' => 'Primary', 'slug' => 'primary',
+    'description' => '', 'parent' => 0, 'taxonomy' => 'nav_menu'];
+
+$itemId = $tw->write('menuItem', 0, ['title' => 'Pricing', 'url' => '/pricing/'], 'primary');
+checkTrue('a menu entry can be created', $itemId > 0);
+$item = $tw->read('menuItem', $itemId);
+check('it carries the title', $item['title'], 'Pricing');
+// The destination lives in meta, not in the row. A kind that wrote only the row would produce an
+// entry that renders as a link to nowhere.
+check('and the destination, which lives in meta rather than the row', $item['url'], '/pricing/');
+check('published, because a menu entry nobody can see is not an entry',
+    WP_Fake::$posts[$itemId]['post_status'], 'publish');
+check('and it belongs to the menu it was written into', WP_Fake::$menuOf[$itemId], 901);
+
+// An edit that only moves an entry must not blank the link it points at.
+$tw->write('menuItem', $itemId, ['position' => 3], 'primary');
+$moved = $tw->read('menuItem', $itemId);
+check('moving an entry keeps its destination', $moved['url'], '/pricing/');
+check('and its title', $moved['title'], 'Pricing');
+check('while the position changed', $moved['position'], 3);
+
+$refused = null;
+try {
+    $tw->write('menuItem', 0, ['title' => 'x'], 'no-such-menu');
+} catch (Throwable $e) {
+    $refused = $e->getMessage();
+}
+checkTrue('writing into a menu that does not exist is refused, naming it',
+    is_string($refused) && str_contains($refused, 'no-such-menu'));
+
+check('a menu entry can be removed', $tw->canTrash('menuItem'), true);
+$tw->trash('menuItem', $itemId);
+check('and it is gone rather than trashed, because a trashed entry still renders',
+    isset(WP_Fake::$posts[$itemId]), false);
+
+WP_Fake::reset();
+
+
+// ------------------------------------------- db.cleanup / db.restore / db.purge --
+
+// Joomla has retired residue tables since ADR 0083; WordPress could not, and a WordPress site is
+// no cleaner after a few years of installing and removing plugins. Same mechanism — rename into
+// a trash name, never a DROP — with the ONE thing that could not be ported: the list of tables
+// that must never be touched. The two CMSs share no table names at all.
+
+$trashSource = new FakeRowSource([
+    'wp_posts'      => ['create' => 'CREATE TABLE `wp_posts` (`ID` int)', 'rows' => [['1']]],
+    'wp_postmeta'   => ['create' => 'CREATE TABLE `wp_postmeta` (`meta_id` int)', 'rows' => [['1']]],
+    'wp_yoast_junk' => ['create' => 'CREATE TABLE `wp_yoast_junk` (`id` int)', 'rows' => [['1'], ['2']]],
+    'wp_old_slider' => ['create' => 'CREATE TABLE `wp_old_slider` (`id` int)', 'rows' => [['1']]],
+]);
+$trashEngine = new Engine($WTOKEN, [], new DbDumper($trashSource));
+
+// The check that had to be rewritten rather than copied: `wp_postmeta` holds every page's SEO and
+// builder payload, and a Joomla list would have waved it straight through.
+check('cleanup refuses a WordPress core table',
+    $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.cleanup',
+        'params' => ['tables' => ['wp_postmeta']]])['error'], 'refused');
+check('and refuses a missing one',
+    $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.cleanup',
+        'params' => ['tables' => ['wp_nope']]])['error'], 'not_found');
+
+$cleanup = $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.cleanup',
+    'params' => ['tables' => ['wp_yoast_junk', 'wp_old_slider']]]);
+check('residue tables are retired', $cleanup['ok'], true);
+check('the whole batch at once', count($cleanup['renamed']), 2);
+$trashName = $cleanup['renamed'][0]['to'];
+checkTrue('into a trash name', strpos($trashName, '_tracy_trash_') === 0);
+checkTrue('that keeps the old name, so a person can see what it was',
+    str_contains($trashName, '__wp_yoast_junk'));
+checkTrue('and the table is out of the list',
+    !in_array('wp_yoast_junk', $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.tables'])['tables'], true));
+
+// Reversible is the whole point of renaming rather than dropping.
+$restored = $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.restore',
+    'params' => ['tables' => [$trashName]]]);
+check('a retired table comes back', $restored['ok'], true);
+checkTrue('under the name it had',
+    in_array('wp_yoast_junk', $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.tables'])['tables'], true));
+
+// Purge is the one destructive action here, so it may only ever point at the trash.
+check('purge refuses anything that is not in the trash',
+    $trashEngine->handle(['token' => $WTOKEN, 'action' => 'db.purge',
+        'params' => ['tables' => ['wp_yoast_junk']]])['error'], 'refused');
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
