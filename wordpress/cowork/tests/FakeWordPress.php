@@ -29,6 +29,10 @@ final class WP_Fake
     /** @var array<int,int> */
     public static array $cleaned = [];
     public static int $nextId = 500;
+    /** @var array<string,string[]> "postId:taxonomy" => term names */
+    public static array $terms = [];
+    /** The active theme, which is what a template-part override has to be filed under. */
+    public static string $stylesheet = 'tracy';
 
     public static function reset(): void
     {
@@ -36,6 +40,8 @@ final class WP_Fake
         self::$meta = [];
         self::$options = [];
         self::$cleaned = [];
+        self::$terms = [];
+        self::$stylesheet = 'tracy';
         self::$nextId = 500;
     }
 }
@@ -143,4 +149,77 @@ function clean_post_cache(int $id): void
 function wp_cache_delete(string $key, string $group = ''): bool
 {
     return true;
+}
+
+// ---- what a template-part override needs, and nothing this fake did not already owe ----------
+
+/**
+ * Enough of a post object for code that reads `->ID` and `->post_content`. WordPress's own class
+ * carries fifty fields; the writer touches four, and inventing the rest would be a fake of a fake.
+ */
+class WP_Post
+{
+    public int $ID = 0;
+    public string $post_title = '';
+    public string $post_content = '';
+    public string $post_name = '';
+    public string $post_status = '';
+    public string $post_type = '';
+}
+
+function get_stylesheet(): string
+{
+    return WP_Fake::$stylesheet;
+}
+
+function wp_set_object_terms(int $id, $terms, string $taxonomy, bool $append = false): array
+{
+    $names = is_array($terms) ? $terms : [$terms];
+    $key = $id . ':' . $taxonomy;
+    WP_Fake::$terms[$key] = $append ? array_merge(WP_Fake::$terms[$key] ?? [], $names) : $names;
+    return WP_Fake::$terms[$key];
+}
+
+function wp_get_object_terms(int $id, string $taxonomy, array $args = []): array
+{
+    return WP_Fake::$terms[$id . ':' . $taxonomy] ?? [];
+}
+
+/**
+ * The one query this code makes: a post of a given type and slug, filed under a given term.
+ * Only the arguments the writer actually sends are honoured — a fake that pretended to
+ * understand the rest of WP_Query would be lying about what is covered.
+ */
+function get_posts(array $args = []): array
+{
+    $type = (string) ($args['post_type'] ?? 'post');
+    $name = (string) ($args['name'] ?? '');
+    $wantTerm = null;
+    foreach ((array) ($args['tax_query'] ?? []) as $clause) {
+        if (($clause['taxonomy'] ?? '') === 'wp_theme') {
+            $wantTerm = (string) ($clause['terms'] ?? '');
+        }
+    }
+
+    $out = [];
+    foreach (WP_Fake::$posts as $id => $row) {
+        if (($row['post_type'] ?? '') !== $type) {
+            continue;
+        }
+        if ('' !== $name && ($row['post_name'] ?? '') !== $name) {
+            continue;
+        }
+        if (null !== $wantTerm && !in_array($wantTerm, WP_Fake::$terms[$id . ':wp_theme'] ?? [], true)) {
+            continue;
+        }
+        $post = new WP_Post();
+        $post->ID = (int) $id;
+        $post->post_title = (string) ($row['post_title'] ?? '');
+        $post->post_content = (string) ($row['post_content'] ?? '');
+        $post->post_name = (string) ($row['post_name'] ?? '');
+        $post->post_status = (string) ($row['post_status'] ?? '');
+        $post->post_type = (string) ($row['post_type'] ?? '');
+        $out[] = $post;
+    }
+    return $out;
 }

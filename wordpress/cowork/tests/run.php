@@ -937,5 +937,118 @@ check('content.get requires an id', $wEngine->handle(['token' => $WTOKEN, 'actio
     'params' => []])['error'], 'bad_params');
 $writer->posts = [];
 
+// --------------------------------------------- the guard against dying silently --
+
+// A fatal is the one failure the engine's own try/catch cannot reach: memory exhausted, a
+// timeout, a stack overflow. PHP prints its notice and stops, so what leaves the site is not
+// JSON — and the relay turns that into a bare COMPONENT_BAD_RESPONSE with the cause thrown away.
+// Measured 24/08/2026 on tracy.ai: two writes died this way, ninety minutes apart, and both
+// arrived as the same 502 while the fatal named its file and line the whole time.
+//
+// The judgement is kept apart from the printing precisely so it can be checked here, with no
+// web server, no shutdown and no real fatal — `payloadFor()` decides, `arm()` only prints.
+require_once __DIR__ . '/../lib/FatalGuard.php';
+
+$answer = FatalGuard::payloadFor([
+    'type'    => E_ERROR,
+    'message' => 'Allowed memory size of 134217728 bytes exhausted',
+    'file'    => '/var/www/html/wp-includes/post.php',
+    'line'    => 4210,
+]);
+check('a fatal answers as a refusal, not as silence', $answer['ok'] ?? null, false);
+check('and is named as a fatal, so it is not mistaken for a refused write', $answer['error'] ?? null, 'fatal');
+checkTrue(
+    'the message keeps the file and line, which is the whole point of the line',
+    str_contains((string) ($answer['message'] ?? ''), 'wp-includes/post.php:4210')
+);
+checkTrue(
+    'and keeps what PHP said went wrong',
+    str_contains((string) ($answer['message'] ?? ''), 'memory size')
+);
+
+// A warning is not a death: the request finished, and its real answer must travel untouched.
+check('a mere warning leaves the answer alone', FatalGuard::payloadFor([
+    'type'    => E_WARNING,
+    'message' => 'Undefined array key "x"',
+    'file'    => '/w/x.php',
+    'line'    => 1,
+]), null);
+check('and a clean request is left alone too', FatalGuard::payloadFor(null), null);
+
+
+// ------------------------------------------------------ templatePart (the "code" kind) --
+
+// The kind that changes what the site LOOKS like. Joomla has had this since the beginning
+// (`module`, `templateStyle`); WordPress had post/postmeta/option, all content and configuration,
+// so on a block theme — where the header IS a template part — Apply could reach a site's words
+// and never its appearance. Measured 24/08/2026 on tracy.ai: a logo swap was impossible on the
+// live site for exactly this reason, while the same swap on Joomla is a module edit.
+
+WP_Fake::reset();
+$tpWriter = new Claude_Cowork_Site_Writer();
+
+// Nothing overrides the theme yet, which is what makes the undo of the first write a delete —
+// and a delete is what hands the part back to the theme's own file.
+check('an untouched part reads as absent', $tpWriter->read('templatePart', 0, 'header'), null);
+
+$tpId = $tpWriter->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
+checkTrue('writing one yields an id', $tpId > 0);
+
+$row = WP_Fake::$posts[$tpId];
+check('it is filed as a template part', $row['post_type'], 'wp_template_part');
+check('under the slug the caller named', $row['post_name'], 'header');
+// Published, not drafted. A drafted override is never rendered, so the caller would be told the
+// write succeeded and see no change — the worst answer available.
+check('and published, because a drafted override renders nothing', $row['post_status'], 'publish');
+check('it carries the active theme, which is how WordPress knows the override applies',
+    WP_Fake::$terms[$tpId . ':wp_theme'], ['tracy']);
+check('and the area, which is how the Site Editor files it',
+    WP_Fake::$terms[$tpId . ':wp_template_part_area'], ['header']);
+
+// Second write to the same slug edits the override rather than stacking a second one: two rows
+// for one part is a site whose header depends on which row WordPress reads first.
+$again = $tpWriter->write('templatePart', 0, ['content' => '<!-- second -->'], 'header');
+check('writing the same slug again edits the same row', $again, $tpId);
+check('and there is still only one override', count(WP_Fake::$posts), 1);
+check('the area survives a write that did not mention it',
+    WP_Fake::$terms[$tpId . ':wp_template_part_area'], ['header']);
+
+$before = $tpWriter->read('templatePart', 0, 'header');
+check('reading it back gives the content an undo would restore', $before['content'], '<!-- second -->');
+check('and the area with it', $before['area'], 'header');
+
+// Another theme's override must be invisible: a site that switched themes keeps the old rows,
+// and editing by slug alone would rewrite a header nobody has seen for months.
+WP_Fake::$stylesheet = 'twentytwentyfive';
+check('a part of another theme is not found', $tpWriter->read('templatePart', 0, 'header'), null);
+WP_Fake::$stylesheet = 'tracy';
+
+// Deleting the override is how the theme's own file comes back — the undo of a create, and a
+// deliberate act in its own right.
+$tpWriter->delete('templatePart', 0, 'header');
+check('deleting the override hands the part back to the theme', $tpWriter->read('templatePart', 0, 'header'), null);
+
+// The two ways a caller gets this wrong, both answered rather than half-written.
+$refused = null;
+try {
+    $tpWriter->write('templatePart', 0, ['content' => 'x'], '');
+} catch (Throwable $e) {
+    $refused = $e->getMessage();
+}
+checkTrue('a part with no slug is refused, naming what is missing',
+    is_string($refused) && str_contains($refused, 'slug'));
+
+$refused = null;
+try {
+    $tpWriter->write('templatePart', 0, ['area' => 'header'], 'header');
+} catch (Throwable $e) {
+    $refused = $e->getMessage();
+}
+checkTrue('and one with no content is refused too',
+    is_string($refused) && str_contains($refused, 'content'));
+
+WP_Fake::reset();
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

@@ -99,6 +99,24 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			return self::ABSENT === $value ? null : array( 'value' => $value );
 		}
 
+		if ( 'templatePart' === $kind ) {
+			if ( '' === $key ) {
+				return null;
+			}
+			$existing = $this->find_template_part( $key );
+			// Null means the theme's own file is still in charge, which makes the undo of this
+			// write a delete — and a delete puts the theme's file back, exactly where it was.
+			if ( null === $existing ) {
+				return null;
+			}
+			return array(
+				'id'      => (int) $existing->ID,
+				'title'   => (string) $existing->post_title,
+				'content' => (string) $existing->post_content,
+				'area'    => $this->template_part_area( (int) $existing->ID ),
+			);
+		}
+
 		throw new RuntimeException( "unknown kind: {$kind}" );
 	}
 
@@ -283,6 +301,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'option' === $kind ) {
 			return $this->write_option( $fields, $key );
 		}
+		if ( 'templatePart' === $kind ) {
+			return $this->write_template_part( $key, $fields );
+		}
 		throw new RuntimeException( "unknown kind: {$kind}" );
 	}
 
@@ -305,6 +326,15 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'option' === $kind ) {
 			if ( '' !== $key && ! self::is_protected( $key ) ) {
 				delete_option( $key );
+			}
+			return;
+		}
+		if ( 'templatePart' === $kind ) {
+			// Deleting the override is what restores the theme's own file, so this is both the
+			// undo of a create AND the way to hand a part back to the theme on purpose.
+			$existing = '' === $key ? null : $this->find_template_part( $key );
+			if ( null !== $existing ) {
+				wp_delete_post( (int) $existing->ID, true );
 			}
 			return;
 		}
@@ -413,6 +443,105 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( isset( $fields['seo'] ) && is_array( $fields['seo'] ) ) {
 			$this->write_seo( $post_id, $fields['seo'] );
 		}
+	}
+
+	/**
+	 * The override row for one template part of the ACTIVE theme, or null when the theme's own
+	 * file is still in charge.
+	 *
+	 * Scoped to the active theme on purpose. A site that has switched themes keeps the old
+	 * theme's overrides in the same table, and a lookup by slug alone would edit a header no
+	 * visitor has seen for months.
+	 */
+	private function find_template_part( string $slug ): ?\WP_Post {
+		$found = get_posts(
+			array(
+				'post_type'        => 'wp_template_part',
+				'name'             => $slug,
+				'post_status'      => array( 'publish', 'draft', 'auto-draft' ),
+				'numberposts'      => 1,
+				'no_found_rows'    => true,
+				'suppress_filters' => false,
+				'tax_query'        => array(
+					array(
+						'taxonomy' => 'wp_theme',
+						'field'    => 'name',
+						'terms'    => get_stylesheet(),
+					),
+				),
+			)
+		);
+		return isset( $found[0] ) && $found[0] instanceof \WP_Post ? $found[0] : null;
+	}
+
+	/** Which part of the layout this override belongs to, as the Site Editor files them. */
+	private function template_part_area( int $post_id ): string {
+		$terms = wp_get_object_terms( $post_id, 'wp_template_part_area', array( 'fields' => 'names' ) );
+		return is_array( $terms ) && isset( $terms[0] ) ? (string) $terms[0] : 'uncategorized';
+	}
+
+	/**
+	 * Write the override that changes what a block theme renders.
+	 *
+	 * Three things have to be true together, and WordPress says nothing when one is missing — the
+	 * row simply never takes effect, which is the failure this method exists to make impossible:
+	 *
+	 * 1. `post_type` is `wp_template_part` and the slug is the part's name (`header`, `footer`)
+	 * 2. it carries a `wp_theme` term naming the ACTIVE theme, which is how WordPress decides an
+	 *    override belongs to the theme being rendered
+	 * 3. it carries a `wp_template_part_area` term, which is how the Site Editor groups it
+	 *
+	 * Published, not drafted. The default for a new post here is `draft` — right for an article
+	 * nobody approved, wrong for this: a drafted override is not applied, so the caller would be
+	 * told the write succeeded and see no change, which is the worst answer available.
+	 *
+	 * @param array<string,mixed> $fields
+	 */
+	private function write_template_part( string $slug, array $fields ): int {
+		if ( '' === $slug ) {
+			throw new RuntimeException( 'templatePart needs a key: the part slug, e.g. "header"' );
+		}
+		if ( ! array_key_exists( 'content', $fields ) ) {
+			throw new RuntimeException( 'templatePart needs a content field: the block markup to render' );
+		}
+
+		$theme    = get_stylesheet();
+		$existing = $this->find_template_part( $slug );
+		$area     = isset( $fields['area'] ) && '' !== $fields['area']
+			? (string) $fields['area']
+			: ( null !== $existing ? $this->template_part_area( (int) $existing->ID ) : 'uncategorized' );
+
+		$data = array(
+			'post_content' => (string) $fields['content'],
+			'post_status'  => 'publish',
+			'post_type'    => 'wp_template_part',
+			'post_name'    => $slug,
+			'post_title'   => isset( $fields['title'] ) && '' !== $fields['title'] ? (string) $fields['title'] : $slug,
+		);
+
+		if ( null !== $existing ) {
+			$data['ID'] = (int) $existing->ID;
+			unset( $data['post_type'] );
+			$written = wp_update_post( wp_slash( $data ), true );
+		} else {
+			$written = wp_insert_post( wp_slash( $data ), true );
+		}
+
+		if ( is_wp_error( $written ) ) {
+			throw new RuntimeException( $written->get_error_message() );
+		}
+		$written = (int) $written;
+		if ( $written <= 0 ) {
+			throw new RuntimeException( 'WordPress refused the template part without saying why' );
+		}
+
+		// Set every time, not only on create: a row whose theme term went missing renders nothing
+		// and reports nothing, and re-asserting it costs one query.
+		wp_set_object_terms( $written, $theme, 'wp_theme', false );
+		wp_set_object_terms( $written, $area, 'wp_template_part_area', false );
+
+		$this->touched[ $written ] = $written;
+		return $written;
 	}
 
 	/**
