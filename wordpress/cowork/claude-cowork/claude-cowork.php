@@ -209,6 +209,12 @@ function claude_cowork_counts(): array
  */
 function claude_cowork_exec(): void
 {
+    // Required and armed before the engine, so a death while LOADING the engine is answered too.
+    // That is not hypothetical: a lib file with a parse error on an old PHP would otherwise be
+    // the one failure this guard exists for, and the one it slept through.
+    require_once __DIR__ . '/lib/FatalGuard.php';
+    FatalGuard::arm();
+
     claude_cowork_load_engine();
 
     // Read the raw body rather than `$_POST`: the request is JSON, and admin-ajax only parses

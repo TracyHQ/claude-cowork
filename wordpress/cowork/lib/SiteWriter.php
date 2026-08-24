@@ -31,8 +31,21 @@
 
 interface SiteWriter
 {
-    /** The kinds of content an Apply may edit. A caller naming anything else is refused by the engine. */
-    public const KINDS = ['post', 'postmeta', 'option'];
+    /**
+     * The kinds of content an Apply may edit. A caller naming anything else is refused by the engine.
+     *
+     * `templatePart` is the one that changes what the site LOOKS like, and it is here because
+     * nothing else could. The Joomla original has had that power since the beginning — `module`
+     * and `templateStyle` are its "code" kinds, and a Joomla logo swap is a module edit. WordPress
+     * had no equivalent: `post`, `postmeta` and `option` are all content and configuration, so on
+     * a block theme — where every header, footer and layout IS a template part — Apply could reach
+     * the site's words and never its appearance.
+     *
+     * Writing one is how the Site Editor itself works: WordPress reads the theme's `.html` files
+     * as a starting point and lets a database row override them, so an edit lands without touching
+     * a single file of somebody else's theme, and deleting the row restores the theme's own.
+     */
+    public const KINDS = ['post', 'postmeta', 'option', 'templatePart'];
 
     /**
      * The current state of one target, or null when nothing is there.
