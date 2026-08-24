@@ -200,6 +200,20 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
     }
 
     /**
+     * The Tracy Role the fleet-bar Worker vouched for: owner|admin|developer|editor. Read from
+     * `x-tracy-role`, which only the Worker sets — it strips any client value before the request
+     * reaches origin, trusted on the same ground as `x-tracy-tier`. This is what lets the backend
+     * group follow the Role (ADR 0038) instead of collapsing everyone to one group. Anything
+     * unrecognised — including a missing header from an older Worker — falls to `editor`, the safe
+     * floor: an unknown Role never lands someone in an elevated group by accident.
+     */
+    private function role(): string
+    {
+        $value = strtolower(trim((string) ($_SERVER['HTTP_X_TRACY_ROLE'] ?? '')));
+        return \in_array($value, ['owner', 'admin', 'developer', 'editor'], true) ? $value : 'editor';
+    }
+
+    /**
      * Finds the Joomla user for this email, creating one the first time.
      *
      * Lazy on purpose: a seat is not a Joomla account until its holder actually opens the clone,
@@ -219,7 +233,7 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
 
         if ($id > 0) {
             $existing = new User($id);
-            $this->ensureGroup($existing);
+            $this->applyGroup($existing);
             return $existing;
         }
 
@@ -234,7 +248,11 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             'email'     => $email,
             // A bcrypt of random bytes: a real hash that no password will ever match.
             'password'  => UserHelper::hashPassword(bin2hex(random_bytes(32))),
-            'groups'    => [$this->workGroupId()],
+            // Create in Manager, never straight into the role's real group: Joomla's User::save()
+            // refuses, during a guest request, to place a user in a group higher than the acting
+            // identity's, so binding Super Users here would fail the whole save. The role's real
+            // group is written afterwards by applyGroup, which goes around that guard.
+            'groups'    => [$this->groupIdByTitle('Manager', 6)],
             // Marks the rows this plugin owns, so a cleanup can find them and a human can tell
             // them from the customer's own admins.
             // Joomla wraps params into a Registry itself, so this is an array, not a
@@ -245,34 +263,74 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             $this->warn('tracyaccess: could not create user for ' . $email . ': ' . implode('; ', $user->getErrors()));
             return null;
         }
+        $this->applyGroup($user);
         return $user;
     }
 
-    /** Puts an existing user into the work group if they are not already in it. */
-    private function ensureGroup(User $user): void
+    /**
+     * Ensures the user holds the group their Role maps to, writing `#__user_usergroup_map` directly.
+     *
+     * NOT through `User::save()`: Joomla guards that call so a request acting as a guest (which is
+     * what this plugin is until the login below runs) cannot place anyone in a group higher than
+     * its own — so `save()` silently drops an Owner into nothing above Manager. The map row is the
+     * plugin's to write; it already mints these accounts, and the seat book upstream is the
+     * authority on the Role. Additive: it grants the Role's group, it does not strip whatever else
+     * the account already holds (a downgrade is handled by the seat losing editor tier, which logs
+     * the session out).
+     */
+    private function applyGroup(User $user): void
     {
         $groupId = $this->workGroupId();
-        if (!in_array($groupId, array_map('intval', (array) $user->groups), true)) {
-            $user->groups[] = $groupId;
-            $user->save();
+        if (in_array($groupId, array_map('intval', (array) $user->groups), true)) {
+            return;
         }
+        $db = $this->getDatabase();
+        $userId = (int) $user->id;
+        // Values are integers this code casts itself, so they are inlined rather than bound — it
+        // keeps the method free of any ParameterType dependency, which the wrapping catch would
+        // otherwise swallow as a bare login failure if the class ever resolved differently.
+        $exists = (int) $db->setQuery(
+            $db->getQuery(true)
+                ->select('COUNT(*)')
+                ->from($db->quoteName('#__user_usergroup_map'))
+                ->where($db->quoteName('user_id') . ' = ' . $userId)
+                ->where($db->quoteName('group_id') . ' = ' . (int) $groupId)
+        )->loadResult();
+        if ($exists > 0) {
+            return;
+        }
+        // insertObject takes its object BY REFERENCE, so — like User::bind above — a literal cannot
+        // be passed in PHP 8 ("Only variables should be passed by reference"), which the wrapping
+        // catch would swallow as a silent login failure. Hold it in a variable.
+        $row = (object) ['user_id' => $userId, 'group_id' => (int) $groupId];
+        $db->insertObject('#__user_usergroup_map', $row);
     }
 
     /**
-     * The Joomla group everyone through the door lands in.
+     * The Joomla group this viewer's Role maps to (ADR 0038, ADR 0085).
      *
-     * NOT Super Users, and by default NOT Administrator either. Administrator in Joomla can
-     * install extensions and manage users, which on a clone — a full copy of the customer's site,
-     * password hashes and all — is the power to exfiltrate everything. A seat means the right to
-     * do the WORK (ADR 0023), and the narrowest core group that lets someone edit content in the
-     * backend is `Manager`. The group name is a param, so a site that genuinely wants more can
-     * raise it, but the default does not hand a content editor the keys to the box.
+     * Owner and Admin — the people who run the site — get `Super Users`: full control of their own
+     * site's working copy, which is what "admin" means to the person who owns it. Developer and
+     * Editor land in `Manager`, the narrowest backend group that still edits content: a seat is the
+     * right to do the WORK (ADR 0023), not automatically the keys to the box. An unrecognised Role
+     * falls to Manager, never up.
      *
-     * The provision account keeps Super Users; nobody through Access is ever put there.
+     * The mapping keys off `x-tracy-role`, sent per request by the Worker; the flat `work_group`
+     * param survives only as the Manager-tier override for a site that wants to name that group.
      */
     private function workGroupId(): int
     {
+        $role = $this->role();
+        if ($role === 'owner' || $role === 'admin') {
+            return $this->groupIdByTitle('Super Users', 8);
+        }
         $title = trim((string) $this->params->get('work_group', 'Manager')) ?: 'Manager';
+        return $this->groupIdByTitle($title, 6);
+    }
+
+    /** The `#__usergroups` id for a group title, or a known-default id when the title is missing. */
+    private function groupIdByTitle(string $title, int $fallback): int
+    {
         $db = $this->getDatabase();
         $query = $db->getQuery(true)
             ->select($db->quoteName('id'))
@@ -281,9 +339,9 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             ->bind(':title', $title)
             ->setLimit(1);
         $id = (int) $db->setQuery($query)->loadResult();
-        // A clone always has the core groups; falling back to Manager's usual id is a last resort
-        // rather than a silent Super User.
-        return $id > 0 ? $id : 6;
+        // A clone always has the core groups; the numeric fallback (Super Users 8, Manager 6) is a
+        // last resort rather than a silent wrong group.
+        return $id > 0 ? $id : $fallback;
     }
 
     /**

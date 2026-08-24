@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Bundles the auto-login system plugin, now mapping a coworker's Role to their Joomla group: an owner or admin signs in as a Super User, everyone else as Manager.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.8.19</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.19</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.8.19/pkg_claudecowork-0.8.19.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Now also bundles the auto-login system plugin, so one package carries both.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
