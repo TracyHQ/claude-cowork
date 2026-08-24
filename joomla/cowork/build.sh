@@ -16,6 +16,11 @@ mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
+# The auto-login system plugin ships in the SAME package as the component (ADR 0085): one upgrade
+# installs both, so a clone never carries a separate floating extension. It must be a system plugin —
+# only that hooks `onAfterInitialise` to set the session before the admin decides auth — but it
+# travels inside pkg_claudecowork.
+( cd plg_system_tracyaccess && zip -qr ../build/packages/plg_system_tracyaccess.zip . -x '*.DS_Store' )
 cp pkg_claudecowork.xml build/
 ( cd build && zip -qr ../dist/pkg_claudecowork.zip . -x '*.DS_Store' )
 
