@@ -32,6 +32,18 @@ final class DbDumper
         $this->src = $src;
     }
 
+    /** RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). */
+    public function renameTable(string $from, string $to): void
+    {
+        $this->src->renameTable($from, $to);
+    }
+
+    /** DROP TABLE — only ever called on `_tracy_trash_*` names (ADR 0083: purge). */
+    public function dropTable(string $table): void
+    {
+        $this->src->dropTable($table);
+    }
+
     /** Table names, so the caller discovers the schema rather than being told it. @return string[] */
     public function tables(): array
     {

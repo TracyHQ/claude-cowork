@@ -99,6 +99,47 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			return self::ABSENT === $value ? null : array( 'value' => $value );
 		}
 
+		if ( 'term' === $kind ) {
+			// `key` is the taxonomy, `id` the term. A term is meaningless without knowing which
+			// vocabulary it belongs to — the same slug is a category on one site and a menu on
+			// the next.
+			if ( '' === $key || $id <= 0 ) {
+				return null;
+			}
+			$term = get_term( $id, $key );
+			if ( ! $term || is_wp_error( $term ) ) {
+				return null;
+			}
+			return array(
+				'name'        => (string) $term->name,
+				'slug'        => (string) $term->slug,
+				'description' => (string) $term->description,
+				'parent'      => (int) $term->parent,
+			);
+		}
+
+		if ( 'menuItem' === $kind ) {
+			if ( $id <= 0 ) {
+				return null;
+			}
+			$item = get_post( $id, ARRAY_A );
+			if ( ! is_array( $item ) || 'nav_menu_item' !== ( $item['post_type'] ?? '' ) ) {
+				return null;
+			}
+			// The row alone does not describe a menu item: what it points AT lives in meta, and
+			// an undo that restored the title while losing the destination would look like a
+			// success and read as a broken link.
+			return array(
+				'title'     => (string) $item['post_title'],
+				'position'  => (int) $item['menu_order'],
+				'type'      => (string) get_post_meta( $id, '_menu_item_type', true ),
+				'object'    => (string) get_post_meta( $id, '_menu_item_object', true ),
+				'object_id' => (int) get_post_meta( $id, '_menu_item_object_id', true ),
+				'url'       => (string) get_post_meta( $id, '_menu_item_url', true ),
+				'parent'    => (int) get_post_meta( $id, '_menu_item_menu_item_parent', true ),
+			);
+		}
+
 		if ( 'templatePart' === $kind ) {
 			if ( '' === $key ) {
 				return null;
@@ -304,6 +345,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'templatePart' === $kind ) {
 			return $this->write_template_part( $key, $fields );
 		}
+		if ( 'term' === $kind ) {
+			return $this->write_term( $key, $id, $fields );
+		}
+		if ( 'menuItem' === $kind ) {
+			return $this->write_menu_item( $key, $id, $fields );
+		}
 		throw new RuntimeException( "unknown kind: {$kind}" );
 	}
 
@@ -338,7 +385,68 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			}
 			return;
 		}
+		if ( 'term' === $kind ) {
+			// Only ever the undo of a create this run made — `canTrash` refuses a term a person
+			// asked to delete, because re-creating one mints a new id and orphans everything
+			// filed under the old.
+			if ( $id > 0 && '' !== $key ) {
+				wp_delete_term( $id, $key );
+			}
+			return;
+		}
+		if ( 'menuItem' === $kind ) {
+			if ( $id > 0 ) {
+				wp_delete_post( $id, true );
+			}
+			return;
+		}
 		throw new RuntimeException( "unknown kind: {$kind}" );
+	}
+
+	/**
+	 * A post can go to the trash; a template part gives its slot back to the theme.
+	 *
+	 * Options and meta cannot: neither has a trash to sit in, and a caller who wants one gone is
+	 * writing an empty value rather than deleting a row. Saying so here means the engine refuses
+	 * with a sentence instead of the writer throwing halfway through.
+	 */
+	public function canTrash( string $kind ): bool {
+		// A term is missing on purpose. Deleting one and creating it again mints a NEW term id,
+		// and every post filed under the old one quietly loses its category — an undo that
+		// restores the name but not the relationships is worse than refusing.
+		return in_array( $kind, array( 'post', 'templatePart', 'menuItem' ), true );
+	}
+
+	public function trash( string $kind, int $id ): void {
+		if ( 'templatePart' === $kind ) {
+			// A template part has no trash of its own: removing the override IS the delete, and
+			// what comes back is the theme's own file. The revert re-writes the override.
+			if ( $id > 0 ) {
+				wp_delete_post( $id, true );
+			}
+			return;
+		}
+		if ( 'menuItem' === $kind ) {
+			// Forced, not trashed: a menu entry in the trash still belongs to the menu and still
+			// renders. Removing it IS the delete, and the before-state is what puts it back.
+			if ( $id > 0 ) {
+				wp_delete_post( $id, true );
+			}
+			return;
+		}
+		if ( 'post' !== $kind ) {
+			throw new RuntimeException( "a {$kind} cannot be trashed" );
+		}
+		if ( $id <= 0 ) {
+			throw new RuntimeException( 'trash needs an id' );
+		}
+		// WordPress's own trash, not a delete: it keeps the row, records the status it had, and
+		// leaves the page recoverable from the admin screens long after this Apply's revert
+		// window has closed. Forcing a delete here would make Tracy the only way back.
+		if ( false === wp_trash_post( $id ) ) {
+			throw new RuntimeException( "WordPress would not trash post {$id}" );
+		}
+		$this->touched[ $id ] = $id;
 	}
 
 	public function purgeCache(): void {
@@ -443,6 +551,110 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( isset( $fields['seo'] ) && is_array( $fields['seo'] ) ) {
 			$this->write_seo( $post_id, $fields['seo'] );
 		}
+	}
+
+	/**
+	 * Create or rename one term: a category, a tag, or the menu a menu belongs to.
+	 *
+	 * Joomla edits a category as a row and a menu as another; WordPress keeps both in taxonomies,
+	 * so one kind covers what Joomla needs two for — `key` names the vocabulary and the same code
+	 * serves `category`, `post_tag` and `nav_menu` alike.
+	 *
+	 * Only the taxonomies a site actually registered are accepted. WordPress will happily create a
+	 * term in a vocabulary nothing reads, and a caller who mistyped `categories` would be told it
+	 * worked and see nothing anywhere.
+	 *
+	 * @param array<string,mixed> $fields
+	 */
+	private function write_term( string $taxonomy, int $id, array $fields ): int {
+		if ( '' === $taxonomy ) {
+			throw new RuntimeException( 'term needs a key: the taxonomy, e.g. "category" or "nav_menu"' );
+		}
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			throw new RuntimeException( "this site has no taxonomy called {$taxonomy}" );
+		}
+
+		$args = array();
+		foreach ( array( 'slug', 'description', 'parent' ) as $field ) {
+			if ( array_key_exists( $field, $fields ) ) {
+				$args[ $field ] = 'parent' === $field ? (int) $fields[ $field ] : (string) $fields[ $field ];
+			}
+		}
+
+		if ( $id > 0 ) {
+			if ( array_key_exists( 'name', $fields ) ) {
+				$args['name'] = (string) $fields['name'];
+			}
+			$result = wp_update_term( $id, $taxonomy, $args );
+		} else {
+			if ( ! isset( $fields['name'] ) || '' === $fields['name'] ) {
+				throw new RuntimeException( 'a new term needs a name' );
+			}
+			$result = wp_insert_term( (string) $fields['name'], $taxonomy, $args );
+		}
+
+		if ( is_wp_error( $result ) ) {
+			throw new RuntimeException( $result->get_error_message() );
+		}
+		$term_id = (int) ( is_array( $result ) ? ( $result['term_id'] ?? 0 ) : $result );
+		if ( $term_id <= 0 ) {
+			throw new RuntimeException( 'WordPress refused the term without saying why' );
+		}
+		return $term_id;
+	}
+
+	/**
+	 * Create or edit one entry of a menu.
+	 *
+	 * `wp_update_nav_menu_item` rather than a post insert, and that is the whole reason this is a
+	 * kind of its own: a menu entry is a `nav_menu_item` post whose destination lives in five meta
+	 * keys, and a row written without them is an entry that renders as a link to nowhere. The
+	 * function is WordPress's own and writes all of it.
+	 *
+	 * `key` is the menu — its slug, id or name, whatever the caller has. A menu entry outside a
+	 * menu is not a thing.
+	 *
+	 * @param array<string,mixed> $fields
+	 */
+	private function write_menu_item( string $menu, int $id, array $fields ): int {
+		if ( '' === $menu ) {
+			throw new RuntimeException( 'menuItem needs a key: the menu it belongs to' );
+		}
+		$term = get_term_by( 'slug', $menu, 'nav_menu' );
+		if ( ! $term ) {
+			$term = get_term_by( 'name', $menu, 'nav_menu' );
+		}
+		if ( ! $term || is_wp_error( $term ) ) {
+			throw new RuntimeException( "this site has no menu called {$menu}" );
+		}
+
+		// Named as WordPress names them, so a caller reading its own site's data can pass it
+		// straight back. Anything not mentioned keeps what it had — an edit that only moves an
+		// entry must not blank the link it points at.
+		$existing = $id > 0 ? $this->read( 'menuItem', $id ) : array();
+		$args     = array(
+			'menu-item-title'     => (string) ( $fields['title'] ?? ( $existing['title'] ?? '' ) ),
+			'menu-item-url'       => (string) ( $fields['url'] ?? ( $existing['url'] ?? '' ) ),
+			'menu-item-object-id' => (int) ( $fields['object_id'] ?? ( $existing['object_id'] ?? 0 ) ),
+			'menu-item-object'    => (string) ( $fields['object'] ?? ( $existing['object'] ?? '' ) ),
+			'menu-item-type'      => (string) ( $fields['type'] ?? ( $existing['type'] ?? 'custom' ) ),
+			'menu-item-parent-id' => (int) ( $fields['parent'] ?? ( $existing['parent'] ?? 0 ) ),
+			'menu-item-position'  => (int) ( $fields['position'] ?? ( $existing['position'] ?? 0 ) ),
+			// Published, not draft: a menu entry nobody can see is not an entry, and WordPress
+			// defaults a bare insert to draft.
+			'menu-item-status'    => 'publish',
+		);
+
+		$written = wp_update_nav_menu_item( (int) $term->term_id, $id, $args );
+		if ( is_wp_error( $written ) ) {
+			throw new RuntimeException( $written->get_error_message() );
+		}
+		$written = (int) $written;
+		if ( $written <= 0 ) {
+			throw new RuntimeException( 'WordPress refused the menu item without saying why' );
+		}
+		$this->touched[ $written ] = $written;
+		return $written;
 	}
 
 	/**

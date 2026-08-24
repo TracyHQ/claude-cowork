@@ -132,6 +132,14 @@ final class Engine
                 return $this->contentGet($params);
             case 'content.update':
                 return $this->contentUpdate($params);
+            case 'content.delete':
+                return $this->contentDelete($params);
+            case 'db.cleanup':
+                return $this->dbCleanup($params);
+            case 'db.restore':
+                return $this->dbRestore($params);
+            case 'db.purge':
+                return $this->dbPurge($params);
             case 'media.upload':
                 return $this->mediaUpload($params);
             case 'apply.revert':
@@ -154,6 +162,30 @@ final class Engine
      * Each half is optional. A site whose database is unreachable can still be sized by its
      * files, and reporting what could be measured beats refusing to answer at all.
      */
+    /** Where a retired table goes: renamed, never dropped (ADR 0083). */
+    private const TRASH_PREFIX = '_tracy_trash_';
+
+    /**
+     * Core suffixes no cleanup may touch, matched against the END of the table name so the
+     * site's install-time prefix does not matter — `wp_`, `wp_2_` on a multisite, or whatever a
+     * hardening plugin randomised it to.
+     *
+     * This list is WordPress's, not a copy of the Joomla one: the two CMSs share not a single
+     * table name, and a list ported without reading would refuse `_menu` (which WordPress does
+     * not have) while waving through `_postmeta` (which holds every page's SEO and builder data).
+     *
+     * Deny-side false positives are the safe direction. A third-party `acme_comments` wrongly
+     * refused stays exactly where it is and somebody asks again; a core table wrongly renamed
+     * takes the site down.
+     */
+    private const CORE_TABLE_SUFFIXES = [
+        '_posts', '_postmeta', '_users', '_usermeta', '_options',
+        '_terms', '_termmeta', '_term_taxonomy', '_term_relationships',
+        '_comments', '_commentmeta', '_links',
+        // Multisite's own furniture: present only on a network, fatal to lose when it is.
+        '_blogs', '_site', '_sitemeta', '_signups', '_registration_log', '_blogmeta',
+    ];
+
     private function siteStats(): array
     {
         $out = [];
@@ -759,6 +791,220 @@ final class Engine
      * reversed rather than left behind. Anything past the inline ceiling belongs on the signed-URL
      * path, so the request the relay has to proxy stays small.
      */
+    /**
+     * Send one row to the site's trash, recorded so the Apply can put it back.
+     *
+     * Joomla writes -2 into a trash column; WordPress has a trash of its own, and using it is the
+     * point — the page stays recoverable from the admin screens long after this Apply's revert
+     * window closes, so Tracy is never the only way back from a delete.
+     *
+     * Only kinds that HAVE somewhere to go can be deleted. An option or a meta value has no trash
+     * to sit in, and a caller who wants one gone is writing an empty value rather than removing a
+     * row — refused here with a sentence rather than half-done in the writer.
+     */
+    private function contentDelete(array $p): array
+    {
+        if ($this->writer === null || $this->log === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
+        if (!$this->writer->canTrash($kind)) {
+            return $this->err('unsupported', "a {$kind} cannot be deleted through Apply");
+        }
+        $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+        $id = (int) ($p['id'] ?? 0);
+
+        // A template part is addressed by slug, the way it is written; a post by id. Reading the
+        // before-state settles which row is meant before anything is touched.
+        $before = $this->writer->read($kind, $id, $key);
+        if ($before === null) {
+            return $this->err('not_found', 'templatePart' === $kind
+                ? "no templatePart with slug {$key}"
+                : "no {$kind} with id {$id}");
+        }
+        if ('templatePart' === $kind) {
+            $id = (int) ($before['id'] ?? 0);
+        }
+
+        try {
+            $this->writer->trash($kind, $id);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, [
+                'op' => 'content',
+                'kind' => $kind,
+                'id' => $id,
+                'key' => $key,
+                'before' => $before,
+            ]);
+        } catch (Throwable $e) {
+            $this->rollbackContent($kind, $id, $key, $before);
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $e) {
+            // Best-effort by contract, as everywhere else here.
+        }
+
+        $this->stamped('content');
+
+        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key === '' ? null : $key]);
+    }
+
+    /**
+     * Trash-not-drop cleanup (ADR 0083): each table is RENAMEd to
+     * `_tracy_trash_<YmdHis>__<old name>` — instant, reversible, never a DROP. Mechanics only
+     * are guarded here; whether a table truly is residue is the check's and the person's call.
+     */
+    private function dbCleanup(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        // Validate the WHOLE batch before renaming anything: half a cleanup is a worse state
+        // than no cleanup.
+        foreach ($tables as $table) {
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+            if (strpos($table, self::TRASH_PREFIX) === 0) {
+                return $this->err('bad_params', "table {$table} is already in the trash");
+            }
+            foreach (self::CORE_TABLE_SUFFIXES as $suffix) {
+                if (substr($table, -strlen($suffix)) === $suffix) {
+                    return $this->err('refused', "table {$table} looks like a core table");
+                }
+            }
+        }
+        $stamp = gmdate('YmdHis');
+        $renamed = [];
+        foreach ($tables as $table) {
+            $to = self::TRASH_PREFIX . $stamp . '__' . $table;
+            try {
+                $this->dumper->renameTable($table, $to);
+            } catch (Throwable $e) {
+                // Report exactly how far it got — the caller can restore or retry the rest.
+                return $this->err('rename_failed', $e->getMessage(), ['renamed' => $renamed]);
+            }
+            $renamed[] = ['from' => $table, 'to' => $to];
+        }
+        return $this->ok(['renamed' => $renamed]);
+    }
+
+    /** The way back out of the trash: rename to the original name parsed from the suffix. */
+
+    /** The way back out of the trash: rename to the original name parsed from the suffix. */
+    private function dbRestore(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        $plan = [];
+        foreach ($tables as $table) {
+            if (strpos($table, self::TRASH_PREFIX) !== 0) {
+                return $this->err('bad_params', "table {$table} is not in the trash");
+            }
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+            $rest = substr($table, strlen(self::TRASH_PREFIX));
+            $sep = strpos($rest, '__');
+            $original = $sep === false ? '' : substr($rest, $sep + 2);
+            if ($original === '') {
+                return $this->err('bad_params', "table {$table} does not carry its original name");
+            }
+            if (isset($existing[$original])) {
+                return $this->err('refused', "table {$original} already exists");
+            }
+            $plan[] = ['from' => $table, 'to' => $original];
+        }
+        $restored = [];
+        foreach ($plan as $step) {
+            try {
+                $this->dumper->renameTable($step['from'], $step['to']);
+            } catch (Throwable $e) {
+                return $this->err('rename_failed', $e->getMessage(), ['restored' => $restored]);
+            }
+            $restored[] = $step;
+        }
+        return $this->ok(['restored' => $restored]);
+    }
+
+    /**
+     * The trash's second step (ADR 0083: purge): DROP, accepted ONLY for `_tracy_trash_*`
+     * names — a plain table name is refused outright, which is what confines the one
+     * destructive operation this engine has to tables a cleanup already parked.
+     */
+
+    /**
+     * The trash's second step (ADR 0083: purge): DROP, accepted ONLY for `_tracy_trash_*`
+     * names — a plain table name is refused outright, which is what confines the one
+     * destructive operation this engine has to tables a cleanup already parked.
+     */
+    private function dbPurge(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : [];
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+        try {
+            $existing = array_flip($this->dumper->tables());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        foreach ($tables as $table) {
+            if (strpos($table, self::TRASH_PREFIX) !== 0) {
+                return $this->err('refused', "table {$table} is not in the trash — purge only empties the trash");
+            }
+            if (!isset($existing[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+        }
+        $dropped = [];
+        foreach ($tables as $table) {
+            try {
+                $this->dumper->dropTable($table);
+            } catch (Throwable $e) {
+                return $this->err('drop_failed', $e->getMessage(), ['dropped' => $dropped]);
+            }
+            $dropped[] = $table;
+        }
+        return $this->ok(['dropped' => $dropped]);
+    }
+
     private function mediaUpload(array $p): array
     {
         if ($this->media === null || $this->log === null) {

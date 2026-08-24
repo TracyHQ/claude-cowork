@@ -44,8 +44,13 @@ interface SiteWriter
      * Writing one is how the Site Editor itself works: WordPress reads the theme's `.html` files
      * as a starting point and lets a database row override them, so an edit lands without touching
      * a single file of somebody else's theme, and deleting the row restores the theme's own.
+     *
+     * `term` and `menuItem` close the other half of the same gap. Joomla edits a category or a
+     * menu as a row; WordPress keeps both in taxonomies, and a plugin that only wrote posts and
+     * options could rename neither. A WordPress menu is a `nav_menu` term with `nav_menu_item`
+     * posts hanging off it — two shapes, so two kinds, rather than one kind pretending.
      */
-    public const KINDS = ['post', 'postmeta', 'option', 'templatePart'];
+    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'term', 'menuItem'];
 
     /**
      * The current state of one target, or null when nothing is there.
@@ -76,6 +81,24 @@ interface SiteWriter
 
     /** Remove one target. Used only to reverse a create this run made — never a user-facing delete. */
     public function delete(string $kind, int $id, string $key = ''): void;
+
+    /**
+     * Whether this kind can be sent to the trash by a person asking for it.
+     *
+     * Distinct from {@see delete()}, which is the UNDO of a create and takes the row away for
+     * good. This is somebody deciding a page should go, and WordPress's own trash is where it
+     * goes — recoverable from the admin screens even after the Apply's revert window closes.
+     *
+     * Configuration says no. An option or a meta value has no trash to sit in, and a caller who
+     * wanted one gone is writing an empty value, not deleting a row.
+     */
+    public function canTrash(string $kind): bool;
+
+    /**
+     * Send one row to the trash. The engine has already read its before-state, so the undo is a
+     * write of what was there — the trash itself is the site's safety net, not the Apply's.
+     */
+    public function trash(string $kind, int $id): void;
 
     /**
      * Drop whatever cache would otherwise keep serving the version just replaced. Best-effort by
