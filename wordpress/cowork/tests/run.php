@@ -895,6 +895,33 @@ try {
 }
 checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
 
+// ------------------------------------------------------- taking an update on request --
+// WordPress finds updates on its own clock: our manifest answer is cached six hours, and the cron
+// that acts on it runs twice a day. Right for a site nobody watches; wrong for the minutes after a
+// release, when a fix can be published and still be half a day from the site it was written for.
+// This action is the same work brought forward, and it takes no parameters — which version to
+// install is `update.json`'s answer, never a caller's.
+
+FakePackages::$selfUpdate = ['ok' => true, 'updated' => true, 'before' => '0.6.1', 'after' => '0.6.2'];
+$took = $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'plugin.selfUpdate', 'params' => []]);
+check('plugin.selfUpdate answers', $took['ok'], true);
+check('and says which version it left', $took['before'], '0.6.1');
+check('and which one it arrived at', $took['after'], '0.6.2');
+
+// The common answer, and not a failure: nothing newer is announced.
+FakePackages::$selfUpdate = ['ok' => true, 'updated' => false, 'before' => '0.6.2', 'after' => '0.6.2'];
+$none = $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'plugin.selfUpdate', 'params' => []]);
+check('already current is an ok, not an error', $none['ok'], true);
+check('and says nothing moved', $none['updated'], false);
+
+// An upgrade that reports success and leaves the old version is the exact failure this action
+// exists to end — it must not be answered as ok. (25/08/2026: an upload said `ready` while the
+// site stayed three versions behind, and it cost a day.)
+FakePackages::$selfUpdate = ['ok' => false, 'error' => 'upgrade reported success but the version is still 0.6.1'];
+$stuck = $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'plugin.selfUpdate', 'params' => []]);
+check('an upgrade that did not land is an error', $stuck['ok'], false);
+check('and it is told apart from an install failure', $stuck['error'], 'update_failed');
+
 // ------------------------------------------------------------ update manifest --
 // The Plugins screen asks raw.githubusercontent for update.json and compares it against the
 // header of the copy on disk. Two files must therefore agree about one number, and nothing but

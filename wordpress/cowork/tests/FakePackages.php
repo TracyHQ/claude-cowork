@@ -37,6 +37,14 @@ final class FakePackages
         ];
     }
 
+    /** What `self_update` should answer, per case. Set by the test before it calls. */
+    public static array $selfUpdate = ['ok' => true, 'updated' => true, 'before' => '0.6.1', 'after' => '0.6.2'];
+
+    public function self_update(): array
+    {
+        return self::$selfUpdate;
+    }
+
     public function install_plugin(string $url): array
     {
         $shape = self::checkUrl($url);

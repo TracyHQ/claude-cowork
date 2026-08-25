@@ -122,6 +122,8 @@ final class Engine
                 return $this->themeList();
             case 'core.manifest':
                 return $this->coreManifest();
+            case 'plugin.selfUpdate':
+                return $this->pluginSelfUpdate();
             case 'theme.install':
                 return $this->themeInstall($params);
             case 'theme.activate':
@@ -610,6 +612,33 @@ final class Engine
         return ($result['ok'] ?? false) === true
             ? $this->ok(['installed' => $result])
             : $this->err('install_failed', (string) ($result['error'] ?? 'install failed'));
+    }
+
+    /**
+     * Take the newest announced version of this plugin now, instead of on WordPress's schedule.
+     *
+     * The schedule is right for a site nobody watches and wrong for the minutes after a release:
+     * the manifest answer is cached six hours and the cron that acts on it runs twice a day, so a
+     * fix can be published and still be half a day from the site it was written for.
+     *
+     * Takes no parameters on purpose. Which version to install is not a caller's decision — it is
+     * whatever `update.json` announces, checked by the same filter that draws the notice on the
+     * Plugins screen. This action only removes the waiting, so there is nothing to pass in and
+     * nothing a caller could get wrong.
+     */
+    private function pluginSelfUpdate(): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $result = $this->packages->self_update();
+        return ($result['ok'] ?? false) === true
+            ? $this->ok([
+                'updated' => (bool) ($result['updated'] ?? false),
+                'before' => (string) ($result['before'] ?? ''),
+                'after' => (string) ($result['after'] ?? ''),
+            ])
+            : $this->err('update_failed', (string) ($result['error'] ?? 'update failed'));
     }
 
     private function themeInstall(array $p): array

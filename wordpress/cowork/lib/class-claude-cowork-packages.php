@@ -167,6 +167,81 @@ final class Claude_Cowork_Packages {
 	 * @param string $url https URL of a .zip.
 	 * @return array{ok:bool, error?:string, file?:string, name?:string, version?:string}
 	 */
+	/**
+	 * Ask the site to fetch and install the newest announced version of THIS plugin, now.
+	 *
+	 * WordPress finds updates on its own schedule: the manifest answer is remembered for six hours
+	 * and the cron that acts on it runs twice a day. For a site nobody is watching that is exactly
+	 * right. For the person who just cut a release and wants to see it on a Preview, half a day is
+	 * not a wait, it is a different working day.
+	 *
+	 * So this is the same work WordPress would have done, brought forward: forget what was
+	 * remembered, ask again, and take the answer if there is one. Nothing here decides WHICH version
+	 * is right — `update.json` already said, and the update filter already checked it. This only
+	 * removes the waiting.
+	 *
+	 * Upgrading the plugin whose code is currently executing is safe for the same reason pressing
+	 * Update on the Plugins screen is: the files change, the process finishes on the code it already
+	 * loaded, and the next request runs the new copy. What it must NOT do is report the version it
+	 * has in memory — that is the old one by definition, which is why the answer is read back off
+	 * disk after the upgrade.
+	 *
+	 * @return array{ok:bool, error?:string, before?:string, after?:string, updated?:bool}
+	 */
+	public function self_update() {
+		$file = 'claude-cowork/claude-cowork.php';
+		$this->load_upgrader();
+
+		$before = $this->installed_version( $file );
+
+		// Both caches, because they answer different questions: ours holds the manifest, WordPress's
+		// holds the update set built from it. Clearing one and not the other asks a fresh question
+		// and reads a stale answer.
+		delete_site_transient( 'claude_cowork_update' );
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+
+		$updates = get_site_transient( 'update_plugins' );
+		if ( ! isset( $updates->response[ $file ] ) ) {
+			// Nothing newer is announced. Not a failure: it is the answer most of the time.
+			return array( 'ok' => true, 'updated' => false, 'before' => $before, 'after' => $before );
+		}
+
+		$upgrader = new Plugin_Upgrader( new WP_Ajax_Upgrader_Skin() );
+		$done     = $upgrader->upgrade( $file );
+
+		if ( is_wp_error( $done ) ) {
+			return array( 'ok' => false, 'error' => $done->get_error_message() );
+		}
+		if ( true !== $done ) {
+			$errors = $upgrader->skin->get_errors();
+			$why    = is_wp_error( $errors ) && $errors->has_errors() ? $errors->get_error_message() : 'upgrader refused the package';
+			return array( 'ok' => false, 'error' => $why );
+		}
+
+		// Read from disk, not from what this process loaded — see the note above.
+		wp_clean_plugins_cache();
+		$after = $this->installed_version( $file );
+
+		// An upgrade that reports success and leaves the old version is the failure this whole
+		// action exists to end. Say so rather than answering ok.
+		if ( $after === $before ) {
+			return array( 'ok' => false, 'error' => "upgrade reported success but the version is still {$before}" );
+		}
+
+		return array( 'ok' => true, 'updated' => true, 'before' => $before, 'after' => $after );
+	}
+
+	/** The version on disk right now, read fresh. '' when the file is not there. */
+	private function installed_version( $file ) {
+		$path = WP_PLUGIN_DIR . '/' . $file;
+		if ( ! file_exists( $path ) ) {
+			return '';
+		}
+		$data = get_plugin_data( $path, false, false );
+		return isset( $data['Version'] ) ? (string) $data['Version'] : '';
+	}
+
 	public function install_plugin( $url ) {
 		$shape = Claude_Cowork_Package_Url::check( $url );
 		if ( true !== $shape['ok'] ) {
