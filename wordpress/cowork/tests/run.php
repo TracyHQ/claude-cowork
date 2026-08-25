@@ -950,6 +950,13 @@ checkTrue('the plugin declares an Update URI on github.com', (bool) preg_match('
 // dead code there. Measured 25/08/2026: tracy.ai ran 0.4.0 while the release was 0.6.0, so every
 // `templatePart` write was refused by a plugin that had never heard of the kind.
 $updateSource = file_get_contents(__DIR__ . '/../claude-cowork/update.php');
+// A cache of our own must not survive an explicit re-check. WordPress clears its update cache when
+// somebody presses "Check again"; a plugin that keeps answering from six hours ago turns that
+// button into a no-op, which is exactly what it was on 25/08/2026 with a release minutes old.
+checkTrue(
+    'an explicit force-check bypasses our own cache',
+    (bool) preg_match('/force-check/', $updateSource)
+);
 checkTrue(
     'the plugin asks WordPress to update it without being asked',
     (bool) preg_match('/add_filter\(\s*[\'"]auto_update_plugin[\'"]/', $updateSource)

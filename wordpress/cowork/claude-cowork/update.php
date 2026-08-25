@@ -45,7 +45,14 @@ const CLAUDE_COWORK_UPDATE_TTL = 6 * HOUR_IN_SECONDS;
 /** The manifest, or null when it cannot be read. Never throws: an update check is not worth a site. */
 function claude_cowork_update_manifest(): ?array
 {
-    $cached = get_site_transient('claude_cowork_update');
+    // "Check again" must actually check again. WordPress clears its OWN update cache when a person
+    // presses that button (or a tool loads `update-core.php?force-check=1`) and then asks every
+    // plugin afresh — but a plugin answering from a six-hour cache of its own makes that button a
+    // lie. Measured 25/08/2026: a release was minutes old, force-check ran, and the site still drew
+    // no update link, because this function answered from something it remembered before the
+    // release existed.
+    $forced = isset($_GET['force-check']) && '' !== $_GET['force-check']; // phpcs:ignore WordPress.Security.NonceVerification
+    $cached = $forced ? false : get_site_transient('claude_cowork_update');
     if (is_array($cached)) {
         return $cached;
     }
