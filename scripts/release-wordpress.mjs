@@ -26,8 +26,12 @@ const cowork = join(repo, 'wordpress', 'cowork')
 const pluginFile = join(cowork, 'claude-cowork', 'claude-cowork.php')
 const manifestFile = join(repo, 'wordpress', 'update.json')
 
-const run = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, { cwd: repo, encoding: 'utf8', stdio: 'pipe', ...opts }).trim()
+// `stdio: 'inherit'` khiến execFileSync trả null thay vì chuỗi — cái output đã đi thẳng ra màn
+// hình rồi. Người gọi nào cần chữ thì để mặc định 'pipe'; ai chỉ cần chạy thì không phải nghĩ.
+const run = (cmd, args, opts = {}) => {
+  const out = execFileSync(cmd, args, { cwd: repo, encoding: 'utf8', stdio: 'pipe', ...opts })
+  return typeof out === 'string' ? out.trim() : ''
+}
 
 const die = (message) => {
   console.error(`\n✘ ${message}\n`)
