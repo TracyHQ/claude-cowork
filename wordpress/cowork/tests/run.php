@@ -917,6 +917,24 @@ checkTrue(
 // The header selects the filter name: change the host and the hook in update.php is never called.
 checkTrue('the plugin declares an Update URI on github.com', (bool) preg_match('#^\s*\*\s*Update URI:\s*https://github\.com/#m', $pluginHeader));
 
+// Knowing a newer version exists is not the same as getting it. WordPress shows the Plugins screen
+// a notice and waits for somebody to press Update — which on a site nobody administers by hand
+// means the plugin stays on whatever shipped the day it was installed, and every fix after that is
+// dead code there. Measured 25/08/2026: tracy.ai ran 0.4.0 while the release was 0.6.0, so every
+// `templatePart` write was refused by a plugin that had never heard of the kind.
+$updateSource = file_get_contents(__DIR__ . '/../claude-cowork/update.php');
+checkTrue(
+    'the plugin asks WordPress to update it without being asked',
+    (bool) preg_match('/add_filter\(\s*[\'"]auto_update_plugin[\'"]/', $updateSource)
+);
+// Scoped to this plugin's own file. The filter runs for EVERY plugin on the site, so returning a
+// blanket true here would switch on automatic updates for extensions that are not ours — on a
+// customer's site, with their business on it.
+checkTrue(
+    'and only for its own file',
+    (bool) preg_match('/claude_cowork_auto_update/', $updateSource)
+);
+
 // the read half of the content mirror (ADR 0071)
 $writer->posts = [
     ['id' => 7, 'type' => 'post', 'title' => 'Hello', 'slug' => 'hello', 'content' => '<p>Body</p>', 'excerpt' => ''],

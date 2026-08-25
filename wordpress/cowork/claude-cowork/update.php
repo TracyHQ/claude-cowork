@@ -103,3 +103,43 @@ function claude_cowork_check_update($update, array $plugin_data, string $plugin_
 }
 
 add_filter('update_plugins_github.com', 'claude_cowork_check_update', 10, 3);
+
+/**
+ * Take the update WordPress just found, without waiting for somebody to press a button.
+ *
+ * Knowing a newer version exists and getting it are two different things. The filter above makes
+ * the Plugins screen show a notice; WordPress then waits. On a site nobody administers by hand
+ * that wait never ends, and every fix shipped afterwards is dead code there — the same failure as
+ * a phone app whose owner never taps Update. Measured on tracy.ai, 25/08/2026: the site ran 0.4.0
+ * while 0.6.0 had been released, so every `templatePart` write was refused by a plugin that had
+ * never heard of the kind, and the refusal read like a bug in something else entirely.
+ *
+ * ## Why this plugin decides, and not each site owner
+ *
+ * The one thing this plugin does is let software act on the site. What it accepts, what it
+ * refuses, and what it records are all defined by its own version — so a site left behind is not
+ * a site missing a feature, it is a site whose safety rules are a different set from the ones the
+ * caller is written against. That is not a preference to leave switched off by default.
+ *
+ * ## The two ways out, both deliberately left open
+ *
+ * The Plugins screen keeps its own switch: a site owner who turns automatic updates off for this
+ * plugin is obeyed, because `auto_update_plugins` is consulted by WordPress before this filter is
+ * ever reached for a plugin listed there. And `update.json` is the single place a release is
+ * announced — a version that should not spread is un-announced by editing one line, without
+ * touching a single site.
+ */
+function claude_cowork_auto_update($update, $item)
+{
+    // `$item` describes whichever plugin WordPress is currently deciding about — this filter runs
+    // for ALL of them. Answering for anything but our own file is switching on automatic updates
+    // for somebody else's extension, on somebody else's site.
+    $plugin = is_object($item) && isset($item->plugin) ? (string) $item->plugin : '';
+    if ($plugin !== 'claude-cowork/claude-cowork.php') {
+        return $update;
+    }
+
+    return true;
+}
+
+add_filter('auto_update_plugin', 'claude_cowork_auto_update', 10, 2);
