@@ -1240,6 +1240,21 @@ check('the package declares where to ask',
     trim((string) $pkg->updateservers->server),
     'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml');
 
+// --- update.json: the same release, for a different asker ------------------------------------
+// update.xml answers Joomla's own updater: it carries the targetplatform rule and every past
+// version, because a site on an older Joomla still has to find the last release that supported
+// it. Tracy Desk asks a different question — "what is current" — has no XML parser in the main
+// process, and has no targetplatform rule to apply. Two files, one number.
+//
+// It sits beside update.xml at `joomla/`, not here in the component, for the same reason that one
+// does: the raw.githubusercontent path is compiled into every desk already installed on somebody's
+// machine, so it is a published address. Tidying it inwards would 404 them all, silently.
+$json = json_decode(file_get_contents(__DIR__ . '/../../update.json'), true);
+check('update.json names the package version', $json['version'] ?? null, $pkgVersion);
+checkTrue(
+    'and points at that version\'s release asset',
+    ($json['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+
 // --- core.upgrade: the one write that moves a Joomla version --------------------------------
 // The engine validates the target and delegates the site-touching work to a CoreUpgrader, so
 // the routing and the guard are testable with a fake. The real JoomlaCoreUpgrader is proven
