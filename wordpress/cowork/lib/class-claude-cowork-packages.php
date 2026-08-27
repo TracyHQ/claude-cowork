@@ -186,11 +186,24 @@ final class Claude_Cowork_Packages {
 	 * has in memory — that is the old one by definition, which is why the answer is read back off
 	 * disk after the upgrade.
 	 *
+	 * IT MUST ALSO SWITCH ITSELF BACK ON. `Plugin_Upgrader::upgrade()` deactivates the plugin it is
+	 * about to replace and never reactivates it — on the Plugins screen the surrounding page does
+	 * that, and there is no surrounding page here. Measured on vincent-test1.tracy.ai, 27/08/2026:
+	 * the upgrade answered `{"ok":true,"before":"0.6.2","after":"0.6.3"}` and every request after it
+	 * got `0` from admin-ajax, because the endpoint had been switched off by its own success. That
+	 * is worse than the wait this action exists to remove: a site nobody can reach cannot be told to
+	 * turn anything back on, and it took wp-cli on the host to recover.
+	 *
 	 * @return array{ok:bool, error?:string, before?:string, after?:string, updated?:bool}
 	 */
 	public function self_update() {
 		$file = 'claude-cowork/claude-cowork.php';
 		$this->load_upgrader();
+
+		// Read BEFORE the upgrader touches anything, and restore only what was true: a plugin that
+		// was already off must stay off, or this action becomes a way to switch on a plugin the
+		// site had deliberately switched off.
+		$was_active = is_plugin_active( $file );
 
 		$before = $this->installed_version( $file );
 
@@ -209,6 +222,10 @@ final class Claude_Cowork_Packages {
 
 		$upgrader = new Plugin_Upgrader( new WP_Ajax_Upgrader_Skin() );
 		$done     = $upgrader->upgrade( $file );
+
+		// Before every return below, including the failing ones: the upgrader deactivates first and
+		// a refused package leaves the plugin off just as surely as a successful one does.
+		$this->restore_active( $file, $was_active );
 
 		if ( is_wp_error( $done ) ) {
 			return array( 'ok' => false, 'error' => $done->get_error_message() );
@@ -232,6 +249,25 @@ final class Claude_Cowork_Packages {
 		return array( 'ok' => true, 'updated' => true, 'before' => $before, 'after' => $after );
 	}
 
+	/**
+	 * Put the plugin back on if it was on. Never throws and never reports: the upgrade's own answer
+	 * is what the caller asked for, and a reactivation that failed is visible in the next request
+	 * either working or not.
+	 *
+	 * `activate_plugin` is given `$silent = true` so the activation hook does not run again — the
+	 * plugin was already installed and seeded, and re-firing that hook on every upgrade is a second
+	 * behaviour nobody asked for.
+	 */
+	private function restore_active( $file, $was_active ) {
+		if ( ! $was_active ) {
+			return;
+		}
+		wp_clean_plugins_cache();
+		if ( ! is_plugin_active( $file ) ) {
+			activate_plugin( $file, '', false, true );
+		}
+	}
+
 	/** The version on disk right now, read fresh. '' when the file is not there. */
 	private function installed_version( $file ) {
 		$path = WP_PLUGIN_DIR . '/' . $file;
@@ -252,7 +288,17 @@ final class Claude_Cowork_Packages {
 
 		$before   = array_keys( get_plugins() );
 		$upgrader = new Plugin_Upgrader( new WP_Ajax_Upgrader_Skin() );
-		$done     = $upgrader->install( $url );
+		// `overwrite_package` is what makes this able to update, and not only to add. Without it
+		// WordPress refuses any package whose folder already exists — `install()` runs with
+		// `clear_destination => false` by default — so installing a newer build of something the
+		// site already has answered "Destination folder already exists." and nothing else.
+		// Measured on vincent-test1.tracy.ai, 27/08/2026: Tracy Desk's own Update button sends
+		// `plugin.install` with the newest release URL, and it could never once succeed.
+		//
+		// This is the `wp plugin install --force` behaviour, and unlike `upgrade()` it does NOT
+		// deactivate what it replaces — which is why the update path belongs here rather than
+		// behind the upgrader that has to be talked back into switching the plugin on again.
+		$done = $upgrader->install( $url, array( 'overwrite_package' => true ) );
 
 		if ( is_wp_error( $done ) ) {
 			return array( 'ok' => false, 'error' => $done->get_error_message() );
@@ -267,10 +313,18 @@ final class Claude_Cowork_Packages {
 
 		// Which plugin arrived is answered by diffing the list, not by trusting the archive's
 		// folder name: a zip may unpack to a directory that matches nothing a caller guessed.
+		//
+		// An UPDATE adds nothing to that list, so the diff is empty and the answer would carry no
+		// version at all — which is the one field the caller is checking to see whether the update
+		// landed. `plugin_info()` reads the folder the package actually unpacked into, so it names
+		// the right plugin in both cases; the diff stays first because it is the stronger evidence
+		// when there is any.
 		wp_clean_plugins_cache();
 		$added = array_values( array_diff( array_keys( get_plugins() ), $before ) );
-		$file  = isset( $added[0] ) ? $added[0] : '';
-		$data  = '' !== $file ? get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false ) : array();
+		$file  = isset( $added[0] ) ? $added[0] : (string) $upgrader->plugin_info();
+		$data  = '' !== $file && file_exists( WP_PLUGIN_DIR . '/' . $file )
+			? get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false )
+			: array();
 
 		return array(
 			'ok'      => true,
