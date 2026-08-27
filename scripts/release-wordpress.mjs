@@ -1,20 +1,21 @@
 #!/usr/bin/env node
-// Cắt một bản WordPress: một lệnh, một con số, ba nơi không thể lệch nhau.
+// Cut a WordPress release: one command, one number, three places that cannot disagree.
 //
 //   node scripts/release-wordpress.mjs 0.6.1
-//   node scripts/release-wordpress.mjs 0.6.1 --dry-run   kiểm + build, không đẩy gì
+//   node scripts/release-wordpress.mjs 0.6.1 --dry-run   check and build, publish nothing
 //
-// Vì sao có file này. Một bản plugin sống ở ba chỗ phải khớp nhau: header `Version:` trong
-// claude-cowork.php, `version` + `package` trong wordpress/update.json, và tag của release mang
-// file zip. Cho tới hôm nay cả ba đều sửa tay. Ngày 25/08/2026 kết quả là tracy.ai chạy 0.4.0
-// trong khi mọi tài liệu nói 0.5.4 và Tracy Desk mang theo 0.6.0 — ba con số, ba câu trả lời
-// khác nhau, không ai sai một cách nhìn thấy được.
+// Why this file exists. A plugin release lives in three places that have to match: the `Version:`
+// header in claude-cowork.php, `version` + `package` in wordpress/update.json, and the release tag
+// carrying the zip. Until now all three were edited by hand. On 2026-08-25 the result was tracy.ai
+// running 0.4.0 while every document said 0.5.4 and Tracy Desk shipped 0.6.0 — three numbers,
+// three answers, and nothing anywhere that looked wrong.
 //
-// Cố ý KHÔNG làm hai việc:
-//   - không tự đoán số phiên bản. Người gõ số. Đoán hộ patch/minor là thứ sẽ đoán sai đúng hôm
-//     cần đúng, và số ấy đi thẳng ra site của khách.
-//   - không chạy trong CI. Push lên main mà tự phát hành cho mọi site đang cài là bỏ mất nút
-//     dừng cuối cùng. Phát hành là một hành động có người bấm.
+// Two things it deliberately does NOT do:
+//   - it does not guess the version. A person types it. Guessing patch-versus-minor is the kind of
+//     guess that goes wrong on the day it matters, and that number goes straight out to customer
+//     sites.
+//   - it does not run in CI. Publishing to every installed site because someone pushed to main
+//     removes the last place to stop. A release is an act somebody performs.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -26,8 +27,9 @@ const cowork = join(repo, 'wordpress', 'cowork')
 const pluginFile = join(cowork, 'claude-cowork', 'claude-cowork.php')
 const manifestFile = join(repo, 'wordpress', 'update.json')
 
-// `stdio: 'inherit'` khiến execFileSync trả null thay vì chuỗi — cái output đã đi thẳng ra màn
-// hình rồi. Người gọi nào cần chữ thì để mặc định 'pipe'; ai chỉ cần chạy thì không phải nghĩ.
+// `stdio: 'inherit'` makes execFileSync return null rather than a string — that output has already
+// gone to the screen. Callers that need the text keep the default 'pipe'; callers that only need
+// the command to run do not have to think about it.
 const run = (cmd, args, opts = {}) => {
   const out = execFileSync(cmd, args, { cwd: repo, encoding: 'utf8', stdio: 'pipe', ...opts })
   return typeof out === 'string' ? out.trim() : ''
@@ -41,35 +43,35 @@ const die = (message) => {
 const version = process.argv[2]
 const dryRun = process.argv.includes('--dry-run')
 
-// ── 0. con số phải là một con số ────────────────────────────────────────────────────────────
+// ── 0. the number has to be a number ─────────────────────────────────────────────────────────
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-  die('cần một phiên bản dạng x.y.z, ví dụ: node scripts/release-wordpress.mjs 0.6.1')
+  die('a version of the form x.y.z is required, e.g. node scripts/release-wordpress.mjs 0.6.1')
 }
 
-// ── 1. cùng cổng mà seat-registry dựng sau sự cố deploy đè bản cũ (tracy.ai#86) ──────────────
-// Phát hành từ một checkout cũ là phát hành một bản không ai đọc được từ lịch sử.
+// ── 1. the same gate seat-registry grew after a deploy overwrote a newer build (tracy.ai#86) ──
+// Releasing from a stale checkout publishes a build nobody can trace back through history.
 try {
   run('git', ['fetch', 'origin', 'main', '--quiet'])
 } catch {
-  die('không fetch được origin/main — không xác nhận được checkout này mới hay cũ')
+  die('could not fetch origin/main — there is no way to tell whether this checkout is current')
 }
 if (run('git', ['rev-parse', 'HEAD']) !== run('git', ['rev-parse', 'origin/main'])) {
-  die('HEAD lệch origin/main. Merge và pull --rebase trước khi cắt release.')
+  die('HEAD differs from origin/main. Merge and pull --rebase before cutting a release.')
 }
 if (run('git', ['status', '--porcelain'])) {
-  die('cây làm việc còn thay đổi chưa commit. Commit hoặc stash trước.')
+  die('the working tree has uncommitted changes. Commit or stash them first.')
 }
 
 const existingTags = run('git', ['tag', '--list', `wordpress-v${version}`])
-if (existingTags) die(`tag wordpress-v${version} đã tồn tại — con số này đã được dùng`)
+if (existingTags) die(`tag wordpress-v${version} already exists — that number has been used`)
 
-// ── 2 & 3. hai nơi khai phiên bản, sinh ra từ CÙNG một biến ──────────────────────────────────
+// ── 2 & 3. two places declare the version, both written from the SAME variable ────────────────
 const zipName = `claude-cowork-${version}.zip`
 const packageUrl = `https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-v${version}/${zipName}`
 
 const plugin = readFileSync(pluginFile, 'utf8')
 const bumped = plugin.replace(/^(\s*\*\s*Version:\s*)(.+)$/m, `$1${version}`)
-if (bumped === plugin) die('không tìm thấy dòng `Version:` trong header plugin')
+if (bumped === plugin) die('no `Version:` line found in the plugin header')
 writeFileSync(pluginFile, bumped)
 
 const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'))
@@ -78,31 +80,32 @@ manifest.package = packageUrl
 manifest.url = `https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-v${version}`
 writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`)
 
-console.log(`· header và manifest cùng ghi ${version}`)
+console.log(`· header and manifest both say ${version}`)
 
-// ── 4. đọc lại từ đĩa và tự chứng minh ───────────────────────────────────────────────────────
-// Chạy SAU khi sửa, không phải trước: thứ cần chứng minh là hai file VỪA GHI có khớp nhau không,
-// đọc lại từ đĩa chứ không tin hai biến vừa dùng để ghi chúng. `tests/run.php` kiểm đúng ba điều
-// này và CI chạy nó trên mọi push — nhưng nó cần php, mà máy phát hành không chắc có. Một cổng
-// bỏ qua được khi thiếu dependency là một cổng mở, nên nó được viết lại ở đây bằng thứ luôn có.
+// ── 4. read it back off disk and prove it ────────────────────────────────────────────────────
+// This runs AFTER the edit, not before: what needs proving is that the two files JUST WRITTEN
+// agree, read back from disk rather than trusted from the variables that wrote them.
+// `tests/run.php` checks these same three things and CI runs it on every push — but it needs php,
+// which the releasing machine may not have. A gate that can be skipped when a dependency is
+// missing is an open gate, so it is restated here in something that is always present.
 const writtenHeader = readFileSync(pluginFile, 'utf8').match(/^\s*\*\s*Version:\s*(.+)$/m)?.[1]?.trim()
 const written = JSON.parse(readFileSync(manifestFile, 'utf8'))
-if (writtenHeader !== version) die(`header ghi ${writtenHeader}, không phải ${version}`)
-if (written.version !== version) die(`manifest ghi ${written.version}, không phải ${version}`)
-if (written.package !== packageUrl) die('manifest trỏ vào một asset khác asset sắp được tạo')
-console.log('· header, manifest và tên gói cùng nói một con số')
+if (writtenHeader !== version) die(`the header says ${writtenHeader}, not ${version}`)
+if (written.version !== version) die(`the manifest says ${written.version}, not ${version}`)
+if (written.package !== packageUrl) die('the manifest points at an asset other than the one about to be created')
+console.log('· header, manifest and package name all say one number')
 
-// ── 5. gói ───────────────────────────────────────────────────────────────────────────────────
+// ── 5. package ───────────────────────────────────────────────────────────────────────────────
 run('bash', ['build.sh'], { cwd: cowork, stdio: 'inherit' })
 renameSync(join(cowork, 'dist', 'claude-cowork.zip'), join(cowork, 'dist', zipName))
 console.log(`· dist/${zipName}`)
 
 if (dryRun) {
-  console.log('\n--dry-run: dừng ở đây. Hai file đã sửa — `git checkout` nếu không muốn giữ.\n')
+  console.log('\n--dry-run: stopping here. Two files were edited — `git checkout` them if you do not want that.\n')
   process.exit(0)
 }
 
-// ── 6 & 7. một commit, một tag, một release ─────────────────────────────────────────────────
+// ── 6 & 7. one commit, one tag, one release ─────────────────────────────────────────────────
 run('git', ['add', 'wordpress/cowork/claude-cowork/claude-cowork.php', 'wordpress/update.json'])
 run('git', ['commit', '-m', `release(wordpress): ${version}`])
 run('git', ['tag', `wordpress-v${version}`])
@@ -120,9 +123,9 @@ run('gh', [
 ])
 
 console.log(`
-✓ wordpress-v${version} đã phát hành.
+✓ wordpress-v${version} released.
 
-  Manifest là nguồn sự thật duy nhất và nó đã trỏ vào bản này. Site cài Tracy tự kiểm
-  khoảng hai lần một ngày rồi tự cập nhật — không ai phải bấm gì. Muốn thu lại bản này thì
-  sửa wordpress/update.json về phiên bản trước và đẩy: không phải đụng tới site nào cả.
+  The manifest is the single source of truth and it now points at this build. Sites running Tracy
+  check it about twice a day and update themselves — nobody has to press anything. To withdraw this
+  release, set wordpress/update.json back to the previous version and push: no site is touched.
 `)
