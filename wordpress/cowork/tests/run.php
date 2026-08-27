@@ -1100,6 +1100,35 @@ $clean = new Claude_Cowork_Site_Writer();
 $cleanId = $clean->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
 checkTrue('an unaltered write still succeeds', $cleanId > 0);
 
+// WordPress normalises markup on the way in — a closing slash, a space, an entity spelled out —
+// and a body that comes back LONGER has plainly lost nothing. On 27/08/2026 the first version of
+// this guard refused a write that grew by a single character, which blocked a legitimate logo swap
+// twice in a row while catching nothing at all. A check that stops real work to prevent nothing is
+// worse than the silence it replaced.
+WP_Fake::reset();
+$tidy = new Claude_Cowork_Site_Writer();
+WP_Fake::$contentFilter = static function (string $html): string {
+    return str_replace('<img src="x.png">', '<img src="x.png" />', $html);
+};
+$tidyId = $tidy->write('templatePart', 0, ['content' => '<a href="/"><img src="x.png"></a>', 'area' => 'header'], 'header');
+checkTrue('markup WordPress tidied, not stripped, is accepted', $tidyId > 0);
+
+// And a body that lost real text, with every tag still standing, is still refused: KSES strips
+// attributes and inline handlers too, and a caller told nothing would report that as done.
+WP_Fake::reset();
+$thin = new Claude_Cowork_Site_Writer();
+WP_Fake::$contentFilter = static function (string $html): string {
+    return str_replace(str_repeat('keep this text ', 40), '', $html);
+};
+$thinThrew = '';
+try {
+    $thin->write('templatePart', 0, ['content' => '<p>' . str_repeat('keep this text ', 40) . '</p>', 'area' => 'header'], 'header');
+} catch (Throwable $e) {
+    $thinThrew = $e->getMessage();
+}
+checkTrue('a body that came back much shorter is refused even with every tag intact', '' !== $thinThrew);
+WP_Fake::$contentFilter = null;
+
 WP_Fake::reset();
 $tpWriter = new Claude_Cowork_Site_Writer();
 $tpId = $tpWriter->write('templatePart', 0, ['content' => '<!-- second -->', 'area' => 'header'], 'header');

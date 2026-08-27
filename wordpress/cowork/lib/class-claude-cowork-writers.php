@@ -489,23 +489,43 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			return;
 		}
 
+		// Not every difference is a loss. WordPress normalises markup on the way in — a closing
+		// slash, a space inside a tag, an entity spelled out — and content that comes back a
+		// character LONGER has plainly not been stripped of anything. Refusing those would block
+		// ordinary work while catching nothing, which is worse than the silence this replaced.
+		//
+		// What is worth refusing is content that came back with less in it: a tag gone, or a body
+		// noticeably shorter than what was sent. KSES removes whole elements, so both show up loudly.
 		$lost = array();
+		$storedTags = self::tag_names( $stored );
 		foreach ( array_unique( self::tag_names( $sent ) ) as $tag ) {
-			if ( ! in_array( $tag, self::tag_names( $stored ), true ) ) {
+			if ( ! in_array( $tag, $storedTags, true ) ) {
 				$lost[] = '<' . $tag . '>';
 			}
 		}
+
+		$sentLength   = strlen( $sent );
+		$storedLength = strlen( $stored );
+		// Two percent, and never fewer than 16 characters: enough room for the normalising above,
+		// far too little to hide a deleted element.
+		$slack   = max( 16, (int) ( $sentLength * 0.02 ) );
+		$shorter = $sentLength - $storedLength;
+
+		if ( array() === $lost && $shorter <= $slack ) {
+			return;
+		}
+
 		$named = array() === $lost
-			? 'no whole tag disappeared, so the difference is in attributes or text'
+			? sprintf( 'no whole tag disappeared, but %d characters did', $shorter )
 			: 'these did not survive: ' . implode( ', ', array_slice( $lost, 0, 8 ) );
 
 		throw new RuntimeException(
 			sprintf(
-				'WordPress changed the content on the way in: %d characters were sent and %d were stored, and %s. '
+				'WordPress removed part of the content on the way in: %d characters were sent and %d were stored, and %s. '
 				. 'This is what KSES does to markup it does not allow when the caller lacks unfiltered_html. '
 				. 'An <img> pointing at an uploaded file survives where inline markup does not.',
-				strlen( $sent ),
-				strlen( $stored ),
+				$sentLength,
+				$storedLength,
 				$named
 			)
 		);
