@@ -1,8 +1,8 @@
 {
   "_comment": "What a WordPress site asks for when it checks this plugin for updates. Read by claude-cowork/update.php over the update_plugins_github.com filter. Bump it in the same commit that bumps the plugin header; tests/run.php fails if the two disagree.",
-  "version": "0.6.3",
-  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-v0.6.3/claude-cowork-0.6.3.zip",
-  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-v0.6.3",
+  "version": "0.7.0",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-v0.7.0/claude-cowork-0.7.0.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-v0.7.0",
   "requires": "5.8",
   "requires_php": "7.4",
   "tested": "6.9"
