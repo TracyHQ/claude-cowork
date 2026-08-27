@@ -1127,6 +1127,40 @@ try {
     $thinThrew = $e->getMessage();
 }
 checkTrue('a body that came back much shorter is refused even with every tag intact', '' !== $thinThrew);
+
+// A refusal must leave nothing behind. The check runs after the write, so the row is already
+// changed when it fires — and the caller records an undo only for writes that SUCCEED. An orphan
+// left here becomes the "before" of the next attempt, and reverting the Apply then faithfully
+// restores the wreckage. Measured on tracy.ai, 27/08/2026: two refused attempts left two orphan
+// overrides, and the revert afterwards put one of them back on the customer's home page.
+WP_Fake::reset();
+$orphan = new Claude_Cowork_Site_Writer();
+WP_Fake::$contentFilter = static function (string $html): string {
+    return preg_replace('#<svg\b.*?</svg>#is', '', $html);
+};
+try {
+    $orphan->write('templatePart', 0, ['content' => '<a><svg viewBox="0 0 1 1"><path d="M0 0"/></svg></a>', 'area' => 'header'], 'header');
+} catch (Throwable $e) {
+    // expected
+}
+WP_Fake::$contentFilter = null;
+check('a refused create leaves no override behind', $orphan->read('templatePart', 0, 'header'), null);
+
+// And a refused UPDATE puts the previous content back rather than leaving the stripped version.
+WP_Fake::reset();
+$keep = new Claude_Cowork_Site_Writer();
+$keep->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
+WP_Fake::$contentFilter = static function (string $html): string {
+    return preg_replace('#<svg\b.*?</svg>#is', '', $html);
+};
+try {
+    $keep->write('templatePart', 0, ['content' => '<a><svg viewBox="0 0 1 1"><path d="M0 0"/></svg></a>'], 'header');
+} catch (Throwable $e) {
+    // expected
+}
+WP_Fake::$contentFilter = null;
+$kept = $keep->read('templatePart', 0, 'header');
+check('a refused update restores what was there before', $kept['content'] ?? null, '<!-- wp:site-title /-->');
 WP_Fake::$contentFilter = null;
 
 WP_Fake::reset();

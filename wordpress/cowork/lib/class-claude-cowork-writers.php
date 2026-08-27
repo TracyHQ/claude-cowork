@@ -479,6 +479,33 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * @param string $sent The content handed to it, unslashed.
 	 * @throws RuntimeException When the stored content differs from what was sent.
 	 */
+	/**
+	 * Put the row back the way it was, then refuse.
+	 *
+	 * The check below runs after the write, because reading back is the only way to see what
+	 * WordPress kept. That leaves a window: the row is already changed when the refusal is raised,
+	 * and a refusal that leaves its damage in place is not a refusal at all. Worse, the caller
+	 * records an undo only for writes that SUCCEED — so an orphan left here becomes the
+	 * "before" state of the next attempt, and reverting the whole Apply then restores the wreckage
+	 * instead of removing it. Measured on tracy.ai, 27/08/2026: two refused attempts left two
+	 * orphan overrides, and the revert afterwards faithfully put one of them back.
+	 *
+	 * @param int         $id     The row just written.
+	 * @param string|null $before Its content before this write, or null when this write created it.
+	 */
+	private function undo_write( int $id, ?string $before ): void {
+		try {
+			if ( null === $before ) {
+				wp_delete_post( $id, true );
+				return;
+			}
+			wp_update_post( wp_slash( array( 'ID' => $id, 'post_content' => $before ) ), true );
+		} catch ( Throwable $e ) {
+			// The refusal about to be thrown is the more useful of the two failures.
+			unset( $e );
+		}
+	}
+
 	private function assert_content_survived( int $id, string $sent ): void {
 		$row = get_post( $id, ARRAY_A );
 		if ( ! is_array( $row ) || ! array_key_exists( 'post_content', $row ) ) {
@@ -559,6 +586,16 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			);
 		}
 
+		// Read before writing, so a refusal below can put it back. Null means this write is a create,
+		// and undoing a create is a delete.
+		$contentBefore = null;
+		if ( $id > 0 ) {
+			$existingPost = get_post( $id, ARRAY_A );
+			if ( is_array( $existingPost ) && array_key_exists( 'post_content', $existingPost ) ) {
+				$contentBefore = (string) $existingPost['post_content'];
+			}
+		}
+
 		if ( $id > 0 ) {
 			// An update that carried post_type would be re-typing an existing object, not editing
 			// it. Dropped here so a before-state (which holds every column) restores cleanly.
@@ -588,7 +625,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 
 		if ( array_key_exists( 'post_content', $data ) ) {
-			$this->assert_content_survived( $written, (string) $data['post_content'] );
+			try {
+				$this->assert_content_survived( $written, (string) $data['post_content'] );
+			} catch ( Throwable $e ) {
+				$this->undo_write( $written, $contentBefore );
+				throw $e;
+			}
 		}
 
 		$this->touched[ $written ] = $written;
@@ -832,6 +874,13 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$written = (int) $written;
 		if ( $written <= 0 ) {
 			throw new RuntimeException( 'WordPress refused the template part without saying why' );
+		}
+
+		try {
+			$this->assert_content_survived( $written, (string) $data['post_content'] );
+		} catch ( Throwable $e ) {
+			$this->undo_write( $written, null !== $existing ? (string) $existing->post_content : null );
+			throw $e;
 		}
 
 		$this->assert_content_survived( $written, (string) $data['post_content'] );
