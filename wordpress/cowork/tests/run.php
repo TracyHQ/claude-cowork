@@ -1159,6 +1159,26 @@ try {
 WP_Fake::$contentFilter = null;
 check('a refused create leaves no override behind', $orphan->read('templatePart', 0, 'header'), null);
 
+// A template part routinely carries markup KSES deletes — a block theme's header keeps its icons
+// as inline <svg>. With the filter in the way, keeping the icon means the write is refused every
+// time and dropping it means the write succeeds: the only route through destroys something the
+// customer owns. On 27/08/2026 that put the words "[GitHub icon]" on tracy.ai's home page. The
+// filter now comes off for the duration of one write, the way WordPress takes it off for an
+// administrator.
+WP_Fake::reset();
+$icons = new Claude_Cowork_Site_Writer();
+$ksesOn = true;
+WP_Fake::$contentFilter = static function (string $html) use (&$ksesOn): string {
+    return $ksesOn ? preg_replace('#<svg\b.*?</svg>#is', '', $html) : $html;
+};
+// The writer flips this the way core does, through remove_filter/add_filter.
+$GLOBALS['__kses_toggle'] = static function (bool $on) use (&$ksesOn): void { $ksesOn = $on; };
+$withIcon = '<div><a href="/x"><svg viewBox="0 0 1 1"><path d="M0 0"/></svg></a></div>';
+$iconId = $icons->write('templatePart', 0, ['content' => $withIcon, 'area' => 'header'], 'header');
+checkTrue('a header carrying an inline svg icon can be written at all', $iconId > 0);
+check('and the icon is still there afterwards', WP_Fake::$posts[$iconId]['post_content'], $withIcon);
+WP_Fake::$contentFilter = null;
+
 // And a refused UPDATE puts the previous content back rather than leaving the stripped version.
 WP_Fake::reset();
 $keep = new Claude_Cowork_Site_Writer();

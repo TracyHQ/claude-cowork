@@ -493,6 +493,43 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * @param int         $id     The row just written.
 	 * @param string|null $before Its content before this write, or null when this write created it.
 	 */
+	/**
+	 * Write markup the way WordPress writes it for someone allowed to.
+	 *
+	 * `wp_insert_post()` and `wp_update_post()` run `post_content` through KSES unless the current
+	 * user holds `unfiltered_html`. This component has no logged-in user — it authenticates with a
+	 * site token and the relay gates every call by Role — so KSES always applies, and it deletes
+	 * whole elements without telling anyone.
+	 *
+	 * That is not a safety net here; it is a wall across ordinary work. A block theme's header
+	 * routinely carries inline `<svg>` icons that have nothing to do with the change being made.
+	 * Measured on tracy.ai, 27/08/2026: a header of 840 characters was stored as 323, and the only
+	 * edit that got through was one that deleted the site's own GitHub icon and put the words
+	 * "[GitHub icon]" on the company home page. Keep the icon and the write is refused forever;
+	 * drop it and the write succeeds. Neither outcome is the one anybody wanted.
+	 *
+	 * So the filters come off for the duration of one write, exactly as WordPress takes them off
+	 * for an administrator, and go straight back on. The authority behind that is the same
+	 * authority that already lets this component install and activate a plugin — a door far wider
+	 * than this one, and one nobody thought to narrow.
+	 *
+	 * @param callable $write Performs the write and returns its result.
+	 * @return mixed Whatever $write returned.
+	 */
+	private function write_unfiltered( callable $write ) {
+		$filtered = has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		if ( $filtered && function_exists( 'kses_remove_filters' ) ) {
+			kses_remove_filters();
+		}
+		try {
+			return $write();
+		} finally {
+			if ( $filtered && function_exists( 'kses_init_filters' ) ) {
+				kses_init_filters();
+			}
+		}
+	}
+
 	private function undo_write( int $id, ?string $before ): void {
 		try {
 			if ( null === $before ) {
@@ -865,13 +902,16 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			'post_title'   => isset( $fields['title'] ) && '' !== $fields['title'] ? (string) $fields['title'] : $slug,
 		);
 
-		if ( null !== $existing ) {
-			$data['ID'] = (int) $existing->ID;
-			unset( $data['post_type'] );
-			$written = wp_update_post( wp_slash( $data ), true );
-		} else {
-			$written = wp_insert_post( wp_slash( $data ), true );
-		}
+		$written = $this->write_unfiltered(
+			static function () use ( $existing, $data ) {
+				if ( null !== $existing ) {
+					$data['ID'] = (int) $existing->ID;
+					unset( $data['post_type'] );
+					return wp_update_post( wp_slash( $data ), true );
+				}
+				return wp_insert_post( wp_slash( $data ), true );
+			}
+		);
 
 		if ( is_wp_error( $written ) ) {
 			throw new RuntimeException( $written->get_error_message() );

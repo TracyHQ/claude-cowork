@@ -33,6 +33,8 @@ final class WP_Fake
     public static array $terms = [];
     /** Stands in for KSES: a callable applied to post_content on the way in, or null for verbatim. */
     public static $contentFilter = null;
+    /** Where kses_remove_filters() parks the filter while one write goes through. */
+    public static $ksesParked = null;
     /** @var array<int,array<string,mixed>> term_id => row */
     public static array $termRows = [];
     /** @var array<int,int> menu item id => menu term id */
@@ -57,6 +59,7 @@ final class WP_Fake
         self::$stylesheet = 'tracy';
         self::$nextId = 500;
         self::$contentFilter = null;
+        self::$ksesParked = null;
     }
 }
 
@@ -346,4 +349,29 @@ function wp_update_nav_menu_item(int $menuId, int $itemId = 0, array $args = [])
     WP_Fake::$meta[$id . ':_menu_item_menu_item_parent'] = (int) ($args['menu-item-parent-id'] ?? 0);
     WP_Fake::$menuOf[$id] = $menuId;
     return $id;
+}
+
+/**
+ * The KSES switch, as the writer sees it. Core's kses_remove_filters()/kses_init_filters() work by
+ * calling remove_filter/add_filter; standing in for those is enough for a test to watch the writer
+ * turn the filter off for one write and back on after.
+ */
+function has_filter($tag = '', $fn = '')
+{
+    return WP_Fake::$contentFilter !== null;
+}
+
+function kses_remove_filters(): void
+{
+    WP_Fake::$ksesParked = WP_Fake::$contentFilter;
+    if (isset($GLOBALS['__kses_toggle'])) {
+        ($GLOBALS['__kses_toggle'])(false);
+    }
+}
+
+function kses_init_filters(): void
+{
+    if (isset($GLOBALS['__kses_toggle'])) {
+        ($GLOBALS['__kses_toggle'])(true);
+    }
 }
