@@ -31,6 +31,8 @@ final class WP_Fake
     public static int $nextId = 500;
     /** @var array<string,string[]> "postId:taxonomy" => term names */
     public static array $terms = [];
+    /** Stands in for KSES: a callable applied to post_content on the way in, or null for verbatim. */
+    public static $contentFilter = null;
     /** @var array<int,array<string,mixed>> term_id => row */
     public static array $termRows = [];
     /** @var array<int,int> menu item id => menu term id */
@@ -54,6 +56,7 @@ final class WP_Fake
         self::$nextTermId = 900;
         self::$stylesheet = 'tracy';
         self::$nextId = 500;
+        self::$contentFilter = null;
     }
 }
 
@@ -88,11 +91,25 @@ function get_post(int $id, string $output = '')
     return ARRAY_A === $output ? WP_Fake::$posts[$id] : (object) WP_Fake::$posts[$id];
 }
 
+/**
+ * What real WordPress does to `post_content` on the way in, when the caller lacks
+ * `unfiltered_html`: KSES removes any tag outside its allow-list. Set
+ * `WP_Fake::$contentFilter` to a callable to stand in for it. Null means store verbatim.
+ */
+function wp_fake_apply_content_filter(array $data): array
+{
+    if (isset($data['post_content']) && is_callable(WP_Fake::$contentFilter)) {
+        $data['post_content'] = call_user_func(WP_Fake::$contentFilter, (string) $data['post_content']);
+    }
+    return $data;
+}
+
 function wp_insert_post(array $data, bool $wpError = false)
 {
     if (!isset($data['post_title']) && !isset($data['post_content'])) {
         return $wpError ? new WP_Error('empty post') : 0;
     }
+    $data = wp_fake_apply_content_filter($data);
     $id = WP_Fake::$nextId++;
     WP_Fake::$posts[$id] = array_merge(['ID' => $id], $data);
     return $id;
@@ -104,6 +121,7 @@ function wp_update_post(array $data, bool $wpError = false)
     if (!isset(WP_Fake::$posts[$id])) {
         return $wpError ? new WP_Error("no such post: {$id}") : 0;
     }
+    $data = wp_fake_apply_content_filter($data);
     WP_Fake::$posts[$id] = array_merge(WP_Fake::$posts[$id], $data);
     return $id;
 }

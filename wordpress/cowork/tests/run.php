@@ -1069,6 +1069,74 @@ $before = $tpWriter->read('templatePart', 0, 'header');
 check('reading it back gives the content an undo would restore', $before['content'], '<!-- second -->');
 check('and the area with it', $before['area'], 'header');
 
+// WordPress filters `post_content` on the way in when the caller lacks `unfiltered_html`: KSES
+// deletes every tag outside its allow-list, `<svg>` among them, and says nothing. On 27/08/2026 a
+// 16,298-character header carrying a logo went in and 3,822 characters came out — the logo gone,
+// the site's own header emptied — and Apply answered ok. A writer that cannot see that has no way
+// to stop reporting a success it did not achieve, so it must read back and compare.
+WP_Fake::reset();
+$kses = new Claude_Cowork_Site_Writer();
+WP_Fake::$contentFilter = static function (string $html): string {
+    return preg_replace('#<svg\b.*?</svg>#is', '', $html);
+};
+$sent = '<!-- wp:html --><a href="/"><svg viewBox="0 0 10 10"><path d="M0 0"/></svg></a><!-- /wp:html -->';
+$threw = '';
+try {
+    $kses->write('templatePart', 0, ['content' => $sent, 'area' => 'header'], 'header');
+} catch (Throwable $e) {
+    $threw = $e->getMessage();
+}
+checkTrue('a write whose content WordPress altered is refused, not reported as done', '' !== $threw);
+checkTrue('and the refusal says the content was changed on the way in',
+    false !== stripos($threw, 'changed') || false !== stripos($threw, 'stripped') || false !== stripos($threw, 'filtered'));
+checkTrue('and it names the tag that did not survive, so the caller can pick another route',
+    false !== stripos($threw, 'svg'));
+WP_Fake::$contentFilter = null;
+
+// Content that survives untouched is written exactly as before: the read-back must not become a
+// second way for a good write to fail.
+WP_Fake::reset();
+$clean = new Claude_Cowork_Site_Writer();
+$cleanId = $clean->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
+checkTrue('an unaltered write still succeeds', $cleanId > 0);
+
+WP_Fake::reset();
+$tpWriter = new Claude_Cowork_Site_Writer();
+$tpId = $tpWriter->write('templatePart', 0, ['content' => '<!-- second -->', 'area' => 'header'], 'header');
+
+// A file that lost bytes on the way here must not land looking like a success. On 27/08/2026 an
+// agent typed a 4,935-byte PNG out as base64 by hand; three characters came through wrong, the
+// file arrived exactly the right size and unopenable, and the Apply answered ok. The page showed
+// the wreckage. A checksum taken before the bytes left is the only thing that can see that.
+$sumWriter = new FakeSiteWriter();
+$sumMedia  = new FakeMediaWriter();
+$sumEngine = new Engine($WTOKEN, [], null, null, null, null, $sumWriter, $sumMedia, new FakeApplyLog());
+$sumApply  = static function (string $action, array $params) use ($sumEngine, $WTOKEN): array {
+    return $sumEngine->handle(['token' => $WTOKEN, 'action' => $action, 'params' => $params]);
+};
+$goodBytes = 'the original bytes';
+$goodSum   = hash('sha256', $goodBytes);
+
+$okUp = $sumApply('media.upload', [
+    'apply_id' => 'S1', 'path' => 'wp-content/uploads/2026/08/x.png',
+    'content_b64' => base64_encode($goodBytes), 'sha256' => $goodSum,
+]);
+checkTrue('an upload whose checksum matches is accepted', ($okUp['ok'] ?? false) === true);
+
+$badUp = $sumApply('media.upload', [
+    'apply_id' => 'S2', 'path' => 'wp-content/uploads/2026/08/y.png',
+    'content_b64' => base64_encode('the 0riginal bytes'), 'sha256' => $goodSum,
+]);
+check('an upload whose bytes changed on the way is refused', $badUp['ok'] ?? null, false);
+check('and it is named as a corruption, not a write failure', $badUp['error'] ?? null, 'corrupt_upload');
+check('and nothing was written for it', $sumMedia->read('wp-content/uploads/2026/08/y.png'), null);
+
+$noSum = $sumApply('media.upload', [
+    'apply_id' => 'S3', 'path' => 'wp-content/uploads/2026/08/z.png',
+    'content_b64' => base64_encode($goodBytes),
+]);
+checkTrue('an older caller that sends no checksum still works', ($noSum['ok'] ?? false) === true);
+
 // Another theme's override must be invisible: a site that switched themes keeps the old rows,
 // and editing by slug alone would rewrite a header nobody has seen for months.
 WP_Fake::$stylesheet = 'twentytwentyfive';

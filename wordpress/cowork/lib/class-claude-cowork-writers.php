@@ -461,6 +461,69 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	/**
 	 * @param array<string,mixed> $fields
 	 */
+	/**
+	 * Refuse a write whose content WordPress changed on the way in.
+	 *
+	 * `wp_insert_post()` and `wp_update_post()` run `post_content` through KSES whenever the
+	 * caller lacks `unfiltered_html`, which deletes every tag outside the allow-list and reports
+	 * nothing: the id comes back, the write looks clean, and the row holds less than was sent.
+	 * On 27/08/2026 a 16,298-character header carrying a logo was stored as 3,822 characters with
+	 * the logo gone, the site's own header emptied, and Apply answering ok — the caller had no way
+	 * to know, so it told the customer the job was done.
+	 *
+	 * Reading the row back is the only way to see it from here, so that is what this does. It is
+	 * a refusal rather than a warning because a half-written override renders, and a header that
+	 * renders wrong is worse than one that was never touched.
+	 *
+	 * @param int    $id   The row WordPress just wrote.
+	 * @param string $sent The content handed to it, unslashed.
+	 * @throws RuntimeException When the stored content differs from what was sent.
+	 */
+	private function assert_content_survived( int $id, string $sent ): void {
+		$row = get_post( $id, ARRAY_A );
+		if ( ! is_array( $row ) || ! array_key_exists( 'post_content', $row ) ) {
+			return;
+		}
+		$stored = (string) $row['post_content'];
+		if ( $stored === $sent ) {
+			return;
+		}
+
+		$lost = array();
+		foreach ( array_unique( self::tag_names( $sent ) ) as $tag ) {
+			if ( ! in_array( $tag, self::tag_names( $stored ), true ) ) {
+				$lost[] = '<' . $tag . '>';
+			}
+		}
+		$named = array() === $lost
+			? 'no whole tag disappeared, so the difference is in attributes or text'
+			: 'these did not survive: ' . implode( ', ', array_slice( $lost, 0, 8 ) );
+
+		throw new RuntimeException(
+			sprintf(
+				'WordPress changed the content on the way in: %d characters were sent and %d were stored, and %s. '
+				. 'This is what KSES does to markup it does not allow when the caller lacks unfiltered_html. '
+				. 'An <img> pointing at an uploaded file survives where inline markup does not.',
+				strlen( $sent ),
+				strlen( $stored ),
+				$named
+			)
+		);
+	}
+
+	/**
+	 * Every tag name in a fragment, lower-cased, in the order they appear.
+	 *
+	 * @param string $html Markup to read.
+	 * @return string[]
+	 */
+	private static function tag_names( string $html ): array {
+		if ( ! preg_match_all( '/<\s*([a-zA-Z][a-zA-Z0-9:-]*)/', $html, $m ) ) {
+			return array();
+		}
+		return array_map( 'strtolower', $m[1] );
+	}
+
 	private function write_post( int $id, array $fields ): int {
 		$data = array();
 		foreach ( $fields as $field => $value ) {
@@ -502,6 +565,10 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$written = (int) $written;
 		if ( $written <= 0 ) {
 			throw new RuntimeException( 'WordPress refused the post without saying why' );
+		}
+
+		if ( array_key_exists( 'post_content', $data ) ) {
+			$this->assert_content_survived( $written, (string) $data['post_content'] );
 		}
 
 		$this->touched[ $written ] = $written;
@@ -746,6 +813,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( $written <= 0 ) {
 			throw new RuntimeException( 'WordPress refused the template part without saying why' );
 		}
+
+		$this->assert_content_survived( $written, (string) $data['post_content'] );
 
 		// Set every time, not only on create: a row whose theme term went missing renders nothing
 		// and reports nothing, and re-asserting it costs one query.

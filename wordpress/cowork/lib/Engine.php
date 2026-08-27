@@ -1056,6 +1056,29 @@ final class Engine
             return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
         }
 
+        // What the bytes were before they left the caller. base64 carries no integrity of its own,
+        // so a file transcribed by hand — which is what an agent does when it types content_b64
+        // rather than naming a file — can arrive the exact right length and still be broken. On
+        // 2026-08-27 three characters of a 4,935-byte PNG came through wrong: the upload reported
+        // success, the attachment was created, and every visitor saw a mangled logo. Optional, so
+        // an older caller that cannot compute it is not locked out; when it is sent, it decides.
+        $expected = isset($p['sha256']) && is_string($p['sha256']) ? strtolower(trim($p['sha256'])) : '';
+        if ($expected !== '') {
+            $actual = hash('sha256', $bytes);
+            if (!hash_equals($expected, $actual)) {
+                return $this->err(
+                    'corrupt_upload',
+                    sprintf(
+                        'the bytes that arrived are not the bytes that were sent: expected sha256 %s, got %s (%d bytes). '
+                        . 'Nothing was written. Send the file by path rather than transcribing it.',
+                        substr($expected, 0, 12),
+                        substr($actual, 0, 12),
+                        strlen($bytes)
+                    )
+                );
+            }
+        }
+
         try {
             $before = $this->media->read($path); // null => new file, so its undo is a delete
             $attachment = $this->media->write($path, $bytes);
