@@ -538,13 +538,18 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$slack   = max( 16, (int) ( $sentLength * 0.02 ) );
 		$shorter = $sentLength - $storedLength;
 
-		if ( array() === $lost && $shorter <= $slack ) {
+		// Length decides; the tag list only explains. Counting tag names off a regex also catches
+		// `<x` sitting in ordinary text or inside an HTML comment, and WordPress escaping one of
+		// those to `&lt;x` reads as a tag that disappeared. Content that came back the same size or
+		// LONGER has lost nothing, whatever the names suggest — measured 27/08/2026, when a header
+		// that grew by nine characters was refused for losing a tag called `<x>`.
+		if ( $shorter <= $slack ) {
 			return;
 		}
 
 		$named = array() === $lost
-			? sprintf( 'no whole tag disappeared, but %d characters did', $shorter )
-			: 'these did not survive: ' . implode( ', ', array_slice( $lost, 0, 8 ) );
+			? sprintf( '%d characters went missing without a whole tag disappearing', $shorter )
+			: 'these look gone: ' . implode( ', ', array_slice( $lost, 0, 8 ) );
 
 		throw new RuntimeException(
 			sprintf(

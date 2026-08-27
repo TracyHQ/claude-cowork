@@ -1113,6 +1113,19 @@ WP_Fake::$contentFilter = static function (string $html): string {
 $tidyId = $tidy->write('templatePart', 0, ['content' => '<a href="/"><img src="x.png"></a>', 'area' => 'header'], 'header');
 checkTrue('markup WordPress tidied, not stripped, is accepted', $tidyId > 0);
 
+// The tag list is an explanation, never the verdict. A regex over tag names also matches `<x`
+// sitting in plain text or inside an HTML comment, and WordPress escaping one to `&lt;x` reads as
+// a tag that vanished. On 27/08/2026 a header that came back NINE CHARACTERS LONGER was refused
+// for losing a tag called `<x>`, which had never been a tag.
+WP_Fake::reset();
+$grew = new Claude_Cowork_Site_Writer();
+WP_Fake::$contentFilter = static function (string $html): string {
+    return str_replace('<x', '&lt;x', $html) . '  ';
+};
+$grewId = $grew->write('templatePart', 0, ['content' => '<p>a comparison like a <x b, in prose</p>', 'area' => 'header'], 'header');
+checkTrue('content that came back longer is accepted, whatever the tag names say', $grewId > 0);
+WP_Fake::$contentFilter = null;
+
 // And a body that lost real text, with every tag still standing, is still refused: KSES strips
 // attributes and inline handlers too, and a caller told nothing would report that as done.
 WP_Fake::reset();
