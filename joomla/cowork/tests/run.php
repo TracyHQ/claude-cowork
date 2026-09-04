@@ -1415,5 +1415,54 @@ checkTrue('what came back is a readable tar with the file in it', $inlineStatus 
 checkTrue('capability names one of the three roads', in_array(AutoUploader::capability(), ['curl', 'stream', 'none'], true));
 
 
+// ---------------------------------------------------------------- long paths (PAX) --
+// A 116-character image filename on a live Joomla 6 site (2026-09-04): no slash to split on, so
+// USTAR cannot hold it and the whole part died. The archive now carries such a path in a PAX
+// header, and the part cursor has to slice through a three-block header as easily as one.
+
+$paxTmp = sys_get_temp_dir() . '/tracy_pax_' . bin2hex(random_bytes(4));
+mkdir("$paxTmp/images/Article Images/Initial with watermarks/1. fiji travel exp", 0777, true);
+$paxName = 'stock-photo-active-senior-couple-taking-under-water-selfie-in-tropical-sea-excursion-with-water-camera-boat-2257076149.jpg';
+$paxRel  = "images/Article Images/Initial with watermarks/1. fiji travel exp/{$paxName}";
+file_put_contents("$paxTmp/$paxRel", str_repeat('J', 3000));
+file_put_contents("$paxTmp/index.php", '<?php');
+checkTrue('the filename alone is longer than USTAR allows', strlen($paxName) > 100);
+
+$paxEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($paxTmp), null);
+$paxParts = []; $cursor = ''; $offset = 0; $declared = 0; $guard = 0;
+do {
+    $r = $paxEngine->handle([
+        'token'  => 'a-token-at-least-16',
+        'action' => 'files.pack',
+        // MIN_PART_BYTES clamps target_bytes, so slice the entry by asking for it in pieces at the
+        // engine's floor and checking the cursor lands inside the header on the way.
+        'params' => ['inline' => true, 'target_bytes' => 1, 'path' => $cursor, 'offset' => $offset, 'size' => $declared],
+    ]);
+    checkTrue('each inline part succeeds', $r['ok'] === true);
+    $paxParts[] = base64_decode($r['part_b64']);
+    $cursor = $r['next_path'] ?? ''; $offset = $r['next_offset'] ?? 0; $declared = $r['next_size'] ?? 0;
+} while (empty($r['done']) && ++$guard < 20);
+
+$paxTar = "$paxTmp/out.tar";
+file_put_contents($paxTar, implode('', $paxParts));
+exec('tar -tf ' . escapeshellarg($paxTar) . ' 2>&1', $paxList, $paxStatus);
+check('tar reads an archive with a 116-character filename', $paxStatus, 0);
+checkTrue('and the long path survives the round trip', in_array($paxRel, array_map('trim', $paxList), true));
+
+// The cursor arithmetic itself: an entry offset that falls INSIDE a three-block header resumes
+// mid-header and still produces the same bytes as one uninterrupted pack.
+$wholeEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($paxTmp), null);
+$whole = base64_decode($wholeEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['inline' => true]])['part_b64']);
+$headerLen = strlen(TarStream::fileHeader($paxRel, 3000, 0644, 0));
+check('a long path costs three blocks of header', $headerLen, 3 * TarStream::BLOCK_BYTES);
+$resumed = $wholeEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['inline' => true, 'path' => $paxRel, 'offset' => 700, 'size' => 3000]]);
+checkTrue('resuming inside the PAX header succeeds', $resumed['ok'] === true);
+$resumedBytes = base64_decode($resumed['part_b64']);
+// The entry starts one block before its PAX record (the record names the real path).
+$recordPos = strpos($whole, "path={$paxRel}\n");
+checkTrue('the PAX record names the real path', $recordPos !== false);
+$posInWhole = $recordPos - TarStream::BLOCK_BYTES;
+check('bytes after offset 700 match the uninterrupted archive', substr($resumedBytes, 0, 1024), substr($whole, $posInWhole + 700, 1024));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

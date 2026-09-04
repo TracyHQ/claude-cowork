@@ -540,7 +540,12 @@ final class Engine
                 // everything after that entry would shift.
                 $size = ($entryOffset > 0 && $declared > 0) ? $declared : (int) filesize($abs);
                 $declared = $size;
-                $headerEnd  = TarStream::BLOCK_BYTES;
+                // Measured, not assumed: a path USTAR cannot hold arrives as a PAX header, its
+                // record, then the ordinary header — three blocks, not one (TarStream::entry).
+                // A 116-character image filename on a live Joomla 6 site killed a run on the
+                // one-block assumption (2026-09-04).
+                $header     = TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
+                $headerEnd  = strlen($header);
                 $contentEnd = $headerEnd + $size;
                 $entryEnd   = $contentEnd + strlen(TarStream::pad($size));
 
@@ -549,7 +554,6 @@ final class Engine
                     if ($entryOffset === 0) {
                         $files++;
                     }
-                    $header = TarStream::fileHeader($path, $size, fileperms($abs) & 0777, (int) filemtime($abs));
                     $take   = min($headerEnd - $entryOffset, $target - strlen($buf));
                     $buf         .= substr($header, $entryOffset, $take);
                     $entryOffset += $take;
