@@ -203,6 +203,19 @@ final class AutoUploader implements Uploader
         return $this->chosen instanceof CurlUploader ? 'curl' : 'stream';
     }
 
+    /**
+     * What this host can do at all: 'curl', 'stream', or 'none' when it cannot open an outbound
+     * connection either way. Reported by `info` so a caller can choose the inline road for
+     * `files.pack` before the first part, instead of learning it from a failed upload.
+     */
+    public static function capability(): string
+    {
+        if (function_exists('curl_init')) {
+            return 'curl';
+        }
+        return StreamUploader::available() ? 'stream' : 'none';
+    }
+
     public function put(string $url, string $body): array
     {
         return $this->chosen->put($url, $body);

@@ -1393,5 +1393,27 @@ checkTrue('…and says so', str_contains($down['error'], 'Connection refused'));
 checkTrue('AutoUploader picks curl where curl exists', (new AutoUploader())->via() === (function_exists('curl_init') ? 'curl' : 'stream'));
 
 
+// ---------------------------------------------------------------- inline pack --
+// A host that cannot open an outbound connection hands the part back in the answer.
+
+$inlineTmp = sys_get_temp_dir() . '/tracy_inline_' . bin2hex(random_bytes(4));
+mkdir($inlineTmp);
+file_put_contents("$inlineTmp/hello.txt", "hello inline\n");
+$inlineEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($inlineTmp), null);
+$noWay = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['put_url' => 'https://example.test/p']]);
+check('without an uploader the direct road is unavailable, as before', $noWay['error'], 'unavailable');
+$inlinePart = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['inline' => true, 'target_bytes' => 5 * 1024 * 1024]]);
+checkTrue('the inline road needs no uploader', $inlinePart['ok'] === true);
+checkTrue('and finishes a small site in one part', $inlinePart['done'] === true);
+check('the part is base64 of the tar bytes, etag left to the caller', [strlen(base64_decode($inlinePart['part_b64'], true)) === $inlinePart['bytes'], $inlinePart['etag']], [true, '']);
+check('the sha256 is of the raw bytes', hash('sha256', base64_decode($inlinePart['part_b64'])), $inlinePart['sha256']);
+$inlineTar = "$inlineTmp.tar";
+file_put_contents($inlineTar, base64_decode($inlinePart['part_b64']));
+exec('tar -tf ' . escapeshellarg($inlineTar) . ' 2>&1', $inlineListed, $inlineStatus);
+checkTrue('what came back is a readable tar with the file in it', $inlineStatus === 0 && in_array('hello.txt', array_map('trim', $inlineListed), true));
+@unlink($inlineTar); @unlink("$inlineTmp/hello.txt"); @rmdir($inlineTmp);
+checkTrue('capability names one of the three roads', in_array(AutoUploader::capability(), ['curl', 'stream', 'none'], true));
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

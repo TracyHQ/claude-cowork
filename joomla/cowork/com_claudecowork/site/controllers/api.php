@@ -57,6 +57,7 @@ class ClaudeCoworkControllerApi extends BaseController
                 'php'       => PHP_VERSION,
                 'joomla'    => \defined('JVERSION') ? JVERSION : null,
                 'component' => $this->installedVersion(),
+                'upload'    => \AutoUploader::capability(),
             ],
             $this->buildDumper(),
             $this->buildWalker($params),

@@ -104,6 +104,7 @@ final class EngineFactory
                 'php'       => PHP_VERSION,
                 'joomla'    => \defined('JVERSION') ? JVERSION : null,
                 'component' => self::installedVersion(),
+                'upload'    => \AutoUploader::capability(),
             ],
             self::buildDumper(),
             self::buildWalker($params),

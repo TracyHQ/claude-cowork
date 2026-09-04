@@ -469,12 +469,20 @@ final class Engine
         if ($this->walker === null) {
             return $this->err('unavailable', 'file walk not wired');
         }
-        if ($this->uploader === null) {
-            return $this->err('unavailable', 'uploader not wired');
-        }
+        // Two ways out for a part. `put_url`: this host PUTs it to the store itself, the usual way.
+        // `inline`: the part comes back in the answer, base64, and the caller stores it — for a
+        // host that cannot open an outbound connection at all (no ext/curl AND allow_url_fopen
+        // off; measured on a live Joomla 6.0.3 site, 2026-09-04). The database has always
+        // travelled inline; this gives files the same road when the direct one is closed.
+        $inline = !empty($p['inline']);
         $putUrl = isset($p['put_url']) && is_string($p['put_url']) ? $p['put_url'] : '';
-        if ($putUrl === '') {
-            return $this->err('bad_params', 'put_url required');
+        if (!$inline) {
+            if ($this->uploader === null) {
+                return $this->err('unavailable', 'uploader not wired');
+            }
+            if ($putUrl === '') {
+                return $this->err('bad_params', 'put_url required');
+            }
         }
 
         $target = (int) ($p['target_bytes'] ?? self::MIN_PART_BYTES);
@@ -614,18 +622,26 @@ final class Engine
         }
 
         $sha = hash('sha256', $buf);
-        $put = $this->uploader->put($putUrl, $buf);
-        if (!$put['ok']) {
-            // The cursor does not move when the upload fails: the caller signs a fresh URL and
-            // asks for this same part again.
-            return $this->err('upload_failed', $put['error']);
+        $etag = '';
+        $partB64 = null;
+        if ($inline) {
+            $partB64 = base64_encode($buf);
+        } else {
+            $put = $this->uploader->put($putUrl, $buf);
+            if (!$put['ok']) {
+                // The cursor does not move when the upload fails: the caller signs a fresh URL and
+                // asks for this same part again.
+                return $this->err('upload_failed', $put['error']);
+            }
+            $etag = $put['etag'];
         }
 
         return $this->ok([
             'bytes'       => strlen($buf),
             'files'       => $files,
             'sha256'      => $sha,
-            'etag'        => $put['etag'],
+            'etag'        => $etag,
+            'part_b64'    => $partB64,
             'next_path'   => $path,
             'next_offset' => $entryOffset,
             // Only meaningful mid-entry, which is the only time the caller must hand it back.

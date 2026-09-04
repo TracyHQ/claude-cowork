@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. files.pack can now hand each part back inline, for a host that cannot open an outbound connection at all; info reports which upload road the host has.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.8.22</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.22</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.8.22/pkg_claudecowork-0.8.22.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Uploads through PHP's own HTTP streams when ext/curl is missing, so a host without curl can still hand its files to Tracy.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
