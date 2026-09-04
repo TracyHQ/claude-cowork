@@ -1375,5 +1375,23 @@ check('the door plugin enables itself on install', trim((string) $doorManifest->
 checkTrue('build.sh zips the door plugin', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'plg_system_claudecoworkapi.zip'));
 
 
+// ---------------------------------------------------------------- StreamUploader --
+// The no-curl path. Only the parsing is pinned here (no network in the runner); the wire itself
+// was exercised by hand against a live Joomla 6 site with no ext/curl on 2026-09-04.
+
+$okParse = StreamUploader::parseResponse(['HTTP/1.1 200 OK', 'ETag: "abc123"', 'Content-Length: 0'], '');
+check('a 200 with an ETag is an accepted part', $okParse, ['ok' => true, 'status' => 200, 'etag' => 'abc123', 'error' => '']);
+check('the last hop\'s status and ETag win after a redirect',
+    StreamUploader::parseResponse(['HTTP/1.1 307 Temporary Redirect', 'Location: /x', 'HTTP/1.1 200 OK', 'ETag: second'], ''),
+    ['ok' => true, 'status' => 200, 'etag' => 'second', 'error' => '']);
+check('a 200 without an ETag is refused, like curl does', StreamUploader::parseResponse(['HTTP/1.1 200 OK'], '')['error'], 'response carried no ETag');
+$denied = StreamUploader::parseResponse(['HTTP/1.1 403 Forbidden'], '<Error><Code>SignatureDoesNotMatch</Code></Error>');
+check('a refusal carries the status and the store\'s words', [$denied['ok'], $denied['status'], $denied['error']], [false, 403, 'HTTP 403: <Error><Code>SignatureDoesNotMatch</Code></Error>']);
+$down = StreamUploader::parseResponse([], false, 'file_get_contents(): Failed to open stream: Connection refused');
+check('no answer at all is a transport error with the PHP warning', [$down['ok'], $down['status']], [false, 0]);
+checkTrue('…and says so', str_contains($down['error'], 'Connection refused'));
+checkTrue('AutoUploader picks curl where curl exists', (new AutoUploader())->via() === (function_exists('curl_init') ? 'curl' : 'stream'));
+
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

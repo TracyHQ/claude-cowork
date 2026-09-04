@@ -107,7 +107,7 @@ final class EngineFactory
             ],
             self::buildDumper(),
             self::buildWalker($params),
-            new \CurlUploader(120),
+            new \AutoUploader(120),
             new JoomlaExtensions(),
             self::buildWriter(),
             self::buildMedia(),

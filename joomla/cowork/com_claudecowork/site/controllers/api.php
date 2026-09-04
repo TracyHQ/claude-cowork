@@ -60,7 +60,7 @@ class ClaudeCoworkControllerApi extends BaseController
             ],
             $this->buildDumper(),
             $this->buildWalker($params),
-            new \CurlUploader(120),
+            new \AutoUploader(120),
             null
         );
 

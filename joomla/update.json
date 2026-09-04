@@ -1,7 +1,7 @@
 {
   "_comment": "What Tracy Desk asks for when it checks this package for updates. update.xml answers Joomla's own updater, which needs the targetplatform rule and every past release; this answers the desk, which has no XML parser in its main process and no targetplatform rule to apply. Two files, one number. Bump it in the same commit that bumps pkg_claudecowork.xml; tests/run.php fails if they disagree.",
-  "version": "0.8.20",
-  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.8.20/pkg_claudecowork-0.8.20.zip",
-  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.20",
+  "version": "0.8.21",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.8.21/pkg_claudecowork-0.8.21.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.21",
   "requires_php": "7.4"
 }
