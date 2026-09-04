@@ -1461,7 +1461,9 @@ $resumedBytes = base64_decode($resumed['part_b64']);
 // The entry starts one block before its PAX record (the record names the real path).
 $recordPos = strpos($whole, "path={$paxRel}\n");
 checkTrue('the PAX record names the real path', $recordPos !== false);
-$posInWhole = $recordPos - TarStream::BLOCK_BYTES;
+// The record starts on a block boundary with its own length ("180 path=…"), so the block holding
+// `path=` is the record block, and the entry begins one block before it.
+$posInWhole = intdiv($recordPos, TarStream::BLOCK_BYTES) * TarStream::BLOCK_BYTES - TarStream::BLOCK_BYTES;
 check('bytes after offset 700 match the uninterrupted archive', substr($resumedBytes, 0, 1024), substr($whole, $posInWhole + 700, 1024));
 
 echo "\n{$passed} passed, {$failed} failed\n";
