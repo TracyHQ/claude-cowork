@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="system" method="upgrade">
+    <name>plg_system_claudecoworkapi</name>
+    <author>Tracy</author>
+    <creationDate>2026-09</creationDate>
+    <copyright>(C) 2026 Tracy</copyright>
+    <license>GPL-2.0-or-later</license>
+    <version>0.1.0</version>
+    <description><![CDATA[
+        Answers the Claude Cowork API door before Joomla routes the request, on the site and the
+        administrator alike. Installed and updated as part of the Claude Cowork package.
+    ]]></description>
+    <namespace path="src">Tracy\Plugin\System\ClaudeCoworkApi</namespace>
+    <scriptfile>script.php</scriptfile>
+    <files>
+        <folder plugin="claudecoworkapi">services</folder>
+        <folder>src</folder>
+    </files>
+</extension>

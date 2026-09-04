@@ -16,6 +16,7 @@ require_once __DIR__ . '/../lib/Extensions.php';
 require_once __DIR__ . '/../lib/SiteWriter.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/../lib/Engine.php';
+require_once __DIR__ . '/../lib/Door.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
 // PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
@@ -1342,6 +1343,36 @@ check('a restorer refusal becomes a clean error, not a 500', $frFail['error'], '
 
 $frNone = (new Engine($frToken))->handle(['token' => $frToken, 'action' => 'files.restore', 'params' => ['get_url' => 'https://r2.example/snap.tar']]);
 check('with no restorer wired the action is unavailable', $frNone['error'], 'unavailable');
+
+
+// ---------------------------------------------------------------- Door -----
+// The one question the system plugin asks of every request before Joomla routes it: is this the
+// API door? Pure so it can be pinned here — the plugin itself only runs inside Joomla.
+
+checkTrue('the door answers option+task', Door::wants(['option' => 'com_claudecowork', 'task' => 'api.exec']));
+checkTrue('task is matched case-insensitively', Door::wants(['option' => 'com_claudecowork', 'task' => 'API.Exec']));
+checkTrue('format is not required — the door decides the format itself', Door::wants(['option' => 'com_claudecowork', 'task' => 'api.exec', 'format' => 'html']));
+check('another component is not the door', Door::wants(['option' => 'com_content', 'task' => 'api.exec']), false);
+check('another task of this component is not the door', Door::wants(['option' => 'com_claudecowork', 'task' => 'display']), false);
+check('an empty request is not the door', Door::wants([]), false);
+check('array-valued query parts never match', Door::wants(['option' => ['com_claudecowork'], 'task' => 'api.exec']), false);
+
+// ---------------------------------------------------------------- packaging --
+// The door plugin travels INSIDE pkg_claudecowork, so one install or one update puts it on the
+// site. A plugin left out of the package manifest builds fine and is never installed — nothing
+// would say so except a site whose front end is blocked and whose import still fails.
+
+$pkgFiles = [];
+foreach ($pkg->files->file as $file) {
+    $pkgFiles[(string) $file['id']] = ['type' => (string) $file['type'], 'group' => (string) $file['group'], 'zip' => trim((string) $file)];
+}
+check('the package carries the door plugin', $pkgFiles['claudecoworkapi'] ?? null, ['type' => 'plugin', 'group' => 'system', 'zip' => 'plg_system_claudecoworkapi.zip']);
+$doorManifest = simplexml_load_file(__DIR__ . '/../plg_system_claudecoworkapi/claudecoworkapi.xml');
+checkTrue('the door plugin has a manifest', $doorManifest !== false);
+check('the door plugin is a system plugin', (string) $doorManifest['group'], 'system');
+check('the door plugin registers its namespace', trim((string) $doorManifest->namespace), 'Tracy\Plugin\System\ClaudeCoworkApi');
+check('the door plugin enables itself on install', trim((string) $doorManifest->scriptfile), 'script.php');
+checkTrue('build.sh zips the door plugin', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'plg_system_claudecoworkapi.zip'));
 
 
 echo "\n{$passed} passed, {$failed} failed\n";

@@ -65,6 +65,24 @@ running a version cut before this existed has no address to ask, and stays silen
 updates it once by hand. That first update is the price of adding this late; every one after it
 is a click.
 
+## Why the door is ALSO a system plugin
+
+The component answers `index.php?option=com_claudecowork&task=api.exec` after Joomla has routed
+the request — at the end of a chain every other system plugin runs first. A site behind a
+"coming soon" page, an offline switch, a maintenance screen or a firewall extension has one of
+those plugins answering every front-end request itself, and the component is never reached.
+Measured 2026-09-04 on a Joomla 6.0.3 site: every `index.php?option=…` URL, core `com_ajax`
+included, returned the same coming-soon page.
+
+`plg_system_claudecoworkapi` answers the same door at `onAfterInitialise`, the earliest event a
+system plugin gets: before the router, before any gatekeeper, and on the administrator client too,
+where those gatekeepers do not act and before the administrator asks who is logged in. So the door
+opens at two addresses — `/index.php?…` and `/administrator/index.php?…` — with the token in the
+body as the only credential at either. A caller whose front door is blocked uses the back one.
+Nothing in the plugin knows about any particular gatekeeper; it ships inside this package so one
+install or update brings it, its install script enables it and orders it first, and both answerers
+share one engine wiring (`EngineFactory`) so neither can drift.
+
 ## Why a component, not a plugin
 
 This started as `plg_ajax_tracymigration`, reached through `com_ajax`. That works, but

@@ -21,6 +21,10 @@ cp lib/*.php com_claudecowork/administrator/lib/
 # only that hooks `onAfterInitialise` to set the session before the admin decides auth — but it
 # travels inside pkg_claudecowork.
 ( cd plg_system_tracyaccess && zip -qr ../build/packages/plg_system_tracyaccess.zip . -x '*.DS_Store' )
+# The API door plugin answers `api.exec` at onAfterInitialise, before routing and on both clients, so a
+# gated front end (coming soon, offline, maintenance) cannot hide the component. Same package, same
+# update, for the same reason as the plugin above.
+( cd plg_system_claudecoworkapi && zip -qr ../build/packages/plg_system_claudecoworkapi.zip . -x '*.DS_Store' )
 cp pkg_claudecowork.xml build/
 ( cd build && zip -qr ../dist/pkg_claudecowork.zip . -x '*.DS_Store' )
 
