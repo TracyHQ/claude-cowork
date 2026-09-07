@@ -650,15 +650,25 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			}
 		}
 
-		if ( $id > 0 ) {
-			// An update that carried post_type would be re-typing an existing object, not editing
-			// it. Dropped here so a before-state (which holds every column) restores cleanly.
-			unset( $data['post_type'] );
-			$data['ID'] = $id;
-			// wp_slash because WordPress unslashes on the way in: content with a backslash in it
-			// loses that backslash on every save that skips this.
-			$written = wp_update_post( wp_slash( $data ), true );
-		} else {
+		// KSES comes off for this one write, exactly as it does for `write_template_part` and for
+		// the same reason (see {@see write_unfiltered}): a page built from a block theme carries the
+		// theme's own inline `<svg>` icons, and KSES deletes them without telling anyone — the row
+		// then holds less than was sent, `assert_content_survived` refuses, and a site built from a
+		// design cannot be built at all. Measured 08/09/2026 seeding a new site: 66,557 characters
+		// sent, 61,126 stored, every `<svg>`, `<path>`, `<circle>` and `<rect>` gone. The authority
+		// is the same one the relay already applied: this call arrived through a seat whose role may
+		// write content on this site.
+		$written = $this->write_unfiltered( function () use ( $id, $data ) {
+			if ( $id > 0 ) {
+				// An update that carried post_type would be re-typing an existing object, not
+				// editing it. Dropped here so a before-state (which holds every column) restores
+				// cleanly.
+				unset( $data['post_type'] );
+				$data['ID'] = $id;
+				// wp_slash because WordPress unslashes on the way in: content with a backslash in
+				// it loses that backslash on every save that skips this.
+				return wp_update_post( wp_slash( $data ), true );
+			}
 			if ( ! isset( $data['post_type'] ) || '' === $data['post_type'] ) {
 				$data['post_type'] = 'post';
 			}
@@ -667,8 +677,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				// saying so is the one outcome an Apply must not produce by omission.
 				$data['post_status'] = 'draft';
 			}
-			$written = wp_insert_post( wp_slash( $data ), true );
-		}
+			return wp_insert_post( wp_slash( $data ), true );
+		} );
 
 		if ( is_wp_error( $written ) ) {
 			throw new RuntimeException( $written->get_error_message() );
