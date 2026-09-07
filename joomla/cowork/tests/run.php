@@ -1257,6 +1257,43 @@ check('and points at that version\'s release asset',
     trim((string) $upd->update->downloads->downloadurl),
     "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
 check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
+
+// ── the self-updater ────────────────────────────────────────────────────────────────────────
+// Joomla notifies about an extension update and then waits; this plugin is what installs it, so a
+// site nobody administers by hand does not sit on the version it was born with. It is only ever
+// reached if it ships INSIDE the package, is enabled on install, and never installs anything but a
+// release of this repository — three things nothing else here would notice losing.
+
+$plgFiles = [];
+
+foreach ($pkg->files->file as $file) {
+    $plgFiles[] = trim((string) $file);
+}
+
+check('the package ships the self-updater', \in_array('plg_system_claudecoworkupdate.zip', $plgFiles, true), true);
+checkTrue('build.sh packs it', str_contains(
+    file_get_contents(__DIR__ . '/../build.sh'),
+    'plg_system_claudecoworkupdate.zip'
+));
+
+$updaterSrc = file_get_contents(__DIR__ . '/../plg_system_claudecoworkupdate/src/Extension/ClaudeCoworkUpdate.php');
+
+// A package is downloaded by URL and installed on somebody's server. A manifest that has been
+// tampered with, or one day moved, must not be able to point a site at anything else.
+checkTrue('it will only install a release asset of this repository', str_contains(
+    $updaterSrc,
+    "ASSET_PREFIX = 'https://github.com/TracyHQ/claude-cowork/releases/download/'"
+));
+checkTrue('it keeps the package current', str_contains($updaterSrc, "'pkg_claudecowork' => 'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml'"));
+// The look is released from the same repository and drifts the same silent way.
+checkTrue('and the template', str_contains($updaterSrc, "'tpl_tracy'") && str_contains($updaterSrc, "main/joomla/template/update.xml'"));
+// Joomla installs a plugin disabled, and a self-updater installed disabled never runs.
+checkTrue('and it switches itself on when installed', str_contains(
+    file_get_contents(__DIR__ . '/../plg_system_claudecoworkupdate/script.php'),
+    "'enabled') . ' = 1'"
+));
+// After the response, never before it: a visitor must not wait behind a download.
+checkTrue('it works after the page has gone to the browser', str_contains($updaterSrc, "'onAfterRespond' => 'onAfterRespond'"));
 // Without a declared server Joomla has nowhere to ask, and the backend never mentions an update.
 check('the package declares where to ask',
     trim((string) $pkg->updateservers->server),

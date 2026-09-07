@@ -25,6 +25,9 @@ cp lib/*.php com_claudecowork/administrator/lib/
 # gated front end (coming soon, offline, maintenance) cannot hide the component. Same package, same
 # update, for the same reason as the plugin above.
 ( cd plg_system_claudecoworkapi && zip -qr ../build/packages/plg_system_claudecoworkapi.zip . -x '*.DS_Store' )
+# The self-updater takes the releases Tracy announces instead of showing them and waiting — Joomla
+# core notifies and stops there. Same package, same update, for the same reason as the two above.
+( cd plg_system_claudecoworkupdate && zip -qr ../build/packages/plg_system_claudecoworkupdate.zip . -x '*.DS_Store' )
 cp pkg_claudecowork.xml build/
 ( cd build && zip -qr ../dist/pkg_claudecowork.zip . -x '*.DS_Store' )
 

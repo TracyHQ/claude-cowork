@@ -4,7 +4,7 @@
     <packagename>claudecowork</packagename>
     <author>Tracy</author>
     <creationDate>2026-08-10</creationDate>
-    <version>0.9.0</version>
+    <version>0.10.0</version>
     <description>PKG_CLAUDECOWORK_XML_DESCRIPTION</description>
 
     <!-- A package around a single component looks like overkill today and is not.
@@ -15,6 +15,7 @@
         <file type="component" id="com_claudecowork">com_claudecowork.zip</file>
         <file type="plugin" id="tracyaccess" group="system">plg_system_tracyaccess.zip</file>
         <file type="plugin" id="claudecoworkapi" group="system">plg_system_claudecoworkapi.zip</file>
+        <file type="plugin" id="claudecoworkupdate" group="system">plg_system_claudecoworkupdate.zip</file>
     </files>
 
     <!-- What makes "Check For Updates" in the Joomla backend ever say anything about this

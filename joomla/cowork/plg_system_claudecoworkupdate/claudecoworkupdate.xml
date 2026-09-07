@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="system" method="upgrade">
+    <name>plg_system_claudecoworkupdate</name>
+    <author>Tracy</author>
+    <creationDate>2026-09</creationDate>
+    <copyright>(C) 2026 Tracy</copyright>
+    <license>GPL-2.0-or-later</license>
+    <version>0.1.0</version>
+    <description><![CDATA[
+        Takes the updates Tracy announces for this site, without waiting for somebody to press a
+        button in the backend. Joomla shows an extension update and then waits; WordPress installs
+        it. This plugin gives Joomla the WordPress behaviour for Tracy's own extensions only.
+        Installed and updated as part of the Claude Cowork package.
+    ]]></description>
+    <namespace path="src">Tracy\Plugin\System\ClaudeCoworkUpdate</namespace>
+    <scriptfile>script.php</scriptfile>
+    <files>
+        <folder plugin="claudecoworkupdate">services</folder>
+        <folder>src</folder>
+    </files>
+    <config>
+        <fields name="params">
+            <fieldset name="basic">
+                <!-- The way out, and it is deliberately one switch rather than a schedule: a site
+                     owner who does not want Tracy's extensions updating themselves turns this off
+                     and Joomla goes back to showing the update and waiting. -->
+                <field
+                    name="autoupdate"
+                    type="radio"
+                    layout="joomla.form.field.radio.switcher"
+                    label="Install updates automatically"
+                    description="When off, updates are only shown in Extensions → Update, as Joomla does for every other extension."
+                    default="1"
+                >
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+            </fieldset>
+        </fields>
+    </config>
+</extension>
