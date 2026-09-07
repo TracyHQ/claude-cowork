@@ -99,8 +99,15 @@ if (dryRun) {
 }
 
 // ── 5. one commit, one tag, one release ──────────────────────────────────────────────────────
+// The manifest can already say what this release says — the very first one, where the file was
+// written by hand before any release existed. `git commit` refuses an empty change, and refusing
+// there would leave a zip built, no tag, and nothing said about why.
 run('git', ['add', 'wordpress/theme/update.json'])
-run('git', ['commit', '-m', `release(wordpress-theme): ${version}`])
+if (run('git', ['status', '--porcelain', 'wordpress/theme/update.json'])) {
+  run('git', ['commit', '-m', `release(wordpress-theme): ${version}`])
+} else {
+  console.log('· the manifest already said this version — nothing to commit')
+}
 run('git', ['tag', `wordpress-theme-v${version}`])
 run('git', ['push', 'origin', 'HEAD', '--tags'])
 
