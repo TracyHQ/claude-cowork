@@ -67,7 +67,15 @@ node scripts/release-wordpress-theme.mjs   0.1.1   # tag wordpress-theme-v0.1.1
 ```
 
 Each reads the version out of the mirrored tree and refuses when it disagrees with the number
-asked for — the number is decided once, in the repository that generates the tree. It writes the
+asked for — the number is decided once, in the repository that generates the tree.
+
+**Four release lines, one repository.** `joomla-v*` and `wordpress-v*` are the extension;
+`joomla-template-v*` and `wordpress-theme-v*` are the look. They never collide: provisioning
+resolves the extension by tag prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`)
+and a site resolves its look through the update manifest, so neither ever asks GitHub for "the
+latest release" of the repository as a whole. A look release is cut with `--latest=false` for the
+same reason: that badge is repo-wide and belongs to the extension, which is what a person coming
+here installs first. It writes the
 announcement (`joomla/template/update.xml`, `wordpress/theme/update.json`), builds the zip, tags,
 and creates the release. A site installed with the update server recorded then finds the new
 version by itself, the same way the extension does.

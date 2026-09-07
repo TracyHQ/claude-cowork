@@ -130,6 +130,11 @@ run('gh', [
   join(templateDir, 'dist', zipName),
   '--title',
   `Joomla template ${version}`,
+  // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a
+  // person coming here installs first; a look release taking it would answer the wrong question on
+  // the repository page. Provisioning is unaffected either way — it resolves the extension by tag
+  // prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`), never by /releases/latest.
+  '--latest=false',
   '--notes',
   `Tracy template ${version}. Sites on ${version} or newer need do nothing; older ones find it under "Check For Updates".`
 ])
