@@ -673,6 +673,17 @@ check('and the site is on the new one', FakePackages::$active, 'twentytwentytwo'
 
 check('a theme that is not there is refused', $call('theme.activate', ['stylesheet' => 'nope'])['error'], 'activate_failed');
 
+// A look and a style are two decisions. `theme.activate` puts a theme on; `theme.style` chooses
+// which of its variations the site wears — the step a site built from a design inspiration needs,
+// and the one that has no other door: WordPress keeps "which variation" in the user's global-styles
+// post, which no content kind describes.
+$worn = $call('theme.style', ['style' => 'airbnb']);
+check('wearing a style answers with the one now worn', $worn['style'], 'airbnb');
+checkTrue('and the site is wearing it', FakePackages::$wornStyle === 'airbnb');
+check('a style the theme does not ship is refused', $call('theme.style', ['style' => 'nope'])['error'], 'style_failed');
+check('a style id with a path in it never reaches the theme', $call('theme.style', ['style' => '../secret'])['error'], 'style_failed');
+check('and no style at all is a parameter refusal', $call('theme.style', [])['error'], 'bad_params');
+
 // Switching a plugin on destroys the same kind of state a theme switch does: whether it was
 // already running. What this covers is the ENGINE contract: the prior state the packages layer
 // reports is carried out to the caller. It does NOT cover Claude_Cowork_Packages itself, which

@@ -73,6 +73,22 @@ final class FakePackages
         return ['ok' => true, 'was_active' => $wasActive];
     }
 
+    /** The variations this fake theme ships, and the one it is wearing. */
+    public static array $styles = ['airbnb', 'apple'];
+    public static ?string $wornStyle = null;
+
+    public function wear_style(string $style): array
+    {
+        if (!preg_match('/^[a-z0-9-]+$/', $style)) {
+            return ['ok' => false, 'error' => 'style must be a-z, 0-9 and dashes'];
+        }
+        if (!in_array($style, self::$styles, true)) {
+            return ['ok' => false, 'error' => "the theme has no styles/{$style}.json"];
+        }
+        self::$wornStyle = $style;
+        return ['ok' => true, 'style' => $style, 'post' => 7];
+    }
+
     public function activate_theme(string $stylesheet): array
     {
         if (empty(self::$themes[$stylesheet])) {

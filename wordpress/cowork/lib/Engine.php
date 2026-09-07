@@ -128,6 +128,8 @@ final class Engine
                 return $this->themeInstall($params);
             case 'theme.activate':
                 return $this->themeActivate($params);
+            case 'theme.style':
+                return $this->themeStyle($params);
             case 'content.list':
                 return $this->contentList($params);
             case 'content.get':
@@ -690,6 +692,29 @@ final class Engine
         return ($result['ok'] ?? false) === true
             ? $this->ok(['activated' => $stylesheet, 'previous' => $result['previous'] ?? null])
             : $this->err('activate_failed', (string) ($result['error'] ?? 'activate failed'));
+    }
+
+    /**
+     * Wear one of the active theme's style variations.
+     *
+     * A look and a style are two steps because they are two decisions: `theme.install` and
+     * `theme.activate` put a theme on the site, and this chooses which of its variations the site
+     * wears. Tracy's own theme ships 152 of them — one per design inspiration — so building a site
+     * from an inspiration is exactly this call after those two.
+     */
+    private function themeStyle(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $style = isset($p['style']) && is_string($p['style']) ? trim($p['style']) : '';
+        if ($style === '') {
+            return $this->err('bad_params', 'style required, e.g. airbnb');
+        }
+        $result = $this->packages->wear_style($style);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['style' => $result['style'] ?? $style, 'post' => $result['post'] ?? null])
+            : $this->err('style_failed', (string) ($result['error'] ?? 'the style did not go on'));
     }
 
     // ---- Applying an approved change, and undoing it ------------------------------------------

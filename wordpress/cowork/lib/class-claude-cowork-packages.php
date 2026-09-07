@@ -433,4 +433,77 @@ final class Claude_Cowork_Packages {
 
 		return array( 'ok' => true, 'previous' => $previous );
 	}
+
+	/**
+	 * Wear one of the active theme's style variations — `styles/<style>.json` in the theme.
+	 *
+	 * A block theme ships variations as files, but "which one is worn" is not a file: it is the
+	 * user's own global-styles post. Writing it takes three steps that each fail SILENTLY when
+	 * skipped, which is why they are spelled out here rather than left to a caller:
+	 *
+	 *  1. The post must carry the `wp_theme` term. A post created with no logged-in user (WP-CLI,
+	 *     or this door) never got one, and the resolver then cannot find it — every later call
+	 *     mints another orphan post and the site keeps its old look.
+	 *  2. The kses filters on `content_save_pre` must come off for this one write. They exist to
+	 *     scrub user HTML; on theme JSON they strip everything but layout, so the write appears to
+	 *     succeed and nothing changes.
+	 *  3. `isGlobalStylesUserThemeJSON` must be set, and `$schema`/`title` dropped, or the resolver
+	 *     refuses the shape.
+	 *
+	 * @param string $style Variation id, `a-z0-9-`.
+	 * @return array
+	 */
+	public function wear_style( $style ) {
+		if ( ! preg_match( '/^[a-z0-9-]+$/', $style ) ) {
+			return array( 'ok' => false, 'error' => 'style must be a-z, 0-9 and dashes' );
+		}
+		$file = get_theme_file_path( "styles/{$style}.json" );
+		if ( ! file_exists( $file ) ) {
+			return array( 'ok' => false, 'error' => "the theme has no styles/{$style}.json" );
+		}
+		$variation = wp_json_file_decode( $file, array( 'associative' => true ) );
+		if ( ! is_array( $variation ) ) {
+			return array( 'ok' => false, 'error' => "styles/{$style}.json is not readable JSON" );
+		}
+		unset( $variation['$schema'], $variation['title'] );
+		$variation['isGlobalStylesUserThemeJSON'] = true;
+
+		$post_id = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
+		if ( ! $post_id ) {
+			$data    = WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme(), true );
+			$post_id = isset( $data['ID'] ) ? (int) $data['ID'] : 0;
+		}
+		if ( ! $post_id ) {
+			return array( 'ok' => false, 'error' => 'this site has no global styles post to write' );
+		}
+
+		wp_set_object_terms( $post_id, wp_get_theme()->get_stylesheet(), 'wp_theme' );
+
+		$had_post_kses   = has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		$had_styles_kses = has_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		if ( $had_post_kses ) {
+			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		}
+		if ( $had_styles_kses ) {
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		}
+		$written = wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => wp_json_encode( $variation ),
+			),
+			true
+		);
+		if ( $had_post_kses ) {
+			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		}
+		if ( $had_styles_kses ) {
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		}
+		if ( is_wp_error( $written ) ) {
+			return array( 'ok' => false, 'error' => $written->get_error_message() );
+		}
+
+		return array( 'ok' => true, 'style' => $style, 'post' => (int) $post_id );
+	}
 }
