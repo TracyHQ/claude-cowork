@@ -994,6 +994,28 @@ check('include_body carries the body', $full['items'][0]['content'], '<p>Body</p
 check('content.list pages by offset',
     array_column($wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
         'params' => ['offset' => 1, 'limit' => 1]])['items'], 'id'), [9]);
+// A seeded blog dates its posts backwards and files them under a category. Both travel as ordinary
+// post fields to `wp_insert_post`; both were missing from the allowlist until 08/09, and a post
+// without them lands today, uncategorised, and never shows in the blog listing the menu points at.
+$dated = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => [
+    'apply_id' => 'seed-1', 'kind' => 'post', 'id' => 0,
+    'fields' => ['post_title' => 'A post', 'post_date' => '2026-08-01 09:00:00', 'post_category' => [4]],
+]]);
+check('a create carrying a date and a category is accepted', $dated['ok'], true);
+check('and both fields reach the writer', array_keys($writer->store['post'][(string) $dated['id']]),
+    ['post_title', 'post_date', 'post_category']);
+
+// Asking by slug is one question, not a scan. A seeder that reruns has to know whether its page is
+// already there, and paging through a site to find out is how it ends up creating everything twice.
+$bySlug = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['name' => 'about']]);
+check('content.list finds one row by its slug', array_column($bySlug['items'], 'id'), [9]);
+check('and by post type', array_column($wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+    'params' => ['post_type' => 'post']])['items'], 'id'), [7]);
+check('a slug nobody has is an empty list, not an error', $wEngine->handle(['token' => $WTOKEN,
+    'action' => 'content.list', 'params' => ['name' => 'nope']])['items'], []);
+check('a slug with a path in it is refused', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list',
+    'params' => ['name' => '../etc']])['error'], 'bad_params');
+
 check('content.get names a missing row', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
     'params' => ['id' => 404]])['error'], 'not_found');
 check('content.get requires an id', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',

@@ -15,9 +15,16 @@ final class FakeSiteWriter implements SiteWriter
     /** @var array<int,array<string,mixed>> Rows the mirror should see, in id order. */
     public array $posts = [];
 
-    public function list_posts(int $offset, int $limit, bool $withBody): array
+    public function list_posts(int $offset, int $limit, bool $withBody, string $name = '', string $type = ''): array
     {
-        $rows = array_slice($this->posts, $offset, $limit);
+        $pool = $this->posts;
+        if ($name !== '') {
+            $pool = array_values(array_filter($pool, static fn ($row) => ($row['slug'] ?? '') === $name));
+        }
+        if ($type !== '') {
+            $pool = array_values(array_filter($pool, static fn ($row) => ($row['type'] ?? '') === $type));
+        }
+        $rows = array_slice($pool, $offset, $limit);
         if (!$withBody) {
             foreach ($rows as $i => $row) {
                 unset($rows[$i]['content'], $rows[$i]['excerpt']);

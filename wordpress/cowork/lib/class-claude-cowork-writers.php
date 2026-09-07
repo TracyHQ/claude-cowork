@@ -41,6 +41,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		'post_parent',
 		'menu_order',
 		'post_type',
+		// A seeded blog dates its posts backwards so the archive reads like a year of work rather
+		// than one afternoon. `wp_insert_post` takes the date directly; without it every post
+		// carries the minute the site was built (08/09).
+		'post_date',
+		// Categories and tags travel as ids, the shape `wp_insert_post` itself takes. A post
+		// without its category never appears in the blog listing the menu points at.
+		'post_category',
+		'tags_input',
 	);
 
 	/**
@@ -176,10 +184,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 *
 	 * @return array<int,array<string,mixed>>
 	 */
-	public function list_posts( int $offset, int $limit, bool $with_body ): array {
+	public function list_posts( int $offset, int $limit, bool $with_body, string $name = '', string $type = '' ): array {
 		$query = new \WP_Query(
 			array(
-				'post_type'           => array( 'post', 'page' ),
+				// A caller that knows the slug is asking ONE question — "is this page already
+				// there?" — and paging through every post to answer it is how a seeder that runs
+				// twice creates everything twice (08/09).
+				'name'                => $name,
+				'post_type'           => '' === $type ? array( 'post', 'page' ) : $type,
 				'post_status'         => array( 'publish', 'draft', 'pending', 'private', 'future' ),
 				'orderby'             => 'ID',
 				'order'               => 'ASC',

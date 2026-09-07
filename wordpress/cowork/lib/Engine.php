@@ -752,8 +752,19 @@ final class Engine
         $ceiling = $withBody ? 25 : 200;
         $limit = min($ceiling, max(1, (int) ($p['limit'] ?? ($withBody ? 25 : 100))));
 
+        // `name` asks one question — is this slug already on the site? — instead of paging through
+        // everything to find out. A seeder that cannot ask it creates its pages twice on a rerun.
+        $name = isset($p['name']) && is_string($p['name']) ? trim($p['name']) : '';
+        if ($name !== '' && !preg_match('/^[a-z0-9._-]+$/i', $name)) {
+            return $this->err('bad_params', 'name must be a slug');
+        }
+        $type = isset($p['post_type']) && is_string($p['post_type']) ? trim($p['post_type']) : '';
+        if ($type !== '' && !preg_match('/^[a-z0-9_-]+$/i', $type)) {
+            return $this->err('bad_params', 'post_type must be a post type name');
+        }
+
         try {
-            $items = $this->writer->list_posts($offset, $limit, $withBody);
+            $items = $this->writer->list_posts($offset, $limit, $withBody, $name, $type);
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
