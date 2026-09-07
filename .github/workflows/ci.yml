@@ -69,3 +69,34 @@ jobs:
 
       - name: Language check
         run: node ../../scripts/check-language.mjs claude-cowork/lib
+
+  # The look a Tracy site is built in: one Joomla template and one WordPress theme, each mirrored
+  # here from the repository that generates them. Nothing is compiled here, so the job asks the two
+  # questions a mirror can still get wrong — does every PHP file parse, and does the zip assemble
+  # with all 152 design inspirations in it.
+  themes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Lint the template's PHP
+        run: find joomla/template/tpl_tracy -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Lint the theme's PHP
+        run: find wordpress/theme/tracy -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Build the template package
+        run: ./build.sh
+        working-directory: joomla/template
+
+      - name: Build the theme package
+        run: ./build.sh
+        working-directory: wordpress/theme
+
+      - name: Language check
+        run: node scripts/check-language.mjs joomla/template/tpl_tracy wordpress/theme/tracy
+

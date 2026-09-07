@@ -1,0 +1,9 @@
+{
+  "_comment": "What a WordPress site asks for when it checks the Tracy theme for updates. Read by tracy/inc/update.php over the update_themes_github.com filter, reached because style.css declares `Update URI: https://github.com/TracyHQ/claude-cowork`. Bump it in the same commit that bumps the theme header — scripts/release-wordpress-theme.mjs writes both from one number.",
+  "version": "0.1.0",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-v0.1.0/tracy-0.1.0.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-v0.1.0",
+  "requires": "6.6",
+  "requires_php": "8.1",
+  "tested": "6.9"
+}

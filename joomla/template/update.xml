@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What a Joomla site reads when its administrator presses "Check For Updates" for the Tracy
+    template.
+
+    Reached because `templateDetails.xml` declares this address as the template's update server.
+    Joomla records that address when the template is INSTALLED, so a site that got the template
+    before this file existed has no update site and must be updated once by hand (or by Tracy)
+    before it can update itself.
+
+    One entry per released version, newest first. Joomla picks the highest version whose
+    targetplatform matches the site it runs on, so leaving old entries in place costs nothing.
+
+    Written by scripts/release-joomla-template.mjs, which puts the same number here and in the
+    manifest inside the zip.
+-->
+<updates>
+    <update>
+        <name>Tracy</name>
+        <description>One template, 152 looks: each design inspiration is a style parameter, and the navigation and hero layouts follow it.</description>
+        <element>tpl_tracy</element>
+        <type>template</type>
+        <client>site</client>
+        <version>0.1.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-template-v0.1.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-template-v0.1.0/tpl_tracy-0.1.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(5|6)\.[0-9]+"/>
+        <php_minimum>8.1</php_minimum>
+    </update>
+</updates>

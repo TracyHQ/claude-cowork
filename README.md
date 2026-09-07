@@ -27,6 +27,11 @@ so Claude, ChatGPT, Gemini or something you wrote yourself all use it the same w
 | [`wordpress/`](./wordpress) | WordPress | In use |
 | `shopify/` | Shopify | Not started |
 
+Each platform folder holds two things a site installs: `cowork/`, the extension above, and the
+**look** Tracy builds a site in — [`joomla/template/`](./joomla/template) (`tpl_tracy`) and
+[`wordpress/theme/`](./wordpress/theme) (`tracy`). One template and one theme, each carrying 152
+design inspirations as styles, so a site changes its whole look by changing one setting.
+
 One repository rather than one per platform, and **one engine per platform inside it**. Each
 platform owns its own `lib/`: they start as copies of each other and are expected to drift, because
 tuning for an old WordPress must not be a change Joomla has to survive. Side by side in one
@@ -44,6 +49,28 @@ site. It moved to [tracy-fleet](https://github.com/TracyHQ/tracy-fleet)
 (`provision/access/`) on 2026-08-17: it is installed only by provisioning, on a clone, and it
 creates users and opens sessions — nothing a customer downloads should sit next to. Keeping it
 here also meant maintaining a second copy in the fleet repository, which had already drifted.
+
+## The template and the theme
+
+`joomla/template/tpl_tracy/` and `wordpress/theme/tracy/` are **mirrors**, not sources. They are
+generated in Tracy's own repository from a vendored design library — 152 token sets, 152 style
+variations, the page layouts and the section markup — and copied here by
+`node scripts/sync-cms-themes.mjs <this checkout>` over there. Nothing in those two directories is
+edited here: an edit would be overwritten by the next sync, and the gate that proves the generated
+files match the library does not run in this repository.
+
+What does belong here is the release:
+
+```
+node scripts/release-joomla-template.mjs   0.1.1   # tag joomla-template-v0.1.1
+node scripts/release-wordpress-theme.mjs   0.1.1   # tag wordpress-theme-v0.1.1
+```
+
+Each reads the version out of the mirrored tree and refuses when it disagrees with the number
+asked for — the number is decided once, in the repository that generates the tree. It writes the
+announcement (`joomla/template/update.xml`, `wordpress/theme/update.json`), builds the zip, tags,
+and creates the release. A site installed with the update server recorded then finds the new
+version by itself, the same way the extension does.
 
 ## What it is for
 
