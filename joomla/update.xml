@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Adds extension.enable, so a plugin can be switched on or off and the step undone; and db.snapshot with db.rollback, which copy the tables aside before an upgrade and rename them back if it fails.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.9.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.9.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.9.0/pkg_claudecowork-0.9.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Archives a path longer than USTAR allows with a PAX header instead of failing the part, matching the WordPress plugin.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

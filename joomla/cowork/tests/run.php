@@ -715,6 +715,27 @@ final class FakeExtensions implements ExtensionManager
     {
         return $this->manifest;
     }
+
+    /** @var array<int,array<string,mixed>> every switch asked for, in order */
+    public array $switched = [];
+
+    public function setEnabled(string $type, string $element, ?string $folder, bool $enabled): array
+    {
+        $this->switched[] = ['type' => $type, 'element' => $element, 'folder' => $folder, 'enabled' => $enabled];
+        $before = null;
+        foreach ($this->manifest['extensions'] as $i => $row) {
+            $rowFolder = isset($row['folder']) && $row['folder'] !== '' ? (string) $row['folder'] : null;
+            if ((string) $row['type'] === $type && (string) $row['element'] === $element && $rowFolder === $folder) {
+                $before = (bool) ($row['enabled'] ?? false);
+                $this->manifest['extensions'][$i]['enabled'] = $enabled;
+                break;
+            }
+        }
+        if ($before === null) {
+            return ['ok' => false, 'error' => 'not installed'];
+        }
+        return ['ok' => true, 'before' => $before];
+    }
 }
 
 $TOKEN = 'a-token-at-least-16';
@@ -1465,6 +1486,128 @@ checkTrue('the PAX record names the real path', $recordPos !== false);
 // `path=` is the record block, and the entry begins one block before it.
 $posInWhole = intdiv($recordPos, TarStream::BLOCK_BYTES) * TarStream::BLOCK_BYTES - TarStream::BLOCK_BYTES;
 check('bytes after offset 700 match the uninterrupted archive', substr($resumedBytes, 0, 1024), substr($whole, $posInWhole + 700, 1024));
+
+
+// ── db.snapshot / db.rollback (0.9.0) ────────────────────────────────────────────────────────
+//
+// The gap these close: `db.restore` reads like the other half of a backup and is not — it renames
+// a table out of the trash, and nothing here could put a dump back. So a core upgrade that died
+// mid-flight left files `files.restore` could return and a schema nothing could.
+
+function snapSource(): FakeRowSource
+{
+    return new FakeRowSource([
+        'jos_content'  => ['create' => 'CREATE TABLE `jos_content`', 'rows' => [['1', 'first'], ['2', 'second']]],
+        'jos_menu'     => ['create' => 'CREATE TABLE `jos_menu`', 'rows' => [['1', 'home']]],
+        '_tracy_trash_20260101000000__jos_old' => ['create' => 'CREATE TABLE `x`', 'rows' => []],
+    ]);
+}
+
+$snapSrc = snapSource();
+$snapEngine = new Engine($TOKEN, [], new DbDumper($snapSrc));
+
+$snap = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.snapshot']);
+check('db.snapshot ok', $snap['ok'], true);
+checkTrue('db.snapshot tag is the 14-digit stamp', strlen($snap['tag']) === 14 && ctype_digit($snap['tag']));
+// Two live tables copied; the one already in the trash is not a thing to snapshot.
+check('db.snapshot copies the live tables only', count($snap['copied']), 2);
+$tag = $snap['tag'];
+$afterSnap = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.tables'])['tables'];
+checkTrue('the copy carries the snapshot prefix', in_array("_tracy_snap_{$tag}__jos_content", $afterSnap, true));
+
+// A snapshot that moved when the live table moved would be no snapshot at all.
+$snapSrc->insertRow('jos_content', ['3', 'added after the snapshot'], 2);
+$liveDump = (new DbDumper($snapSrc))->dumpChunk('jos_content', 0, 100);
+$snapDump = (new DbDumper($snapSrc))->dumpChunk("_tracy_snap_{$tag}__jos_content", 0, 100);
+checkTrue('the live table has the new row', str_contains($liveDump['sql'], 'added after the snapshot'));
+checkTrue('the snapshot does not', !str_contains($snapDump['sql'], 'added after the snapshot'));
+
+$missing = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.snapshot', 'params' => ['tables' => ['jos_nope']]]);
+check('db.snapshot refuses a missing table', $missing['error'], 'not_found');
+$copyOfCopy = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.snapshot', 'params' => ['tables' => ["_tracy_snap_{$tag}__jos_menu"]]]);
+check('db.snapshot refuses to copy a copy', $copyOfCopy['error'], 'bad_params');
+
+// The tag goes straight into a table name, so it is digits and exactly that width or nothing.
+$badTag = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.rollback', 'params' => ['tag' => 'nope; DROP TABLE x']]);
+check('db.rollback refuses a tag that is not the stamp', $badTag['error'], 'bad_params');
+$noSuchTag = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.rollback', 'params' => ['tag' => '20200101000000']]);
+check('db.rollback refuses a tag nothing carries', $noSuchTag['error'], 'not_found');
+
+$back = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.rollback', 'params' => ['tag' => $tag]]);
+check('db.rollback ok', $back['ok'], true);
+check('db.rollback restores both tables', count($back['restored']), 2);
+// What it displaced is parked, not dropped: a rollback runs when something has already gone
+// wrong, and that is the worst moment to destroy the evidence.
+check('db.rollback trashes what it displaced', count($back['trashed']), 2);
+$rolled = (new DbDumper($snapSrc))->dumpChunk('jos_content', 0, 100);
+checkTrue('the row added after the snapshot is gone from the live table', !str_contains($rolled['sql'], 'added after the snapshot'));
+$afterBack = $snapEngine->handle(['token' => $TOKEN, 'action' => 'db.tables'])['tables'];
+checkTrue('and it is still readable in the trash', count(array_filter($afterBack, function ($t) { return strpos($t, '_tracy_trash_') === 0; })) >= 2);
+
+// ── extension.enable (0.9.0) ─────────────────────────────────────────────────────────────────
+//
+// The column `extensionParams` cannot reach: its whitelist is `params` alone, so nothing in the
+// catalog could switch a plugin on. Three ordinary jobs sit behind it — a cache plugin on, a
+// coming-soon page off, the plugin an install just laid down published.
+
+$switchExt = new FakeExtensions();
+$switchExt->manifest = [
+    'platform'        => 'joomla',
+    'platformVersion' => '6.1.3',
+    'extensions'      => [
+        ['type' => 'component', 'element' => 'com_content', 'folder' => null, 'core' => true, 'enabled' => true, 'version' => '6.1.3'],
+        ['type' => 'component', 'element' => 'com_claudecowork', 'folder' => null, 'core' => false, 'enabled' => true, 'version' => '0.9.0'],
+        ['type' => 'plugin', 'element' => 'cache', 'folder' => 'system', 'core' => false, 'enabled' => false, 'version' => '6.1.3'],
+        ['type' => 'plugin', 'element' => 'aacomingsoon', 'folder' => 'system', 'core' => false, 'enabled' => true, 'version' => '2.0.0'],
+    ],
+];
+$switchLog = new FakeApplyLog();
+$switchEngine = new Engine($TOKEN, [], null, null, null, $switchExt, null, null, $switchLog);
+
+$noApply = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['type' => 'plugin', 'element' => 'cache', 'folder' => 'system', 'enabled' => true]]);
+check('extension.enable needs an apply_id', $noApply['error'], 'bad_params');
+
+$notBool = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'plugin', 'element' => 'cache', 'folder' => 'system', 'enabled' => 'yes']]);
+check('extension.enable refuses a non-boolean', $notBool['error'], 'bad_params');
+
+$selfOff = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'component', 'element' => 'com_claudecowork', 'enabled' => false]]);
+check('the component will not switch itself off', $selfOff['error'], 'refused');
+
+$coreOff = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'component', 'element' => 'com_content', 'enabled' => false]]);
+check('a core row is refused', $coreOff['error'], 'refused');
+
+$unknown = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'plugin', 'element' => 'nope', 'folder' => 'system', 'enabled' => true]]);
+check('an extension nobody installed is refused', $unknown['error'], 'not_found');
+
+// The group is part of the address: without it a plugin answers to another product's claim.
+$wrongFolder = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'plugin', 'element' => 'cache', 'enabled' => true]]);
+check('a plugin without its group is not found', $wrongFolder['error'], 'not_found');
+
+$on = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'plugin', 'element' => 'cache', 'folder' => 'system', 'enabled' => true]]);
+check('the cache plugin switches on', $on['ok'], true);
+check('and reports what it was before', $on['before'], false);
+
+$off = $switchEngine->handle(['token' => $TOKEN, 'action' => 'extension.enable',
+    'params' => ['apply_id' => 'a1', 'type' => 'plugin', 'element' => 'aacomingsoon', 'folder' => 'system', 'enabled' => false]]);
+check('the coming-soon plugin switches off', $off['before'], true);
+
+// Unlike an install, a switch is perfectly reversible — which is why it is in the undo log.
+check('both steps are recorded under the apply', count($switchLog->entries('a1')), 2);
+$reverted = $switchEngine->handle(['token' => $TOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'a1']]);
+check('apply.revert replays them', $reverted['reverted'], 2);
+$state = [];
+foreach ($switchExt->manifest['extensions'] as $row) {
+    $state[$row['element']] = $row['enabled'];
+}
+check('the cache plugin is off again', $state['cache'], false);
+check('and the coming-soon plugin is back on', $state['aacomingsoon'], true);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

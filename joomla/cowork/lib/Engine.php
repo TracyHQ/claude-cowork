@@ -120,6 +120,10 @@ final class Engine
                 return $this->dbPurge($params);
             case 'db.dump':
                 return $this->dbDump($params);
+            case 'db.snapshot':
+                return $this->dbSnapshot($params);
+            case 'db.rollback':
+                return $this->dbRollback($params);
             case 'files.list':
                 return $this->filesList($params);
             case 'files.pack':
@@ -132,6 +136,8 @@ final class Engine
                 return $this->coreManifest();
             case 'extension.install':
                 return $this->extensionInstall($params);
+            case 'extension.enable':
+                return $this->extensionEnable($params);
             case 'content.list':
                 return $this->contentList($params);
             case 'content.get':
@@ -229,6 +235,14 @@ final class Engine
      * separator, which is what lets db.restore rebuild it without a ledger.
      */
     private const TRASH_PREFIX = '_tracy_trash_';
+
+    /**
+     * Where a snapshot parks a copy. A separate prefix from the trash on purpose: the trash holds
+     * tables on their way OUT and `db.purge` may drop anything wearing that name, while these hold
+     * the only copy of a row somebody may still need back. One prefix for both would put a
+     * snapshot one `db.purge` away from being gone.
+     */
+    private const SNAP_PREFIX = '_tracy_snap_';
 
     /**
      * Core suffixes no cleanup may touch, matched against the end of the table name so the
@@ -335,6 +349,244 @@ final class Engine
             $restored[] = $step;
         }
         return $this->ok(['restored' => $restored]);
+    }
+
+    /**
+     * Copy every table aside, so a step that rewrites the schema has a way back.
+     *
+     * Exists because the way back was missing. `db.restore` reads like the other half of a backup
+     * and is not: it renames a table OUT of the trash, and nothing in this engine could ever put a
+     * dump back in. So a `core.upgrade` that died between `prepare` and `finalise` left files that
+     * `files.restore` could return and a schema that nothing could — measured against the catalog,
+     * not guessed.
+     *
+     * A copy rather than a dump because of what restoring costs. A dump has to be written out,
+     * carried, and replayed statement by statement, which on a real site is tens of minutes and a
+     * SQL parser this component deliberately does not have. A copy is a table sitting next to the
+     * original, and putting it back is two renames: metadata, instant, and reversible again.
+     *
+     * The price is disk — briefly twice the database — which is why `tables` narrows it and why a
+     * caller drops the snapshot once the upgrade has been accepted.
+     */
+    private function dbSnapshot(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        try {
+            $existing = $this->dumper->tables();
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        $have = array_flip($existing);
+
+        $tables = isset($p['tables']) && is_array($p['tables']) ? $p['tables'] : null;
+        if ($tables === null) {
+            // Everything the site itself owns. Copies of copies are not a snapshot, so anything
+            // already parked under either prefix is skipped rather than doubled.
+            $tables = [];
+            foreach ($existing as $name) {
+                if (strpos($name, self::TRASH_PREFIX) === 0 || strpos($name, self::SNAP_PREFIX) === 0) {
+                    continue;
+                }
+                $tables[] = $name;
+            }
+        }
+        if ($tables === [] || $tables !== array_filter($tables, 'is_string')) {
+            return $this->err('bad_params', 'tables must be a non-empty list of names');
+        }
+
+        $stamp = gmdate('YmdHis');
+        // Validate the WHOLE batch first: half a snapshot is worse than none, because it reads
+        // like a way back that is not there.
+        $plan = [];
+        foreach ($tables as $table) {
+            if (!isset($have[$table])) {
+                return $this->err('not_found', "table {$table} does not exist");
+            }
+            if (strpos($table, self::TRASH_PREFIX) === 0 || strpos($table, self::SNAP_PREFIX) === 0) {
+                return $this->err('bad_params', "table {$table} is already a copy");
+            }
+            $to = self::SNAP_PREFIX . $stamp . '__' . $table;
+            if (isset($have[$to])) {
+                return $this->err('refused', "table {$to} already exists");
+            }
+            $plan[] = ['from' => $table, 'to' => $to];
+        }
+
+        $copied = [];
+        foreach ($plan as $step) {
+            try {
+                $this->dumper->copyTable($step['from'], $step['to']);
+            } catch (Throwable $e) {
+                // Say exactly how far it got: the caller rolls the partial copies away itself
+                // rather than believing in a snapshot that covers only some tables.
+                return $this->err('copy_failed', $e->getMessage(), ['tag' => $stamp, 'copied' => $copied]);
+            }
+            $copied[] = $step;
+        }
+        return $this->ok(['tag' => $stamp, 'copied' => $copied]);
+    }
+
+    /**
+     * Put a snapshot back: for each copy, the live table goes to the trash and the copy takes its
+     * name. Two renames per table, so the whole thing is metadata and finishes in one request.
+     *
+     * The live table is trashed rather than dropped for the reason ADR 0083 gives: a rollback runs
+     * when something has already gone wrong, and that is the worst moment to destroy the only
+     * evidence of what went wrong. What it displaces stays readable under `_tracy_trash_*` until
+     * somebody purges it deliberately.
+     */
+    private function dbRollback(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tag = isset($p['tag']) && is_string($p['tag']) ? trim($p['tag']) : '';
+        // The tag names a batch and goes straight into a table name. Digits only, and exactly the
+        // width gmdate('YmdHis') produces, so nothing a caller sends can shape the identifier.
+        if (strlen($tag) !== 14 || !ctype_digit($tag)) {
+            return $this->err('bad_params', 'tag must be the 14-digit stamp a snapshot returned');
+        }
+        try {
+            $existing = $this->dumper->tables();
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        $have = array_flip($existing);
+
+        $prefix = self::SNAP_PREFIX . $tag . '__';
+        $plan = [];
+        foreach ($existing as $name) {
+            if (strpos($name, $prefix) !== 0) {
+                continue;
+            }
+            $original = substr($name, strlen($prefix));
+            if ($original === '') {
+                return $this->err('bad_params', "table {$name} does not carry its original name");
+            }
+            $plan[] = ['from' => $name, 'to' => $original];
+        }
+        if ($plan === []) {
+            return $this->err('not_found', "no snapshot carries the tag {$tag}");
+        }
+
+        $stamp = gmdate('YmdHis');
+        $restored = [];
+        $trashed = [];
+        foreach ($plan as $step) {
+            try {
+                if (isset($have[$step['to']])) {
+                    $aside = self::TRASH_PREFIX . $stamp . '__' . $step['to'];
+                    $this->dumper->renameTable($step['to'], $aside);
+                    $trashed[] = ['from' => $step['to'], 'to' => $aside];
+                }
+                $this->dumper->renameTable($step['from'], $step['to']);
+            } catch (Throwable $e) {
+                return $this->err('rename_failed', $e->getMessage(), ['restored' => $restored, 'trashed' => $trashed]);
+            }
+            $restored[] = $step;
+        }
+        $this->stamped('rollback');
+        return $this->ok(['restored' => $restored, 'trashed' => $trashed]);
+    }
+
+    /**
+     * Publish or unpublish one installed extension.
+     *
+     * Addressed by `type` + `element` + `folder` rather than by row id, because those are the three
+     * fields `extension.list` and `core.manifest` already hand back, and because the core check
+     * below is a lookup in the manifest — asking a caller for an id it would have to guess, to name
+     * a row this engine then has to find again, buys nothing.
+     *
+     * Two refusals, and both are about not handing over a way to break the site quietly:
+     * a core row, which Joomla itself will not let you disable and whose absence takes the site
+     * with it; and this component, which is the door the caller is standing in.
+     */
+    private function extensionEnable(array $p): array
+    {
+        if ($this->extensions === null) {
+            return $this->err('unavailable', 'extension manager not wired');
+        }
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $type = isset($p['type']) && is_string($p['type']) ? trim($p['type']) : '';
+        $element = isset($p['element']) && is_string($p['element']) ? trim($p['element']) : '';
+        if ($type === '' || $element === '') {
+            return $this->err('bad_params', 'type and element required');
+        }
+        $folder = isset($p['folder']) && is_string($p['folder']) && trim($p['folder']) !== ''
+            ? trim($p['folder']) : null;
+        if (!isset($p['enabled']) || !is_bool($p['enabled'])) {
+            return $this->err('bad_params', 'enabled must be true or false');
+        }
+        $enabled = $p['enabled'];
+
+        if ($element === 'com_claudecowork') {
+            return $this->err('refused', 'this component cannot switch itself off');
+        }
+
+        try {
+            $manifest = $this->extensions->coreManifest();
+        } catch (Throwable $e) {
+            return $this->err('manifest_failed', $e->getMessage());
+        }
+        $rows = isset($manifest['extensions']) && is_array($manifest['extensions']) ? $manifest['extensions'] : [];
+        $found = null;
+        foreach ($rows as $row) {
+            $rowFolder = isset($row['folder']) && $row['folder'] !== '' ? (string) $row['folder'] : null;
+            if ((string) ($row['type'] ?? '') === $type
+                && (string) ($row['element'] ?? '') === $element
+                && $rowFolder === $folder) {
+                $found = $row;
+                break;
+            }
+        }
+        if ($found === null) {
+            return $this->err('not_found', "no extension {$type}/{$element} is installed");
+        }
+        if (!empty($found['core'])) {
+            return $this->err('refused', "extension {$element} is core");
+        }
+
+        try {
+            $result = $this->extensions->setEnabled($type, $element, $folder, $enabled);
+        } catch (Throwable $e) {
+            return $this->err('enable_failed', $e->getMessage());
+        }
+        if (empty($result['ok'])) {
+            return $this->err('enable_failed', (string) ($result['error'] ?? 'unknown error'));
+        }
+
+        $before = isset($result['before']) ? (bool) $result['before'] : !$enabled;
+        try {
+            $this->log->record($applyId, [
+                'op' => 'extension',
+                'type' => $type,
+                'element' => $element,
+                'folder' => $folder,
+                'before' => $before,
+            ]);
+        } catch (Throwable $e) {
+            // The write landed. A log that would not record is worth saying out loud, because the
+            // caller's undo will not cover this step.
+            return $this->err('log_failed', $e->getMessage(), ['enabled' => $enabled, 'before' => $before]);
+        }
+
+        if ($this->writer !== null) {
+            try {
+                $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+        $this->stamped('extension');
+        return $this->ok(['enabled' => $enabled, 'before' => $before]);
     }
 
     /**
@@ -1170,6 +1422,22 @@ final class Engine
                 (int) ($before['parent_id'] ?? 0),
                 (int) ($before['after'] ?? -1)
             );
+            return;
+        }
+        if ($op === 'extension') {
+            if ($this->extensions === null) {
+                throw new RuntimeException('extension manager not wired');
+            }
+            $folder = isset($entry['folder']) && is_string($entry['folder']) ? $entry['folder'] : null;
+            $result = $this->extensions->setEnabled(
+                (string) ($entry['type'] ?? ''),
+                (string) ($entry['element'] ?? ''),
+                $folder,
+                (bool) ($entry['before'] ?? false)
+            );
+            if (empty($result['ok'])) {
+                throw new RuntimeException((string) ($result['error'] ?? 'setEnabled failed'));
+            }
             return;
         }
         if ($op === 'media') {

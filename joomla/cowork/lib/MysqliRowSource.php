@@ -185,6 +185,27 @@ final class MysqliRowSource implements RowSource
         return ['rows' => $rows, 'after' => $next];
     }
 
+    /**
+     * Two statements, and the order is the point. `CREATE TABLE ... LIKE` carries the indexes, the
+     * engine and the charset across; `CREATE TABLE ... SELECT` would carry none of them, and a
+     * snapshot restored without its primary key is a table that works until the first duplicate.
+     */
+    public function copyTable(string $from, string $to): void
+    {
+        $f = $this->db->real_escape_string($from);
+        $t = $this->db->real_escape_string($to);
+        if (!$this->db->query("CREATE TABLE `{$t}` LIKE `{$f}`")) {
+            throw new RuntimeException($this->db->error ?: 'create like failed');
+        }
+        if (!$this->db->query("INSERT INTO `{$t}` SELECT * FROM `{$f}`")) {
+            $error = $this->db->error ?: 'copy rows failed';
+            // Leave nothing half-made behind: an empty table wearing a snapshot name reads as a
+            // snapshot, and a rollback would restore emptiness over live rows.
+            $this->db->query("DROP TABLE `{$t}`");
+            throw new RuntimeException($error);
+        }
+    }
+
     public function renameTable(string $from, string $to): void
     {
         $f = $this->db->real_escape_string($from);

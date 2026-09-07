@@ -53,6 +53,12 @@ final class DbDumper
         $this->src->renameTable($from, $to);
     }
 
+    /** CREATE TABLE LIKE + INSERT SELECT, for the snapshot a rollback renames back into place. */
+    public function copyTable(string $from, string $to): void
+    {
+        $this->src->copyTable($from, $to);
+    }
+
     /** DROP TABLE — only ever called on `_tracy_trash_*` names (ADR 0083: purge). */
     public function dropTable(string $table): void
     {

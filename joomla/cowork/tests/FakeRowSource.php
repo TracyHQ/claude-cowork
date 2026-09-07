@@ -64,6 +64,19 @@ final class FakeRowSource implements RowSource
         return $out;
     }
 
+    public function copyTable(string $from, string $to): void
+    {
+        if (!isset($this->tables[$from])) {
+            throw new RuntimeException("table {$from} does not exist");
+        }
+        if (isset($this->tables[$to])) {
+            throw new RuntimeException("table {$to} already exists");
+        }
+        // A copy, not a reference: the point of a snapshot is that later writes to the live table
+        // leave it alone, and PHP's array assignment gives exactly that for a value like this.
+        $this->tables[$to] = $this->tables[$from];
+    }
+
     public function renameTable(string $from, string $to): void
     {
         if (!isset($this->tables[$from])) {

@@ -32,6 +32,76 @@ final class JoomlaExtensions implements \ExtensionManager
     /** A package this large on a shared host is a mistake somewhere, not a template. */
     private const MAX_PACKAGE_BYTES = 104857600; // 100 MiB
 
+    /**
+     * Flip `enabled` on one row of `#__extensions`.
+     *
+     * A direct write rather than Joomla's `ExtensionModel`, because that model lives in
+     * `com_installer` on the ADMINISTRATOR side and this component answers on the site side:
+     * loading an admin MVC model from a public request pulls in an admin session and an ACL
+     * context that is not there. The column is a plain tinyint with no derived state hanging off
+     * it — no assets row, no nested set, no cache key — so the honest write is the narrow one.
+     *
+     * Addressed by type + element + folder because that triple is what identifies an extension
+     * across every Joomla generation, and because two products ship a plugin whose element is
+     * `com_k2`; only the group tells them apart. `folder` is null for anything that is not a
+     * plugin, and the query has to ask for that as an empty string, which is what the column
+     * actually holds.
+     *
+     * @return array{ok:bool, error?:string, before?:bool}
+     */
+    public function setEnabled(string $type, string $element, ?string $folder, bool $enabled): array
+    {
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+
+        $where = [
+            $db->quoteName('type') . ' = :type',
+            $db->quoteName('element') . ' = :element',
+            $db->quoteName('folder') . ' = :folder',
+        ];
+        $folderValue = $folder ?? '';
+
+        $query = $db->getQuery(true)
+            ->select($db->quoteName(['extension_id', 'enabled']))
+            ->from($db->quoteName('#__extensions'))
+            ->where($where)
+            ->bind(':type', $type)
+            ->bind(':element', $element)
+            ->bind(':folder', $folderValue);
+
+        try {
+            $row = $db->setQuery($query)->loadAssoc();
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+        if (!$row) {
+            return ['ok' => false, 'error' => "no extension {$type}/{$element} is installed"];
+        }
+
+        $before = (int) ($row['enabled'] ?? 0) === 1;
+        if ($before === $enabled) {
+            // Already where the caller wants it. Reported as a success with the true before-value
+            // so an undo records the same thing either way.
+            return ['ok' => true, 'before' => $before];
+        }
+
+        $id = (int) $row['extension_id'];
+        $value = $enabled ? 1 : 0;
+        $update = $db->getQuery(true)
+            ->update($db->quoteName('#__extensions'))
+            ->set($db->quoteName('enabled') . ' = :enabled')
+            ->where($db->quoteName('extension_id') . ' = :id')
+            ->bind(':enabled', $value, \Joomla\Database\ParameterType::INTEGER)
+            ->bind(':id', $id, \Joomla\Database\ParameterType::INTEGER);
+
+        try {
+            $db->setQuery($update)->execute();
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+
+        return ['ok' => true, 'before' => $before];
+    }
+
     public function installFromUrl(string $url): array
     {
         $file = InstallerHelper::downloadPackage($url);

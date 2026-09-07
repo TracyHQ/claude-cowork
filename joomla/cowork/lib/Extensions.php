@@ -41,6 +41,28 @@ interface ExtensionManager
     public function listInstalled(): array;
 
     /**
+     * Publish or unpublish one installed extension — the `enabled` column of `#__extensions`.
+     *
+     * Added in 0.9.0, and it reverses a line this file used to hold: the surface was "one verb
+     * that takes one URL", with enable/disable left to an admin panel. That held while the only
+     * job was standing a copy up. It stopped holding the moment the job became finishing a piece
+     * of work on a customer's site, where three ordinary steps — switch a cache plugin on, turn a
+     * coming-soon page off, publish the plugin an install just laid down — all sit behind this one
+     * column and nothing else in the catalog can reach it. `extensionParams` cannot: its whitelist
+     * is `params` alone, by design, because everything else in that row belongs to the installer.
+     *
+     * Still narrower than install. It flips one boolean on a row that already exists, it creates
+     * nothing and removes nothing, and it is perfectly reversible — which is why, unlike
+     * `installFromUrl`, it belongs in the undo log.
+     *
+     * `folder` is the plugin group and is null for everything that is not a plugin. Returns the
+     * value the row held BEFORE the write, which is what the caller records to undo it.
+     *
+     * @return array{ok:bool, error?:string, before?:bool}
+     */
+    public function setEnabled(string $type, string $element, ?string $folder, bool $enabled): array;
+
+    /**
      * What this install says is core (ADR 0070 addendum: the per-site core source).
      *
      * The flag is computed HERE, because only the platform adapter knows its own semantics:

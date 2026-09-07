@@ -87,6 +87,22 @@ interface RowSource
     public function readRowsAfter(string $table, ?array $after, int $limit): array;
 
     /**
+     * `CREATE TABLE <to> LIKE <from>` then `INSERT INTO <to> SELECT * FROM <from>` — the copy a
+     * snapshot is made of.
+     *
+     * Narrow on purpose. The obvious alternative was a method that runs a statement, so a caller
+     * could hand back the SQL a dump produced; that would make this interface able to execute
+     * anything, which is the one thing it has never been able to do. A copy is the smallest verb
+     * that buys a way back: the snapshot is a real table, restoring it is two renames, and no SQL
+     * ever crosses the wire.
+     *
+     * Structure first, rows second, because `LIKE` carries the indexes and the engine while a
+     * `CREATE ... SELECT` would silently drop both — and a restored table without its primary key
+     * is a site that runs until the first duplicate.
+     */
+    public function copyTable(string $from, string $to): void;
+
+    /**
      * RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). A metadata operation: instant,
      * no data copied, fully reversible by renaming back.
      */
