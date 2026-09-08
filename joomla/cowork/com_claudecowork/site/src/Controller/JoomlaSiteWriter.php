@@ -232,6 +232,9 @@ final class JoomlaSiteWriter implements \SiteWriter
         ],
     ];
 
+    /** The kind of the write in progress, so claimHome knows which table it is guarding. */
+    private string $lastKind = '';
+
     private DatabaseInterface $db;
 
     public function __construct(DatabaseInterface $db)
@@ -296,9 +299,11 @@ final class JoomlaSiteWriter implements \SiteWriter
         // parent_id) are exactly the ones an update may not touch.
         // Asked for BEFORE the whitelists run: which branch writes the row differs, but the
         // question "was this item asked to become the home page" is the same in all three.
-        $wantsHome = $kind === 'menuItem'
+        $wantsHome = ($kind === 'menuItem' || $kind === 'templateStyle')
             && array_key_exists('home', $fields)
             && (int) $fields['home'] === 1;
+
+        $this->lastKind = $kind;
 
         if ($id <= 0 && isset(self::NESTED[$kind])) {
             $newId = $this->createNested($kind, $fields);
@@ -377,6 +382,10 @@ final class JoomlaSiteWriter implements \SiteWriter
      */
     private function claimHome(int $id): void
     {
+        if ($this->lastKind === 'templateStyle') {
+            $this->claimHomeStyle($id);
+            return;
+        }
         $language = (string) $this->db->setQuery(
             $this->db->getQuery(true)
                 ->select($this->db->quoteName('language'))
@@ -402,6 +411,32 @@ final class JoomlaSiteWriter implements \SiteWriter
             $this->db->getQuery(true)
                 ->update($this->db->quoteName('#__menu'))
                 ->set($this->db->quoteName('home') . ' = 1')
+                ->where($this->db->quoteName('id') . ' = ' . (int) $id)
+        )->execute();
+    }
+
+    /**
+     * Make one template style the site's default, and the only one.
+     *
+     * A Joomla site serves the template style flagged `home` on client 0, and its own style manager
+     * clears the previous one on save. A raw column write cannot, so two rows end up flagged and the
+     * site renders with whichever the query reaches first — measured 08/09 on a site built from a
+     * design, where the new template and the one Joomla ships were both marked home.
+     */
+    private function claimHomeStyle(int $id): void
+    {
+        $this->db->setQuery(
+            $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__template_styles'))
+                ->set($this->db->quoteName('home') . ' = ' . $this->db->quote('0'))
+                ->where($this->db->quoteName('client_id') . ' = 0')
+                ->where($this->db->quoteName('id') . ' <> ' . (int) $id)
+        )->execute();
+
+        $this->db->setQuery(
+            $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__template_styles'))
+                ->set($this->db->quoteName('home') . ' = ' . $this->db->quote('1'))
                 ->where($this->db->quoteName('id') . ' = ' . (int) $id)
         )->execute();
     }
