@@ -1472,5 +1472,20 @@ check('purge refuses anything that is not in the trash',
         'params' => ['tables' => ['wp_yoast_junk']]])['error'], 'refused');
 
 
+// ── content.language ─────────────────────────────────────────────────────────────────────────
+//
+// The verb a build calls once a customer asks for a second language. The case that matters most is
+// the one every site starts in: no translation plugin. It has to REFUSE READABLY — a build turns
+// that into a warning and finishes in one language, and a silent success would leave a site that
+// claims two languages and shows one.
+check('content.language refuses when the site has no translation plugin',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.language',
+        'params' => ['apply_id' => 'a-lang', 'id' => 1, 'lang' => 'vi']])['error'], 'unavailable');
+
+// The parameter checks run before the plugin check would matter to a caller reading the message.
+check('content.language needs an apply_id',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.language',
+        'params' => ['id' => 1, 'lang' => 'vi']])['error'], 'bad_params');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

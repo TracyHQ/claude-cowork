@@ -109,9 +109,26 @@ final class JoomlaSiteWriter implements \SiteWriter
             // through a content door would let an Apply reshape the backend.
             'where'   => ['client_id' => 0],
         ],
+        'language' => [
+            'table'   => '#__languages',
+            // `lang_code` is the tag articles carry (`vi-VN`); `sef` is the URL segment the
+            // Language Filter routes on. Both are named on a create because a language with
+            // neither is a row Joomla lists in its admin and can never route to.
+            'columns' => ['lang_code', 'title', 'title_native', 'sef', 'image', 'description',
+                'metakey', 'metadesc', 'sitename', 'published', 'access', 'ordering'],
+            'create'  => true,
+            'trash'   => 'published',
+            'pk'      => 'lang_id',
+        ],
         'menutype' => [
             'table'   => '#__menu_types',
-            'columns' => ['title', 'description'],
+            // `menutype` is the KEY a menu item points at, and `client_id` decides site or admin.
+            // Without the first on this list a create wrote a row with no name: `#__menu_types`
+            // took it, no error came back, and every item pointing at that menu showed nowhere.
+            // A multilingual Joomla needs one menu per language, so this stopped being theoretical
+            // (2026-09-08). `client_id` is written so a create lands on the SITE menu — a default
+            // of 0 in the column is not the same as saying so.
+            'columns' => ['menutype', 'title', 'description', 'client_id'],
             'create'  => true,
         ],
         'redirect' => [

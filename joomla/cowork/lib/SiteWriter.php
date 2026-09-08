@@ -32,6 +32,10 @@ interface SiteWriter
         // content — the site's words and editorial structure
         'article', 'category', 'tag', 'field', 'menuItem', 'menutype', 'redirect',
         'banner', 'bannerClient', 'contact', 'newsfeed',
+        // A content language of a multilingual site. It is content, not configuration: it decides
+        // which words a visitor is shown, and it is the row without which every article tagged
+        // `vi-VN` is filed under a language Joomla does not know and shows to nobody (2026-09-08).
+        'language',
         // code — can change markup/behaviour of the rendered site
         'module', 'templateStyle',
         // site — identity and configuration

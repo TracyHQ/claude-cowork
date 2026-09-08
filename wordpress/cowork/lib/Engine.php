@@ -136,6 +136,8 @@ final class Engine
                 return $this->contentGet($params);
             case 'content.update':
                 return $this->contentUpdate($params);
+            case 'content.language':
+                return $this->contentLanguage($params);
             case 'content.delete':
                 return $this->contentDelete($params);
             case 'db.cleanup':
@@ -793,6 +795,129 @@ final class Engine
         }
 
         return $this->ok(['kind' => 'post', 'id' => $id, 'item' => $item]);
+    }
+
+    /**
+     * What language a page is in, and which pages are each other's translations.
+     *
+     * WordPress has no notion of a translated page, so this is Polylang's — the plugin Tracy
+     * installs when a customer asks for more than one language. Everything below is its published
+     * API, measured on Polylang 3.8.8 (2026-09-08):
+     *
+     *   - a language that does not exist yet is CREATED here, because "this page is Vietnamese"
+     *     has no meaning on a site with no Vietnamese. `PLL()->model->languages->add()` is the
+     *     3.x way in; `PLL()->model->add_language()` is the 2.x name every tutorial still prints
+     *     and it does not exist any more.
+     *   - the cache must be cleaned after adding, or `pll_languages_list()` keeps answering the
+     *     list it had at the top of the request.
+     *
+     * A site with no Polylang is not an error: it answers `unavailable`, the caller writes a
+     * warning, and the site keeps the one language it has.
+     */
+    private function contentLanguage(array $p): array
+    {
+        if ($this->log === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        if (!function_exists('pll_set_post_language')) {
+            return $this->err('unavailable', 'this site has no translation plugin');
+        }
+        $id = max(0, (int) ($p['id'] ?? 0));
+        if ($id === 0) {
+            return $this->err('bad_params', 'id required');
+        }
+        $lang = isset($p['lang']) && is_string($p['lang']) ? trim($p['lang']) : '';
+        if ($lang === '' || !preg_match('/^[a-z]{2}(-[a-z]{2})?$/i', $lang)) {
+            return $this->err('bad_params', 'lang must be a language code');
+        }
+        $slug = strtolower(substr($lang, 0, 2));
+
+        $before = function_exists('pll_get_post_language') ? pll_get_post_language($id) : null;
+
+        try {
+            $this->ensureLanguage($slug);
+            pll_set_post_language($id, $slug);
+            $translations = [];
+            foreach ((array) ($p['translations'] ?? []) as $code => $postId) {
+                $code = strtolower(substr((string) $code, 0, 2));
+                $postId = (int) $postId;
+                if ($code !== '' && $postId > 0) {
+                    $this->ensureLanguage($code);
+                    $translations[$code] = $postId;
+                }
+            }
+            if (count($translations) > 1 && function_exists('pll_save_post_translations')) {
+                pll_save_post_translations($translations);
+            }
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+
+        try {
+            $this->log->record($applyId, [
+                'op' => 'language',
+                'id' => $id,
+                'before' => $before === false ? null : $before,
+            ]);
+        } catch (Throwable $e) {
+            // The language of a page is not a destructive change and Polylang holds no history of
+            // it; a lost undo entry is not worth undoing a page that is now correctly filed.
+        }
+
+        $this->stamped('content');
+
+        return $this->ok(['id' => $id, 'lang' => $slug]);
+    }
+
+    /**
+     * Make sure Polylang knows a language, using its own defaults for everything a form never asks
+     * for. The locale is the one Polylang ships for that slug when it has one — its predefined list
+     * is the only place that knows `vi` is `vi_VN` and `en` is `en_US` — and `<slug>_<SLUG>` only
+     * when it does not, which is a guess the caller is told about by the language simply appearing
+     * under that name.
+     */
+    private function ensureLanguage(string $slug): void
+    {
+        if (!function_exists('PLL') || !PLL() || !isset(PLL()->model)) {
+            return;
+        }
+        $existing = function_exists('pll_languages_list') ? (array) pll_languages_list() : [];
+        if (in_array($slug, $existing, true)) {
+            return;
+        }
+        $locale = $slug . '_' . strtoupper($slug);
+        $flag = $slug;
+        if (class_exists('PLL_Settings') && method_exists('PLL_Settings', 'get_predefined_languages')) {
+            foreach (PLL_Settings::get_predefined_languages() as $code => $row) {
+                if (isset($row['code']) && $row['code'] === $slug) {
+                    $locale = is_string($code) ? $code : $locale;
+                    $flag = isset($row['flag']) ? (string) $row['flag'] : $flag;
+                    break;
+                }
+            }
+        }
+        $model = PLL()->model;
+        $add = [
+            'name' => $slug,
+            'slug' => $slug,
+            'locale' => $locale,
+            'rtl' => 0,
+            'term_group' => count($existing),
+            'flag' => $flag,
+        ];
+        if (isset($model->languages) && method_exists($model->languages, 'add')) {
+            $model->languages->add($add);
+        } elseif (method_exists($model, 'add_language')) {
+            // Polylang 2.x. Kept because a customer's site is whatever version they installed.
+            $model->add_language($add);
+        }
+        if (method_exists($model, 'clean_languages_cache')) {
+            $model->clean_languages_cache();
+        }
     }
 
     private function contentUpdate(array $p): array

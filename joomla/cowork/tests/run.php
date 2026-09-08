@@ -1050,6 +1050,15 @@ check('apply.list returns every step', count($list['steps']), 2);
 check('apply.list names the content kind', $list['steps'][0]['kind'], 'module');
 checkTrue('apply.list does not leak the before payload', !isset($list['steps'][0]['before']));
 
+// A content language is a kind, so a multilingual site is built through the same door as its words
+// (2026-09-08). Without it, every article tagged `vi-VN` is filed under a language Joomla does not
+// know and shows to nobody — with nothing in a log to find.
+$lang = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'LANG', 'kind' => 'language', 'fields' => [
+        'lang_code' => 'vi-VN', 'title' => 'Vietnamese', 'title_native' => 'Tiếng Việt',
+        'sef' => 'vi', 'published' => 1]]]);
+check('a content language can be created through the door', $lang['ok'], true);
+
 // refusals ------------------------------------------------------------------------------------
 $badKind = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['apply_id' => 'X', 'kind' => 'wombat', 'fields' => ['a' => 'b']]]);
