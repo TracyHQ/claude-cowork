@@ -136,10 +136,16 @@ final class JoomlaSiteWriter implements \SiteWriter
         ],
         'contact' => [
             'table'   => '#__contact_details',
-            'columns' => ['name', 'con_position', 'address', 'suburb', 'country', 'postcode',
+            // `alias` and `metadata` sit here for the same reason an article has them: the table
+            // declares both NOT NULL with no default, so a create that cannot name them is refused
+            // by the database and never reaches this class's own rules. Measured 08/09 building a
+            // site from a design: "Field 'alias' doesn't have a default value", a sentence that
+            // names no contact and no caller. An alias is the address a contact is read at, which
+            // is a decision the writer of the contact makes, not the installer.
+            'columns' => ['name', 'alias', 'con_position', 'address', 'suburb', 'country', 'postcode',
                 'telephone', 'fax', 'misc', 'email_to', 'mobile', 'webpage', 'published',
                 'catid', 'access', 'ordering', 'params', 'language', 'metadesc', 'metakey',
-                'featured', 'publish_up', 'publish_down'],
+                'metadata', 'featured', 'publish_up', 'publish_down'],
             'create'  => true,
             'trash'   => 'published',
         ],
@@ -330,6 +336,9 @@ final class JoomlaSiteWriter implements \SiteWriter
             }
             if ($kind === 'contact' || $kind === 'newsfeed') {
                 $object->created = $now;
+                // `modified` is NOT NULL with no default on #__contact_details too, and unlike
+                // #__content it is not stamped by anything else on the way in.
+                $object->modified = $now;
             }
             $this->db->insertObject($table, $object, $pk);
             $newId = (int) $object->{$pk};
