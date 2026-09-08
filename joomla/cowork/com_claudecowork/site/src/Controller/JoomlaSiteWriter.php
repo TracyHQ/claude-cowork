@@ -97,7 +97,12 @@ final class JoomlaSiteWriter implements \SiteWriter
         ],
         'menuItem' => [
             'table'   => '#__menu',
-            'columns' => ['title', 'note', 'published', 'params'],
+            // `home` is the flag that decides which page the site serves at its root, and it is
+            // the one column a seeded site cannot do without: without it a site built from a
+            // design still opens on whatever Joomla shipped. It is guarded rather than raw —
+            // see claimHome(): setting it to 1 clears the previous home of the same language, so
+            // a site is never left with two, which Joomla's own menu manager refuses to allow.
+            'columns' => ['title', 'note', 'published', 'params', 'home'],
             'create'  => false,
             'trash'   => 'published',
             // The admin menu (client_id 1) is Joomla's own furniture — listing or editing it
@@ -194,7 +199,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         'menuItem' => [
             'class'         => \Joomla\CMS\Table\Menu::class,
             'createColumns' => ['title', 'menutype', 'link', 'type', 'published', 'parent_id',
-                'browserNav', 'access', 'language', 'note', 'params'],
+                'browserNav', 'access', 'language', 'note', 'params', 'home'],
             'defaults'      => ['type' => 'url', 'published' => 1, 'access' => 1, 'language' => '*',
                 'browserNav' => 0, 'note' => '', 'params' => '{}', 'img' => '', 'path' => '',
                 'template_style_id' => 0, 'component_id' => 0, 'client_id' => 0],
@@ -283,8 +288,18 @@ final class JoomlaSiteWriter implements \SiteWriter
         // A new node in a tree is placed by Joomla's Table, not by this class's raw path — and
         // this branch comes before the raw whitelist because create-time fields (menutype, link,
         // parent_id) are exactly the ones an update may not touch.
+        // Asked for BEFORE the whitelists run: which branch writes the row differs, but the
+        // question "was this item asked to become the home page" is the same in all three.
+        $wantsHome = $kind === 'menuItem'
+            && array_key_exists('home', $fields)
+            && (int) $fields['home'] === 1;
+
         if ($id <= 0 && isset(self::NESTED[$kind])) {
-            return $this->createNested($kind, $fields);
+            $newId = $this->createNested($kind, $fields);
+            if ($wantsHome) {
+                $this->claimHome($newId);
+            }
+            return $newId;
         }
 
         $object = new \stdClass();
@@ -321,6 +336,9 @@ final class JoomlaSiteWriter implements \SiteWriter
             if ($tags !== null) {
                 $this->setTags($newId, $tags);
             }
+            if ($wantsHome) {
+                $this->claimHome($newId);
+            }
             return $newId;
         }
 
@@ -329,7 +347,54 @@ final class JoomlaSiteWriter implements \SiteWriter
         if ($tags !== null) {
             $this->setTags($id, $tags);
         }
+        if ($wantsHome) {
+            $this->claimHome($id);
+        }
         return $id;
+    }
+
+    /**
+     * Make one menu item the home of its language, and the only one.
+     *
+     * Joomla allows exactly one home per language on the site menu (`*` being the site-wide
+     * default), and its menu manager enforces that by clearing the previous one on save. A raw
+     * column write cannot: it would leave two rows flagged home, and Joomla then serves whichever
+     * the router reaches first — a site that looks randomly broken between page loads rather than
+     * plainly wrong. So every path that sets `home` comes through here.
+     *
+     * The item's own language is read back from the row rather than taken from the caller: an
+     * update may not have mentioned language at all, and clearing the wrong language's home would
+     * take down a page nobody asked about.
+     */
+    private function claimHome(int $id): void
+    {
+        $language = (string) $this->db->setQuery(
+            $this->db->getQuery(true)
+                ->select($this->db->quoteName('language'))
+                ->from($this->db->quoteName('#__menu'))
+                ->where($this->db->quoteName('id') . ' = ' . (int) $id)
+        )->loadResult();
+        if ($language === '') {
+            $language = '*';
+        }
+
+        $this->db->setQuery(
+            $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__menu'))
+                ->set($this->db->quoteName('home') . ' = 0')
+                ->where($this->db->quoteName('client_id') . ' = 0')
+                ->where($this->db->quoteName('language') . ' = ' . $this->db->quote($language))
+                ->where($this->db->quoteName('id') . ' <> ' . (int) $id)
+        )->execute();
+
+        // Set ours last and unconditionally: on the nested-create path the Table may drop a column
+        // it does not consider its own, so the flag this method is named for is written here.
+        $this->db->setQuery(
+            $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__menu'))
+                ->set($this->db->quoteName('home') . ' = 1')
+                ->where($this->db->quoteName('id') . ' = ' . (int) $id)
+        )->execute();
     }
 
     /**

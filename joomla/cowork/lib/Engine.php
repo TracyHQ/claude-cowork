@@ -959,7 +959,10 @@ final class Engine
             return $this->err('unavailable', 'extension manager not wired');
         }
         try {
-            return $this->ok(['manifest' => $this->extensions->coreManifest()]);
+            // `platform` first, and named the same word WordPress uses: a caller holding a token
+            // for a site it has never seen asks this one question to learn which CMS it is talking
+            // to. Without it the answer is only readable by somebody who already knows.
+            return $this->ok(['platform' => 'joomla', 'manifest' => $this->extensions->coreManifest()]);
         } catch (Throwable $e) {
             return $this->err('manifest_failed', $e->getMessage());
         }
