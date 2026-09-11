@@ -831,7 +831,7 @@ check('a wrong token installs nothing', $noToken['error'], 'unauthorized');
 // exactly what was there, and an edit whose undo cannot be recorded is rolled back rather than
 // left standing (ADR 0048).
 
-final class FakeSiteWriter implements SiteWriter
+class FakeSiteWriter implements SiteWriter
 {
     /** @var array<string,array<int,array<string,?scalar>>> */
     public array $store = [];
@@ -1654,6 +1654,43 @@ foreach ($switchExt->manifest['extensions'] as $row) {
 }
 check('the cache plugin is off again', $state['cache'], false);
 check('and the coming-soon plugin is back on', $state['aacomingsoon'], true);
+
+// Transactional batches: commit receipt, conflict rollback and ID dependencies.
+final class TransactionWriter extends FakeSiteWriter {
+    private FakeApplyLog $log;
+    public function __construct(FakeApplyLog $log) { $this->log = $log; }
+    public function transaction(callable $work): array {
+        $before = [$this->store, $this->pos, $this->log->log];
+        try { return $work(); } catch (Throwable $error) {
+            [$this->store, $this->pos, $this->log->log] = $before;
+            throw $error;
+        }
+    }
+}
+$batchLog = new FakeApplyLog(); $batchWriter = new TransactionWriter($batchLog);
+$batchWriter->store['article'][1] = ['title' => 'Original'];
+$batchEngine = new Engine($WTOKEN, [], null, null, null, null, $batchWriter, null, $batchLog);
+$request = ['token' => $WTOKEN, 'action' => 'content.batch', 'params' => ['apply_id' => 'batch-test', 'request_id' => 'one', 'operations' => [
+    ['key' => 'first', 'kind' => 'article', 'id' => 1, 'expected' => ['title' => 'Original'], 'fields' => ['title' => 'New']],
+    ['key' => 'second', 'kind' => 'article', 'id' => 0, 'fields' => ['title' => 'Created']],
+]]];
+$batchResult = $batchEngine->handle($request);
+check('batch commits', $batchResult['ok'], true);
+check('lost reply replays the committed receipt', $batchEngine->handle($request), $batchResult);
+check('duplicate request does not create twice', count($batchWriter->store['article']), 2);
+$conflict = $request; $conflict['params']['request_id'] = 'conflict';
+$conflict['params']['operations'][0]['expected'] = ['title' => 'New'];
+$conflict['params']['operations'][0]['fields'] = ['title' => 'Must roll back'];
+$conflict['params']['operations'][1] = ['kind' => 'article', 'id' => 1, 'expected' => ['title' => 'Stale'], 'fields' => ['title' => 'Never']];
+$logBefore = $batchLog->log;
+check('batch conflict fails', $batchEngine->handle($conflict)['ok'], false);
+check('earlier operation rolls back', $batchWriter->store['article'][1]['title'], 'New');
+check('undo log rolls back with the rows', $batchLog->log, $logBefore);
+$altered = $request; $altered['params']['operations'][0]['fields']['title'] = 'Different';
+check('reusing an id with different contents is refused', $batchEngine->handle($altered)['ok'], false);
+$undo = $batchEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'batch-test']]);
+check('batch undo succeeds', $undo['ok'], true);
+check('batch undo restores and removes its create', $batchWriter->store['article'], [1 => ['title' => 'Original']]);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

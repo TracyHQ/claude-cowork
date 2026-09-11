@@ -28,6 +28,8 @@ require_once __DIR__ . '/FilesRestorer.php';
 
 final class Engine
 {
+    private bool $batching = false;
+    private bool $writing = false;
     private ?string $token;
     /** @var array<string,mixed> What the host says about itself, returned by the 'info' action. */
     private array $info;
@@ -105,6 +107,16 @@ final class Engine
         $action = isset($req['action']) && is_string($req['action']) ? $req['action'] : '';
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
 
+        if (!$this->writing && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
+            ['content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+            try {
+                return $this->writer->serialize(function () use ($req) {
+                    $this->writing = true;
+                    try { return $this->handle($req); } finally { $this->writing = false; }
+                });
+            } catch (Throwable $error) { return $this->err('writer_busy', $error->getMessage()); }
+        }
+
         switch ($action) {
             case 'info':
                 return $this->ok(['info' => $this->info]);
@@ -142,6 +154,8 @@ final class Engine
                 return $this->contentList($params);
             case 'content.get':
                 return $this->contentGet($params);
+            case 'content.batch':
+                return $this->contentBatch($params);
             case 'content.update':
                 return $this->contentUpdate($params);
             case 'content.delete':
@@ -580,7 +594,7 @@ final class Engine
 
         if ($this->writer !== null) {
             try {
-                $this->writer->purgeCache();
+                if (!$this->batching) $this->writer->purgeCache();
             } catch (Throwable $e) {
                 // Best-effort by contract.
             }
@@ -985,13 +999,21 @@ final class Engine
         if ($url === '') {
             return $this->err('bad_params', 'url required');
         }
-        $shape = PackageUrl::check($url);
+        $sha = $p['sha256'] ?? null;
+        if ($sha !== null && (!is_string($sha) || !preg_match('/^[a-f0-9]{64}$/D', $sha))) return $this->err('bad_params', 'invalid sha256');
+        // A pinned archive can use an official download endpoint with a query: its bytes, not
+        // a URL suffix, identify it; the adapter supplies Joomla a safe .zip filename.
+        $shape = $sha !== null && parse_url($url, PHP_URL_SCHEME) === 'https' && parse_url($url, PHP_URL_HOST)
+            ? ['ok' => true] : PackageUrl::check($url);
         if ($shape['ok'] !== true) {
             return $this->err('bad_params', $shape['error']);
         }
 
         try {
-            $result = $this->extensions->installFromUrl($url);
+            if ($sha !== null) {
+                if (!method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+                $result = $this->extensions->installVerifiedFromUrl($url, $sha, isset($p['bytes']) ? (int) $p['bytes'] : null);
+            } else $result = $this->extensions->installFromUrl($url);
         } catch (Throwable $e) {
             return $this->err('install_failed', $e->getMessage());
         }
@@ -1091,6 +1113,76 @@ final class Engine
         return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
     }
 
+    /** A bounded transaction: the same request id returns its committed result after a lost reply.
+     * Expected fields are checked under the site writer lock; all row changes and undo entries
+     * share one database transaction. Files and extension installers are deliberately excluded.
+     */
+    private function contentBatch(array $p): array
+    {
+        if (!$this->writer || !$this->log || !method_exists($this->writer, 'transaction')) {
+            return $this->err('unavailable', 'transactional site writer not installed');
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        $steps = $p['operations'] ?? null;
+        if (!$apply || !is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request)
+            || !is_array($steps) || count($steps) < 1 || count($steps) > 100) {
+            return $this->err('bad_params', 'apply_id, request_id and 1–100 operations required');
+        }
+        $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
+        try {
+            $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash) {
+                foreach ($this->log->entries($apply) as $entry) {
+                    if (($entry['op'] ?? '') === 'batch' && ($entry['request'] ?? '') === $request) {
+                        if (!hash_equals($entry['hash'], $hash)) throw new RuntimeException('request_id already used with different operations');
+                        return $entry['result'];
+                    }
+                }
+                $this->batching = true;
+                $ids = [];
+                foreach ($steps as $index => $step) {
+                    if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
+                    $kind = $step['kind'];
+                    // Identity and installed executable settings require their own privileged door.
+                    if (in_array($kind, ['user', 'extensionParams'], true)) throw new RuntimeException('kind not allowed in a content batch');
+                    $id = $step['id'] ?? 0;
+                    if (is_string($id) && str_starts_with($id, '$')) $id = $ids[substr($id, 1)] ?? -1;
+                    if (!is_numeric($id) || (int) $id < 0) throw new RuntimeException('unresolved id');
+                    $fields = $step['fields'];
+                    foreach ($fields as $column => $value) {
+                        if (is_string($value) && preg_match('/^\$([a-zA-Z0-9_-]+)$/D', $value, $match)) {
+                            if (!isset($ids[$match[1]])) throw new RuntimeException('unresolved field reference');
+                            $fields[$column] = $ids[$match[1]];
+                        }
+                    }
+                    if (isset($step['expected'])) {
+                        $before = $this->writer->read($kind, (int) $id);
+                        foreach ($step['expected'] as $key => $value) {
+                            if (!$before || !array_key_exists($key, $before) || (string) $before[$key] !== (string) $value) {
+                                throw new RuntimeException("conflict at operation {$index}: {$key} changed");
+                            }
+                        }
+                    }
+                    $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => (int) $id, 'fields' => $fields]);
+                    if (empty($answer['ok'])) throw new RuntimeException("operation {$index}: " . ($answer['message'] ?? json_encode($answer['error'])));
+                    $key = $step['key'] ?? (string) $index;
+                    if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
+                    $ids[$key] = $answer['id'];
+                }
+                $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
+                $this->log->record($apply, ['op' => 'batch', 'request' => $request, 'hash' => $hash, 'result' => $result]);
+                return $result;
+            });
+            $this->batching = false;
+            $this->writer->purgeCache();
+            $this->stamped('content');
+            return $result;
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('batch_failed', $error->getMessage());
+        }
+    }
+
     private function contentUpdate(array $p): array
     {
         if ($this->writer === null || $this->log === null) {
@@ -1182,12 +1274,12 @@ final class Engine
         }
 
         try {
-            $this->writer->purgeCache();
+            if (!$this->batching) $this->writer->purgeCache();
         } catch (Throwable $e) {
             // Best-effort by contract: a stale cache is not worth failing a change that landed.
         }
 
-        $this->stamped('content');
+        if (!$this->batching) $this->stamped('content');
 
         $out = ['kind' => $kind, 'id' => $newId, 'created' => $fields !== [] && $before === null && $id === 0];
         if ($moveTo !== null) {
@@ -1244,12 +1336,12 @@ final class Engine
         }
 
         try {
-            $this->writer->purgeCache();
+            if (!$this->batching) $this->writer->purgeCache();
         } catch (Throwable $e) {
             // Best-effort by contract.
         }
 
-        $this->stamped('content');
+        if (!$this->batching) $this->stamped('content');
 
         return $this->ok(['kind' => $kind, 'id' => $id, 'trashed' => true]);
     }
@@ -1337,7 +1429,7 @@ final class Engine
 
         if ($this->writer !== null) {
             try {
-                $this->writer->purgeCache();
+                if (!$this->batching) $this->writer->purgeCache();
             } catch (Throwable $e) {
                 // Best-effort by contract.
             }
@@ -1405,6 +1497,7 @@ final class Engine
     private function revertOne(array $entry): void
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
+        if ($op === 'batch') { return; }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');

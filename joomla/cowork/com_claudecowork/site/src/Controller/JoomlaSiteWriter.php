@@ -102,13 +102,17 @@ final class JoomlaSiteWriter implements \SiteWriter
             // design still opens on whatever Joomla shipped. It is guarded rather than raw —
             // see claimHome(): setting it to 1 clears the previous home of the same language, so
             // a site is never left with two, which Joomla's own menu manager refuses to allow.
-            'columns' => ['title', 'note', 'published', 'params', 'home'],
+            'columns' => ['title', 'note', 'published', 'params', 'home', 'language', 'template_style_id', 'link'],
             'create'  => false,
             'trash'   => 'published',
             // The admin menu (client_id 1) is Joomla's own furniture — listing or editing it
             // through a content door would let an Apply reshape the backend.
             'where'   => ['client_id' => 0],
         ],
+        'languageFilter' => ['table' => '#__extensions', 'pk' => 'extension_id', 'columns' => ['enabled', 'params'], 'create' => false, 'where' => ['type' => 'plugin', 'folder' => 'system', 'element' => 'languagefilter']],
+        'articleAssociation' => ['table' => '#__associations', 'columns' => [], 'create' => false],
+        'menuAssociation' => ['table' => '#__associations', 'columns' => [], 'create' => false],
+        'moduleAssignment' => ['table' => '#__modules_menu', 'columns' => [], 'create' => false],
         'language' => [
             'table'   => '#__languages',
             // `lang_code` is the tag articles carry (`vi-VN`); `sef` is the URL segment the
@@ -182,7 +186,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         ],
         'templateStyle' => [
             'table'   => '#__template_styles',
-            'columns' => ['title', 'params', 'home'],
+            'columns' => ['title', 'params', 'home', 'template'],
             'create'  => false,
         ],
         'user' => [
@@ -222,7 +226,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         'menuItem' => [
             'class'         => \Joomla\CMS\Table\Menu::class,
             'createColumns' => ['title', 'menutype', 'link', 'type', 'published', 'parent_id',
-                'browserNav', 'access', 'language', 'note', 'params', 'home'],
+                'browserNav', 'access', 'language', 'note', 'params', 'home', 'template_style_id', 'alias'],
             'defaults'      => ['type' => 'url', 'published' => 1, 'access' => 1, 'language' => '*',
                 'browserNav' => 0, 'note' => '', 'params' => '{}', 'img' => '', 'path' => '',
                 'template_style_id' => 0, 'component_id' => 0, 'client_id' => 0],
@@ -259,6 +263,31 @@ final class JoomlaSiteWriter implements \SiteWriter
         $this->db = $db;
     }
 
+    /** InnoDB rolls the whole batch and its apply log back if PHP dies mid-request. */
+    public function transaction(callable $work): array
+    {
+        return $this->serialize(function () use ($work) {
+            $this->db->transactionStart();
+            try {
+                $result = $work();
+                $this->db->transactionCommit();
+                return $result;
+            } catch (\Throwable $error) {
+                $this->db->transactionRollback();
+                throw $error;
+            }
+        });
+    }
+
+    /** All component writers share this database advisory lock, including old single edits. */
+    public function serialize(callable $work): array
+    {
+        $lock = 'tracy-write-' . substr(hash('sha256', Factory::getApplication()->get('db') . ':' . $this->db->getPrefix()), 0, 32);
+        if ((int) $this->db->setQuery('SELECT GET_LOCK(' . $this->db->quote($lock) . ', 0)')->loadResult() !== 1) throw new \RuntimeException('another writer is changing this site');
+        try { return $work(); }
+        finally { $this->db->setQuery('SELECT RELEASE_LOCK(' . $this->db->quote($lock) . ')')->loadResult(); }
+    }
+
     public function canCreate(string $kind): bool
     {
         $this->tableFor($kind); // validates the kind
@@ -282,12 +311,13 @@ final class JoomlaSiteWriter implements \SiteWriter
     {
         $prefix = $alias === '' ? '' : $alias . '.';
         foreach ((self::MAP[$kind]['where'] ?? []) as $column => $value) {
-            $query->where($prefix . $this->db->quoteName($column) . ' = ' . (int) $value);
+            $query->where($prefix . $this->db->quoteName($column) . ' = ' . (is_int($value) ? $value : $this->db->quote($value)));
         }
     }
 
     public function read(string $kind, int $id): ?array
     {
+        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->read($kind, $id);
         $table = $this->tableFor($kind);
         if ($id <= 0) {
             return null;
@@ -304,6 +334,13 @@ final class JoomlaSiteWriter implements \SiteWriter
 
     public function write(string $kind, int $id, array $fields): int
     {
+        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->write($kind, $id, $fields);
+        if ($id > 0 && !$this->read($kind, $id)) throw new \RuntimeException('target does not exist in this scope');
+        if ($kind === 'templateStyle' && isset($fields['template'])) {
+            $element = (string) $fields['template'];
+            $query = $this->db->getQuery(true)->select('extension_id')->from('#__extensions')->where('type = ' . $this->db->quote('template'))->where('client_id = 0')->where('element = ' . $this->db->quote($element));
+            if (!$this->db->setQuery($query)->loadResult()) throw new \RuntimeException('template is not installed');
+        }
         // Tags are not a column of #__content, so they travel beside the row rather than in it.
         // Written only when the caller mentioned them: a file silent about tags must not clear
         // an article's tags.
@@ -340,6 +377,25 @@ final class JoomlaSiteWriter implements \SiteWriter
             throw new \RuntimeException("no writable column for kind {$kind}");
         }
 
+        if (in_array($kind, ['article', 'module'], true)) {
+            $class = $kind === 'article' ? \Joomla\CMS\Table\Content::class : \Joomla\CMS\Table\Module::class;
+            $row = new $class($this->db);
+            if ($id > 0 && !$row->load($id)) throw new \RuntimeException('content target missing');
+            $data = get_object_vars($object);
+            if ($id <= 0) {
+                $data += ['access' => 1, 'language' => '*'];
+                if ($kind === 'article') $data += ['created' => Factory::getDate()->toSql(), 'images' => '{}', 'urls' => '{}', 'attribs' => '{}', 'metadata' => '{}', 'metakey' => '', 'metadesc' => ''];
+            }
+            if (!$row->bind($data) || !$row->check() || !$row->store()) throw new \RuntimeException((string) $row->getError());
+            $newId = (int) $row->id;
+            if ($tags !== null) $this->setTags($newId, $tags);
+            if ($kind === 'article' && $id <= 0) {
+                $workflow = new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db);
+                $stage = $workflow->getDefaultStageByCategory((int) $row->catid);
+                if ($stage) $workflow->createAssociation($newId, (int) $stage);
+            }
+            return $newId;
+        }
         $pk = $this->pkFor($kind);
         if ($id <= 0) {
             if (!$this->canCreate($kind)) {
@@ -529,6 +585,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         'field'           => ['id', 'title', 'name', 'label', 'type', 'context', 'state', 'required', 'language'],
         'menuItem'        => ['id', 'menutype', 'title', 'alias', 'path', 'link', 'type', 'published',
             'parent_id', 'level', 'language', 'client_id'],
+        'language'        => ['lang_id', 'lang_code', 'title', 'published', 'sef'],
         'menutype'        => ['id', 'menutype', 'title', 'description'],
         'redirect'        => ['id', 'old_url', 'new_url', 'published', 'header', 'hits'],
         'banner'          => ['id', 'name', 'alias', 'catid', 'state', 'clickurl', 'sticky', 'language'],
@@ -544,6 +601,8 @@ final class JoomlaSiteWriter implements \SiteWriter
 
     public function list(string $kind, int $offset, int $limit): array
     {
+        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return [];
+        if ($kind === 'languageFilter') return $this->db->setQuery("SELECT extension_id AS id, enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssocList();
         $table = $this->tableFor($kind);
         $columns = self::LIST_COLUMNS[$kind];
 
@@ -594,6 +653,8 @@ final class JoomlaSiteWriter implements \SiteWriter
                 $rows[$index]['access_name'] = $this->accessName((int) ($row['access'] ?? 0));
             }
         }
+        foreach ($rows as &$row) $row['id'] = $row[$this->pkFor($kind)];
+        unset($row);
         return $rows;
     }
 
@@ -633,7 +694,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         // recipe as the model: slug the title, fall back to a timestamp when nothing survives.
         if ($kind === 'menuItem') {
             $alias = \Joomla\CMS\Application\ApplicationHelper::stringURLSafe(
-                (string) $data['title'],
+                (string) ($data['alias'] ?? $data['title']),
                 (string) ($data['language'] ?? '*')
             );
             if (trim(str_replace('-', '', $alias)) === '') {
@@ -769,6 +830,14 @@ final class JoomlaSiteWriter implements \SiteWriter
         if ($id <= 0) {
             return;
         }
+        if (in_array($kind, ['article', 'module'], true)) {
+            $class = $kind === 'article' ? \Joomla\CMS\Table\Content::class : \Joomla\CMS\Table\Module::class;
+            $row = new $class($this->db);
+            if ($row->load($id) && !$row->delete($id)) throw new \RuntimeException((string) $row->getError());
+            if ($kind === 'article') (new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db))->deleteAssociation([$id]);
+            if ($kind === 'module') $this->db->setQuery('DELETE FROM #__modules_menu WHERE moduleid=' . $id)->execute();
+            return;
+        }
         // A tree node leaves through the Table too: Nested::delete() closes the lft/rgt gap a
         // raw DELETE would leave open. Only ever called to reverse a create this run made, so
         // the node has no children. A missing Table class means the create failed the same way
@@ -800,7 +869,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         // One group per component the catalog can touch. Cleaning a group that saw no write is
         // cheap; serving a stale menu after a rename is not.
         foreach ([
-            'com_content', 'com_modules', 'com_templates', '_system', 'page',
+            'com_content', 'com_modules', 'com_templates', 't4', 'mod_ja_acm', '_system', 'page',
             'com_menus', 'mod_menu', 'com_categories', 'com_tags', 'com_fields',
             'com_redirect', 'com_banners', 'com_contact', 'com_newsfeeds', 'com_users', 'com_plugins',
         ] as $group) {

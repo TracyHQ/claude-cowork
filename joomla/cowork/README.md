@@ -111,3 +111,22 @@ reason, nothing else — because a preview watching the site cannot be called ba
 on the customer's machine and has no address. The site writes, whoever is watching reads. Only
 changes made THROUGH this component are stamped; an administrator editing in the Joomla backend
 is not, and covering that needs a system plugin the package manifest was shaped to allow.
+
+## Transactional content batches (0.13.0)
+
+`content.batch` accepts `apply_id`, a stable `request_id`, and 1–100 `operations`
+(`kind`, `id`, `fields`, optional `key` and `expected` fields). A repeated request returns
+the committed receipt; reusing its ID with another body fails. A conflict rolls back the
+entire batch and its undo log. `apply.revert` replays the apply in reverse order.
+
+The Joomla writer supports `articleAssociation`, `menuAssociation`, `moduleAssignment`
+and the narrowly scoped `languageFilter` plugin settings. Relations validate their
+existing targets; article/module writes use Joomla Tables. New menu items may supply a
+unique alias. All component mutations serialize on the site's database advisory lock.
+
+`extension.install` accepts optional `sha256` and `bytes`; a pinned package is verified
+before extraction, including official language-pack download URLs with query strings.
+This version does not change the default template or publish an automatic update feed.
+
+Verified on Joomla 6: English seeding, adding French, repeated reconciliation, and
+reverting both applies to the original menu and module assignments.

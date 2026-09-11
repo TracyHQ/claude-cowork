@@ -102,9 +102,14 @@ final class JoomlaExtensions implements \ExtensionManager
         return ['ok' => true, 'before' => $before];
     }
 
-    public function installFromUrl(string $url): array
+    public function installVerifiedFromUrl(string $url, string $sha256, ?int $bytes = null): array
     {
-        $file = InstallerHelper::downloadPackage($url);
+        return $this->installFromUrl($url, $sha256, $bytes);
+    }
+
+    public function installFromUrl(string $url, ?string $sha256 = null, ?int $bytes = null): array
+    {
+        $file = InstallerHelper::downloadPackage($url, $sha256 ? 'tracy-' . $sha256 . '.zip' : false);
         if ($file === false) {
             return ['ok' => false, 'error' => 'could not download the package'];
         }
@@ -115,6 +120,10 @@ final class JoomlaExtensions implements \ExtensionManager
             return ['ok' => false, 'error' => 'package is larger than this site allows'];
         }
 
+        if ($sha256 !== null && (!is_file($path) || !hash_equals($sha256, hash_file('sha256', $path)) || ($bytes !== null && filesize($path) !== $bytes))) {
+            @unlink($path);
+            return ['ok' => false, 'error' => 'package checksum or size does not match the catalog'];
+        }
         $package = InstallerHelper::unpack($path, true);
         if ($package === false || empty($package['dir'])) {
             InstallerHelper::cleanupInstall($path, '');
