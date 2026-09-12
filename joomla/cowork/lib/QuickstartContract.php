@@ -53,7 +53,13 @@ final class QuickstartContract
         // before it exists keeps working untouched, and a receiver carrying it does not claim the
         // capability for a contract whose profile is absent.
         $profileFile = $directory . '/multilingual-map.json';
-        $catalogFile = dirname($directory, 3) . '/language-packs.json';
+        // 🔒 THE CATALOG IS NOT CONTRACT BYTES, SO IT DOES NOT LIVE WITH THEM. `lib/contracts/<id>/`
+        // holds what a SITE is held to — the files whose hashes are pinned and whose drift refuses
+        // the site. A list of language packages this receiver may download is receiver-wide and
+        // verifies nothing about the site, so it sits beside the engine instead. Keeping it in a
+        // profile directory would have made the contract gate demand it be pinned as contract
+        // bytes, which would be the gate telling the reader something untrue.
+        $catalogFile = dirname($directory, 4) . '/language-packs.json';
         if (is_file($profileFile)) {
             $raw = file_get_contents($profileFile);
             $this->multilingual = new MultilingualProfile(

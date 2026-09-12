@@ -12,10 +12,19 @@ rm -rf build dist && mkdir -p build/packages dist
 # Created, not assumed: the copy is gitignored, so a fresh clone does not have this directory
 # and `cp` into a missing one fails. It only ever worked here because the directory survived
 # from before it was ignored — the first clone of this repository is what found that out.
+# 🔒 CLEARED, NOT JUST CREATED. The copy is gitignored, so it survives between builds — and a file
+# that MOVED or was deleted in lib/ keeps shipping from here, silently, for as long as the working
+# copy lives. Measured 2026-09-12: `language-packs.json` moved out of `lib/contracts/` and the
+# package still carried it in the old place as well as the new one, with every gate green.
+rm -rf com_claudecowork/administrator/lib
 mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
 mkdir -p com_claudecowork/administrator/lib/contracts
 cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
+# The language-pack catalog is receiver-wide, not part of any contract, so it is copied beside the
+# engine rather than swept up by the contracts copy above. Named explicitly because a file the
+# package forgets is a receiver that reports every locale as unverified, with no error anywhere.
+cp lib/language-packs.json com_claudecowork/administrator/lib/
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
 # The auto-login system plugin ships in the SAME package as the component (ADR 0085): one upgrade
