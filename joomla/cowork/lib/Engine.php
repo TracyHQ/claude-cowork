@@ -1213,6 +1213,13 @@ final class Engine
         if (!$this->contract->bound()) return $this->err('contract_failed', 'A language needs a bound site');
         $operation = substr((string) $p['operation'], strlen('multilingual.'));
         $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        // 🔒 REFUSED, NOT IGNORED. A request that names its own archive is refused even when the
+        // values happen to be right: accepting the SHAPE is accepting a request that could carry
+        // wrong ones, and silently dropping the fields would let a caller believe it chose the
+        // bytes. On a bound site what may arrive is decided in review, in language-packs.json.
+        foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
+            if (isset($p[$mine]))
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
         $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
         if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
         switch ($operation) {
@@ -1325,10 +1332,17 @@ final class Engine
                 $next = $executor->step($job, $state, $translations);
                 if ($next['phase'] === 'completed') {
                     $this->contract->saveJob(null);
+                    // Two steps, and the order is what makes the second one safe. First the
+                    // derived baseline: which ids belong to which source, and that the translated
+                    // sources have left `*`. Then a full inspect, which PROVES every copy against
+                    // the derivation rules — and only then is its snapshot stored. Storing the
+                    // proven snapshot is not "copying whatever the site holds": it is recording a
+                    // state that has just been checked field by field. Without it the stored
+                    // baseline lacks the copies' own presentation, and the next ordinary content
+                    // edit fails with "Cannot replace a content-only baseline" — measured while
+                    // editing a Chinese headline after the language landed.
                     $this->contract->rebind($this->contract->bindingAfterLanguage($next));
-                    // Proves the finished site against the new baseline before the transaction
-                    // closes: a language that does not verify is not a language that landed.
-                    $this->contract->inspect();
+                    $this->contract->rebind($this->contract->inspect()['snapshot']);
                 } else $this->contract->saveJob($next);
                 return ['job' => $next];
             })['job'];
@@ -1452,13 +1466,15 @@ final class Engine
             $result = $this->writer->transaction(function () use ($applyId, $locale, $abandon, $leftovers) {
                 $reverted = $this->applyRevert(['apply_id' => $applyId]);
                 if (empty($reverted['ok']) || !empty($reverted['failed'])) throw new RuntimeException('The language could not be fully taken back');
+                // The stored baseline currently describes the site WITH the language, so the
+                // expectations have to come off before anything is re-read against them.
                 // Rows a committed-but-unlogged phase left behind (see MultilingualApply: a phase
                 // is bounded, not atomic). The undo log cannot name them because its own entries
                 // rolled back with the phase, so they are removed by the identity that found them.
                 foreach ($leftovers as $kind => $ids) foreach ($ids as $id) $this->writer->delete($kind, (int) $id);
                 if ($abandon) $this->contract->saveJob(null);
                 else $this->contract->rebind($this->contract->bindingAfterRevert($locale));
-                $this->contract->inspect();
+                $this->contract->rebind($this->contract->inspect()['snapshot']);
                 return $reverted;
             });
             $this->batching = false;

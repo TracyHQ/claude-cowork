@@ -1,6 +1,6 @@
 {
   "schemaVersion": "tracy-quickstart-multilingual/v1",
-  "extensionVersion": "1.0.0",
+  "extensionVersion": "1.1.0",
   "contract": "tracy-apple/j6/1.1.0",
   "baseHash": "1311135cff00fb488d81019b2fedefaedf9815e04fad76aa27f1a33b7148fcde",
   "baseFiles": {

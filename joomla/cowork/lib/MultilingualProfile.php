@@ -253,6 +253,27 @@ final class MultilingualProfile
     public static function preservationErrors(string $source, string $target): array
     {
         $out = [];
+        // A figure carrying a SCALE WORD is exempt from the verbatim rule and checked separately.
+        // "$44bn" is written "440亿美元" in Chinese: same currency, same amount, and the scale has
+        // moved into the number because that is how Chinese writes large figures. Measured
+        // 2026-09-12 — the model gave that answer twice, including when asked again with the
+        // complaint attached, because the answer was right and the rule was wrong. What is still
+        // checked is that a figure is there at all; silently dropping the amount stays a refusal.
+        $scaled = '~(?<![\w.])[$€£¥]?\s?\d[\d,.]*\s?(?:bn|tn|[kmb])\b~ui';
+        if (preg_match($scaled, $source)) {
+            // "Still a number somewhere" is too weak on its own: the English "$44bn O2" dropped
+            // whole still leaves the 2 of O2 behind. So a digit run that already appears verbatim
+            // in the SOURCE does not count as evidence — what must be there is a number the
+            // translation produced, which is exactly what re-scaling makes.
+            preg_match_all('~\d+~u', $source, $fromSource);
+            preg_match_all('~\d+~u', $target, $inTarget);
+            $produced = array_diff($inTarget[0], $fromSource[0]);
+            if (!$produced) {
+                preg_match($scaled, $source, $which);
+                $out[] = 'the figure ' . trim($which[0]) . ' left no number in the translation';
+            }
+            $source = (string) preg_replace($scaled, ' ', $source);
+        }
         $checks = [
             'URL' => '~https?://[^\s<>"\)]+~',
             'email address' => '~[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}~',
@@ -295,10 +316,19 @@ final class MultilingualProfile
     /**
      * Point a copied link at the copies of what it referenced.
      *
-     * Only NUMERIC references are touched — `id=` and `Itemid=`. A raw path needs no remapping at
-     * all here: a copy keeps its source's alias, so `/resources/style-guide` is the same path under
-     * both language prefixes, and rewriting it would break it. Anything else is left exactly as it
-     * was; a link this cannot prove the meaning of is not a link it may edit.
+     * 🔒 `id=` MEANS DIFFERENT THINGS UNDER DIFFERENT VIEWS, AND GUESSING IS NOT AVAILABLE. In a
+     * Joomla menu link the same parameter names an ARTICLE under `view=article`, a CATEGORY under
+     * `view=category`, and a contact under `com_contact&view=contact`. Only the first has a copy to
+     * point at — categories are shared by this profile, and so is everything outside com_content.
+     *
+     * Measured 2026-09-12: mapping every `id=` through the article table rewrote the Team page's
+     * `view=category&…&id=10` to the id of the copy of ARTICLE 10, and `/zh/company/team` answered
+     * 404 while `/en/company/team` served the page. Seven of the forty-six menu links had that
+     * shape. The rule is therefore narrow on purpose: a reference this cannot prove the meaning of
+     * is a reference it does not touch.
+     *
+     * A raw path needs no remapping at all: a menu copy keeps its source's alias, so
+     * `/resources/style-guide` is the same path under both language prefixes.
      */
     public function remapLink(string $link, array $idMap): string
     {
@@ -307,12 +337,24 @@ final class MultilingualProfile
         // left exactly as written. Without this guard a customer's link to a supplier's catalogue
         // page at `?id=1` came back pointing at `?id=101`, a page on a server Tracy does not own.
         if (preg_match('~^(?:[a-z][a-z0-9+.-]*:|//)~i', $link)) return $link;
-        return (string) preg_replace_callback(
-            '~\b(id|Itemid)=(\d+)~',
+        // An Itemid is a menu item under every view there is, so it maps unconditionally.
+        $link = (string) preg_replace_callback(
+            '~\bItemid=(\d+)~',
             static function (array $match) use ($idMap): string {
-                $kind = $match[1] === 'Itemid' ? 'menuItem' : 'article';
-                $id = (int) $match[2];
-                return $match[1] . '=' . ($idMap[$kind][$id] ?? $id);
+                $id = (int) $match[1];
+                return 'Itemid=' . ($idMap['menuItem'][$id] ?? $id);
+            },
+            $link
+        );
+        // A plain `id=` is an article only here: com_content's single-article view.
+        $query = (string) parse_url($link, PHP_URL_QUERY);
+        parse_str($query, $args);
+        if (($args['option'] ?? '') !== 'com_content' || ($args['view'] ?? '') !== 'article') return $link;
+        return (string) preg_replace_callback(
+            '~\bid=(\d+)~',
+            static function (array $match) use ($idMap): string {
+                $id = (int) $match[1];
+                return 'id=' . ($idMap['article'][$id] ?? $id);
             },
             $link
         );

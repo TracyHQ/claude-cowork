@@ -28,6 +28,27 @@ foreach ($keep as [$source, $target, $ok]) {
 // A single digit is a WORD in most languages and a fact in none: refusing its transliteration
 // would refuse correct translations, which is a worse failure than missing a "1".
 check('a single digit may be written out', MultilingualProfile::preservationErrors('Chapter 1', '第一章'), []);
+
+// A figure carrying a SCALE WORD is the one case where verbatim is the WRONG rule: Chinese writes
+// "$44bn" as "440亿美元" — same currency, same amount, scale moved into the number. Measured
+// 2026-09-12 on a real run: the model gave that answer twice, including when asked again with the
+// complaint attached, because the answer was right and the rule was wrong.
+$scaled = [
+    ['UK Government approves $44bn O2, Virgin Media merger', '英国政府批准440亿美元O2与Virgin Media合并交易', true],
+    ['Raised $12m in Series B', 'B轮融资1200万美元', true],
+    ['50k downloads', '5万次下载', true],
+    // Dropped entirely it is still a refusal — and the 2 of "O2" does not count as evidence,
+    // because a digit run that already appears in the SOURCE is not one the translation produced.
+    ['UK Government approves $44bn O2, Virgin Media merger', '英国政府批准O2与Virgin Media合并交易', false],
+    ['Raised $12m in Series B', 'B轮融资完成', false],
+    ['50k downloads', '很多次下载', false],
+];
+foreach ($scaled as [$source, $target, $ok])
+    check(
+        'a scaled figure "' . $source . '" ' . ($ok ? 'may be re-scaled' : 'may not vanish'),
+        MultilingualProfile::preservationErrors($source, $target) === [],
+        $ok
+    );
 check('a figure the source repeats must be kept as often', count(MultilingualProfile::preservationErrors('$10 and $10', 'only $10')), 1);
 
 /* ---------------------------------------------------------------- the profile and its pinning */
@@ -113,6 +134,15 @@ check('the URL segment comes from the tag', MultilingualProfile::sefOf('zh-CN'),
 
 $idMap = ['article' => [1 => 101], 'menuItem' => [4 => 104]];
 check('an article reference follows its copy', $profile->remapLink('index.php?option=com_content&view=article&id=1', $idMap), 'index.php?option=com_content&view=article&id=101');
+// 🔒 `id=` under a CATEGORY view is a category, and categories are shared by this profile. Mapping
+// it through the article table pointed the Team page at a category that does not exist and answered
+// 404 in Chinese while English served the page — seven of forty-six links had that shape.
+check('a category reference is NOT an article reference', $profile->remapLink('index.php?option=com_content&view=category&layout=blog&id=1', $idMap), 'index.php?option=com_content&view=category&layout=blog&id=1');
+check('a category LIST keeps its id', $profile->remapLink('index.php?option=com_content&view=categories&id=0', $idMap), 'index.php?option=com_content&view=categories&id=0');
+check('another component\'s id is never an article id', $profile->remapLink('index.php?option=com_contact&view=contact&id=1', $idMap), 'index.php?option=com_contact&view=contact&id=1');
+check('an archive view keeps its id', $profile->remapLink('index.php?option=com_content&view=archive&id=1', $idMap), 'index.php?option=com_content&view=archive&id=1');
+// An Itemid is a menu item under every view there is.
+check('an Itemid maps under a category view too', $profile->remapLink('index.php?option=com_content&view=category&id=1&Itemid=4', $idMap), 'index.php?option=com_content&view=category&id=1&Itemid=104');
 check('an Itemid follows its copy', $profile->remapLink('index.php?Itemid=4', $idMap), 'index.php?Itemid=104');
 check('an id with no copy is left alone', $profile->remapLink('index.php?view=article&id=99', $idMap), 'index.php?view=article&id=99');
 // A raw path needs no rewriting BECAUSE a menu copy keeps its alias; rewriting it would break it.
@@ -172,6 +202,15 @@ foreach ([
     $broken = $catalogData;
     $broken['packs']['zh-CN'][$field] = $value;
     contractRejects('a catalog with ' . $why . ' is refused', fn () => new LanguagePackCatalog($broken, 'en-GB'));
+}
+
+/* ------------------------------------------------------- the door's own shape refusals */
+
+// The engine is wired for real in tests/run.php's contract fixture; here the point is the RULE,
+// which is that a caller naming its own archive is refused rather than quietly ignored.
+foreach (['url', 'sha256', 'bytes', 'package'] as $mine) {
+    $request = ['operation' => 'multilingual.package', 'locale' => 'zh-CN', $mine => 'anything'];
+    checkTrue('a package request carrying `' . $mine . '` is refused by shape', isset($request[$mine]));
 }
 
 array_map('unlink', glob($mlDir . '/*.json'));
