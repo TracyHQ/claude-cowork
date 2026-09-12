@@ -130,3 +130,27 @@ This version does not change the default template or publish an automatic update
 
 Verified on Joomla 6: English seeding, adding French, repeated reconciliation, and
 reverting both applies to the original menu and module assignments.
+
+## Versioned quickstart content/display contracts
+
+`content.contract` accepts `operation: inspect` or `apply`. Inspect resolves the trusted packaged
+profile and reports slots, page relationships and a revision; apply accepts only scalar changes
+with that expected revision, an immutable `contract-` apply ID and request ID. It validates
+presentation before and inside the write transaction. The private
+`#__claudecowork_content_contract` table stores the installation binding and baseline.
+
+`lib/contracts/tracy-apple/j6/1.1.0` is a verbatim mirror of the canonical TCH profile. `build.sh`
+packages it with the engine. Update the canonical TCH files first, then copy the entire profile;
+never allow an agent to submit its own presentation lock. Generic structural writes are blocked
+once bound. Reverting a contract is transactional and refuses to overwrite a later revision.
+
+The first profile protects module status/schedules/type/position/order, menu assignments including
+exclusions, template parameters, layout/override assets, language and effective ACL inheritance.
+Joomla `{loadposition ...}` directives are structure, not editable copy. Factual slots require a
+provenance reference, whose truth still needs review. Bound media uploads use content-addressed
+paths under `images/tracy-content/`. Admin/direct database or filesystem access remains outside
+this API boundary; drift is detected on the next contract request.
+
+Release activation is separate from source availability: 0.14.0 has been tested as a local package,
+but the default TCH build recipe must also be migrated and pinned before claiming all new sites
+use content-only mode. The published 1.1.0 profile is not the later, locally modified 8212 demo.

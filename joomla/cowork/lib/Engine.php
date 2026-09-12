@@ -25,9 +25,11 @@ require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
+require_once __DIR__ . '/QuickstartContract.php';
 
 final class Engine
 {
+    private ?QuickstartContract $contract;
     private bool $batching = false;
     private bool $writing = false;
     private ?string $token;
@@ -78,7 +80,9 @@ final class Engine
         ?ApplyLog $log = null,
         ?ChangeStamp $stamp = null,
         ?CoreUpgrader $upgrader = null,
-        ?FilesRestorer $filesRestorer = null) {
+        ?FilesRestorer $filesRestorer = null,
+        ?QuickstartContract $contract = null) {
+        $this->contract = $contract;
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
@@ -108,7 +112,7 @@ final class Engine
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
 
         if (!$this->writing && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
-            ['content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
             try {
                 return $this->writer->serialize(function () use ($req) {
                     $this->writing = true;
@@ -117,6 +121,37 @@ final class Engine
             } catch (Throwable $error) { return $this->err('writer_busy', $error->getMessage()); }
         }
 
+        try { $contractBound=$this->contract && $this->contract->bound(); }
+        catch(Throwable $error) { return $this->err('contract_unavailable', 'The private contract store is unavailable; repair the component installation'); }
+        if ($contractBound && in_array($action, ['content.batch','content.update','content.delete','extension.install','extension.enable','db.restore','db.rollback','db.cleanup','db.purge','core.upgrade','files.restore'], true)) {
+            return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
+        }
+        if ($contractBound && $action === 'media.upload') {
+            $path = $params['path'] ?? '';
+            if (!is_string($path) || !preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('content_only', 'Use a new content-addressed image in images/tracy-content');
+            if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('content_only', 'Media uploads must use a separate apply receipt');
+        }
+        if ($contractBound && $action === 'apply.revert') {
+            $entries = $this->log ? $this->log->entries($params['apply_id'] ?? '') : [];
+            $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
+            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode');
+            try {
+                $state=$this->contract->inspect();
+                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                $this->batching=true;
+                $result=$this->writer->transaction(function()use($params){
+                    $result=$this->applyRevert($params);
+                    if(!$result['ok'] || !empty($result['failed']))throw new RuntimeException('Contract revert failed');
+                    $this->contract->inspect();
+                    return $result;
+                });
+                $this->batching=false;
+                try { $this->writer->purgeCache(); } catch(Throwable $ignored) {}
+                $this->stamped('revert');
+                return $result;
+            } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+            finally { $this->batching=false; }
+        }
         switch ($action) {
             case 'info':
                 return $this->ok(['info' => $this->info]);
@@ -154,6 +189,8 @@ final class Engine
                 return $this->contentList($params);
             case 'content.get':
                 return $this->contentGet($params);
+            case 'content.contract':
+                return $this->contentContract($params);
             case 'content.batch':
                 return $this->contentBatch($params);
             case 'content.update':
@@ -1117,7 +1154,39 @@ final class Engine
      * Expected fields are checked under the site writer lock; all row changes and undo entries
      * share one database transaction. Files and extension installers are deliberately excluded.
      */
-    private function contentBatch(array $p): array
+    private function contentContract(array $p): array
+    {
+        if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
+        try {
+            if (($p['operation'] ?? 'inspect') === 'inspect') {
+                $state=$this->contract->inspect();
+                unset($state['rows'], $state['snapshot']);
+                return $this->ok($state);
+            }
+            if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
+            $apply=$this->applyId($p);$request=$p['request_id']??'';
+            if (!$apply || strpos($apply,'contract-')!==0 || !is_string($request) || !$request) throw new RuntimeException('contract- apply_id and request_id required');
+            $hash=hash('sha256',json_encode([$p['changes']??null,$p['evidence']??[]]));
+            foreach($this->log->entries($apply) as $entry) {
+                if (($entry['op']??'')==='contract' && $entry['request']===$request) {
+                    if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');
+                    $this->contract->inspect();
+                    return $entry['result'];
+                }
+            }
+            if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
+            $plan=$this->contract->plan($p);
+            if(count($plan['operations'])>100)throw new RuntimeException('Split the revision into at most 100 entities');
+            if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
+            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash){
+                $this->contract->bind($plan['snapshot']);
+                $state=$this->contract->inspect();
+                $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
+            });
+        } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+    }
+
+    private function contentBatch(array $p, ?callable $verify = null): array
     {
         if (!$this->writer || !$this->log || !method_exists($this->writer, 'transaction')) {
             return $this->err('unavailable', 'transactional site writer not installed');
@@ -1131,7 +1200,7 @@ final class Engine
         }
         $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
         try {
-            $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash) {
+            $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
                     if (($entry['op'] ?? '') === 'batch' && ($entry['request'] ?? '') === $request) {
                         if (!hash_equals($entry['hash'], $hash)) throw new RuntimeException('request_id already used with different operations');
@@ -1170,6 +1239,7 @@ final class Engine
                     $ids[$key] = $answer['id'];
                 }
                 $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
+                if ($verify) $verify($result);
                 $this->log->record($apply, ['op' => 'batch', 'request' => $request, 'hash' => $hash, 'result' => $result]);
                 return $result;
             });
@@ -1374,6 +1444,8 @@ final class Engine
             return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
         }
 
+        if ($this->contract && $this->contract->bound() && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('content_only', 'Image filename must match its SHA-256');
+
         try {
             $before = $this->media->read($path); // null => new file, so its undo is a delete
             $this->media->write($path, $bytes);
@@ -1435,7 +1507,7 @@ final class Engine
             }
         }
 
-        if ($reverted > 0) {
+        if ($reverted > 0 && !$this->batching) {
             $this->stamped('revert');
         }
 
@@ -1497,7 +1569,7 @@ final class Engine
     private function revertOne(array $entry): void
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
-        if ($op === 'batch') { return; }
+        if ($op === 'batch' || $op === 'contract') { return; }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');

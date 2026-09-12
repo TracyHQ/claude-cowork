@@ -52,6 +52,15 @@ final class EngineFactory
         }
     }
 
+    private static function buildContract(): ?\QuickstartContract
+    {
+        $directory = self::libDir() . '/contracts/tracy-apple/j6/1.1.0';
+        if (!is_file($directory . '/manifest.json')) return null;
+        $writer = self::buildWriter();
+        if (!$writer) return null;
+        return new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore(Factory::getContainer()->get(DatabaseInterface::class)), JPATH_ROOT, $directory);
+    }
+
     /** Whether the component's engine is on disk — false on a site where only the plugin survived. */
     public static function installed(): bool
     {
@@ -117,7 +126,8 @@ final class EngineFactory
             // is SERVED from, because a preview reads it over HTTP as `/tracy-changed.json`.
             new \ChangeStamp(JPATH_ROOT),
             new JoomlaCoreUpgrader(),
-            new JoomlaFilesRestorer()
+            new JoomlaFilesRestorer(),
+            self::buildContract()
         );
     }
 

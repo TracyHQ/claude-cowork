@@ -14,6 +14,8 @@ rm -rf build dist && mkdir -p build/packages dist
 # from before it was ignored — the first clone of this repository is what found that out.
 mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
+mkdir -p com_claudecowork/administrator/lib/contracts
+cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
 # The auto-login system plugin ships in the SAME package as the component (ADR 0085): one upgrade

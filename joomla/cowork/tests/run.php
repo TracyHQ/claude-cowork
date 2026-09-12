@@ -1692,5 +1692,7 @@ $undo = $batchEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'p
 check('batch undo succeeds', $undo['ok'], true);
 check('batch undo restores and removes its create', $batchWriter->store['article'], [1 => ['title' => 'Original']]);
 
+require __DIR__ . "/contracts.php";
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
