@@ -93,6 +93,11 @@ contractRejects('contract rejects injected Joomla module directives',fn()=>$cont
 $contractLog=new FakeApplyLog();$transactional=new ContractTestWriter($contractLog,$cs);$transactional->store=$cw->store;
 $receiverContract=new QuickstartContract($transactional,$cs,$contractDir,$contractDir);
 $receiver=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$receiverContract);
+$cs->binding=null;
+$bind=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']];
+check('bootstrap binds before any customer write',$receiver->handle($bind)['bound'],true);
+check('bootstrap binding is idempotent',$receiver->handle($bind)['bound'],true);
+check('bootstrap immediately blocks generic writes',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'content_only');
 $first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
 $firstResult=$receiver->handle($first);
 check('contract receiver commits content in place',$firstResult['ok'],true);

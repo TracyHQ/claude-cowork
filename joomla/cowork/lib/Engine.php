@@ -1158,6 +1158,14 @@ final class Engine
     {
         if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
         try {
+            if (($p['operation'] ?? '') === 'bind') {
+                if(!$this->writer || !method_exists($this->writer,'transaction'))throw new RuntimeException('Transactional writer required');
+                return $this->writer->transaction(function(){
+                    $state=$this->contract->inspect();
+                    $this->contract->bind($state['snapshot']);
+                    return $this->ok(['contract'=>$state['contract'],'revision'=>$state['revision'],'bound'=>true]);
+                });
+            }
             if (($p['operation'] ?? 'inspect') === 'inspect') {
                 $state=$this->contract->inspect();
                 unset($state['rows'], $state['snapshot']);
@@ -1176,7 +1184,7 @@ final class Engine
             }
             if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
             $plan=$this->contract->plan($p);
-            if(count($plan['operations'])>100)throw new RuntimeException('Split the revision into at most 100 entities');
+            if(count($plan['operations'])>300)throw new RuntimeException('Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
             return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash){
                 $this->contract->bind($plan['snapshot']);
@@ -1195,7 +1203,7 @@ final class Engine
         $request = $p['request_id'] ?? '';
         $steps = $p['operations'] ?? null;
         if (!$apply || !is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request)
-            || !is_array($steps) || count($steps) < 1 || count($steps) > 100) {
+            || !is_array($steps) || count($steps) < 1 || count($steps) > ($verify ? 300 : 100)) {
             return $this->err('bad_params', 'apply_id, request_id and 1–100 operations required');
         }
         $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
