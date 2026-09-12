@@ -478,17 +478,17 @@ final class QuickstartContract
             if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw new RuntimeException('Customer evidence required: '.$key);
         }
         // Empty ACM fields control conditional markup; changing occupancy changes layout.
-        if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot');
-        if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot');
-        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw new RuntimeException('Markup and control characters are not content');
-        if(preg_match('/\{\/?[a-z][^{}]*\}/i',$value))throw new RuntimeException('Joomla plugin directives are not content');
+        if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
+        if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
+        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw new RuntimeException('Markup and control characters are not content: '.$key);
+        if(preg_match('/\{\/?[a-z][^{}]*\}/i',$value))throw new RuntimeException('Joomla plugin directives are not content: '.$key);
         if(mb_strlen($value)>$slot['maxCharacters'])throw new RuntimeException('Content too long: '.$key);
-        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw new RuntimeException('Unsupported CTA URL');
-        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw new RuntimeException('Unsupported CTA URL');
+        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw new RuntimeException('Unsupported CTA URL: '.$key);
+        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw new RuntimeException('Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {
-            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw new RuntimeException('Image must already exist in the site media library');
+            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw new RuntimeException('Image must already exist in the site media library: '.$key);
             $resolved=realpath($this->root.'/'.$value);$imageRoot=realpath($this->root.'/images');
-            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw new RuntimeException('Image escapes the site media library');
+            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw new RuntimeException('Image escapes the site media library: '.$key);
             $before=@getimagesize($this->root.'/'.$slot['sample']);$after=@getimagesize($this->root.'/'.$value);
             if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw new RuntimeException('Image aspect ratio does not match its slot');
         }
