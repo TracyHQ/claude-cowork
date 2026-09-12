@@ -79,15 +79,21 @@ final class QuickstartContract
         }
         return $filtered;
     }
+    private function generatedCache(string $path): bool {
+        // T4 produces these from the separately hash-locked sources when a route is first viewed.
+        return (bool)preg_match('~^media/t4/optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)$~D',$path);
+    }
     private function files(): void {
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
+            if($this->generatedCache($path) && !is_link($file))continue;
             if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))throw new RuntimeException('Presentation asset changed: '.$path);
         }
         foreach($this->lock['fileRoots'] as $prefix) {
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
+                if($this->generatedCache($relative) && !$file->isLink())continue;
                 if(!isset($this->lock['files'][$relative]))throw new RuntimeException('Unexpected presentation file: '.$relative);
             }
         }

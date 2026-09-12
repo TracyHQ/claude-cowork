@@ -52,8 +52,17 @@ foreach(ContentSlots::htmlSlots($module['content']) as $n=>$s)$slots[]=['key'=>'
 $cs=new TestContractStore();
 $data=['manifest'=>['id'=>'test/v1'],'content-map'=>['entities'=>$entities,'slots'=>$slots,'pages'=>[]],'presentation-lock'=>['entities'=>$protected,'assignments'=>[['moduleid'=>10,'menuid'=>-21]],'fileRoots'=>['assets'],'files'=>['assets/demo.css'=>hash_file('sha256',$contractDir.'/assets/demo.css')],'inventoryCounts'=>['module'=>1,'menuItem'=>2],'access'=>$cs->acl]];
 foreach($data as $name=>$body)file_put_contents($contractDir.'/'.$name.'.json',json_encode($body));
+mkdir($contractDir.'/media/t4/optimize/css',0777,true);
+$cache='media/t4/optimize/css/'.str_repeat('a',32).'.css';
+file_put_contents($contractDir.'/'.$cache,'derived');
+$data['presentation-lock']['fileRoots'][]='media';
+$data['presentation-lock']['files'][$cache]=hash_file('sha256',$contractDir.'/'.$cache);
+file_put_contents($contractDir.'/presentation-lock.json',json_encode($data['presentation-lock']));
 $contract=new QuickstartContract($cw,$cs,$contractDir,$contractDir);
 check('Joomla loadposition directives are never editable text',ContentSlots::htmlSlots('<p>{loadposition about-page}</p>'),[]);
+unlink($contractDir.'/'.$cache);
+$newCache='media/t4/optimize/css/'.str_repeat('b',32).'.css';
+file_put_contents($contractDir.'/'.$newCache,'regenerated from locked sources');
 $state=$contract->inspect();
 check('contract maps negative excluded menu IDs onto the installed site',$state['snapshot']['assignments']['hero'],[-121]);
 $contract->bind($state['snapshot']);
@@ -64,6 +73,10 @@ function contractRejects(string $label, callable $work): void {
     try { $work();check($label,'accepted','rejected'); }
     catch (RuntimeException $error) { check($label,'rejected','rejected'); }
 }
+check('T4 cache regeneration keeps the source contract valid',$contract->inspect()['contract'],'test/v1');
+file_put_contents($contractDir.'/media/t4/optimize/css/injected.php','unexpected executable');
+contractRejects('cache exception never allows executable files',fn()=>$contract->inspect());
+unlink($contractDir.'/media/t4/optimize/css/injected.php');
 foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
     $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;
     contractRejects('contract rejects module '.$field.' drift',fn()=>$contract->inspect());
@@ -117,5 +130,6 @@ $beforeFailure=[$transactional->store,$contractLog->log,$cs->binding];
 $transactional->drift=true;
 check('post-write presentation drift fails the whole apply',$receiver->handle($first)['ok'],false);
 check('failed apply rolls back rows, receipt and binding',[$transactional->store,$contractLog->log,$cs->binding],$beforeFailure);
+unlink($contractDir.'/'.$newCache);rmdir($contractDir.'/media/t4/optimize/css');rmdir($contractDir.'/media/t4/optimize');rmdir($contractDir.'/media/t4');rmdir($contractDir.'/media');
 foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
 unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);
