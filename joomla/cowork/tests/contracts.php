@@ -13,9 +13,16 @@ checkTrue('reparenting the asset cannot silently change effective ACL',ContractA
 
 final class TestContractStore implements ContractStore {
     public ?array $binding=null;
+    public ?array $job=null;
     public array $acl=['viewlevels'=>[['id'=>'1','rules'=>[1]]]];
     public function load(): ?array { return $this->binding; }
-    public function save(array $value): void { $this->binding=$value; }
+    public function save(array $value): void {
+        if($this->binding!==null){ if($this->binding!=$value)throw new RuntimeException('Cannot replace a content-only baseline'); return; }
+        $this->binding=$value;
+    }
+    public function replace(array $value): void { $this->binding=$value; }
+    public function job(): ?array { return $this->job; }
+    public function saveJob(?array $job): void { $this->job=$job; }
     public function access(): array { return $this->acl; }
 }
 final class ContractTestWriter extends FakeSiteWriter {
@@ -28,9 +35,9 @@ final class ContractTestWriter extends FakeSiteWriter {
         return parent::write($kind,$id,$fields);
     }
     public function transaction(callable $work):array {
-        $before=[$this->store,$this->log->log,$this->binding->binding];
+        $before=[$this->store,$this->log->log,$this->binding->binding,$this->binding->job];
         try{return $work();}catch(Throwable $error){
-            [$this->store,$this->log->log,$this->binding->binding]=$before;throw $error;
+            [$this->store,$this->log->log,$this->binding->binding,$this->binding->job]=$before;throw $error;
         }
     }
 }
