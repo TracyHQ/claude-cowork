@@ -34,12 +34,19 @@ check('a single digit may be written out', MultilingualProfile::preservationErro
 // 2026-09-12 on a real run: the model gave that answer twice, including when asked again with the
 // complaint attached, because the answer was right and the rule was wrong.
 $scaled = [
+    // Chinese folds the scale into the number; French keeps the digits and translates the scale.
+    // Both are right, and neither contains "$44bn".
     ['UK Government approves $44bn O2, Virgin Media merger', '英国政府批准440亿美元O2与Virgin Media合并交易', true],
+    ['UK Government approves $44bn O2, Virgin Media merger', 'Le gouvernement britannique approuve la fusion de 44 milliards de dollars entre O2 et Virgin Media', true],
+    // A scale word spelled out is the same case as one abbreviated.
+    ['Verizon to sell Yahoo and AOL for $5 Billion to Apollo', 'Verizon vend Yahoo et AOL pour 5 milliards de dollars à Apollo', true],
     ['Raised $12m in Series B', 'B轮融资1200万美元', true],
     ['50k downloads', '5万次下载', true],
-    // Dropped entirely it is still a refusal — and the 2 of "O2" does not count as evidence,
-    // because a digit run that already appears in the SOURCE is not one the translation produced.
+    // Dropped entirely it is still a refusal — and the 2 of "O2" does not count as evidence: a
+    // source word carrying a digit that survives verbatim is struck out before the target is read.
     ['UK Government approves $44bn O2, Virgin Media merger', '英国政府批准O2与Virgin Media合并交易', false],
+    ['UK Government approves $44bn O2, Virgin Media merger', 'Le gouvernement approuve la fusion entre O2 et Virgin Media', false],
+    ['Verizon to sell Yahoo and AOL for $5 Billion to Apollo', 'Verizon vend Yahoo et AOL à Apollo', false],
     ['Raised $12m in Series B', 'B轮融资完成', false],
     ['50k downloads', '很多次下载', false],
 ];

@@ -270,8 +270,20 @@ final class MultilingualApply
         foreach (['menuItem' => 'menuAssociation', 'article' => 'articleAssociation'] as $kind => $relation)
             foreach ($this->sources($state, $kind) as $key) $work[] = [$relation, $key];
         $slice = array_slice($work, $job['cursor'], self::CHUNK);
-        foreach ($slice as [$relation, $key])
-            ($this->write)($relation, (int) $job['ids'][$key], ['ids' => json_encode([(int) $state['ids'][$key], (int) $job['ids'][$key]])]);
+        foreach ($slice as [$relation, $key]) {
+            // 🔒 THE WHOLE GROUP, NOT A PAIR. An association in Joomla is one set per entity across
+            // every language, and `JoomlaRelations` refuses — rightly — to merge a pair into a
+            // group that already exists. Sending [source, new] worked while there was one
+            // translation and failed on the THIRD language with "association already belongs to
+            // another group", measured adding French to a site that already had Chinese.
+            $ids = [(int) $state['ids'][$key]];
+            foreach ($state['keys'] as $other => $meta)
+                if (($meta['base'] ?? null) === $key && isset($state['ids'][$other])) $ids[] = (int) $state['ids'][$other];
+            $ids[] = (int) $job['ids'][$key];
+            $ids = array_values(array_unique($ids));
+            sort($ids);
+            ($this->write)($relation, (int) $job['ids'][$key], ['ids' => json_encode($ids)]);
+        }
         $job['cursor'] += count($slice);
         return $job['cursor'] >= count($work);
     }

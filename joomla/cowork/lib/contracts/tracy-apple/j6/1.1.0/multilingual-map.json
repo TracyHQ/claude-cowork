@@ -1138,6 +1138,11 @@
       "reason": "Not identified by the published 1.1.0 contract, which covers published articles only"
     },
     {
+      "scope": "acm-layout-defaults",
+      "effect": "Copy written into a template ACM layout as the fallback for an empty module parameter renders in the source language on every page, translated or not. Measured 12/09/2026 on the Apple quickstart home page: 33 of 180 visible lines, among them the three feature cards and the four statistic labels.",
+      "reason": "These strings are not content slots in the published 1.1.0 contract — grep the content map and they are absent — so they cannot be edited in the SOURCE language either. They live in `templates/tracy/acm/*/tmpl/style-1.php`, which the presentation lock hash-locks as design. Reaching them is a change to the contract or to the template, not to this extension."
+    },
+    {
       "scope": "text-in-images",
       "effect": "Words baked into an image stay in the source language.",
       "reason": "The contract carries image paths, not image content, and Tracy does not redraw customer artwork"

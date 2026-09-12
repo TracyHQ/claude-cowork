@@ -253,25 +253,31 @@ final class MultilingualProfile
     public static function preservationErrors(string $source, string $target): array
     {
         $out = [];
-        // A figure carrying a SCALE WORD is exempt from the verbatim rule and checked separately.
-        // "$44bn" is written "440亿美元" in Chinese: same currency, same amount, and the scale has
-        // moved into the number because that is how Chinese writes large figures. Measured
-        // 2026-09-12 — the model gave that answer twice, including when asked again with the
-        // complaint attached, because the answer was right and the rule was wrong. What is still
-        // checked is that a figure is there at all; silently dropping the amount stays a refusal.
-        $scaled = '~(?<![\w.])[$€£¥]?\s?\d[\d,.]*\s?(?:bn|tn|[kmb])\b~ui';
-        if (preg_match($scaled, $source)) {
-            // "Still a number somewhere" is too weak on its own: the English "$44bn O2" dropped
-            // whole still leaves the 2 of O2 behind. So a digit run that already appears verbatim
-            // in the SOURCE does not count as evidence — what must be there is a number the
-            // translation produced, which is exactly what re-scaling makes.
-            preg_match_all('~\d+~u', $source, $fromSource);
-            preg_match_all('~\d+~u', $target, $inTarget);
-            $produced = array_diff($inTarget[0], $fromSource[0]);
-            if (!$produced) {
-                preg_match($scaled, $source, $which);
-                $out[] = 'the figure ' . trim($which[0]) . ' left no number in the translation';
+        /**
+         * A figure carrying a SCALE WORD is checked differently, because verbatim is the wrong
+         * rule for it. "$44bn" is "44 milliards de dollars" in French and "440亿美元" in Chinese:
+         * French keeps the digits and translates the scale, Chinese folds the scale into the
+         * number. Both are correct; neither contains "$44bn". Measured 2026-09-12 across two real
+         * runs of 969 strings — three refusals, all three of them correct translations.
+         *
+         * What must still be true is that a NUMBER survived. The trap is that a sentence can carry
+         * digits of its own: "$44bn O2, Virgin Media" dropped whole still leaves the 2 of O2. So
+         * any source word that contains a digit and is carried over verbatim is struck out of the
+         * target first; whatever digits remain are the ones the translation produced for this
+         * figure.
+         */
+        $scale = '(?:bn|tn|k|m|b|billion|million|thousand|trillion)';
+        $scaled = '~(?<![\w.])[$€£¥]?\s?\d[\d,.]*\s?' . $scale . '\b~ui';
+        if (preg_match($scaled, $source, $which)) {
+            $left = $target;
+            foreach (preg_split('~\s+~u', $source) as $word) {
+                $word = trim($word, ".,;:!?()[]\"'");
+                if ($word !== '' && preg_match('~\d~u', $word) && !preg_match($scaled, $word)
+                    && mb_strpos($left, $word) !== false)
+                    $left = str_replace($word, ' ', $left);
             }
+            if (!preg_match('~\d~u', $left))
+                $out[] = 'the figure ' . trim($which[0]) . ' left no number in the translation';
             $source = (string) preg_replace($scaled, ' ', $source);
         }
         $checks = [
