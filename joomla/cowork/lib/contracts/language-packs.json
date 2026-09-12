@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "tracy-joomla-language-packs/v1",
+  "version": "1.0.0",
+  "discovery": {
+    "list": "https://update.joomla.org/language/translationlist_6.xml",
+    "details": "https://update.joomla.org/language/details6/{tag}_details.xml",
+    "downloadHost": "downloads.joomla.org",
+    "verifiedAt": "2026-09-12",
+    "note": "Joomla's own accredited-translation feed declares sha256/sha384/sha512 per release; every pin below was re-measured by downloading the archive. Admission into this file is a reviewed commit, never a runtime lookup."
+  },
+  "packs": {
+    "fr-FR": {
+      "tag": "fr-FR",
+      "name": "French",
+      "version": "6.1.3.1",
+      "url": "https://downloads.joomla.org/language-packs/translations-joomla6/downloads/joomla6-french/6-1-3-1/fr-fr_joomla_lang_full_6-1-3v1-zip?format=zip",
+      "sha256": "7b4d1d2b5df5bb05c979e007ef850fc755d94546cadeeda706e28593bfe3d97c",
+      "bytes": 571380,
+      "platformMajors": [6]
+    },
+    "zh-CN": {
+      "tag": "zh-CN",
+      "name": "Chinese (Simplified)",
+      "version": "6.0.1.4",
+      "url": "https://downloads.joomla.org/language-packs/translations-joomla6/downloads/joomla6-chinese-simplified/6-0-1-4/zh-cn_joomla_lang_full_6-0-1v4-zip?format=zip",
+      "sha256": "d2758165800993b060dc4c4c5fda25951ddb75aec506b5ed7201bb9e8e276bca",
+      "bytes": 619023,
+      "platformMajors": [6]
+    },
+    "zh-TW": {
+      "tag": "zh-TW",
+      "name": "Chinese (Traditional)",
+      "version": "6.0.4.1",
+      "url": "https://downloads.joomla.org/language-packs/translations-joomla6/downloads/joomla6-chinese-traditional/6-0-4-1/zh-tw_joomla_lang_full_6-0-4v1-zip?format=zip",
+      "sha256": "1cb38ab03ca47cddbc6beedb0ae8372ebd31675ec207f331a009f42299a98a60",
+      "bytes": 830802,
+      "platformMajors": [6]
+    }
+  }
+}

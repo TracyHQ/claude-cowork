@@ -1171,9 +1171,11 @@ final class Engine
             }
             if (($p['operation'] ?? 'inspect') === 'inspect') {
                 $state=$this->contract->inspect();
-                unset($state['rows'], $state['snapshot']);
+                foreach(['rows','snapshot','keys','ids','localeMaps','assignments','slotValues','binding'] as $internal)unset($state[$internal]);
+                if($state['job'])$state['job']=['locale'=>$state['job']['locale'],'phase'=>$state['job']['phase']];
                 return $this->ok($state);
             }
+            if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             if (!$apply || strpos($apply,'contract-')!==0 || !is_string($request) || !$request) throw new RuntimeException('contract- apply_id and request_id required');
@@ -1195,6 +1197,297 @@ final class Engine
                 $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
             });
         } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+    }
+
+
+    /**
+     * Adding, checking and taking back a language version of a bound quickstart.
+     *
+     * Five operations behind one action, because the relay admits actions by NAME and a site under
+     * a content-only contract must not need a second door opened for this. They are deliberately
+     * not one call: `plan` reads, `package` moves files, `apply` moves rows one committed phase at
+     * a time, `verify` re-reads, `revert` takes it back. Anything that cannot say which of those it
+     * is has no business changing a customer's site.
+     */
+    private function multilingual(array $p): array
+    {
+        if (!$this->contract->multilingualAvailable())
+            return $this->err('unsupported', 'This quickstart contract carries no multilingual profile; the site cannot be given a second language by this receiver');
+        if (!$this->contract->bound()) return $this->err('contract_failed', 'A language needs a bound site');
+        $operation = substr((string) $p['operation'], strlen('multilingual.'));
+        $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        // 🔒 REFUSED, NOT IGNORED. A request that names its own archive is refused even when the
+        // values happen to be right: accepting the SHAPE is accepting a request that could carry
+        // wrong ones, and silently dropping the fields would let a caller believe it chose the
+        // bytes. On a bound site what may arrive is decided in review, in language-packs.json.
+        foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
+            if (isset($p[$mine]))
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+        $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
+        if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
+        switch ($operation) {
+            case 'plan':
+                return $this->ok($this->contract->languagePlan($locale, $major, $this->contract->inspect()));
+            case 'package':
+                return $this->multilingualPackage($locale, $major);
+            case 'apply':
+                return $this->multilingualApply($p, $locale, $major);
+            case 'verify':
+                return $this->multilingualVerify($locale);
+            case 'revert':
+                return $this->multilingualRevert($p, $locale);
+            default:
+                return $this->err('bad_params', 'Unknown multilingual operation');
+        }
+    }
+
+    /**
+     * Install the language pack this receiver has pinned for a locale.
+     *
+     * The caller names a LOCALE. It does not get to name a URL, a hash or a size even correctly:
+     * accepting those fields would accept the shape of a request that could carry wrong ones, and
+     * the whole point of a bound site is that what may reach it was decided in review.
+     */
+    private function multilingualPackage(string $locale, int $major): array
+    {
+        if ($this->extensions === null) return $this->err('unavailable', 'extension manager not wired');
+        try {
+            $pack = $this->contract->languagePackage($locale, $major);
+        } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        if ($pack === null) return $this->ok(['locale' => $locale, 'installed' => true, 'source' => true]);
+        try { $installed = $this->languagePackPresent($locale); }
+        catch (Throwable $error) { return $this->err('read_failed', $error->getMessage()); }
+        if (!$installed) {
+            if (!method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+            try {
+                $result = $this->extensions->installVerifiedFromUrl($pack['url'], $pack['sha256'], (int) $pack['bytes']);
+            } catch (Throwable $error) { return $this->err('install_failed', $error->getMessage()); }
+            if (($result['ok'] ?? false) !== true) return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+        }
+        // An installer writes FILES, and files are half of what this contract protects. Re-reading
+        // here is what turns "the installer returned ok" into "the site is still the site".
+        try { $this->contract->inspect(); }
+        catch (Throwable $error) { return $this->err('contract_failed', 'The package installed but the site no longer matches its contract: ' . $error->getMessage()); }
+        $this->stamped('extension');
+        return $this->ok(['locale' => $locale, 'installed' => true, 'version' => $pack['version'], 'alreadyPresent' => $installed]);
+    }
+
+    /**
+     * One phase of one language, committed.
+     *
+     * Repeating the same request id continues the same job rather than starting a second one, and a
+     * request id that arrives with different words is a conflict, not an update: a caller whose
+     * reply was lost must be able to ask again without translating the site twice, and must not be
+     * able to change what a half-applied job is applying.
+     */
+    private function multilingualApply(array $p, string $locale, int $major): array
+    {
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        $translations = $p['translations'] ?? null;
+        if (!$apply || strpos($apply, 'mlang-') !== 0 || !is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+            return $this->err('bad_params', 'an mlang- apply_id and a request_id are required');
+        if (!is_array($translations) || !$translations) return $this->err('bad_params', 'translations are required');
+        $hash = hash('sha256', json_encode([$locale, $translations], JSON_THROW_ON_ERROR));
+        try {
+            $job = $this->contract->job();
+            if ($job !== null && ($job['locale'] !== $locale || $job['requestId'] !== $request))
+                return $this->err('conflict', 'Another language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase']);
+            if ($job !== null && !hash_equals($job['translationHash'], $hash))
+                return $this->err('conflict', 'This request id is already applying different words');
+            // Reading the whole contract costs seconds — 3,900 file hashes and every governed row —
+            // so it is done ONCE outside the transaction, and only when a job is being STARTED and
+            // its revision has to be checked. A continuing call gets its fresh read inside the
+            // transaction, where it is needed anyway.
+            $state = $job === null ? $this->contract->inspect() : null;
+            if ($job === null) {
+                if (in_array($locale, $state['languages'], true))
+                    return $this->ok(['locale' => $locale, 'status' => 'completed', 'phase' => 'completed', 'alreadyPresent' => true]);
+                if (!isset($p['expected_revision']) || !hash_equals($state['revision'], (string) $p['expected_revision']))
+                    return $this->err('conflict', 'The site changed since it was planned; inspect again');
+                $plan = $this->contract->languagePlan($locale, $major, $state);
+                // The words can be ready before the files are, and usually are; what must not happen
+                // is rows tagged `zh-CN` on a site where Joomla has never heard of `zh-CN`.
+                if ($plan['package'] !== null && !$this->languagePackPresent($locale))
+                    return $this->err('contract_failed', 'Install the ' . $locale . ' language pack before applying it');
+                $missing = $this->translationProblems($plan['slots'], $translations);
+                // The full list, not a sample of it: the caller's only way to fix a translation is
+                // to ask again for exactly the slots that failed, and a truncated list turns that
+                // into guess-and-retry over a thousand of them.
+                if ($missing) return $this->err(
+                    'contract_failed',
+                    'The translation is not usable: ' . implode('; ', array_slice(array_column($missing, 'problem'), 0, 3))
+                        . (count($missing) > 3 ? ' (and ' . (count($missing) - 3) . ' more)' : ''),
+                    ['problems' => $missing]
+                );
+                $job = MultilingualApply::start($locale, $apply, $request, $hash, $state['snapshot']['contractHash'], $plan['profileHash'], $state['revision']);
+            }
+            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply): int {
+                $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => $id, 'fields' => $fields]);
+                if (empty($answer['ok'])) throw new RuntimeException($kind . ' ' . $id . ': ' . ($answer['message'] ?? json_encode($answer['error'])));
+                return (int) $answer['id'];
+            });
+            $this->batching = true;
+            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
+                // A fresh read inside the transaction: the phase must act on the site as it is now,
+                // not on a picture taken before another writer had its turn.
+                $state = $this->contract->inspect();
+                $next = $executor->step($job, $state, $translations);
+                if ($next['phase'] === 'completed') {
+                    $this->contract->saveJob(null);
+                    // Two steps, and the order is what makes the second one safe. First the
+                    // derived baseline: which ids belong to which source, and that the translated
+                    // sources have left `*`. Then a full inspect, which PROVES every copy against
+                    // the derivation rules — and only then is its snapshot stored. Storing the
+                    // proven snapshot is not "copying whatever the site holds": it is recording a
+                    // state that has just been checked field by field. Without it the stored
+                    // baseline lacks the copies' own presentation, and the next ordinary content
+                    // edit fails with "Cannot replace a content-only baseline" — measured while
+                    // editing a Chinese headline after the language landed.
+                    $this->contract->rebind($this->contract->bindingAfterLanguage($next));
+                    $this->contract->rebind($this->contract->inspect()['snapshot']);
+                } else $this->contract->saveJob($next);
+                return ['job' => $next];
+            })['job'];
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('content');
+            return $this->ok([
+                'locale' => $locale,
+                'status' => $done['phase'] === 'completed' ? 'completed' : 'running',
+                'phase' => $done['phase'], 'cursor' => $done['cursor'],
+                'created' => count($done['ids']), 'applyId' => $apply,
+                'phases' => MultilingualApply::PHASES,
+            ]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+
+
+    /**
+     * Rows an unfinished language left on the site, grouped by kind, newest first.
+     *
+     * Newest first because a menu item cannot be removed before its children: ids rise with
+     * creation order, so descending order takes the tree apart from the leaves.
+     *
+     * @return array<string,int[]>
+     */
+    private function orphansOf(array $state, string $locale): array
+    {
+        $out = [];
+        foreach ($state['keys'] as $key => $meta) {
+            if (($meta['locale'] ?? null) !== $locale) continue;
+            $out[$meta['kind']][] = (int) $state['ids'][$key];
+        }
+        if ($state['switcher'] !== null) $out['module'][] = (int) $state['switcher'];
+        foreach ($out as $kind => $ids) { rsort($ids); $out[$kind] = $ids; }
+        return $out;
+    }
+
+    /** Whether Joomla itself already carries this language, as the site reports it. */
+    private function languagePackPresent(string $locale): bool
+    {
+        if ($this->extensions === null) return false;
+        foreach ($this->extensions->listInstalled() as $row)
+            if (($row['type'] ?? '') === 'language' && ($row['element'] ?? '') === $locale) return true;
+        return false;
+    }
+
+    /** Every reason a supplied translation cannot be used, named one slot at a time. */
+    private function translationProblems(array $slots, array $translations): array
+    {
+        $out = [];
+        foreach ($slots as $slot) {
+            if ($slot['type'] !== 'text') continue;
+            $key = $slot['key'];
+            $say = function (string $problem) use (&$out, $key): void { $out[] = ['slot' => $key, 'problem' => $key . ': ' . $problem]; };
+            if (!array_key_exists($key, $translations) || !is_string($translations[$key])) { $say('no translation was supplied'); continue; }
+            $value = $translations[$key];
+            $source = (string) $slot['source'];
+            if (trim($value) === '' && trim($source) !== '') { $say('is empty but its source is not'); continue; }
+            if (trim($value) !== '' && trim($source) === '') { $say('fills a slot the source leaves empty'); continue; }
+            if (mb_strlen($value) > $slot['maxCharacters']) { $say('is ' . mb_strlen($value) . ' characters, over the slot limit of ' . $slot['maxCharacters']); continue; }
+            if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries markup or control characters'); continue; }
+            if (preg_match('/\{\/?[a-z][^{}]*\}/i', $value)) { $say('carries a Joomla plugin directive'); continue; }
+            foreach (MultilingualProfile::preservationErrors($source, $value) as $lost) $say($lost);
+        }
+        return $out;
+    }
+
+    /** Re-read the whole contract, then report what the language actually consists of. */
+    private function multilingualVerify(string $locale): array
+    {
+        try { $state = $this->contract->inspect(); }
+        catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        if ($locale !== '' && !in_array($locale, $state['languages'], true))
+            return $this->err('contract_failed', $locale . ' is not a language of this site' . ($state['job'] ? ' yet; a job is at phase ' . $state['job']['phase'] : ''));
+        $binding = $state['binding']['multilingual'] ?? [];
+        $per = [];
+        foreach ($binding['languages'] ?? [] as $tag => $language) {
+            $kinds = [];
+            foreach ($language['ids'] as $baseKey => $id) {
+                $kind = $state['keys'][MultilingualProfile::derivedKey($tag, $baseKey)]['kind'];
+                $kinds[$kind] = ($kinds[$kind] ?? 0) + 1;
+            }
+            $per[$tag] = ['entities' => $kinds, 'contentLanguage' => $language['contentLanguage'], 'applyId' => $language['applyId']];
+        }
+        return $this->ok([
+            'contract' => $state['contract'], 'revision' => $state['revision'],
+            'languages' => $state['languages'], 'perLanguage' => $per,
+            'switcher' => $state['switcher'], 'verified' => true,
+        ]);
+    }
+
+    /**
+     * Take one language back out, and nothing else.
+     *
+     * Replaying this language's own apply log in reverse is what makes the scope exact: it removes
+     * the rows this run created and restores the fields this run changed, so a language pack that
+     * was already on the site, and anything a person did afterwards under a different apply id,
+     * are not its business. A revert that does not verify afterwards is rolled back whole.
+     */
+    private function multilingualRevert(array $p, string $locale): array
+    {
+        try {
+            $state = $this->contract->inspect();
+            $language = $state['binding']['multilingual']['languages'][$locale] ?? null;
+            $job = $state['job'];
+            // A language that never finished is taken back through the SAME door. Without this a
+            // job whose words can no longer be supplied — the caller lost them, or changed them —
+            // could only be cleared from a database console, and until it was, the site refused
+            // every other content change.
+            $abandon = $language === null && $job !== null && $job['locale'] === $locale;
+            if ($language === null && !$abandon) return $this->err('contract_failed', $locale . ' is not a language of this site');
+            if (isset($p['expected_revision']) && !hash_equals($state['revision'], (string) $p['expected_revision']))
+                return $this->err('conflict', 'The site changed since it was read; inspect again');
+            $applyId = $abandon ? $job['applyId'] : $language['applyId'];
+            $leftovers = $abandon ? ($state['languages'] === [] ? $this->orphansOf($state, $locale) : []) : [];
+            $this->batching = true;
+            $result = $this->writer->transaction(function () use ($applyId, $locale, $abandon, $leftovers) {
+                $reverted = $this->applyRevert(['apply_id' => $applyId]);
+                if (empty($reverted['ok']) || !empty($reverted['failed'])) throw new RuntimeException('The language could not be fully taken back');
+                // The stored baseline currently describes the site WITH the language, so the
+                // expectations have to come off before anything is re-read against them.
+                // Rows a committed-but-unlogged phase left behind (see MultilingualApply: a phase
+                // is bounded, not atomic). The undo log cannot name them because its own entries
+                // rolled back with the phase, so they are removed by the identity that found them.
+                foreach ($leftovers as $kind => $ids) foreach ($ids as $id) $this->writer->delete($kind, (int) $id);
+                if ($abandon) $this->contract->saveJob(null);
+                else $this->contract->rebind($this->contract->bindingAfterRevert($locale));
+                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                return $reverted;
+            });
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('revert');
+            return $this->ok(['locale' => $locale, 'reverted' => $result['reverted'] ?? 0, 'removed' => true]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
     }
 
     private function contentBatch(array $p, ?callable $verify = null): array

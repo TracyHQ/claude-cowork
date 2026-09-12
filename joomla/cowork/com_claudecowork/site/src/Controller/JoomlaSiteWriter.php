@@ -583,7 +583,7 @@ final class JoomlaSiteWriter implements \SiteWriter
         'category'        => ['id', 'title', 'alias', 'path', 'parent_id', 'level', 'extension', 'published', 'language'],
         'tag'             => ['id', 'title', 'alias', 'path', 'parent_id', 'level', 'published', 'language'],
         'field'           => ['id', 'title', 'name', 'label', 'type', 'context', 'state', 'required', 'language'],
-        'menuItem'        => ['id', 'menutype', 'title', 'alias', 'path', 'link', 'type', 'published',
+        'menuItem'        => ['id', 'menutype', 'title', 'note', 'alias', 'path', 'link', 'type', 'published',
             'parent_id', 'level', 'language', 'client_id'],
         'language'        => ['lang_id', 'lang_code', 'title', 'published', 'sef'],
         'menutype'        => ['id', 'menutype', 'title', 'description'],
@@ -592,7 +592,10 @@ final class JoomlaSiteWriter implements \SiteWriter
         'bannerClient'    => ['id', 'name', 'contact', 'email', 'state'],
         'contact'         => ['id', 'name', 'alias', 'con_position', 'email_to', 'published', 'catid', 'language'],
         'newsfeed'        => ['id', 'name', 'alias', 'link', 'published', 'catid', 'language'],
-        'module'          => ['id', 'title', 'position', 'module', 'published', 'language'],
+        // `note` is in the summary because it is where a row says where it CAME from. Finding the
+        // copies a half-finished language left behind means matching that note across the whole
+        // table, and reading every full row to do it is one query per module on a shared host.
+        'module'          => ['id', 'title', 'note', 'position', 'module', 'published', 'language'],
         'templateStyle'   => ['id', 'title', 'template', 'home'],
         // No email in a LIST — identity summaries name the account, the full row is a `get`.
         'user'            => ['id', 'name', 'username', 'block', 'registerDate', 'lastvisitDate'],
@@ -670,7 +673,12 @@ final class JoomlaSiteWriter implements \SiteWriter
         if (!class_exists($def['class'])) {
             throw new \RuntimeException("kind {$kind} needs a Joomla table class this site does not ship");
         }
+        // Two of Joomla's own menu item types carry NO link and never have: a heading is a label in
+        // a menu and a separator is a rule between two of them. Demanding one refused every menu
+        // that has either — found translating a quickstart whose first top-level item is a heading.
+        $linkless = $kind === 'menuItem' && \in_array((string) ($fields['type'] ?? ''), ['heading', 'separator'], true);
         foreach ($def['require'] as $column) {
+            if ($linkless && $column === 'link') continue;
             if (trim((string) ($fields[$column] ?? '')) === '') {
                 throw new \RuntimeException("creating a {$kind} needs {$column}");
             }
