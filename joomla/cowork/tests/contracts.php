@@ -101,6 +101,7 @@ check('bootstrap immediately blocks generic writes',$receiver->handle(['token'=>
 $first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
 $firstResult=$receiver->handle($first);
 check('contract receiver commits content in place',$firstResult['ok'],true);
+check('inspect exposes current content separately from immutable demo samples',$receiverContract->inspect()['slots'][0]['current'],'First customer title');
 check('contract receiver replays the identical committed receipt',$receiver->handle($first),$firstResult);
 check('bound receiver refuses generic module unpublishing',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['error'],'content_only');
 $second=$first;$second['params']['apply_id']='contract-second';$second['params']['request_id']='second';

@@ -46,6 +46,21 @@ final class QuickstartContract
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         return $row;
     }
+    private function currentValue(array $row, array $slot): string {
+        $value=$row[$slot['column']];
+        if(isset($slot['xpath'])) {
+            $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+            if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+            return $nodes->item(0)->nodeValue;
+        }
+        if(isset($slot['jsonPath'])) {
+            $outer=json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
+            foreach($slot['jsonPath'] as $key)$value=$value[$key];
+        }
+        if(!is_string($value))throw new RuntimeException('Content slot is not text');
+        return $value;
+    }
     private function presentation(string $key, array $row): array {
         $fields=$this->lock['entities'][$key]; $filtered=[];
         foreach($fields as $name=>$v) {
@@ -136,7 +151,7 @@ final class QuickstartContract
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$key]);
-        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$this->digest($revisionRows),'slots'=>$this->map['slots'],'pages'=>$this->map['pages'],'rows'=>$rows];
+        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$this->digest($revisionRows),'slots'=>array_map(function($slot)use($rows){$slot['current']=$this->currentValue($rows[$slot['entity']],$slot);return $slot;},$this->map['slots']),'pages'=>$this->map['pages'],'rows'=>$rows];
     }
     public function plan(array $params): array {
         $state=$this->inspect();
