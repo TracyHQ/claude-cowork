@@ -122,6 +122,27 @@ final class MultilingualProfile
     }
 
     /**
+     * The language already holding this locale's URL segment, or null when the segment is free.
+     *
+     * 🔒 `#__languages.sef` IS UNIQUE, AND THE SEGMENT IS DERIVED. `zh-CN` and `zh-TW` both derive
+     * `zh`, so a site that publishes one cannot take the other — the row simply cannot be inserted.
+     * The caller asks this at PLAN time because by apply time the customer has already paid for a
+     * whole edition of translated strings.
+     *
+     * @param string $locale the tag being asked for.
+     * @param array $have every language already on the site, the source included.
+     */
+    public static function sefClash(string $locale, array $have): ?string
+    {
+        $sef = self::sefOf($locale);
+        foreach ($have as $one) {
+            $one = (string) $one;
+            if ($one !== '' && $one !== $locale && self::sefOf($one) === $sef) return $one;
+        }
+        return null;
+    }
+
+    /**
      * The editable slots of a derived entity: the source's own slots, re-keyed to the copy, plus a
      * title slot for a module that SHOWS its title.
      *

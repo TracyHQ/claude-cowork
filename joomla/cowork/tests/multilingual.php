@@ -137,6 +137,15 @@ check('a menu copy keeps its source path', $profile->derivedAlias('menuItem', 's
 check('an article copy cannot', $profile->derivedAlias('article', 'style-guide', 'zh-CN'), 'style-guide-zh');
 check('the URL segment comes from the tag', MultilingualProfile::sefOf('zh-CN'), 'zh');
 
+// 🔒 TWO CHINESES CANNOT SHARE A SITE, and the plan is where that is said. Both tags derive `zh`,
+// `#__languages.sef` is unique, and by apply time the customer has paid for ~1000 translated
+// strings. Measured 12/09 on a site already publishing zh-TW: the plan happily answered
+// `creates: {module: 49, article: 78, menuItem: 46}` for zh-CN before this check existed.
+check('a second Chinese collides with the first', MultilingualProfile::sefClash('zh-CN', ['en-GB', 'zh-TW']), 'zh-TW');
+check('the source language holds its own segment too', MultilingualProfile::sefClash('en-US', ['en-GB']), 'en-GB');
+check('an unrelated language is free to land', MultilingualProfile::sefClash('fr-FR', ['en-GB', 'zh-TW']), null);
+check('a locale already present is not a clash with itself', MultilingualProfile::sefClash('zh-TW', ['en-GB', 'zh-TW']), null);
+
 /* ---------------------------------------------------------------- what a copied link points at */
 
 $idMap = ['article' => [1 => 101], 'menuItem' => [4 => 104]];

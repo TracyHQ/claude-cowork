@@ -553,6 +553,12 @@ final class QuickstartContract
     public function languagePlan(string $locale, int $major, array $state): array {
         $profile=$this->profile(); $catalog=$this->catalog();
         if(!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D',$locale))throw new RuntimeException('Not a Joomla language tag: '.$locale);
+        // 🔒 THE SEF SEGMENT IS DERIVED, AND `#__languages.sef` IS UNIQUE. `zh-CN` and `zh-TW` both
+        // derive `zh`, so a site that has one cannot take the other — and the plan is where that has
+        // to be said, because the caller translates ~1000 strings BEFORE the first write. Refusing at
+        // the insert would mean the customer pays for a whole edition and then loses it.
+        $clash=MultilingualProfile::sefClash($locale,array_merge([$profile->sourceLanguage()],$state['languages']));
+        if($clash!==null)throw new RuntimeException('This site already publishes '.$clash.' at /'.MultilingualProfile::sefOf($locale).'/, and '.$locale.' would need the same address. Joomla gives one language each URL segment, so the two cannot both be on this site. Nothing has been written.');
         $pack=$catalog->pack($locale,$major);
         $already=in_array($locale,$state['languages'],true);
         $creates=[];$slots=[];
