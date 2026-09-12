@@ -231,3 +231,42 @@ foreach (['url', 'sha256', 'bytes', 'package'] as $mine) {
 
 array_map('unlink', glob($mlDir . '/*.json'));
 rmdir($mlDir);
+
+/* ------------------------------------------------- who an association group is written THROUGH */
+
+// 🔒 THE UNDO LOG STORES WHAT `read()` ANSWERED FOR THE ID BEING WRITTEN. A copy created moments
+// ago belongs to no group, so a group write addressed to the COPY recorded an empty "before", and
+// undoing it deleted the whole group instead of restoring it. Measured 12/09/2026 on a site with
+// English, Chinese and French: reverting French left `#__associations` empty, and the switcher on
+// an English inner page fell back to the Chinese HOME page instead of the translated page.
+// Addressed to the SOURCE, the before is the group as it stood, and the undo restores it.
+$relationWrites = [];
+$applyRef = new ReflectionClass(MultilingualApply::class);
+$applyForRelations = $applyRef->newInstanceWithoutConstructor();
+foreach ([
+    'profile' => $profile,
+    'write' => function (string $kind, int $id, array $fields) use (&$relationWrites): int {
+        $relationWrites[] = [$kind, $id, $fields];
+        return $id;
+    },
+] as $name => $value) {
+    $applyRef->getProperty($name)->setValue($applyForRelations, $value);
+}
+$relationsJob = MultilingualApply::start('zh-CN', 'apply-1', 'req-1', 't', 'c', 'p', 'rev');
+$relationsJob['phase'] = 'relations';
+$relationsJob['ids'] = ['article-1' => 101, 'menuItem-4' => 104];
+$relationsState = [
+    'ids' => ['article-1' => 1, 'menuItem-4' => 4],
+    'keys' => [
+        'article-1' => ['kind' => 'article'],
+        'module-2' => ['kind' => 'module'],
+        'module-3' => ['kind' => 'module'],
+        'menuItem-4' => ['kind' => 'menuItem'],
+    ],
+];
+$applyForRelations->step($relationsJob, $relationsState, []);
+check('an association group is written through the SOURCE, never the new copy',
+    array_map(fn ($w) => [$w[0], $w[1]], $relationWrites),
+    [['menuAssociation', 4], ['articleAssociation', 1]]);
+check('and it carries the whole group, source and copy together',
+    array_map(fn ($w) => json_decode($w[2]['ids'], true), $relationWrites), [[4, 104], [1, 101]]);

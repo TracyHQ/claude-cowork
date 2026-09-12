@@ -282,7 +282,14 @@ final class MultilingualApply
             $ids[] = (int) $job['ids'][$key];
             $ids = array_values(array_unique($ids));
             sort($ids);
-            ($this->write)($relation, (int) $job['ids'][$key], ['ids' => json_encode($ids)]);
+            // 🔒 WRITE THE GROUP THROUGH THE SOURCE, NOT THROUGH THE NEW COPY. The undo log stores
+            // what `read()` answered for the id being written, and a copy created moments ago
+            // belongs to no group at all — so a write addressed to it recorded an EMPTY before, and
+            // undoing it deleted the whole group instead of restoring it. Measured 12/09 on a site
+            // with English, Chinese and French: reverting French left `#__associations` empty, and
+            // the switcher on a Chinese inner page fell back to the Chinese home page. Addressed to
+            // the source, the before is the group as it stood — [en, zh] — and the undo restores it.
+            ($this->write)($relation, (int) $state['ids'][$key], ['ids' => json_encode($ids)]);
         }
         $job['cursor'] += count($slice);
         return $job['cursor'] >= count($work);
