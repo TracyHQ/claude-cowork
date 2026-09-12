@@ -33,6 +33,26 @@ Observed read-only in Joomla admin at 127.0.0.1:8212 on 2026-09-12: Home - Hero 
 uses masthead and Public access, but is assigned only to Home variation. The working demo also has
 later content and layout edits; it is not the published 1.1.0 baseline.
 
+## One base archive, more than one design
+
+A design is not always its own archive. `tracy-airbnb/j6/1.0.0` is the same `tracy-apple/j6/1.1.0`
+base with the `tracy_airbnb` template installed on top and the six base template styles rewritten
+in place, so both profiles describe the same 197 entities and the same 1,113 scalar slots. The
+difference is exactly six template-style rows, the six `media/t4/css/<styleId>.css` files T4
+compiles from their parameters, and the 272 files of the template package.
+
+Which profile a site is held to is a component parameter the provisioner writes, next to the write
+token and with the same trust; it never arrives on a request. A receiver that does not carry the
+profile a site names refuses every action rather than answering as a site with no contract — that
+state is the one in which structural writes are allowed, so reaching it by being out of date would
+be the worst possible failure. Changing the parameter on a site that is already bound does not
+rebind it: the stored snapshot pins the contract hash, and the file lock catches the design change
+first. A design change on a live site needs its own migration workflow.
+
+T4 writes `media/t4/css/<styleId>.css` the first time a route using that style is served, so an
+activation regenerates all of them before the site is bound. Otherwise a site binds with the base
+design's compiled colours and drifts on its first visitor.
+
 ## Current delivery boundary
 
 The first contract covers the published `tracy-apple/j6/1.1.0` archive. The capture contains

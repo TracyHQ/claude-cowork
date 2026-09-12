@@ -52,10 +52,39 @@ final class EngineFactory
         }
     }
 
+    /**
+     * The published contract profile this site is held to.
+     *
+     * One base archive now carries more than one design — Airbnb is the same Apple quickstart with
+     * a different template activated on top — so the profile can no longer be a path literal. It is
+     * read from the component's own params, which only the provisioner writes (the same place, and
+     * the same trust, as the write token); a request can never reach it, because every action that
+     * writes an extension row is refused on a bound site.
+     *
+     * A site provisioned before this existed has no param, so the Apple profile is the default and
+     * those sites keep verifying against exactly the bytes they were bound to.
+     *
+     * Swapping the param on an already-bound site does NOT rebind it: `inspect()` compares the
+     * stored `contractHash` against the loaded profile and fails closed, which is what a design
+     * change on a live site has to do until a migration workflow exists to do it properly.
+     */
+    private const DEFAULT_CONTRACT = 'tracy-apple/j6/1.1.0';
+
     private static function buildContract(): ?\QuickstartContract
     {
-        $directory = self::libDir() . '/contracts/tracy-apple/j6/1.1.0';
-        if (!is_file($directory . '/manifest.json')) return null;
+        $configured = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
+        // Three segments of the shape the published profiles use, and nothing that could climb out
+        // of `lib/contracts/` — this string becomes a directory. A param that is set but malformed
+        // is deliberately NOT waved through to the default: it names a site whose design nobody can
+        // account for, and that has to refuse rather than quietly verify against Apple's bytes.
+        $valid = $configured !== ''
+            && preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured);
+        $directory = self::libDir() . '/contracts/' . ($valid ? $configured : self::DEFAULT_CONTRACT);
+        // No contract configured and no default profile on disk is the one legacy shape that means
+        // "this receiver carries no contracts at all"; everything else hands back a contract that
+        // refuses, so a receiver older than the site's profile cannot read as an unbound site.
+        if ($configured === '' && !is_file($directory . '/manifest.json')) return null;
+        if ($configured !== '' && !$valid) $directory = self::libDir() . '/contracts/unconfigured';
         $writer = self::buildWriter();
         if (!$writer) return null;
         return new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore(Factory::getContainer()->get(DatabaseInterface::class)), JPATH_ROOT, $directory);

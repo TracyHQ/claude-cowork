@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.15.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.15.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.15.0/pkg_claudecowork-0.15.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. A multilingual site can now be built through the same door as its words: a content language is a kind, so the languages a site speaks are declared the way its articles are. A menu can also name itself — menutype was the one column a menu item points at that the door would not write, so a menu made through it was reachable by nothing.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

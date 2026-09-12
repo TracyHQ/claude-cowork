@@ -15,16 +15,27 @@ final class QuickstartContract
     private SiteWriter $writer;
     private ContractStore $store;
     private string $root;
+    /**
+     * Why a missing profile is carried rather than thrown from the constructor: the caller decides
+     * whether a site has a contract by whether it was handed one, and a receiver too old to carry
+     * the profile a site was provisioned for would otherwise look like a site with NO contract —
+     * which is the one state where every structural write is allowed. Refusing from every method
+     * keeps that mistake closed and says which half is out of date.
+     */
+    private ?string $unavailable = null;
     public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
-            $value = json_decode(file_get_contents($directory . '/' . $name . '.json'), true, 512, JSON_THROW_ON_ERROR);
+            $file = $directory . '/' . $name . '.json';
+            if (!is_file($file)) { $this->unavailable = 'This site names a content contract this receiver does not carry'; return; }
+            $value = json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
             if ($name === 'manifest') $this->manifest=$value;
             elseif ($name === 'content-map') $this->map=$value;
             else $this->lock=$value;
         }
     }
-    public function bound(): bool { return $this->store->load() !== null; }
+    private function ready(): void { if ($this->unavailable !== null) throw new RuntimeException($this->unavailable); }
+    public function bound(): bool { $this->ready(); return $this->store->load() !== null; }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
     private function contractHash(): string { return $this->digest([$this->manifest,$this->map,$this->lock]); }
     private function entities(): array { return array_column($this->map['entities'], null, 'key'); }
@@ -99,6 +110,7 @@ final class QuickstartContract
         }
     }
     public function inspect(): array {
+        $this->ready();
         $this->files(); $binding=$this->store->load();
         if ($this->store->access() != $this->lock['access']) throw new RuntimeException('Access-level or ACL definition changed');
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
@@ -197,5 +209,5 @@ final class QuickstartContract
         }
         return ['operations'=>$operations,'snapshot'=>$state['snapshot']];
     }
-    public function bind(array $snapshot): void { $this->store->save($snapshot); }
+    public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); }
 }

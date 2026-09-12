@@ -130,6 +130,37 @@ $beforeFailure=[$transactional->store,$contractLog->log,$cs->binding];
 $transactional->drift=true;
 check('post-write presentation drift fails the whole apply',$receiver->handle($first)['ok'],false);
 check('failed apply rolls back rows, receipt and binding',[$transactional->store,$contractLog->log,$cs->binding],$beforeFailure);
+// ── A base archive that serves more than one design ──────────────────────────────────────────
+// Apple and Airbnb are the same quickstart with a different template activated on top, so the
+// receiver now carries several profiles and picks one from the component's own params. Two things
+// have to hold: a site bound to one profile must refuse to be read under another, and a receiver
+// that does not carry the profile a site names must refuse everything rather than read as a site
+// with no contract at all — the one state where every structural write is allowed.
+$secondDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
+mkdir($secondDir);mkdir($secondDir.'/assets');
+copy($contractDir.'/assets/demo.css',$secondDir.'/assets/demo.css');
+$secondData=$data;$secondData['manifest']=['id'=>'test-airbnb/v1'];
+foreach($secondData as $name=>$body)file_put_contents($secondDir.'/'.$name.'.json',json_encode($body));
+$secondContract=new QuickstartContract($transactional,$cs,$contractDir,$secondDir);
+$cs->binding=null;
+check('a second design profile reads the same site on its own terms',$secondContract->inspect()['contract'],'test-airbnb/v1');
+$cs->binding=$receiverContract->inspect()['snapshot'];
+check('the first design profile still reads the site it is bound to',$receiverContract->inspect()['contract'],'test/v1');
+contractRejects('a site bound to one design refuses to be read under another',fn()=>$secondContract->inspect());
+
+$missingDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
+$absent=new QuickstartContract($transactional,$cs,$contractDir,$missingDir);
+contractRejects('a receiver without the named profile refuses to answer bound()',fn()=>$absent->bound());
+contractRejects('a receiver without the named profile refuses to inspect',fn()=>$absent->inspect());
+contractRejects('a receiver without the named profile refuses to bind',fn()=>$absent->bind([]));
+$absentEngine=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$absent);
+check('a receiver without the named profile refuses generic writes instead of allowing them',
+    $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'contract_unavailable');
+check('a receiver without the named profile refuses the contract door too',
+    $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unavailable');
+foreach(array_keys($secondData) as $name)unlink($secondDir.'/'.$name.'.json');
+unlink($secondDir.'/assets/demo.css');rmdir($secondDir.'/assets');rmdir($secondDir);
+
 unlink($contractDir.'/'.$newCache);rmdir($contractDir.'/media/t4/optimize/css');rmdir($contractDir.'/media/t4/optimize');rmdir($contractDir.'/media/t4');rmdir($contractDir.'/media');
 foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
 unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);
