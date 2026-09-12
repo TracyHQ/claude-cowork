@@ -25,6 +25,25 @@ foreach ($keep as [$source, $target, $ok]) {
     $errors = MultilingualProfile::preservationErrors($source, $target);
     check('translation of "' . $source . '" ' . ($ok ? 'keeps its facts' : 'is refused'), $errors === [], $ok);
 }
+// A CURRENCY AMOUNT MAY PUT ITS SYMBOL ON THE OTHER SIDE. Measured 13/09/2026 on a real French run:
+// the three tiers of a pricing block, "$0" / "$24" / "$96", came back as "0 $" / "24 $" / "96 $" —
+// correct French — and were refused three times running. The amount must survive; the symbol
+// may stand on either side of it. Dropping the amount is still refused.
+$money = [
+    ['$24', '24 $', true],
+    ['$24', "24\u{202F}\$", true],
+    ['$0 free forever', '0 $ pour toujours', true],
+    ['From $96 a night', 'À partir de 96 $ la nuit', true],
+    ['€19 per month', '19 € par mois', true],
+    ['$24', '24', false],
+    ['$24', '42 $', false],
+    ['$24 and $96', '24 $ et 69 $', false],
+];
+foreach ($money as [$source, $target, $ok]) {
+    $errors = MultilingualProfile::preservationErrors($source, $target);
+    check('currency "' . $source . '" as "' . $target . '" ' . ($ok ? 'keeps its amount' : 'is refused'), $errors === [], $ok);
+}
+
 // A single digit is a WORD in most languages and a fact in none: refusing its transliteration
 // would refuse correct translations, which is a worse failure than missing a "1".
 check('a single digit may be written out', MultilingualProfile::preservationErrors('Chapter 1', '第一章'), []);

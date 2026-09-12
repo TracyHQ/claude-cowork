@@ -310,7 +310,20 @@ final class MultilingualProfile
         foreach ($checks as $what => $pattern) {
             preg_match_all($pattern, $source, $found);
             foreach (array_count_values($found[0]) as $token => $times) {
-                if (substr_count($target, (string) $token) < $times)
+                $token = (string) $token;
+                $seen = substr_count($target, $token);
+                // A CURRENCY AMOUNT MAY PUT ITS SYMBOL ON THE OTHER SIDE. French writes "$24" as
+                // "24 $" (symbol after, thin or ordinary space), and German, Spanish and others do
+                // the same for their own currencies. Measured 13/09 on a real run: the three price
+                // tiers of a pricing block — "$0", "$24", "$96" — came back as "0 $", "24 $",
+                // "96 $", correct French, refused three times including after the complaint. The
+                // amount is what must survive; the symbol may stand on either side of it.
+                if ($seen < $times && $what === 'figure' && preg_match('~^([$€£¥])\s?(\d[\d,.]*)$~u', $token, $money)) {
+                    $sym = preg_quote($money[1], '~');
+                    $num = preg_quote($money[2], '~');
+                    $seen += preg_match_all('~(?<![\d.,])' . $num . '(?:\s|\x{00A0}|\x{202F})?' . $sym . '~u', $target);
+                }
+                if ($seen < $times)
                     $out[] = 'the ' . $what . ' ' . $token . ' is missing from the translation';
             }
         }
