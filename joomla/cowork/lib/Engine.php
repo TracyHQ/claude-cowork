@@ -122,7 +122,10 @@ final class Engine
         }
 
         try { $contractBound=$this->contract && $this->contract->bound(); }
-        catch(Throwable $error) { return $this->err('contract_unavailable', 'The private contract store is unavailable; repair the component installation'); }
+        // The reason travels: since one base archive serves several designs, "unavailable" now also
+        // means "this receiver does not carry the profile this site names", and an operator who
+        // reads only "repair the component installation" goes looking in the wrong half.
+        catch(Throwable $error) { return $this->err('contract_unavailable', $error->getMessage() ?: 'The private contract store is unavailable; repair the component installation'); }
         if ($contractBound && in_array($action, ['content.batch','content.update','content.delete','extension.install','extension.enable','db.restore','db.rollback','db.cleanup','db.purge','core.upgrade','files.restore'], true)) {
             return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
         }
