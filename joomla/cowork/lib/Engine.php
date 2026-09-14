@@ -98,6 +98,27 @@ final class Engine
     }
 
     /**
+     * The profile a site under construction was provisioned FROM, when it has no contract yet.
+     *
+     * A Base site is a site whose template is still to be built: the provisioner writes
+     * `tracy_build_baseline` and leaves `contract` empty on purpose, because a contract names the
+     * presentation to protect and there is none yet. Such a site must answer the contract door
+     * honestly — unbound, here is the baseline — rather than fall back to a default profile and
+     * verify the Base files against another design's lock. Measured 14/09 on a fresh Base site: the
+     * first `inspect` failed with "Presentation asset changed: templates/tracy/acm/accordion/css/
+     * style.css", a file nobody had touched, and every build from a design with no template of its
+     * own died on that line.
+     */
+    private ?string $constructionBaseline = null;
+
+    /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
+    public function underConstruction(string $baseline): self
+    {
+        $this->constructionBaseline = $baseline;
+        return $this;
+    }
+
+    /**
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
      */
@@ -1159,6 +1180,13 @@ final class Engine
      */
     private function contentContract(array $p): array
     {
+        if (!$this->contract && $this->constructionBaseline !== null) {
+            // Under construction there is nothing to verify and nothing to write through: the door
+            // says so, names the baseline, and the builder goes on to capture and name a profile.
+            if (($p['operation'] ?? 'inspect') === 'inspect')
+                return $this->ok(['bound' => false, 'contract' => '', 'baseline' => $this->constructionBaseline, 'construction' => true]);
+            return $this->err('contract_unbound', 'This site is under construction (baseline ' . $this->constructionBaseline . '): capture and name its profile before binding or applying content');
+        }
         if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
         try {
             if (($p['operation'] ?? '') === 'bind') {

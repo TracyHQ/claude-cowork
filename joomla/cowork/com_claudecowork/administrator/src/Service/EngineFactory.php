@@ -73,6 +73,13 @@ final class EngineFactory
     private static function buildContract(): ?\QuickstartContract
     {
         $configured = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
+        // A site under construction — provisioned from the Base archive with `tracy_build_baseline`
+        // and no `contract`, because its template is still to be built — carries NO contract. It
+        // must not fall through to the default profile below: that verified Base's files against
+        // Apple's lock and refused the first inspection of every such site ("Presentation asset
+        // changed: templates/tracy/acm/accordion/css/style.css", measured 14/09). The engine
+        // answers the contract door for it instead (`Engine::underConstruction`).
+        if ($configured === '' && self::constructionBaseline() !== null) return null;
         // Three segments of the shape the published profiles use, and nothing that could climb out
         // of `lib/contracts/` — this string becomes a directory. A param that is set but malformed
         // is deliberately NOT waved through to the default: it names a site whose design nobody can
@@ -88,6 +95,17 @@ final class EngineFactory
         $writer = self::buildWriter();
         if (!$writer) return null;
         return new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore(Factory::getContainer()->get(DatabaseInterface::class)), JPATH_ROOT, $directory);
+    }
+
+    /**
+     * The baseline profile of a site under construction, or null when the site is not one. Same
+     * shape rule as `contract`: a malformed value is not a baseline.
+     */
+    private static function constructionBaseline(): ?string
+    {
+        $baseline = trim((string) ComponentHelper::getParams('com_claudecowork')->get('tracy_build_baseline', ''));
+        if ($baseline === '' || !preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $baseline)) return null;
+        return $baseline;
     }
 
     /** Whether the component's engine is on disk — false on a site where only the plugin survived. */
@@ -136,7 +154,7 @@ final class EngineFactory
         $params = ComponentHelper::getParams('com_claudecowork');
         $token = trim((string) $params->get('token', ''));
 
-        return new \Engine(
+        $engine = new \Engine(
             $token === '' ? null : $token,
             [
                 'php'       => PHP_VERSION,
@@ -158,6 +176,10 @@ final class EngineFactory
             new JoomlaFilesRestorer(),
             self::buildContract()
         );
+        $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
+        $baseline = self::constructionBaseline();
+        if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);
+        return $engine;
     }
 
     /**

@@ -165,6 +165,23 @@ check('a receiver without the named profile refuses generic writes instead of al
     $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'contract_unavailable');
 check('a receiver without the named profile refuses the contract door too',
     $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unavailable');
+
+// A site under construction: provisioned from the Base archive with `tracy_build_baseline` and no
+// `contract` yet, because the template is still to be built. Measured 14/09 on a fresh Base site:
+// the receiver fell back to the Apple profile, hashed Base's files against Apple's lock and refused
+// the first inspection with "Presentation asset changed: templates/tracy/acm/accordion/css/style.css"
+// — a file nobody had touched. Under construction there is no lock to verify and no default to guess.
+$construction=(new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog))->underConstruction('tracy-base/j6/1.0.0');
+$unbound=$construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'inspect']]);
+check('a site under construction answers inspect as unbound, naming its baseline',
+    [$unbound['ok']??null,$unbound['bound']??null,$unbound['contract']??null,$unbound['baseline']??null,$unbound['construction']??null],
+    [true,false,'','tracy-base/j6/1.0.0',true]);
+check('a site under construction cannot be bound before it names a profile',
+    $construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unbound');
+check('nor written through the contract door',
+    $construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-x','request_id'=>'x','changes'=>[]]])['error'],'contract_unbound');
+checkTrue('structural writes stay open while the template is being built',
+    ($construction->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error']??'')!=='content_only');
 foreach(array_keys($secondData) as $name)unlink($secondDir.'/'.$name.'.json');
 unlink($secondDir.'/assets/demo.css');rmdir($secondDir.'/assets');rmdir($secondDir);
 
