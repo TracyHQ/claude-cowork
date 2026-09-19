@@ -749,6 +749,31 @@ final class Engine
         if (!method_exists($this->writer, 'list_posts')) {
             return $this->err('unavailable', 'this plugin is too old to list content');
         }
+        /**
+         * 🔒 THIS LISTS POSTS AND NOTHING ELSE, AND IT NOW SAYS SO INSTEAD OF PRETENDING.
+         *
+         * `kind` was read nowhere in this method: every call ran `list_posts()` and answered
+         * `"kind":"post"` whatever was asked for. Measured 19/09/2026 across two sites,
+         * `content.list` with `kind` of `option`, `menuItem`, `user`, `menutype` and `page` each
+         * came back with the site's posts and an `ok:true` — the one shape this component refuses
+         * everywhere else, a wrong answer reporting success. An agent reading it concluded the site
+         * had no options and went looking in the webroot's PHP.
+         *
+         * The writer has one list, `list_posts`. Growing the others is a bigger piece of work than
+         * this; until then the honest answer is a refusal that NAMES the door which does serve the
+         * kind asked for, because a refusal an agent can act on costs one call and a wrong list
+         * costs a wrong theory.
+         */
+        $kind = isset($p['kind']) && is_string($p['kind']) && trim($p['kind']) !== ''
+            ? trim($p['kind'])
+            : 'post';
+        if ($kind !== 'post') {
+            return $this->err(
+                'bad_params',
+                "content.list serves kind \"post\" only; \"{$kind}\" is not listed here. "
+                    . 'Read one with content.get {kind, id or key}, and use post_type to narrow posts.'
+            );
+        }
         $offset = max(0, (int) ($p['offset'] ?? 0));
         $withBody = !empty($p['include_body']);
         $ceiling = $withBody ? 25 : 200;
@@ -774,27 +799,60 @@ final class Engine
         return $this->ok(['kind' => 'post', 'offset' => $offset, 'items' => $items]);
     }
 
-    /** One post, exactly as the site holds it — the same read the undo log takes before a write. */
+    /**
+     * One record, exactly as the site holds it — the same read the undo log takes before a write.
+     *
+     * 🔒 IT READS EVERY KIND THE WRITER WRITES, AND UNTIL 19/09/2026 IT READ ONLY POSTS. This took
+     * `id` alone and called `read('post', $id)` with the kind hardcoded, so `content.get
+     * {kind:"option", key:"WPLANG"}` answered `bad_params: id required` — an option has no numeric
+     * id — and there was no way to read one back at all. `contentUpdate` three hundred lines below
+     * has always passed `kind`, `id` AND `key` to the same `SiteWriter::read()`, because it needs
+     * the before-image for the undo log; the read path simply never caught up.
+     *
+     * ⚠ WHAT THE GAP COST, MEASURED ON A REAL SITE. An agent asked to translate `demowpnam` needed
+     * to know an option's value, could not read it, and so WROTE
+     * `show_comments_cookies_opt_in = 1` and put it back to `0` — two writes to a customer's live
+     * site whose only purpose was to discover the old value. It named that apply `vi-check-noop`.
+     * An earlier turn on another site spent fifteen of its eighteen steps reading this component's
+     * own PHP out of the webroot to work out that options can be written and not read.
+     *
+     * 🔒 `kind` DEFAULTS TO `post`, SO EVERY CALLER THAT EXISTS TODAY IS UNTOUCHED. The old shape
+     * `{id: 7}` still returns that post, and the answer still carries `kind`, so a caller reading
+     * that field sees what it always saw.
+     */
     private function contentGet(array $p): array
     {
         if ($this->writer === null) {
             return $this->err('unavailable', 'site writer not wired');
         }
+        $kind = isset($p['kind']) && is_string($p['kind']) && trim($p['kind']) !== ''
+            ? trim($p['kind'])
+            : 'post';
+        if (!in_array($kind, SiteWriter::KINDS, true)) {
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+        }
         $id = max(0, (int) ($p['id'] ?? 0));
-        if ($id === 0) {
-            return $this->err('bad_params', 'id required');
+        $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+        // Each kind is addressed its own way and `SiteWriter::read()` holds that knowledge — a post
+        // by id, an option by key, a postmeta and a term by both. Refusing here on a second copy of
+        // that table is how the two would drift; the refusal below names what was actually asked.
+        if ($id === 0 && $key === '') {
+            return $this->err('bad_params', "id or key required to name which {$kind} to read");
         }
 
         try {
-            $item = $this->writer->read('post', $id);
+            $item = $this->writer->read($kind, $id, $key);
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
         if ($item === null) {
-            return $this->err('not_found', "no post with id {$id}");
+            // Both halves of the address, because a null here means either "no such record" or
+            // "that kind is not addressed the way you addressed it", and the caller cannot tell
+            // which from a message that repeats back only the half it happened to send.
+            return $this->err('not_found', sprintf('no %s at id %d, key "%s"', $kind, $id, $key));
         }
 
-        return $this->ok(['kind' => 'post', 'id' => $id, 'item' => $item]);
+        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item]);
     }
 
     /**
