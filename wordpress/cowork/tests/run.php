@@ -1020,6 +1020,46 @@ check('content.get names a missing row', $wEngine->handle(['token' => $WTOKEN, '
     'params' => ['id' => 404]])['error'], 'not_found');
 check('content.get requires an id', $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
     'params' => []])['error'], 'bad_params');
+
+// READING BACK WHAT THIS DOOR JUST WROTE. Until 19/09/2026 `content.get` hardcoded `read('post',
+// $id)`, so a record addressed by NAME could be written and never read: `{kind:"option",
+// key:"WPLANG"}` answered `bad_params: id required`, because an option has no numeric id. The cost
+// was not the wasted call. An agent translating a real site needed an option's value, could not
+// read it, and so WROTE the option to `1` and put it back to `0` — two writes to a customer's live
+// site whose only purpose was to learn the old value.
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => [
+    'apply_id' => 'opt-1', 'kind' => 'option', 'key' => 'blogname', 'fields' => ['value' => 'Xin chào'],
+]]);
+$got = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
+    'params' => ['kind' => 'option', 'key' => 'blogname']]);
+check('an option written through this door can be read back', $got['ok'], true);
+check('and the value is the one that was written', $got['item'], ['value' => 'Xin chào']);
+check('the answer names the kind and the key it was asked for', [$got['kind'], $got['key']],
+    ['option', 'blogname']);
+
+// The shape every caller alive today sends: no kind at all, and a numeric id. It must keep meaning
+// a post, and the answer must keep saying so.
+$post = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['id' => $dated['id']]]);
+check('a call with no kind is still a post, exactly as before', [$post['ok'], $post['kind']], [true, 'post']);
+
+// A kind that IS addressed by name, asked for without one, must not be told "id required" — that
+// sent an agent looking for an id no option has.
+check('an option asked for with no key says which half is missing',
+    $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.get',
+        'params' => ['kind' => 'option']])['message'], 'id or key required to name which option to read');
+check('a kind nobody serves is refused by name', $wEngine->handle(['token' => $WTOKEN,
+    'action' => 'content.get', 'params' => ['kind' => 'menutype', 'key' => 'x']])['error'], 'bad_params');
+
+// 🔒 AND `content.list` MUST REFUSE WHAT IT CANNOT LIST RATHER THAN ANSWER WITH POSTS. It read
+// `kind` nowhere: `{kind:"option"}`, `{kind:"menuItem"}`, `{kind:"user"}` each came back `ok:true`
+// carrying the site's posts and `"kind":"post"`. A wrong answer that reports success is the one
+// shape this component refuses everywhere else.
+$listed = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.list', 'params' => ['kind' => 'option']]);
+check('content.list refuses a kind it does not serve', $listed['error'], 'bad_params');
+check('rather than answering with posts', isset($listed['items']), false);
+check('and it names the door that does serve it', str_contains($listed['message'], 'content.get'), true);
+check('listing with no kind is unchanged', $wEngine->handle(['token' => $WTOKEN,
+    'action' => 'content.list', 'params' => ['kind' => 'post']])['ok'], true);
 $writer->posts = [];
 
 // --------------------------------------------- the guard against dying silently --
