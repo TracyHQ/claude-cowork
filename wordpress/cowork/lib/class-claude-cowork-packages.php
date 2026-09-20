@@ -435,6 +435,151 @@ final class Claude_Cowork_Packages {
 	}
 
 	/**
+	 * The colour palette this site actually renders with: the theme's own, plus whatever the user
+	 * global styles have overridden, keyed by slug.
+	 *
+	 * Read from the MERGED theme.json data rather than from the user post alone — a site that has
+	 * never been recoloured has an empty user post and a full theme palette, and answering "no
+	 * colours" there would be false.
+	 *
+	 * @return array List of { slug, color, name }.
+	 */
+	public function palette() {
+		$merged = WP_Theme_JSON_Resolver::get_merged_data();
+		$data   = $merged->get_raw_data();
+		$list   = isset( $data['settings']['color']['palette'] ) ? $data['settings']['color']['palette'] : array();
+		if ( ! is_array( $list ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $list as $entry ) {
+			// `theme` and `default` origins arrive as their own lists on some versions; a flat list
+			// of entries is what every one of them ends up as once merged.
+			if ( ! is_array( $entry ) || ! isset( $entry['slug'] ) ) {
+				continue;
+			}
+			$out[] = array(
+				'slug'  => (string) $entry['slug'],
+				'color' => isset( $entry['color'] ) ? (string) $entry['color'] : '',
+				'name'  => isset( $entry['name'] ) ? (string) $entry['name'] : '',
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Change named colours, and change NOTHING else.
+	 *
+	 * 🔒 MERGE, NEVER REPLACE — that is the whole difference between this and `wear_style`. The user
+	 * global styles post is one JSON document holding every override the site has; writing a fresh
+	 * document with only a palette in it would silently drop typography, spacing and every other
+	 * value a variation had put there. So this reads the post, edits `settings.color.palette` in
+	 * place, and writes the same document back.
+	 *
+	 * A slug the palette does not have is ADDED rather than refused: a theme can name a colour the
+	 * user's overrides do not carry yet, and refusing would make the first change to such a colour
+	 * impossible. What is refused is a slug or a value of the wrong shape, which `Engine` checks.
+	 *
+	 * @param array $pairs slug => `#rrggbb`.
+	 * @return array
+	 */
+	public function set_palette( $pairs ) {
+		if ( ! is_array( $pairs ) || array() === $pairs ) {
+			return array( 'ok' => false, 'error' => 'no colours were named' );
+		}
+
+		$post_id = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
+		if ( ! $post_id ) {
+			$data    = WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme(), true );
+			$post_id = isset( $data['ID'] ) ? (int) $data['ID'] : 0;
+		}
+		if ( ! $post_id ) {
+			return array( 'ok' => false, 'error' => 'this site has no global styles post to write' );
+		}
+
+		$post     = get_post( $post_id );
+		$document = array();
+		if ( $post && is_string( $post->post_content ) && '' !== trim( $post->post_content ) ) {
+			$decoded = json_decode( $post->post_content, true );
+			if ( is_array( $decoded ) ) {
+				$document = $decoded;
+			}
+		}
+		if ( ! isset( $document['settings'] ) || ! is_array( $document['settings'] ) ) {
+			$document['settings'] = array();
+		}
+		if ( ! isset( $document['settings']['color'] ) || ! is_array( $document['settings']['color'] ) ) {
+			$document['settings']['color'] = array();
+		}
+		$palette = isset( $document['settings']['color']['palette'] ) && is_array( $document['settings']['color']['palette'] )
+			? $document['settings']['color']['palette']
+			: array();
+
+		// What the site renders with now, so a slug the user post has never carried still reports
+		// the value it is replacing rather than an empty string.
+		$effective = array();
+		foreach ( $this->palette() as $entry ) {
+			$effective[ $entry['slug'] ] = $entry['color'];
+		}
+
+		$was     = array();
+		$changed = array();
+		foreach ( $pairs as $slug => $color ) {
+			$was[ $slug ] = isset( $effective[ $slug ] ) ? $effective[ $slug ] : '';
+			$found        = false;
+			foreach ( $palette as $index => $entry ) {
+				if ( is_array( $entry ) && isset( $entry['slug'] ) && (string) $entry['slug'] === (string) $slug ) {
+					$palette[ $index ]['color'] = $color;
+					$found                      = true;
+					break;
+				}
+			}
+			if ( ! $found ) {
+				$palette[] = array(
+					'slug'  => (string) $slug,
+					'color' => $color,
+					'name'  => isset( $effective[ $slug ] ) ? ucfirst( str_replace( '-', ' ', (string) $slug ) ) : ucfirst( str_replace( '-', ' ', (string) $slug ) ),
+				);
+			}
+			$changed[ $slug ] = $color;
+		}
+		$document['settings']['color']['palette'] = array_values( $palette );
+		$document['isGlobalStylesUserThemeJSON']  = true;
+		unset( $document['$schema'], $document['title'] );
+
+		wp_set_object_terms( $post_id, wp_get_theme()->get_stylesheet(), 'wp_theme' );
+
+		// The same two filters `wear_style` lifts, for the same reason: they strip a global-styles
+		// document down to nothing on the way into the post.
+		$had_post_kses   = has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		$had_styles_kses = has_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		if ( $had_post_kses ) {
+			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		}
+		if ( $had_styles_kses ) {
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		}
+		$written = wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => wp_json_encode( $document ),
+			),
+			true
+		);
+		if ( $had_post_kses ) {
+			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		}
+		if ( $had_styles_kses ) {
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+		}
+		if ( is_wp_error( $written ) ) {
+			return array( 'ok' => false, 'error' => $written->get_error_message() );
+		}
+
+		return array( 'ok' => true, 'changed' => $changed, 'was' => $was, 'post' => (int) $post_id );
+	}
+
+	/**
 	 * Wear one of the active theme's style variations — `styles/<style>.json` in the theme.
 	 *
 	 * A block theme ships variations as files, but "which one is worn" is not a file: it is the
