@@ -77,6 +77,43 @@ final class FakePackages
     public static array $styles = ['airbnb', 'apple'];
     public static ?string $wornStyle = null;
 
+    /** The palette a site renders with — theme values, with any override already merged in. */
+    public static $palette = [
+        ['slug' => 'primary', 'color' => '#111827', 'name' => 'Primary'],
+        ['slug' => 'contrast', 'color' => '#ffffff', 'name' => 'Contrast'],
+    ];
+
+    public function palette(): array
+    {
+        return self::$palette;
+    }
+
+    public function set_palette($pairs): array
+    {
+        if (!is_array($pairs) || $pairs === []) {
+            return ['ok' => false, 'error' => 'no colours were named'];
+        }
+        $was = [];
+        $changed = [];
+        foreach ($pairs as $slug => $color) {
+            $found = false;
+            foreach (self::$palette as $index => $entry) {
+                if ($entry['slug'] === (string) $slug) {
+                    $was[$slug] = $entry['color'];
+                    self::$palette[$index]['color'] = $color;
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $was[$slug] = '';
+                self::$palette[] = ['slug' => (string) $slug, 'color' => $color, 'name' => (string) $slug];
+            }
+            $changed[$slug] = $color;
+        }
+        return ['ok' => true, 'changed' => $changed, 'was' => $was, 'post' => 7];
+    }
+
     public function wear_style(string $style): array
     {
         if (!preg_match('/^[a-z0-9-]+$/', $style)) {

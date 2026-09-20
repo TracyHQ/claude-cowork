@@ -684,6 +684,21 @@ check('a style the theme does not ship is refused', $call('theme.style', ['style
 check('a style id with a path in it never reaches the theme', $call('theme.style', ['style' => '../secret'])['error'], 'style_failed');
 check('and no style at all is a parameter refusal', $call('theme.style', [])['error'], 'bad_params');
 
+// One COLOUR is not one style, and until 20/09/2026 only the style had a door. Asked for a hex
+// value, an agent found `theme.style`, was told `style required, e.g. airbnb`, and left through
+// `/wp-json/` and the shell instead. `theme.palette` reads the palette when asked for nothing, and
+// changes named slugs when given them — never guessing which slug a theme calls "primary".
+$read = $call('theme.palette', []);
+checkTrue('theme.palette with no colours reads the palette', is_array($read['palette'] ?? null));
+check('and the palette carries the theme own slugs', $read['palette'][0]['slug'], 'primary');
+$painted = $call('theme.palette', ['colors' => ['primary' => '#bf5b3d']]);
+check('painting one colour answers with what changed', $painted['changed']['primary'], '#bf5b3d');
+check('and with the value it replaced, so it can be put back', $painted['was']['primary'], '#111827');
+checkTrue('and nothing else in the palette moved', FakePackages::$palette[1]['color'] === '#ffffff');
+check('a value that is not a hex colour is refused', $call('theme.palette', ['colors' => ['primary' => 'terracotta']])['error'], 'bad_params');
+check('a slug with a path in it never reaches the theme', $call('theme.palette', ['colors' => ['../x' => '#bf5b3d']])['error'], 'bad_params');
+check('an empty colours object is refused rather than read as a read', $call('theme.palette', ['colors' => []])['error'], 'bad_params');
+
 // Switching a plugin on destroys the same kind of state a theme switch does: whether it was
 // already running. What this covers is the ENGINE contract: the prior state the packages layer
 // reports is carried out to the caller. It does NOT cover Claude_Cowork_Packages itself, which

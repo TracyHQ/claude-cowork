@@ -130,6 +130,8 @@ final class Engine
                 return $this->themeActivate($params);
             case 'theme.style':
                 return $this->themeStyle($params);
+            case 'theme.palette':
+                return $this->themePalette($params);
             case 'content.list':
                 return $this->contentList($params);
             case 'content.get':
@@ -717,6 +719,55 @@ final class Engine
         return ($result['ok'] ?? false) === true
             ? $this->ok(['style' => $result['style'] ?? $style, 'post' => $result['post'] ?? null])
             : $this->err('style_failed', (string) ($result['error'] ?? 'the style did not go on'));
+    }
+
+    /**
+     * Read this site's colour palette, or change named colours in it.
+     *
+     * 🔒 ONE COLOUR IS NOT ONE STYLE, AND UNTIL NOW ONLY THE STYLE HAD A DOOR. `theme.style` wears
+     * a whole variation — `airbnb`, `apple`, one of the theme's 152 — which is the right call when
+     * a site is being dressed. It is the wrong one, and the only one, when the customer says "make
+     * the primary colour terracotta": wearing a variation to change one value replaces every other
+     * value with it.
+     *
+     * Measured 20/09/2026 on a customer site: asked for `#bf5b3d`, the agent found `theme.style`,
+     * was told `style required, e.g. airbnb`, and went instead to
+     * `/wp-json/wp/v2/global-styles/...` — which answered 401 to an unauthenticated read — and then
+     * to a dozen shell calls editing theme files by hand. There was no door, so it made one.
+     *
+     * ⚠ SLUGS ARE THE THEME'S, NOT OURS. Which slug means "primary" is a fact about the active
+     * theme, so this never guesses: called with no `colors` it RETURNS the palette, slugs and all,
+     * and the caller names what it wants changed. A door that guessed would write `primary` into a
+     * theme whose accent is called `contrast` and report success.
+     *
+     * The previous value of every colour it writes comes back in the answer, so the change can be
+     * put back without reading the site again.
+     */
+    private function themePalette(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        if (!array_key_exists('colors', $p)) {
+            return $this->ok(['palette' => $this->packages->palette()]);
+        }
+        if (!is_array($p['colors']) || $p['colors'] === []) {
+            return $this->err('bad_params', 'colors must be an object of slug => "#rrggbb"; omit it to read the palette');
+        }
+        $wanted = [];
+        foreach ($p['colors'] as $slug => $color) {
+            if (!is_string($slug) || !preg_match('/^[a-z0-9-]+$/', $slug)) {
+                return $this->err('bad_params', 'a colour slug is a-z, 0-9 and dashes — read the palette first for this theme\'s own slugs');
+            }
+            if (!is_string($color) || !preg_match('/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $color)) {
+                return $this->err('bad_params', sprintf('%s must be a hex colour like #bf5b3d', $slug));
+            }
+            $wanted[$slug] = $color;
+        }
+        $result = $this->packages->set_palette($wanted);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok(['changed' => $result['changed'] ?? [], 'was' => $result['was'] ?? [], 'post' => $result['post'] ?? null])
+            : $this->err('palette_failed', (string) ($result['error'] ?? 'the palette did not go on'));
     }
 
     // ---- Applying an approved change, and undoing it ------------------------------------------
