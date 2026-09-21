@@ -373,6 +373,62 @@ final class Claude_Cowork_Packages {
 	}
 
 	/**
+	 * Fetch one core translation, so WordPress itself speaks the language the site was built in.
+	 *
+	 * Nothing here unpacks anything. `wp_download_language_pack()` is wp-admin's own road: it asks
+	 * api.wordpress.org which translations exist, refuses a locale that is not among them, and
+	 * hands the pack to `Language_Pack_Upgrader`, which is the class the Updates screen uses.
+	 * A hand-rolled download would be code to re-audit every WordPress release, and it would have
+	 * to reimplement the one check that matters — that the pack is the one WordPress signed off on.
+	 *
+	 * Idempotent: a locale already in `get_available_languages()` answers ok without a request, so
+	 * seeding a site twice costs nothing the second time. Answering an error there would make a
+	 * rerun fail on work already done.
+	 *
+	 * The empty available list is reported as itself rather than as "no such locale". A site that
+	 * cannot reach api.wordpress.org would otherwise be told its perfectly real locale does not
+	 * exist, and whoever read that would go looking for the wrong thing.
+	 *
+	 * @param string $locale WordPress locale, e.g. `vi`, `pt_BR`, `de_DE_formal`.
+	 * @return array{ok:bool, error?:string, locale?:string, already?:bool}
+	 */
+	public function install_language( $locale ) {
+		require_once ABSPATH . 'wp-admin/includes/translation-install.php';
+		$this->load_upgrader();
+
+		$have = get_available_languages();
+		if ( is_array( $have ) && in_array( $locale, $have, true ) ) {
+			return array( 'ok' => true, 'locale' => $locale, 'already' => true );
+		}
+
+		$offered = wp_get_available_translations();
+		if ( ! is_array( $offered ) || array() === $offered ) {
+			return array( 'ok' => false, 'error' => 'the list of translations could not be read from api.wordpress.org' );
+		}
+		if ( ! isset( $offered[ $locale ] ) ) {
+			return array( 'ok' => false, 'error' => "WordPress offers no translation for {$locale}" );
+		}
+
+		$done = wp_download_language_pack( $locale );
+		if ( is_wp_error( $done ) ) {
+			return array( 'ok' => false, 'error' => $done->get_error_message() );
+		}
+		if ( ! is_string( $done ) || '' === $done ) {
+			// `wp_download_language_pack` answers false for both "this site may not install" and
+			// "the upgrader refused", and keeps no reason. Say which decision was reached rather
+			// than inventing one.
+			return array(
+				'ok'    => false,
+				'error' => function_exists( 'wp_can_install_language_pack' ) && ! wp_can_install_language_pack()
+					? 'this site is not allowed to install language packs'
+					: "the {$locale} translation could not be installed",
+			);
+		}
+
+		return array( 'ok' => true, 'locale' => $done, 'already' => false );
+	}
+
+	/**
 	 * Turn a plugin on.
 	 *
 	 * `activate_plugin` runs the plugin's own activation hooks, which is the difference between

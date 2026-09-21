@@ -711,10 +711,48 @@ checkTrue('activating a plugin reports that it was off before', $firstOn['was_ac
 $againOn = $call('plugin.activate', ['file' => 'akismet/akismet.php']);
 checkTrue('and reports that it was already on the second time', $againOn['was_active'] === true);
 
+// A page can be MARKED as Vietnamese through `content.language` without WordPress speaking a word
+// of it: the marking is Polylang's taxonomy, the language is a core translation on disk. Until
+// 22/09/2026 the door had no verb for the second, so a site seeded through it came out with
+// Vietnamese pages under an English admin — and the seeder's only honest move was a refusal.
+FakePackages::$haveLocales = ['en_GB'];
+FakePackages::$languageRefusal = null;
+$got = $call('language.install', ['locale' => 'vi']);
+check('installing a translation answers with the locale it fetched', $got['locale'], 'vi');
+checkTrue('and says it was not already there', $got['already'] === false);
+
+// Seeding reruns. A locale already on disk is the job already done, not a failure — a rerun that
+// fails on finished work is a rerun nobody can use.
+$again = $call('language.install', ['locale' => 'vi']);
+checkTrue('installing the same translation twice is an ok', ($again['ok'] ?? null) === true);
+checkTrue('and says the site already had it', $again['already'] === true);
+
+// The locale is WORDPRESS'S spelling — `pt_BR`, not the product's `pt-br`. Both are refused for
+// different reasons, and only the second one is a shape mistake this side can see.
+check('an underscored locale is the one that travels', $call('language.install', ['locale' => 'pt_BR'])['locale'], 'pt_BR');
+check('a dashed locale never reaches the site', $call('language.install', ['locale' => 'pt-br'])['error'], 'bad_params');
+check('a locale with a path in it never reaches the site', $call('language.install', ['locale' => '../../etc'])['error'], 'bad_params');
+check('and no locale at all is a parameter refusal', $call('language.install', [])['error'], 'bad_params');
+
+// A locale WordPress does not publish is refused by name, so nobody goes looking for a typo in
+// their own spelling when the translation simply does not exist.
+check('a locale WordPress does not offer is refused by name', $call('language.install', ['locale' => 'xx'])['message'], 'WordPress offers no translation for xx');
+check('and it is an install failure, not a caller mistake', $call('language.install', ['locale' => 'xx'])['error'], 'install_failed');
+
+// A host that forbids language packs fails the install, and says which decision was reached.
+FakePackages::$languageRefusal = 'this site is not allowed to install language packs';
+$blocked = $call('language.install', ['locale' => 'en_GB']);
+checkTrue('a locale already on disk is answered before any host check', ($blocked['ok'] ?? null) === true);
+$blocked = $call('language.install', ['locale' => 'fr_FR']);
+check('a host that forbids language packs says so', $blocked['message'], 'this site is not allowed to install language packs');
+FakePackages::$languageRefusal = null;
+
 // A site wired for reading only must refuse every write action rather than half-answering.
 $readOnlyEngine = new Engine('a-token-at-least-16', []);
 $refused = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'theme.install', 'params' => ['url' => 'https://e.test/x.zip']]);
 check('a read-only site refuses to install', $refused['error'], 'unavailable');
+$refusedLang = $readOnlyEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'language.install', 'params' => ['locale' => 'vi']]);
+check('and refuses to install a translation for the same reason', $refusedLang['error'], 'unavailable');
 
 // -------------------------------------------------------------- Apply, and its undo --
 //

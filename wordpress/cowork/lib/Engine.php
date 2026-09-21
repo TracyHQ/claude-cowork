@@ -124,6 +124,8 @@ final class Engine
                 return $this->coreManifest();
             case 'plugin.selfUpdate':
                 return $this->pluginSelfUpdate();
+            case 'language.install':
+                return $this->languageInstall($params);
             case 'theme.install':
                 return $this->themeInstall($params);
             case 'theme.activate':
@@ -645,6 +647,46 @@ final class Engine
                 'after' => (string) ($result['after'] ?? ''),
             ])
             : $this->err('update_failed', (string) ($result['error'] ?? 'update failed'));
+    }
+
+    /**
+     * Make this WordPress speak a language: fetch its core translation.
+     *
+     * 🔒 WITHOUT THIS VERB A TRANSLATED SITE IS HALF TRANSLATED. A site built through this door can
+     * have its pages MARKED per language (`content.language`, Polylang), and nothing here could
+     * make WordPress itself fetch `vi` — so a customer who asked for Vietnamese got Vietnamese
+     * pages under an English admin, an English theme and English dates. On a machine that holds the
+     * webroot the answer is one wp-cli call; through this door there was no answer at all, and the
+     * seeder's only honest move was a refusal in words.
+     *
+     * The locale is WORDPRESS'S spelling — `pt_BR`, not `pt-br`. That is the one edge where the
+     * product's tag and WordPress's locale meet, and the caller translates before it gets here so
+     * this side never has to guess which convention it was handed.
+     *
+     * Idempotent on purpose: a locale already on disk answers ok with `already: true`. Seeding
+     * reruns, and a rerun that fails on work already done is a rerun nobody can use.
+     */
+    private function languageInstall(array $p): array
+    {
+        if ($refusal = $this->packagesReady()) {
+            return $refusal;
+        }
+        $locale = isset($p['locale']) && is_string($p['locale']) ? trim($p['locale']) : '';
+        if ($locale === '') {
+            return $this->err('bad_params', 'locale required, e.g. vi or pt_BR');
+        }
+        // Shape first, so a path or a wildcard never reaches WordPress's own list — the same
+        // reason `theme.style` checks its id here rather than trusting the layer below.
+        if (!preg_match('/^[a-z]{2,3}(_[A-Za-z0-9]+){0,2}$/', $locale)) {
+            return $this->err('bad_params', 'locale must be a WordPress locale, e.g. vi, pt_BR, de_DE_formal');
+        }
+        $result = $this->packages->install_language($locale);
+        return ($result['ok'] ?? false) === true
+            ? $this->ok([
+                'locale' => (string) ($result['locale'] ?? $locale),
+                'already' => (bool) ($result['already'] ?? false),
+            ])
+            : $this->err('install_failed', (string) ($result['error'] ?? 'language install failed'));
     }
 
     private function themeInstall(array $p): array

@@ -61,6 +61,30 @@ final class FakePackages
         return ['ok' => true, 'stylesheet' => 'twentytwentytwo', 'name' => 'Twenty Twenty-Two', 'version' => '1.9'];
     }
 
+    /** Locales this fake WordPress already has on disk, and the ones api.wordpress.org offers. */
+    public static array $haveLocales = ['en_GB'];
+    public static array $offeredLocales = ['vi', 'pt_BR', 'en_GB', 'fr_FR'];
+    /** Set to a sentence to make the download fail the way a hardened host does. */
+    public static ?string $languageRefusal = null;
+
+    public function install_language(string $locale): array
+    {
+        if (in_array($locale, self::$haveLocales, true)) {
+            return ['ok' => true, 'locale' => $locale, 'already' => true];
+        }
+        if (self::$offeredLocales === []) {
+            return ['ok' => false, 'error' => 'the list of translations could not be read from api.wordpress.org'];
+        }
+        if (!in_array($locale, self::$offeredLocales, true)) {
+            return ['ok' => false, 'error' => "WordPress offers no translation for {$locale}"];
+        }
+        if (self::$languageRefusal !== null) {
+            return ['ok' => false, 'error' => self::$languageRefusal];
+        }
+        self::$haveLocales[] = $locale;
+        return ['ok' => true, 'locale' => $locale, 'already' => false];
+    }
+
     public function activate_plugin_file(string $file): array
     {
         if ($file !== 'akismet/akismet.php') {

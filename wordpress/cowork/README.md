@@ -13,6 +13,7 @@ POST /wp-admin/admin-ajax.php?action=claude_cowork
 | --- | --- |
 | `info`, `site.stats`, `site.counts`, `db.*`, `files.*`, `file.read` | Reading, in pieces small enough to finish on a host that stops PHP after 30 seconds. |
 | `plugin.install`, `plugin.activate`, `theme.install`, `theme.activate` | Adding something to the site, through WordPress's own upgraders. Install and activate are separate: they fail differently. |
+| `language.install` | Fetching a core translation, so WordPress itself speaks the language the site was built in. Already installed is an `ok`, not an error. |
 | `content.update`, `media.upload` | Editing a post, one of its meta values, or an option; putting a file into `uploads/` and the Media Library. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 
