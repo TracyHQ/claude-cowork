@@ -121,6 +121,7 @@ class com_claudecoworkInstallerScript
      */
     private function ensureApplyLogTable($db): void
     {
+        $db->setQuery('CREATE TABLE IF NOT EXISTS #__claudecowork_content_contract (id INT NOT NULL PRIMARY KEY, binding LONGTEXT NOT NULL) ENGINE=InnoDB')->execute();
         $db->setQuery(
             'CREATE TABLE IF NOT EXISTS ' . $db->quoteName('#__claudecowork_apply_log') . ' ('
             . $db->quoteName('id') . ' INT UNSIGNED NOT NULL AUTO_INCREMENT, '

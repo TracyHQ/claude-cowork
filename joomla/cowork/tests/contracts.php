@@ -1,0 +1,190 @@
+<?php
+// Loaded by run.php: exercise the write boundary, not generated JSON's spelling.
+
+$aclInventory=['viewlevels'=>[['id'=>'1','rules'=>'[1]']],'usergroups'=>[['id'=>'1','parent_id'=>'0']],
+    'assets'=>[['id'=>'1','parent_id'=>'0','name'=>'root.1','rules'=>'{}'],['id'=>'18','parent_id'=>'1','name'=>'com_modules','rules'=>'{"core.edit":{"7":1}}']],
+    'modules'=>[['id'=>'178','asset_id'=>'0']],'content'=>[],'categories'=>[]];
+$beforeAcl=ContractAccess::snapshot($aclInventory);
+$aclInventory['assets'][]=['id'=>'236','parent_id'=>'18','name'=>'com_modules.module.178','rules'=>'{}'];
+$aclInventory['modules'][0]['asset_id']='236';
+check('Joomla may create an inherited ACL asset without changing permissions',ContractAccess::snapshot($aclInventory),$beforeAcl);
+$aclInventory['assets'][2]['parent_id']='1';
+checkTrue('reparenting the asset cannot silently change effective ACL',ContractAccess::snapshot($aclInventory)!=$beforeAcl);
+
+final class TestContractStore implements ContractStore {
+    public ?array $binding=null;
+    public ?array $job=null;
+    public array $acl=['viewlevels'=>[['id'=>'1','rules'=>[1]]]];
+    public function load(): ?array { return $this->binding; }
+    public function save(array $value): void {
+        if($this->binding!==null){ if($this->binding!=$value)throw new RuntimeException('Cannot replace a content-only baseline'); return; }
+        $this->binding=$value;
+    }
+    public function replace(array $value): void { $this->binding=$value; }
+    public function job(): ?array { return $this->job; }
+    public function saveJob(?array $job): void { $this->job=$job; }
+    public function access(): array { return $this->acl; }
+}
+final class ContractTestWriter extends FakeSiteWriter {
+    private FakeApplyLog $log; private TestContractStore $binding;
+    public bool $drift=false;
+    public function __construct(FakeApplyLog $log,TestContractStore $binding){$this->log=$log;$this->binding=$binding;}
+    public function write(string $kind,int $id,array $fields):int {
+        $fields=array_merge($this->read($kind,$id)??[],$fields);
+        if($this->drift && $kind==='module')$fields['position']='wrong-position';
+        return parent::write($kind,$id,$fields);
+    }
+    public function transaction(callable $work):array {
+        $before=[$this->store,$this->log->log,$this->binding->binding,$this->binding->job];
+        try{return $work();}catch(Throwable $error){
+            [$this->store,$this->log->log,$this->binding->binding,$this->binding->job]=$before;throw $error;
+        }
+    }
+}
+$contractDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
+mkdir($contractDir);mkdir($contractDir.'/assets');
+file_put_contents($contractDir.'/assets/demo.css','.hero { color: red }');
+$module=['title'=>'Home hero','module'=>'mod_custom','position'=>'masthead','published'=>'1','publish_up'=>null,'publish_down'=>null,'ordering'=>'1','access'=>'1','showtitle'=>'0','language'=>'*','client_id'=>'0','content'=>'<h1 class="hero">Demo title</h1><a href="/start">Start</a>','params'=>'{"moduleclass_sfx":"original","module_tag":"div","header_tag":"h3","style":"0","cache":"0"}'];
+$entities=[['key'=>'hero','kind'=>'module','sourceId'=>10,'identity'=>['title'=>'Home hero']]];
+$protected=['hero'=>$module];
+$cw=new FakeSiteWriter();$cw->store['module'][110]=['id'=>'110']+$module;
+foreach([20=>120,21=>121] as $old=>$actual) {
+    $key='menu-'.$old;$row=['title'=>$key,'path'=>$key,'published'=>'1','access'=>'1','language'=>'*'];
+    $entities[]=['key'=>$key,'kind'=>'menuItem','sourceId'=>$old,'identity'=>['path'=>$key]];
+    $protected[$key]=$row;$cw->store['menuItem'][$actual]=['id'=>(string)$actual]+$row;
+}
+$cw->store['moduleAssignment'][110]=['menuids'=>'[-121]'];
+$slots=[];
+foreach(ContentSlots::htmlSlots($module['content']) as $n=>$s)$slots[]=['key'=>'hero.'.$n,'entity'=>'hero','column'=>'content','maxCharacters'=>80]+$s;
+$cs=new TestContractStore();
+$data=['manifest'=>['id'=>'test/v1'],'content-map'=>['entities'=>$entities,'slots'=>$slots,'pages'=>[]],'presentation-lock'=>['entities'=>$protected,'assignments'=>[['moduleid'=>10,'menuid'=>-21]],'fileRoots'=>['assets'],'files'=>['assets/demo.css'=>hash_file('sha256',$contractDir.'/assets/demo.css')],'inventoryCounts'=>['module'=>1,'menuItem'=>2],'access'=>$cs->acl]];
+foreach($data as $name=>$body)file_put_contents($contractDir.'/'.$name.'.json',json_encode($body));
+mkdir($contractDir.'/media/t4/optimize/css',0777,true);
+$cache='media/t4/optimize/css/'.str_repeat('a',32).'.css';
+file_put_contents($contractDir.'/'.$cache,'derived');
+$data['presentation-lock']['fileRoots'][]='media';
+$data['presentation-lock']['files'][$cache]=hash_file('sha256',$contractDir.'/'.$cache);
+file_put_contents($contractDir.'/presentation-lock.json',json_encode($data['presentation-lock']));
+$contract=new QuickstartContract($cw,$cs,$contractDir,$contractDir);
+check('Joomla loadposition directives are never editable text',ContentSlots::htmlSlots('<p>{loadposition about-page}</p>'),[]);
+unlink($contractDir.'/'.$cache);
+$newCache='media/t4/optimize/css/'.str_repeat('b',32).'.css';
+file_put_contents($contractDir.'/'.$newCache,'regenerated from locked sources');
+$state=$contract->inspect();
+check('contract maps negative excluded menu IDs onto the installed site',$state['snapshot']['assignments']['hero'],[-121]);
+$contract->bind($state['snapshot']);
+$plan=$contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.0'=>'Customer & partners']]);
+check('contract updates the original module ID',$plan['operations'][0]['id'],110);
+checkTrue('HTML content stays escaped',str_contains($plan['operations'][0]['fields']['content'],'Customer &amp; partners'));
+function contractRejects(string $label, callable $work): void {
+    try { $work();check($label,'accepted','rejected'); }
+    catch (RuntimeException $error) { check($label,'rejected','rejected'); }
+}
+check('T4 cache regeneration keeps the source contract valid',$contract->inspect()['contract'],'test/v1');
+file_put_contents($contractDir.'/media/t4/optimize/css/injected.php','unexpected executable');
+contractRejects('cache exception never allows executable files',fn()=>$contract->inspect());
+unlink($contractDir.'/media/t4/optimize/css/injected.php');
+foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
+    $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;
+    contractRejects('contract rejects module '.$field.' drift',fn()=>$contract->inspect());
+    $cw->store['module'][110][$field]=$before;
+}
+$cw->store['moduleAssignment'][110]['menuids']='[0]';
+contractRejects('contract rejects changing exclusions to all pages',fn()=>$contract->inspect());
+$cw->store['moduleAssignment'][110]['menuids']='[-121]';
+$cw->store['menuItem'][120]['access']='2';
+contractRejects('contract rejects menu access drift',fn()=>$contract->inspect());
+$cw->store['menuItem'][120]['access']='1';
+$cs->acl['viewlevels'][0]['rules']=[2];
+contractRejects('same access ID cannot silently change its audience',fn()=>$contract->inspect());
+$cs->acl['viewlevels'][0]['rules']=[1];
+$cw->store['module'][111]=['id'=>'111']+$module;
+contractRejects('contract rejects an extra module',fn()=>$contract->inspect());
+unset($cw->store['module'][111]);
+file_put_contents($contractDir.'/assets/demo.css','.hero { display: none }');
+contractRejects('contract rejects CSS drift',fn()=>$contract->inspect());
+file_put_contents($contractDir.'/assets/demo.css','.hero { color: red }');
+foreach(['hero.0'=>'','hero.99'=>'unknown'] as $key=>$value)contractRejects('contract rejects empty or unknown slot '.$key,fn()=>$contract->plan(['expected_revision'=>$state['revision'],'changes'=>[$key=>$value]]));
+$urlSlot=current(array_filter($slots,fn($s)=>$s['type']==='url'))['key'];
+foreach(['javascript:alert(1)','//other.example/','/\\other.example/'] as $url)contractRejects('contract rejects unsafe CTA '.$url,fn()=>$contract->plan(['expected_revision'=>$state['revision'],'changes'=>[$urlSlot=>$url]]));
+contractRejects('contract rejects stale revision',fn()=>$contract->plan(['expected_revision'=>'old','changes'=>['hero.0'=>'New title']]));
+contractRejects('contract rejects injected Joomla module directives',fn()=>$contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.0'=>'{loadposition new-position}']]));
+
+$contractLog=new FakeApplyLog();$transactional=new ContractTestWriter($contractLog,$cs);$transactional->store=$cw->store;
+$receiverContract=new QuickstartContract($transactional,$cs,$contractDir,$contractDir);
+$receiver=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$receiverContract);
+$cs->binding=null;
+$bind=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']];
+check('bootstrap binds before any customer write',$receiver->handle($bind)['bound'],true);
+check('bootstrap binding is idempotent',$receiver->handle($bind)['bound'],true);
+check('bootstrap immediately blocks generic writes',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'content_only');
+$first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
+$firstResult=$receiver->handle($first);
+check('contract receiver commits content in place',$firstResult['ok'],true);
+check('inspect exposes current content separately from immutable demo samples',$receiverContract->inspect()['slots'][0]['current'],'First customer title');
+check('contract receiver replays the identical committed receipt',$receiver->handle($first),$firstResult);
+check('bound receiver refuses generic module unpublishing',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['error'],'content_only');
+$second=$first;$second['params']['apply_id']='contract-second';$second['params']['request_id']='second';
+$second['params']['expected_revision']=$receiverContract->inspect()['revision'];$second['params']['changes']['hero.0']='Second customer title';
+check('contract receiver commits a later revision',$receiver->handle($second)['ok'],true);
+$revert=['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'contract-first']];
+check('contract undo cannot overwrite a later revision',$receiver->handle($revert)['ok'],false);
+$revert['params']['apply_id']='contract-second';check('latest contract revision can be undone',$receiver->handle($revert)['ok'],true);
+$revert['params']['apply_id']='contract-first';check('earlier revision can then be undone',$receiver->handle($revert)['ok'],true);
+check('contract undo restores original HTML byte for byte',$transactional->store['module'][110]['content'],$module['content']);
+
+$beforeFailure=[$transactional->store,$contractLog->log,$cs->binding];
+$transactional->drift=true;
+check('post-write presentation drift fails the whole apply',$receiver->handle($first)['ok'],false);
+check('failed apply rolls back rows, receipt and binding',[$transactional->store,$contractLog->log,$cs->binding],$beforeFailure);
+// ── A base archive that serves more than one design ──────────────────────────────────────────
+// Apple and Airbnb are the same quickstart with a different template activated on top, so the
+// receiver now carries several profiles and picks one from the component's own params. Two things
+// have to hold: a site bound to one profile must refuse to be read under another, and a receiver
+// that does not carry the profile a site names must refuse everything rather than read as a site
+// with no contract at all — the one state where every structural write is allowed.
+$secondDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
+mkdir($secondDir);mkdir($secondDir.'/assets');
+copy($contractDir.'/assets/demo.css',$secondDir.'/assets/demo.css');
+$secondData=$data;$secondData['manifest']=['id'=>'test-airbnb/v1'];
+foreach($secondData as $name=>$body)file_put_contents($secondDir.'/'.$name.'.json',json_encode($body));
+$secondContract=new QuickstartContract($transactional,$cs,$contractDir,$secondDir);
+$cs->binding=null;
+check('a second design profile reads the same site on its own terms',$secondContract->inspect()['contract'],'test-airbnb/v1');
+$cs->binding=$receiverContract->inspect()['snapshot'];
+check('the first design profile still reads the site it is bound to',$receiverContract->inspect()['contract'],'test/v1');
+contractRejects('a site bound to one design refuses to be read under another',fn()=>$secondContract->inspect());
+
+$missingDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
+$absent=new QuickstartContract($transactional,$cs,$contractDir,$missingDir);
+contractRejects('a receiver without the named profile refuses to answer bound()',fn()=>$absent->bound());
+contractRejects('a receiver without the named profile refuses to inspect',fn()=>$absent->inspect());
+contractRejects('a receiver without the named profile refuses to bind',fn()=>$absent->bind([]));
+$absentEngine=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$absent);
+check('a receiver without the named profile refuses generic writes instead of allowing them',
+    $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'contract_unavailable');
+check('a receiver without the named profile refuses the contract door too',
+    $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unavailable');
+
+// A site under construction: provisioned from the Base archive with `tracy_build_baseline` and no
+// `contract` yet, because the template is still to be built. Measured 14/09 on a fresh Base site:
+// the receiver fell back to the Apple profile, hashed Base's files against Apple's lock and refused
+// the first inspection with "Presentation asset changed: templates/tracy/acm/accordion/css/style.css"
+// — a file nobody had touched. Under construction there is no lock to verify and no default to guess.
+$construction=(new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog))->underConstruction('tracy-base/j6/1.0.0');
+$unbound=$construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'inspect']]);
+check('a site under construction answers inspect as unbound, naming its baseline',
+    [$unbound['ok']??null,$unbound['bound']??null,$unbound['contract']??null,$unbound['baseline']??null,$unbound['construction']??null],
+    [true,false,'','tracy-base/j6/1.0.0',true]);
+check('a site under construction cannot be bound before it names a profile',
+    $construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unbound');
+check('nor written through the contract door',
+    $construction->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-x','request_id'=>'x','changes'=>[]]])['error'],'contract_unbound');
+checkTrue('structural writes stay open while the template is being built',
+    ($construction->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error']??'')!=='content_only');
+foreach(array_keys($secondData) as $name)unlink($secondDir.'/'.$name.'.json');
+unlink($secondDir.'/assets/demo.css');rmdir($secondDir.'/assets');rmdir($secondDir);
+
+unlink($contractDir.'/'.$newCache);rmdir($contractDir.'/media/t4/optimize/css');rmdir($contractDir.'/media/t4/optimize');rmdir($contractDir.'/media/t4');rmdir($contractDir.'/media');
+foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
+unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);

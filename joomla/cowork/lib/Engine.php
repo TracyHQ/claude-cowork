@@ -25,9 +25,13 @@ require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
+require_once __DIR__ . '/QuickstartContract.php';
 
 final class Engine
 {
+    private ?QuickstartContract $contract;
+    private bool $batching = false;
+    private bool $writing = false;
     private ?string $token;
     /** @var array<string,mixed> What the host says about itself, returned by the 'info' action. */
     private array $info;
@@ -76,7 +80,9 @@ final class Engine
         ?ApplyLog $log = null,
         ?ChangeStamp $stamp = null,
         ?CoreUpgrader $upgrader = null,
-        ?FilesRestorer $filesRestorer = null) {
+        ?FilesRestorer $filesRestorer = null,
+        ?QuickstartContract $contract = null) {
+        $this->contract = $contract;
         $this->token = $token;
         $this->info = $info;
         $this->dumper = $dumper;
@@ -89,6 +95,27 @@ final class Engine
         $this->stamp = $stamp;
         $this->upgrader = $upgrader;
         $this->filesRestorer = $filesRestorer;
+    }
+
+    /**
+     * The profile a site under construction was provisioned FROM, when it has no contract yet.
+     *
+     * A Base site is a site whose template is still to be built: the provisioner writes
+     * `tracy_build_baseline` and leaves `contract` empty on purpose, because a contract names the
+     * presentation to protect and there is none yet. Such a site must answer the contract door
+     * honestly — unbound, here is the baseline — rather than fall back to a default profile and
+     * verify the Base files against another design's lock. Measured 14/09 on a fresh Base site: the
+     * first `inspect` failed with "Presentation asset changed: templates/tracy/acm/accordion/css/
+     * style.css", a file nobody had touched, and every build from a design with no template of its
+     * own died on that line.
+     */
+    private ?string $constructionBaseline = null;
+
+    /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
+    public function underConstruction(string $baseline): self
+    {
+        $this->constructionBaseline = $baseline;
+        return $this;
     }
 
     /**
@@ -105,6 +132,50 @@ final class Engine
         $action = isset($req['action']) && is_string($req['action']) ? $req['action'] : '';
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
 
+        if (!$this->writing && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
+            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+            try {
+                return $this->writer->serialize(function () use ($req) {
+                    $this->writing = true;
+                    try { return $this->handle($req); } finally { $this->writing = false; }
+                });
+            } catch (Throwable $error) { return $this->err('writer_busy', $error->getMessage()); }
+        }
+
+        try { $contractBound=$this->contract && $this->contract->bound(); }
+        // The reason travels: since one base archive serves several designs, "unavailable" now also
+        // means "this receiver does not carry the profile this site names", and an operator who
+        // reads only "repair the component installation" goes looking in the wrong half.
+        catch(Throwable $error) { return $this->err('contract_unavailable', $error->getMessage() ?: 'The private contract store is unavailable; repair the component installation'); }
+        if ($contractBound && in_array($action, ['content.batch','content.update','content.delete','extension.install','extension.enable','db.restore','db.rollback','db.cleanup','db.purge','core.upgrade','files.restore'], true)) {
+            return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
+        }
+        if ($contractBound && $action === 'media.upload') {
+            $path = $params['path'] ?? '';
+            if (!is_string($path) || !preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('content_only', 'Use a new content-addressed image in images/tracy-content');
+            if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('content_only', 'Media uploads must use a separate apply receipt');
+        }
+        if ($contractBound && $action === 'apply.revert') {
+            $entries = $this->log ? $this->log->entries($params['apply_id'] ?? '') : [];
+            $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
+            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode');
+            try {
+                $state=$this->contract->inspect();
+                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                $this->batching=true;
+                $result=$this->writer->transaction(function()use($params){
+                    $result=$this->applyRevert($params);
+                    if(!$result['ok'] || !empty($result['failed']))throw new RuntimeException('Contract revert failed');
+                    $this->contract->inspect();
+                    return $result;
+                });
+                $this->batching=false;
+                try { $this->writer->purgeCache(); } catch(Throwable $ignored) {}
+                $this->stamped('revert');
+                return $result;
+            } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+            finally { $this->batching=false; }
+        }
         switch ($action) {
             case 'info':
                 return $this->ok(['info' => $this->info]);
@@ -142,6 +213,10 @@ final class Engine
                 return $this->contentList($params);
             case 'content.get':
                 return $this->contentGet($params);
+            case 'content.contract':
+                return $this->contentContract($params);
+            case 'content.batch':
+                return $this->contentBatch($params);
             case 'content.update':
                 return $this->contentUpdate($params);
             case 'content.delete':
@@ -580,7 +655,7 @@ final class Engine
 
         if ($this->writer !== null) {
             try {
-                $this->writer->purgeCache();
+                if (!$this->batching) $this->writer->purgeCache();
             } catch (Throwable $e) {
                 // Best-effort by contract.
             }
@@ -985,13 +1060,21 @@ final class Engine
         if ($url === '') {
             return $this->err('bad_params', 'url required');
         }
-        $shape = PackageUrl::check($url);
+        $sha = $p['sha256'] ?? null;
+        if ($sha !== null && (!is_string($sha) || !preg_match('/^[a-f0-9]{64}$/D', $sha))) return $this->err('bad_params', 'invalid sha256');
+        // A pinned archive can use an official download endpoint with a query: its bytes, not
+        // a URL suffix, identify it; the adapter supplies Joomla a safe .zip filename.
+        $shape = $sha !== null && parse_url($url, PHP_URL_SCHEME) === 'https' && parse_url($url, PHP_URL_HOST)
+            ? ['ok' => true] : PackageUrl::check($url);
         if ($shape['ok'] !== true) {
             return $this->err('bad_params', $shape['error']);
         }
 
         try {
-            $result = $this->extensions->installFromUrl($url);
+            if ($sha !== null) {
+                if (!method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+                $result = $this->extensions->installVerifiedFromUrl($url, $sha, isset($p['bytes']) ? (int) $p['bytes'] : null);
+            } else $result = $this->extensions->installFromUrl($url);
         } catch (Throwable $e) {
             return $this->err('install_failed', $e->getMessage());
         }
@@ -1091,6 +1174,417 @@ final class Engine
         return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
     }
 
+    /** A bounded transaction: the same request id returns its committed result after a lost reply.
+     * Expected fields are checked under the site writer lock; all row changes and undo entries
+     * share one database transaction. Files and extension installers are deliberately excluded.
+     */
+    private function contentContract(array $p): array
+    {
+        if (!$this->contract && $this->constructionBaseline !== null) {
+            // Under construction there is nothing to verify and nothing to write through: the door
+            // says so, names the baseline, and the builder goes on to capture and name a profile.
+            if (($p['operation'] ?? 'inspect') === 'inspect')
+                return $this->ok(['bound' => false, 'contract' => '', 'baseline' => $this->constructionBaseline, 'construction' => true]);
+            return $this->err('contract_unbound', 'This site is under construction (baseline ' . $this->constructionBaseline . '): capture and name its profile before binding or applying content');
+        }
+        if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
+        try {
+            if (($p['operation'] ?? '') === 'bind') {
+                if(!$this->writer || !method_exists($this->writer,'transaction'))throw new RuntimeException('Transactional writer required');
+                return $this->writer->transaction(function(){
+                    $state=$this->contract->inspect();
+                    $this->contract->bind($state['snapshot']);
+                    return $this->ok(['contract'=>$state['contract'],'revision'=>$state['revision'],'bound'=>true]);
+                });
+            }
+            if (($p['operation'] ?? 'inspect') === 'inspect') {
+                $state=$this->contract->inspect();
+                foreach(['rows','snapshot','keys','ids','localeMaps','assignments','slotValues','binding'] as $internal)unset($state[$internal]);
+                if($state['job'])$state['job']=['locale'=>$state['job']['locale'],'phase'=>$state['job']['phase']];
+                return $this->ok($state);
+            }
+            if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
+            if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
+            $apply=$this->applyId($p);$request=$p['request_id']??'';
+            if (!$apply || strpos($apply,'contract-')!==0 || !is_string($request) || !$request) throw new RuntimeException('contract- apply_id and request_id required');
+            $hash=hash('sha256',json_encode([$p['changes']??null,$p['evidence']??[]]));
+            foreach($this->log->entries($apply) as $entry) {
+                if (($entry['op']??'')==='contract' && $entry['request']===$request) {
+                    if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');
+                    $this->contract->inspect();
+                    return $entry['result'];
+                }
+            }
+            if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
+            $plan=$this->contract->plan($p);
+            if(count($plan['operations'])>300)throw new RuntimeException('Split the revision into at most 300 entities');
+            if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
+            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash){
+                $this->contract->bind($plan['snapshot']);
+                $state=$this->contract->inspect();
+                $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
+            });
+        } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+    }
+
+
+    /**
+     * Adding, checking and taking back a language version of a bound quickstart.
+     *
+     * Five operations behind one action, because the relay admits actions by NAME and a site under
+     * a content-only contract must not need a second door opened for this. They are deliberately
+     * not one call: `plan` reads, `package` moves files, `apply` moves rows one committed phase at
+     * a time, `verify` re-reads, `revert` takes it back. Anything that cannot say which of those it
+     * is has no business changing a customer's site.
+     */
+    private function multilingual(array $p): array
+    {
+        if (!$this->contract->multilingualAvailable())
+            return $this->err('unsupported', 'This quickstart contract carries no multilingual profile; the site cannot be given a second language by this receiver');
+        if (!$this->contract->bound()) return $this->err('contract_failed', 'A language needs a bound site');
+        $operation = substr((string) $p['operation'], strlen('multilingual.'));
+        $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        // 🔒 REFUSED, NOT IGNORED. A request that names its own archive is refused even when the
+        // values happen to be right: accepting the SHAPE is accepting a request that could carry
+        // wrong ones, and silently dropping the fields would let a caller believe it chose the
+        // bytes. On a bound site what may arrive is decided in review, in language-packs.json.
+        foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
+            if (isset($p[$mine]))
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+        $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
+        if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
+        switch ($operation) {
+            case 'plan':
+                return $this->ok($this->contract->languagePlan($locale, $major, $this->contract->inspect()));
+            case 'package':
+                return $this->multilingualPackage($locale, $major);
+            case 'apply':
+                return $this->multilingualApply($p, $locale, $major);
+            case 'verify':
+                return $this->multilingualVerify($locale);
+            case 'revert':
+                return $this->multilingualRevert($p, $locale);
+            default:
+                return $this->err('bad_params', 'Unknown multilingual operation');
+        }
+    }
+
+    /**
+     * Install the language pack this receiver has pinned for a locale.
+     *
+     * The caller names a LOCALE. It does not get to name a URL, a hash or a size even correctly:
+     * accepting those fields would accept the shape of a request that could carry wrong ones, and
+     * the whole point of a bound site is that what may reach it was decided in review.
+     */
+    private function multilingualPackage(string $locale, int $major): array
+    {
+        if ($this->extensions === null) return $this->err('unavailable', 'extension manager not wired');
+        try {
+            $pack = $this->contract->languagePackage($locale, $major);
+        } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        if ($pack === null) return $this->ok(['locale' => $locale, 'installed' => true, 'source' => true]);
+        try { $installed = $this->languagePackPresent($locale); }
+        catch (Throwable $error) { return $this->err('read_failed', $error->getMessage()); }
+        if (!$installed) {
+            if (!method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+            try {
+                $result = $this->extensions->installVerifiedFromUrl($pack['url'], $pack['sha256'], (int) $pack['bytes']);
+            } catch (Throwable $error) { return $this->err('install_failed', $error->getMessage()); }
+            if (($result['ok'] ?? false) !== true) return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+        }
+        // An installer writes FILES, and files are half of what this contract protects. Re-reading
+        // here is what turns "the installer returned ok" into "the site is still the site".
+        try { $this->contract->inspect(); }
+        catch (Throwable $error) { return $this->err('contract_failed', 'The package installed but the site no longer matches its contract: ' . $error->getMessage()); }
+        $this->stamped('extension');
+        return $this->ok(['locale' => $locale, 'installed' => true, 'version' => $pack['version'], 'alreadyPresent' => $installed]);
+    }
+
+    /**
+     * One phase of one language, committed.
+     *
+     * Repeating the same request id continues the same job rather than starting a second one, and a
+     * request id that arrives with different words is a conflict, not an update: a caller whose
+     * reply was lost must be able to ask again without translating the site twice, and must not be
+     * able to change what a half-applied job is applying.
+     */
+    private function multilingualApply(array $p, string $locale, int $major): array
+    {
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        $translations = $p['translations'] ?? null;
+        if (!$apply || strpos($apply, 'mlang-') !== 0 || !is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+            return $this->err('bad_params', 'an mlang- apply_id and a request_id are required');
+        if (!is_array($translations) || !$translations) return $this->err('bad_params', 'translations are required');
+        $hash = hash('sha256', json_encode([$locale, $translations], JSON_THROW_ON_ERROR));
+        try {
+            $job = $this->contract->job();
+            if ($job !== null && ($job['locale'] !== $locale || $job['requestId'] !== $request))
+                return $this->err('conflict', 'Another language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase']);
+            if ($job !== null && !hash_equals($job['translationHash'], $hash))
+                return $this->err('conflict', 'This request id is already applying different words');
+            // Reading the whole contract costs seconds — 3,900 file hashes and every governed row —
+            // so it is done ONCE outside the transaction, and only when a job is being STARTED and
+            // its revision has to be checked. A continuing call gets its fresh read inside the
+            // transaction, where it is needed anyway.
+            $state = $job === null ? $this->contract->inspect() : null;
+            if ($job === null) {
+                if (in_array($locale, $state['languages'], true))
+                    return $this->ok(['locale' => $locale, 'status' => 'completed', 'phase' => 'completed', 'alreadyPresent' => true]);
+                if (!isset($p['expected_revision']) || !hash_equals($state['revision'], (string) $p['expected_revision']))
+                    return $this->err('conflict', 'The site changed since it was planned; inspect again');
+                $plan = $this->contract->languagePlan($locale, $major, $state);
+                // The words can be ready before the files are, and usually are; what must not happen
+                // is rows tagged `zh-CN` on a site where Joomla has never heard of `zh-CN`.
+                if ($plan['package'] !== null && !$this->languagePackPresent($locale))
+                    return $this->err('contract_failed', 'Install the ' . $locale . ' language pack before applying it');
+                $missing = $this->translationProblems($plan['slots'], $translations);
+                // The full list, not a sample of it: the caller's only way to fix a translation is
+                // to ask again for exactly the slots that failed, and a truncated list turns that
+                // into guess-and-retry over a thousand of them.
+                if ($missing) return $this->err(
+                    'contract_failed',
+                    'The translation is not usable: ' . implode('; ', array_slice(array_column($missing, 'problem'), 0, 3))
+                        . (count($missing) > 3 ? ' (and ' . (count($missing) - 3) . ' more)' : ''),
+                    ['problems' => $missing]
+                );
+                $job = MultilingualApply::start($locale, $apply, $request, $hash, $state['snapshot']['contractHash'], $plan['profileHash'], $state['revision']);
+            }
+            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply): int {
+                $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => $id, 'fields' => $fields]);
+                if (empty($answer['ok'])) throw new RuntimeException($kind . ' ' . $id . ': ' . ($answer['message'] ?? json_encode($answer['error'])));
+                return (int) $answer['id'];
+            });
+            $this->batching = true;
+            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
+                // A fresh read inside the transaction: the phase must act on the site as it is now,
+                // not on a picture taken before another writer had its turn.
+                $state = $this->contract->inspect();
+                $next = $executor->step($job, $state, $translations);
+                if ($next['phase'] === 'completed') {
+                    $this->contract->saveJob(null);
+                    // Two steps, and the order is what makes the second one safe. First the
+                    // derived baseline: which ids belong to which source, and that the translated
+                    // sources have left `*`. Then a full inspect, which PROVES every copy against
+                    // the derivation rules — and only then is its snapshot stored. Storing the
+                    // proven snapshot is not "copying whatever the site holds": it is recording a
+                    // state that has just been checked field by field. Without it the stored
+                    // baseline lacks the copies' own presentation, and the next ordinary content
+                    // edit fails with "Cannot replace a content-only baseline" — measured while
+                    // editing a Chinese headline after the language landed.
+                    $this->contract->rebind($this->contract->bindingAfterLanguage($next));
+                    $this->contract->rebind($this->contract->inspect()['snapshot']);
+                } else $this->contract->saveJob($next);
+                return ['job' => $next];
+            })['job'];
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('content');
+            return $this->ok([
+                'locale' => $locale,
+                'status' => $done['phase'] === 'completed' ? 'completed' : 'running',
+                'phase' => $done['phase'], 'cursor' => $done['cursor'],
+                'created' => count($done['ids']), 'applyId' => $apply,
+                'phases' => MultilingualApply::PHASES,
+            ]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+
+
+    /**
+     * Rows an unfinished language left on the site, grouped by kind, newest first.
+     *
+     * Newest first because a menu item cannot be removed before its children: ids rise with
+     * creation order, so descending order takes the tree apart from the leaves.
+     *
+     * @return array<string,int[]>
+     */
+    private function orphansOf(array $state, string $locale): array
+    {
+        $out = [];
+        foreach ($state['keys'] as $key => $meta) {
+            if (($meta['locale'] ?? null) !== $locale) continue;
+            $out[$meta['kind']][] = (int) $state['ids'][$key];
+        }
+        if ($state['switcher'] !== null) $out['module'][] = (int) $state['switcher'];
+        foreach ($out as $kind => $ids) { rsort($ids); $out[$kind] = $ids; }
+        return $out;
+    }
+
+    /** Whether Joomla itself already carries this language, as the site reports it. */
+    private function languagePackPresent(string $locale): bool
+    {
+        if ($this->extensions === null) return false;
+        foreach ($this->extensions->listInstalled() as $row)
+            if (($row['type'] ?? '') === 'language' && ($row['element'] ?? '') === $locale) return true;
+        return false;
+    }
+
+    /** Every reason a supplied translation cannot be used, named one slot at a time. */
+    private function translationProblems(array $slots, array $translations): array
+    {
+        $out = [];
+        foreach ($slots as $slot) {
+            if ($slot['type'] !== 'text') continue;
+            $key = $slot['key'];
+            $say = function (string $problem) use (&$out, $key): void { $out[] = ['slot' => $key, 'problem' => $key . ': ' . $problem]; };
+            if (!array_key_exists($key, $translations) || !is_string($translations[$key])) { $say('no translation was supplied'); continue; }
+            $value = $translations[$key];
+            $source = (string) $slot['source'];
+            if (trim($value) === '' && trim($source) !== '') { $say('is empty but its source is not'); continue; }
+            if (trim($value) !== '' && trim($source) === '') { $say('fills a slot the source leaves empty'); continue; }
+            if (mb_strlen($value) > $slot['maxCharacters']) { $say('is ' . mb_strlen($value) . ' characters, over the slot limit of ' . $slot['maxCharacters']); continue; }
+            if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries markup or control characters'); continue; }
+            if (preg_match('/\{\/?[a-z][^{}]*\}/i', $value)) { $say('carries a Joomla plugin directive'); continue; }
+            foreach (MultilingualProfile::preservationErrors($source, $value) as $lost) $say($lost);
+        }
+        return $out;
+    }
+
+    /** Re-read the whole contract, then report what the language actually consists of. */
+    private function multilingualVerify(string $locale): array
+    {
+        try { $state = $this->contract->inspect(); }
+        catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        if ($locale !== '' && !in_array($locale, $state['languages'], true))
+            return $this->err('contract_failed', $locale . ' is not a language of this site' . ($state['job'] ? ' yet; a job is at phase ' . $state['job']['phase'] : ''));
+        $binding = $state['binding']['multilingual'] ?? [];
+        $per = [];
+        foreach ($binding['languages'] ?? [] as $tag => $language) {
+            $kinds = [];
+            foreach ($language['ids'] as $baseKey => $id) {
+                $kind = $state['keys'][MultilingualProfile::derivedKey($tag, $baseKey)]['kind'];
+                $kinds[$kind] = ($kinds[$kind] ?? 0) + 1;
+            }
+            $per[$tag] = ['entities' => $kinds, 'contentLanguage' => $language['contentLanguage'], 'applyId' => $language['applyId']];
+        }
+        return $this->ok([
+            'contract' => $state['contract'], 'revision' => $state['revision'],
+            'languages' => $state['languages'], 'perLanguage' => $per,
+            'switcher' => $state['switcher'], 'verified' => true,
+        ]);
+    }
+
+    /**
+     * Take one language back out, and nothing else.
+     *
+     * Replaying this language's own apply log in reverse is what makes the scope exact: it removes
+     * the rows this run created and restores the fields this run changed, so a language pack that
+     * was already on the site, and anything a person did afterwards under a different apply id,
+     * are not its business. A revert that does not verify afterwards is rolled back whole.
+     */
+    private function multilingualRevert(array $p, string $locale): array
+    {
+        try {
+            $state = $this->contract->inspect();
+            $language = $state['binding']['multilingual']['languages'][$locale] ?? null;
+            $job = $state['job'];
+            // A language that never finished is taken back through the SAME door. Without this a
+            // job whose words can no longer be supplied — the caller lost them, or changed them —
+            // could only be cleared from a database console, and until it was, the site refused
+            // every other content change.
+            $abandon = $language === null && $job !== null && $job['locale'] === $locale;
+            if ($language === null && !$abandon) return $this->err('contract_failed', $locale . ' is not a language of this site');
+            if (isset($p['expected_revision']) && !hash_equals($state['revision'], (string) $p['expected_revision']))
+                return $this->err('conflict', 'The site changed since it was read; inspect again');
+            $applyId = $abandon ? $job['applyId'] : $language['applyId'];
+            $leftovers = $abandon ? ($state['languages'] === [] ? $this->orphansOf($state, $locale) : []) : [];
+            $this->batching = true;
+            $result = $this->writer->transaction(function () use ($applyId, $locale, $abandon, $leftovers) {
+                $reverted = $this->applyRevert(['apply_id' => $applyId]);
+                if (empty($reverted['ok']) || !empty($reverted['failed'])) throw new RuntimeException('The language could not be fully taken back');
+                // The stored baseline currently describes the site WITH the language, so the
+                // expectations have to come off before anything is re-read against them.
+                // Rows a committed-but-unlogged phase left behind (see MultilingualApply: a phase
+                // is bounded, not atomic). The undo log cannot name them because its own entries
+                // rolled back with the phase, so they are removed by the identity that found them.
+                foreach ($leftovers as $kind => $ids) foreach ($ids as $id) $this->writer->delete($kind, (int) $id);
+                if ($abandon) $this->contract->saveJob(null);
+                else $this->contract->rebind($this->contract->bindingAfterRevert($locale));
+                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                return $reverted;
+            });
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('revert');
+            return $this->ok(['locale' => $locale, 'reverted' => $result['reverted'] ?? 0, 'removed' => true]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+    private function contentBatch(array $p, ?callable $verify = null): array
+    {
+        if (!$this->writer || !$this->log || !method_exists($this->writer, 'transaction')) {
+            return $this->err('unavailable', 'transactional site writer not installed');
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        $steps = $p['operations'] ?? null;
+        if (!$apply || !is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request)
+            || !is_array($steps) || count($steps) < 1 || count($steps) > ($verify ? 300 : 100)) {
+            return $this->err('bad_params', 'apply_id, request_id and 1–100 operations required');
+        }
+        $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
+        try {
+            $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
+                foreach ($this->log->entries($apply) as $entry) {
+                    if (($entry['op'] ?? '') === 'batch' && ($entry['request'] ?? '') === $request) {
+                        if (!hash_equals($entry['hash'], $hash)) throw new RuntimeException('request_id already used with different operations');
+                        return $entry['result'];
+                    }
+                }
+                $this->batching = true;
+                $ids = [];
+                foreach ($steps as $index => $step) {
+                    if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
+                    $kind = $step['kind'];
+                    // Identity and installed executable settings require their own privileged door.
+                    if (in_array($kind, ['user', 'extensionParams'], true)) throw new RuntimeException('kind not allowed in a content batch');
+                    $id = $step['id'] ?? 0;
+                    if (is_string($id) && str_starts_with($id, '$')) $id = $ids[substr($id, 1)] ?? -1;
+                    if (!is_numeric($id) || (int) $id < 0) throw new RuntimeException('unresolved id');
+                    $fields = $step['fields'];
+                    foreach ($fields as $column => $value) {
+                        if (is_string($value) && preg_match('/^\$([a-zA-Z0-9_-]+)$/D', $value, $match)) {
+                            if (!isset($ids[$match[1]])) throw new RuntimeException('unresolved field reference');
+                            $fields[$column] = $ids[$match[1]];
+                        }
+                    }
+                    if (isset($step['expected'])) {
+                        $before = $this->writer->read($kind, (int) $id);
+                        foreach ($step['expected'] as $key => $value) {
+                            if (!$before || !array_key_exists($key, $before) || (string) $before[$key] !== (string) $value) {
+                                throw new RuntimeException("conflict at operation {$index}: {$key} changed");
+                            }
+                        }
+                    }
+                    $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => (int) $id, 'fields' => $fields]);
+                    if (empty($answer['ok'])) throw new RuntimeException("operation {$index}: " . ($answer['message'] ?? json_encode($answer['error'])));
+                    $key = $step['key'] ?? (string) $index;
+                    if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
+                    $ids[$key] = $answer['id'];
+                }
+                $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
+                if ($verify) $verify($result);
+                $this->log->record($apply, ['op' => 'batch', 'request' => $request, 'hash' => $hash, 'result' => $result]);
+                return $result;
+            });
+            $this->batching = false;
+            $this->writer->purgeCache();
+            $this->stamped('content');
+            return $result;
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('batch_failed', $error->getMessage());
+        }
+    }
+
     private function contentUpdate(array $p): array
     {
         if ($this->writer === null || $this->log === null) {
@@ -1182,12 +1676,12 @@ final class Engine
         }
 
         try {
-            $this->writer->purgeCache();
+            if (!$this->batching) $this->writer->purgeCache();
         } catch (Throwable $e) {
             // Best-effort by contract: a stale cache is not worth failing a change that landed.
         }
 
-        $this->stamped('content');
+        if (!$this->batching) $this->stamped('content');
 
         $out = ['kind' => $kind, 'id' => $newId, 'created' => $fields !== [] && $before === null && $id === 0];
         if ($moveTo !== null) {
@@ -1244,12 +1738,12 @@ final class Engine
         }
 
         try {
-            $this->writer->purgeCache();
+            if (!$this->batching) $this->writer->purgeCache();
         } catch (Throwable $e) {
             // Best-effort by contract.
         }
 
-        $this->stamped('content');
+        if (!$this->batching) $this->stamped('content');
 
         return $this->ok(['kind' => $kind, 'id' => $id, 'trashed' => true]);
     }
@@ -1281,6 +1775,8 @@ final class Engine
         if (strlen($bytes) > self::MAX_MEDIA_BYTES) {
             return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
         }
+
+        if ($this->contract && $this->contract->bound() && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('content_only', 'Image filename must match its SHA-256');
 
         try {
             $before = $this->media->read($path); // null => new file, so its undo is a delete
@@ -1337,13 +1833,13 @@ final class Engine
 
         if ($this->writer !== null) {
             try {
-                $this->writer->purgeCache();
+                if (!$this->batching) $this->writer->purgeCache();
             } catch (Throwable $e) {
                 // Best-effort by contract.
             }
         }
 
-        if ($reverted > 0) {
+        if ($reverted > 0 && !$this->batching) {
             $this->stamped('revert');
         }
 
@@ -1405,6 +1901,7 @@ final class Engine
     private function revertOne(array $entry): void
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
+        if ($op === 'batch' || $op === 'contract') { return; }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');

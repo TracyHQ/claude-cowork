@@ -111,3 +111,46 @@ reason, nothing else — because a preview watching the site cannot be called ba
 on the customer's machine and has no address. The site writes, whoever is watching reads. Only
 changes made THROUGH this component are stamped; an administrator editing in the Joomla backend
 is not, and covering that needs a system plugin the package manifest was shaped to allow.
+
+## Transactional content batches (0.13.0)
+
+`content.batch` accepts `apply_id`, a stable `request_id`, and 1–100 `operations`
+(`kind`, `id`, `fields`, optional `key` and `expected` fields). A repeated request returns
+the committed receipt; reusing its ID with another body fails. A conflict rolls back the
+entire batch and its undo log. `apply.revert` replays the apply in reverse order.
+
+The Joomla writer supports `articleAssociation`, `menuAssociation`, `moduleAssignment`
+and the narrowly scoped `languageFilter` plugin settings. Relations validate their
+existing targets; article/module writes use Joomla Tables. New menu items may supply a
+unique alias. All component mutations serialize on the site's database advisory lock.
+
+`extension.install` accepts optional `sha256` and `bytes`; a pinned package is verified
+before extraction, including official language-pack download URLs with query strings.
+This version does not change the default template or publish an automatic update feed.
+
+Verified on Joomla 6: English seeding, adding French, repeated reconciliation, and
+reverting both applies to the original menu and module assignments.
+
+## Versioned quickstart content/display contracts
+
+`content.contract` accepts `operation: inspect` or `apply`. Inspect resolves the trusted packaged
+profile and reports slots, page relationships and a revision; apply accepts only scalar changes
+with that expected revision, an immutable `contract-` apply ID and request ID. It validates
+presentation before and inside the write transaction. The private
+`#__claudecowork_content_contract` table stores the installation binding and baseline.
+
+`lib/contracts/tracy-apple/j6/1.1.0` is a verbatim mirror of the canonical TCH profile. `build.sh`
+packages it with the engine. Update the canonical TCH files first, then copy the entire profile;
+never allow an agent to submit its own presentation lock. Generic structural writes are blocked
+once bound. Reverting a contract is transactional and refuses to overwrite a later revision.
+
+The first profile protects module status/schedules/type/position/order, menu assignments including
+exclusions, template parameters, layout/override assets, language and effective ACL inheritance.
+Joomla `{loadposition ...}` directives are structure, not editable copy. Factual slots require a
+provenance reference, whose truth still needs review. Bound media uploads use content-addressed
+paths under `images/tracy-content/`. Admin/direct database or filesystem access remains outside
+this API boundary; drift is detected on the next contract request.
+
+Release activation is separate from source availability: 0.14.0 has been tested as a local package,
+but the default TCH build recipe must also be migrated and pinned before claiming all new sites
+use content-only mode. The published 1.1.0 profile is not the later, locally modified 8212 demo.
