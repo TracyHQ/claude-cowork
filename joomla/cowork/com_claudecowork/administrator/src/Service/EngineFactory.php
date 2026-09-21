@@ -192,6 +192,10 @@ final class EngineFactory
     public static function answer(CMSApplicationInterface $app): void
     {
         self::loadEngine();
+        // Before `build()`: the contract profile is decoded in the engine's constructor, and a
+        // 43-language quickstart's lock is ~8 MB with ~6k ACL chains — more than PHP's default
+        // 128M survives. Why, and what it never lowers: `Door::MEMORY_LIMIT`.
+        \Door::reserveMemory();
 
         $request = json_decode((string) $app->getInput()->json->getRaw(), true);
         if (!\is_array($request)) {

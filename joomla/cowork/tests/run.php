@@ -1424,6 +1424,23 @@ check('another task of this component is not the door', Door::wants(['option' =>
 check('an empty request is not the door', Door::wants([]), false);
 check('array-valued query parts never match', Door::wants(['option' => ['com_claudecowork'], 'task' => 'api.exec']), false);
 
+// The door reserves memory before the engine decodes a profile (why: Door::MEMORY_LIMIT).
+check('128M is raised to the reserve', Door::memoryLimitFor('128M'), Door::MEMORY_LIMIT);
+check('256M is raised too', Door::memoryLimitFor('256M'), Door::MEMORY_LIMIT);
+check('the reserve itself is left alone', Door::memoryLimitFor('512M'), null);
+check('a higher limit is never lowered', Door::memoryLimitFor('1G'), null);
+check('lowercase shorthand is PHP shorthand', Door::memoryLimitFor('2g'), null);
+check('a plain byte count is read as bytes', Door::memoryLimitFor('536870912'), null);
+check('one byte short of the reserve is raised', Door::memoryLimitFor('536870911'), Door::MEMORY_LIMIT);
+check('unlimited stays unlimited', Door::memoryLimitFor('-1'), null);
+check('a value PHP reads as 0 is raised', Door::memoryLimitFor('lots'), Door::MEMORY_LIMIT);
+$limitBefore = ini_get('memory_limit');
+ini_set('memory_limit', '128M');
+check('reserveMemory raises the default limit', Door::reserveMemory(), Door::MEMORY_LIMIT);
+ini_set('memory_limit', '1G');
+check('reserveMemory keeps a higher one', Door::reserveMemory(), '1G');
+ini_set('memory_limit', $limitBefore);
+
 // ---------------------------------------------------------------- packaging --
 // The door plugin travels INSIDE pkg_claudecowork, so one install or one update puts it on the
 // site. A plugin left out of the package manifest builds fine and is never installed — nothing

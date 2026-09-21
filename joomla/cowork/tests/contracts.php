@@ -196,6 +196,10 @@ unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($con
 // action after the upgrade that was meant to seal it — the one failure the customer meets first.
 // So every directory under lib/contracts/ is loaded here, exactly the way the engine loads it.
 $bundledRoot=realpath(__DIR__.'/../lib/contracts');
+// Loaded the way the door loads them: behind the memory reserve. Without it this file dies at
+// PHP's 128M default on the Business lock — the same fatal the receiver had before the reserve.
+Door::reserveMemory();
+$entityRules=[];
 $bundled=[];
 foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     $id=basename(dirname($dir,2)).'/j6/'.basename($dir);
@@ -205,6 +209,10 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     $manifest=json_decode(file_get_contents("$dir/manifest.json"),true,512,JSON_THROW_ON_ERROR);
     check("$id names itself in its manifest",$manifest['id']??null,$id);
     check("$id names the version it carries",$manifest['quickstart']['version']??null,basename($dir));
+    $lock=json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR);
+    checkTrue("$id lock carries an access snapshot",isset($lock['access']['entityRules'])&&is_array($lock['access']['entityRules']));
+    $entityRules[$id]=count($lock['access']['entityRules']??[]);
+    unset($lock);
     if(!is_file("$dir/multilingual-map.json"))continue;
     $raw=file_get_contents("$dir/multilingual-map.json");
     $loaded=null;
@@ -218,3 +226,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
 }
 foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
+// 1.1.0 is the 43-language archive, and its lock was captured from THAT archive: an ACL chain for
+// every one of its 6,144 entities. The 1.0.0 lock's 322 refused bind on every Business site with
+// "Access-level or ACL definition changed: entityRules(categories.1000 …)" (measured 2026-09-21).
+check('tracy-business/j6/1.1.0 lock carries ACL rules for the whole 1.1.0 archive',$entityRules['tracy-business/j6/1.1.0']??null,6144);
