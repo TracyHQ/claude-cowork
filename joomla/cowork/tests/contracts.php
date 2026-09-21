@@ -188,3 +188,33 @@ unlink($secondDir.'/assets/demo.css');rmdir($secondDir.'/assets');rmdir($secondD
 unlink($contractDir.'/'.$newCache);rmdir($contractDir.'/media/t4/optimize/css');rmdir($contractDir.'/media/t4/optimize');rmdir($contractDir.'/media/t4');rmdir($contractDir.'/media');
 foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
 unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);
+
+/* ------------------------------------------------- every profile the package carries loads */
+// The receiver reads a profile from disk on every request, and the constructor above throws on a
+// multilingual map whose shape it does not know (`policies`, `sourceDelta`), on one pinned to other
+// bytes, or on a missing file. A profile committed in that state is a site that refuses every
+// action after the upgrade that was meant to seal it — the one failure the customer meets first.
+// So every directory under lib/contracts/ is loaded here, exactly the way the engine loads it.
+$bundledRoot=realpath(__DIR__.'/../lib/contracts');
+$bundled=[];
+foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
+    $id=basename(dirname($dir,2)).'/j6/'.basename($dir);
+    $bundled[]=$id;
+    foreach(['manifest','content-map','presentation-lock'] as $name)
+        checkTrue("$id carries $name.json",is_file("$dir/$name.json"));
+    $manifest=json_decode(file_get_contents("$dir/manifest.json"),true,512,JSON_THROW_ON_ERROR);
+    check("$id names itself in its manifest",$manifest['id']??null,$id);
+    check("$id names the version it carries",$manifest['quickstart']['version']??null,basename($dir));
+    if(!is_file("$dir/multilingual-map.json"))continue;
+    $raw=file_get_contents("$dir/multilingual-map.json");
+    $loaded=null;
+    try{
+        new MultilingualProfile(json_decode($raw,true,512,JSON_THROW_ON_ERROR),
+            json_decode(file_get_contents("$dir/content-map.json"),true,512,JSON_THROW_ON_ERROR),
+            json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR),$dir,$raw);
+        $loaded=true;
+    }catch(Throwable $e){$loaded=$e->getMessage();}
+    check("$id multilingual map is one this receiver can load",$loaded,true);
+}
+foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0'] as $id)
+    checkTrue("the package carries $id",in_array($id,$bundled,true));
