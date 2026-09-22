@@ -230,3 +230,38 @@ foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja
 // every one of its 6,144 entities. The 1.0.0 lock's 322 refused bind on every Business site with
 // "Access-level or ACL definition changed: entityRules(categories.1000 …)" (measured 2026-09-21).
 check('tracy-business/j6/1.1.0 lock carries ACL rules for the whole 1.1.0 archive',$entityRules['tracy-business/j6/1.1.0']??null,6144);
+
+/* --------------------------- the Business profile knows the archive is ALREADY two editions */
+// 🔒 THIS IS THE ONE PROFILE WHOSE SOURCE IS NOT THE WHOLE SITE. Apple and Airbnb ship every row at
+// `language='*'`; Business ships an en-GB edition AND a ru-RU edition its customer authored — 180
+// Russian rows carrying their own legal identifiers (INN, OGRN, SRO), Russian client names and a
+// Moscow address. Nothing here can derive or check those words, so a profile that treated them as
+// translatable source would build a second Vietnamese copy of every block and put two editions of
+// the same module on one page. It fails no gate and throws nothing: it is only visible on the
+// customer's site. These four checks are what keeps a regenerated map from losing that guard.
+$bizDir=$bundledRoot.'/tracy-business/j6/1.1.0';
+$bizRaw=file_get_contents($bizDir.'/multilingual-map.json');
+$bizMap=json_decode(file_get_contents($bizDir.'/content-map.json'),true,512,JSON_THROW_ON_ERROR);
+$bizLock=json_decode(file_get_contents($bizDir.'/presentation-lock.json'),true,512,JSON_THROW_ON_ERROR);
+$biz=new MultilingualProfile(json_decode($bizRaw,true,512,JSON_THROW_ON_ERROR),$bizMap,$bizLock,$bizDir,$bizRaw);
+check('the Business profile is the 1.1.0 extension shape',$biz->version(),'1.1.0');
+$bizCoverage=$biz->coverage();
+check('the Business profile classifies every entity of the contract',
+    count($bizCoverage['translate'])+count($bizCoverage['shared']),count($bizMap['entities']));
+// Every row the archive authored in another language, and every row it left at `*`, stays put: the
+// first because its words are facts the source does not hold, the second because Joomla filters
+// `language IN (tag, '*')` and pulling it to en-GB would take it off the Russian pages it serves.
+$copiedNonSource=[];
+foreach($bizMap['entities'] as $entity){
+    $tag=(string)($bizLock['entities'][$entity['key']]['language']??'');
+    if($tag!==''&&$tag!=='en-GB'&&$biz->isTranslated($entity['key']))$copiedNonSource[]=$entity['key'].'@'.$tag;
+}
+check('the Business profile copies no row outside the en-GB edition',$copiedNonSource,[]);
+// The archive already publishes a `mod_languages` module, with the template's own layout. The
+// receiver finds an existing switcher by the profile's `note` and only creates one when it finds
+// none, so this note is what stands between one switcher in the topbar and two.
+check('the Business profile reuses the switcher the archive ships',
+    [$biz->switcherPresentation()['note'],$biz->switcherPresentation()['position'],$biz->switcherAnchor()],
+    ['tb:pilot','language-switcher','module-425']);
+check('and that switcher is a row the profile never copies',$biz->isTranslated('module-425'),false);
+unset($biz,$bizMap,$bizLock,$bizRaw);

@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Bundles the tracy-business/j6/1.1.0 multilingual profile, so a Tracy Business site can be given a second language. The profile is written for an archive that is ALREADY two authored editions: its 157 en-GB rows are translated, while the 180 ru-RU rows the customer authored and the rows left at language='*' are declared shared and never copied, and the language switcher the archive already publishes is reused instead of a second one being created.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.5</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.5</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.5/pkg_claudecowork-0.16.5.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Replaces the tracy-business/j6/1.1.0 presentation lock with one captured from the 1.1.0 archive itself, carrying ACL rules for all 6,144 entities of its 43 language editions instead of the 322 of 1.0.0, so bind on a Tracy Business site no longer refuses with an entityRules change. The API door now reserves 512M of PHP memory before loading a profile, so that 8 MB lock decodes on a site left at PHP's 128M default; a higher or unlimited limit is never lowered.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
