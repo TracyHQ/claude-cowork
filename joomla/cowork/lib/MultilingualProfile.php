@@ -301,33 +301,121 @@ final class MultilingualProfile
                 $out[] = 'the figure ' . trim($which[0]) . ' left no number in the translation';
             $source = (string) preg_replace($scaled, ' ', $source);
         }
+        /**
+         * 🔒 A FIGURE IS COMPARED BY ITS VALUE, NOT BY ITS SPELLING.
+         *
+         * Digit grouping is part of a language, not part of a fact. Vietnamese writes `4.800`
+         * where British English writes `4,800`, and `6,2` where English writes `6.2`; German,
+         * Spanish, Italian, Portuguese, Russian, Turkish and French all group with a dot or a
+         * space. Comparing the characters refuses every one of those, and it refused them on text
+         * TRACY ITSELF SHIPPED — measured 22/09/2026 on the reviewed `vi-VN` edition of the
+         * Business quickstart: `4,800` → `4.800`, `6.2` → `6,2`, `4,000` → `4.000`, all correct,
+         * all refused, and the build stopped at the `language` stage with nothing wrong.
+         *
+         * So both sides are reduced to a key in which every separator — comma, dot, ordinary
+         * space, non-breaking and narrow space — reads the same, and the currency mark and percent
+         * sign are dropped (`figureKey()`). The digits and their POSITIONS still have to match, so
+         * `4,800` → `4,900` is refused exactly as before, and a figure dropped outright still is.
+         */
+        $figures = self::figuresIn($target);
+        preg_match_all(self::FIGURE, $source, $sourceFigures);
+        foreach (array_count_values(array_map([self::class, 'figureKey'], $sourceFigures[0])) as $key => $times)
+            if (($figures[$key] ?? 0) < $times)
+                $out[] = 'the figure ' . self::spellOut($sourceFigures[0], $key) . ' is missing from the translation';
         $checks = [
             'URL' => '~https?://[^\s<>"\)]+~',
             'email address' => '~[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}~',
             'placeholder' => '~%[0-9]+\$?[sd]|%[sd]~',
-            'figure' => '~(?<![\w.])(?:[$€£¥]\s?\d[\d,.]*|\d[\d,.]*\s?%|\d[\d,.]*[.,]\d+|\d{2,}(?:[\d,.]*\d)?)~u',
         ];
         foreach ($checks as $what => $pattern) {
             preg_match_all($pattern, $source, $found);
             foreach (array_count_values($found[0]) as $token => $times) {
                 $token = (string) $token;
                 $seen = substr_count($target, $token);
-                // A CURRENCY AMOUNT MAY PUT ITS SYMBOL ON THE OTHER SIDE. French writes "$24" as
-                // "24 $" (symbol after, thin or ordinary space), and German, Spanish and others do
-                // the same for their own currencies. Measured 13/09 on a real run: the three price
-                // tiers of a pricing block — "$0", "$24", "$96" — came back as "0 $", "24 $",
-                // "96 $", correct French, refused three times including after the complaint. The
-                // amount is what must survive; the symbol may stand on either side of it.
-                if ($seen < $times && $what === 'figure' && preg_match('~^([$€£¥])\s?(\d[\d,.]*)$~u', $token, $money)) {
-                    $sym = preg_quote($money[1], '~');
-                    $num = preg_quote($money[2], '~');
-                    $seen += preg_match_all('~(?<![\d.,])' . $num . '(?:\s|\x{00A0}|\x{202F})?' . $sym . '~u', $target);
-                }
                 if ($seen < $times)
                     $out[] = 'the ' . $what . ' ' . $token . ' is missing from the translation';
             }
         }
         return $out;
+    }
+
+    /**
+     * What counts as a figure: a currency amount, a percentage, or a number of two digits or more,
+     * written with any of the separators the world's locales use between and inside its digits.
+     *
+     * A single digit is deliberately outside it — "Chapter 1" becoming "第一章" is a correct
+     * translation, and a rule that refused it would be refusing the job.
+     */
+    /**
+     * Whether a translation brings markup its source did not have.
+     *
+     * 🔒 AN ANGLE BRACKET IS MARKUP ONLY WHERE THE SOURCE HAS NONE. Refusing `<` and `>` outright
+     * refuses a translation for FAITHFULLY KEEPING what its source says. Measured 22/09/2026 on
+     * the Business quickstart: slot `module-678.9` is an email preview whose published English
+     * reads `From: Northgate <no-reply@northgate-ind.ru>` — the address in the angle brackets every
+     * mail client writes — and the reviewed Vietnamese edition Tracy ships keeps it. The check
+     * called that markup and stopped the build with nothing wrong on either side.
+     *
+     * What the rule is for is a translation INTRODUCING markup into a slot that had none, so that
+     * is what it now asks. A plain-text slot is unchanged — no brackets in, none allowed out — and
+     * a slot that legitimately carries one cannot be grown into a tag.
+     */
+    public static function markupIntroduced(string $source, string $target): bool
+    {
+        return preg_match_all('/[<>]/u', $target) > preg_match_all('/[<>]/u', $source);
+    }
+
+    /** One more digit, or a separator that has a digit behind it. A plain space groups only by threes. */
+    private const FIGURE_STEP = '(?:\d|[.,\x{00A0}\x{202F}\x{2009}](?=\d)|\x20(?=\d{3}(?!\d)))';
+    private const FIGURE = '~(?<![\w.])(?:'
+        // A currency amount, single-digit included: "$0 free forever" is a price.
+        . '[$€£¥]\s?\d' . self::FIGURE_STEP . '*'
+        // The same amount with the mark on the other side: French writes "$0" as "0 $".
+        . '|\d' . self::FIGURE_STEP . '*\s?[$€£¥]'
+        // A percentage, same reason.
+        . '|\d' . self::FIGURE_STEP . '*\s?%'
+        // Otherwise a number needs a second digit or a separator: a lone digit is a WORD in most
+        // languages and a fact in none, so "Chapter 1" → "第一章" must not be refused.
+        . '|\d' . self::FIGURE_STEP . self::FIGURE_STEP . '*'
+        . ')~u';
+
+    /**
+     * One figure reduced to the value it names, so two spellings of the same number compare equal.
+     *
+     * Separators are levelled rather than deleted: deleting them would make `6.2` and `62` the
+     * same figure, and a translation that turned six-point-two into sixty-two would pass. Levelled,
+     * `6.2` and `6,2` are one key while `62` is another — and `4,800` still differs from `4,900`.
+     */
+    private static function figureKey(string $token): string
+    {
+        // A space standing BETWEEN digits is a separator (French and Russian group that way);
+        // any other space is not part of the value.
+        $key = (string) preg_replace('~(?<=\d)[\x{00A0}\x{202F}\x{2009}\x20](?=\d)~u', '.', $token);
+        // ⚠ THE MARK IS KEPT, ITS SIDE IS NOT. A price may be written "$24" or "24 $" and mean the
+        // same thing, but "24" alone has lost the currency — measured as a real refusal worth
+        // keeping. So the mark moves to the front of the key rather than being dropped.
+        preg_match('~[$€£¥%]~u', $key, $mark);
+        $key = (string) preg_replace('~[\s\x{00A0}\x{202F}\x{2009}$€£¥%]~u', '', $key);
+        return ($mark[0] ?? '') . str_replace(',', '.', $key);
+    }
+
+    /** Every figure the text carries, counted by value. */
+    private static function figuresIn(string $text): array
+    {
+        preg_match_all(self::FIGURE, $text, $found);
+        $out = [];
+        foreach ($found[0] as $token) {
+            $key = self::figureKey($token);
+            $out[$key] = ($out[$key] ?? 0) + 1;
+        }
+        return $out;
+    }
+
+    /** The figure as the SOURCE wrote it, so the complaint quotes text the author can search for. */
+    private static function spellOut(array $tokens, string $key): string
+    {
+        foreach ($tokens as $token) if (self::figureKey($token) === $key) return trim($token);
+        return $key;
     }
 
     /**

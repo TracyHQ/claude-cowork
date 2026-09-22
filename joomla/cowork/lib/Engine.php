@@ -1438,7 +1438,10 @@ final class Engine
             if (trim($value) === '' && trim($source) !== '') { $say('is empty but its source is not'); continue; }
             if (trim($value) !== '' && trim($source) === '') { $say('fills a slot the source leaves empty'); continue; }
             if (mb_strlen($value) > $slot['maxCharacters']) { $say('is ' . mb_strlen($value) . ' characters, over the slot limit of ' . $slot['maxCharacters']); continue; }
-            if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries markup or control characters'); continue; }
+            if (preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries control characters'); continue; }
+            // An angle bracket is markup only where the source has none — the rule, and the
+            // measurement behind it, are in MultilingualProfile::markupIntroduced().
+            if (MultilingualProfile::markupIntroduced($source, $value)) { $say('carries markup its source does not'); continue; }
             if (preg_match('/\{\/?[a-z][^{}]*\}/i', $value)) { $say('carries a Joomla plugin directive'); continue; }
             foreach (MultilingualProfile::preservationErrors($source, $value) as $lost) $say($lost);
         }

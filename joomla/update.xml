@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Two false refusals that stopped the `language` stage on text Tracy itself shipped. A figure is now compared by its VALUE, not its spelling: Vietnamese writes 4.800 where English writes 4,800 and 6,2 where English writes 6.2, and every locale that groups with a dot or a space hit the same wall — a changed or missing figure is still refused. And an angle bracket counts as markup only where the source has none, so a translation that faithfully keeps an email address in brackets is no longer turned away. Carries the 0.16.5 payload: the tracy-business/j6/1.1.0 multilingual profile.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.6</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.6</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.6/pkg_claudecowork-0.16.6.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Bundles the tracy-business/j6/1.1.0 multilingual profile, so a Tracy Business site can be given a second language. The profile is written for an archive that is ALREADY two authored editions: its 157 en-GB rows are translated, while the 180 ru-RU rows the customer authored and the rows left at language='*' are declared shared and never copied, and the language switcher the archive already publishes is reused instead of a second one being created.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

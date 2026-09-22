@@ -44,6 +44,52 @@ foreach ($money as [$source, $target, $ok]) {
     check('currency "' . $source . '" as "' . $target . '" ' . ($ok ? 'keeps its amount' : 'is refused'), $errors === [], $ok);
 }
 
+// AN ANGLE BRACKET IS MARKUP ONLY WHERE THE SOURCE HAS NONE. `module-678.9` of the Business
+// quickstart is an email preview: its published English carries `<no-reply@northgate-ind.ru>`, the
+// address in the brackets every mail client writes, and the reviewed Vietnamese edition keeps it.
+// Refusing every `<` turned that faithful translation away and stopped the build (22/09/2026).
+$markup = [
+    ['From: Northgate <no-reply@northgate-ind.ru>', 'Từ: Northgate <no-reply@northgate-ind.ru>', false],
+    // A plain slot is unchanged: nothing in, nothing allowed out.
+    ['Talk to our team', 'Nói chuyện với <b>đội ngũ</b> của chúng tôi', true],
+    ['Talk to our team', 'Nói chuyện với đội ngũ của chúng tôi', false],
+    // And a slot that legitimately holds one bracket pair cannot be grown into a tag.
+    ['From: Northgate <no-reply@northgate-ind.ru>', 'Từ: <b>Northgate</b> <no-reply@northgate-ind.ru>', true],
+];
+foreach ($markup as [$source, $target, $introduced]) {
+    check('"' . $target . '" ' . ($introduced ? 'brings markup its source lacks' : 'brings no markup of its own'),
+        MultilingualProfile::markupIntroduced($source, $target), $introduced);
+}
+
+// DIGIT GROUPING IS PART OF A LANGUAGE, NOT PART OF A FACT. Vietnamese writes "4.800" where
+// British English writes "4,800", and "6,2" where English writes "6.2"; German, Spanish, Italian,
+// Portuguese, Russian, Turkish and French group with a dot or a space too. Comparing the
+// characters refused every one of them — and it refused text TRACY ITSELF SHIPPED: measured
+// 22/09/2026, the reviewed vi-VN edition of the Business quickstart was turned away on
+// article-546.0 ("4,800" → "4.800") and article-547.0 ("6.2" → "6,2"), and the build stopped at
+// the `language` stage with nothing wrong on either side. The figure is compared by VALUE now, and
+// a figure that changed or vanished is refused exactly as before.
+$separators = [
+    ['Full cycle: 4,800 tonnes of steel frame', 'Trọn chu trình: khung thép 4.800 tấn', true],
+    ['6.2 km of internal roads', '6,2 km đường nội bộ', true],
+    ['a plant rated 4,000 m3 a day', 'nhà máy công suất 4.000 m³/ngày', true],
+    // Grouped with spaces — ordinary, non-breaking and narrow — as French and Russian write them.
+    ['Over 1,200 teams', 'plus de 1 200 équipes', true],
+    ["Over 1,200 teams", "plus de 1\u{00A0}200 équipes", true],
+    ["Over 1,200 teams", "plus de 1\u{202F}200 équipes", true],
+    // Still strict about the digits themselves: a different number is a different fact.
+    ['Full cycle: 4,800 tonnes of steel frame', 'Trọn chu trình: khung thép 4.900 tấn', false],
+    ['6.2 km of internal roads', '6,3 km đường nội bộ', false],
+    // And a figure dropped outright is still a loss, whatever the separator rule.
+    ['Full cycle: 4,800 tonnes of steel frame', 'Trọn chu trình: khung thép chịu lực', false],
+    // Levelling the separators must not make a decimal into a whole number.
+    ['Response in 1.5 seconds', 'Phản hồi trong 15 giây', false],
+];
+foreach ($separators as [$source, $target, $ok]) {
+    $errors = MultilingualProfile::preservationErrors($source, $target);
+    check('separator "' . $source . '" as "' . $target . '" ' . ($ok ? 'keeps its figure' : 'is refused'), $errors === [], $ok);
+}
+
 // A single digit is a WORD in most languages and a fact in none: refusing its transliteration
 // would refuse correct translations, which is a worse failure than missing a "1".
 check('a single digit may be written out', MultilingualProfile::preservationErrors('Chapter 1', '第一章'), []);
