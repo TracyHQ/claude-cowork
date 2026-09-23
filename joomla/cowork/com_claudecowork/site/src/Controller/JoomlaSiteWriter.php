@@ -531,6 +531,13 @@ final class JoomlaSiteWriter implements \SiteWriter
             $class = $kind === 'article' ? \Joomla\CMS\Table\Content::class : \Joomla\CMS\Table\Module::class;
             $row = new $class($this->db);
             if ($id > 0 && !$row->load($id)) throw new \RuntimeException('content target missing');
+            // A row the quickstart shipped WITHOUT an asset inherits com_content's (or com_modules')
+            // rules. Table::store() mints one on save, and when the category has no asset either it
+            // hangs it under root.1 — skipping the component's rules, so the contract's ACL check
+            // refuses the whole apply. Measured 23/09/2026 on ja-voyara (j-se6mii): six page articles
+            // seeded, `Access-level or ACL definition changed: entityRules(content.200 …)`. The
+            // row's ACL is not this write's to change: the minted asset is removed again below.
+            $hadAsset = $id > 0 ? (int) ($row->asset_id ?? 0) : -1;
             $data = get_object_vars($object);
             if ($id <= 0) {
                 $data += ['access' => 1, 'language' => '*'];
@@ -538,6 +545,7 @@ final class JoomlaSiteWriter implements \SiteWriter
             }
             if (!$row->bind($data) || !$row->check() || !$row->store()) throw new \RuntimeException((string) $row->getError());
             $newId = (int) $row->id;
+            if ($hadAsset === 0 && (int) ($row->asset_id ?? 0) > 0) $this->dropMintedAsset($kind, $newId, (int) $row->asset_id);
             if ($tags !== null) $this->setTags($newId, $tags);
             if ($kind === 'article' && $id <= 0) {
                 $workflow = new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db);
@@ -817,6 +825,26 @@ final class JoomlaSiteWriter implements \SiteWriter
      * as an admin save would produce them. Throws with the Table's own error text on refusal;
      * the engine turns that into a failed (and rolled-back) apply.
      */
+    /**
+     * Undo the asset Table::store() minted for a row that had none, so its effective ACL stays the
+     * component's. Through the Asset table, not a DELETE: `#__assets` is a nested set, and a raw
+     * delete would leave its lft/rgt with a hole every later insert trips over.
+     */
+    private function dropMintedAsset(string $kind, int $id, int $assetId): void
+    {
+        $table = $kind === 'article' ? '#__content' : '#__modules';
+        $this->db->setQuery(
+            $this->db->getQuery(true)->update($this->db->quoteName($table))
+                ->set($this->db->quoteName('asset_id') . ' = 0')
+                ->where($this->db->quoteName('id') . ' = ' . (int) $id)
+        )->execute();
+        $asset = new \Joomla\CMS\Table\Asset($this->db);
+        $name = ($kind === 'article' ? 'com_content.article.' : 'com_modules.module.') . $id;
+        if ($asset->load($assetId) && $asset->name === $name && !$asset->delete()) {
+            throw new \RuntimeException('could not remove the asset minted for ' . $name . ': ' . $asset->getError());
+        }
+    }
+
     private function createNested(string $kind, array $fields): int
     {
         $def = self::NESTED[$kind];
