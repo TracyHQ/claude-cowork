@@ -287,6 +287,21 @@ foreach ($gateContracts as $profileFile) {
     $editions = is_file($dir . '/editions.json') ? json_decode(file_get_contents($dir . '/editions.json'), true) : null;
     $rowCount = fn () => array_sum(array_map(fn ($k) => count($gw->store[$k] ?? []), ['article', 'menuItem', 'module']));
     $before = $rowCount();
+    // The source's picture as a seed leaves it — drawn for the customer, not the archive's — in the
+    // first image slot of a translated row: a taken edition must carry it, not keep the demo's.
+    $picture = null;
+    if ($editions !== null) {
+        $contentMap = json_decode(file_get_contents($dir . '/content-map.json'), true);
+        foreach ($contentMap['slots'] as $slot) {
+            if ($slot['type'] !== 'image' || !isset($editions['locales']['vi-VN']['ids'][$slot['entity']])) continue;
+            $sourceId = null;
+            foreach ($contentMap['entities'] as $entity) if ($entity['key'] === $slot['entity']) $sourceId = (int) $entity['sourceId'];
+            $kind = explode('-', $slot['entity'])[0];
+            $gw->store[$kind][$sourceId] = $gc->patch($gw->store[$kind][$sourceId], [$slot], [$slot['key'] => 'images/tracy-content/customer-hero.png']);
+            $picture = [$slot, $kind, (int) $editions['locales']['vi-VN']['ids'][$slot['entity']]];
+            break;
+        }
+    }
     // Derive vi-VN: the plan's own source words stand in for a translation.
     $plan = $call(['operation' => 'multilingual.plan', 'locale' => 'vi-VN']);
     if (!$step('plan vi-VN', $plan)) continue;
@@ -322,6 +337,8 @@ foreach ($gateContracts as $profileFile) {
     if ($editions !== null) {
         check("$id: taking vi-VN makes no row", $rowCount(), $before);
         check("$id: every row of the vi-VN edition is shown", $shown('vi-VN'), []);
+        if ($picture !== null)
+            check("$id: the taken vi-VN row shows the source's picture, not the archive's", $gc->slotValue($gw->store[$picture[1]][$picture[2]], $picture[0]), 'images/tracy-content/customer-hero.png');
     }
 
     // A customer who changes their mind: fr-FR, which the retire hid, is added beside vi-VN — then

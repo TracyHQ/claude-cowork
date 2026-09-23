@@ -137,10 +137,17 @@ final class MultilingualApply
                     throw new RuntimeException('No translation supplied for ' . $slot['key']);
                 $values[$slot['key']] = (string) $translations[$slot['key']];
             } elseif ($slot['type'] === 'url') {
-                $values[$slot['key']] = $this->profile->remapLink((string) $source, $idMap);
+                $values[$slot['key']] = $this->profile->edition($locale)
+                    ? $this->profile->editionLinkFor($locale, (string) $source, $idMap)
+                    : $this->profile->remapLink((string) $source, $idMap);
+            } elseif ($this->profile->edition($locale)) {
+                // A taken edition row still holds the ARCHIVE's picture, so the source's goes in
+                // explicitly — the customer's hero on `/en/` and the demo's on `/vi/` otherwise
+                // (j-ee6vsk, 23/09/2026). The same file, so the aspect-ratio rule holds.
+                $values[$slot['key']] = (string) $source;
             }
-            // An image is the same picture in every language; leaving it out of $values keeps the
-            // source's value, which is also what makes the aspect-ratio rule trivially satisfied.
+            // For a copy an image is simply not in $values: the copy is built from the source row,
+            // so it already holds the source's picture.
         }
         return $values;
     }
@@ -536,7 +543,11 @@ final class MultilingualApply
             if (!$row) throw new RuntimeException('The shipped ' . $locale . ' edition has no row for ' . $key);
             $values = $this->slotValues($state, $key, $locale, $translations, $idMap);
             $patched = $this->contract->patch($row, $this->contract->derivedSlotsFor($locale, $key), $values);
-            $fields = array_intersect_key($patched, array_flip($this->profile->translatedColumns($kind)));
+            // The translated columns, and every column a slot lives in (an article's picture is in
+            // `images`, which carries no words): nothing else of the edition's row is rewritten.
+            $columns = $this->profile->translatedColumns($kind);
+            foreach ($this->contract->derivedSlotsFor($locale, $key) as $slot) $columns[] = (string) $slot['column'];
+            $fields = array_intersect_key($patched, array_flip($columns));
             if ($kind === 'module' && !$this->profile->showsTitle($key, $this->contract->lockFields($key))) unset($fields['title']);
             // A language's home page is decided per language, and Joomla takes the flag off the old
             // holder whenever another row claims it — a copy made on this site by an older receiver

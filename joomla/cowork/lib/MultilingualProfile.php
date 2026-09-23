@@ -203,6 +203,14 @@ final class MultilingualProfile
         return $node;
     }
 
+    /** A source link as the edition of `$locale` would carry it. */
+    public function editionLinkFor(string $locale, string $link, array $idMap = []): string
+    {
+        $edition = $this->edition($locale);
+        if ($edition === null) throw new RuntimeException('No shipped edition of ' . $locale);
+        return $this->editionLink($link, $this->editionMaps($locale, $idMap), (string) $edition['sef']);
+    }
+
     /** A source link, pointed at the edition: its articles, categories and menu items, and its prefix. */
     private function editionLink(string $link, array $maps, string $sef): string
     {
