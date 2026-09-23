@@ -1736,7 +1736,15 @@ final class Engine
             if (($meta['locale'] ?? null) !== $locale) continue;
             $out[$meta['kind']][] = (int) $state['ids'][$key];
         }
-        if ($state['switcher'] !== null) $out['module'][] = (int) $state['switcher'];
+        // Only a switcher the job CREATED is its to take back. A profile may reuse the archive's own
+        // (Business: module-425), and that row is a governed base entity — deleting it with the
+        // orphans left the site without its switcher and every later inspect dead on "Bound entity
+        // disappeared: module-425" (measured 23/09/2026 on j-ee6vsk).
+        $governed = [];
+        foreach ($state['keys'] as $key => $meta)
+            if ($meta['kind'] === 'module' && !isset($meta['locale']) && empty($meta['switcher']) && isset($state['ids'][$key]))
+                $governed[] = (int) $state['ids'][$key];
+        if ($state['switcher'] !== null && !in_array((int) $state['switcher'], $governed, true)) $out['module'][] = (int) $state['switcher'];
         foreach ($out as $kind => $ids) { rsort($ids); $out[$kind] = $ids; }
         return $out;
     }

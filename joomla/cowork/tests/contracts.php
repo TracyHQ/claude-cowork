@@ -353,3 +353,19 @@ check('the Business profile reuses the switcher the archive ships',
 check('and that switcher is a row the profile never copies',$biz->isTranslated('module-425'),false);
 unset($biz,$bizMap,$bizLock,$bizRaw);
 
+
+// 🔒 TAKING BACK AN UNFINISHED LANGUAGE NEVER DELETES A GOVERNED MODULE. `orphansOf` lists the rows a
+// job left behind for deletion, and it listed the switcher unconditionally — measured 23/09/2026 on
+// `j-ee6vsk`: abandoning a vi-VN job deleted module-425, the Business archive's own switcher, and the
+// next inspect died "Bound entity disappeared: module-425". Only a switcher the job CREATED is its.
+$orphans=new ReflectionMethod(Engine::class,'orphansOf');
+$orphans->setAccessible(true);
+$bare=(new ReflectionClass(Engine::class))->newInstanceWithoutConstructor();
+$heldState=['keys'=>['hero'=>['kind'=>'module'],'vi-VN::hero'=>['kind'=>'module','locale'=>'vi-VN','base'=>'hero']],
+    'ids'=>['hero'=>425,'vi-VN::hero'=>4139],'switcher'=>425];
+check('a reused archive switcher is never an orphan',$orphans->invoke($bare,$heldState,'vi-VN'),['module'=>[4139]]);
+$heldState['switcher']=5000;
+check('a switcher the job created still goes with it',$orphans->invoke($bare,$heldState,'vi-VN'),['module'=>[5000,4139]]);
+// Ids are per table: an ARTICLE 5000 being governed says nothing about the module 5000 the job made.
+$heldState['keys']['post']=['kind'=>'article'];$heldState['ids']['post']=5000;
+check('a governed article does not shield a created switcher of the same id',$orphans->invoke($bare,$heldState,'vi-VN'),['module'=>[5000,4139]]);
