@@ -180,7 +180,25 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
                 $row['title'] = str_replace('(' . $srcSef . ')', '(' . $e['sef'] . ')', $row['title']);
                 $params = (string) $row['params'];
                 foreach ($e['menutypes'] as $from => $to) $params = str_replace('"' . $from . '"', '"' . $to . '"', $params);
-                $row['params'] = preg_replace_callback('~("catid":\[)([\d,"]*)(\])~', fn ($m) => $m[1] . preg_replace_callback('~\d+~', fn ($n) => $cat($n[0]), $m[2]) . $m[3], $params);
+                $params = preg_replace_callback('~("catid":\[)([\d,"]*)(\])~', fn ($m) => $m[1] . preg_replace_callback('~\d+~', fn ($n) => $cat($n[0]), $m[2]) . $m[3], $params);
+                // A JA block's config, a JSON string inside the JSON: its source category and its
+                // selected articles are the edition's.
+                $decoded = json_decode($params, true);
+                if (is_array($decoded) && is_string($decoded['jatools-config'] ?? null)) {
+                    $config = json_decode($decoded['jatools-config'], true);
+                    $walk = function (array $node) use (&$walk, $cat, $art): array {
+                        foreach ($node as $k => $v) {
+                            $to = str_ends_with((string) $k, '[source-category]') ? $cat : (str_ends_with((string) $k, '[selected]') ? $art : null);
+                            if ($to !== null) $node[$k] = is_array($v) ? array_map(fn ($i) => is_numeric($i) ? (int) $to($i) : $i, $v) : (is_numeric($v) ? (int) $to($v) : $v);
+                            elseif (is_array($v)) $node[$k] = $walk($v);
+                        }
+                        return $node;
+                    };
+                    $config = $walk($config);
+                    $decoded['jatools-config'] = json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                    $params = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                }
+                $row['params'] = $params;
             }
             $w->store[$kind][$eid] = $row;
             $governed[$kind] = ($governed[$kind] ?? 0) + 1;

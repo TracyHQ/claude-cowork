@@ -172,13 +172,35 @@ final class MultilingualProfile
     {
         $decoded = is_array($params) ? $params : json_decode((string) $params, true);
         if (!is_array($decoded)) return $params;
-        if (isset($decoded['aliasoptions']) && is_numeric($decoded['aliasoptions']))
-            $decoded['aliasoptions'] = $maps['menuItem'][(int) $decoded['aliasoptions']] ?? $decoded['aliasoptions'];
-        if (isset($decoded['menutype']) && is_string($decoded['menutype']))
-            $decoded['menutype'] = $menutypes[$decoded['menutype']] ?? $decoded['menutype'];
-        if (isset($decoded['catid']) && is_array($decoded['catid']))
-            $decoded['catid'] = array_map(static fn ($id) => is_numeric($id) ? ($maps['category'][(int) $id] ?? $id) : $id, $decoded['catid']);
+        $nested = isset($decoded['jatools-config']) && is_string($decoded['jatools-config']);
+        if ($nested) $decoded['jatools-config'] = json_decode($decoded['jatools-config'], true) ?? $decoded['jatools-config'];
+        $decoded = self::editionRefs($decoded, $maps, $menutypes);
+        if ($nested && is_array($decoded['jatools-config']))
+            $decoded['jatools-config'] = json_encode($decoded['jatools-config'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return is_array($params) ? $decoded : (string) json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Every id a parameter names, pointed at the edition. The kinds of reference are the ones the
+     * generator found in every edition of the release, by key: a menu item's `aliasoptions`, a
+     * module's `menutype`, `catid`, and a JA block's `…[source-category]` (categories) and
+     * `…[selected]` (articles).
+     */
+    private static function editionRefs(array $node, array $maps, array $menutypes): array
+    {
+        $map = static function ($value, array $table) {
+            if (is_array($value)) return array_map(static fn ($v) => is_numeric($v) ? ($table[(int) $v] ?? $v) : $v, $value);
+            return is_numeric($value) ? ($table[(int) $value] ?? $value) : $value;
+        };
+        foreach ($node as $key => $value) {
+            $key = (string) $key;
+            if ($key === 'aliasoptions') $node[$key] = $map($value, $maps['menuItem']);
+            elseif ($key === 'menutype' && is_string($value)) $node[$key] = $menutypes[$value] ?? $value;
+            elseif ($key === 'catid' || str_ends_with($key, '[source-category]')) $node[$key] = $map($value, $maps['category']);
+            elseif (str_ends_with($key, '[selected]')) $node[$key] = $map($value, $maps['article']);
+            elseif (is_array($value)) $node[$key] = self::editionRefs($value, $maps, $menutypes);
+        }
+        return $node;
     }
 
     /** A source link, pointed at the edition: its articles, categories and menu items, and its prefix. */
