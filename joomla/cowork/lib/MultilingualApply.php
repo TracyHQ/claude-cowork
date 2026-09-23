@@ -348,7 +348,10 @@ final class MultilingualApply
             // Same reason as every other copy: a `finish` that died after this write leaves the
             // module behind, and making a second one would put two switchers in the header.
             $id = $this->existingSwitcher() ?: ($this->write)('module', 0, $this->switcherFields());
-            ($this->write)('moduleAssignment', $id, ['menuids' => '[0]']);
+            // A switcher the archive ships is a governed module with its own locked assignment (Business:
+            // module-425); only a switcher this job created is placed on every page.
+            if (!in_array($id, array_map('intval', $state['ids']), true))
+                ($this->write)('moduleAssignment', $id, ['menuids' => '[0]']);
             $job['switcher'] = $id;
         }
         $filters = $this->writer->list('languageFilter', 0, 10);

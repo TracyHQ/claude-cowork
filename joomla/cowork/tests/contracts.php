@@ -210,6 +210,52 @@ checkTrue('structural writes stay open while the template is being built',
 foreach(array_keys($secondData) as $name)unlink($secondDir.'/'.$name.'.json');
 unlink($secondDir.'/assets/demo.css');rmdir($secondDir.'/assets');rmdir($secondDir);
 
+/* ------------------------------------------------ a switcher the archive already ships, reused */
+
+// 🔒 THE BUSINESS PROFILE REUSES THE ARCHIVE'S OWN SWITCHER (module-425, note `tb:pilot`), so the
+// topbar never carries two. That module is a governed base entity with its own title, assignment and
+// place in the inventory count — and inspect held it to the NEW-switcher shape instead: title
+// "Languages", assignment "all pages", one module more than the lock. Measured 23/09/2026 on
+// `j-ee6vsk`: the vi-VN language job died at its last step with "Presentation drift:
+// multilingual::switcher — title [want "Languages" got "[Tracy Business] Topbar - Language switcher"]".
+// A reused switcher is held to its own lock, which the base entity check has already enforced.
+$reuseDir=sys_get_temp_dir().'/cowork-reuse-'.bin2hex(random_bytes(6));
+mkdir($reuseDir);mkdir($reuseDir.'/assets');
+foreach(['manifest','content-map','presentation-lock'] as $name)copy($contractDir.'/'.$name.'.json',$reuseDir.'/'.$name.'.json');
+copy($contractDir.'/assets/demo.css',$reuseDir.'/assets/demo.css');
+$reuseLock=json_decode(file_get_contents($reuseDir.'/presentation-lock.json'),true);
+$reuseLock['fileRoots']=['assets'];$reuseLock['files']=['assets/demo.css'=>hash_file('sha256',$reuseDir.'/assets/demo.css')];
+file_put_contents($reuseDir.'/presentation-lock.json',json_encode($reuseLock));
+$reuseBase=hash('sha256',implode('',array_map(fn($n)=>$n.':'.hash_file('sha256',$reuseDir.'/'.$n)."\n",['manifest.json','content-map.json','presentation-lock.json'])));
+file_put_contents($reuseDir.'/multilingual-map.json',json_encode([
+    'schemaVersion'=>'tracy-quickstart-multilingual/v1','extensionVersion'=>'1.1.0','contract'=>'test/v1','baseHash'=>$reuseBase,
+    'sourceLanguage'=>'en-GB',
+    'derive'=>['module'=>['create'=>'row','carry'=>['position'],'translate'=>['content'],'note'=>'tracy-ml:{sourceKey}:{locale}','assignments'=>'map']],
+    'sourceDelta'=>['language'=>['from'=>'*','to'=>'en-GB','entities'=>[]]],
+    'policies'=>['hero'=>['kind'=>'module','policy'=>'shared','reason'=>'the switcher itself'],
+        'menu-20'=>['kind'=>'menuItem','policy'=>'shared','reason'=>'test'],'menu-21'=>['kind'=>'menuItem','policy'=>'shared','reason'=>'test']],
+    'switcher'=>['module'=>'mod_custom','position'=>'masthead','anchorEntity'=>'hero','language'=>'*','showtitle'=>'0','access'=>'1',
+        'published'=>'1','ordering'=>'1','assignment'=>'all','note'=>'','params'=>['moduleclass_sfx'=>'original']],
+    'languageFilter'=>['element'=>'languagefilter','folder'=>'system','enabled'=>1,'params'=>['item_associations'=>1]],
+    'unsupported'=>[],'aliasPolicy'=>'shared-with-source',
+]));
+$rw=new FakeSiteWriter();$rw->store=$cw->store;
+$rs=new TestContractStore();
+$reuse=new QuickstartContract($rw,$rs,$reuseDir,$reuseDir);
+$reuse->bind($reuse->inspect()['snapshot']);
+// The binding a completed language job leaves when it found the archive's switcher: the switcher IS
+// module 110, the governed `hero`.
+$rs->binding['multilingual']=['profileHash'=>$reuse->profile()->hash(),'profileVersion'=>'1.1.0','source'=>'en-GB','languages'=>[],'switcher'=>110];
+$reuseState=null;
+try { $reuseState=$reuse->inspect(); } catch (RuntimeException $error) { echo '  (', $error->getMessage(), ")\n"; }
+check('a reused archive switcher is held to its own lock, not the new-switcher shape',$reuseState['switcher']??null,110);
+// Still strict: the reused module drifting from its lock is refused, as any governed module is.
+$rw->store['module'][110]['title']='Somebody renamed it';
+contractRejects('a reused switcher that drifts is still refused',fn()=>$reuse->inspect());
+
+foreach(['manifest','content-map','presentation-lock','multilingual-map'] as $name)unlink($reuseDir.'/'.$name.'.json');
+unlink($reuseDir.'/assets/demo.css');rmdir($reuseDir.'/assets');rmdir($reuseDir);
+
 unlink($contractDir.'/'.$newCache);rmdir($contractDir.'/media/t4/optimize/css');rmdir($contractDir.'/media/t4/optimize');rmdir($contractDir.'/media/t4');rmdir($contractDir.'/media');
 foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
 unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);
@@ -306,3 +352,4 @@ check('the Business profile reuses the switcher the archive ships',
     ['tb:pilot','language-switcher','module-425']);
 check('and that switcher is a row the profile never copies',$biz->isTranslated('module-425'),false);
 unset($biz,$bizMap,$bizLock,$bizRaw);
+

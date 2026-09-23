@@ -407,11 +407,18 @@ final class QuickstartContract
         foreach($languages as $locale=>$state)
             foreach($state['ids'] as $baseKey=>$id)
                 $localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
+        // 🔒 A SWITCHER THE ARCHIVE ALREADY SHIPS IS A GOVERNED MODULE, NOT A NEW ONE. A profile may
+        // reuse it (Business: module-425, note `tb:pilot`) so the topbar never carries two; that row is
+        // then checked field by field, assigned and counted under its own base key, and holding it to
+        // the new-switcher shape too ("Languages", all pages, one module more) refused every Business
+        // site that gained a language — measured 23/09/2026 on `j-ee6vsk`.
+        $anchorKey=$this->multilingual ? $this->multilingual->switcherAnchor() : null;
+        $reusedSwitcher=$switcher!==null && $anchorKey!==null && isset($ids[$anchorKey]) && (int)$ids[$anchorKey]===(int)$switcher;
         $protected=[];
         foreach($keys as $key=>$meta) {
             $actual=$this->presentation($key,$rows[$key],$meta);
             if (!empty($meta['switcher'])) {
-                $expected=$this->multilingual->switcherPresentation();
+                $expected=$reusedSwitcher ? $actual : $this->multilingual->switcherPresentation();
             } elseif (isset($meta['locale'])) {
                 // Recomputed from the SOURCE as it stands now, never from what was stored when the
                 // copy was made: a copy that drifted is caught on the next read.
@@ -451,7 +458,7 @@ final class QuickstartContract
             $actual=$this->writer->read('moduleAssignment',$ids[$key]);
             $menus=json_decode($actual['menuids']??'[]',true,512,JSON_THROW_ON_ERROR);sort($menus);
             if (!empty($meta['switcher'])) {
-                $expected=[0];
+                $expected=$reusedSwitcher ? $assignments[$anchorKey] : [0];
             } elseif (isset($meta['locale'])) {
                 // The same pages as the source, named by the copies of those pages. A negative id
                 // is Joomla's "everywhere except this one" and keeps its sign through the map.
@@ -490,7 +497,7 @@ final class QuickstartContract
         $expectedCounts=$this->lock['inventoryCounts'];
         foreach($languages as $locale=>$state)
             foreach($state['ids'] as $baseKey=>$id)$expectedCounts[$this->baseEntities()[$baseKey]['kind']]++;
-        if($switcher !== null)$expectedCounts['module']++;
+        if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
         if($counts!=$expectedCounts)throw new RuntimeException('Quickstart inventory changed');
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
