@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>A hidden article no longer shows on the tag pages. Joomla keeps a second copy of an article's state in #__ucm_content, and com_tags lists items by that copy; the Table keeps the two in step, the raw visibility UPDATE used by the demo trim, retire and taking an edition back did not. Measured on a JA Kinetic site: 240 trimmed demo posts still listed under the tag pages, 205 links to 404. setVisibility now writes both. The JA Kinetic demo-trim map also hides the Tags menu item and its alias, which list only demo posts (a site trimmed with the previous map must be trimmed again). Carries 0.16.14.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.15</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.15</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.15/pkg_claudecowork-0.16.15.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>A language the quickstart ships an edition of now shows the customer's pictures and links there too: a taken edition row held the archive's picture, so `/vi/` kept the demo hero while `/en/` showed the one drawn for the customer. The source's picture goes into every image slot of a taken row, its links are pointed at the edition, and an article's `images` column is written with them. Carries 0.16.13.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
