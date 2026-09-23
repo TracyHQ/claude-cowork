@@ -1206,7 +1206,12 @@ final class Engine
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
-            if (!$apply || strpos($apply,'contract-')!==0 || !is_string($request) || !$request) throw new RuntimeException('contract- apply_id and request_id required');
+            // Two refusals, each naming the id it is about. One sentence for both read as "neither id
+            // arrived" to an agent that had sent both: it retried fourteen times with an apply_id that
+            // never carried the prefix, and wrote nothing (tch, 23/09/2026, j-1ibzqi: 1.1M tokens).
+            if (!$apply) throw new RuntimeException('apply_id required; it must start with "contract-"');
+            if (strpos($apply,'contract-')!==0) throw new RuntimeException('apply_id must start with "contract-", got "'.substr($apply,0,60).'"');
+            if (!is_string($request) || !$request) throw new RuntimeException('request_id required: any string, the same on a retry and new for a different change');
             $hash=hash('sha256',json_encode([$p['changes']??null,$p['evidence']??[]]));
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {

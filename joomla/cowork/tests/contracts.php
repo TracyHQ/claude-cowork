@@ -119,6 +119,16 @@ check('bootstrap binds before any customer write',$receiver->handle($bind)['boun
 check('bootstrap binding is idempotent',$receiver->handle($bind)['bound'],true);
 check('bootstrap immediately blocks generic writes',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'content_only');
 $first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
+// Each refusal names the one id that is wrong: a single sentence for both sent an agent that had
+// both round fourteen retries with an apply_id that never carried the prefix.
+$untouched=$receiverContract->inspect()['revision'];
+$unprefixed=$first;$unprefixed['params']['apply_id']='h1-home-toyota';$refused=$receiver->handle($unprefixed);
+check('an apply_id without the contract- prefix is refused by name',[$refused['ok'],$refused['error'],$refused['message']],[false,'contract_failed','apply_id must start with "contract-", got "h1-home-toyota"']);
+$unnamed=$first;unset($unnamed['params']['apply_id']);
+check('a missing apply_id is refused by name',$receiver->handle($unnamed)['message'],'apply_id required; it must start with "contract-"');
+$unrequested=$first;unset($unrequested['params']['request_id']);
+check('a missing request_id is refused on its own',$receiver->handle($unrequested)['message'],'request_id required: any string, the same on a retry and new for a different change');
+check('a refused apply writes nothing',$receiverContract->inspect()['revision'],$untouched);
 $firstResult=$receiver->handle($first);
 check('contract receiver commits content in place',$firstResult['ok'],true);
 check('inspect exposes current content separately from immutable demo samples',$receiverContract->inspect()['slots'][0]['current'],'First customer title');
