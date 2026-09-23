@@ -315,6 +315,17 @@ foreach ([
     contractRejects('a catalog with ' . $why . ' is refused', fn () => new LanguagePackCatalog($broken, 'en-GB'));
 }
 
+// 🔒 THE SHIPPED CATALOG IS THE ONE THE BUILD FORM OFFERS. TracyHQ/tch pins 52 packs
+// (`packages/cms/tracy-joomla-quickstart/language-packs.json`, re-measured 21/09/2026) and its Build form
+// offers every one; this file had stayed at three, so a customer who chose German was refused here with
+// "No verified language pack for de-DE" (j-8zjzs6, 23/09/2026) while the form had just offered it.
+$shipped = new LanguagePackCatalog(
+    json_decode((string) file_get_contents(__DIR__ . '/../lib/language-packs.json'), true),
+    'en-GB'
+);
+checkTrue('the shipped catalog covers the languages the Build form offers', count($shipped->locales(6)) > 50);
+check('German is one of them', $shipped->pack('de-DE', 6)['tag'], 'de-DE');
+
 /* ------------------------------------------------------- the door's own shape refusals */
 
 // The engine is wired for real in tests/run.php's contract fixture; here the point is the RULE,
