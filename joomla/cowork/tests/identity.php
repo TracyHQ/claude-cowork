@@ -26,7 +26,7 @@ $idSlots = [];
 foreach (ContentSlots::htmlSlots($idHero['content']) as $n => $s) $idSlots[] = ['key' => 'hero.' . $n, 'entity' => 'hero', 'column' => 'content', 'maxCharacters' => 80] + $s;
 foreach (['site-name' => ['text', 'Northgate Industrial'], 'phone' => ['text', ''], 'tiktok' => ['url', '']] as $field => [$type, $sample])
     $idSlots[] = ['key' => 'identity.' . $field, 'entity' => 'identity', 'column' => 'params', 'type' => $type, 'sample' => $sample,
-        'maxCharacters' => 255, 'jsonPath' => ['site-identity', $field], 'nestedJson' => 'jatools-config', 'identity' => true];
+        'maxCharacters' => 255, 'jsonPath' => ['site-identity', $field], 'nestedJson' => 'jatools-config', 'siteIdentity' => true];
 $idFiles = [
     'manifest' => ['id' => 'identity/v1'],
     'content-map' => ['entities' => [

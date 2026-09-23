@@ -542,7 +542,7 @@ final class QuickstartContract
         // Empty ACM fields control conditional markup; changing occupancy changes layout. The one
         // exception is the identity module: it renders nothing itself, and a fact the customer does
         // not have (a TikTok page, a legal name) must be emptied, or the demo's value is shown instead.
-        if(empty($slot['identity'])) {
+        if(empty($slot['siteIdentity'])) {
             if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
             if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
         }
