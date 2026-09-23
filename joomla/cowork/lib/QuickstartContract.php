@@ -289,7 +289,12 @@ final class QuickstartContract
     }
     private function generatedCache(string $path): bool {
         // T4 produces these from the separately hash-locked sources when a route is first viewed.
-        return (bool)preg_match('~^media/t4/optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)$~D',$path);
+        // `media/t4/css/<styleId>-sub.css` is the same kind of file: `Template::getCustomCssFilename()`
+        // compiles it the first time a style renders a page that is not its menu item's own target
+        // (`Layout::isSubpage()`). A capture only holds the ones its crawl happened to open — some
+        // Tracy locks list two or three, the JoomlArt ones none — so the first customer to open any
+        // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
+        return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
     private function files(): void {
         foreach($this->lock['files'] as $path=>$hash) {
