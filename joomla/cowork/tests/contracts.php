@@ -28,8 +28,11 @@ final class TestContractStore implements ContractStore {
 final class ContractTestWriter extends FakeSiteWriter {
     private FakeApplyLog $log; private TestContractStore $binding;
     public bool $drift=false;
+    /** [kind, id] whose next write throws, to stand in for a row Joomla refuses mid-batch. */
+    public ?array $failOn=null;
     public function __construct(FakeApplyLog $log,TestContractStore $binding){$this->log=$log;$this->binding=$binding;}
     public function write(string $kind,int $id,array $fields):int {
+        if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
         $fields=array_merge($this->read($kind,$id)??[],$fields);
         if($this->drift && $kind==='module')$fields['position']='wrong-position';
         return parent::write($kind,$id,$fields);
@@ -211,6 +214,7 @@ $bundledRoot=realpath(__DIR__.'/../lib/contracts');
 Door::reserveMemory();
 $entityRules=[];
 $bundled=[];
+$trimmed=[];
 foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     $id=basename(dirname($dir,2)).'/j6/'.basename($dir);
     $bundled[]=$id;
@@ -223,6 +227,18 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     checkTrue("$id lock carries an access snapshot",isset($lock['access']['entityRules'])&&is_array($lock['access']['entityRules']));
     $entityRules[$id]=count($lock['access']['entityRules']??[]);
     unset($lock);
+    if(is_file("$dir/demo-trim-map.json")) {
+        $raw=file_get_contents("$dir/demo-trim-map.json");
+        $loaded=null;
+        try{
+            new DemoTrimProfile(json_decode($raw,true,512,JSON_THROW_ON_ERROR),
+                json_decode(file_get_contents("$dir/content-map.json"),true,512,JSON_THROW_ON_ERROR),
+                json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR),$dir,$raw);
+            $loaded=true;
+        }catch(Throwable $e){$loaded=$e->getMessage();}
+        check("$id demo-trim map is one this receiver can load",$loaded,true);
+        $trimmed[]=$id;
+    }
     if(!is_file("$dir/multilingual-map.json"))continue;
     $raw=file_get_contents("$dir/multilingual-map.json");
     $loaded=null;
@@ -236,6 +252,9 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
 }
 foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
+// ja-kinetic's demo is 240 blog posts about a company that does not exist; without this file every
+// customer site built on it shows them, and nothing anywhere reports that.
+checkTrue('the package carries the ja-kinetic demo-trim map',in_array('ja-kinetic/j6/1.0.0',$trimmed,true));
 // 1.1.0 is the 43-language archive, and its lock was captured from THAT archive: an ACL chain for
 // every one of its 6,144 entities. The 1.0.0 lock's 322 refused bind on every Business site with
 // "Access-level or ACL definition changed: entityRules(categories.1000 …)" (measured 2026-09-21).
