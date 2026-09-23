@@ -2,11 +2,11 @@
   "schemaVersion": "tracy-quickstart-multilingual/v1",
   "extensionVersion": "1.1.0",
   "contract": "tracy-business/j6/1.2.0",
-  "baseHash": "f120ffa6a8a83693504a8ca215df4fac35bda8d40a70ae7424d03b64782e6b3c",
+  "baseHash": "d2f043d20deb6510aeb1f3867641d579801d499f60c67c72eb3efd3c747171b5",
   "baseFiles": {
-    "manifest.json": "dd3e28daa99156e90d1baff710881ca555bc133822caf07a48097b05dbf412b2",
+    "manifest.json": "8a027d2d0b67cfea1d3213e20d828380511d8d8ce396756ecf2f63619e4626d7",
     "content-map.json": "7f1a7f0b641907a999c847a8a387cb5e936c437d184572a4d59a479e79a9a4ce",
-    "presentation-lock.json": "c8657832e48ad0ca36d71e56f66a4adf7d138831cb017518c4ca303c80966f61"
+    "presentation-lock.json": "9bf6afbe55baca6c9499730397a9d6c42baa0cb595776b652a2e997bb382a355"
   },
   "sourceLanguage": "en-GB",
   "derive": {

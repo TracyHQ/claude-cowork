@@ -70,8 +70,8 @@
       },
       "database": {
         "file": "tracy-business-j6-database-1.2.0.sql.gz",
-        "bytes": 1186835,
-        "sha256": "f73523cd69d172c9cff19f7692bb2d1e729440a8deb498327a2ee36a0a95c85c",
+        "bytes": 1186842,
+        "sha256": "4132d1ad869244029555716a682aafbc94041c18a32ec2d137f95a971ac51c9c",
         "url": "https://github.com/JoomlArt-Products/ja-products/releases/download/tracy-business%2Fj6/tracy-business-j6-database-1.2.0.sql.gz"
       }
     }

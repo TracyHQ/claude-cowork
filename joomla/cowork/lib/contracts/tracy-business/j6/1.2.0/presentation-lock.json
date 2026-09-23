@@ -3400,7 +3400,7 @@
       "title": "[Tracy] Site identity",
       "note": "tracy:identity",
       "content": "",
-      "ordering": "0",
+      "ordering": "1",
       "position": "",
       "publish_up": null,
       "publish_down": null,
@@ -3408,7 +3408,7 @@
       "module": "mod_ja_acm",
       "access": "1",
       "showtitle": "0",
-      "params": "{\"jatools-config\": \"{\\\":type\\\": \\\"tracy_business:site-identity\\\", \\\"site-identity\\\": {\\\"site-name\\\": \\\"Northgate Industrial\\\", \\\"legal-name\\\": \\\"Northgate Industrial JSC\\\", \\\"slogan\\\": \\\"Industrial infrastructure\\\", \\\"monogram\\\": \\\"NG\\\", \\\"email\\\": \\\"sales@northgate-ind.ru\\\", \\\"phone\\\": \\\"8 800 550-67-90\\\", \\\"address\\\": \\\"Vorsino Industrial Park, plot 12, Kaluga Region\\\", \\\"hours\\\": \\\"Mon–Fri, 9:00–18:00 (MSK)\\\", \\\"facebook\\\": \\\"\\\", \\\"instagram\\\": \\\"\\\", \\\"linkedin\\\": \\\"\\\", \\\"tiktok\\\": \\\"\\\", \\\"youtube\\\": \\\"\\\", \\\"jatools-layout-site-identity\\\": \\\"style-1\\\"}}\", \"jatools-layout-site-identity\": \"style-1\", \"cache\": 0}",
+      "params": "{\"jatools-config\":\"{\\\":type\\\":\\\"tracy_business:site-identity\\\",\\\"site-identity\\\":{\\\"site-name\\\":\\\"Northgate Industrial\\\",\\\"legal-name\\\":\\\"Northgate Industrial JSC\\\",\\\"slogan\\\":\\\"Industrial infrastructure\\\",\\\"monogram\\\":\\\"NG\\\",\\\"email\\\":\\\"sales@northgate-ind.ru\\\",\\\"phone\\\":\\\"8 800 550-67-90\\\",\\\"address\\\":\\\"Vorsino Industrial Park, plot 12, Kaluga Region\\\",\\\"hours\\\":\\\"Mon–Fri, 9:00–18:00 (MSK)\\\",\\\"facebook\\\":\\\"\\\",\\\"instagram\\\":\\\"\\\",\\\"linkedin\\\":\\\"\\\",\\\"tiktok\\\":\\\"\\\",\\\"youtube\\\":\\\"\\\",\\\"jatools-layout-site-identity\\\":\\\"style-1\\\"}}\",\"jatools-layout-site-identity\":\"style-1\",\"cache\":0}",
       "client_id": "0",
       "language": "*"
     },
