@@ -44,8 +44,33 @@ final class ContractTestWriter extends FakeSiteWriter {
     /** Each table's columns and their defaults: kind => [column => default]. */
     public array $columns=[];
     public function __construct(FakeApplyLog $log,ContractStore $binding){$this->log=$log;$this->binding=$binding;}
+    /** @var array<string,array<int,string>> association context => member id => group key, as #__associations holds it */
+    public array $groups=[];
+    private const RELATIONS=['menuAssociation'=>'com_menus.item','articleAssociation'=>'com_content.item'];
+    public function read(string $kind,int $id):?array {
+        if(!$this->nestedPaths||!isset(self::RELATIONS[$kind]))return parent::read($kind,$id);
+        $key=$this->groups[$kind][$id]??null;$members=[];
+        if($key!==null)foreach($this->groups[$kind] as $mid=>$k)if($k===$key)$members[]=['id'=>$mid,'context'=>self::RELATIONS[$kind],'key'=>$k];
+        return ['members'=>json_encode($members)];
+    }
     public function write(string $kind,int $id,array $fields):int {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
+        // JoomlaRelations' rules: one group per item, and a new group never swallows part of another.
+        if($this->nestedPaths && isset(self::RELATIONS[$kind])){
+            $old=json_decode($this->read($kind,$id)['members'],true);
+            if(isset($fields['members']))$members=json_decode((string)$fields['members'],true);
+            else{
+                $ids=json_decode((string)$fields['ids'],true);sort($ids);$key=md5(json_encode($ids));
+                $langs=array_map(fn($m)=>(string)(parent::read($kind==='menuAssociation'?'menuItem':'article',$m)['language']??''),$ids);
+                if(in_array('*',$langs,true)||count(array_unique($langs))!==count($ids))throw new RuntimeException('association requires one item per specific language');
+                foreach($ids as $m)foreach(json_decode($this->read($kind,$m)['members'],true) as $e)
+                    if(!in_array((int)$e['id'],$ids,true))throw new RuntimeException('association already belongs to another group');
+                $members=array_map(fn($m)=>['id'=>$m,'key'=>$key],$ids);
+            }
+            foreach(array_merge([['id'=>$id]],$old,$members) as $e)unset($this->groups[$kind][(int)$e['id']]);
+            foreach($members as $e)$this->groups[$kind][(int)$e['id']]=$e['key'];
+            return $id;
+        }
         if($this->tableAssets && $kind==='article')$this->binding->acl['entityRules']['content.'.$id]='minted by Table::store';
         $fields=array_merge($this->read($kind,$id)??[],$fields);
         // The real writer's create defaults for a menu item (JoomlaSiteWriter::MAP['menuItem']['defaults']),

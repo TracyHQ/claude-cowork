@@ -152,10 +152,16 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
     foreach ($w->store['menuItem'] ?? [] as $row)
         if ((int) ($row['parent_id'] ?? 1) === 1 && (string) ($row['client_id'] ?? '0') === '0' && $row['title'] !== 'ancestor ' . $row['id']) $tops[] = $row;
     if (($lock['inventoryCounts']['menuItem'] ?? 0) - ($governed['menuItem'] ?? 0) >= 2 * count($tops))
-        foreach (['vi-VN', 'fr-FR'] as $edition) foreach ($tops as $row) {
-            $id = $next++;
-            $w->store['menuItem'][$id] = ['id' => (string) $id, 'language' => $edition, 'note' => 'archive edition', 'home' => '0'] + $row;
-            $governed['menuItem']++;
+        foreach ($tops as $row) {
+            // ...and each edition joined to its source in one association group, as Business ships it.
+            $group = [(int) $row['id']];
+            foreach (['vi-VN', 'fr-FR'] as $edition) {
+                $id = $next++;
+                $w->store['menuItem'][$id] = ['id' => (string) $id, 'language' => $edition, 'note' => 'archive edition', 'home' => '0'] + $row;
+                $governed['menuItem']++;
+                $group[] = $id;
+            }
+            if ((string) ($row['language'] ?? '*') !== '*') foreach ($group as $member) $w->groups['menuAssociation'][$member] = md5(json_encode($group));
         }
     foreach ($lock['inventoryCounts'] as $kind => $count) {
         for ($n = $governed[$kind] ?? 0; $n < $count; $n++) {
@@ -249,5 +255,8 @@ foreach ($gateContracts as $profileFile) {
     $back = array_filter($gw->store['menuItem'] ?? [], fn ($r) => ($r['note'] ?? '') === 'archive edition' && ($r['language'] ?? '') === 'vi-VN'
         && str_ends_with((string) $r['alias'], '-archive'));
     checkTrue("$id: the archive's own vi-VN edition was moved aside and is back after the revert", $moved === [] || ($aside > 0 && $back === []));
+    $archiveVi = array_keys(array_filter($gw->store['menuItem'] ?? [], fn ($r) => ($r['note'] ?? '') === 'archive edition' && ($r['language'] ?? '') === 'vi-VN'));
+    $grouped = array_filter($archiveVi, fn ($mid) => isset($gw->groups['menuAssociation'][$mid]));
+    checkTrue("$id: the archive's association groups are whole again after the revert", ($gw->groups['menuAssociation'] ?? []) === [] || count($grouped) > 0);
     unset($lock);
 }

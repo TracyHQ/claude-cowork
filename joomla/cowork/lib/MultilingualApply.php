@@ -352,9 +352,9 @@ final class MultilingualApply
     {
         $work = [];
         foreach (['menuItem' => 'menuAssociation', 'article' => 'articleAssociation'] as $kind => $relation)
-            foreach ($this->sources($state, $kind) as $key) $work[] = [$relation, $key];
+            foreach ($this->sources($state, $kind) as $key) $work[] = [$relation, $key, $kind];
         $slice = array_slice($work, $job['cursor'], self::CHUNK);
-        foreach ($slice as [$relation, $key]) {
+        foreach ($slice as [$relation, $key, $kind]) {
             // 🔒 THE WHOLE GROUP, NOT A PAIR. An association in Joomla is one set per entity across
             // every language, and `JoomlaRelations` refuses — rightly — to merge a pair into a
             // group that already exists. Sending [source, new] worked while there was one
@@ -364,8 +364,30 @@ final class MultilingualApply
             foreach ($state['keys'] as $other => $meta)
                 if (($meta['base'] ?? null) === $key && isset($state['ids'][$other])) $ids[] = (int) $state['ids'][$other];
             $ids[] = (int) $job['ids'][$key];
+            // The group the source already belongs to stays whole. An archive that ships its own
+            // editions ships them associated (Business: `home` with 42 others), and a group that
+            // left them out was refused as swallowing part of another — measured 23/09/2026 on
+            // j-ee6vsk. Only the archive's row in THIS language gives its place to the copy.
+            $group = json_decode((string) (($this->writer->read($relation, (int) $state['ids'][$key]) ?? [])['members'] ?? '[]'), true) ?: [];
+            $dropped = false;
+            foreach ($group as $member) {
+                $mid = (int) ($member['id'] ?? 0);
+                if ($mid < 1 || in_array($mid, $ids, true)) continue;
+                if ((string) (($this->writer->read($kind, $mid) ?? [])['language'] ?? '') === $locale) { $dropped = true; continue; }
+                $ids[] = $mid;
+            }
             $ids = array_values(array_unique($ids));
             sort($ids);
+            // Leaving a member out is refused by the `ids` form — rightly, it guards a customer's
+            // group — so the one case that must, names the whole group instead: the same form an
+            // undo writes, and the undo of THIS write still restores the group as it stood.
+            if ($dropped) {
+                $context = $relation === 'articleAssociation' ? 'com_content.item' : 'com_menus.item';
+                $groupKey = md5(json_encode($ids));
+                ($this->write)($relation, (int) $state['ids'][$key], ['members' => json_encode(array_map(
+                    static fn (int $member): array => ['id' => $member, 'context' => $context, 'key' => $groupKey], $ids))]);
+                continue;
+            }
             // 🔒 WRITE THE GROUP THROUGH THE SOURCE, NOT THROUGH THE NEW COPY. The undo log stores
             // what `read()` answered for the id being written, and a copy created moments ago
             // belongs to no group at all — so a write addressed to it recorded an EMPTY before, and

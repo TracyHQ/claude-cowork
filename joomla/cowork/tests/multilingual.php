@@ -414,6 +414,8 @@ foreach ([
         $relationWrites[] = [$kind, $id, $fields];
         return $id;
     },
+    // A site with no association groups yet: the source belongs to none.
+    'writer' => new FakeSiteWriter(),
 ] as $name => $value) {
     $applyRef->getProperty($name)->setValue($applyForRelations, $value);
 }
