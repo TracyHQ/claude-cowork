@@ -1227,6 +1227,12 @@ final class Engine
                 }
             }
             if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
+            // New source words under a half-made language leave its copies translated from text the
+            // site no longer holds, and the baseline cannot be re-saved mid-job anyway — so say which
+            // job and how to clear it (j-ee6vsk: a second Build's seed died on "Cannot replace a
+            // content-only baseline").
+            if (($job = $this->contract->job()) !== null)
+                return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . ': finish it, or take it back with multilingual.revert locale ' . $job['locale']);
             $plan=$this->contract->plan($p);
             if(count($plan['operations'])>300)throw new RuntimeException('Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);

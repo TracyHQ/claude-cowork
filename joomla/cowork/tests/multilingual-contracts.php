@@ -218,7 +218,11 @@ foreach ($gateContracts as $profileFile) {
         $a = $call($apply);
         // A new Build on the same site runs `style` (bind) again while a language is half made:
         // a site whose inspect is clean is already locked, not a baseline to replace (j-ee6vsk).
-        if ($i === 2 && ($a['status'] ?? '') === 'running' && !$step('bind again with vi-VN in flight', $call(['operation' => 'bind']))) continue 2;
+        if ($i === 2 && ($a['status'] ?? '') === 'running') {
+            if (!$step('bind again with vi-VN in flight', $call(['operation' => 'bind']))) continue 2;
+            $mid = $call(['operation' => 'apply', 'apply_id' => 'contract-gate-mid', 'request_id' => 'mid', 'changes' => [['key' => 'x', 'value' => 'y']]]);
+            check("$id: a content apply under a half-made language names the job", preg_match('/in flight for vi-VN.*multilingual\.revert/', (string) ($mid['message'] ?? '')), 1);
+        }
     }
     if (!$step('derive vi-VN', $a)) continue;
     check("$id: vi-VN completes", $a['status'] ?? null, 'completed');
