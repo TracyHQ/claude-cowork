@@ -38,10 +38,6 @@
       "reason": "page: menuItem-226 opens it"
     },
     {
-      "key": "article-75",
-      "reason": "page: menuItem-230 opens it"
-    },
-    {
       "key": "article-88",
       "reason": "page: menuItem-269 opens it"
     },
@@ -60,6 +56,14 @@
       "reason": "lists articles (view=category, layout=blog); every one it lists is hidden"
     },
     {
+      "key": "menuItem-230",
+      "kind": "menuItem",
+      "field": "published",
+      "from": "1",
+      "to": "0",
+      "reason": "opens article-75, a post of the hidden blog (category 22)"
+    },
+    {
       "key": "menuItem-231",
       "kind": "menuItem",
       "field": "published",
@@ -74,6 +78,14 @@
       "from": "1",
       "to": "0",
       "reason": "alias of menuItem-221, which is hidden"
+    },
+    {
+      "key": "menuItem-243",
+      "kind": "menuItem",
+      "field": "published",
+      "from": "1",
+      "to": "0",
+      "reason": "alias of menuItem-230, which is hidden"
     },
     {
       "key": "menuItem-245",
@@ -122,6 +134,14 @@
       "from": "1",
       "to": "0",
       "reason": "lists articles (view=author, layout=author); every one it lists is hidden"
+    },
+    {
+      "key": "article-75",
+      "kind": "article",
+      "field": "state",
+      "from": "1",
+      "to": "0",
+      "reason": "demo content: no menu item opens it as a page"
     },
     {
       "key": "article-76",
@@ -2045,7 +2065,7 @@
     }
   ],
   "counts": {
-    "menuItem": 9,
-    "article": 240
+    "menuItem": 11,
+    "article": 241
   }
 }
