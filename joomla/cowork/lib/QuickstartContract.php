@@ -73,11 +73,12 @@ final class QuickstartContract
         if (is_file($catalogFile))
             $this->packs = new LanguagePackCatalog(
                 json_decode(file_get_contents($catalogFile), true, 512, JSON_THROW_ON_ERROR),
-                $this->multilingual ? $this->multilingual->sourceLanguage() : 'en-GB'
+                $this->multilingual ? $this->multilingual->publishedSourceLanguage() : self::DEFAULT_SOURCE
             );
         // The demo-trim extension is optional in the same way, and for the same reason: a contract
         // published before it keeps working, and a receiver carrying the code claims nothing for a
         // contract that ships no list of what its demo is.
+        $this->syncSourceRelabel();
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
@@ -520,6 +521,7 @@ final class QuickstartContract
         // longer knows the demo was hidden — and the one after that would call it drift.
         if(isset($binding['demoTrim']))$snapshot['demoTrim']=$binding['demoTrim'];
         if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
+        if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $slots=[];
@@ -706,7 +708,7 @@ final class QuickstartContract
             // left the site failing its own inspect — every later call refused.
             foreach($binding['presentation'] as $key=>$fields)
                 if(($fields['language']??null)===$profile->sourceLanguage() && $profile->isTranslated($key))
-                    $binding['presentation'][$key]['language']=(string)($this->lock['entities'][$key]['language']??'*');
+                    $binding['presentation'][$key]['language']=$this->lockedLanguage($key);
             unset($binding['multilingual']);
         }
         return $binding;
@@ -777,7 +779,49 @@ final class QuickstartContract
         return array_keys($this->store->load()['multilingual']['languages'] ?? []);
     }
 
-    public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); }
+    public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); $this->syncSourceRelabel(); }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
-    public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); }
+    public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->syncSourceRelabel(); }
+
+    /* ------------------------------------------------------------ source relabel */
+
+    /** The tag the archive's source edition was published under. */
+    public function publishedSourceLanguage(): string {
+        return $this->multilingual ? $this->multilingual->publishedSourceLanguage() : self::DEFAULT_SOURCE;
+    }
+    /** The tag the site's source edition carries now: the published one, or what `sourceLanguage.set` renamed it to. */
+    public function sourceLanguage(): string {
+        return $this->sourceRelabel['to'] ?? $this->publishedSourceLanguage();
+    }
+    private const DEFAULT_SOURCE = 'en-GB';
+    private ?array $sourceRelabel = null;
+    private function syncSourceRelabel(): void {
+        if ($this->unavailable !== null) return;
+        $record = $this->store->load()['sourceRelabel'] ?? null;
+        $this->sourceRelabel = is_array($record) ? $record : null;
+        if ($this->multilingual) $this->multilingual->relabelSource($this->sourceRelabel['to'] ?? null);
+    }
+
+    /**
+     * The baseline with the source edition called `$record['to']` — or back to its published tag,
+     * when $record is null. Every recorded row that carried the old tag carries the new one; nothing
+     * else moves, because a relabel moves nothing else.
+     */
+    public function bindingWithSourceRelabel(?array $record): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('A source relabel needs a bound site');
+        $from=$this->sourceLanguage();
+        $to=$record['to'] ?? $this->publishedSourceLanguage();
+        // `home` too: a template style set per language names its language there.
+        foreach($binding['presentation'] as $key=>$fields)foreach(['language','home'] as $field)
+            if(($fields[$field]??null)===$from)$binding['presentation'][$key][$field]=$to;
+        if(isset($binding['multilingual']['source']))$binding['multilingual']['source']=$to;
+        if($record===null)unset($binding['sourceRelabel']);else $binding['sourceRelabel']=$record;
+        return $binding;
+    }
+    /** A locked row's language as this site names it: the published source tag reads as the relabelled one. */
+    private function lockedLanguage(string $key): string {
+        $language=(string)($this->lock['entities'][$key]['language']??'*');
+        return $language===$this->publishedSourceLanguage() ? $this->sourceLanguage() : $language;
+    }
 }

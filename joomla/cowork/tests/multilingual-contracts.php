@@ -266,7 +266,7 @@ foreach ($gateContracts as $profileFile) {
     $gl = new FakeApplyLog();
     $gw = gateSite($dir, $gs, $gl);
     $ext = new FakeExtensions();
-    $ext->installed = [['type' => 'language', 'element' => 'vi-VN'], ['type' => 'language', 'element' => 'fr-FR']];
+    $ext->installed = [['type' => 'language', 'element' => 'vi-VN'], ['type' => 'language', 'element' => 'fr-FR'], ['type' => 'language', 'element' => 'en-US']];
     $gc = new QuickstartContract($gw, $gs, $dir, $dir);
     $ge = new Engine($WTOKEN, ['joomla' => '6.1.1'], null, null, null, $ext, $gw, null, $gl, null, null, null, $gc);
     $call = fn (array $params) => $ge->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
@@ -278,8 +278,13 @@ foreach ($gateContracts as $profileFile) {
 
     if (!$step('bind', $call(['operation' => 'bind']))) continue;
 
+    // The customer writes American English: the source edition is CALLED en-US before anything else
+    // happens, and every step after it must hold with the source under its new tag.
+    if (!$step('relabel the source en-US', $call(['operation' => 'sourceLanguage.set', 'locale' => 'en-US', 'apply_id' => 'srclang-gate', 'request_id' => 'gate-src']))) continue;
+    check("$id: no row keeps the published source tag", array_sum(array_map(fn ($k) => count(array_filter($gw->store[$k] ?? [], fn ($r) => ($r['language'] ?? '') === 'en-GB')), ['article', 'menuItem', 'module', 'category'])), 0);
+
     // Hide what the customer did not ask for, until the receiver says it is done.
-    $retire = ['operation' => 'multilingual.retire', 'keep' => ['en-GB', 'vi-VN'], 'apply_id' => 'mlang-gate-retire'];
+    $retire = ['operation' => 'multilingual.retire', 'keep' => ['en-US', 'vi-VN'], 'apply_id' => 'mlang-gate-retire'];
     for ($i = 0, $r = ['ok' => true, 'status' => 'running']; $i < 20 && ($r['status'] ?? '') === 'running'; $i++) $r = $call($retire);
     if (!$step('retire', $r)) continue;
     check("$id: retire hides the other editions", count(array_filter($gw->store['article'] ?? [], fn ($a) => ($a['language'] ?? '') === 'de-DE' && (string) ($a['state'] ?? '') === '1')), 0);
@@ -401,5 +406,7 @@ foreach ($gateContracts as $profileFile) {
     $archiveVi = array_keys(array_filter($gw->store['menuItem'] ?? [], fn ($r) => ($r['note'] ?? '') === 'archive edition' && ($r['language'] ?? '') === 'vi-VN'));
     $grouped = array_filter($archiveVi, fn ($mid) => isset($gw->groups['menuAssociation'][$mid]));
     checkTrue("$id: the archive's association groups are whole again after the revert", ($gw->groups['menuAssociation'] ?? []) === [] || count($grouped) > 0);
+    if (!$step('give the source its published tag back', $call(['operation' => 'sourceLanguage.revert', 'apply_id' => 'srclang-gate-undo', 'request_id' => 'gate-src-undo']))) continue;
+    check("$id: no row keeps the relabelled tag", array_sum(array_map(fn ($k) => count(array_filter($gw->store[$k] ?? [], fn ($r) => ($r['language'] ?? '') === 'en-US')), ['article', 'menuItem', 'module', 'category'])), 0);
     unset($lock);
 }

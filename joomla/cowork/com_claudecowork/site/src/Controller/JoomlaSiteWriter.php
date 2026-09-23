@@ -363,6 +363,73 @@ final class JoomlaSiteWriter implements \SiteWriter
         }
     }
 
+    public function relabelLanguage(string $from, string $to, ?array $label = null): array
+    {
+        foreach ([$from, $to] as $tag)
+            if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag)) throw new \RuntimeException('Not a Joomla language tag: ' . $tag);
+        $db = $this->db;
+        $row = fn (string $tag) => $db->setQuery($db->getQuery(true)->select('*')->from($db->quoteName('#__languages'))
+            ->where($db->quoteName('lang_code') . ' = ' . $db->quote($tag)))->loadAssoc() ?: null;
+        $source = $row($from);
+        if ($source === null) throw new \RuntimeException('This site has no ' . $from . ' content language to relabel');
+        $removed = $row($to);
+        $set = fn (string $table, string $column, array $where = []) => $db->setQuery(
+            'UPDATE ' . $db->quoteName($table) . ' SET ' . $db->quoteName($column) . ' = ' . $db->quote($to)
+            . ' WHERE ' . $db->quoteName($column) . ' = ' . $db->quote($from)
+            . implode('', array_map(fn ($w) => ' AND ' . $w, $where))
+        )->execute();
+        if ($removed !== null) {
+            // Only an EMPTY row is ours to remove: one that content already names is a language
+            // this site publishes, and folding the source into it would merge two editions.
+            foreach (['#__content', '#__menu', '#__modules', '#__categories'] as $table)
+                if ((int) $db->setQuery('SELECT COUNT(*) FROM ' . $db->quoteName($table) . ' WHERE ' . $db->quoteName('language') . ' = ' . $db->quote($to))->loadResult() > 0)
+                    throw new \RuntimeException('This site already publishes content in ' . $to . '; it cannot also be the name of its ' . $from . ' edition');
+            $db->setQuery('DELETE FROM ' . $db->quoteName('#__languages') . ' WHERE ' . $db->quoteName('lang_id') . ' = ' . (int) $removed['lang_id'])->execute();
+        }
+        $label ??= $removed !== null
+            ? ['title' => (string) $removed['title'], 'title_native' => (string) $removed['title_native'], 'image' => (string) $removed['image']]
+            : $this->languageLabel($to);
+        foreach (['#__content', '#__categories', '#__tags', '#__fields', '#__contact_details', '#__newsfeeds', '#__banners'] as $table)
+            $set($table, 'language');
+        $set('#__modules', 'language', [$db->quoteName('client_id') . ' = 0']);
+        $set('#__menu', 'language', [$db->quoteName('client_id') . ' = 0']);
+        $set('#__template_styles', 'home', [$db->quoteName('client_id') . ' = 0']);
+        $set('#__ucm_content', 'core_language');
+        $db->setQuery('UPDATE ' . $db->quoteName('#__languages')
+            . ' SET ' . $db->quoteName('lang_code') . ' = ' . $db->quote($to)
+            . ', ' . $db->quoteName('title') . ' = ' . $db->quote((string) $label['title'])
+            . ', ' . $db->quoteName('title_native') . ' = ' . $db->quote((string) $label['title_native'])
+            . ', ' . $db->quoteName('image') . ' = ' . $db->quote((string) $label['image'])
+            . ' WHERE ' . $db->quoteName('lang_id') . ' = ' . (int) $source['lang_id'])->execute();
+        // The Language Filter names the x-default edition by tag; left at the old one it would point
+        // search engines at a language this site no longer has.
+        $filter = $db->getQuery(true)->select([$db->quoteName('extension_id'), $db->quoteName('params')])->from($db->quoteName('#__extensions'))
+            ->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
+            ->where($db->quoteName('folder') . ' = ' . $db->quote('system'))
+            ->where($db->quoteName('element') . ' = ' . $db->quote('languagefilter'));
+        $plugin = $db->setQuery($filter)->loadAssoc();
+        $params = $plugin ? (json_decode((string) $plugin['params'], true) ?: []) : [];
+        if ($plugin && ($params['xdefault_language'] ?? null) === $from) {
+            $params['xdefault_language'] = $to;
+            $db->setQuery('UPDATE ' . $db->quoteName('#__extensions') . ' SET ' . $db->quoteName('params') . ' = '
+                . $db->quote(json_encode($params, JSON_UNESCAPED_SLASHES)) . ' WHERE ' . $db->quoteName('extension_id') . ' = ' . (int) $plugin['extension_id'])->execute();
+        }
+        return [
+            'previous' => ['title' => (string) $source['title'], 'title_native' => (string) $source['title_native'], 'image' => (string) $source['image']],
+            'removed' => $removed,
+        ];
+    }
+
+    /** A content language's label from its installed pack, the way Joomla's installer names one. */
+    private function languageLabel(string $tag): array
+    {
+        $file = JPATH_SITE . '/language/' . $tag . '/langmetadata.xml';
+        $xml = is_file($file) ? @simplexml_load_file($file) : false;
+        $name = $xml !== false && isset($xml->name) ? (string) $xml->name : $tag;
+        $native = $xml !== false && isset($xml->metadata->nativeName) ? (string) $xml->metadata->nativeName : $name;
+        return ['title' => $name, 'title_native' => $native, 'image' => strtolower(str_replace('-', '_', $tag))];
+    }
+
     public function realiasMenuItem(int $id, string $alias): void
     {
         $row = $id > 0 ? $this->read('menuItem', $id) : null;

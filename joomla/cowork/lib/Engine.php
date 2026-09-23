@@ -1210,6 +1210,7 @@ final class Engine
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (strpos((string)($p['operation'] ?? ''), 'demoTrim.') === 0) return $this->demoTrim($p);
             if (strpos((string)($p['operation'] ?? ''), 'siteLanguage.') === 0) return $this->siteLanguage($p);
+            if (strpos((string)($p['operation'] ?? ''), 'sourceLanguage.') === 0) return $this->sourceLanguage($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -1482,6 +1483,109 @@ final class Engine
         } catch (Throwable $error) {
             return $this->err('contract_failed', $error->getMessage());
         }
+    }
+
+    /**
+     * `content.contract` sourceLanguage.plan | set | revert — call the source edition by another tag
+     * of the SAME language: en-GB → en-US, en-AU, en-CA, en-NZ.
+     *
+     * 🔒 A RELABEL, NOT A COPY. Tracy Business is written in en-GB and ships no en-US edition; a
+     * customer who wants "English (United States)" wants THAT text under the US tag. A copy would
+     * duplicate every row and lose the main menu (the template reads `tb-main-<sef>`, and a copy's
+     * menus are not the archive's) — measured on `j-ee6vsk`, 23/09/2026. So the tag changes and the
+     * `sef` does not: `/en/…`, `tb-main-en` and the megamenu keep working untouched, and `<html lang>`
+     * and hreflang say en-US. Another LANGUAGE is not a relabel; that is multilingual.* or siteLanguage.*.
+     */
+    private function sourceLanguage(array $p): array
+    {
+        if (!$this->contract->siteLanguageAvailable())
+            return $this->err('unsupported', 'This receiver carries no language-pack catalog for this site');
+        $operation = substr((string) $p['operation'], strlen('sourceLanguage.'));
+        foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
+            if (isset($p[$mine]))
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+        $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
+        if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
+        $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        try {
+            $published = $this->contract->publishedSourceLanguage();
+            $current = $this->contract->sourceLanguage();
+            $sameLanguage = fn (string $tag) => preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag) && explode('-', $tag)[0] === explode('-', $published)[0];
+            if ($operation === 'plan') {
+                if ($locale !== '' && !$sameLanguage($locale))
+                    return $this->err('bad_params', $locale . ' is not a variant of ' . $published . '; another language is added with multilingual.* or set with siteLanguage.*');
+                $pack = $locale === '' || $locale === $published ? null : $this->contract->languagePackage($locale, $major);
+                return $this->ok([
+                    'published' => $published, 'current' => $current, 'locale' => $locale ?: null,
+                    'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
+                    'installed' => $pack === null || $this->languagePackPresent($locale),
+                    'onRecord' => $this->contract->binding()['sourceRelabel'] ?? null,
+                ]);
+            }
+            if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown sourceLanguage operation');
+            $apply = $this->applyId($p);
+            $request = $p['request_id'] ?? '';
+            if (!$apply || strpos($apply, 'srclang-') !== 0) return $this->err('bad_params', 'apply_id must start with "srclang-"');
+            if (!is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+                return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+            if (($job = $this->contract->job()) !== null)
+                return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . '; finish or revert it before relabelling the source');
+            $binding = $this->contract->binding();
+            $onRecord = $binding['sourceRelabel'] ?? null;
+            if ($operation === 'revert') {
+                if ($onRecord === null) return $this->err('contract_failed', 'This site’s source edition still carries its published tag; there is nothing to take back');
+                $this->relabelSource($apply, (string) $onRecord['to'], $published, null, $onRecord);
+                return $this->ok(['status' => 'reverted', 'source' => $published]);
+            }
+            if (!$sameLanguage($locale))
+                return $this->err('bad_params', ($locale ?: 'That') . ' is not a variant of ' . $published . '; another language is added with multilingual.* or set with siteLanguage.*');
+            if ($locale === $current) return $this->ok(['status' => 'completed', 'source' => $locale, 'alreadySet' => true]);
+            if ($onRecord !== null)
+                return $this->err('conflict', 'This site’s source edition is already called ' . $current . '; take that back with sourceLanguage.revert before choosing another');
+            if (in_array($locale, $this->contract->derivedLanguages(), true))
+                return $this->err('conflict', 'This site already has a ' . $locale . ' edition; the source cannot take its name');
+            $pack = $this->contract->languagePackage($locale, $major);
+            if ($pack !== null && !$this->languagePackPresent($locale)) {
+                if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+                $result = $this->extensions->installVerifiedFromUrl($pack['url'], $pack['sha256'], (int) $pack['bytes']);
+                if (($result['ok'] ?? false) !== true) return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+                if (!$this->languagePackPresent($locale)) return $this->err('install_failed', 'The ' . $locale . ' pack installed but Joomla does not list it');
+                $this->stamped('extension');
+            }
+            // A site relabelled for the first time here is bound as it stands, before anything moves.
+            if ($binding === null) $this->writer->transaction(function () {
+                $this->contract->bind($this->contract->inspect()['snapshot']);
+                return [];
+            });
+            $this->relabelSource($apply, $current, $locale, [
+                'from' => $current, 'to' => $locale, 'applyId' => $apply, 'requestId' => $request,
+                'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
+            ], null);
+            return $this->ok(['status' => 'completed', 'source' => $locale, 'packVersion' => $pack['version'] ?? null]);
+        } catch (Throwable $error) {
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+    /** One relabel, logged, recorded and proven in a single transaction; $record null takes it back. */
+    private function relabelSource(string $apply, string $from, string $to, ?array $record, ?array $undoing): void
+    {
+        $this->writer->transaction(function () use ($apply, $from, $to, $record, $undoing) {
+            $defaults = $this->writer->readLanguageDefaults();
+            $moved = $this->writer->relabelLanguage($from, $to, $undoing['label'] ?? null);
+            if ($record !== null) $record['label'] = $moved['previous'];
+            $this->writer->writeLanguageDefaults(
+                $defaults['site'] === $from ? $to : $defaults['site'],
+                $defaults['administrator'] === $from ? $to : $defaults['administrator']
+            );
+            $this->log->record($apply, ['op' => 'relabel', 'from' => $from, 'to' => $to, 'label' => $moved['previous'], 'defaults' => $defaults]);
+            $this->contract->rebind($this->contract->bindingWithSourceRelabel($record));
+            // Proven, then stored — the same two steps every other sealed write ends with.
+            $this->contract->rebind($this->contract->inspect()['snapshot']);
+            return [];
+        });
+        try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+        $this->stamped('content');
     }
 
     /**
@@ -2265,6 +2369,12 @@ final class Engine
         if ($op === 'batch' || $op === 'contract') { return; }
         if ($op === 'alias') {
             $this->writer->realiasMenuItem((int) ($entry['id'] ?? 0), (string) ($entry['before'] ?? ''));
+            return;
+        }
+        if ($op === 'relabel') {
+            $this->writer->relabelLanguage((string) $entry['to'], (string) $entry['from'], $entry['label'] ?? null);
+            $defaults = $entry['defaults'] ?? null;
+            if (is_array($defaults)) $this->writer->writeLanguageDefaults((string) $defaults['site'], (string) $defaults['administrator']);
             return;
         }
         if ($op === 'visibility') {
