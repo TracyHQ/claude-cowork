@@ -332,6 +332,21 @@ final class JoomlaSiteWriter implements \SiteWriter
         return $row === null ? null : $row;
     }
 
+    /** The only column per kind setVisibility() may touch. */
+    private const VISIBILITY = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
+
+    public function setVisibility(string $kind, int $id, string $column, string $value): void
+    {
+        if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
+        if ($id <= 0 || !$this->read($kind, $id)) throw new \RuntimeException('target does not exist in this scope');
+        // One raw UPDATE of one column. Deliberately not the Table: see SiteWriter::setVisibility().
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName($this->tableFor($kind)))
+            ->set($this->db->quoteName($column) . ' = ' . (int) $value)
+            ->where($this->db->quoteName($this->pkFor($kind)) . ' = ' . (int) $id);
+        $this->db->setQuery($query)->execute();
+    }
+
     public function write(string $kind, int $id, array $fields): int
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->write($kind, $id, $fields);

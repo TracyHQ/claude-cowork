@@ -1345,8 +1345,12 @@ final class Engine
                 $pending = $this->demoTrimPending($state, $hide);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
                 foreach ($batch as $key => [$kind, $field, $value]) {
-                    $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => (int) $state['ids'][$key], 'fields' => [$field => $value]]);
-                    if (empty($answer['ok'])) throw new RuntimeException($key . ': ' . ($answer['message'] ?? json_encode($answer['error'] ?? null)));
+                    // One column, raw — never write(): Joomla's Table would mint `#__assets` rows
+                    // for demo posts that ship without them, and move the ACL the contract holds.
+                    $id = (int) $state['ids'][$key];
+                    $before = (string) ($state['rows'][$key][$field] ?? '');
+                    $this->writer->setVisibility($kind, $id, $field, $value);
+                    $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $field, 'before' => $before]);
                 }
                 $remaining = count($pending) - count($batch);
                 if ($remaining === 0)

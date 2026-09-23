@@ -58,6 +58,19 @@ interface SiteWriter
     public function trashColumn(string $kind): ?string;
 
     /**
+     * Set one visibility column of an existing row, and nothing else.
+     *
+     * Not write(): for an article or a module that goes through Joomla's Table, whose store() also
+     * writes the row's `#__assets` entry, stamps `modified`, and takes table locks that commit
+     * implicitly. A quickstart hiding its own demo must change what Joomla serves, not who may edit
+     * it — measured 23/09/2026 on `j-1pd0de`: six demo posts shipped without assets, and a trim
+     * through write() minted them at the root and moved their effective ACL.
+     *
+     * @param string $kind   article (`state`), menuItem (`published`) or module (`published`).
+     */
+    public function setVisibility(string $kind, int $id, string $column, string $value): void;
+
+    /**
      * The current fields of one target, or null when nothing with that id exists.
      *
      * This is the before-state the engine records: precise enough that restoring it returns the

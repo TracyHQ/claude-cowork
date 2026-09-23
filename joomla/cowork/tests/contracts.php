@@ -30,12 +30,24 @@ final class ContractTestWriter extends FakeSiteWriter {
     public bool $drift=false;
     /** [kind, id] whose next write throws, to stand in for a row Joomla refuses mid-batch. */
     public ?array $failOn=null;
+    /**
+     * Joomla's Table::store() on an article writes its `#__assets` row as a side effect —
+     * creating one, parented at the root, for a row that had none. Measured 23/09/2026 on
+     * `j-1pd0de` (ja-kinetic): the demo posts ship without assets, and one trim through write()
+     * minted six, which moved their effective ACL. On, this double does the same to the ACL.
+     */
+    public bool $tableAssets=false;
     public function __construct(FakeApplyLog $log,TestContractStore $binding){$this->log=$log;$this->binding=$binding;}
     public function write(string $kind,int $id,array $fields):int {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
+        if($this->tableAssets && $kind==='article')$this->binding->acl['entityRules']['content.'.$id]='minted by Table::store';
         $fields=array_merge($this->read($kind,$id)??[],$fields);
         if($this->drift && $kind==='module')$fields['position']='wrong-position';
         return parent::write($kind,$id,$fields);
+    }
+    public function setVisibility(string $kind,int $id,string $column,string $value):void {
+        if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
+        parent::setVisibility($kind,$id,$column,$value);
     }
     public function transaction(callable $work):array {
         $before=[$this->store,$this->log->log,$this->binding->binding,$this->binding->job];

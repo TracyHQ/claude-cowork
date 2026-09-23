@@ -863,6 +863,11 @@ class FakeSiteWriter implements SiteWriter
     {
         return $this->store[$kind][$id] ?? null;
     }
+    public function setVisibility(string $kind, int $id, string $column, string $value): void
+    {
+        if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
+        $this->store[$kind][$id][$column] = $value;
+    }
     public function write(string $kind, int $id, array $fields): int
     {
         if ($id === 0) {

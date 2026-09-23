@@ -16,13 +16,13 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>A sealed quickstart can hide its own demo content. A contract that ships a reviewed `demo-trim-map.json` lets the new `demoTrim.apply` operation unpublish the demo rows it lists (on JA Kinetic: 240 blog posts and the 7 menu items that list them), and the contract then holds the site to that hidden state: an ordinary content edit keeps them hidden, and a row that reappears is drift. `demoTrim.revert` brings every one of them back. Pages a menu item opens directly are never listed, a translated site is refused rather than half-trimmed, and a request cannot name rows of its own.</description>
+        <description>Hiding a quickstart's demo no longer changes who may edit it. 0.16.8 unpublished demo rows through Joomla's Table, whose store() also writes the row's `#__assets` entry: JA Kinetic ships its 230 demo posts without assets, so the trim minted them at the root, the contract refused the moved ACL, and — because Table takes locks that commit implicitly — the site kept both the half-trim and the new assets, and refused every read after it. The trim now sets the one visibility column with a single UPDATE, in both directions. Measured on a local JA Kinetic 1.0.0 site: 247 rows hidden in one call (16 s), inspect clean, no asset created, a content edit afterwards keeps the demo hidden, and revert brings all 247 back.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
-        <version>0.16.8</version>
-        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.8</infourl>
+        <version>0.16.9</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.9</infourl>
         <downloads>
-            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.8/pkg_claudecowork-0.16.8.zip</downloadurl>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.9/pkg_claudecowork-0.16.9.zip</downloadurl>
         </downloads>
         <tags>
             <tag>stable</tag>
