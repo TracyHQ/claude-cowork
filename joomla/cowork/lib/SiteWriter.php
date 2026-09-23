@@ -71,6 +71,19 @@ interface SiteWriter
     public function setVisibility(string $kind, int $id, string $column, string $value): void;
 
     /**
+     * The site's default languages, as Joomla keeps them in com_languages' params.
+     *
+     * @return array{site:string,administrator:string}
+     */
+    public function readLanguageDefaults(): array;
+
+    /**
+     * Set the site's default languages and nothing else in those params. A narrow door on purpose:
+     * the generic extensionParams kind is refused on a bound site, and must stay refused.
+     */
+    public function writeLanguageDefaults(string $site, string $administrator): void;
+
+    /**
      * The current fields of one target, or null when nothing with that id exists.
      *
      * This is the before-state the engine records: precise enough that restoring it returns the

@@ -1205,6 +1205,7 @@ final class Engine
             }
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (strpos((string)($p['operation'] ?? ''), 'demoTrim.') === 0) return $this->demoTrim($p);
+            if (strpos((string)($p['operation'] ?? ''), 'siteLanguage.') === 0) return $this->siteLanguage($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -1370,6 +1371,101 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+    /**
+     * One language for a sealed site that has no second edition: its pack, from the reviewed
+     * catalog, installed and made the default for the site and the administrator.
+     *
+     * The multilingual operations need the contract's multilingual profile, because they build a
+     * second edition. A quickstart that cannot have one (ja-kinetic) still has to be able to BE in
+     * the customer's language — this is that, and nothing more: no copies, no filter, no switcher.
+     * Nothing it touches is under the contract (language/ is no file root; #__languages and
+     * com_languages params are not inspected), and the site is re-proven after it anyway.
+     */
+    private function siteLanguage(array $p): array
+    {
+        if (!$this->contract->siteLanguageAvailable())
+            return $this->err('unsupported', 'This receiver carries no language-pack catalog for this site');
+        $operation = substr((string) $p['operation'], strlen('siteLanguage.'));
+        foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
+            if (isset($p[$mine]))
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+        $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
+        if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
+        $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        try {
+            if ($operation === 'plan') {
+                if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $locale)) return $this->err('bad_params', 'Not a Joomla language tag: ' . $locale);
+                $pack = $this->contract->languagePackage($locale, $major);
+                return $this->ok([
+                    'locale' => $locale, 'current' => $this->writer->readLanguageDefaults(),
+                    'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
+                    'installed' => $pack === null || $this->languagePackPresent($locale),
+                    'onRecord' => $this->contract->binding()['siteLanguage'] ?? null,
+                ]);
+            }
+            if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown siteLanguage operation');
+            $apply = $this->applyId($p);
+            $request = $p['request_id'] ?? '';
+            if (!$apply || strpos($apply, 'slang-') !== 0) return $this->err('bad_params', 'apply_id must start with "slang-"');
+            if (!is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+                return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+            $binding = $this->contract->binding();
+            if (!empty($binding['multilingual']['languages']))
+                return $this->err('contract_failed', 'This site already has a second language edition; its languages are managed by the multilingual operations. Nothing has been written.');
+            $onRecord = $binding['siteLanguage'] ?? null;
+            if ($operation === 'revert') {
+                if ($onRecord === null) return $this->err('contract_failed', 'This site has no language set by this door to take back');
+                $previous = $onRecord['previous'];
+                $this->writer->transaction(function () use ($apply, $previous) {
+                    $before = $this->writer->readLanguageDefaults();
+                    $this->writer->writeLanguageDefaults((string) $previous['site'], (string) $previous['administrator']);
+                    $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
+                    $this->contract->rebind($this->contract->bindingWithSiteLanguage(null));
+                    $this->contract->rebind($this->contract->inspect()['snapshot']);
+                    return [];
+                });
+                try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+                $this->stamped('content');
+                return $this->ok(['status' => 'reverted', 'current' => $this->writer->readLanguageDefaults()]);
+            }
+            if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $locale)) return $this->err('bad_params', 'Not a Joomla language tag: ' . $locale);
+            if ($onRecord !== null) {
+                if ($onRecord['locale'] === $locale) return $this->ok(['status' => 'completed', 'locale' => $locale, 'alreadySet' => true]);
+                return $this->err('conflict', 'This site is already set to ' . $onRecord['locale'] . '; take that back with siteLanguage.revert before choosing another');
+            }
+            $pack = $this->contract->languagePackage($locale, $major);
+            if ($pack !== null && !$this->languagePackPresent($locale)) {
+                if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+                $result = $this->extensions->installVerifiedFromUrl($pack['url'], $pack['sha256'], (int) $pack['bytes']);
+                if (($result['ok'] ?? false) !== true) return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+                if (!$this->languagePackPresent($locale)) return $this->err('install_failed', 'The ' . $locale . ' pack installed but Joomla does not list it');
+                $this->stamped('extension');
+            }
+            // A site bound for the first time here is bound as it stands, before anything is set.
+            if ($binding === null) $this->writer->transaction(function () {
+                $this->contract->bind($this->contract->inspect()['snapshot']);
+                return [];
+            });
+            $this->writer->transaction(function () use ($apply, $request, $locale, $pack) {
+                $before = $this->writer->readLanguageDefaults();
+                $this->writer->writeLanguageDefaults($locale, $locale);
+                $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
+                $this->contract->rebind($this->contract->bindingWithSiteLanguage([
+                    'locale' => $locale, 'previous' => $before, 'applyId' => $apply, 'requestId' => $request,
+                    'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
+                ]));
+                // Proven, then stored — the same two steps every other sealed write ends with.
+                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                return [];
+            });
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('content');
+            return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null]);
+        } catch (Throwable $error) {
             return $this->err('contract_failed', $error->getMessage());
         }
     }

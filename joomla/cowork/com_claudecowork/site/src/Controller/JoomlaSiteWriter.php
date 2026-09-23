@@ -347,6 +347,35 @@ final class JoomlaSiteWriter implements \SiteWriter
         $this->db->setQuery($query)->execute();
     }
 
+    public function readLanguageDefaults(): array
+    {
+        $params = json_decode((string) $this->db->setQuery($this->languageParamsQuery())->loadResult(), true) ?: [];
+        return ['site' => (string) ($params['site'] ?? 'en-GB'), 'administrator' => (string) ($params['administrator'] ?? 'en-GB')];
+    }
+
+    public function writeLanguageDefaults(string $site, string $administrator): void
+    {
+        foreach ([$site, $administrator] as $tag)
+            if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag)) throw new \RuntimeException('Not a Joomla language tag: ' . $tag);
+        // Merged into the existing params, never replaced: com_languages keeps other keys there.
+        $params = json_decode((string) $this->db->setQuery($this->languageParamsQuery())->loadResult(), true) ?: [];
+        $params['site'] = $site;
+        $params['administrator'] = $administrator;
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName('#__extensions'))
+            ->set($this->db->quoteName('params') . ' = ' . $this->db->quote(json_encode($params, JSON_UNESCAPED_SLASHES)))
+            ->where($this->db->quoteName('type') . ' = ' . $this->db->quote('component'))
+            ->where($this->db->quoteName('element') . ' = ' . $this->db->quote('com_languages'));
+        $this->db->setQuery($query)->execute();
+    }
+
+    private function languageParamsQuery(): \Joomla\Database\QueryInterface
+    {
+        return $this->db->getQuery(true)->select($this->db->quoteName('params'))->from($this->db->quoteName('#__extensions'))
+            ->where($this->db->quoteName('type') . ' = ' . $this->db->quote('component'))
+            ->where($this->db->quoteName('element') . ' = ' . $this->db->quote('com_languages'));
+    }
+
     public function write(string $kind, int $id, array $fields): int
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->write($kind, $id, $fields);

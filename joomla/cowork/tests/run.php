@@ -863,6 +863,14 @@ class FakeSiteWriter implements SiteWriter
     {
         return $this->store[$kind][$id] ?? null;
     }
+    public function readLanguageDefaults(): array
+    {
+        return $this->store['languageDefaults'] ?? ['site' => 'en-GB', 'administrator' => 'en-GB'];
+    }
+    public function writeLanguageDefaults(string $site, string $administrator): void
+    {
+        $this->store['languageDefaults'] = ['site' => $site, 'administrator' => $administrator];
+    }
     public function setVisibility(string $kind, int $id, string $column, string $value): void
     {
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
@@ -1717,6 +1725,7 @@ check('batch undo restores and removes its create', $batchWriter->store['article
 require __DIR__ . "/contracts.php";
 require __DIR__ . "/multilingual.php";
 require __DIR__ . "/demo-trim.php";
+require __DIR__ . "/site-language.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
