@@ -288,8 +288,11 @@ final class MultilingualProfile
          * figure.
          */
         $scale = '(?:bn|tn|k|m|b|billion|million|thousand|trillion)';
-        $scaled = '~(?<![\w.])[$€£¥]?\s?\d[\d,.]*\s?' . $scale . '\b~ui';
-        if (preg_match($scaled, $source, $which)) {
+        $scaled = '~' . self::NOT_AFTER . '[$€£¥]?\s?\d[\d,.]*\s?' . $scale . '\b~ui';
+        // A figure the translation carries VERBATIM is kept, whatever its scale reads as: "45 m" is
+        // a length as often as "$12m" is a sum, and striking the 45 below left "跨度达45 m" with no
+        // number (measured 23/09/2026 on `j-h0n2f4`, zh-CN).
+        if (preg_match($scaled, $source, $which) && mb_strpos($target, trim($which[0])) === false) {
             $left = $target;
             foreach (preg_split('~\s+~u', $source) as $word) {
                 $word = trim($word, ".,;:!?()[]\"'");
@@ -365,9 +368,19 @@ final class MultilingualProfile
         return preg_match_all('/[<>]/u', $target) > preg_match_all('/[<>]/u', $source);
     }
 
+    /**
+     * What may NOT stand right before a figure: a letter of a script that spaces its words, a
+     * digit, an underscore or a dot — so the 2 of "O2" and the 20 of "X20" are part of a name.
+     *
+     * 🔒 NOT `\w`. Under `/u` PHP's `\w` is every letter of every script, and Chinese and Japanese
+     * write a number against the word beside it: "成立于2004年", "14个州". Measured 23/09/2026 on
+     * `j-h0n2f4` (Business, zh-CN): 40 correct translations refused as "the figure 2004 is missing",
+     * and the `language` stage stopped on every retry.
+     */
+    private const NOT_AFTER = '(?<![\p{Latin}\p{Greek}\p{Cyrillic}\p{Armenian}\p{Georgian}\p{N}_.])';
     /** One more digit, or a separator that has a digit behind it. A plain space groups only by threes. */
     private const FIGURE_STEP = '(?:\d|[.,\x{00A0}\x{202F}\x{2009}](?=\d)|\x20(?=\d{3}(?!\d)))';
-    private const FIGURE = '~(?<![\w.])(?:'
+    private const FIGURE = '~' . self::NOT_AFTER . '(?:'
         // A currency amount, single-digit included: "$0 free forever" is a price.
         . '[$€£¥]\s?\d' . self::FIGURE_STEP . '*'
         // The same amount with the mark on the other side: French writes "$0" as "0 $".

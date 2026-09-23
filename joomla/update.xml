@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Chinese and Japanese translations are no longer refused for dropping figures they kept. Those languages write a number against the word beside it ("成立于2004年", "14个州"), and the figure check read the Han character before the digits as part of a word, saw no number, and stopped the `language` stage on every retry. A figure written verbatim with a unit that doubles as a scale word ("45 m") is kept too. A figure that is changed or dropped is still refused, and the digits inside a name such as "O2" are still not a figure. Also carries: the contract apply names the id it refuses.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.7</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.7</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.7/pkg_claudecowork-0.16.7.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Two false refusals that stopped the `language` stage on text Tracy itself shipped. A figure is now compared by its VALUE, not its spelling: Vietnamese writes 4.800 where English writes 4,800 and 6,2 where English writes 6.2, and every locale that groups with a dot or a space hit the same wall — a changed or missing figure is still refused. And an angle bracket counts as markup only where the source has none, so a translation that faithfully keeps an email address in brackets is no longer turned away. Carries the 0.16.5 payload: the tracy-business/j6/1.1.0 multilingual profile.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

@@ -123,6 +123,36 @@ foreach ($scaled as [$source, $target, $ok])
     );
 check('a figure the source repeats must be kept as often', count(MultilingualProfile::preservationErrors('$10 and $10', 'only $10')), 1);
 
+// CHINESE AND JAPANESE WRITE A NUMBER AGAINST THE WORD BESIDE IT. "Established 2004" is "成立于2004年"
+// and "14 regions" is "14个州": no space, so a lookbehind that only means "not inside a Latin word"
+// read the Han character before the digits as a letter and saw no figure at all. Measured
+// 23/09/2026 on `j-h0n2f4` (Business, zh-CN): 40 correct translations refused, "the figure 2004 is
+// missing", and the `language` stage stopped on every retry. The digits inside a Latin word stay
+// out, so "O2" is still not a figure.
+$cjk = [
+    ['Established 2004', '成立于2004年', true],
+    ['across 14 regions of Central and Volga Russia', '为俄罗斯中部和伏尔加地区14个州', true],
+    ['Issue 14 · 12 August 2026', '第14期 · 2026年8月12日', true],
+    ['Founded in 2004', '2004年に設立', true],
+    ['Established 2004', '成立于2005年', false],
+    ['across 14 regions', '覆盖多个州', false],
+];
+foreach ($cjk as [$source, $target, $ok])
+    check(
+        'a figure against a Han or kana character "' . $target . '" ' . ($ok ? 'is read' : 'is still refused'),
+        MultilingualProfile::preservationErrors($source, $target) === [],
+        $ok
+    );
+check('digits inside a Latin word are still not a figure', MultilingualProfile::preservationErrors('Model X20', 'Modèle X20'), []);
+
+// A scaled figure copied VERBATIM is kept, not lost. "m" is a scale word ("$12m") and a unit
+// ("45 m"), and the translation of a length keeps "45 m" as it is — but the scale rule struck every
+// verbatim digit word out of the target first, the 45 with it, and then found no number left.
+// Measured 23/09/2026 on `j-h0n2f4` (zh-CN): the last two refusals of the edition, both correct.
+check('a scaled figure copied verbatim is kept', MultilingualProfile::preservationErrors('steel frames spanning up to 45 m.', '跨度达45 m的钢结构框架'), []);
+check('a unit figure copied with a space before it is kept', MultilingualProfile::preservationErrors('the design frost depth reaches 1.6 m and', '设计冻深可达 1.6 m，'), []);
+check('a scaled figure dropped outright is still refused', MultilingualProfile::preservationErrors('steel frames spanning up to 45 m.', '钢结构框架'), ['the figure 45 m left no number in the translation']);
+
 /* ---------------------------------------------------------------- the profile and its pinning */
 
 $mlDir = sys_get_temp_dir() . '/cowork-ml-' . bin2hex(random_bytes(6));
