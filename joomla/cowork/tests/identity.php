@@ -60,3 +60,8 @@ check('after the identity is written the contract still holds, with the new valu
 
 check('a phone link built from the identity is an editable link, not a directive',
     array_column(ContentSlots::htmlSlots('<a href="tel:{contact.tel}">{contact.phone}</a>'), 'sample'), ['tel:{contact.tel}', '{contact.phone}']);
+
+check('a translation that drops an identity token is refused',
+    MultilingualProfile::preservationErrors('Why {site.name}', 'Warum Northgate') !== [], true);
+check('a translation that keeps every identity token passes',
+    MultilingualProfile::preservationErrors('Why {site.name}', 'Warum {site.name}'), []);
