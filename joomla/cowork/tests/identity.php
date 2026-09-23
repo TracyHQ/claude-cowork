@@ -57,3 +57,6 @@ foreach ($idOps as $op) $idWriter->store[$op['kind']][$op['id']] = $op['fields']
 $idAfter = $idContract->inspect();
 check('after the identity is written the contract still holds, with the new values read back',
     [$idAfter['slotValues']['identity.site-name'] ?? null, $idAfter['slotValues']['hero.0'] ?? null], ['Sarah', 'Why {site.name} now']);
+
+check('a phone link built from the identity is an editable link, not a directive',
+    array_column(ContentSlots::htmlSlots('<a href="tel:{contact.tel}">{contact.phone}</a>'), 'sample'), ['tel:{contact.tel}', '{contact.phone}']);

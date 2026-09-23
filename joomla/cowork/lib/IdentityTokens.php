@@ -14,7 +14,7 @@ final class IdentityTokens
 {
     public const NAMES = [
         'site.name', 'site.legalName', 'site.slogan', 'site.monogram',
-        'contact.email', 'contact.phone', 'contact.address', 'contact.hours',
+        'contact.email', 'contact.phone', 'contact.tel', 'contact.address', 'contact.hours',
         'social.facebook', 'social.instagram', 'social.linkedin', 'social.tiktok', 'social.youtube',
     ];
 
