@@ -81,6 +81,10 @@ check('a site that already has a translation is not trimmed', $trimCall(['operat
     'This site already has a second language; hiding its demo rows would leave the translated copies showing. Nothing has been written.');
 $trimStore->binding = null;
 
+// 🔒 VISIBILITY ONLY, AND NOTHING JOOMLA DOES AROUND IT. From here on the double behaves like the
+// real site: storing an article or a module through Table mints its asset. A trim that went that
+// way would change the ACL the contract holds and fail every read after it.
+$trimWriter->tableAssets = true;
 // A crash in the middle of the first batch rolls back the rows, but not the record that a trim began.
 $trimWriter->failOn = ['article', 203];
 $crashed = $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1']);
@@ -117,6 +121,7 @@ check('the generic revert does not take a trim apart', $trimEngine->handle(['tok
 $back = $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo', 'request_id' => 'u1']);
 check('revert brings every hidden row back', [$back['ok'], $back['status'], $trimWriter->store['article'][202]['state'], $trimWriter->store['article'][203]['state'], $trimWriter->store['menuItem'][330]['published']], [true, 'reverted', '1', '1', '1']);
 check('and leaves no trim on record', [isset($trimStore->binding['demoTrim']), $trimStore->binding['presentation']['article-post']['state']], [false, '1']);
+$trimWriter->tableAssets = false;
 check('the customer copy survives the revert', $trimWriter->store['module'][110]['content'], '<h1>Customer title</h1>');
 check('the reverted site inspects clean', $trimContract->inspect()['contract'], 'trim/v1');
 check('revert with nothing trimmed says so', $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo2', 'request_id' => 'u2'])['error'], 'contract_failed');
