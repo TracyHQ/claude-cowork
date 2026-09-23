@@ -672,9 +672,12 @@ final class QuickstartContract
         unset($binding['multilingual']['languages'][$locale]);
         if(empty($binding['multilingual']['languages'])) {
             $profile=$this->profile();
+            // Back to what the ARCHIVE shipped, not to `*` by assumption: Business ships most of its
+            // translated modules in en-GB already (module-428), and a revert that called them `*`
+            // left the site failing its own inspect — every later call refused.
             foreach($binding['presentation'] as $key=>$fields)
                 if(($fields['language']??null)===$profile->sourceLanguage() && $profile->isTranslated($key))
-                    $binding['presentation'][$key]['language']='*';
+                    $binding['presentation'][$key]['language']=(string)($this->lock['entities'][$key]['language']??'*');
             unset($binding['multilingual']);
         }
         return $binding;

@@ -71,6 +71,17 @@ interface SiteWriter
     public function setVisibility(string $kind, int $id, string $column, string $value): void;
 
     /**
+     * Give one existing menu item a new alias, and its branch the paths that follow from it.
+     *
+     * Only for moving an archive's own row out of the way: Joomla keeps one alias per (client,
+     * parent, language), and a quickstart that ships an edition in the language a customer asks
+     * for already holds every alias its copy must take (Business: 43 editions; measured 23/09/2026
+     * on j-ee6vsk, `Duplicate entry '0-1-home-vi-VN'`). Like setVisibility, not the Table: a menu
+     * row has no asset, and the Table's store would also re-decide `home`.
+     */
+    public function realiasMenuItem(int $id, string $alias): void;
+
+    /**
      * The site's default languages, as Joomla keeps them in com_languages' params.
      *
      * @return array{site:string,administrator:string}

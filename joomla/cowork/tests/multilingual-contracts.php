@@ -145,6 +145,18 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
         if (preg_match('/^(modules|content)\.(\d+)$/', $asset, $m) && !isset($w->store[$m[1] === 'modules' ? 'module' : 'article'][(int) $m[2]]))
             $named[$m[1] === 'modules' ? 'module' : 'article'][] = (int) $m[2];
     $next = 900000;
+    // The archive's own editions in the languages the gate derives, top of the menu tree: Business
+    // ships one per language with its source's aliases, and a copy must find its alias taken
+    // (j-ee6vsk, `Duplicate entry '0-1-home-vi-VN'`). Only where the lock's inventory has room.
+    $tops = [];
+    foreach ($w->store['menuItem'] ?? [] as $row)
+        if ((int) ($row['parent_id'] ?? 1) === 1 && (string) ($row['client_id'] ?? '0') === '0' && $row['title'] !== 'ancestor ' . $row['id']) $tops[] = $row;
+    if (($lock['inventoryCounts']['menuItem'] ?? 0) - ($governed['menuItem'] ?? 0) >= 2 * count($tops))
+        foreach (['vi-VN', 'fr-FR'] as $edition) foreach ($tops as $row) {
+            $id = $next++;
+            $w->store['menuItem'][$id] = ['id' => (string) $id, 'language' => $edition, 'note' => 'archive edition', 'home' => '0'] + $row;
+            $governed['menuItem']++;
+        }
     foreach ($lock['inventoryCounts'] as $kind => $count) {
         for ($n = $governed[$kind] ?? 0; $n < $count; $n++) {
             $id = ($named[$kind] ?? []) ? array_shift($named[$kind]) : $next++;
@@ -202,7 +214,12 @@ foreach ($gateContracts as $profileFile) {
     foreach ($plan['slots'] as $slot) $words[$slot['key']] = (string) ($slot['source'] ?? '');
     $apply = ['operation' => 'multilingual.apply', 'locale' => 'vi-VN', 'translations' => $words,
         'expected_revision' => $plan['revision'], 'apply_id' => 'mlang-gate-vi', 'request_id' => 'gate-vi'];
-    for ($i = 0, $a = ['ok' => true, 'status' => 'running']; $i < 400 && ($a['status'] ?? '') === 'running'; $i++) $a = $call($apply);
+    for ($i = 0, $a = ['ok' => true, 'status' => 'running']; $i < 400 && ($a['status'] ?? '') === 'running'; $i++) {
+        $a = $call($apply);
+        // A new Build on the same site runs `style` (bind) again while a language is half made:
+        // a site whose inspect is clean is already locked, not a baseline to replace (j-ee6vsk).
+        if ($i === 2 && ($a['status'] ?? '') === 'running' && !$step('bind again with vi-VN in flight', $call(['operation' => 'bind']))) continue 2;
+    }
     if (!$step('derive vi-VN', $a)) continue;
     check("$id: vi-VN completes", $a['status'] ?? null, 'completed');
     if (!$step('verify vi-VN', $call(['operation' => 'multilingual.verify', 'locale' => 'vi-VN']))) continue;
@@ -222,5 +239,11 @@ foreach ($gateContracts as $profileFile) {
     foreach (json_decode(file_get_contents($dir . '/content-map.json'), true)['entities'] as $entity)
         if (!isset($gw->store[$entity['kind']][(int) $entity['sourceId']])) $missing[] = $entity['key'];
     check("$id: taking a job back leaves every governed row", $missing, []);
+    $moved = array_filter($gw->store['menuItem'] ?? [], fn ($r) => ($r['note'] ?? '') === 'archive edition' && ($r['language'] ?? '') === 'vi-VN');
+    $aside = count(array_filter($moved, fn ($r) => str_ends_with((string) $r['alias'], '-archive')));
+    if (!$step('take back vi-VN', $call(['operation' => 'multilingual.revert', 'locale' => 'vi-VN']))) continue;
+    $back = array_filter($gw->store['menuItem'] ?? [], fn ($r) => ($r['note'] ?? '') === 'archive edition' && ($r['language'] ?? '') === 'vi-VN'
+        && str_ends_with((string) $r['alias'], '-archive'));
+    checkTrue("$id: the archive's own vi-VN edition was moved aside and is back after the revert", $moved === [] || ($aside > 0 && $back === []));
     unset($lock);
 }

@@ -55,9 +55,12 @@ final class MultilingualApply
     private SiteWriter $writer;
     /** @var callable(string,int,array):int one recorded, revertable write */
     private $write;
+    /** @var null|callable(int,string,string):void one recorded, revertable menu realias: id, from, to */
+    private $aside;
 
-    public function __construct(QuickstartContract $contract, SiteWriter $writer, callable $write)
+    public function __construct(QuickstartContract $contract, SiteWriter $writer, callable $write, ?callable $aside = null)
     {
+        $this->aside = $aside;
         $this->contract = $contract;
         $this->profile = $contract->profile();
         $this->catalog = $contract->catalog();
@@ -225,6 +228,7 @@ final class MultilingualApply
 
     private function phaseMenu(array &$job, array $state, array $translations, string $locale): bool
     {
+        $this->clearMenuAliases($state, $locale);
         return $this->createChunk($job, $state, $translations, $locale, 'menuItem', function (array $row, array $fields, array $idMap) use ($locale): array {
             $parent = (int) $row['parent_id'];
             // The LIVE map, handed in per row. Capturing the job here instead read the ids as they
@@ -250,6 +254,42 @@ final class MultilingualApply
                 'alias' => $this->profile->derivedAlias('menuItem', (string) $row['alias'], $locale),
             ];
         });
+    }
+
+    /**
+     * Move the archive's own rows off every alias a copy is about to take.
+     *
+     * A copy keeps its source alias (`"alias": "source"`), and Joomla holds one alias per (client,
+     * parent, language). An archive that ships an edition in this very language — Business ships
+     * 43, retired but still there — therefore already holds `home` in vi-VN, and the copy died on
+     * `Duplicate entry '0-1-home-vi-VN'` (23/09/2026, j-ee6vsk). Only a row that is neither
+     * governed nor a copy is moved, only under a parent that already exists (a copy's own new
+     * parent has no children to collide with), and each move is logged so a revert takes it back.
+     */
+    private function clearMenuAliases(array $state, string $locale): void
+    {
+        $sources = $this->sources($state, 'menuItem');
+        $copied = [];
+        foreach ($sources as $key) $copied[(int) $state['ids'][$key]] = true;
+        $taken = [];
+        foreach ($sources as $key) {
+            $row = $state['rows'][$key];
+            if (isset($copied[(int) $row['parent_id']])) continue;
+            $taken[(int) $row['parent_id'] . "\0" . $this->profile->derivedAlias('menuItem', (string) $row['alias'], $locale)] = true;
+        }
+        if (!$taken) return;
+        $governed = array_flip(array_map('intval', $state['ids']));
+        for ($offset = 0; $offset < 20000; $offset += 100) {
+            $page = $this->writer->list('menuItem', $offset, 100);
+            foreach ($page as $row) {
+                if ((string) ($row['language'] ?? '') !== $locale || (int) ($row['client_id'] ?? 0) !== 0) continue;
+                if (!isset($taken[(int) $row['parent_id'] . "\0" . (string) $row['alias']])) continue;
+                if (isset($governed[(int) $row['id']]) || strpos((string) ($row['note'] ?? ''), 'tracy-ml:') === 0) continue;
+                if ($this->aside === null) throw new RuntimeException('Menu item ' . $row['id'] . ' holds the alias ' . $row['alias'] . ' in ' . $locale);
+                ($this->aside)((int) $row['id'], (string) $row['alias'], (string) $row['alias'] . '-archive');
+            }
+            if (count($page) < 100) break;
+        }
     }
 
     private function phaseArticles(array &$job, array $state, array $translations, string $locale): bool

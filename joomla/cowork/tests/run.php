@@ -876,6 +876,22 @@ class FakeSiteWriter implements SiteWriter
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
         $this->store[$kind][$id][$column] = $value;
     }
+    public function realiasMenuItem(int $id, string $alias): void
+    {
+        if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
+        $old = (string) ($this->store['menuItem'][$id]['path'] ?? '');
+        $new = (strpos($old, '/') === false ? '' : substr($old, 0, strrpos($old, '/') + 1)) . $alias;
+        $this->store['menuItem'][$id]['alias'] = $alias;
+        // The branch by the tree, as lft..rgt is on a site: the node, then its children, and so on.
+        for ($branch = [$id]; $branch; $branch = $next) {
+            $next = [];
+            foreach ($branch as $mid) {
+                $path = (string) ($this->store['menuItem'][$mid]['path'] ?? '');
+                $this->store['menuItem'][$mid]['path'] = $new . substr($path, strlen($old));
+                foreach ($this->store['menuItem'] as $cid => $row) if ((int) ($row['parent_id'] ?? 0) === $mid && $cid !== $mid) $next[] = $cid;
+            }
+        }
+    }
     public function write(string $kind, int $id, array $fields): int
     {
         if ($id === 0) {

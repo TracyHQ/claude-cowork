@@ -1193,7 +1193,11 @@ final class Engine
                 if(!$this->writer || !method_exists($this->writer,'transaction'))throw new RuntimeException('Transactional writer required');
                 return $this->writer->transaction(function(){
                     $state=$this->contract->inspect();
-                    $this->contract->bind($state['snapshot']);
+                    // A site already bound is locked once its inspect is clean — the inspect just
+                    // proved it against the stored baseline. Saving again demanded the snapshot equal
+                    // that baseline byte for byte, which a half-made language never does: a second
+                    // Build on j-ee6vsk died at `style` on "Cannot replace a content-only baseline".
+                    if($state['binding']===null)$this->contract->bind($state['snapshot']);
                     return $this->ok(['contract'=>$state['contract'],'revision'=>$state['revision'],'bound'=>true]);
                 });
             }
@@ -1574,6 +1578,10 @@ final class Engine
                 $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => $id, 'fields' => $fields]);
                 if (empty($answer['ok'])) throw new RuntimeException($kind . ' ' . $id . ': ' . ($answer['message'] ?? json_encode($answer['error'])));
                 return (int) $answer['id'];
+            }, function (int $id, string $before, string $after) use ($apply): void {
+                // Undo first, as retire does: a row whose way back was not recorded is never moved.
+                $this->log->record($apply, ['op' => 'alias', 'kind' => 'menuItem', 'id' => $id, 'before' => $before]);
+                $this->writer->realiasMenuItem($id, $after);
             });
             $this->batching = true;
             $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
@@ -2239,6 +2247,10 @@ final class Engine
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
         if ($op === 'batch' || $op === 'contract') { return; }
+        if ($op === 'alias') {
+            $this->writer->realiasMenuItem((int) ($entry['id'] ?? 0), (string) ($entry['before'] ?? ''));
+            return;
+        }
         if ($op === 'visibility') {
             $this->setVisible((string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0), (string) ($entry['column'] ?? ''), (int) ($entry['before'] ?? 1));
             return;

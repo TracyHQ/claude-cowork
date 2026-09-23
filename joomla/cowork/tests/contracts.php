@@ -63,6 +63,11 @@ final class ContractTestWriter extends FakeSiteWriter {
             $fields['path']=($parent && (int)($fields['parent_id']??1)!==1 ? $parent['path'].'/' : '').($fields['alias']??'');
             $fields['level']=(string)(($parent && (int)($fields['parent_id']??1)!==1 ? (int)$parent['level'] : 0)+1);
         }
+        // MariaDB's idx_client_id_parent_id_alias_language, which the real insert meets.
+        if($this->nestedPaths && $kind==='menuItem' && $id===0)foreach($this->store['menuItem']??[] as $other)
+            if((int)($other['client_id']??0)===(int)($fields['client_id']??0) && (int)($other['parent_id']??1)===(int)($fields['parent_id']??1)
+                && (string)($other['alias']??'')===(string)($fields['alias']??'') && (string)($other['language']??'')===(string)($fields['language']??''))
+                throw new RuntimeException("Duplicate entry '".(int)($fields['client_id']??0).'-'.(int)($fields['parent_id']??1).'-'.$fields['alias'].'-'.$fields['language']."'");
         if($this->drift && $kind==='module')$fields['position']='wrong-position';
         return parent::write($kind,$id,$fields);
     }

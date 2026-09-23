@@ -351,6 +351,29 @@ final class JoomlaSiteWriter implements \SiteWriter
         $this->db->setQuery($query)->execute();
     }
 
+    public function realiasMenuItem(int $id, string $alias): void
+    {
+        $row = $id > 0 ? $this->read('menuItem', $id) : null;
+        if (!$row) throw new \RuntimeException('target does not exist in this scope');
+        if (!preg_match('/^[a-z0-9][a-z0-9-]*$/D', $alias)) throw new \RuntimeException('not a menu alias: ' . $alias);
+        $table = $this->db->quoteName('#__menu');
+        $node = $this->db->setQuery($this->db->getQuery(true)
+            ->select($this->db->quoteName(['path', 'lft', 'rgt']))->from($table)
+            ->where($this->db->quoteName('id') . ' = ' . (int) $id))->loadAssoc();
+        $old = (string) $node['path'];
+        $new = (strpos($old, '/') === false ? '' : substr($old, 0, strrpos($old, '/') + 1)) . $alias;
+        $this->db->setQuery($this->db->getQuery(true)->update($table)
+            ->set($this->db->quoteName('alias') . ' = ' . $this->db->quote($alias))
+            ->where($this->db->quoteName('id') . ' = ' . (int) $id))->execute();
+        // The node and every descendant: the branch is exactly the lft..rgt range of one tree.
+        $this->db->setQuery($this->db->getQuery(true)->update($table)
+            ->set($this->db->quoteName('path') . ' = CONCAT(' . $this->db->quote($new) . ', SUBSTRING('
+                . $this->db->quoteName('path') . ', ' . (strlen($old) + 1) . '))')
+            ->where($this->db->quoteName('lft') . ' >= ' . (int) $node['lft'])
+            ->where($this->db->quoteName('rgt') . ' <= ' . (int) $node['rgt'])
+            ->where($this->db->quoteName('client_id') . ' = 0'))->execute();
+    }
+
     public function readLanguageDefaults(): array
     {
         $params = json_decode((string) $this->db->setQuery($this->languageParamsQuery())->loadResult(), true) ?: [];
