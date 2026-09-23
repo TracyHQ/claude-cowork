@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>A customer opening a page of a T4 site no longer locks its content door. T4 compiles media/t4/css/&lt;styleId&gt;-sub.css the first time a style renders a page that is not its menu item's own target; a contract capture only holds the ones its crawl happened to open, so the next visitor to any other such page made inspect refuse the site with "Unexpected presentation file" (measured on a JA Kinetic site: 36-sub.css, and the build's seed stage stopped). That file is now treated as the compiled cache it is, like media/t4/optimize; a script, a .php or a differently named stylesheet there is still refused. Carries 0.16.12.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.13</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.13</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.13/pkg_claudecowork-0.16.13.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>A customer can take any language the quickstart already ships, one or several, and keep it the way the archive built it. Tracy Business ships 41 editions made by its own add-language tool, each with its own menus (`tb-main-vi`), megamenu, modules and categories; a copy made from the source sat in `tb-main-en` while the template reads `tb-main-&lt;sef&gt;`, so `/vi/` lost its main menu. A contract may now carry `editions.json`, generated from the release database and pinned to the base: for such a language the receiver writes the translation into the edition's own rows, shows them, spares them from retire, joins the edition's association group, and a revert returns words and visibility without deleting anything. Inspect holds each taken row to the add-language rules the generator proved against every edition of the release. For a language without an edition the copy road stays, now with: the archive's own rows moved off an alias a copy needs, association groups kept whole, a new switcher placed even when its id matches another kind's, and a second Build able to bind and seed while a language is half made. Carries 0.16.11.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
