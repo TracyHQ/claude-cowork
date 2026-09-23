@@ -538,6 +538,11 @@ final class MultilingualApply
             $patched = $this->contract->patch($row, $this->contract->derivedSlotsFor($locale, $key), $values);
             $fields = array_intersect_key($patched, array_flip($this->profile->translatedColumns($kind)));
             if ($kind === 'module' && !$this->profile->showsTitle($key, $this->contract->lockFields($key))) unset($fields['title']);
+            // A language's home page is decided per language, and Joomla takes the flag off the old
+            // holder whenever another row claims it — a copy made on this site by an older receiver
+            // left the edition's `home` at 0 after its revert (j-ee6vsk, 23/09/2026). Mirrored here.
+            if ($kind === 'menuItem' && (int) ($row['home'] ?? 0) !== (int) ($state['rows'][$key]['home'] ?? 0))
+                $fields['home'] = (int) $state['rows'][$key]['home'];
             ($this->write)($kind, $id, $fields);
             $want = (int) ($state['rows'][$key][$column] ?? 1);
             if ((int) ($row[$column] ?? 0) !== $want) $this->show($kind, $id, $column, $want);
