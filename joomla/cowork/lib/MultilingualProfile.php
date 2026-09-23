@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/IdentityTokens.php';
 /**
  * The versioned multilingual extension of a quickstart content contract.
  *
@@ -433,6 +434,13 @@ final class MultilingualProfile
     public static function preservationErrors(string $source, string $target): array
     {
         $out = [];
+        // An identity token ({site.name}, {contact.email}...) is the customer's own fact, replaced
+        // as the page is sent. A translation that loses one puts back whatever it wrote instead —
+        // usually the demo's name — and nothing downstream would notice.
+        foreach (IdentityTokens::NAMES as $name) {
+            $token = '{' . $name . '}';
+            if (substr_count($source, $token) !== substr_count($target, $token)) $out[] = 'keeps ' . $token . ' as many times as its source';
+        }
         /**
          * A figure carrying a SCALE WORD is checked differently, because verbatim is the wrong
          * rule for it. "$44bn" is "44 milliards de dollars" in French and "440亿美元" in Chinese:

@@ -539,11 +539,15 @@ final class QuickstartContract
             $evidence=$params['evidence'][$key]??null;
             if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw new RuntimeException('Customer evidence required: '.$key);
         }
-        // Empty ACM fields control conditional markup; changing occupancy changes layout.
-        if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
-        if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
+        // Empty ACM fields control conditional markup; changing occupancy changes layout. The one
+        // exception is the identity module: it renders nothing itself, and a fact the customer does
+        // not have (a TikTok page, a legal name) must be emptied, or the demo's value is shown instead.
+        if(empty($slot['siteIdentity'])) {
+            if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
+            if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
+        }
         if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw new RuntimeException('Markup and control characters are not content: '.$key);
-        if(preg_match('/\{\/?[a-z][^{}]*\}/i',$value))throw new RuntimeException('Joomla plugin directives are not content: '.$key);
+        if(IdentityTokens::hasDirective($value))throw new RuntimeException('Joomla plugin directives are not content: '.$key);
         if(mb_strlen($value)>$slot['maxCharacters'])throw new RuntimeException('Content too long: '.$key);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw new RuntimeException('Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw new RuntimeException('Unsupported CTA URL: '.$key);
