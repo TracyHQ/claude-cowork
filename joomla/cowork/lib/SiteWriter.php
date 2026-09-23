@@ -82,6 +82,21 @@ interface SiteWriter
     public function realiasMenuItem(int $id, string $alias): void;
 
     /**
+     * Give the site's source language another tag of the same language — every row that carries the
+     * old tag, the content language's own row (its `sef`, and so every URL and every `tb-main-<sef>`
+     * menu, unchanged), a template style set per language, and the tag index `#__ucm_content`.
+     * Raw updates, like setVisibility: a relabel moves no row and changes no asset.
+     *
+     * Installing `$to`'s pack makes Joomla add a content language of its own for it (at `/en-us/`,
+     * because `en` is taken) — an empty row that would publish a second English. That row is removed,
+     * and its label is the one the source row takes, unless `$label` names one (a revert does).
+     *
+     * @param array{title: string, title_native: string, image: string}|null $label
+     * @return array{previous: array{title: string, title_native: string, image: string}, removed: ?array} the source row's old label, and the row removed
+     */
+    public function relabelLanguage(string $from, string $to, ?array $label = null): array;
+
+    /**
      * The site's default languages, as Joomla keeps them in com_languages' params.
      *
      * @return array{site:string,administrator:string}

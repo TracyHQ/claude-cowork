@@ -876,6 +876,28 @@ class FakeSiteWriter implements SiteWriter
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
         $this->store[$kind][$id][$column] = $value;
     }
+    public function relabelLanguage(string $from, string $to, ?array $label = null): array
+    {
+        $source = null; $removed = null;
+        foreach ($this->store['language'] ?? [] as $id => $row) {
+            if (($row['lang_code'] ?? null) === $from) $source = $id;
+            if (($row['lang_code'] ?? null) === $to) $removed = $id;
+        }
+        if ($source === null) throw new RuntimeException('This site has no ' . $from . ' content language to relabel');
+        $removedRow = $removed === null ? null : $this->store['language'][$removed];
+        if ($removed !== null) unset($this->store['language'][$removed]);
+        $label ??= $removedRow !== null
+            ? ['title' => (string) $removedRow['title'], 'title_native' => (string) $removedRow['title_native'], 'image' => (string) $removedRow['image']]
+            : ['title' => $to, 'title_native' => $to, 'image' => strtolower(str_replace('-', '_', $to))];
+        foreach ($this->store as $kind => $rows) {
+            if (!is_array($rows) || $kind === 'language') continue;
+            foreach ($rows as $id => $row)
+                if (is_array($row) && ($row['language'] ?? null) === $from) $this->store[$kind][$id]['language'] = $to;
+        }
+        $old = $this->store['language'][$source];
+        $this->store['language'][$source] = ['lang_code' => $to] + $label + $old;
+        return ['previous' => ['title' => (string) ($old['title'] ?? ''), 'title_native' => (string) ($old['title_native'] ?? ''), 'image' => (string) ($old['image'] ?? '')], 'removed' => $removedRow];
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
@@ -1768,6 +1790,7 @@ require __DIR__ . "/multilingual.php";
 require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
+require __DIR__ . "/source-language.php";
 require __DIR__ . "/multilingual-contracts.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";

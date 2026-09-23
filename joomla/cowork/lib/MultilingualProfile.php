@@ -230,6 +230,27 @@ final class MultilingualProfile
     public function hash(): string { return $this->hash; }
     public function version(): string { return (string) $this->profile['extensionVersion']; }
     public function sourceLanguage(): string { return (string) $this->profile['sourceLanguage']; }
+
+    /** The source language the archive was published in, whatever the site now calls it. */
+    public function publishedSourceLanguage(): string { return $this->publishedSource ??= (string) $this->profile['sourceLanguage']; }
+    private ?string $publishedSource = null;
+
+    /**
+     * Call the source edition by another tag of the same language (en-GB → en-US), or back.
+     *
+     * The profile is the archive's, and the archive says en-GB; a site whose customer writes American
+     * English has had its source edition RELABELLED (`sourceLanguage.set`), and every rule here that
+     * names the source — the retag, the filter's x-default, what retire keeps — must name the tag the
+     * rows actually carry. The profile's hash stays the archive's: the contract did not change.
+     */
+    public function relabelSource(?string $to): void
+    {
+        $to ??= $this->publishedSourceLanguage();
+        $this->publishedSourceLanguage();
+        $this->profile['sourceLanguage'] = $to;
+        $this->profile['languageFilter']['params']['xdefault_language'] = $to;
+        if (isset($this->profile['sourceDelta']['language']['to'])) $this->profile['sourceDelta']['language']['to'] = $to;
+    }
     public function unsupported(): array { return $this->profile['unsupported'] ?? []; }
 
     /** Base keys whose entity gets a copy per language; every other key is shared with a reason. */
