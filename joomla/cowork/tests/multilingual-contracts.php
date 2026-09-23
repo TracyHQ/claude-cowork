@@ -356,6 +356,34 @@ foreach ($gateContracts as $profileFile) {
         check("$id: every row of the fr-FR edition is shown once it is taken", $shown('fr-FR'), []);
         check("$id: two taken languages still make no row", $rowCount(), $before);
     }
+    // A picture changed on the source after the languages exist reaches every one of them in the same
+    // apply — measured 23/09/2026 on j-ee6vsk: a drawn photo landed on /en/careers and not on /vi/ or
+    // /fr/. Words are translated; a picture is the same picture in every language.
+    $map = json_decode(file_get_contents($dir . '/content-map.json'), true);
+    $imageSlot = null;
+    foreach ($map['slots'] as $slot)
+        if ($slot['type'] === 'image' && str_starts_with($slot['entity'], 'module-') && ($lock['entities'][$slot['entity']]['language'] ?? '') !== 'ru-RU'
+            && in_array($slot['entity'], array_column(array_filter($map['entities'], fn ($e) => true), 'key'), true)) { $imageSlot = $slot; break; }
+    if ($imageSlot !== null) {
+        $png = function (int $w, int $h): string {
+            return "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . pack('NN', $w, $h) . "\x08\x02\x00\x00\x00" . pack('N', 0);
+        };
+        @mkdir(dirname($dir . '/' . $imageSlot['sample']), 0777, true);
+        @mkdir($dir . '/images/tracy-content', 0777, true);
+        file_put_contents($dir . '/' . $imageSlot['sample'], $png(1600, 1000));
+        file_put_contents($dir . '/images/tracy-content/drawn.png', $png(1600, 1000));
+        $inspected = $call(['operation' => 'inspect']);
+        $changed = $call(['operation' => 'apply', 'apply_id' => 'contract-gate-picture', 'request_id' => 'picture',
+            'expected_revision' => $inspected['revision'] ?? '', 'changes' => [$imageSlot['key'] => 'images/tracy-content/drawn.png']]);
+        if ($step('change a picture on the source', $changed)) {
+            $held = [];
+            foreach (['vi-VN', 'fr-FR'] as $l) {
+                $copyId = $gs->binding['multilingual']['languages'][$l]['ids'][$imageSlot['entity']] ?? null;
+                $held[$l] = $copyId === null ? null : $gc->slotValue($gw->store['module'][$copyId] ?? [], $imageSlot);
+            }
+            check("$id: a picture changed on the source reaches every language", $held, ['vi-VN' => 'images/tracy-content/drawn.png', 'fr-FR' => 'images/tracy-content/drawn.png']);
+        }
+    }
     if (!$step('take back fr-FR', $call(['operation' => 'multilingual.revert', 'locale' => 'fr-FR']))) continue;
     if ($editions !== null)
         check("$id: taking fr-FR back hides its edition again, and keeps every row", [count($shown('fr-FR')) === count($editions['locales']['fr-FR']['ids']), $rowCount()], [true, $before]);

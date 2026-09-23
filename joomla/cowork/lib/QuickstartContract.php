@@ -567,6 +567,16 @@ final class QuickstartContract
             $this->checkValue($allowed[$key],$value,$params);
             $values[$key]=$value;
         }
+        // 🔒 A PICTURE IS THE SAME PICTURE IN EVERY LANGUAGE. Words are translated, so a new source
+        // sentence waits for its language job; a new source picture has nothing to wait for, and left
+        // on the source alone it showed on /en/ only — measured 23/09/2026 on j-ee6vsk, a drawn photo
+        // on /en/careers and the demo's on /vi/ and /fr/. So every language the site carries takes it
+        // in the same apply, through the same slot the language's own row derives from the source.
+        $locales=[];
+        foreach($state['keys'] as $meta)if(isset($meta['locale']))$locales[$meta['locale']]=true;
+        foreach($values as $key=>$value)
+            if(($allowed[$key]['type']??'')==='image')
+                foreach(array_keys($locales) as $locale)$values[MultilingualProfile::derivedKey($locale,$key)]=$value;
         $operations=[];
         foreach($state['keys'] as $key=>$meta) {
             $row=$state['rows'][$key];$next=$this->changeRow($row,$this->slotsOf($key,$meta),$values);$fields=[];$expected=[];
