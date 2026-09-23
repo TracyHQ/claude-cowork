@@ -26,7 +26,7 @@ final class TestContractStore implements ContractStore {
     public function access(): array { return $this->acl; }
 }
 final class ContractTestWriter extends FakeSiteWriter {
-    private FakeApplyLog $log; private TestContractStore $binding;
+    private FakeApplyLog $log; private ContractStore $binding;
     public bool $drift=false;
     /** [kind, id] whose next write throws, to stand in for a row Joomla refuses mid-batch. */
     public ?array $failOn=null;
@@ -37,11 +37,32 @@ final class ContractTestWriter extends FakeSiteWriter {
      * minted six, which moved their effective ACL. On, this double does the same to the ACL.
      */
     public bool $tableAssets=false;
-    public function __construct(FakeApplyLog $log,TestContractStore $binding){$this->log=$log;$this->binding=$binding;}
+    /** Joomla's Table\Menu writes a new item's `path` from its parent's and its alias; on, this does too. */
+    public bool $nestedPaths=false;
+    /** `#__extensions` as JoomlaSiteWriter::componentIdFor() reads it: component element => extension_id. */
+    public array $components=[];
+    /** Each table's columns and their defaults: kind => [column => default]. */
+    public array $columns=[];
+    public function __construct(FakeApplyLog $log,ContractStore $binding){$this->log=$log;$this->binding=$binding;}
     public function write(string $kind,int $id,array $fields):int {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
         if($this->tableAssets && $kind==='article')$this->binding->acl['entityRules']['content.'.$id]='minted by Table::store';
         $fields=array_merge($this->read($kind,$id)??[],$fields);
+        // The real writer's create defaults for a menu item (JoomlaSiteWriter::MAP['menuItem']['defaults']),
+        // under whatever the caller sent — the same order it merges them in.
+        if($this->nestedPaths && $kind==='menuItem' && $id===0)
+            $fields=array_merge(['type'=>'url','published'=>1,'access'=>1,'language'=>'*','browserNav'=>0,'note'=>'','params'=>'{}',
+                'img'=>'','template_style_id'=>0,'component_id'=>0,'client_id'=>0,'publish_up'=>null,'publish_down'=>null],$fields);
+        // A created row reads back every column its table has, at the table's default.
+        if($id===0 && isset($this->columns[$kind]))$fields=array_merge($this->columns[$kind],$fields);
+        // The real writer resolves a component item's component_id from its link, whatever was sent.
+        if($this->nestedPaths && $kind==='menuItem' && $id===0 && ($fields['type']??'')==='component')
+            $fields['component_id']=preg_match('/option=([a-z0-9_]+)/i',(string)($fields['link']??''),$m)?(int)($this->components[$m[1]]??0):0;
+        if($this->nestedPaths && $kind==='menuItem' && $id===0 && (!isset($fields['path']) || $fields['path']==='')){
+            $parent=$this->read('menuItem',(int)($fields['parent_id']??1));
+            $fields['path']=($parent && (int)($fields['parent_id']??1)!==1 ? $parent['path'].'/' : '').($fields['alias']??'');
+            $fields['level']=(string)(($parent && (int)($fields['parent_id']??1)!==1 ? (int)$parent['level'] : 0)+1);
+        }
         if($this->drift && $kind==='module')$fields['position']='wrong-position';
         return parent::write($kind,$id,$fields);
     }
