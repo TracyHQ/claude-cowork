@@ -67,12 +67,14 @@ final class QuickstartContract
             $this->multilingual = new MultilingualProfile(
                 json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw
             );
-            if (is_file($catalogFile))
-                $this->packs = new LanguagePackCatalog(
-                    json_decode(file_get_contents($catalogFile), true, 512, JSON_THROW_ON_ERROR),
-                    $this->multilingual->sourceLanguage()
-                );
         }
+        // The catalog is the receiver's reviewed list of packs, not part of any profile, so a contract
+        // with no multilingual profile can still be given ONE language from it (siteLanguage.*).
+        if (is_file($catalogFile))
+            $this->packs = new LanguagePackCatalog(
+                json_decode(file_get_contents($catalogFile), true, 512, JSON_THROW_ON_ERROR),
+                $this->multilingual ? $this->multilingual->sourceLanguage() : 'en-GB'
+            );
         // The demo-trim extension is optional in the same way, and for the same reason: a contract
         // published before it keeps working, and a receiver carrying the code claims nothing for a
         // contract that ships no list of what its demo is.
@@ -101,6 +103,8 @@ final class QuickstartContract
         return $this->multilingual;
     }
     /** Whether THIS SITE's profile lists demo rows it may hide — a property of the contract, not the receiver. */
+    /** Whether this site can be given one default language from the reviewed catalog. */
+    public function siteLanguageAvailable(): bool { return $this->unavailable === null && $this->packs !== null; }
     public function demoTrimAvailable(): bool { return $this->unavailable === null && $this->demoTrim !== null; }
     public function demoTrim(): DemoTrimProfile {
         $this->ready();
@@ -493,6 +497,7 @@ final class QuickstartContract
         // Carried through every rebind, or the next content edit would store a baseline that no
         // longer knows the demo was hidden — and the one after that would call it drift.
         if(isset($binding['demoTrim']))$snapshot['demoTrim']=$binding['demoTrim'];
+        if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $slots=[];
@@ -692,6 +697,16 @@ final class QuickstartContract
         if(!$binding)throw new RuntimeException('A revert needs a bound site');
         foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['from'];
         unset($binding['demoTrim']);
+        return $binding;
+    }
+
+    /* ------------------------------------------------------------ site language */
+
+    /** The baseline with the site's one language on record — or with none, when $record is null. */
+    public function bindingWithSiteLanguage(?array $record): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('A site language needs a bound site');
+        if($record===null)unset($binding['siteLanguage']);else $binding['siteLanguage']=$record;
         return $binding;
     }
 
