@@ -349,6 +349,18 @@ final class JoomlaSiteWriter implements \SiteWriter
             ->set($this->db->quoteName($column) . ' = ' . (int) $value)
             ->where($this->db->quoteName($this->pkFor($kind)) . ' = ' . (int) $id);
         $this->db->setQuery($query)->execute();
+        // 🔒 AN ARTICLE'S STATE LIVES TWICE. Joomla keeps a copy in `#__ucm_content.core_state`, and the
+        // tag pages (com_tags) list items by THAT copy — the Table keeps the two in step, a raw UPDATE
+        // does not. Measured 23/09/2026 on j-yo65dx (ja-kinetic): 240 trimmed demo posts still listed
+        // under /pages/tags/*, 205 links to 404. Not a contract field; only the listing reads it.
+        if ($kind === 'article') {
+            $ucm = $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__ucm_content'))
+                ->set($this->db->quoteName('core_state') . ' = ' . (int) $value)
+                ->where($this->db->quoteName('core_type_alias') . ' = ' . $this->db->quote('com_content.article'))
+                ->where($this->db->quoteName('core_content_item_id') . ' = ' . (int) $id);
+            $this->db->setQuery($ucm)->execute();
+        }
     }
 
     public function realiasMenuItem(int $id, string $alias): void

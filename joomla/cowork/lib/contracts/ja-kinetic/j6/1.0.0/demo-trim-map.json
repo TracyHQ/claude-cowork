@@ -60,12 +60,28 @@
       "reason": "lists articles (view=category, layout=blog); every one it lists is hidden"
     },
     {
+      "key": "menuItem-231",
+      "kind": "menuItem",
+      "field": "published",
+      "from": "1",
+      "to": "0",
+      "reason": "lists articles (view=tags); every one it lists is hidden"
+    },
+    {
       "key": "menuItem-242",
       "kind": "menuItem",
       "field": "published",
       "from": "1",
       "to": "0",
       "reason": "alias of menuItem-221, which is hidden"
+    },
+    {
+      "key": "menuItem-245",
+      "kind": "menuItem",
+      "field": "published",
+      "from": "1",
+      "to": "0",
+      "reason": "alias of menuItem-231, which is hidden"
     },
     {
       "key": "menuItem-250",
@@ -2029,7 +2045,7 @@
     }
   ],
   "counts": {
-    "menuItem": 7,
+    "menuItem": 9,
     "article": 240
   }
 }
