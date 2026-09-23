@@ -1800,7 +1800,7 @@ final class Engine
             // An angle bracket is markup only where the source has none — the rule, and the
             // measurement behind it, are in MultilingualProfile::markupIntroduced().
             if (MultilingualProfile::markupIntroduced($source, $value)) { $say('carries markup its source does not'); continue; }
-            if (preg_match('/\{\/?[a-z][^{}]*\}/i', $value)) { $say('carries a Joomla plugin directive'); continue; }
+            if (IdentityTokens::hasDirective($value)) { $say('carries a Joomla plugin directive'); continue; }
             foreach (MultilingualProfile::preservationErrors($source, $value) as $lost) $say($lost);
         }
         return $out;

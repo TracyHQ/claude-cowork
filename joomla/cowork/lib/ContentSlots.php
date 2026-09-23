@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/IdentityTokens.php';
 /** Scalar slots only: JSON leaves or text/URL/media nodes in existing HTML. */
 final class ContentSlots
 {
@@ -17,7 +18,7 @@ final class ContentSlots
             $element = $node instanceof DOMAttr ? $node->ownerElement : $node->parentNode;
             if ($xpath->query('ancestor-or-self::script | ancestor-or-self::style | ancestor-or-self::svg | ancestor-or-self::code', $element)->length) continue;
             // Joomla content-plugin directives select modules/fields and are executable structure.
-            if (preg_match('/\{\/?[a-z][^{}]*\}/i', $node->nodeValue)) continue;
+            if (IdentityTokens::hasDirective($node->nodeValue)) continue;
             $out[] = ['xpath' => $node->getNodePath(), 'type' => $node->nodeName === 'src' ? 'image' : ($node->nodeName === 'href' ? 'url' : 'text'), 'sample' => $node->nodeValue];
         }
         return $out;
