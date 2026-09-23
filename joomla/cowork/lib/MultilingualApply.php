@@ -139,6 +139,46 @@ final class MultilingualApply
         return $values;
     }
 
+    /**
+     * The writes that hide every language the site should not route, and every row a quickstart
+     * shipped in a language other than its source that the contract does not govern.
+     *
+     * 🔒 UNPUBLISH, NEVER DELETE, AND NEVER A GOVERNED ROW. The Business archive carries 43
+     * content languages its contract does not govern; left published, the switcher and hreflang
+     * offered all of them (the vendor's demo company, translated), and the archive's own zh-CN
+     * edition sat beside the copy derived from the customer's words — measured 23/09/2026 on
+     * `j-h0n2f4`. A governed row is compared field by field by `inspect`, so it is left exactly as
+     * it is; a retired language is hidden through its `#__languages` row instead, which `inspect`
+     * does not read. Every row is recorded as a `visibility` undo, and `multilingual.restore` brings a
+     * pass back (a sealed site's `apply.revert` takes contract receipts only).
+     *
+     * @param array<string,array<int,array<string,mixed>>> $rows `language`, `article`, `menuItem`, `module` summaries
+     * @param array<string,int[]> $governed per kind, the ids the contract governs — derived copies
+     *        and the switcher included. Per kind because ids are per table.
+     * @param string[] $routed the content languages that stay published; the source always does
+     * @return array<int,array{0:string,1:int,2:array<string,int>}>
+     */
+    public static function retireWrites(array $rows, array $governed, string $source, array $routed): array
+    {
+        $routed = array_merge([$source], $routed);
+        $out = [];
+        foreach ($rows['language'] ?? [] as $row)
+            if ((int) $row['published'] === 1 && !in_array((string) $row['lang_code'], $routed, true))
+                $out[] = ['language', (int) $row['lang_id'], ['published' => 0]];
+        $columns = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
+        foreach ($columns as $kind => $column) {
+            $keep = array_flip(array_map('intval', $governed[$kind] ?? []));
+            foreach ($rows[$kind] ?? [] as $row) {
+                $language = (string) ($row['language'] ?? '*');
+                if ($language === '*' || $language === $source || (int) ($row[$column] ?? 0) !== 1) continue;
+                if ($kind === 'menuItem' && (int) ($row['client_id'] ?? 0) !== 0) continue;
+                if (isset($keep[(int) $row['id']])) continue;
+                $out[] = [$kind, (int) $row['id'], [$column => 0]];
+            }
+        }
+        return $out;
+    }
+
     /* ---------------------------------------------------------------- phases */
 
     /**

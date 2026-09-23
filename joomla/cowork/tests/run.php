@@ -1007,6 +1007,22 @@ check('the new value is live', $writer->read('templateStyle', 7), ['params' => '
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'A2']]);
 check('reverting an update restores the before-state', $writer->read('templateStyle', 7), ['params' => '{"color":"blue"}']);
 
+// 🔒 A HIDDEN ROW COMES BACK THROUGH THE SAME COLUMN, NEVER THROUGH write(). A retire hides rows with
+// setVisibility() because write() goes through Joomla's Table and moves the row's ACL (0.16.9); its
+// undo must not take the other road back. The language row is the one kind setVisibility() does not
+// serve, so it returns through write() — a content language has no asset.
+$visWriter = new FakeSiteWriter();
+$visLog = new FakeApplyLog();
+$visEngine = new Engine($WTOKEN, [], null, null, null, null, $visWriter, new FakeMediaWriter(), $visLog);
+$visWriter->store['article'][55] = ['title' => 'Demo', 'state' => '0'];
+$visWriter->store['language'][4] = ['lang_code' => 'de-DE', 'published' => 0];
+$visLog->record('R1', ['op' => 'visibility', 'kind' => 'language', 'id' => 4, 'column' => 'published', 'before' => 1]);
+$visLog->record('R1', ['op' => 'visibility', 'kind' => 'article', 'id' => 55, 'column' => 'state', 'before' => 1]);
+$vis = $visEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'R1']]);
+check('a visibility undo reverts every entry', $vis['reverted'] ?? null, 2);
+check('the hidden article is shown again', $visWriter->read('article', 55)['state'], '1');
+check('the retired language is published again', (int) $visWriter->read('language', 4)['published'], 1);
+
 // the read half of the content mirror (ADR 0071): list pages, get returns the full row
 $writer->store['article'][3] = ['title' => 'First', 'alias' => 'first', 'introtext' => '<p>long body</p>'];
 $writer->store['article'][9] = ['title' => 'Second', 'alias' => 'second', 'introtext' => '<p>x</p>'];
@@ -1453,6 +1469,15 @@ check('reserveMemory raises the default limit', Door::reserveMemory(), Door::MEM
 ini_set('memory_limit', '1G');
 check('reserveMemory keeps a higher one', Door::reserveMemory(), '1G');
 ini_set('memory_limit', $limitBefore);
+
+// The door reserves TIME as it reserves memory (why: Door::TIME_LIMIT). A contract inspect of the
+// 43-language Business quickstart is ~42 s on the fleet, and PHP's stock 30 s killed the call that
+// followed it with a 500 — measured 23/09/2026 on `j-h0n2f4`, twice, once after the seed's apply
+// had already written every slot.
+check('the stock 30 s is raised to the reserve', Door::timeLimitFor(30), Door::TIME_LIMIT);
+check('the reserve itself is left alone', Door::timeLimitFor(Door::TIME_LIMIT), null);
+check('a longer limit is never shortened', Door::timeLimitFor(900), null);
+check('no limit stays no limit', Door::timeLimitFor(0), null);
 
 // ---------------------------------------------------------------- packaging --
 // The door plugin travels INSIDE pkg_claudecowork, so one install or one update puts it on the

@@ -196,6 +196,8 @@ final class EngineFactory
         // 43-language quickstart's lock is ~8 MB with ~6k ACL chains — more than PHP's default
         // 128M survives. Why, and what it never lowers: `Door::MEMORY_LIMIT`.
         \Door::reserveMemory();
+        // The same reasoning for time: a contract inspect outlives PHP's stock 30 s. `Door::TIME_LIMIT`.
+        \Door::reserveTime();
 
         $request = json_decode((string) $app->getInput()->json->getRaw(), true);
         if (!\is_array($request)) {

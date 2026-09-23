@@ -77,6 +77,38 @@ final class Door
     }
 
     /**
+     * The seconds of execution the door reserves before the engine is built.
+     *
+     * A contract inspect reads ~3,900 file hashes and every governed row; on the 43-language
+     * Business quickstart that is ~42 s on the fleet, and PHP's stock `max_execution_time` of 30 s
+     * killed the call that followed it with a 500 — measured 23/09/2026 on `j-h0n2f4`, once after
+     * the seed's apply had already written every slot, once in `multilingual.package`. Reserved
+     * here for the same reason as memory: php.ini on a customer's host is not ours to edit, and a
+     * host that forbids `set_time_limit` is exactly as it was before.
+     */
+    public const TIME_LIMIT = 300;
+
+    /** Raise the execution limit to at least TIME_LIMIT. Never shortens one, leaves 0 alone. */
+    public static function reserveTime(): int
+    {
+        $wanted = self::timeLimitFor((int) ini_get('max_execution_time'));
+        if ($wanted !== null && function_exists('set_time_limit')) {
+            @set_time_limit($wanted);
+        }
+        return (int) ini_get('max_execution_time');
+    }
+
+    /** The limit to set for a configured `max_execution_time`, or null when it is already enough. */
+    public static function timeLimitFor(int $configured): ?int
+    {
+        // 0 is PHP's "no limit"; nothing this could set is more than that.
+        if ($configured <= 0 || $configured >= self::TIME_LIMIT) {
+            return null;
+        }
+        return self::TIME_LIMIT;
+    }
+
+    /**
      * PHP's own ini shorthand: an integer with an optional K, M or G suffix, case-insensitive.
      * Anything unparseable counts as 0, which is what PHP itself makes of it — and 0 is raised.
      */

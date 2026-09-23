@@ -153,6 +153,65 @@ check('a scaled figure copied verbatim is kept', MultilingualProfile::preservati
 check('a unit figure copied with a space before it is kept', MultilingualProfile::preservationErrors('the design frost depth reaches 1.6 m and', '设计冻深可达 1.6 m，'), []);
 check('a scaled figure dropped outright is still refused', MultilingualProfile::preservationErrors('steel frames spanning up to 45 m.', '钢结构框架'), ['the figure 45 m left no number in the translation']);
 
+/* ------------------------------------------------ the languages a customer did not ask for */
+
+// 🔒 A QUICKSTART MAY SHIP EDITIONS OF ITS OWN, AND A CUSTOMER'S SITE MUST NOT KEEP THEM. The
+// Business archive carries 43 content languages (~184 rows each) that its contract does not
+// govern: measured 23/09/2026 on `j-h0n2f4`, built in en-GB + zh-CN + vi-VN, the switcher and the
+// page's hreflang offered all 43 — the other 40 were the vendor's demo company, translated. And the
+// archive's OWN zh-CN edition would sit beside the copy derived from the customer's words: a second
+// zh-CN home, a second set of zh-CN modules. So a retire pass unpublishes (never deletes) every
+// ungoverned row in a language other than the source, and every content language the site should
+// not route. Rows the contract governs are never touched — that is what keeps `inspect` exact.
+$retireRows = [
+    'language' => [
+        ['lang_id' => 1, 'lang_code' => 'en-GB', 'published' => 1],
+        ['lang_id' => 2, 'lang_code' => 'ru-RU', 'published' => 1],
+        ['lang_id' => 3, 'lang_code' => 'zh-CN', 'published' => 1],
+        ['lang_id' => 4, 'lang_code' => 'de-DE', 'published' => 1],
+        ['lang_id' => 5, 'lang_code' => 'ko-KR', 'published' => 0],
+    ],
+    'article' => [
+        ['id' => 10, 'language' => 'en-GB', 'state' => 1],   // the source edition, governed
+        ['id' => 11, 'language' => 'ru-RU', 'state' => 1],   // an authored edition the contract governs
+        ['id' => 12, 'language' => 'zh-CN', 'state' => 1],   // the archive's own zh-CN — not governed
+        ['id' => 13, 'language' => 'zh-CN', 'state' => 1],   // the copy derived from the customer's words
+        ['id' => 14, 'language' => 'de-DE', 'state' => 1],   // an edition nobody asked for
+        ['id' => 15, 'language' => '*', 'state' => 1],       // shows in every language
+        ['id' => 16, 'language' => 'de-DE', 'state' => 0],   // already hidden
+        ['id' => 17, 'language' => 'en-GB', 'state' => 1],   // ungoverned, but in the source language
+    ],
+    'menuItem' => [
+        ['id' => 20, 'language' => 'de-DE', 'published' => 1, 'client_id' => 0],
+        ['id' => 21, 'language' => 'de-DE', 'published' => 1, 'client_id' => 1],  // the admin menu
+    ],
+    'module' => [
+        ['id' => 30, 'language' => 'zh-CN', 'published' => 1],
+        ['id' => 31, 'language' => 'zh-CN', 'published' => 1],  // the derived copy
+    ],
+];
+$retired = MultilingualApply::retireWrites($retireRows, ['article' => [10, 11, 13], 'module' => [31]], 'en-GB', ['en-GB', 'zh-CN']);
+check('a retire pass hides exactly the rows nobody asked for', $retired, [
+    ['language', 2, ['published' => 0]],
+    ['language', 4, ['published' => 0]],
+    ['article', 12, ['state' => 0]],
+    ['article', 14, ['state' => 0]],
+    ['menuItem', 20, ['published' => 0]],
+    ['module', 30, ['published' => 0]],
+]);
+check('a retire pass on a retired site writes nothing', MultilingualApply::retireWrites([
+    'language' => [['lang_id' => 1, 'lang_code' => 'en-GB', 'published' => 1], ['lang_id' => 2, 'lang_code' => 'ru-RU', 'published' => 0]],
+    'article' => [['id' => 12, 'language' => 'zh-CN', 'state' => 0]],
+], [], 'en-GB', ['en-GB']), []);
+// Ids are per TABLE: article 20 being governed says nothing about menu item 20.
+check('a governed id guards only its own kind', MultilingualApply::retireWrites([
+    'menuItem' => [['id' => 20, 'language' => 'de-DE', 'published' => 1, 'client_id' => 0]],
+], ['article' => [20]], 'en-GB', []), [['menuItem', 20, ['published' => 0]]]);
+// The source language is routed whatever the caller says: without it the site has no home page.
+check('the source language is never retired', MultilingualApply::retireWrites([
+    'language' => [['lang_id' => 1, 'lang_code' => 'en-GB', 'published' => 1]],
+], [], 'en-GB', []), []);
+
 /* ---------------------------------------------------------------- the profile and its pinning */
 
 $mlDir = sys_get_temp_dir() . '/cowork-ml-' . bin2hex(random_bytes(6));

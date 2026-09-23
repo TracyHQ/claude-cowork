@@ -1271,6 +1271,10 @@ final class Engine
                 return $this->multilingualVerify($locale);
             case 'revert':
                 return $this->multilingualRevert($p, $locale);
+            case 'retire':
+                return $this->multilingualRetire($p);
+            case 'restore':
+                return $this->multilingualRestore($p);
             default:
                 return $this->err('bad_params', 'Unknown multilingual operation');
         }
@@ -1610,6 +1614,112 @@ final class Engine
     }
 
 
+
+    /**
+     * Bring back every row one retire pass hid, by its apply id. The sealed site's `apply.revert` takes
+     * contract receipts only, so a retire has its own way back — through the same column it moved.
+     */
+    private function multilingualRestore(array $p): array
+    {
+        if ($this->writer === null || $this->log === null) return $this->err('unavailable', 'site writer not wired');
+        $apply = $this->applyId($p);
+        if (!$apply || strpos($apply, 'mlang-') !== 0) return $this->err('bad_params', 'the mlang- apply_id of the retire pass is required');
+        try {
+            $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
+            if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
+            $this->writer->transaction(function () use ($entries) {
+                foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
+                return [];
+            });
+            $this->log->clear($apply);
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('revert');
+            return $this->ok(['restored' => count($entries), 'applyId' => $apply]);
+        } catch (Throwable $error) {
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+    /**
+     * How many rows one retire call hides before it answers `running`. Each is one read and one
+     * UPDATE of one column (`setVisible`); through the full write path the same pass ran ~6 rows a
+     * second and outlived the 60 s its callers allowed (measured 23/09/2026).
+     */
+    private const RETIRE_CHUNK = 3000;
+
+    /**
+     * Show or hide one row by its visibility column, and nothing else. Not write(): for an article or
+     * a module that goes through Joomla's Table, which mints an `#__assets` row and moves the ACL
+     * (0.16.9, measured on j-1pd0de). A content language has no asset, so it is the one kind that
+     * does go through write() — setVisibility() does not serve it.
+     */
+    private function setVisible(string $kind, int $id, string $column, int $value): void
+    {
+        if ($kind === 'language') {
+            if ($column !== 'published') throw new RuntimeException('published is the visibility column of a language');
+            $this->writer->write('language', $id, ['published' => $value]);
+            return;
+        }
+        $this->writer->setVisibility($kind, $id, $column, (string) $value);
+    }
+
+    /**
+     * Hide every language the customer did not ask for, and every row the quickstart shipped in a
+     * language the contract does not govern (why, and what is never touched:
+     * `MultilingualApply::retireWrites`). `keep` names the languages the site should route; only
+     * those that have been DERIVED stay published, so a language still waiting for its words is
+     * not routed onto the archive's edition of it. Chunked: repeat the call until it answers
+     * `completed`. Every row is recorded under `apply_id` as a `visibility` undo; on a sealed site, where
+     * `apply.revert` takes contract receipts only, `multilingual.restore` with the same id brings the
+     * pass back.
+     */
+    private function multilingualRetire(array $p): array
+    {
+        $apply = $this->applyId($p);
+        if (!$apply || strpos($apply, 'mlang-') !== 0) return $this->err('bad_params', 'an mlang- apply_id is required');
+        $keep = $p['keep'] ?? null;
+        if (!is_array($keep)) return $this->err('bad_params', 'keep must list the languages the site routes');
+        foreach ($keep as $tag)
+            if (!is_string($tag) || !preg_match('/^[a-z]{2,3}-[A-Za-z]{2,4}$/D', $tag)) return $this->err('bad_params', 'keep holds language tags like zh-CN');
+        try {
+            if (($job = $this->contract->job()) !== null)
+                return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase']);
+            $governed = $this->contract->governedIds();
+            $routed = array_values(array_intersect($this->contract->derivedLanguages(), $keep));
+            $rows = [];
+            foreach (['language', 'article', 'menuItem', 'module'] as $kind) {
+                $rows[$kind] = [];
+                for ($offset = 0; $offset < 20000; $offset += 100) {
+                    $page = $this->writer->list($kind, $offset, 100);
+                    foreach ($page as $row) $rows[$kind][] = $row;
+                    if (count($page) < 100) break;
+                }
+            }
+            $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), $routed);
+            $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            $this->writer->transaction(function () use ($slice, $apply) {
+                // Undo first, then the change: a row whose undo could not be recorded is never hidden.
+                foreach ($slice as [$kind, $id, $fields]) {
+                    $column = (string) array_key_first($fields);
+                    $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1]);
+                    $this->setVisible($kind, $id, $column, 0);
+                }
+                return [];
+            });
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            if ($slice) $this->stamped('content');
+            $hidden = [];
+            foreach ($slice as [$kind]) $hidden[$kind] = ($hidden[$kind] ?? 0) + 1;
+            return $this->ok([
+                'status' => count($writes) > count($slice) ? 'running' : 'completed',
+                'hidden' => $hidden, 'remaining' => count($writes) - count($slice),
+                'routed' => array_merge([$this->contract->profile()->sourceLanguage()], $routed),
+                'applyId' => $apply,
+            ]);
+        } catch (Throwable $error) {
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
 
     /**
      * Rows an unfinished language left on the site, grouped by kind, newest first.
@@ -2121,6 +2231,10 @@ final class Engine
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
         if ($op === 'batch' || $op === 'contract') { return; }
+        if ($op === 'visibility') {
+            $this->setVisible((string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0), (string) ($entry['column'] ?? ''), (int) ($entry['before'] ?? 1));
+            return;
+        }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');

@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>A quickstart that ships editions of its own no longer leaves them on a customer's site. `multilingual.retire` hides (never deletes) every content language the customer did not ask for, and every row the archive shipped in a language other than its source that the contract does not govern, so the switcher and hreflang offer only the site's own languages and a derived edition no longer sits beside the archive's. Rows move by their visibility column only (setVisibility, as the demo trim does), so no row's ACL changes; `multilingual.restore` brings a pass back. The door also reserves 300 s of execution beside its memory: a contract inspect of the 43-language Business quickstart outlived PHP's stock 30 s. Carries 0.16.10: one language for a quickstart with no second edition.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.16.11</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.11</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.16.11/pkg_claudecowork-0.16.11.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>A sealed quickstart with no second edition can be built in the customer's language. New `siteLanguage.plan / set / revert`: the reviewed language pack is installed (verified against the catalog, as for a second edition) and made the default for the site and the administrator, with the previous defaults kept on record for the revert. It needs no multilingual profile — JA Kinetic has none — and refuses a site that already has a second edition. Measured on a local JA Kinetic 1.0.0 site: vi-VN 4.2.2.1 installed and set in 5.8 s, the home page and the administrator answer lang="vi-vn", and the contract inspects clean, demo trim included.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

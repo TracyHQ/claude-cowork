@@ -710,6 +710,34 @@ final class QuickstartContract
         return $binding;
     }
 
+    /**
+     * Per kind, every id the contract governs on this site — the bound base entities, every
+     * derived copy and the switcher — read from the binding, without an inspect. What a retire
+     * pass must leave alone; cheap because a retire runs in chunks and an inspect costs ~40 s on
+     * a 43-language archive.
+     *
+     * @return array<string,int[]>
+     */
+    public function governedIds(): array {
+        $this->ready();
+        $binding = $this->store->load();
+        if ($binding === null) throw new RuntimeException('A retire needs a bound site');
+        $out = [];
+        foreach ($binding['ids'] ?? [] as $key => $id)
+            if (isset($this->baseEntities()[$key])) $out[$this->baseEntities()[$key]['kind']][] = (int) $id;
+        foreach ($binding['multilingual']['languages'] ?? [] as $state)
+            foreach ($state['ids'] ?? [] as $baseKey => $id)
+                if (isset($this->baseEntities()[$baseKey])) $out[$this->baseEntities()[$baseKey]['kind']][] = (int) $id;
+        if (isset($binding['multilingual']['switcher'])) $out['module'][] = (int) $binding['multilingual']['switcher'];
+        return $out;
+    }
+
+    /** The content languages this site has been given copies of, per its binding. */
+    public function derivedLanguages(): array {
+        $this->ready();
+        return array_keys($this->store->load()['multilingual']['languages'] ?? []);
+    }
+
     public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
     public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); }
