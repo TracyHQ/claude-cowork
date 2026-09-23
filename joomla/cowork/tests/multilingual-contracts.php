@@ -34,7 +34,7 @@ function gateContractCopy(string $source): string {
         fn ($n) => $n . ':' . hash_file('sha256', $dir . '/' . $n) . "\n",
         ['manifest.json', 'content-map.json', 'presentation-lock.json']
     )));
-    foreach (['multilingual-map', 'demo-trim-map'] as $name) {
+    foreach (['multilingual-map', 'demo-trim-map', 'editions'] as $name) {
         if (!is_file($source . '/' . $name . '.json')) continue;
         $profile = json_decode(file_get_contents($source . '/' . $name . '.json'), true, 512, JSON_THROW_ON_ERROR);
         $profile['baseHash'] = $base;
@@ -145,13 +145,65 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
         if (preg_match('/^(modules|content)\.(\d+)$/', $asset, $m) && !isset($w->store[$m[1] === 'modules' ? 'module' : 'article'][(int) $m[2]]))
             $named[$m[1] === 'modules' ? 'module' : 'article'][] = (int) $m[2];
     $next = 900000;
+    // An archive that ships its own editions (editions.json): each translated row of vi-VN and fr-FR
+    // stands at the id the map names, written by the archive's `add-language` rules — implemented
+    // here a second time, apart from the receiver's, so the gate does not grade its own answer.
+    $editionsFile = $dir . '/editions.json';
+    $editions = is_file($editionsFile) ? json_decode(file_get_contents($editionsFile), true, 512, JSON_THROW_ON_ERROR) : null;
+    foreach (['vi-VN', 'fr-FR'] as $edition) {
+        $e = $editions['locales'][$edition] ?? null;
+        if ($e === null) continue;
+        $srcSef = $editions['source']['sef'];
+        $groupsOf = [];
+        foreach ($e['ids'] as $key => $eid) {
+            $entity = null;
+            foreach ($map['entities'] as $candidate) if ($candidate['key'] === $key) { $entity = $candidate; break; }
+            $kind = $entity['kind'];
+            $row = $w->store[$kind][(int) $entity['sourceId']];
+            $row['id'] = (string) $eid;
+            $row['language'] = $edition;
+            $cat = fn ($id) => (string) ($e['maps']['category'][(string) $id] ?? $id);
+            $menu = fn ($id) => (string) ($e['maps']['menuItem'][(string) $id] ?? $id);
+            $art = fn ($id) => (string) ($e['maps']['article'][(string) $id] ?? $id);
+            if ($kind === 'article') { $row['alias'] .= '-' . $e['sef']; $row['catid'] = $cat($row['catid']); }
+            if ($kind === 'menuItem') {
+                $row['menutype'] = $e['menutypes'][$row['menutype']] ?? $row['menutype'];
+                $row['parent_id'] = $menu($row['parent_id']);
+                $link = preg_replace_callback('~(view=article&id=)(\d+)~', fn ($m) => $m[1] . $art($m[2]), $row['link']);
+                $link = preg_replace_callback('~(view=category(?:&[a-z_]+=[^&]*)*&id=)(\d+)~', fn ($m) => $m[1] . $cat($m[2]), $link);
+                $link = preg_replace_callback('~(Itemid=)(\d+)~', fn ($m) => $m[1] . $menu($m[2]), $link);
+                if (str_starts_with($link, '/' . $srcSef . '/')) $link = '/' . $e['sef'] . '/' . substr($link, strlen($srcSef) + 2);
+                $row['link'] = $link;
+                $row['params'] = preg_replace_callback('~("aliasoptions":)(\d+)~', fn ($m) => $m[1] . $menu($m[2]), (string) $row['params']);
+            }
+            if ($kind === 'module') {
+                $row['title'] = str_replace('(' . $srcSef . ')', '(' . $e['sef'] . ')', $row['title']);
+                $params = (string) $row['params'];
+                foreach ($e['menutypes'] as $from => $to) $params = str_replace('"' . $from . '"', '"' . $to . '"', $params);
+                $row['params'] = preg_replace_callback('~("catid":\[)([\d,"]*)(\])~', fn ($m) => $m[1] . preg_replace_callback('~\d+~', fn ($n) => $cat($n[0]), $m[2]) . $m[3], $params);
+            }
+            $w->store[$kind][$eid] = $row;
+            $governed[$kind] = ($governed[$kind] ?? 0) + 1;
+            if ($kind === 'module') {
+                $menus = [];
+                foreach (json_decode($w->store['moduleAssignment'][(int) $entity['sourceId']]['menuids'] ?? '[]', true) as $m)
+                    $menus[] = ($m < 0 ? -1 : 1) * ($m === 0 ? 0 : (int) $menu(abs($m)));
+                $w->store['moduleAssignment'][$eid] = ['menuids' => json_encode($menus)];
+            }
+            if ($kind === 'menuItem' || $kind === 'article') $groupsOf[$kind . 'Association'][$key][] = (int) $eid;
+        }
+        foreach ($groupsOf as $relation => $byKey) foreach ($byKey as $key => $members) $w->editionGroups[$relation][$key][] = $members[0];
+    }
+    foreach ($w->editionGroups ?? [] as $relation => $byKey)
+        foreach ($byKey as $members) foreach ($members as $member) $w->groups[$relation][$member] = md5(json_encode($members));
+
     // The archive's own editions in the languages the gate derives, top of the menu tree: Business
     // ships one per language with its source's aliases, and a copy must find its alias taken
     // (j-ee6vsk, `Duplicate entry '0-1-home-vi-VN'`). Only where the lock's inventory has room.
     $tops = [];
     foreach ($w->store['menuItem'] ?? [] as $row)
         if ((int) ($row['parent_id'] ?? 1) === 1 && (string) ($row['client_id'] ?? '0') === '0' && $row['title'] !== 'ancestor ' . $row['id']) $tops[] = $row;
-    if (($lock['inventoryCounts']['menuItem'] ?? 0) - ($governed['menuItem'] ?? 0) >= 2 * count($tops))
+    if ($editions === null && ($lock['inventoryCounts']['menuItem'] ?? 0) - ($governed['menuItem'] ?? 0) >= 2 * count($tops))
         foreach ($tops as $row) {
             // ...and each edition joined to its source in one association group, as Business ships it.
             $group = [(int) $row['id']];
@@ -165,7 +217,8 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
         }
     foreach ($lock['inventoryCounts'] as $kind => $count) {
         for ($n = $governed[$kind] ?? 0; $n < $count; $n++) {
-            $id = ($named[$kind] ?? []) ? array_shift($named[$kind]) : $next++;
+            do $id = ($named[$kind] ?? []) ? array_shift($named[$kind]) : $next++;
+            while (isset($w->store[$kind][$id]));
             $row = ['id' => (string) $id, 'title' => 'pad ' . $id, 'alias' => 'pad-' . $id, 'language' => 'de-DE', 'note' => ''];
             if ($kind === 'article') $row += ['state' => '1', 'catid' => '0'];
             elseif ($kind === 'module') $row += ['published' => '1', 'client_id' => '0', 'module' => 'mod_custom', 'position' => 'pad'];
@@ -213,6 +266,9 @@ foreach ($gateContracts as $profileFile) {
     if (!$step('retire', $r)) continue;
     check("$id: retire hides the other editions", count(array_filter($gw->store['article'] ?? [], fn ($a) => ($a['language'] ?? '') === 'de-DE' && (string) ($a['state'] ?? '') === '1')), 0);
 
+    $editions = is_file($dir . '/editions.json') ? json_decode(file_get_contents($dir . '/editions.json'), true) : null;
+    $rowCount = fn () => array_sum(array_map(fn ($k) => count($gw->store[$k] ?? []), ['article', 'menuItem', 'module']));
+    $before = $rowCount();
     // Derive vi-VN: the plan's own source words stand in for a translation.
     $plan = $call(['operation' => 'multilingual.plan', 'locale' => 'vi-VN']);
     if (!$step('plan vi-VN', $plan)) continue;
@@ -235,15 +291,39 @@ foreach ($gateContracts as $profileFile) {
     if (!$step('verify vi-VN', $call(['operation' => 'multilingual.verify', 'locale' => 'vi-VN']))) continue;
     $switchers = array_filter($gw->store['module'] ?? [], fn ($m) => ($m['module'] ?? '') === 'mod_languages' && (string) ($m['published'] ?? '1') === '1');
     check("$id: one language switcher", count($switchers), 1);
+    // A shipped edition is TAKEN: no row is made, and its own rows stand shown, in its own menus.
+    $shown = function (string $locale) use ($editions, $gw): array {
+        $hidden = [];
+        foreach ($editions['locales'][$locale]['ids'] ?? [] as $key => $eid) {
+            $kind = explode('-', $key)[0];
+            $row = $gw->store[$kind][$eid] ?? null;
+            if (!$row || (string) ($row[$kind === 'article' ? 'state' : 'published'] ?? '') !== '1') $hidden[] = $key;
+        }
+        return $hidden;
+    };
+    if ($editions !== null) {
+        check("$id: taking vi-VN makes no row", $rowCount(), $before);
+        check("$id: every row of the vi-VN edition is shown", $shown('vi-VN'), []);
+    }
 
-    // Start fr-FR, stop it half-way, and take it back: nothing governed may leave with it.
+    // A customer who changes their mind: fr-FR, which the retire hid, is added beside vi-VN — then
+    // taken back, and nothing governed may leave with it.
     $frPlan = $call(['operation' => 'multilingual.plan', 'locale' => 'fr-FR']);
     if (!$step('plan fr-FR', $frPlan)) continue;
     $fr = [];
     foreach ($frPlan['slots'] as $slot) $fr[$slot['key']] = (string) ($slot['source'] ?? '');
-    $call(['operation' => 'multilingual.apply', 'locale' => 'fr-FR', 'translations' => $fr,
-        'expected_revision' => $frPlan['revision'], 'apply_id' => 'mlang-gate-fr', 'request_id' => 'gate-fr']);
+    $frApply = ['operation' => 'multilingual.apply', 'locale' => 'fr-FR', 'translations' => $fr,
+        'expected_revision' => $frPlan['revision'], 'apply_id' => 'mlang-gate-fr', 'request_id' => 'gate-fr'];
+    for ($i = 0, $f = ['ok' => true, 'status' => 'running']; $i < 400 && ($f['status'] ?? '') === 'running'; $i++) $f = $call($frApply);
+    if (!$step('add fr-FR beside vi-VN', $f)) continue;
+    if (!$step('verify fr-FR', $call(['operation' => 'multilingual.verify', 'locale' => 'fr-FR']))) continue;
+    if ($editions !== null) {
+        check("$id: every row of the fr-FR edition is shown once it is taken", $shown('fr-FR'), []);
+        check("$id: two taken languages still make no row", $rowCount(), $before);
+    }
     if (!$step('take back fr-FR', $call(['operation' => 'multilingual.revert', 'locale' => 'fr-FR']))) continue;
+    if ($editions !== null)
+        check("$id: taking fr-FR back hides its edition again, and keeps every row", [count($shown('fr-FR')) === count($editions['locales']['fr-FR']['ids']), $rowCount()], [true, $before]);
     $lock = json_decode(file_get_contents($dir . '/presentation-lock.json'), true);
     $missing = [];
     foreach (json_decode(file_get_contents($dir . '/content-map.json'), true)['entities'] as $entity)

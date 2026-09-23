@@ -343,7 +343,9 @@ final class QuickstartContract
         $job = $this->store->job();
         $languages = $this->effectiveLanguages($binding, $job);
         $switcher = $binding['multilingual']['switcher'] ?? ($job['switcher'] ?? null);
-        if ($job && $job['phase'] !== 'completed') [$languages, $switcher] = $this->adoptOrphans($job, $languages, $switcher, $binding);
+        // A taken edition creates no rows, so a half-run job of one leaves none unnamed behind it.
+        if ($job && $job['phase'] !== 'completed' && !($this->multilingual && $this->multilingual->edition((string) $job['locale'])))
+            [$languages, $switcher] = $this->adoptOrphans($job, $languages, $switcher, $binding);
         if ($languages || $switcher !== null) {
             if (!$this->multilingual) throw new RuntimeException('This site has translations but the receiver carries no multilingual profile');
             foreach ([$binding['multilingual']['profileHash'] ?? null, $job['profileHash'] ?? null] as $seen)
@@ -404,9 +406,14 @@ final class QuickstartContract
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
         // link and a copied menu parent are rewritten with.
         $localeMaps=[];
-        foreach($languages as $locale=>$state)
+        foreach($languages as $locale=>$state) {
             foreach($state['ids'] as $baseKey=>$id)
                 $localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
+            // A shipped edition's links and assignments point at ITS rows everywhere, the untranslated
+            // ones included (a kit page, a category), so its whole map stands behind the job's ids.
+            if($this->multilingual && $this->multilingual->edition($locale))
+                $localeMaps[$locale]=$this->multilingual->editionMaps($locale,$localeMaps[$locale]??[]);
+        }
         // 🔒 A SWITCHER THE ARCHIVE ALREADY SHIPS IS A GOVERNED MODULE, NOT A NEW ONE. A profile may
         // reuse it (Business: module-425, note `tb:pilot`) so the topbar never carries two; that row is
         // then checked field by field, assigned and counted under its own base key, and holding it to
@@ -422,7 +429,7 @@ final class QuickstartContract
             } elseif (isset($meta['locale'])) {
                 // Recomputed from the SOURCE as it stands now, never from what was stored when the
                 // copy was made: a copy that drifted is caught on the next read.
-                $expected=$this->multilingual->derivedPresentation(
+                $expected=$this->multilingual->{$this->multilingual->edition($meta['locale']) ? 'editionPresentation' : 'derivedPresentation'}(
                     $meta['kind'], $meta['base'],
                     $this->presentation($meta['base'],$rows[$meta['base']],$keys[$meta['base']]),
                     $meta['locale'], $localeMaps[$meta['locale']] ?? [], $this->lock['entities'][$meta['base']], $actual
@@ -495,8 +502,11 @@ final class QuickstartContract
         }
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
-        foreach($languages as $locale=>$state)
+        foreach($languages as $locale=>$state) {
+            // A taken edition's rows were already in the archive's count; only a copy adds one.
+            if($this->multilingual && $this->multilingual->edition($locale))continue;
             foreach($state['ids'] as $baseKey=>$id)$expectedCounts[$this->baseEntities()[$baseKey]['kind']]++;
+        }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
         if($counts!=$expectedCounts)throw new RuntimeException('Quickstart inventory changed');
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];

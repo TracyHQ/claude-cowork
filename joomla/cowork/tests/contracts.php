@@ -46,6 +46,8 @@ final class ContractTestWriter extends FakeSiteWriter {
     public function __construct(FakeApplyLog $log,ContractStore $binding){$this->log=$log;$this->binding=$binding;}
     /** @var array<string,array<int,string>> association context => member id => group key, as #__associations holds it */
     public array $groups=[];
+    /** The gate's shipped editions, per relation and base key, before they are laid into $groups. */
+    public array $editionGroups=[];
     private const RELATIONS=['menuAssociation'=>'com_menus.item','articleAssociation'=>'com_content.item'];
     public function read(string $kind,int $id):?array {
         if(!$this->nestedPaths||!isset(self::RELATIONS[$kind]))return parent::read($kind,$id);

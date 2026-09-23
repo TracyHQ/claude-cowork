@@ -57,10 +57,13 @@ final class MultilingualApply
     private $write;
     /** @var null|callable(int,string,string):void one recorded, revertable menu realias: id, from, to */
     private $aside;
+    /** @var null|callable(string,int,string,int):void one recorded, revertable visibility change */
+    private $reveal;
 
-    public function __construct(QuickstartContract $contract, SiteWriter $writer, callable $write, ?callable $aside = null)
+    public function __construct(QuickstartContract $contract, SiteWriter $writer, callable $write, ?callable $aside = null, ?callable $reveal = null)
     {
         $this->aside = $aside;
+        $this->reveal = $reveal;
         $this->contract = $contract;
         $this->profile = $contract->profile();
         $this->catalog = $contract->catalog();
@@ -161,9 +164,10 @@ final class MultilingualApply
      * @param string[] $routed the content languages that stay published; the source always does
      * @return array<int,array{0:string,1:int,2:array<string,int>}>
      */
-    public static function retireWrites(array $rows, array $governed, string $source, array $routed): array
+    public static function retireWrites(array $rows, array $governed, string $source, array $routed, array $spared = []): array
     {
         $routed = array_merge([$source], $routed);
+        $spare = array_flip($spared);
         $out = [];
         foreach ($rows['language'] ?? [] as $row)
             if ((int) $row['published'] === 1 && !in_array((string) $row['lang_code'], $routed, true))
@@ -174,6 +178,7 @@ final class MultilingualApply
             foreach ($rows[$kind] ?? [] as $row) {
                 $language = (string) ($row['language'] ?? '*');
                 if ($language === '*' || $language === $source || (int) ($row[$column] ?? 0) !== 1) continue;
+                if (isset($spare[$language])) continue;
                 if ($kind === 'menuItem' && (int) ($row['client_id'] ?? 0) !== 0) continue;
                 if (isset($keep[(int) $row['id']])) continue;
                 $out[] = [$kind, (int) $row['id'], [$column => 0]];
@@ -228,7 +233,8 @@ final class MultilingualApply
 
     private function phaseMenu(array &$job, array $state, array $translations, string $locale): bool
     {
-        $this->clearMenuAliases($state, $locale);
+        // A taken edition creates nothing, so no alias of its own can stand in the way.
+        if (!$this->profile->edition($locale)) $this->clearMenuAliases($state, $locale);
         return $this->createChunk($job, $state, $translations, $locale, 'menuItem', function (array $row, array $fields, array $idMap) use ($locale): array {
             $parent = (int) $row['parent_id'];
             // The LIVE map, handed in per row. Capturing the job here instead read the ids as they
@@ -364,6 +370,11 @@ final class MultilingualApply
             foreach ($state['keys'] as $other => $meta)
                 if (($meta['base'] ?? null) === $key && isset($state['ids'][$other])) $ids[] = (int) $state['ids'][$other];
             $ids[] = (int) $job['ids'][$key];
+            // A taken edition row arrives in the archive's own group of editions (Business: the 41 it
+            // generated, apart from en↔ru); that group joins too, or the `ids` form refuses the copy
+            // as swallowing part of another.
+            foreach (json_decode((string) (($this->writer->read($relation, (int) $job['ids'][$key]) ?? [])['members'] ?? '[]'), true) ?: [] as $member)
+                if ((int) ($member['id'] ?? 0) > 0 && !in_array((int) $member['id'], $ids, true)) $ids[] = (int) $member['id'];
             // The group the source already belongs to stays whole. An archive that ships its own
             // editions ships them associated (Business: `home` with 42 others), and a group that
             // left them out was refused as swallowing part of another — measured 23/09/2026 on
@@ -435,6 +446,14 @@ final class MultilingualApply
             'enabled' => 1,
             'params' => json_encode($this->profile->languageFilterParams()),
         ]);
+        // The rest of a taken edition — its topbar links, legal menu, off-canvas, kit pages — shown
+        // again as the archive published it. Before the language row, which is what routes to it.
+        if ($edition = $this->profile->edition($locale))
+            foreach (['module' => 'published', 'menuItem' => 'published', 'article' => 'state'] as $kind => $column)
+                foreach ($edition['reveal'][$kind] ?? [] as $id) {
+                    $row = $this->writer->read($kind, (int) $id);
+                    if ($row && (int) ($row[$column] ?? 0) !== 1) $this->show($kind, (int) $id, $column, 1);
+                }
         ($this->write)('language', (int) $job['contentLanguage'], ['published' => 1]);
         return true;
     }
@@ -470,6 +489,7 @@ final class MultilingualApply
      */
     private function createChunk(array &$job, array $state, array $translations, string $locale, string $kind, callable $build, ?callable $after = null): bool
     {
+        if ($this->profile->edition($locale)) return $this->takeChunk($job, $state, $translations, $locale, $kind);
         $idMap = $this->idMap($state, $job);
         $adopted = $this->existingCopies($state, $kind, $locale);
         foreach ($this->sources($state, $kind) as $key)
@@ -490,6 +510,49 @@ final class MultilingualApply
         return count($keys) <= count($slice);
     }
 
+
+    /**
+     * Put the translation into up to CHUNK rows of the archive's own edition of this language.
+     *
+     * The edition already stands where a copy would have been built — its own menus, megamenu,
+     * categories and module assignments, written by the archive's `add-language` tool — so the only
+     * thing it lacks is the customer's words. Those are patched into the edition's row, slot by slot,
+     * through the recorded write; only the translated columns go out, so its structure is never
+     * rewritten from the source (a module's `tb-footer-services-vi` stays `-vi`). The row is shown
+     * again as its source is, through the recorded visibility write, so a retire that hid it — or a
+     * revert — has an exact way back.
+     */
+    private function takeChunk(array &$job, array $state, array $translations, string $locale, string $kind): bool
+    {
+        $edition = $this->profile->edition($locale);
+        $idMap = $this->profile->editionMaps($locale, $this->idMap($state, $job));
+        $keys = array_values(array_filter($this->sources($state, $kind), fn($k) => !isset($job['ids'][$k])));
+        $slice = array_slice($keys, 0, self::CHUNK);
+        $column = $kind === 'article' ? 'state' : 'published';
+        foreach ($slice as $key) {
+            $this->currentKey = $key;
+            $id = (int) ($edition['ids'][$key] ?? 0);
+            $row = $id > 0 ? $this->writer->read($kind, $id) : null;
+            if (!$row) throw new RuntimeException('The shipped ' . $locale . ' edition has no row for ' . $key);
+            $values = $this->slotValues($state, $key, $locale, $translations, $idMap);
+            $patched = $this->contract->patch($row, $this->contract->derivedSlotsFor($locale, $key), $values);
+            $fields = array_intersect_key($patched, array_flip($this->profile->translatedColumns($kind)));
+            if ($kind === 'module' && !$this->profile->showsTitle($key, $this->contract->lockFields($key))) unset($fields['title']);
+            ($this->write)($kind, $id, $fields);
+            $want = (int) ($state['rows'][$key][$column] ?? 1);
+            if ((int) ($row[$column] ?? 0) !== $want) $this->show($kind, $id, $column, $want);
+            $job['ids'][$key] = $id;
+            $job['cursor'] += 1;
+        }
+        return count($keys) <= count($slice);
+    }
+
+    /** One recorded visibility change; without the Engine's recorder there is no revertable way to make it. */
+    private function show(string $kind, int $id, string $column, int $value): void
+    {
+        if ($this->reveal === null) throw new RuntimeException('No recorded visibility writer for ' . $kind . ' ' . $id);
+        ($this->reveal)($kind, $id, $column, $value);
+    }
 
     /**
      * Copies of this kind that are already on the site, by the base key they came from.

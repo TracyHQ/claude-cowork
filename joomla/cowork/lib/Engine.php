@@ -1588,6 +1588,10 @@ final class Engine
                 // Undo first, as retire does: a row whose way back was not recorded is never moved.
                 $this->log->record($apply, ['op' => 'alias', 'kind' => 'menuItem', 'id' => $id, 'before' => $before]);
                 $this->writer->realiasMenuItem($id, $after);
+            }, function (string $kind, int $id, string $column, int $value) use ($apply): void {
+                $before = (int) (($this->writer->read($kind, $id) ?? [])[$column] ?? 0);
+                $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => $before]);
+                $this->setVisible($kind, $id, $column, $value);
             });
             $this->batching = true;
             $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
@@ -1709,7 +1713,10 @@ final class Engine
                     if (count($page) < 100) break;
                 }
             }
-            $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), $routed);
+            // A kept language the archive ships an edition of stays exactly as shipped: that edition IS
+            // the language the customer asked for, and its rows receive the translation in place.
+            $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
+            $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
@@ -1746,6 +1753,9 @@ final class Engine
     private function orphansOf(array $state, string $locale): array
     {
         $out = [];
+        // A taken edition's rows are the archive's own: taking the language back returns their words
+        // and visibility through the undo log, and deletes nothing.
+        if (isset($this->contract) && $this->contract->profile()->edition($locale)) return [];
         foreach ($state['keys'] as $key => $meta) {
             if (($meta['locale'] ?? null) !== $locale) continue;
             $out[$meta['kind']][] = (int) $state['ids'][$key];

@@ -28,6 +28,14 @@ final class MultilingualProfile
     private string $hash;
     /** @var array<string,array<string,mixed>> slots of the base contract, grouped by entity key */
     private array $slotsByEntity = [];
+    /**
+     * The language editions the archive itself ships (`editions.json`), by locale: which of its rows
+     * stands for which source row, and the maps its links and parameters were written with. A
+     * locale listed here is TAKEN, not derived: the edition's own rows receive the translation.
+     * @var array<string,array<string,mixed>>
+     */
+    private array $editions = [];
+    private string $editionSourceSef = '';
 
     /** Separates a locale from the base key it derives from. Absent from every base key. */
     private const SEPARATOR = '::';
@@ -65,6 +73,127 @@ final class MultilingualProfile
             if (!isset($profile['policies'][$entity['key']]))
                 throw new RuntimeException('Unclassified entity in multilingual profile: ' . $entity['key']);
         foreach ($map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $slot;
+        // 🔒 AN ARCHIVE THAT SHIPS ITS OWN EDITIONS IS TAKEN, NOT COPIED. Tracy Business ships 41 of
+        // them, each with its own menus (`tb-main-vi`), megamenu, modules and categories; a copy made
+        // from the source sat in `tb-main-en`, the template reads `tb-main-<sef>`, and `/vi/` lost its
+        // main menu — measured 23/09/2026 on `j-ee6vsk`. The map is generated from the release's own
+        // database (`scripts/build-joomla-editions.mjs` in tch) and pinned to the base like this file.
+        $editionsFile = $directory . '/editions.json';
+        if (is_file($editionsFile)) {
+            $rawEditions = (string) file_get_contents($editionsFile);
+            $editions = json_decode($rawEditions, true, 512, JSON_THROW_ON_ERROR);
+            if (($editions['schemaVersion'] ?? '') !== 'tracy-quickstart-editions/v1')
+                throw new RuntimeException('Unsupported editions map');
+            if (!hash_equals((string) ($profile['baseHash'] ?? ''), (string) ($editions['baseHash'] ?? '')))
+                throw new RuntimeException('The editions map does not belong to this contract');
+            $this->editions = $editions['locales'] ?? [];
+            $this->editionSourceSef = (string) ($editions['source']['sef'] ?? '');
+            // A job and a binding record this hash, so a new map is a new profile, never a silent swap.
+            $this->hash = hash('sha256', $rawProfile . "\n" . $rawEditions);
+        }
+    }
+
+    /** The edition of `$locale` the archive ships, or null when a language is derived as a copy. */
+    public function edition(string $locale): ?array
+    {
+        return $this->editions[$locale] ?? null;
+    }
+
+    /** @return string[] every locale the archive ships an edition of */
+    public function editionLocales(): array
+    {
+        return array_keys($this->editions);
+    }
+
+    /** The columns a copy of `$kind` carries in translation (the rest is structure). */
+    public function translatedColumns(string $kind): array
+    {
+        return $this->profile['derive'][$kind]['translate'] ?? [];
+    }
+
+    /**
+     * What a row of a shipped edition must hold, from its source — the rules the archive's own
+     * `add-language` tool wrote it with, proven against every edition of the release by the
+     * generator: its language, the edition's categories, menus and menu types, the edition's copy of
+     * every article and menu item a link or a parameter names, and `(sef)` for `(en)` in a hidden
+     * module title. Everything else is the source's, as for a copy; only the provenance note differs,
+     * because an edition row keeps the archive's own.
+     */
+    public function editionPresentation(string $kind, string $baseKey, array $source, string $locale, array $idMap, array $lockFields, array $actual = []): array
+    {
+        $edition = $this->edition($locale);
+        if ($edition === null) throw new RuntimeException('No shipped edition of ' . $locale);
+        $sef = (string) $edition['sef'];
+        $maps = $this->editionMaps($locale, $idMap);
+        $out = $source;
+        $out['language'] = $locale;
+        if ($kind === 'menuItem' && trim((string) ($source['img'] ?? '')) === '' && trim((string) ($actual['img'] ?? '')) === '')
+            $out['img'] = $actual['img'];
+        if ($kind === 'article') {
+            $out['alias'] = $source['alias'] . '-' . $sef;
+            $out['catid'] = (string) ($maps['category'][(int) $source['catid']] ?? $source['catid']);
+        }
+        if ($kind === 'menuItem') {
+            $out['menutype'] = (string) ($edition['menutypes'][$source['menutype']] ?? $source['menutype']);
+            $parent = (int) $source['parent_id'];
+            $out['parent_id'] = (string) ($maps['menuItem'][$parent] ?? $parent);
+            $out['link'] = $this->editionLink((string) $source['link'], $maps, $sef);
+            if (isset($source['params'])) $out['params'] = self::editionParams($source['params'], $maps, []);
+        }
+        if ($kind === 'module') {
+            if (!$this->showsTitle($baseKey, $lockFields))
+                $out['title'] = str_replace('(' . $this->editionSourceSef . ')', '(' . $sef . ')', (string) $lockFields['title']);
+            else $out['title'] = self::CONTENT_SLOT;
+            if (isset($source['params'])) $out['params'] = self::editionParams($source['params'], $maps, $edition['menutypes']);
+        }
+        return $out;
+    }
+
+    /**
+     * The edition's maps (archive ids), with this installation's ids of the rows the job adopted laid
+     * over them — the same ids on a site restored from the release, and the job's word wins if not.
+     * @return array{article:array<int,int>,menuItem:array<int,int>,category:array<int,int>}
+     */
+    public function editionMaps(string $locale, array $idMap = []): array
+    {
+        $edition = $this->edition($locale) ?? [];
+        $out = ['article' => [], 'menuItem' => [], 'category' => []];
+        foreach ($out as $kind => $_)
+            foreach ($edition['maps'][$kind] ?? [] as $from => $to) $out[$kind][(int) $from] = (int) $to;
+        foreach (['article', 'menuItem'] as $kind) foreach ($idMap[$kind] ?? [] as $from => $to) $out[$kind][(int) $from] = (int) $to;
+        return $out;
+    }
+
+    /**
+     * Parameters pointed at the edition: a menu item's `aliasoptions`, a module's `menutype` and
+     * `catid` list. Takes the JSON either as text or already decoded — inspect compares decoded rows.
+     */
+    private static function editionParams($params, array $maps, array $menutypes)
+    {
+        $decoded = is_array($params) ? $params : json_decode((string) $params, true);
+        if (!is_array($decoded)) return $params;
+        if (isset($decoded['aliasoptions']) && is_numeric($decoded['aliasoptions']))
+            $decoded['aliasoptions'] = $maps['menuItem'][(int) $decoded['aliasoptions']] ?? $decoded['aliasoptions'];
+        if (isset($decoded['menutype']) && is_string($decoded['menutype']))
+            $decoded['menutype'] = $menutypes[$decoded['menutype']] ?? $decoded['menutype'];
+        if (isset($decoded['catid']) && is_array($decoded['catid']))
+            $decoded['catid'] = array_map(static fn ($id) => is_numeric($id) ? ($maps['category'][(int) $id] ?? $id) : $id, $decoded['catid']);
+        return is_array($params) ? $decoded : (string) json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** A source link, pointed at the edition: its articles, categories and menu items, and its prefix. */
+    private function editionLink(string $link, array $maps, string $sef): string
+    {
+        if (preg_match('~^(?:[a-z][a-z0-9+.-]*:|//)~i', $link)) return $link;
+        $link = (string) preg_replace_callback('~(view=article&id=)(\d+)~',
+            static fn (array $m): string => $m[1] . ($maps['article'][(int) $m[2]] ?? $m[2]), $link);
+        $link = (string) preg_replace_callback('~(view=category(?:&[a-z_]+=[^&]*)*&id=)(\d+)~',
+            static fn (array $m): string => $m[1] . ($maps['category'][(int) $m[2]] ?? $m[2]), $link);
+        $link = (string) preg_replace_callback('~(Itemid=)(\d+)~',
+            static fn (array $m): string => $m[1] . ($maps['menuItem'][(int) $m[2]] ?? $m[2]), $link);
+        if ($this->editionSourceSef !== '' && str_starts_with($link, '/' . $this->editionSourceSef . '/'))
+            $link = '/' . $sef . '/' . substr($link, strlen($this->editionSourceSef) + 2);
+        return $link;
     }
 
     public function hash(): string { return $this->hash; }
