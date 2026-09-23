@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>The ja-kinetic demo trim also hides the demo post its "Single Article" showcase opens (/pages/helixql, with its tag chips) and the two menu items that lead to it: an article a menu opens is a page unless it sits in the blog a hidden listing showed. A site trimmed with the previous map must be trimmed again.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.17.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.1</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.17.1/pkg_claudecowork-0.17.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>A Tracy quickstart can keep its identity — name, contact, social links — in one "[Tracy] Site identity" module: the contract lets exactly the identity tokens ({site.name}, {contact.email}...) through where it refuses every other Joomla directive, lets an identity slot be emptied or filled so a fact the customer lacks is not left at the demo's value, and refuses a translation that drops a token. Carries the tracy-business/j6 1.2.0 profile and 0.16.16.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
