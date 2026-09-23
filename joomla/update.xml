@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Writing an article or module the quickstart shipped without an ACL asset keeps it without one: Joomla minted an asset on save and, with no category asset, hung it under the root, so the contract refused the whole apply as an ACL change (ja-voyara page articles). The minted asset is removed through the Asset table. Built on 0.17.2.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.17.3</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.3</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.17.3/pkg_claudecowork-0.17.3.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>A sealed quickstart's source edition can be called by another tag of the same language. New `sourceLanguage.plan / set / revert` on content.contract: en-GB → en-US, en-AU, en-CA or en-NZ RELABELS the archive's English in place — the content language keeps its id and its `sef`, so `/en/`, `tb-main-en` and the megamenu are untouched, while every row, the site and administrator defaults and the Language Filter's x-default take the new tag. A copy would have lost the main menu. The empty content language Joomla's installer adds for the new pack is removed; the binding records the relabel, every later step (retire, a second edition, its revert) names the source by its new tag, and `revert` restores the published tag and label exactly. Measured on a local Tracy Business 1.1.0 site carrying vi-VN and fr-FR editions: relabelled in 12 s, `/en/` answers lang="en-us" with hreflang en-US and x-default, the main menu is whole, the contract inspects clean, and the revert gives back en-GB byte for byte.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
