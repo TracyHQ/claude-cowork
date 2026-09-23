@@ -4,6 +4,7 @@ require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
+require_once __DIR__ . '/DemoTrimProfile.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -39,6 +40,7 @@ final class QuickstartContract
     private ?string $unavailable = null;
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
+    private ?DemoTrimProfile $demoTrim = null;
     public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
@@ -71,6 +73,14 @@ final class QuickstartContract
                     $this->multilingual->sourceLanguage()
                 );
         }
+        // The demo-trim extension is optional in the same way, and for the same reason: a contract
+        // published before it keeps working, and a receiver carrying the code claims nothing for a
+        // contract that ships no list of what its demo is.
+        $trimFile = $directory . '/demo-trim-map.json';
+        if (is_file($trimFile)) {
+            $raw = file_get_contents($trimFile);
+            $this->demoTrim = new DemoTrimProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw);
+        }
     }
     private function ready(): void { if ($this->unavailable !== null) throw new RuntimeException($this->unavailable); }
     public function bound(): bool { $this->ready(); return $this->store->load() !== null; }
@@ -90,6 +100,15 @@ final class QuickstartContract
         if (!$this->multilingual) throw new RuntimeException('This contract has no multilingual profile');
         return $this->multilingual;
     }
+    /** Whether THIS SITE's profile lists demo rows it may hide — a property of the contract, not the receiver. */
+    public function demoTrimAvailable(): bool { return $this->unavailable === null && $this->demoTrim !== null; }
+    public function demoTrim(): DemoTrimProfile {
+        $this->ready();
+        if (!$this->demoTrim) throw new RuntimeException('This contract has no demo-trim profile');
+        return $this->demoTrim;
+    }
+    /** The stored baseline, or null on an unbound site. Read-only: only a validated apply replaces it. */
+    public function binding(): ?array { $this->ready(); return $this->store->load(); }
     public function catalog(): LanguagePackCatalog {
         $this->ready();
         if (!$this->packs) throw new RuntimeException('This receiver carries no language-pack catalog');
@@ -327,6 +346,16 @@ final class QuickstartContract
                 if ($seen !== null && !hash_equals((string)$seen, $this->multilingual->hash()))
                     throw new RuntimeException('The installed multilingual profile changed');
         }
+        $trim = $binding['demoTrim'] ?? null;
+        if ($trim !== null) {
+            if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the receiver carries no demo-trim profile');
+            if (!hash_equals((string) $trim['profileHash'], $this->demoTrim->hash())) throw new RuntimeException('The installed demo-trim profile changed');
+        }
+        // While a trim or its revert is in flight, a listed row may stand at either end of its move:
+        // a batch is bounded, not atomic (Joomla's nested tables commit implicitly), so the site can
+        // genuinely be half-moved. Only the listed rows, only on their visibility column, and only
+        // between the two values the profile names — everything else is held exactly as before.
+        $trimMoving = $trim !== null && in_array($trim['status'] ?? null, ['applying', 'reverting'], true);
         // The one phase in which a translated source row may legitimately still be at `*`: the
         // retag is chunked, so mid-phase the site is genuinely half-moved. Every other phase, and
         // every state with no job at all, demands the finished answer.
@@ -395,6 +424,9 @@ final class QuickstartContract
                     $allowed=$transitional?['*',$this->multilingual->sourceLanguage()]:($retagged?[$this->multilingual->sourceLanguage()]:['*']);
                     if(in_array((string)$actual['language'],$allowed,true))$expected['language']=(string)$actual['language'];
                 }
+                $trimRow = $trimMoving ? $this->demoTrim->row($key) : null;
+                if ($trimRow !== null && in_array((string) ($actual[$trimRow['field']] ?? ''), [$trimRow['from'], $trimRow['to']], true))
+                    $expected[$trimRow['field']] = (string) $actual[$trimRow['field']];
                 if(!$binding)foreach(['template_style_id'=>'templateStyle','catid'=>'category','parent_id'=>$meta['kind']==='category'?'category':'menuItem'] as $field=>$kind) {
                     if(isset($expected[$field],$idMaps[$kind][(int)$expected[$field]]))$expected[$field]=(string)$idMaps[$kind][(int)$expected[$field]];
                 }
@@ -458,6 +490,9 @@ final class QuickstartContract
         if($counts!=$expectedCounts)throw new RuntimeException('Quickstart inventory changed');
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
+        // Carried through every rebind, or the next content edit would store a baseline that no
+        // longer knows the demo was hidden — and the one after that would call it drift.
+        if(isset($binding['demoTrim']))$snapshot['demoTrim']=$binding['demoTrim'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $slots=[];
@@ -467,7 +502,7 @@ final class QuickstartContract
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
-            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher];
+            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null];
     }
 
     /** Scalar content rules, applied identically to an original and to a translation of it. */
@@ -630,6 +665,33 @@ final class QuickstartContract
                     $binding['presentation'][$key]['language']='*';
             unset($binding['multilingual']);
         }
+        return $binding;
+    }
+
+    /* ------------------------------------------------------------ demo trim */
+
+    /** The baseline with a trim on record, before or while rows move. */
+    public function bindingWithTrim(array $record): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('A demo trim needs a bound site');
+        $binding['demoTrim']=$record;
+        return $binding;
+    }
+    /** Every listed row expected hidden from now on. Derived from the profile, never read back from the site. */
+    public function bindingAfterTrim(): array {
+        $binding=$this->store->load();
+        if(!$binding || !isset($binding['demoTrim']))throw new RuntimeException('No demo trim is on record');
+        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['to'];
+        $binding['demoTrim']['status']='complete';
+        $binding['demoTrim']['completedAt']=gmdate('c');
+        return $binding;
+    }
+    /** Every listed row expected at its locked value again, and no trim on record — as if it never happened. */
+    public function bindingAfterTrimRevert(): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('A revert needs a bound site');
+        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['from'];
+        unset($binding['demoTrim']);
         return $binding;
     }
 

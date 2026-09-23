@@ -1711,6 +1711,7 @@ check('batch undo restores and removes its create', $batchWriter->store['article
 
 require __DIR__ . "/contracts.php";
 require __DIR__ . "/multilingual.php";
+require __DIR__ . "/demo-trim.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

@@ -1204,6 +1204,7 @@ final class Engine
                 return $this->ok($state);
             }
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
+            if (strpos((string)($p['operation'] ?? ''), 'demoTrim.') === 0) return $this->demoTrim($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -1272,6 +1273,116 @@ final class Engine
             default:
                 return $this->err('bad_params', 'Unknown multilingual operation');
         }
+    }
+
+    /** Rows moved per committed call. Bounded so one call stays well inside PHP's execution limit. */
+    private const DEMO_TRIM_BATCH = 300;
+
+    /**
+     * Hiding a quickstart's own demo rows on a bound site, and bringing them back.
+     *
+     * Three operations behind the contract door, like the language ones: `plan` reads, `apply` hides
+     * one committed batch per call until nothing is left, `revert` shows them again the same way.
+     * What may be hidden is decided in review, in the contract's `demo-trim-map.json`; a request
+     * names no rows, so it cannot hide anything the review did not list.
+     */
+    private function demoTrim(array $p): array
+    {
+        if (!$this->contract->demoTrimAvailable())
+            return $this->err('unsupported', 'This quickstart contract carries no demo-trim profile; its demo rows cannot be hidden by this receiver');
+        $operation = substr((string) $p['operation'], strlen('demoTrim.'));
+        if ($operation === 'plan') {
+            try {
+                $state = $this->contract->inspect();
+                return $this->ok([
+                    'hides' => $this->contract->demoTrim()->counts(), 'status' => $state['demoTrim'] ?? 'none',
+                    'remaining' => count($this->demoTrimPending($state, true)),
+                    'profileVersion' => $this->contract->demoTrim()->version(), 'profileHash' => $this->contract->demoTrim()->hash(),
+                ]);
+            } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        }
+        if ($operation !== 'apply' && $operation !== 'revert') return $this->err('bad_params', 'Unknown demoTrim operation');
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if (!$apply || strpos($apply, 'dtrim-') !== 0) return $this->err('bad_params', 'apply_id must start with "dtrim-"');
+        if (!is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        try {
+            $binding = $this->contract->binding();
+            // 🔒 A TRANSLATED SITE IS REFUSED, NOT HALF-TRIMMED. A copy's visibility is derived from
+            // its source, so hiding a source would make every copy of it drift — and hiding copies too
+            // is a rule this profile does not carry yet. Saying so beats a site that fails its next read.
+            if (!empty($binding['multilingual']['languages']))
+                return $this->err('contract_failed', 'This site already has a second language; hiding its demo rows would leave the translated copies showing. Nothing has been written.');
+            $trim = $binding['demoTrim'] ?? null;
+            $record = ['status' => $operation === 'apply' ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
+                'profileHash' => $this->contract->demoTrim()->hash(), 'profileVersion' => $this->contract->demoTrim()->version(), 'at' => gmdate('c')];
+            if ($operation === 'apply') {
+                if (($trim['status'] ?? null) === 'complete')
+                    return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyTrimmed' => true, 'applyId' => $trim['applyId']]);
+                if ($trim !== null && ($trim['status'] !== 'applying' || $trim['requestId'] !== $request))
+                    return $this->err('conflict', 'A demo trim is already ' . $trim['status'] . ' under request ' . $trim['requestId']);
+            } else {
+                if ($trim === null) return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
+                if ($trim['status'] === 'reverting' && $trim['requestId'] !== $request)
+                    return $this->err('conflict', 'A demo trim revert is already running under request ' . $trim['requestId']);
+            }
+            // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit. A batch that dies after
+            // Joomla committed some rows must leave a site that says a trim is in flight — otherwise
+            // those rows read as drift, and the retry that would finish them is refused with the rest.
+            if ($trim === null || $trim['status'] !== $record['status'] || $trim['requestId'] !== $request) {
+                $this->writer->transaction(function () use ($record) {
+                    $state = $this->contract->inspect();
+                    if (!$state['binding']) $this->contract->bind($state['snapshot']);
+                    $this->contract->rebind($this->contract->bindingWithTrim($record));
+                    return [];
+                });
+            }
+            $hide = $operation === 'apply';
+            $this->batching = true;
+            $step = $this->writer->transaction(function () use ($hide, $apply) {
+                $state = $this->contract->inspect();
+                $pending = $this->demoTrimPending($state, $hide);
+                $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
+                foreach ($batch as $key => [$kind, $field, $value]) {
+                    $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => (int) $state['ids'][$key], 'fields' => [$field => $value]]);
+                    if (empty($answer['ok'])) throw new RuntimeException($key . ': ' . ($answer['message'] ?? json_encode($answer['error'] ?? null)));
+                }
+                $remaining = count($pending) - count($batch);
+                if ($remaining === 0)
+                    $this->contract->rebind($hide ? $this->contract->bindingAfterTrim() : $this->contract->bindingAfterTrimRevert());
+                // Proven, then stored: the full read checks every row against the baseline just
+                // derived, and only a site that passes it becomes the next baseline.
+                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                return ['remaining' => $remaining, 'moved' => count($batch)];
+            });
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('content');
+            $finished = $step['remaining'] === 0;
+            return $this->ok([
+                'status' => $finished ? ($hide ? 'completed' : 'reverted') : 'running',
+                'moved' => $step['moved'], 'remaining' => $step['remaining'], 'applyId' => $apply,
+            ]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->err('contract_failed', $error->getMessage());
+        }
+    }
+
+    /**
+     * Listed rows not yet where this direction wants them, with the value each should get.
+     *
+     * @return array<string,array{0:string,1:string,2:string}> key => [kind, field, value]
+     */
+    private function demoTrimPending(array $state, bool $hide): array
+    {
+        $out = [];
+        foreach ($this->contract->demoTrim()->rows() as $key => $row) {
+            $want = $hide ? $row['to'] : $row['from'];
+            if ((string) ($state['rows'][$key][$row['field']] ?? '') !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
+        }
+        return $out;
     }
 
     /**
