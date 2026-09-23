@@ -354,7 +354,13 @@ final class MultilingualApply
             $id = $this->existingSwitcher() ?: ($this->write)('module', 0, $this->switcherFields());
             // A switcher the archive ships is a governed module with its own locked assignment (Business:
             // module-425); only a switcher this job created is placed on every page.
-            if (!in_array($id, array_map('intval', $state['ids']), true))
+            // Module ids only: `ids` holds every kind, and a new module sharing its number with a
+            // menu item or an article (273 on the Apple archive) was taken for the archive's own
+            // switcher and left on no page at all.
+            $governedModules = [];
+            foreach ($state['ids'] as $key => $governedId)
+                if ($state['keys'][$key]['kind'] === 'module') $governedModules[] = (int) $governedId;
+            if (!in_array($id, $governedModules, true))
                 ($this->write)('moduleAssignment', $id, ['menuids' => '[0]']);
             $job['switcher'] = $id;
         }
