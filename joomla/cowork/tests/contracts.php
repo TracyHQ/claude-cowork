@@ -152,6 +152,18 @@ check('T4 cache regeneration keeps the source contract valid',$contract->inspect
 file_put_contents($contractDir.'/media/t4/optimize/css/injected.php','unexpected executable');
 contractRejects('cache exception never allows executable files',fn()=>$contract->inspect());
 unlink($contractDir.'/media/t4/optimize/css/injected.php');
+// T4 compiles `media/t4/css/<styleId>-sub.css` the first time a style renders a "subpage" (a page
+// that is not its menu item's own target) — measured 23/09/2026 on j-cr4l1l (ja-kinetic): one
+// visit wrote 36-sub.css, and inspect refused the site with "Unexpected presentation file".
+mkdir($contractDir.'/media/t4/css',0777,true);
+file_put_contents($contractDir.'/media/t4/css/36-sub.css','compiled from locked sources');
+check('a T4 subpage stylesheet is cache, not a presentation change',$contract->inspect()['contract'],'test/v1');
+foreach(['36-sub.css.php','evil.css','36-sub.js'] as $name) {
+    file_put_contents($contractDir.'/media/t4/css/'.$name,'not a compiled stylesheet');
+    contractRejects('the subpage exception does not admit '.$name,fn()=>$contract->inspect());
+    unlink($contractDir.'/media/t4/css/'.$name);
+}
+unlink($contractDir.'/media/t4/css/36-sub.css');rmdir($contractDir.'/media/t4/css');
 foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
     $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;
     contractRejects('contract rejects module '.$field.' drift',fn()=>$contract->inspect());
