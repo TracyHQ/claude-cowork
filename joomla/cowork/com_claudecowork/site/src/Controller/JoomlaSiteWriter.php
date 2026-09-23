@@ -71,7 +71,11 @@ final class JoomlaSiteWriter implements \SiteWriter
                 'urls', 'attribs', 'metadata', 'metakey', 'metadesc', 'language', 'featured', 'ordering',
                 // Who may read it, and the window it is visible in. Both are decisions an editor
                 // makes about an article, and both were readable in the row already.
-                'access', 'publish_up', 'publish_down'],
+                'access', 'publish_up', 'publish_down',
+                // The administrator's note. A copied article carries its source's: the Business
+                // archive marks every article (`tb:pilot`, `tb:pages`…), and a copy made without it
+                // failed the language's own inspect (23/09/2026, j-ee6vsk).
+                'note'],
             'create'  => true,
             'trash'   => 'state',
         ],

@@ -264,6 +264,10 @@ final class MultilingualApply
                 'metakey' => $row['metakey'], 'metadesc' => $row['metadesc'],
                 'language' => $locale, 'featured' => $row['featured'], 'ordering' => $row['ordering'],
                 'access' => $row['access'], 'publish_up' => $row['publish_up'], 'publish_down' => $row['publish_down'],
+                // A copy is its source minus the translated fields, and inspect holds it to exactly
+                // that — the note included. Business marks every article (`tb:pilot`…); leaving it
+                // behind failed every copy (23/09/2026, j-ee6vsk).
+                'note' => (string) ($row['note'] ?? ''),
             ];
         });
     }
