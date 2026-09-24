@@ -45,7 +45,7 @@ quickstart contract (below). A read answers the same either way. A write is eith
 | `media.upload` | write | ok | allowed only at `wp-content/uploads/tracy-content/<sha256 of the bytes>.(png\|jpg\|webp)`, under an `apply_id` that does not start with `contract-` |
 | `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
 | `apply.list` | read | ok | ok |
-| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
@@ -81,10 +81,34 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     reported; refused while the site has a Polylang language the profile ships no edition for.
   - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's
     locale (`en_US` → `en_GB`, `en_AU`, `en_CA`, `en_NZ`) in Polylang and `WPLANG`.
+  - `multilingual.retire` (prefix `mlang-`) — `keep: [tags as the questionnaire spells them:
+    "en-us", "vi", "de-de"]`, `apply_id`, `request_id`. Sets the LIVE edition set: every edition
+    `editions.json` ships whose tag (or primary subtag) is not in `keep` is retired — each of its
+    published pages, posts and navigation twins (`<menu>-<slug>`, since Polylang gives
+    `wp_navigation` no language) goes to `draft`, raw, never deleted — and an edition an earlier
+    call under the same `apply_id` retired comes back from its logged `before` when kept again.
+    The source edition is always live. At most 300 rows per call: repeat until `status:
+    'completed'`. Reply `{ok, status: running|completed, moved, restored, remaining,
+    retired: [slugs], live: [slugs], applyId}`. Rows the customer added (no language, or one the
+    archive ships no edition of) and rows a demo trim already hid are never touched. The binding
+    records `multilingual: {status, applyId, requestId, retired, live, at}` and `inspect` reports
+    `multilingual: {retired, live, applyId} | null`. A second `apply_id` while one is on record is
+    `conflict`; a tag the archive ships no edition of is `bad_params`; no Polylang is
+    `unavailable`. Run `demoTrim.apply` BEFORE a retire: the trim then owns the demo rows of
+    every edition, and a restore brings back only what the retire hid.
+  - `multilingual.restore` (`apply_id` = the `mlang-` id on record) — puts every row of that
+    pass back (newest first), clears its log and takes the record off the binding:
+    `{ok, restored, applyId}`. `apply.revert` refuses an `mlang-` id on a sealed site.
+  - While a retired set is on record, `lib/MultilingualHooks.php` (loaded on every request,
+    engine-free) keeps those languages out of Polylang's switcher — the html list and dropdown
+    through `pll_the_languages`, the raw list through `pll_the_languages_args` +
+    `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
+    and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
+    changed: the language still exists, it is just not live.
 - Error codes: `content_only` (a structural write on a sealed site), `contract_unavailable`
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
-  `conflict` (already bound / a trim or relabel already on record), `writer_busy` (another
-  writer holds the site's lock).
+  `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
+  (another writer holds the site's lock).
 
 ## Layout
 

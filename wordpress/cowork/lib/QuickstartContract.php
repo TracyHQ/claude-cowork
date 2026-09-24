@@ -224,6 +224,77 @@ final class QuickstartContract
         return $this->editions === null ? [self::SOURCE_LANGUAGE] : array_map('strval', array_keys($this->editions['locales']));
     }
 
+    /** The editions profile as shipped, or null when the contract carries none. */
+    public function editions(): ?array
+    {
+        return $this->editions;
+    }
+
+    /** The Polylang slug of the source edition — the one a retire never touches. */
+    public function sourceLanguage(): string
+    {
+        $source = $this->editions['source']['language'] ?? null;
+        return is_string($source) && $source !== '' ? $source : self::SOURCE_LANGUAGE;
+    }
+
+    /**
+     * Which editions a keep list names. A tag is matched as the questionnaire spells it: exactly
+     * (`de-de`, `pt-br`, or the Polylang slug), else by primary subtag — `de` names `de-de`,
+     * `pt` names both Portuguese editions, and a region the archive does not spell (`de-at`)
+     * falls back to the language it belongs to. A tag naming nothing is reported, never
+     * silently dropped: a customer who asked for a language must not get a site without it and
+     * no word about why.
+     *
+     * @return array{kept:string[],unknown:string[]} slugs in profile order, and the tags with no edition
+     */
+    public function editionsKept(array $keep): array
+    {
+        $editions = [];
+        foreach ((array) ($this->editions['locales'] ?? []) as $slug => $edition) {
+            $editions[(string) $slug] = strtolower((string) ($edition['tag'] ?? $slug));
+        }
+        $kept = [];
+        $unknown = [];
+        foreach ($keep as $tag) {
+            $tag = strtolower(trim((string) $tag));
+            $matched = [];
+            foreach ($editions as $slug => $editionTag) {
+                if ($tag === $editionTag || $tag === strtolower($slug)) {
+                    $matched[] = $slug;
+                }
+            }
+            if ($matched === []) {
+                $primary = explode('-', $tag, 2)[0];
+                foreach ($editions as $slug => $editionTag) {
+                    if (explode('-', $editionTag, 2)[0] === $primary) {
+                        $matched[] = $slug;
+                    }
+                }
+            }
+            if ($matched === []) {
+                $unknown[] = $tag;
+            }
+            foreach ($matched as $slug) {
+                $kept[$slug] = true;
+            }
+        }
+        $ordered = [];
+        foreach (array_keys($editions) as $slug) {
+            if (isset($kept[$slug])) {
+                $ordered[] = $slug;
+            }
+        }
+        return ['kept' => $ordered, 'unknown' => $unknown];
+    }
+
+    /** @return string[] Polylang slugs of the editions a binding holds retired; [] when none */
+    public static function retiredLanguages(?array $binding): array
+    {
+        $record = isset($binding['multilingual']) && is_array($binding['multilingual']) ? $binding['multilingual'] : null;
+        $retired = isset($record['retired']) && is_array($record['retired']) ? $record['retired'] : [];
+        return array_values(array_map('strval', $retired));
+    }
+
     /** Load the profile a caller names, without a site to check — what a receiver's own tests do. */
     public function preview(string $id): void
     {
@@ -309,7 +380,7 @@ final class QuickstartContract
      * used (`ContractUnavailable`).
      *
      * @return array{bound:bool,contract:string,revision:string,ids:array<string,int>,entities:array,slots:array<string,string>,
-     *               rows:array<string,array>,demoTrim:?array,sourceLanguage:?array,problems:string[]}
+     *               rows:array<string,array>,demoTrim:?array,sourceLanguage:?array,multilingual:?array,problems:string[]}
      */
     public function inspect(?string $requested = null): array
     {
@@ -457,7 +528,28 @@ final class QuickstartContract
             'rows' => $rows,
             'demoTrim' => $trim,
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
+            'multilingual' => self::multilingualState($binding),
             'problems' => $problems,
+        ];
+    }
+
+    /**
+     * The retired edition set a binding holds, in the shape the door answers — or null. A page
+     * of a retired edition is only a copy, never a governed entity of the source, so nothing
+     * above needs to allow for it; this is a report, not a check.
+     *
+     * @return array{retired:string[],live:string[],applyId:?string}|null
+     */
+    private static function multilingualState(?array $binding): ?array
+    {
+        $record = isset($binding['multilingual']) && is_array($binding['multilingual']) ? $binding['multilingual'] : null;
+        if ($record === null) {
+            return null;
+        }
+        return [
+            'retired' => self::retiredLanguages($binding),
+            'live' => array_values(array_map('strval', is_array($record['live'] ?? null) ? $record['live'] : [])),
+            'applyId' => isset($record['applyId']) ? (string) $record['applyId'] : null,
         ];
     }
 

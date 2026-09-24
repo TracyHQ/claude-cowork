@@ -69,6 +69,10 @@ final class Engine
     /** The only path an image may take onto a sealed site: content-addressed, under one folder. */
     private const CONTRACT_MEDIA_PATH = '~^wp-content/uploads/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D';
     private const DEMO_TRIM_BATCH = 300;
+    /** Rows one `multilingual.retire` call moves (hidden plus brought back) before it answers `running`. */
+    private const MULTILINGUAL_BATCH = 300;
+    /** What a retire drafts: the post types an edition is made of. Navigation twins carry no Polylang language (see `retirableRows`). */
+    private const EDITION_POST_TYPES = ['page', 'post', 'wp_navigation'];
     private const REQUEST_ID_SHAPE = '/^[a-zA-Z0-9._:-]{1,100}$/D';
     private const MAX_FILE_LIMIT = 500;
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
@@ -254,7 +258,8 @@ final class Engine
     // One action, several operations, because the relay admits actions by NAME and a sealed site
     // must not need a second door opened for any of this. Every operation says which of these it
     // is: `inspect` reads, `bind` seals, `apply` writes slot values, `demoTrim.*` hides the
-    // vendor's demo, `sourceLanguage.*` respells the source edition's locale.
+    // vendor's demo, `sourceLanguage.*` respells the source edition's locale, `multilingual.*`
+    // sets which of the archive's editions are live.
 
     private function contentContract(array $p): array
     {
@@ -283,6 +288,9 @@ final class Engine
             }
             if (strpos($operation, 'sourceLanguage.') === 0) {
                 return $this->sourceLanguage($p, substr($operation, strlen('sourceLanguage.')));
+            }
+            if (strpos($operation, 'multilingual.') === 0) {
+                return $this->multilingual($p, substr($operation, strlen('multilingual.')));
             }
             if ($operation !== 'apply') {
                 return $this->err('bad_params', 'unknown contract operation: ' . $operation);
@@ -416,7 +424,7 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims and source relabels have their own revert operations');
+            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims, source relabels and retired editions have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore)');
         }
         try {
             $state = $this->contract->inspectClean();
@@ -527,11 +535,18 @@ final class Engine
         $moved = 0;
         $pending = 0;
         $skipped = [];
+        // A row of a retired edition is `multilingual.retire`'s to hide and `multilingual.restore`'s
+        // to bring back; a trim neither moves it nor records it, and says so.
+        $retired = QuickstartContract::retiredLanguages($this->contract->binding());
         foreach ($profile->rows() as $row) {
             $want = $hide ? $row['to'] : $row['from'];
             $other = $hide ? $row['from'] : $row['to'];
             $current = $this->writer->read('post', $row['id']);
             $status = $current === null ? null : (string) ($current['post_status'] ?? '');
+            if (in_array($row['language'], $retired, true)) {
+                $skipped[] = ['key' => $row['key'], 'id' => $row['id'], 'status' => $status, 'retired' => true];
+                continue;
+            }
             if ($status === $want) {
                 continue;
             }
@@ -647,6 +662,262 @@ final class Engine
             'applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c'),
         ]);
         return $this->ok(['status' => 'completed', 'locale' => $locale, 'from' => $current]);
+    }
+
+    /**
+     * Which of the archive's editions are live. `retire` takes `keep` — the languages the
+     * customer asked for, as the questionnaire spells them (`en-us`, `vi`, `de-de`) — and makes
+     * that the live set: every other edition the archive ships is RETIRED (each of its published
+     * pages, posts and navigation twins drafted, never deleted), and an edition an earlier call
+     * under the same receipt retired comes back when it is kept again. The source edition is
+     * always live. Batched: repeat the call until it answers `completed`. `restore` takes the
+     * whole pass back by its receipt.
+     *
+     * Rows the customer added — no Polylang language, or one the archive ships no edition of —
+     * are never touched; rows a demo trim already hid are left to the trim. Every move is a
+     * `visibility` undo under the `mlang-` apply id; on a sealed site `apply.revert` takes
+     * contract receipts only, so `restore` is the way back.
+     */
+    private function multilingual(array $p, string $operation): array
+    {
+        if ($operation !== 'retire' && $operation !== 'restore') {
+            return $this->err('bad_params', 'Unknown multilingual operation: ' . $operation);
+        }
+        $apply = $this->applyId($p);
+        if ($apply === null || strpos($apply, 'mlang-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "mlang-"');
+        }
+        if (QuickstartContract::polylang() === null) {
+            return $this->err('unavailable', 'this site has no translation plugin, so it has no editions to retire');
+        }
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'Retiring an edition needs a bound site');
+        }
+        if ($this->contract->editions() === null) {
+            return $this->err('unsupported', 'This quickstart contract carries no editions profile; it has no editions to retire');
+        }
+        $binding = $this->contract->binding();
+        $onRecord = isset($binding['multilingual']) && is_array($binding['multilingual']) ? $binding['multilingual'] : null;
+
+        if ($operation === 'restore') {
+            if ($onRecord === null) {
+                return $this->err('contract_failed', 'This site has no retired editions to bring back');
+            }
+            if ((string) ($onRecord['applyId'] ?? '') !== $apply) {
+                return $this->err('conflict', 'The retired editions are on record under ' . (string) ($onRecord['applyId'] ?? '?') . ', not ' . $apply);
+            }
+            $restored = 0;
+            foreach (array_reverse($this->log->entries($apply)) as $entry) {
+                if (($entry['op'] ?? '') !== 'visibility') {
+                    continue;
+                }
+                $this->revertOne($entry);
+                $restored++;
+            }
+            $this->log->clear($apply);
+            $this->contract->record('multilingual', null);
+            try {
+                $this->writer->purgeCache();
+            } catch (Throwable $ignored) {
+            }
+            if ($restored > 0) {
+                $this->stamped('revert');
+            }
+            return $this->ok(['restored' => $restored, 'applyId' => $apply]);
+        }
+
+        $request = $p['request_id'] ?? '';
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        $keep = $p['keep'] ?? null;
+        if (!is_array($keep)) {
+            return $this->err('bad_params', 'keep must list the languages the site keeps, as tags like en-us, vi, de-de');
+        }
+        foreach ($keep as $tag) {
+            if (!is_string($tag) || !preg_match('/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/D', trim($tag))) {
+                return $this->err('bad_params', 'keep holds language tags like en-us, vi, de-de');
+            }
+        }
+        $named = $this->contract->editionsKept($keep);
+        if ($named['unknown'] !== []) {
+            return $this->err('bad_params', 'This archive ships no edition of: ' . implode(', ', $named['unknown']) . '. Nothing has been written.');
+        }
+        if ($onRecord !== null && (string) ($onRecord['applyId'] ?? '') !== $apply) {
+            return $this->err('conflict', 'Editions are already retired under ' . (string) ($onRecord['applyId'] ?? '?') . '; bring them back with multilingual.restore before retiring under another apply_id');
+        }
+        $source = $this->contract->sourceLanguage();
+        $kept = array_flip($named['kept']);
+        $kept[$source] = true;
+        $retired = [];
+        $live = [];
+        foreach ($this->contract->editionLanguages() as $slug) {
+            if (isset($kept[$slug])) {
+                $live[] = $slug;
+            } else {
+                $retired[] = $slug;
+            }
+        }
+        // The record lands BEFORE any row moves, so a call that dies mid-batch leaves a site
+        // that says which set it was moving toward, and its retry is welcome.
+        $record = ['status' => 'running', 'applyId' => $apply, 'requestId' => $request, 'retired' => $retired, 'live' => $live, 'at' => gmdate('c')];
+        $this->contract->record('multilingual', $record);
+
+        $budget = self::MULTILINGUAL_BATCH;
+        $moved = 0;
+        $restored = 0;
+        $remaining = 0;
+
+        // 1. Editions kept again: put back the before-image of each row this receipt hid, newest
+        //    first, and drop those steps from the log — what stays is exactly what is still hidden.
+        $entries = $this->log->entries($apply);
+        $restorable = [];
+        foreach ($entries as $index => $entry) {
+            if (($entry['op'] ?? '') === 'visibility' && isset($kept[(string) ($entry['language'] ?? '')])) {
+                $restorable[] = $index;
+            }
+        }
+        $dropped = [];
+        foreach (array_reverse($restorable) as $index) {
+            if ($budget <= 0) {
+                $remaining++;
+                continue;
+            }
+            $this->revertOne($entries[$index]);
+            $dropped[$index] = true;
+            $restored++;
+            $budget--;
+        }
+        if ($dropped !== []) {
+            $this->log->clear($apply);
+            foreach ($entries as $index => $entry) {
+                if (!isset($dropped[$index])) {
+                    $this->log->record($apply, $entry);
+                }
+            }
+        }
+
+        // 2. Editions retired: draft every published row that is still standing.
+        foreach ($this->retirableRows($retired, $source) as [$kind, $id, $language]) {
+            if ($budget <= 0) {
+                $remaining++;
+                continue;
+            }
+            // Undo first, then the change: a row whose undo could not be recorded is never hidden.
+            $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => 'post_status', 'before' => 'publish', 'language' => $language]);
+            QuickstartContract::setPostStatus($id, 'draft');
+            $moved++;
+            $budget--;
+        }
+
+        if ($remaining === 0) {
+            if ($retired === [] && $this->log->entries($apply) === []) {
+                // Everything is live again and nothing is hidden: the same end as a restore.
+                $this->contract->record('multilingual', null);
+            } else {
+                $record['status'] = 'complete';
+                $record['completedAt'] = gmdate('c');
+                $this->contract->record('multilingual', $record);
+            }
+        }
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        if ($moved + $restored > 0) {
+            $this->stamped('content');
+        }
+        return $this->ok([
+            'status' => $remaining === 0 ? 'completed' : 'running',
+            'moved' => $moved, 'restored' => $restored, 'remaining' => $remaining,
+            'retired' => $retired, 'live' => $live, 'applyId' => $apply,
+        ]);
+    }
+
+    /**
+     * Every published page, post and navigation row of the retired editions, in profile order.
+     *
+     * A page or post belongs to the edition Polylang says it does. A `wp_navigation` row carries
+     * no Polylang language (measured on a live Tracy Business site, 25/09/2026: 0 of 27); the
+     * theme serves the twin whose slug is the source menu's plus `-<slug>` (`tracy` → `tracy-de`),
+     * so that is how a twin is attributed here — and only when the menu it twins exists, so a
+     * customer's own `careers-de` navigation with no `careers` beside it is never taken for one.
+     *
+     * @param string[] $retired
+     * @return array<int,array{0:string,1:int,2:string}> [post type, id, edition slug]
+     */
+    private function retirableRows(array $retired, string $source): array
+    {
+        if ($retired === [] || !function_exists('get_posts')) {
+            return [];
+        }
+        $byEdition = [];
+        foreach ($retired as $slug) {
+            $byEdition[$slug] = [];
+        }
+        $navigationSlugs = [];
+        foreach (self::EDITION_POST_TYPES as $type) {
+            $posts = get_posts([
+                'post_type' => $type,
+                'post_status' => 'publish',
+                'numberposts' => -1,
+                'no_found_rows' => true,
+                'suppress_filters' => true,
+                // Every language, not the current one: without this Polylang answers only the
+                // request's language (14 pages instead of 574, measured 25/09/2026).
+                'lang' => '',
+                'orderby' => 'ID',
+                'order' => 'ASC',
+            ]);
+            $rows = [];
+            foreach ((array) $posts as $post) {
+                $id = (int) (is_object($post) ? $post->ID : ($post['ID'] ?? 0));
+                $status = (string) (is_object($post) ? $post->post_status : ($post['post_status'] ?? ''));
+                $name = (string) (is_object($post) ? $post->post_name : ($post['post_name'] ?? ''));
+                if ($id <= 0 || $status !== 'publish') {
+                    continue;
+                }
+                $rows[$id] = $name;
+                if ($type === 'wp_navigation') {
+                    $navigationSlugs[$name] = true;
+                }
+            }
+            foreach ($rows as $id => $name) {
+                $language = QuickstartContract::postLanguage($id);
+                if ($language === null && $type === 'wp_navigation') {
+                    $language = self::navigationEdition($name, $retired, $navigationSlugs);
+                }
+                if ($language !== null && $language !== $source && isset($byEdition[$language])) {
+                    $byEdition[$language][] = [$type, $id, $language];
+                }
+            }
+        }
+        $out = [];
+        foreach ($byEdition as $rows) {
+            foreach ($rows as $row) {
+                $out[] = $row;
+            }
+        }
+        return $out;
+    }
+
+    /** The retired edition a navigation twin's slug names (`tracy-pt-pt` → `pt-pt`), longest slug first; null when none. */
+    private static function navigationEdition(string $name, array $retired, array $navigationSlugs): ?string
+    {
+        $found = null;
+        foreach ($retired as $slug) {
+            $suffix = '-' . $slug;
+            if (strlen($name) <= strlen($suffix) || substr($name, -strlen($suffix)) !== $suffix) {
+                continue;
+            }
+            if (!isset($navigationSlugs[substr($name, 0, -strlen($suffix))])) {
+                continue;
+            }
+            if ($found === null || strlen($slug) > strlen($found)) {
+                $found = $slug;
+            }
+        }
+        return $found;
     }
 
     /**

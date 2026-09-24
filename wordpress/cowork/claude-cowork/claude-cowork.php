@@ -17,6 +17,12 @@ defined('ABSPATH') || exit;
 // else's host, and the rest of the plugin must stay readable without it.
 require_once __DIR__ . '/update.php';
 
+// Front-end hooks for a retired edition set (`content.contract` `multilingual.retire`): keep a
+// retired language out of Polylang's switcher and hreflang list. One small file, no engine; it
+// reads the binding only when a Polylang filter fires, and does nothing on a site without one.
+require_once __DIR__ . '/lib/MultilingualHooks.php';
+MultilingualHooks::register();
+
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.
  *
