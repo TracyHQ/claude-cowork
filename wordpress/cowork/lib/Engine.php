@@ -1992,6 +1992,11 @@ final class Engine
      *   - the cache must be cleaned after adding, or `pll_languages_list()` keeps answering the
      *     list it had at the top of the request.
      *
+     * `lang` is the URL slug exactly as Tracy chose it — `vi`, or `pt-br` when two variants of one
+     * language share a site — and is also the key of every language in `translations`. Cutting it
+     * to two letters filed `pt-br` and `pt-pt` as one language. `locale`, optional, is the
+     * WordPress locale Tracy wants for `lang` if this call has to create it (see newLanguage).
+     *
      * A site with no Polylang is not an error: it answers `unavailable`, the caller writes a
      * warning, and the site keeps the one language it has.
      */
@@ -2012,25 +2017,44 @@ final class Engine
             return $this->err('bad_params', 'id required');
         }
         $lang = isset($p['lang']) && is_string($p['lang']) ? trim($p['lang']) : '';
-        if ($lang === '' || !preg_match('/^[a-z]{2}(-[a-z]{2})?$/i', $lang)) {
+        if ($lang === '' || !preg_match(self::LANGUAGE_CODE, $lang)) {
             return $this->err('bad_params', 'lang must be a language code');
         }
-        $slug = strtolower(substr($lang, 0, 2));
+        $slug = strtolower($lang);
+        $locale = isset($p['locale']) && is_string($p['locale']) ? trim($p['locale']) : '';
+        if ($locale !== '' && !preg_match(self::WORDPRESS_LOCALE, $locale)) {
+            return $this->err('bad_params', 'locale must be a WordPress locale, e.g. vi, pt_BR, de_DE_formal');
+        }
+        $translations = [];
+        foreach ((array) ($p['translations'] ?? []) as $code => $postId) {
+            if (!preg_match(self::LANGUAGE_CODE, (string) $code)) {
+                return $this->err('bad_params', 'translations must be keyed by language code');
+            }
+            if ((int) $postId > 0) {
+                $translations[strtolower((string) $code)] = (int) $postId;
+            }
+        }
+
+        // Every language this call needs is decided BEFORE anything is written, so a code that has
+        // to go back to the customer leaves the site exactly as it was.
+        $toAdd = [];
+        foreach ([$slug => $locale] + array_fill_keys(array_keys($translations), '') as $code => $exact) {
+            $add = $this->newLanguage($code, $exact);
+            if (is_string($add)) {
+                return $this->err('bad_params', $add);
+            }
+            if ($add !== null) {
+                $toAdd[] = $add;
+            }
+        }
 
         $before = function_exists('pll_get_post_language') ? pll_get_post_language($id) : null;
 
         try {
-            $this->ensureLanguage($slug);
-            pll_set_post_language($id, $slug);
-            $translations = [];
-            foreach ((array) ($p['translations'] ?? []) as $code => $postId) {
-                $code = strtolower(substr((string) $code, 0, 2));
-                $postId = (int) $postId;
-                if ($code !== '' && $postId > 0) {
-                    $this->ensureLanguage($code);
-                    $translations[$code] = $postId;
-                }
+            foreach ($toAdd as $add) {
+                $this->addLanguage($add);
             }
+            pll_set_post_language($id, $slug);
             if (count($translations) > 1 && function_exists('pll_save_post_translations')) {
                 pll_save_post_translations($translations);
             }
@@ -2054,47 +2078,126 @@ final class Engine
         return $this->ok(['id' => $id, 'lang' => $slug]);
     }
 
+    /** A language as Tracy names it: the URL slug, `vi` or `pt-br`. */
+    private const LANGUAGE_CODE = '/^[a-z]{2}(-[a-z]{2})?$/i';
+
+    /** WordPress's spelling of a language, `vi`, `pt_BR`, `de_DE_formal` — never a path or a wildcard. */
+    private const WORDPRESS_LOCALE = '/^[a-z]{2,3}(_[A-Za-z0-9]+){0,2}$/';
+
     /**
-     * Make sure Polylang knows a language, using its own defaults for everything a form never asks
-     * for. The locale is the one Polylang ships for that slug when it has one — its predefined list
-     * is the only place that knows `vi` is `vi_VN` and `en` is `en_US` — and `<slug>_<SLUG>` only
-     * when it does not, which is a guess the caller is told about by the language simply appearing
-     * under that name.
+     * A bare code sent without a locale resolves with exactly the table tch's seeder uses
+     * (`wordpress-language-catalog.mjs`), in WordPress's spelling — Vietnamese and Japanese are
+     * plain `vi` and `ja` there. Two sides resolving one word differently is the bug this exists
+     * to prevent.
      */
-    private function ensureLanguage(string $slug): void
+    private const DEFAULT_LOCALES = [
+        'en' => 'en_US', 'fr' => 'fr_FR', 'de' => 'de_DE', 'es' => 'es_ES', 'it' => 'it_IT',
+        'nl' => 'nl_NL', 'ja' => 'ja', 'ko' => 'ko_KR', 'ru' => 'ru_RU', 'vi' => 'vi',
+    ];
+
+    /** Codes that name a language but not a written form: the customer has to be asked. */
+    private const AMBIGUOUS = ['pt' => ['pt-br', 'pt-pt'], 'zh' => ['zh-cn', 'zh-tw']];
+
+    /**
+     * What Polylang should be given to create a language this site does not have yet — null when
+     * it already has it, a sentence when the code has to go back to the customer.
+     *
+     * 🔒 A LANGUAGE ALREADY ON A SITE IS REUSED AS IT IS, matched by slug the way it always was.
+     * Sites built by the plugin before this filed German under `de_AT` and English under `en_AU` —
+     * "the first row Polylang lists for these two letters". Correcting them here would move a
+     * running site's translations under its customers' feet, so only a language created now gets
+     * the right locale:
+     *
+     *   1. the locale Tracy sent, as sent;
+     *   2. else a full code's own variant (`pt-pt` → `pt_PT`) when Polylang knows it, falling back
+     *      to its base language when it does not (`vi-vn` → `vi`);
+     *   3. else the default table above;
+     *   4. else the one row Polylang lists for the code. More than one and the code is refused with
+     *      the variants named, so the chat agent asks the customer and sends the full code.
+     *
+     * The display name is the language's own, from Polylang's predefined list ("Tiếng Việt"), so
+     * the switcher does not show visitors a bare `vi`.
+     *
+     * @return array<string,mixed>|string|null
+     */
+    private function newLanguage(string $slug, string $locale)
     {
         if (!function_exists('PLL') || !PLL() || !isset(PLL()->model)) {
-            return;
+            return null;
         }
         $existing = function_exists('pll_languages_list') ? (array) pll_languages_list() : [];
         if (in_array($slug, $existing, true)) {
-            return;
+            return null;
         }
-        $locale = $slug . '_' . strtoupper($slug);
-        $flag = $slug;
-        if (class_exists('PLL_Settings') && method_exists('PLL_Settings', 'get_predefined_languages')) {
-            foreach (PLL_Settings::get_predefined_languages() as $code => $row) {
-                if (isset($row['code']) && $row['code'] === $slug) {
-                    $locale = is_string($code) ? $code : $locale;
-                    $flag = isset($row['flag']) ? (string) $row['flag'] : $flag;
-                    break;
-                }
+        $predefined = class_exists('PLL_Settings') && method_exists('PLL_Settings', 'get_predefined_languages')
+            ? (array) PLL_Settings::get_predefined_languages()
+            : [];
+
+        $base = substr($slug, 0, 2);
+        if ($locale === '' && strlen($slug) > 2) {
+            $variant = $base . '_' . strtoupper(substr($slug, 3));
+            if ($predefined === [] || isset($predefined[$variant])) {
+                $locale = $variant;
             }
         }
-        $model = PLL()->model;
-        $add = [
-            'name' => $slug,
+        if ($locale === '') {
+            $variants = self::AMBIGUOUS[$base] ?? [];
+            if (isset(self::DEFAULT_LOCALES[$base])) {
+                $locale = self::DEFAULT_LOCALES[$base];
+            } elseif ($variants === []) {
+                $rows = [];
+                foreach ($predefined as $code => $row) {
+                    if (($row['code'] ?? '') === $base) {
+                        $rows[] = (string) $code;
+                    }
+                }
+                if (count($rows) === 1) {
+                    $locale = $rows[0];
+                } elseif ($rows === []) {
+                    // Not in Polylang's list: the old guess, which the caller sees by the language
+                    // appearing under that name.
+                    $locale = $base . '_' . strtoupper($base);
+                } else {
+                    $variants = array_map(static function (string $code): string {
+                        return strtolower(str_replace('_', '-', $code));
+                    }, $rows);
+                }
+            }
+            if ($locale === '') {
+                return sprintf('"%s" names more than one language (%s): ask which one is meant and send the full code',
+                    $slug, implode(', ', $variants));
+            }
+        }
+
+        $row = isset($predefined[$locale]) && is_array($predefined[$locale]) ? $predefined[$locale] : [];
+        return [
+            'name' => isset($row['name']) ? (string) $row['name'] : $slug,
             'slug' => $slug,
             'locale' => $locale,
             'rtl' => 0,
             'term_group' => count($existing),
-            'flag' => $flag,
+            'flag' => isset($row['flag']) ? (string) $row['flag'] : '',
         ];
+    }
+
+    /**
+     * Create a language in Polylang. `PLL()->model->languages->add()` is the 3.x way in;
+     * `add_language()` is the 2.x name, kept because a customer's site is whatever version they
+     * installed. The cache is cleaned after, or `pll_languages_list()` keeps answering the list it
+     * had at the top of the request.
+     */
+    private function addLanguage(array $add): void
+    {
+        $model = PLL()->model;
         if (isset($model->languages) && method_exists($model->languages, 'add')) {
-            $model->languages->add($add);
+            $done = $model->languages->add($add);
         } elseif (method_exists($model, 'add_language')) {
-            // Polylang 2.x. Kept because a customer's site is whatever version they installed.
-            $model->add_language($add);
+            $done = $model->add_language($add);
+        } else {
+            throw new RuntimeException('this Polylang has no way to add a language');
+        }
+        if (function_exists('is_wp_error') && is_wp_error($done)) {
+            throw new RuntimeException("Polylang refused the language {$add['slug']}: " . $done->get_error_message());
         }
         if (method_exists($model, 'clean_languages_cache')) {
             $model->clean_languages_cache();

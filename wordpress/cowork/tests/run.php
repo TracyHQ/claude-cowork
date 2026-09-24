@@ -1590,5 +1590,89 @@ require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
 
+// ── content.language on a site with Polylang ──────────────────────────────────────────────────
+//
+// From here on the site HAS Polylang: the fake cannot be unloaded, so it comes after the one case
+// that needs it absent.
+require_once __DIR__ . '/FakePolylang.php';
+
+$pllSite = static function (): void {
+    WP_Fake::reset();
+    WP_Fake::$polylang = true;
+};
+
+$mark = static function (int $id, string $lang, array $extra = []) use ($wEngine, $WTOKEN): array {
+    return $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.language',
+        'params' => ['apply_id' => 'a-lang', 'id' => $id, 'lang' => $lang] + $extra]);
+};
+$localeOf = static function (string $slug): ?string {
+    return WP_Fake::$languages[$slug]['locale'] ?? null;
+};
+
+// A language already on a running site is reused as it is — even filed under the wrong locale by an
+// older plugin. Changing it would move that site's theme translations under its customers' feet.
+$pllSite();
+WP_Fake::$languages['de'] = ['name' => 'de', 'slug' => 'de', 'locale' => 'de_AT', 'term_id' => 1];
+check('a language already on the site is reused', $mark(1, 'de')['ok'], true);
+check('as it is: its locale is not corrected', $localeOf('de'), 'de_AT');
+check('and no second copy is made', count(WP_Fake::$languages), 1);
+check('the page is filed under it', WP_Fake::$postLanguage[1], 'de');
+
+// With no locale sent, a bare code resolves with the same table tch's seeder uses — never "the first
+// row Polylang happens to list", which is how German became de_AT and English en_AU.
+$pllSite();
+$table = ['en' => 'en_US', 'fr' => 'fr_FR', 'de' => 'de_DE', 'es' => 'es_ES', 'it' => 'it_IT',
+    'nl' => 'nl_NL', 'ja' => 'ja', 'ko' => 'ko_KR', 'ru' => 'ru_RU', 'vi' => 'vi'];
+$resolved = [];
+foreach (array_keys($table) as $i => $code) {
+    $mark(10 + $i, $code);
+    $resolved[$code] = $localeOf($code);
+}
+check('a bare code gets the default table\'s locale, in WordPress spelling', $resolved, $table);
+check('a new language shows its native name', WP_Fake::$languages['vi']['name'], 'Tiếng Việt');
+check('with Polylang\'s flag for it', WP_Fake::$languages['vi']['flag'], 'vn');
+
+// A code with exactly one row needs no table.
+check('a code Polylang knows one way is that way', [$mark(30, 'pl')['ok'], $localeOf('pl')], [true, 'pl_PL']);
+
+// The URL slug is exactly what Tracy sends, and an exact locale sent with it is the one used.
+$pllSite();
+check('an exact locale is taken as sent', [$mark(40, 'de', ['locale' => 'de_CH'])['ok'], $localeOf('de')], [true, 'de_CH']);
+check('with the native name of that locale', WP_Fake::$languages['de']['name'], 'Deutsch (Schweiz)');
+$mark(41, 'pt-br', ['locale' => 'pt_BR']);
+check('the slug is the full code Tracy sent', WP_Fake::$postLanguage[41], 'pt-br');
+check('a locale that is not a WordPress locale never reaches Polylang',
+    $mark(42, 'fr', ['locale' => 'fr-FR'])['error'], 'bad_params');
+
+// Without a locale a full code still lands on its own variant, and a code whose region Polylang
+// does not spell (vi-vn: WordPress's Vietnamese is plain `vi`) falls back to its base language.
+$pllSite();
+$mark(50, 'pt-pt');
+$mark(51, 'vi-vn');
+check('a full code with no locale is its own variant', $localeOf('pt-pt'), 'pt_PT');
+check('a region Polylang does not spell falls back to the base', $localeOf('vi-vn'), 'vi');
+
+// `pt` and `zh` name a language but not a written form. Picking one would hand a customer a site
+// in the wrong variety of their own language, so the chat agent is told to ask.
+$pllSite();
+$pt = $mark(60, 'pt');
+check('a bare pt is refused', $pt['error'], 'bad_params');
+checkTrue('naming both variants', str_contains((string) ($pt['message'] ?? ''), 'pt-br') && str_contains((string) ($pt['message'] ?? ''), 'pt-pt'));
+checkTrue('and zh the same way', str_contains((string) ($mark(60, 'zh')['message'] ?? ''), 'zh-cn, zh-tw'));
+$ar = $mark(60, 'ar');
+checkTrue('any other code Polylang lists more than one way is refused too',
+    $ar['ok'] === false && str_contains((string) ($ar['message'] ?? ''), 'ar, ary'));
+check('a refusal writes nothing', [WP_Fake::$languages, WP_Fake::$postLanguage], [[], []]);
+
+// Translation links keep the full code, so two variants chosen together stay two languages.
+$pllSite();
+$mark(70, 'pt-br', ['locale' => 'pt_BR']);
+$pair = $mark(71, 'pt-pt', ['locale' => 'pt_PT', 'translations' => ['pt-br' => 70, 'pt-pt' => 71]]);
+check('two variants of one language are linked', $pair['ok'], true);
+check('as two languages', array_keys(WP_Fake::$languages), ['pt-br', 'pt-pt']);
+check('each keeping its full code in the link', WP_Fake::$translations, [70 => ['pt-br' => 70, 'pt-pt' => 71], 71 => ['pt-br' => 70, 'pt-pt' => 71]]);
+check('a translation key that is not a language code is refused',
+    $mark(72, 'en', ['translations' => ['../x' => 70, 'en' => 72]])['error'], 'bad_params');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

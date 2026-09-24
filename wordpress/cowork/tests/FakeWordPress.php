@@ -452,7 +452,7 @@ $GLOBALS['wpdb'] = new WP_Fake_Db();
 
 /**
  * Polylang, as the contract sees it: which language a post is in, which languages exist, and
- * one language's locale being changed. `WP_Fake::$polylang` false is a site without the plugin,
+ * one language being added or its locale changed. `WP_Fake::$polylang` false is a site without the plugin,
  * and then `PLL()` answers null exactly as `function_exists('PLL')` would have answered false.
  * `pll_set_post_language` is deliberately NOT defined: the engine's `content.language` decides
  * whether the plugin exists by that name, and a test above relies on it being absent.
@@ -465,6 +465,16 @@ final class WP_Fake_PLL_Languages
     public function get(string $slug)
     {
         return isset(WP_Fake::$languages[$slug]) ? (object) WP_Fake::$languages[$slug] : false;
+    }
+
+    /** Polylang 3.x's way in for a new language: `true`, or a `WP_Error` when the slug is taken. */
+    public function add(array $args)
+    {
+        if (isset(WP_Fake::$languages[$args['slug']])) {
+            return new WP_Error('The language code must be unique');
+        }
+        WP_Fake::$languages[$args['slug']] = $args + ['term_id' => WP_Fake::$nextTermId++];
+        return true;
     }
 
     public function update(array $args)
@@ -492,6 +502,10 @@ final class WP_Fake_PLL_Model
     public function __construct()
     {
         $this->languages = new WP_Fake_PLL_Languages();
+    }
+
+    public function clean_languages_cache(): void
+    {
     }
 }
 
