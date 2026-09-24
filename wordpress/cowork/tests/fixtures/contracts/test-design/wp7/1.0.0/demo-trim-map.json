@@ -1,0 +1,48 @@
+{
+    "schemaVersion": "tracy-quickstart-demo-trim/wordpress/v1",
+    "extensionVersion": "1.0.0",
+    "contract": "test-design/wp7/1.0.0",
+    "baseHash": "61a73aa8d92b1003ed631c06f482b926f1fdaf0e8a84bf6ce4f06276abb5140d",
+    "hide": [
+        {
+            "key": "post-26",
+            "kind": "post",
+            "id": 26,
+            "field": "post_status",
+            "from": "publish",
+            "to": "draft",
+            "language": "en",
+            "reason": "demo article"
+        },
+        {
+            "key": "post-27",
+            "kind": "post",
+            "id": 27,
+            "field": "post_status",
+            "from": "publish",
+            "to": "draft",
+            "language": "en",
+            "reason": "demo article"
+        },
+        {
+            "key": "post-28",
+            "kind": "post",
+            "id": 28,
+            "field": "post_status",
+            "from": "publish",
+            "to": "draft",
+            "language": "en",
+            "reason": "demo article"
+        }
+    ],
+    "kept": [
+        {
+            "key": "page-home",
+            "reason": "contract page"
+        }
+    ],
+    "counts": {
+        "hide": 3,
+        "kept": 1
+    }
+}

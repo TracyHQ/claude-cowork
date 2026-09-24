@@ -22,8 +22,18 @@ rm -rf build dist && mkdir -p build dist
 
 # Created, not assumed: the copy is gitignored, so a fresh clone does not have this directory
 # and `cp` into a missing one fails.
+# CLEARED, NOT JUST CREATED. The copy survives between builds, so a file that moved or was deleted
+# in lib/ would keep shipping from here, silently, for as long as the working copy lives — the
+# Joomla package measured exactly that on 2026-09-12. Same rule here, before the first profile
+# directory gives it something to be wrong about.
+rm -rf claude-cowork/lib
 mkdir -p claude-cowork/lib
 cp "$ENGINE"/*.php claude-cowork/lib/
+# The content contract profiles ship as they stand: one directory per profile id, byte-identical
+# to TCH (lib/contracts/README.md). A profile the copy forgets is a site that names a contract
+# this plugin "does not carry" — every write refused, no error anywhere else.
+mkdir -p claude-cowork/lib/contracts
+cp -R "$ENGINE"/contracts/. claude-cowork/lib/contracts/
 
 cp -R claude-cowork build/claude-cowork
 ( cd build && zip -qr ../dist/claude-cowork.zip claude-cowork -x '*.DS_Store' )

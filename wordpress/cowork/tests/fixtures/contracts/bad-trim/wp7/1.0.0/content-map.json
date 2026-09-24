@@ -1,0 +1,121 @@
+{
+    "schemaVersion": "tracy-quickstart-content-map/wordpress/v1",
+    "entities": [
+        {
+            "key": "option-blogname",
+            "kind": "option",
+            "identity": {
+                "name": "blogname"
+            },
+            "initial": "Test Co"
+        },
+        {
+            "key": "option-identity",
+            "kind": "option",
+            "identity": {
+                "name": "tracy_identity"
+            }
+        },
+        {
+            "key": "page-home",
+            "kind": "page",
+            "identity": {
+                "postType": "page",
+                "slug": "home",
+                "language": "en"
+            }
+        },
+        {
+            "key": "part-header",
+            "kind": "templatePart",
+            "identity": {
+                "slug": "header"
+            }
+        }
+    ],
+    "slots": [
+        {
+            "key": "site.name",
+            "entity": "option-blogname",
+            "target": {
+                "option": "blogname"
+            },
+            "type": "text",
+            "sample": "Test Co",
+            "maxCharacters": 40,
+            "label": "Site name"
+        },
+        {
+            "key": "identity.email",
+            "entity": "option-identity",
+            "target": {
+                "option": "tracy_identity",
+                "field": "email"
+            },
+            "type": "text",
+            "sample": "hi@test.local",
+            "maxCharacters": 80,
+            "label": "Email"
+        },
+        {
+            "key": "home.hero.eyebrow",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.eyebrow",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Established 2004",
+            "maxCharacters": 40,
+            "label": "home - hero.eyebrow"
+        },
+        {
+            "key": "home.hero.heading",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.heading",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Building things",
+            "maxCharacters": 60,
+            "label": "home - hero.heading"
+        },
+        {
+            "key": "home.hero.cta.text",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.cta",
+                "attr": "text"
+            },
+            "type": "text",
+            "sample": "Talk to us",
+            "maxCharacters": 30,
+            "label": "home - hero.cta"
+        },
+        {
+            "key": "home.hero.cta.url",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.cta",
+                "attr": "url"
+            },
+            "type": "url",
+            "sample": "/contact",
+            "maxCharacters": 200,
+            "label": "home - hero.cta link"
+        },
+        {
+            "key": "header.tagline",
+            "entity": "part-header",
+            "target": {
+                "block": "header.tagline",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Quality since 2004",
+            "maxCharacters": 60,
+            "label": "header - tagline"
+        }
+    ]
+}

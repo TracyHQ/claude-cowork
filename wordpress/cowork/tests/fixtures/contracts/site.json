@@ -1,0 +1,7 @@
+{
+    "home": "<!-- wp:group {\"metadata\":{\"name\":\"hero\"}} -->\n<div class=\"wp-block-group\">\n<!-- wp:paragraph {\"metadata\":{\"name\":\"hero.eyebrow\"},\"className\":\"eyebrow\"} -->\n<p class=\"eyebrow\">Established 2004</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading {\"level\":1,\"metadata\":{\"name\":\"hero.heading\"}} -->\n<h1 class=\"wp-block-heading\">Building things</h1>\n<!-- /wp:heading -->\n<!-- wp:buttons -->\n<div class=\"wp-block-buttons\">\n<!-- wp:button {\"metadata\":{\"name\":\"hero.cta\"},\"url\":\"/contact\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link\" href=\"/contact\">Talk to us</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->\n</div>\n<!-- /wp:group -->",
+    "header": "<!-- wp:group {\"metadata\":{\"name\":\"header\"}} -->\n<div class=\"wp-block-group\"><!-- wp:site-title /-->\n<!-- wp:paragraph {\"metadata\":{\"name\":\"header.tagline\"}} -->\n<p>Quality since 2004</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
+    "footer": "<!-- wp:paragraph -->\n<p>Footer</p>\n<!-- /wp:paragraph -->",
+    "style.css": "/* test theme */\n",
+    "theme.json": "{}\n"
+}

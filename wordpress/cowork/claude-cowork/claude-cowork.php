@@ -55,7 +55,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'ChangeStamp', 'Engine', 'MysqliRowSource'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -251,6 +251,9 @@ function claude_cowork_exec(): void
         Claude_Cowork_Apply_Log::ensure_table();
     }
 
+    // One writer for the engine and the contract: the contract reads the before-image of every
+    // row through it and the engine purges what it touched, so the two must be the same object.
+    $writer = new Claude_Cowork_Site_Writer();
     $engine = new Engine(
         $token === '' ? null : $token,
         [
@@ -262,10 +265,20 @@ function claude_cowork_exec(): void
         claude_cowork_build_walker(),
         new CurlUploader(120),
         new Claude_Cowork_Packages(),
-        new Claude_Cowork_Site_Writer(),
+        $writer,
         new Claude_Cowork_Media_Writer(),
         new Claude_Cowork_Apply_Log(),
-        new ChangeStamp(ABSPATH)
+        new ChangeStamp(ABSPATH),
+        // Always wired. Whether the site is SEALED is a fact of its store (`_tracy_content_contract`),
+        // not of this object: an unbound site with no `claude_cowork_contract` setting behaves as
+        // before, and a bound one refuses every structural write even if the setting is gone.
+        new QuickstartContract(
+            $writer,
+            new Claude_Cowork_Contract_Store(),
+            rtrim(ABSPATH, '/\\'),
+            __DIR__ . '/lib/contracts',
+            (string) get_option(QuickstartContract::SETTING_OPTION, '')
+        )
     );
 
     $answer = $engine->handle($request);
