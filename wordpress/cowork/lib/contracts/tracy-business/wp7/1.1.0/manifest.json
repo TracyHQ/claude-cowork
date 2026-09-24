@@ -33,5 +33,6 @@
     }
   },
   "receiverFloor": "0.8.0",
+  "receiverVersion": "0.12.1",
   "mode": "content-only"
 }
