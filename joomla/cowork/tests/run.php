@@ -917,7 +917,8 @@ class FakeSiteWriter implements SiteWriter
     public function write(string $kind, int $id, array $fields): int
     {
         if ($id === 0) {
-            $id = $this->nextId++;
+            // Like an auto-increment key: a new row never takes an id a row already holds.
+            do $id = $this->nextId++; while (isset($this->store[$kind][$id]));
         }
         $this->store[$kind][$id] = $fields;
         return $id;

@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Carries the site-identity profiles of Tracy Apple 1.3.0 and the Airbnb design 1.2.0 on it: the site name, slogan and monogram live in one "[Tracy] Site identity" module the page reads through plg_system_tracyidentity, so those slots may be emptied or filled like Tracy Business 1.2.0. No code change; built on 0.17.3.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.17.4</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.17.4/pkg_claudecowork-0.17.4.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Writing an article or module the quickstart shipped without an ACL asset keeps it without one: Joomla minted an asset on save and, with no category asset, hung it under the root, so the contract refused the whole apply as an ACL change (ja-voyara page articles). The minted asset is removed through the Asset table. Built on 0.17.2.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
