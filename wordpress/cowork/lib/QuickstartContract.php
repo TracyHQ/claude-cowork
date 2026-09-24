@@ -343,6 +343,7 @@ final class QuickstartContract
             'revision' => $state['revision'],
             'demoTrim' => null,
             'sourceLanguage' => null,
+            'siteLanguage' => null,
             'boundAt' => gmdate('c'),
         ]);
     }
@@ -359,7 +360,7 @@ final class QuickstartContract
         $this->store->replace($binding);
     }
 
-    /** Put a record on the binding under one key (`demoTrim`, `sourceLanguage`), or take it off with null. */
+    /** Put a record on the binding under one key (`demoTrim`, `sourceLanguage`, `siteLanguage`), or take it off with null. */
     public function record(string $field, ?array $record): void
     {
         $binding = $this->store->load();
@@ -380,7 +381,7 @@ final class QuickstartContract
      * used (`ContractUnavailable`).
      *
      * @return array{bound:bool,contract:string,revision:string,ids:array<string,int>,entities:array,slots:array<string,string>,
-     *               rows:array<string,array>,demoTrim:?array,sourceLanguage:?array,multilingual:?array,problems:string[]}
+     *               rows:array<string,array>,demoTrim:?array,sourceLanguage:?array,multilingual:?array,siteLanguage:?array,problems:string[]}
      */
     public function inspect(?string $requested = null): array
     {
@@ -529,6 +530,7 @@ final class QuickstartContract
             'demoTrim' => $trim,
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
             'multilingual' => self::multilingualState($binding),
+            'siteLanguage' => self::siteLanguageState($binding),
             'problems' => $problems,
         ];
     }
@@ -549,6 +551,25 @@ final class QuickstartContract
         return [
             'retired' => self::retiredLanguages($binding),
             'live' => array_values(array_map('strval', is_array($record['live'] ?? null) ? $record['live'] : [])),
+            'applyId' => isset($record['applyId']) ? (string) $record['applyId'] : null,
+        ];
+    }
+
+    /**
+     * The default language a binding holds set, in the shape the door answers — or null. Like
+     * the retired set, a report: which edition is served at `/` changes no governed row.
+     *
+     * @return array{language:string,from:?string,applyId:?string}|null
+     */
+    private static function siteLanguageState(?array $binding): ?array
+    {
+        $record = isset($binding['siteLanguage']) && is_array($binding['siteLanguage']) ? $binding['siteLanguage'] : null;
+        if ($record === null) {
+            return null;
+        }
+        return [
+            'language' => (string) ($record['language'] ?? ''),
+            'from' => isset($record['from']) && is_string($record['from']) ? $record['from'] : null,
             'applyId' => isset($record['applyId']) ? (string) $record['applyId'] : null,
         ];
     }

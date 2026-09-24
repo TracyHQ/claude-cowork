@@ -1584,6 +1584,8 @@ check('content.language needs an apply_id',
 require_once __DIR__ . '/contracts.php';
 // Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.
 require_once __DIR__ . '/multilingual.php';
+// The site's default language on a sealed multilingual site.
+require_once __DIR__ . '/site-language.php';
 require __DIR__ . '/activation-order.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";

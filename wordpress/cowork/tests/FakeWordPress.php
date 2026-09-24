@@ -50,12 +50,18 @@ final class WP_Fake
     public static array $languages = [];
     /** @var array<int,string> post id => Polylang slug */
     public static array $postLanguage = [];
+    /** @var array<int,array<string,int>> post id => [Polylang slug => id of its copy in that language] */
+    public static array $translations = [];
+    /** How many times the rewrite rules were flushed. */
+    public static int $flushed = 0;
 
     public static function reset(): void
     {
         self::$polylang = false;
         self::$languages = [];
         self::$postLanguage = [];
+        self::$translations = [];
+        self::$flushed = 0;
         if (class_exists('WP_Fake_PLL_Languages')) {
             WP_Fake_PLL_Languages::$updates = [];
         }
@@ -509,6 +515,17 @@ function pll_get_post_language(int $id)
 function pll_languages_list(array $args = []): array
 {
     return WP_Fake::$polylang ? array_keys(WP_Fake::$languages) : [];
+}
+
+/** A post's copy in one language, from Polylang's translation group: the id, or false when the group has none. */
+function pll_get_post(int $id, string $lang = '')
+{
+    return WP_Fake::$polylang ? (WP_Fake::$translations[$id][$lang] ?? false) : false;
+}
+
+function flush_rewrite_rules(bool $hard = true): void
+{
+    WP_Fake::$flushed++;
 }
 
 /** The home of one language, as the front-end hooks ask for it when a switcher entry has no translation. */
