@@ -9,16 +9,82 @@ POST /wp-admin/admin-ajax.php?action=claude_cowork
 
 ## What it can do
 
-| Actions | |
-| --- | --- |
-| `info`, `site.stats`, `site.counts`, `db.*`, `files.*`, `file.read` | Reading, in pieces small enough to finish on a host that stops PHP after 30 seconds. |
-| `plugin.install`, `plugin.activate`, `theme.install`, `theme.activate` | Adding something to the site, through WordPress's own upgraders. Install and activate are separate: they fail differently. |
-| `language.install` | Fetching a core translation, so WordPress itself speaks the language the site was built in. Already installed is an `ok`, not an error. |
-| `content.update`, `media.upload` | Editing a post, one of its meta values, or an option; putting a file into `uploads/` and the Media Library. |
-| `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
+Every action, and what happens to it once the site is **sealed** — bound to a content-only
+quickstart contract (below). A read answers the same either way. A write is either refused with
+`content_only`, or still allowed under the rule in the last column.
+
+| Action | Kind | Unbound site | Sealed site |
+| --- | --- | --- | --- |
+| `info` | read | ok | ok |
+| `site.stats` | read | ok | ok |
+| `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
+| `db.tables` | read | ok | ok |
+| `db.dump` | read | ok | ok |
+| `db.cleanup` | write | ok | `content_only` |
+| `db.restore` | write | ok | `content_only` |
+| `db.purge` | write | ok | `content_only` |
+| `files.list` | read | ok | ok |
+| `files.pack` | read | ok | ok |
+| `file.read` | read | ok | ok |
+| `plugin.list` | read | ok | ok |
+| `plugin.install` | write | ok | `content_only` |
+| `plugin.activate` | write | ok | `content_only` |
+| `plugin.selfUpdate` | write | ok | `content_only` |
+| `theme.list` | read | ok | ok |
+| `theme.install` | write | ok | `content_only` |
+| `theme.activate` | write | ok | `content_only` |
+| `theme.style` | write | ok | `content_only` |
+| `theme.palette` | read with no `colors`, else write | ok | read ok; write `content_only` |
+| `core.manifest` | read | ok | ok |
+| `language.install` | write | ok | `content_only` |
+| `content.list` | read | ok | ok |
+| `content.get` | read | ok | ok |
+| `content.update` | write | ok | `content_only` — slot values go through `content.contract` `apply` |
+| `content.language` | write | ok | `content_only` |
+| `content.delete` | write | ok | `content_only` — demo posts are hidden through `content.contract` `demoTrim.apply` |
+| `media.upload` | write | ok | allowed only at `wp-content/uploads/tracy-content/<sha256 of the bytes>.(png\|jpg\|webp)`, under an `apply_id` that does not start with `contract-` |
+| `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
+| `apply.list` | read | ok | ok |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
+
+## The content contract
+
+A site built from a Tracy quickstart is **sealed**: it keeps the design the release shipped, and
+the customer's agent changes words — the value of every slot the profile's `content-map.json`
+names — and nothing else. The profiles live in [`lib/contracts/`](lib/contracts/README.md), one
+directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
+
+- The seal is one option, `_tracy_content_contract` (JSON, not autoloaded). Which profile a site
+  uses comes from the binding, else the `claude_cowork_contract` option, else the `contract`
+  parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
+  refuses every write with `contract_unavailable` — it never reads as an unbound site.
+- `content.contract` takes `operation`:
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, demoTrim, sourceLanguage, problems: []}`.
+    A site that does not match answers `contract_failed` with every `problems[]` named: a theme
+    file changed or added under `fileRoots`, a pinned option, a template part, an entity
+    missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
+    slot masked as `{{slot}}`.
+  - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
+    problem: the baseline is the released lock, never a snapshot of the site as found.
+  - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:
+    {slotKey | locale::slotKey: value}`, optional `evidence`. Every value is checked before any
+    write: known slot, `maxCharacters`, no `<` `>` or control characters, no `{directive}`
+    (identity tokens `{site.*}` `{contact.*}` `{social.*}` are allowed), links limited to
+    `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. One read and one
+    write per row. The same `request_id` with the same content replays the stored result; a new
+    request under a used `apply_id` is refused.
+  - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
+    `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
+    reported; refused while the site has a Polylang language the profile ships no edition for.
+  - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's
+    locale (`en_US` → `en_GB`, `en_AU`, `en_CA`, `en_NZ`) in Polylang and `WPLANG`.
+- Error codes: `content_only` (a structural write on a sealed site), `contract_unavailable`
+  (store or profile unusable), `contract_failed` (the site or the request does not pass),
+  `conflict` (already bound / a trim or relabel already on record), `writer_busy` (another
+  writer holds the site's lock).
 
 ## Layout
 

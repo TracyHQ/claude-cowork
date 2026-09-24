@@ -70,6 +70,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		'user_roles',
 		'claude_cowork_token',
 		'claude_cowork_db_version',
+		// The content-only seal and which profile it names. Writable through `content.update`,
+		// either could unseal a customer's site with one option write, so both are refused here
+		// and reached only through the contract door.
+		'_tracy_content_contract',
+		'claude_cowork_contract',
 	);
 
 	/** Told apart from a real stored value, which may legitimately be null, false or ''. */
@@ -459,6 +464,35 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			throw new RuntimeException( "WordPress would not trash post {$id}" );
 		}
 		$this->touched[ $id ] = $id;
+	}
+
+	/**
+	 * Run one piece of work as the only writer on this site.
+	 *
+	 * A MySQL advisory lock, named for this database and table prefix, taken without waiting:
+	 * a second caller arriving while one apply runs is told `writer_busy` and comes back, rather
+	 * than queueing behind a write it then verifies the site against too late. The lock lives on
+	 * the connection, so a request that dies releases it.
+	 *
+	 * @param callable $work
+	 * @return mixed What the work returned.
+	 */
+	public function serialize( callable $work ) {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			throw new RuntimeException( 'the database is not wired' );
+		}
+		$name = 'tracy-write-' . substr( hash( 'sha256', (string) ( $wpdb->dbname ?? '' ) . ':' . (string) ( $wpdb->prefix ?? '' ) ), 0, 32 );
+		$got  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $name ) );
+		if ( (int) $got !== 1 ) {
+			throw new RuntimeException( 'another writer is changing this site' );
+		}
+		try {
+			return $work();
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+		}
 	}
 
 	public function purgeCache(): void {
@@ -1346,5 +1380,57 @@ final class Claude_Cowork_Apply_Log implements ApplyLog {
 			)
 		);
 		return (int) $max + 1;
+	}
+}
+
+/**
+ * Where the content-only seal lives: one option, JSON, never autoloaded.
+ *
+ * The one rule: a value that is not a binding LOCKS the site. `load()` throws on anything but
+ * absent-or-valid, and the engine turns that into `contract_unavailable` for every write. A
+ * store that read a corrupt seal as "no seal" would open every structural write on exactly the
+ * site somebody has been tampering with.
+ */
+final class Claude_Cowork_Contract_Store implements ContractStore {
+
+	/** Told apart from a real stored value, which may be anything. */
+	private const ABSENT = "\0claude_cowork_absent";
+
+	public function load(): ?array {
+		$raw = get_option( QuickstartContract::STORE_OPTION, self::ABSENT );
+		if ( self::ABSENT === $raw || null === $raw || '' === $raw || false === $raw ) {
+			return null;
+		}
+		$binding = is_string( $raw ) ? json_decode( $raw, true ) : null;
+		if ( ! is_array( $binding ) || ( $binding['schemaVersion'] ?? null ) !== QuickstartContract::SCHEMA_VERSION
+			|| ! isset( $binding['contract'], $binding['contractHash'], $binding['revision'] ) ) {
+			throw new RuntimeException( 'The content contract store is corrupt; every write is refused until it is repaired' );
+		}
+		return $binding;
+	}
+
+	public function save( array $binding ): void {
+		$current = $this->load();
+		if ( null !== $current ) {
+			if ( $current != $binding ) {
+				throw new RuntimeException( 'Cannot replace a content-only baseline' );
+			}
+			return;
+		}
+		$this->write( $binding );
+	}
+
+	public function replace( array $binding ): void {
+		$this->write( $binding );
+	}
+
+	private function write( array $binding ): void {
+		$json = json_encode( $binding, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		if ( ! is_string( $json ) ) {
+			throw new RuntimeException( 'could not encode the content contract binding' );
+		}
+		// `false`: not autoloaded. The seal is read on the one request that needs it and would
+		// otherwise ride along on every page view of the site.
+		update_option( QuickstartContract::STORE_OPTION, $json, false );
 	}
 }

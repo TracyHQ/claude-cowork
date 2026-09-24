@@ -21,6 +21,7 @@ require_once __DIR__ . '/FileWalker.php';
 require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/SiteWriter.php';
+require_once __DIR__ . '/QuickstartContract.php';
 
 final class Engine
 {
@@ -38,8 +39,37 @@ final class Engine
     private ?ApplyLog $log;
     /** Where to say the site moved, when anyone is watching. Null is silence, not an error. */
     private $stamp;
+    /**
+     * The content-only seal. Null on a site wired without one (every existing test), in which case
+     * the site is unbound and nothing below changes. On the plugin it is always wired, and whether
+     * the site is SEALED is a fact of its store, not of this object being present.
+     */
+    private ?QuickstartContract $contract;
+    /** Set while a request runs under the writer lock, so the re-entrant call does not take it twice. */
+    private bool $writing = false;
 
     private const MAX_DB_LIMIT = 5000;
+    /**
+     * What a sealed site refuses — a specific list, no wildcard, so a new action is not blocked or
+     * allowed by accident but by somebody adding it to one of the two lists here.
+     */
+    private const CONTENT_ONLY_BLOCKED = [
+        'content.update', 'content.delete', 'content.language', 'language.install',
+        'plugin.install', 'plugin.activate', 'plugin.selfUpdate',
+        'theme.install', 'theme.activate', 'theme.style', 'theme.palette',
+        'db.cleanup', 'db.restore', 'db.purge',
+    ];
+    /** Writes a sealed site still takes, each under its own rule in handle(). */
+    private const CONTENT_ONLY_RULED = ['media.upload', 'apply.revert', 'content.contract'];
+    /** Actions that change the site, and so run one at a time under the writer's lock. */
+    private const SERIALIZED = [
+        'content.contract', 'content.update', 'content.delete', 'content.language',
+        'media.upload', 'apply.revert', 'db.cleanup', 'db.restore', 'db.purge',
+    ];
+    /** The only path an image may take onto a sealed site: content-addressed, under one folder. */
+    private const CONTRACT_MEDIA_PATH = '~^wp-content/uploads/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D';
+    private const DEMO_TRIM_BATCH = 300;
+    private const REQUEST_ID_SHAPE = '/^[a-zA-Z0-9._:-]{1,100}$/D';
     private const MAX_FILE_LIMIT = 500;
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
     /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
@@ -69,7 +99,8 @@ final class Engine
         ?SiteWriter $writer = null,
         ?MediaWriter $media = null,
         ?ApplyLog $log = null,
-        $stamp = null
+        $stamp = null,
+        ?QuickstartContract $contract = null
     ) {
         $this->token = $token;
         $this->info = $info;
@@ -81,6 +112,7 @@ final class Engine
         $this->media = $media;
         $this->log = $log;
         $this->stamp = $stamp;
+        $this->contract = $contract;
     }
 
     /**
@@ -96,6 +128,60 @@ final class Engine
 
         $action = isset($req['action']) && is_string($req['action']) ? $req['action'] : '';
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
+
+        // One writer at a time. Two agents applying to one site interleave reads and writes, and
+        // a content apply that verified the site before its write is only sound if nothing else
+        // wrote in between. The writers that cannot lock (the in-memory doubles) run as before.
+        if (!$this->writing && $this->writer !== null && method_exists($this->writer, 'serialize')
+            && in_array($action, self::SERIALIZED, true)) {
+            try {
+                return $this->writer->serialize(function () use ($req): array {
+                    $this->writing = true;
+                    try {
+                        return $this->handle($req);
+                    } finally {
+                        $this->writing = false;
+                    }
+                });
+            } catch (Throwable $e) {
+                return $this->err('writer_busy', $e->getMessage());
+            }
+        }
+
+        // The seal. A store that cannot be read, or a bound profile this plugin does not carry,
+        // LOCKS every write: the one thing a sealed site must never do is read as unbound.
+        $bound = false;
+        if ($this->contract !== null) {
+            try {
+                $bound = $this->contract->bound();
+            } catch (Throwable $e) {
+                if (in_array($action, self::CONTENT_ONLY_BLOCKED, true) || in_array($action, self::CONTENT_ONLY_RULED, true)) {
+                    return $this->err('contract_unavailable', $e->getMessage());
+                }
+            }
+        }
+        if ($bound) {
+            if (in_array($action, self::CONTENT_ONLY_BLOCKED, true)) {
+                return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
+            }
+            if ($action === 'media.upload') {
+                $path = isset($params['path']) && is_string($params['path']) ? $params['path'] : '';
+                if (!preg_match(self::CONTRACT_MEDIA_PATH, $path)) {
+                    return $this->err('content_only', 'Use a new content-addressed image under wp-content/uploads/tracy-content/<sha256>.<png|jpg|webp>');
+                }
+                $b64 = isset($params['content_b64']) && is_string($params['content_b64']) ? $params['content_b64'] : '';
+                $bytes = base64_decode($b64, true);
+                if ($bytes === false || !hash_equals(hash('sha256', $bytes), (string) pathinfo($path, PATHINFO_FILENAME))) {
+                    return $this->err('content_only', 'The image name must be the sha256 of its bytes');
+                }
+                if (strpos((string) ($params['apply_id'] ?? ''), 'contract-') === 0) {
+                    return $this->err('content_only', 'Media uploads must use a separate apply receipt, not a contract- apply_id');
+                }
+            }
+            if ($action === 'apply.revert') {
+                return $this->contractRevert($params);
+            }
+        }
 
         switch ($action) {
             case 'info':
@@ -156,9 +242,436 @@ final class Engine
                 return $this->applyRevert($params);
             case 'apply.list':
                 return $this->applyList($params);
+            case 'content.contract':
+                return $this->contentContract($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
+    }
+
+    // ---- The content contract ---------------------------------------------------------------
+    //
+    // One action, several operations, because the relay admits actions by NAME and a sealed site
+    // must not need a second door opened for any of this. Every operation says which of these it
+    // is: `inspect` reads, `bind` seals, `apply` writes slot values, `demoTrim.*` hides the
+    // vendor's demo, `sourceLanguage.*` respells the source edition's locale.
+
+    private function contentContract(array $p): array
+    {
+        if ($this->contract === null || $this->log === null || $this->writer === null) {
+            return $this->err('unavailable', 'content contract receiver not wired');
+        }
+        $operation = isset($p['operation']) && is_string($p['operation']) && $p['operation'] !== '' ? $p['operation'] : 'inspect';
+        $requested = isset($p['contract']) && is_string($p['contract']) && trim($p['contract']) !== '' ? trim($p['contract']) : null;
+        try {
+            if ($operation === 'inspect') {
+                return $this->inspectAnswer($this->contract->inspect($requested));
+            }
+            if ($operation === 'bind') {
+                $state = $this->contract->inspect($requested);
+                if ($state['bound']) {
+                    return $this->err('conflict', 'This site is already bound to ' . $state['contract']);
+                }
+                if ($state['problems'] !== []) {
+                    return $this->inspectAnswer($state);
+                }
+                $this->contract->bind($state);
+                return $this->ok(['bound' => true, 'contract' => $state['contract'], 'revision' => $state['revision'], 'ids' => $state['ids']]);
+            }
+            if (strpos($operation, 'demoTrim.') === 0) {
+                return $this->demoTrim($p, substr($operation, strlen('demoTrim.')));
+            }
+            if (strpos($operation, 'sourceLanguage.') === 0) {
+                return $this->sourceLanguage($p, substr($operation, strlen('sourceLanguage.')));
+            }
+            if ($operation !== 'apply') {
+                return $this->err('bad_params', 'unknown contract operation: ' . $operation);
+            }
+            return $this->contractApply($p);
+        } catch (ContractUnavailable $e) {
+            return $this->err('contract_unavailable', $e->getMessage());
+        } catch (Throwable $e) {
+            return $this->err('contract_failed', $e->getMessage());
+        }
+    }
+
+    /** The public shape of an inspect: the state without its row images, or a refusal naming every problem. */
+    private function inspectAnswer(array $state): array
+    {
+        unset($state['rows']);
+        if ($state['problems'] !== []) {
+            return array_merge(
+                ['ok' => false, 'error' => 'contract_failed', 'message' => implode('; ', $state['problems'])],
+                ['bound' => $state['bound'], 'contract' => $state['contract'], 'problems' => $state['problems']]
+            );
+        }
+        return $this->ok($state);
+    }
+
+    /**
+     * Slot values onto a bound site: checked whole, written per row, proven, then receipted.
+     *
+     * The receipt is what makes a retry safe: the same request_id with the same content answers
+     * the stored result, and a different request under an apply_id already used is refused, so
+     * an agent that lost a reply can ask again without writing twice. One apply_id per revision.
+     */
+    private function contractApply(array $p): array
+    {
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null) {
+            throw new RuntimeException('apply_id required; it must start with "contract-"');
+        }
+        if (strpos($apply, 'contract-') !== 0) {
+            throw new RuntimeException('apply_id must start with "contract-", got "' . substr($apply, 0, 60) . '"');
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            throw new RuntimeException('request_id required: any string, the same on a retry and new for a different change');
+        }
+        if (!$this->contract->bound()) {
+            throw new RuntimeException('Bind this site to its contract before applying content');
+        }
+        $hash = hash('sha256', (string) json_encode([$p['changes'] ?? null, $p['evidence'] ?? []]));
+        $entries = $this->log->entries($apply);
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') === 'contract' && ($entry['request'] ?? null) === $request) {
+                if (!hash_equals((string) ($entry['hash'] ?? ''), $hash)) {
+                    throw new RuntimeException('request_id reused with different content');
+                }
+                $this->contract->inspectClean();
+                return $entry['result'];
+            }
+        }
+        if ($entries !== []) {
+            throw new RuntimeException('Use one new apply_id per content revision');
+        }
+
+        $plan = $this->contract->plan($p);
+        if ($plan['operations'] === []) {
+            return $this->ok(['unchanged' => true, 'revision' => $plan['state']['revision']]);
+        }
+
+        // Written in order, each step logged before the next; on any failure every step already
+        // taken is put back and the log cleared, so the site is exactly as it was and the apply_id
+        // can be used again. WordPress has no transaction to lean on here.
+        $done = [];
+        $written = [];
+        try {
+            foreach ($plan['operations'] as $op) {
+                $before = $this->writer->read($op['kind'], $op['id'], $op['key']);
+                $id = $this->writer->write($op['kind'], $op['id'], $op['fields'], $op['key']);
+                $done[] = [$op['kind'], $id, $op['key'], $before];
+                $this->log->record($apply, ['op' => 'content', 'kind' => $op['kind'], 'id' => $id, 'key' => $op['key'], 'before' => $before]);
+                $written[] = ['kind' => $op['kind'], 'id' => $id, 'key' => $op['key'] === '' ? null : $op['key']];
+            }
+            $state = $this->contract->inspectClean();
+            $this->contract->rebind($state);
+        } catch (Throwable $e) {
+            foreach (array_reverse($done) as [$kind, $id, $key, $before]) {
+                try {
+                    $this->rollbackContent($kind, $id, $key, $before);
+                } catch (Throwable $ignored) {
+                    // Keep going: every other step still deserves its undo.
+                }
+            }
+            try {
+                $this->log->clear($apply);
+            } catch (Throwable $ignored) {
+            }
+            throw new RuntimeException('Nothing was applied: ' . $e->getMessage());
+        }
+
+        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']]);
+        $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        $this->stamped('content');
+        return $result;
+    }
+
+    /**
+     * `apply.revert` on a sealed site: only a content-contract apply, only the latest one, and
+     * the site must pass its inspect afterwards.
+     */
+    private function contractRevert(array $p): array
+    {
+        if ($this->log === null || $this->contract === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        try {
+            $entries = $this->log->entries($applyId);
+        } catch (Throwable $e) {
+            return $this->err('revert_failed', $e->getMessage());
+        }
+        $receipts = [];
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') === 'contract') {
+                $receipts[] = $entry;
+            }
+        }
+        if (count($receipts) !== 1) {
+            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims and source relabels have their own revert operations');
+        }
+        try {
+            $state = $this->contract->inspectClean();
+            if (($receipts[0]['afterRevision'] ?? null) !== $state['revision']) {
+                return $this->err('content_only', 'Later content exists; revert the latest revision first');
+            }
+            $result = $this->applyRevert($p);
+            if (!$result['ok'] || !empty($result['failed'])) {
+                throw new RuntimeException('Contract revert failed: ' . json_encode($result['failed'] ?? $result));
+            }
+            $state = $this->contract->inspectClean();
+            $this->contract->rebind($state);
+            $result['revision'] = $state['revision'];
+            return $result;
+        } catch (ContractUnavailable $e) {
+            return $this->err('contract_unavailable', $e->getMessage());
+        } catch (Throwable $e) {
+            return $this->err('contract_failed', $e->getMessage());
+        }
+    }
+
+    /**
+     * Hiding the vendor's demo posts, and showing them again.
+     *
+     * What may be hidden is decided in review, in the profile's `demo-trim-map.json`; a request
+     * names no rows, so it cannot hide anything the review did not list. A row the customer has
+     * already moved somewhere else is skipped and reported, never forced.
+     */
+    private function demoTrim(array $p, string $operation): array
+    {
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'A demo trim needs a bound site');
+        }
+        if (!$this->contract->demoTrimAvailable()) {
+            return $this->err('unsupported', 'This quickstart contract carries no demo-trim profile; its demo rows cannot be hidden by this plugin');
+        }
+        $profile = $this->contract->demoTrim();
+        if ($operation === 'plan') {
+            $state = $this->contract->inspectClean();
+            $rows = [];
+            foreach ($profile->rows() as $row) {
+                $current = $this->writer->read('post', $row['id']);
+                $status = $current === null ? null : (string) ($current['post_status'] ?? '');
+                $rows[] = [
+                    'key' => $row['key'], 'kind' => $row['kind'], 'id' => $row['id'], 'language' => $row['language'],
+                    'from' => $row['from'], 'to' => $row['to'], 'current' => $status,
+                    'state' => $status === null ? 'missing' : ($status === $row['to'] ? 'hidden' : ($status === $row['from'] ? 'pending' : 'edited')),
+                ];
+            }
+            return $this->ok([
+                'hides' => $profile->counts(), 'rows' => $rows,
+                'status' => $state['demoTrim']['status'] ?? 'none',
+                'languages' => QuickstartContract::languages(), 'editions' => $this->contract->editionLanguages(),
+                'profileVersion' => $profile->version(), 'profileHash' => $profile->hash(),
+            ]);
+        }
+        if ($operation !== 'apply' && $operation !== 'revert') {
+            return $this->err('bad_params', 'Unknown demoTrim operation: ' . $operation);
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null || strpos($apply, 'dtrim-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "dtrim-"');
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        // A language this contract ships no edition for has copies of the demo this profile does
+        // not list; hiding the source alone would leave them showing. Say so, write nothing.
+        $foreign = array_diff(QuickstartContract::languages(), $this->contract->editionLanguages());
+        if ($foreign !== []) {
+            return $this->err('contract_failed', 'This site has a language this contract carries no edition for: ' . implode(', ', $foreign) . '. Nothing has been written.');
+        }
+        $state = $this->contract->inspectClean();
+        $trim = $state['demoTrim'];
+        $hide = $operation === 'apply';
+        if ($hide) {
+            if (($trim['status'] ?? null) === 'complete') {
+                return $this->ok(['status' => 'completed', 'remaining' => 0, 'moved' => 0, 'alreadyTrimmed' => true, 'applyId' => $trim['applyId'] ?? null]);
+            }
+            if ($trim !== null && (($trim['status'] ?? '') !== 'applying' || ($trim['requestId'] ?? '') !== $request)) {
+                return $this->err('conflict', 'A demo trim is already ' . (string) ($trim['status'] ?? '?') . ' under request ' . (string) ($trim['requestId'] ?? '?'));
+            }
+        } else {
+            if ($trim === null) {
+                return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
+            }
+            if (($trim['status'] ?? '') === 'reverting' && ($trim['requestId'] ?? '') !== $request) {
+                return $this->err('conflict', 'A demo trim revert is already running under request ' . (string) ($trim['requestId'] ?? '?'));
+            }
+        }
+        $record = [
+            'status' => $hide ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
+            'profileHash' => $profile->hash(), 'profileVersion' => $profile->version(), 'at' => gmdate('c'),
+        ];
+        if ($hide) {
+            $record['hidden'] = (int) ($trim['hidden'] ?? 0);
+            $record['skipped'] = is_array($trim['skipped'] ?? null) ? $trim['skipped'] : [];
+        }
+        // The record lands BEFORE any row moves: a call that dies mid-batch leaves a site that
+        // says a trim is in flight, so its retry is welcome rather than refused as drift.
+        if ($trim === null || ($trim['status'] ?? '') !== $record['status'] || ($trim['requestId'] ?? '') !== $request) {
+            $this->contract->record('demoTrim', $record);
+        } else {
+            $record = $trim;
+        }
+
+        $moved = 0;
+        $pending = 0;
+        $skipped = [];
+        foreach ($profile->rows() as $row) {
+            $want = $hide ? $row['to'] : $row['from'];
+            $other = $hide ? $row['from'] : $row['to'];
+            $current = $this->writer->read('post', $row['id']);
+            $status = $current === null ? null : (string) ($current['post_status'] ?? '');
+            if ($status === $want) {
+                continue;
+            }
+            if ($status !== $other) {
+                // Customer-edited (or gone): not this profile's row any more. Reported, not forced.
+                $skipped[] = ['key' => $row['key'], 'id' => $row['id'], 'status' => $status];
+                continue;
+            }
+            if ($moved >= self::DEMO_TRIM_BATCH) {
+                $pending++;
+                continue;
+            }
+            QuickstartContract::setPostStatus($row['id'], $want);
+            $this->log->record($apply, ['op' => 'visibility', 'kind' => $row['kind'], 'id' => $row['id'], 'column' => 'post_status', 'before' => $status]);
+            $moved++;
+        }
+        if ($pending === 0) {
+            if ($hide) {
+                $record['status'] = 'complete';
+                $record['hidden'] = (int) $record['hidden'] + $moved;
+                $record['skipped'] = $skipped;
+                $record['completedAt'] = gmdate('c');
+                $this->contract->record('demoTrim', $record);
+            } else {
+                $this->contract->record('demoTrim', null);
+            }
+        } elseif ($hide) {
+            $record['hidden'] = (int) $record['hidden'] + $moved;
+            $this->contract->record('demoTrim', $record);
+        }
+        // Proven after the move: a governed page that is also a demo row is allowed at either end,
+        // and anything else that changed is not this operation's doing — but it is still drift.
+        $this->contract->rebind($this->contract->inspectClean());
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        if ($moved > 0) {
+            $this->stamped('content');
+        }
+        return $this->ok([
+            'status' => $pending === 0 ? ($hide ? 'completed' : 'reverted') : 'running',
+            'moved' => $moved, 'remaining' => $pending, 'skipped' => $skipped, 'applyId' => $apply,
+        ]);
+    }
+
+    /**
+     * Respell the source edition's locale — `en_US` to `en_GB`, `en_AU`, `en_CA` or `en_NZ` and
+     * back. Same words, another spelling and date format; nothing translated, no second edition.
+     * Polylang holds the language's locale and WordPress holds `WPLANG`; both move together.
+     */
+    private function sourceLanguage(array $p, string $operation): array
+    {
+        if (QuickstartContract::polylang() === null) {
+            return $this->err('unavailable', 'this site has no translation plugin, so its source language has no locale to respell');
+        }
+        $language = QuickstartContract::language(QuickstartContract::SOURCE_LANGUAGE);
+        if ($language === null) {
+            return $this->err('contract_failed', 'This site has no Polylang language ' . QuickstartContract::SOURCE_LANGUAGE);
+        }
+        $current = $language['locale'];
+        $locale = isset($p['locale']) && is_string($p['locale']) ? trim($p['locale']) : '';
+        $binding = $this->contract->binding();
+        $onRecord = isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null;
+        if ($operation === 'plan') {
+            if ($locale !== '' && !in_array($locale, QuickstartContract::SOURCE_VARIANTS, true)) {
+                return $this->err('bad_params', $locale . ' is not a variant of ' . QuickstartContract::SOURCE_LOCALE . '; the source edition can only be respelled as one of ' . implode(', ', QuickstartContract::SOURCE_VARIANTS));
+            }
+            return $this->ok([
+                'language' => QuickstartContract::SOURCE_LANGUAGE, 'published' => QuickstartContract::SOURCE_LOCALE,
+                'current' => $current, 'locale' => $locale === '' ? null : $locale,
+                'wplang' => (string) (($this->writer->read('option', 0, 'WPLANG') ?? ['value' => ''])['value']),
+                'variants' => QuickstartContract::SOURCE_VARIANTS, 'onRecord' => $onRecord,
+                'noop' => $locale !== '' && $locale === $current,
+            ]);
+        }
+        if ($operation !== 'set' && $operation !== 'revert') {
+            return $this->err('bad_params', 'Unknown sourceLanguage operation: ' . $operation);
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null || strpos($apply, 'srclang-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "srclang-"');
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'A source relabel needs a bound site');
+        }
+        if ($operation === 'revert') {
+            if ($onRecord === null) {
+                return $this->err('contract_failed', 'This site\'s source edition still carries its published locale; there is nothing to take back');
+            }
+            // WPLANG goes back to what it WAS, not to the locale's name: a site shipped with the
+            // option absent (WordPress's own spelling of en_US) gets it absent again.
+            $this->relabelSource($apply, (string) $onRecord['from'], $onRecord['wplang'] ?? null);
+            $this->contract->record('sourceLanguage', null);
+            return $this->ok(['status' => 'reverted', 'locale' => (string) $onRecord['from']]);
+        }
+        if (!in_array($locale, QuickstartContract::SOURCE_VARIANTS, true)) {
+            return $this->err('bad_params', ($locale === '' ? 'A locale' : $locale) . ' is not a variant of ' . QuickstartContract::SOURCE_LOCALE . '; the source edition can only be respelled as one of ' . implode(', ', QuickstartContract::SOURCE_VARIANTS));
+        }
+        if ($locale === $current) {
+            return $this->ok(['status' => 'completed', 'locale' => $locale, 'alreadySet' => true]);
+        }
+        if ($onRecord !== null) {
+            return $this->err('conflict', 'This site\'s source edition is already respelled as ' . (string) $onRecord['to'] . '; take that back with sourceLanguage.revert before choosing another');
+        }
+        $wplang = $this->relabelSource($apply, $locale, ['value' => $locale]);
+        $this->contract->record('sourceLanguage', [
+            'from' => $current, 'to' => $locale, 'wplang' => $wplang,
+            'applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c'),
+        ]);
+        return $this->ok(['status' => 'completed', 'locale' => $locale, 'from' => $current]);
+    }
+
+    /**
+     * One relabel: Polylang's locale for the source language, and `WPLANG` set to `$wplang`
+     * (null removes the option). Both halves logged, so `apply.revert` outside the seal could
+     * still undo them. Returns the WPLANG before-image, for the record a revert reads.
+     */
+    private function relabelSource(string $apply, string $locale, ?array $wplang): ?array
+    {
+        $before = QuickstartContract::language(QuickstartContract::SOURCE_LANGUAGE);
+        QuickstartContract::setLanguageLocale(QuickstartContract::SOURCE_LANGUAGE, $locale);
+        $this->log->record($apply, ['op' => 'sourceLocale', 'slug' => QuickstartContract::SOURCE_LANGUAGE, 'before' => $before === null ? null : $before['locale']]);
+        $was = $this->writer->read('option', 0, 'WPLANG');
+        if ($wplang === null) {
+            $this->writer->delete('option', 0, 'WPLANG');
+        } else {
+            $this->writer->write('option', 0, $wplang, 'WPLANG');
+        }
+        $this->log->record($apply, ['op' => 'content', 'kind' => 'option', 'id' => 0, 'key' => 'WPLANG', 'before' => $was]);
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        $this->stamped('content');
+        return $was;
     }
 
     /**
@@ -1501,6 +2014,18 @@ final class Engine
                 $step['key'] = ($entry['key'] ?? '') === '' ? null : $entry['key'];
             } elseif ($op === 'media') {
                 $step['path'] = $entry['path'] ?? null;
+            } elseif ($op === 'contract') {
+                // The receipt of a content-contract apply: not a change of its own, so never
+                // "created"; what it carries is which request it answered and the revision after.
+                $step['created'] = false;
+                $step['request'] = $entry['request'] ?? null;
+                $step['afterRevision'] = $entry['afterRevision'] ?? null;
+            } elseif ($op === 'visibility') {
+                $step['kind'] = $entry['kind'] ?? null;
+                $step['id'] = $entry['id'] ?? null;
+                $step['column'] = $entry['column'] ?? null;
+            } elseif ($op === 'sourceLocale') {
+                $step['slug'] = $entry['slug'] ?? null;
             }
             return $step;
         }, $entries);
@@ -1550,6 +2075,19 @@ final class Engine
                 (int) ($entry['attachment'] ?? 0),
                 $entry['before'] ?? null
             );
+            return;
+        }
+        if ($op === 'contract') {
+            // A receipt records that an apply happened; the content entries beside it are what
+            // is undone. Nothing to put back here.
+            return;
+        }
+        if ($op === 'visibility') {
+            QuickstartContract::setPostStatus((int) ($entry['id'] ?? 0), (string) ($entry['before'] ?? ''));
+            return;
+        }
+        if ($op === 'sourceLocale') {
+            QuickstartContract::setLanguageLocale((string) ($entry['slug'] ?? ''), (string) ($entry['before'] ?? ''));
             return;
         }
         throw new RuntimeException("unknown step: {$op}");
