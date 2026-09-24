@@ -1582,6 +1582,8 @@ check('content.language needs an apply_id',
 
 // The content-only seal: its own file, because it is its own boundary.
 require_once __DIR__ . '/contracts.php';
+// Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.
+require_once __DIR__ . '/multilingual.php';
 require __DIR__ . '/activation-order.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
