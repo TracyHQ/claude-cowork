@@ -1391,6 +1391,12 @@ final class Claude_Cowork_Apply_Log implements ApplyLog {
  * store that read a corrupt seal as "no seal" would open every structural write on exactly the
  * site somebody has been tampering with.
  */
+// The store implements the contract's own interface, and this file is required on its own at
+// activation (`register_activation_hook` loads only SiteWriter + writers to create the undo table):
+// without this line activation died with `Interface "ContractStore" not found` — measured on the
+// first provision that installed 0.12.1 (25/09/2026); the fakes never loaded the files that way.
+require_once __DIR__ . '/QuickstartContract.php';
+
 final class Claude_Cowork_Contract_Store implements ContractStore {
 
 	/** Told apart from a real stored value, which may be anything. */

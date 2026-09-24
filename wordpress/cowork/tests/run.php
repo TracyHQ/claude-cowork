@@ -1582,6 +1582,7 @@ check('content.language needs an apply_id',
 
 // The content-only seal: its own file, because it is its own boundary.
 require_once __DIR__ . '/contracts.php';
+require __DIR__ . '/activation-order.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
