@@ -1,0 +1,7 @@
+{
+    "schemaVersion": "tracy-quickstart-contract/v1",
+    "id": "bad-trim/wp7/1.0.0",
+    "platform": "wordpress",
+    "theme": "test-theme",
+    "mode": "content-only"
+}

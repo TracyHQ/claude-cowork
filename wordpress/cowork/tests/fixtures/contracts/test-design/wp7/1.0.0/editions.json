@@ -1,0 +1,30 @@
+{
+    "schemaVersion": "tracy-quickstart-editions/wordpress/v1",
+    "contract": "test-design/wp7/1.0.0",
+    "baseHash": "61a73aa8d92b1003ed631c06f482b926f1fdaf0e8a84bf6ce4f06276abb5140d",
+    "source": {
+        "language": "en",
+        "locale": "en_US",
+        "tag": "en-us"
+    },
+    "locales": {
+        "en": {
+            "locale": "en_US",
+            "tag": "en-us",
+            "ids": {
+                "page-home": 10
+            },
+            "missing": []
+        },
+        "de": {
+            "locale": "de_DE",
+            "tag": "de-de",
+            "ids": {
+                "page-home": 60
+            },
+            "missing": [
+                "page-home:hero.cta"
+            ]
+        }
+    }
+}

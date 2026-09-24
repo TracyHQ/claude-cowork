@@ -1580,5 +1580,8 @@ check('content.language needs an apply_id',
     $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.language',
         'params' => ['id' => 1, 'lang' => 'vi']])['error'], 'bad_params');
 
+// The content-only seal: its own file, because it is its own boundary.
+require_once __DIR__ . '/contracts.php';
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

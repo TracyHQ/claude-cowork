@@ -44,9 +44,25 @@ final class WP_Fake
     public static int $nextTermId = 900;
     /** The active theme, which is what a template-part override has to be filed under. */
     public static string $stylesheet = 'tracy';
+    /** Whether Polylang is "installed": PLL() answers null when it is not. */
+    public static bool $polylang = false;
+    /** @var array<string,array<string,mixed>> slug => Polylang language row */
+    public static array $languages = [];
+    /** @var array<int,string> post id => Polylang slug */
+    public static array $postLanguage = [];
 
     public static function reset(): void
     {
+        self::$polylang = false;
+        self::$languages = [];
+        self::$postLanguage = [];
+        if (class_exists('WP_Fake_PLL_Languages')) {
+            WP_Fake_PLL_Languages::$updates = [];
+        }
+        if (isset($GLOBALS['wpdb']) && $GLOBALS['wpdb'] instanceof WP_Fake_Db) {
+            $GLOBALS['wpdb']->queries = [];
+            $GLOBALS['wpdb']->lockAnswer = 1;
+        }
         self::$posts = [];
         self::$meta = [];
         self::$options = [];
@@ -374,4 +390,123 @@ function kses_init_filters(): void
     if (isset($GLOBALS['__kses_toggle'])) {
         ($GLOBALS['__kses_toggle'])(true);
     }
+}
+
+// ---- what the content contract needs: a database handle, and Polylang ------------------------
+
+/**
+ * `$wpdb` down to the three calls the plugin makes outside the writers: the advisory lock the
+ * site writer takes, and the raw status update a demo trim writes. `update()` edits the same
+ * posts the rest of this fake serves, so a test can read a trimmed post back through `get_post`.
+ */
+final class WP_Fake_Db
+{
+    public string $prefix = 'wp_';
+    public string $posts = 'wp_posts';
+    public string $dbname = 'wp';
+    /** @var string[] every statement seen, so a test can see the lock taken and released */
+    public array $queries = [];
+    /** What GET_LOCK answers: 1 is the lock taken, 0 is another writer holding it. */
+    public int $lockAnswer = 1;
+
+    public function prepare(string $query, ...$args): string
+    {
+        foreach ($args as $arg) {
+            $query = preg_replace('/%[sd]/', is_int($arg) ? (string) $arg : "'" . (string) $arg . "'", $query, 1);
+        }
+        return $query;
+    }
+
+    public function get_var(string $query)
+    {
+        $this->queries[] = $query;
+        if (strpos($query, 'GET_LOCK') !== false) {
+            return $this->lockAnswer;
+        }
+        return 1;
+    }
+
+    public function update(string $table, array $data, array $where, $format = null, $whereFormat = null)
+    {
+        $id = (int) ($where['ID'] ?? 0);
+        if ($table !== $this->posts || !isset(WP_Fake::$posts[$id])) {
+            return false;
+        }
+        foreach ($data as $column => $value) {
+            WP_Fake::$posts[$id][$column] = $value;
+        }
+        return 1;
+    }
+}
+
+$GLOBALS['wpdb'] = new WP_Fake_Db();
+
+/**
+ * Polylang, as the contract sees it: which language a post is in, which languages exist, and
+ * one language's locale being changed. `WP_Fake::$polylang` false is a site without the plugin,
+ * and then `PLL()` answers null exactly as `function_exists('PLL')` would have answered false.
+ * `pll_set_post_language` is deliberately NOT defined: the engine's `content.language` decides
+ * whether the plugin exists by that name, and a test above relies on it being absent.
+ */
+final class WP_Fake_PLL_Languages
+{
+    /** @var array<int,array<string,mixed>> every update() call, as received */
+    public static array $updates = [];
+
+    public function get(string $slug)
+    {
+        return isset(WP_Fake::$languages[$slug]) ? (object) WP_Fake::$languages[$slug] : false;
+    }
+
+    public function update(array $args)
+    {
+        self::$updates[] = $args;
+        foreach (WP_Fake::$languages as $slug => $row) {
+            if ((int) $row['term_id'] === (int) ($args['lang_id'] ?? 0)) {
+                WP_Fake::$languages[$slug]['locale'] = (string) $args['locale'];
+                WP_Fake::$languages[$slug]['name'] = (string) $args['name'];
+                return true;
+            }
+        }
+        return new WP_Error('no such language');
+    }
+
+    public function clean_cache(): void
+    {
+    }
+}
+
+final class WP_Fake_PLL_Model
+{
+    public WP_Fake_PLL_Languages $languages;
+
+    public function __construct()
+    {
+        $this->languages = new WP_Fake_PLL_Languages();
+    }
+}
+
+final class WP_Fake_PLL
+{
+    public WP_Fake_PLL_Model $model;
+
+    public function __construct()
+    {
+        $this->model = new WP_Fake_PLL_Model();
+    }
+}
+
+function PLL()
+{
+    return WP_Fake::$polylang ? new WP_Fake_PLL() : null;
+}
+
+function pll_get_post_language(int $id)
+{
+    return WP_Fake::$polylang ? (WP_Fake::$postLanguage[$id] ?? false) : false;
+}
+
+function pll_languages_list(array $args = []): array
+{
+    return WP_Fake::$polylang ? array_keys(WP_Fake::$languages) : [];
 }
