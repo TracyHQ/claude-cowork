@@ -54,11 +54,14 @@ final class WP_Fake
     public static array $translations = [];
     /** How many times the rewrite rules were flushed. */
     public static int $flushed = 0;
+    /** @var array<string,array<string,string>> Polylang slug => [original string => its translation], what each language's `polylang_mo` post holds */
+    public static array $strings = [];
 
     public static function reset(): void
     {
         self::$polylang = false;
         self::$languages = [];
+        self::$strings = [];
         self::$postLanguage = [];
         self::$translations = [];
         self::$flushed = 0;
@@ -526,6 +529,44 @@ function pll_get_post(int $id, string $lang = '')
 function flush_rewrite_rules(bool $hard = true): void
 {
     WP_Fake::$flushed++;
+}
+
+/**
+ * Polylang's string translations of one language, as `PLL_MO` (a pomo `MO` with a database
+ * home) exposes them: `entries` keyed by the original string, each with `translations[0]`,
+ * loaded from and saved to WP_Fake::$strings per language. Only what the engine calls.
+ */
+final class PLL_MO
+{
+    /** @var array<string,object> original => entry with `singular` and `translations` */
+    public array $entries = [];
+
+    public function import_from_db(string $lang): void
+    {
+        $this->entries = [];
+        foreach (WP_Fake::$strings[$lang] ?? [] as $original => $translation) {
+            $this->add_entry($this->make_entry((string) $original, (string) $translation));
+        }
+    }
+
+    public function make_entry(string $original, string $translation): object
+    {
+        return (object) ['singular' => $original, 'translations' => [$translation]];
+    }
+
+    public function add_entry(object $entry): void
+    {
+        $this->entries[(string) $entry->singular] = $entry;
+    }
+
+    public function export_to_db(string $lang): void
+    {
+        $strings = [];
+        foreach ($this->entries as $original => $entry) {
+            $strings[(string) $original] = (string) ($entry->translations[0] ?? '');
+        }
+        WP_Fake::$strings[$lang] = $strings;
+    }
 }
 
 /** The home of one language, as the front-end hooks ask for it when a switcher entry has no translation. */
