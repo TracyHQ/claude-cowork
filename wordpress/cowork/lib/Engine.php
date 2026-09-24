@@ -371,17 +371,31 @@ final class Engine
         try {
             foreach ($plan['operations'] as $op) {
                 $before = $this->writer->read($op['kind'], $op['id'], $op['key']);
+                // Polylang serves blogname/blogdescription from its per-language STRING
+                // translations, not the option row: read those before the write (Polylang's own
+                // option hook may re-key them during it), write the same words into every
+                // language after, and keep the before-values in the undo entry.
+                $originals = $this->translatedOptionOriginals($op, $before);
+                $translations = QuickstartContract::stringTranslationsBefore($originals);
                 $id = $this->writer->write($op['kind'], $op['id'], $op['fields'], $op['key']);
-                $done[] = [$op['kind'], $id, $op['key'], $before];
-                $this->log->record($apply, ['op' => 'content', 'kind' => $op['kind'], 'id' => $id, 'key' => $op['key'], 'before' => $before]);
+                $done[] = [$op['kind'], $id, $op['key'], $before, $translations];
+                if ($originals !== []) {
+                    QuickstartContract::stringTranslationsWrite($originals, (string) $op['fields']['value']);
+                }
+                $entry = ['op' => 'content', 'kind' => $op['kind'], 'id' => $id, 'key' => $op['key'], 'before' => $before];
+                if ($translations !== []) {
+                    $entry['translations'] = $translations;
+                }
+                $this->log->record($apply, $entry);
                 $written[] = ['kind' => $op['kind'], 'id' => $id, 'key' => $op['key'] === '' ? null : $op['key']];
             }
             $state = $this->contract->inspectClean();
             $this->contract->rebind($state);
         } catch (Throwable $e) {
-            foreach (array_reverse($done) as [$kind, $id, $key, $before]) {
+            foreach (array_reverse($done) as [$kind, $id, $key, $before, $translations]) {
                 try {
                     $this->rollbackContent($kind, $id, $key, $before);
+                    QuickstartContract::stringTranslationsRestore($translations);
                 } catch (Throwable $ignored) {
                     // Keep going: every other step still deserves its undo.
                 }
@@ -676,8 +690,15 @@ final class Engine
      * copies when Polylang's translation groups name them. Nothing is translated and no row
      * moves: a customer who asked for a Vietnamese site gets the Vietnamese edition first.
      *
-     * Four values, one undo entry, one record on the binding. `revert` puts all four back as
+     * Five values, one undo entry, one record on the binding. `revert` puts all five back as
      * they were — `WPLANG` absent again when it was absent — and takes the record off.
+     *
+     * The fifth is Polylang's `hide_default`: the archive is captured with it on, so the source
+     * edition lives at `/` and every other under `/<slug>/`. Making another edition the default
+     * with it still on moves that edition to `/` and the source edition to `/<source>/` — and
+     * every link the archive baked into its navigation blocks (`/about/`, `/vi/news/`) answers
+     * 404. So a non-source default turns it off: every edition keeps its prefix, `/` is
+     * Polylang's default-language home, and the baked links keep working. `force_lang` stays.
      */
     private function siteLanguage(array $p, string $operation): array
     {
@@ -709,10 +730,15 @@ final class Engine
             if ($onRecord === null) {
                 return $this->err('contract_failed', 'This site\'s default language was not set by this door; there is nothing to take back');
             }
-            $this->restoreSiteLanguage([
+            $was = [
                 'default_lang' => $onRecord['from'] ?? null, 'WPLANG' => $onRecord['wplangFrom'] ?? null,
                 'page_on_front' => $onRecord['pageOnFrontFrom'] ?? null, 'page_for_posts' => $onRecord['pageForPostsFrom'] ?? null,
-            ]);
+            ];
+            // A record written before hide_default was part of this step leaves it as it is.
+            if (array_key_exists('hideDefaultFrom', $onRecord)) {
+                $was['hide_default'] = $onRecord['hideDefaultFrom'];
+            }
+            $this->restoreSiteLanguage($was);
             $this->log->clear((string) ($onRecord['applyId'] ?? $apply));
             $this->contract->record('siteLanguage', null);
             $this->siteLanguageSettled();
@@ -752,12 +778,16 @@ final class Engine
             'WPLANG' => get_option('WPLANG', null),
             'page_on_front' => get_option('page_on_front', null),
             'page_for_posts' => get_option('page_for_posts', null),
+            'hide_default' => isset($settings['hide_default']) ? (int) $settings['hide_default'] : null,
         ];
         // The undo lands BEFORE anything moves: a write that dies halfway leaves a log entry
         // `apply.revert` can read on an unbound site, and is put back here on a sealed one.
         $this->log->record($apply, ['op' => 'siteLanguage', 'language' => $slug, 'before' => $before]);
         try {
             $settings['default_lang'] = $slug;
+            if ($slug !== QuickstartContract::SOURCE_LANGUAGE) {
+                $settings['hide_default'] = 0;
+            }
             update_option('polylang', $settings);
             foreach (['page_on_front', 'page_for_posts'] as $key) {
                 $copy = self::editionCopy((int) $before[$key], $slug);
@@ -779,6 +809,7 @@ final class Engine
         $this->contract->record('siteLanguage', [
             'language' => $slug, 'from' => $current, 'wplangFrom' => $before['WPLANG'],
             'pageOnFrontFrom' => $before['page_on_front'], 'pageForPostsFrom' => $before['page_for_posts'],
+            'hideDefaultFrom' => $before['hide_default'],
             'applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c'),
         ]);
         $this->siteLanguageSettled();
@@ -811,8 +842,10 @@ final class Engine
     }
 
     /**
-     * The four values of a site-language step, put back as recorded. `WPLANG` null means the
-     * option was absent, and goes absent again; a page option is written as it was, `0` included.
+     * The values of a site-language step, put back as recorded. `WPLANG` null means the option
+     * was absent, and goes absent again; a page option is written as it was, `0` included;
+     * `hide_default` goes back to the recorded value, absent again when it was absent, and is
+     * left alone when the step (recorded before it was part of one) says nothing about it.
      *
      * @param array<string,mixed> $before
      */
@@ -824,6 +857,13 @@ final class Engine
             $settings['default_lang'] = $default;
         } else {
             unset($settings['default_lang']);
+        }
+        if (array_key_exists('hide_default', $before)) {
+            if ($before['hide_default'] === null) {
+                unset($settings['hide_default']);
+            } else {
+                $settings['hide_default'] = (int) $before['hide_default'];
+            }
         }
         update_option('polylang', $settings);
         foreach (['page_on_front', 'page_for_posts'] as $key) {
@@ -2526,6 +2566,10 @@ final class Engine
                 (string) ($entry['key'] ?? ''),
                 $entry['before'] ?? null
             );
+            // After the row, so Polylang's own re-keying on that write cannot undo the restore.
+            if (isset($entry['translations']) && is_array($entry['translations'])) {
+                QuickstartContract::stringTranslationsRestore($entry['translations']);
+            }
             return;
         }
         if ($op === 'media') {
@@ -2593,6 +2637,38 @@ final class Engine
     {
         $id = isset($p['apply_id']) && is_string($p['apply_id']) ? trim($p['apply_id']) : '';
         return $id === '' ? null : $id;
+    }
+
+    /**
+     * The strings Polylang may key a translation of one of its translated options by, for a
+     * contract write of that option: the option's value before the write, the profile's demo
+     * value(s) for it, and the value being written. `[]` for every other write.
+     *
+     * @param array<string,mixed> $op
+     * @param array<string,mixed>|null $before
+     * @return string[]
+     */
+    private function translatedOptionOriginals(array $op, ?array $before): array
+    {
+        if (($op['kind'] ?? '') !== 'option' || !in_array((string) ($op['key'] ?? ''), QuickstartContract::TRANSLATED_OPTIONS, true)) {
+            return [];
+        }
+        $value = $op['fields']['value'] ?? null;
+        if (!is_string($value)) {
+            return [];
+        }
+        $originals = [];
+        $was = $before['value'] ?? null;
+        if (is_string($was) && $was !== '') {
+            $originals[] = $was;
+        }
+        foreach ($this->contract->optionSamples((string) $op['key']) as $sample) {
+            $originals[] = $sample;
+        }
+        if ($value !== '') {
+            $originals[] = $value;
+        }
+        return array_values(array_unique($originals));
     }
 
     /**

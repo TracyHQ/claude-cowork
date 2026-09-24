@@ -69,18 +69,19 @@ check('nothing was written for any of those', [WP_Fake::$options['polylang']['de
 
 $set = $sdoor($S, 'siteLanguage.set', ['apply_id' => 'slang-1', 'request_id' => 'r1', 'language' => 'vi']);
 check('set makes Vietnamese the default', [$set['ok'], $set['status'], $set['language'], $set['from'], $set['wplang']], [true, 'completed', 'vi', 'en', 'vi']);
-check('and says how Polylang writes its urls', $set['rewrite'], ['force_lang' => 1, 'hide_default' => 1, 'rewrite' => 1]);
+check('and says how Polylang writes its urls now: every edition keeps its prefix', $set['rewrite'], ['force_lang' => 1, 'hide_default' => 0, 'rewrite' => 1]);
 check('Polylang default_lang is vi', WP_Fake::$options['polylang']['default_lang'], 'vi');
-check('the rest of its settings are as they were', [WP_Fake::$options['polylang']['force_lang'], WP_Fake::$options['polylang']['hide_default'], WP_Fake::$options['polylang']['browser']], [1, 1, 0]);
+check('hide_default is off, so the links the archive baked into its navigation keep answering', WP_Fake::$options['polylang']['hide_default'], 0);
+check('the rest of its settings are as they were', [WP_Fake::$options['polylang']['force_lang'], WP_Fake::$options['polylang']['browser']], [1, 0]);
 check('WPLANG is the edition\'s wpLocale', WP_Fake::$options['WPLANG'], 'vi');
 check('the front page is the Vietnamese copy', WP_Fake::$options['page_on_front'], $s['rows']['vi'][0]);
 check('the posts page has no Vietnamese copy and stays', WP_Fake::$options['page_for_posts'], $enPosts);
 check('the rewrite rules were flushed', WP_Fake::$flushed, 1);
 $record = json_decode((string) WP_Fake::$options[QuickstartContract::STORE_OPTION], true)['siteLanguage'];
-check('the binding records it', [$record['language'], $record['from'], $record['wplangFrom'], $record['pageOnFrontFrom'], $record['pageForPostsFrom'], $record['applyId'], $record['requestId']], ['vi', 'en', null, $enHome, $enPosts, 'slang-1', 'r1']);
+check('the binding records it', [$record['language'], $record['from'], $record['wplangFrom'], $record['pageOnFrontFrom'], $record['pageForPostsFrom'], $record['hideDefaultFrom'], $record['applyId'], $record['requestId']], ['vi', 'en', null, $enHome, $enPosts, 1, 'slang-1', 'r1']);
 checkTrue('with a time', is_string($record['at'] ?? null));
 check('and the log holds the undo', $s['log']->log['slang-1'][0]['op'] ?? null, 'siteLanguage');
-check('with the four values as they were', $s['log']->log['slang-1'][0]['before'], ['default_lang' => 'en', 'WPLANG' => null, 'page_on_front' => $enHome, 'page_for_posts' => $enPosts]);
+check('with the five values as they were', $s['log']->log['slang-1'][0]['before'], ['default_lang' => 'en', 'WPLANG' => null, 'page_on_front' => $enHome, 'page_for_posts' => $enPosts, 'hide_default' => 1]);
 check('the plan now says vi', $sdoor($S, 'siteLanguage.plan')['current'], 'vi');
 check('with the record', $sdoor($S, 'siteLanguage.plan')['onRecord']['language'], 'vi');
 check('a retry with the same apply_id and language is alreadySet', $sdoor($S, 'siteLanguage.set', ['apply_id' => 'slang-1', 'request_id' => 'r1', 'language' => 'vi'])['alreadySet'], true);
@@ -98,6 +99,7 @@ check('so the default is still vi', WP_Fake::$options['polylang']['default_lang'
 $back = $sdoor($S, 'siteLanguage.revert', ['apply_id' => 'slang-1']);
 check('revert puts English back', [$back['ok'], $back['status'], $back['language']], [true, 'reverted', 'en']);
 check('in Polylang', WP_Fake::$options['polylang']['default_lang'], 'en');
+check('with hide_default back on, as the archive was captured', WP_Fake::$options['polylang']['hide_default'], 1);
 check('WPLANG as it was: absent', array_key_exists('WPLANG', WP_Fake::$options), false);
 check('the front and posts pages as they were', [WP_Fake::$options['page_on_front'], WP_Fake::$options['page_for_posts']], [$enHome, $enPosts]);
 check('the log is cleared', $s['log']->log, []);
@@ -139,10 +141,17 @@ $v = $siteLanguageSite(false);
 WP_Fake::$options['polylang']['default_lang'] = 'vi';
 WP_Fake::$options['WPLANG'] = 'vi';
 WP_Fake::$options['page_on_front'] = $v['rows']['vi'][0];
-$v['log']->record('slang-x', ['op' => 'siteLanguage', 'language' => 'vi', 'before' => ['default_lang' => 'en', 'WPLANG' => null, 'page_on_front' => $v['rows']['en'][0], 'page_for_posts' => $v['rows']['en'][1]]]);
+WP_Fake::$options['polylang']['hide_default'] = 0;
+$v['log']->record('slang-x', ['op' => 'siteLanguage', 'language' => 'vi', 'before' => ['default_lang' => 'en', 'WPLANG' => null, 'page_on_front' => $v['rows']['en'][0], 'page_for_posts' => $v['rows']['en'][1], 'hide_default' => 1]]);
 $undo = $v['engine']->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-x']]);
 check('an unbound site reverts the step', [$undo['ok'], $undo['reverted']], [true, 1]);
 check('putting the default back', WP_Fake::$options['polylang']['default_lang'], 'en');
+check('and hide_default', WP_Fake::$options['polylang']['hide_default'], 1);
+// A step logged before hide_default was part of it says nothing about it, and leaves it alone.
+WP_Fake::$options['polylang']['hide_default'] = 0;
+$v['log']->record('slang-y', ['op' => 'siteLanguage', 'language' => 'vi', 'before' => ['default_lang' => 'en', 'WPLANG' => null, 'page_on_front' => $v['rows']['en'][0], 'page_for_posts' => $v['rows']['en'][1]]]);
+$v['engine']->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-y']]);
+check('an older undo entry leaves hide_default as it is', WP_Fake::$options['polylang']['hide_default'], 0);
 check('WPLANG absent again', array_key_exists('WPLANG', WP_Fake::$options), false);
 check('and the front page back', WP_Fake::$options['page_on_front'], $v['rows']['en'][0]);
 

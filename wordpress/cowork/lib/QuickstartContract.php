@@ -1051,6 +1051,123 @@ final class QuickstartContract
         return array_values(array_map('strval', (array) pll_languages_list()));
     }
 
+    /**
+     * The options Polylang serves through its STRING translations rather than the option row:
+     * on the front end `option_blogname` / `option_blogdescription` go through `pll__()`, which
+     * answers the current language's entry for the option's value (the `polylang_mo` post of
+     * each language). A customer's name written to the option alone is then shown only where
+     * no entry matches; the archive's per-language entries keep serving the vendor's demo
+     * words everywhere else.
+     */
+    public const TRANSLATED_OPTIONS = ['blogname', 'blogdescription'];
+
+    /** @return string[] the demo values the profile's scalar slots of one option carry (`sample`), unique, in profile order */
+    public function optionSamples(string $name): array
+    {
+        $entities = [];
+        foreach ($this->entities() as $entity) {
+            if (($entity['kind'] ?? '') === 'option' && (string) ($entity['identity']['name'] ?? '') === $name) {
+                $entities[(string) $entity['key']] = true;
+            }
+        }
+        $samples = [];
+        foreach ($this->slots() as $slot) {
+            if (!isset($entities[(string) ($slot['entity'] ?? '')]) || isset($slot['target']['field'])) {
+                continue;
+            }
+            $sample = $slot['sample'] ?? null;
+            if (is_string($sample) && $sample !== '' && !in_array($sample, $samples, true)) {
+                $samples[] = $sample;
+            }
+        }
+        return $samples;
+    }
+
+    /** Whether this site can hold Polylang string translations: the plugin, its languages and its `PLL_MO` class. */
+    private static function stringTranslationsAvailable(): bool
+    {
+        return class_exists('PLL_MO') && function_exists('pll_languages_list') && self::languages() !== [];
+    }
+
+    /**
+     * What every language's string translation of each original says now: `[slug => [original
+     * => translation|null]]`, null for an original that language has no entry for. `[]` without
+     * Polylang, so a site without it records nothing and restores nothing.
+     *
+     * @param string[] $originals
+     * @return array<string,array<string,string|null>>
+     */
+    public static function stringTranslationsBefore(array $originals): array
+    {
+        if ($originals === [] || !self::stringTranslationsAvailable()) {
+            return [];
+        }
+        $before = [];
+        foreach (self::languages() as $slug) {
+            $mo = new PLL_MO();
+            $mo->import_from_db($slug);
+            $before[$slug] = [];
+            foreach ($originals as $original) {
+                $entry = $mo->entries[$original] ?? null;
+                $before[$slug][$original] = is_object($entry) && isset($entry->translations[0]) ? (string) $entry->translations[0] : null;
+            }
+        }
+        return $before;
+    }
+
+    /**
+     * Give every language the same string translation of each original. Polylang keys an
+     * entry by the string it translates, so the option's value before the write, the archive's
+     * demo value and the new value each get one: whichever of them the front end looks up
+     * (Polylang re-keys the entry to the new value when its own option hook ran during the
+     * write) answers the customer's words.
+     *
+     * @param string[] $originals
+     */
+    public static function stringTranslationsWrite(array $originals, string $value): void
+    {
+        if ($originals === [] || !self::stringTranslationsAvailable()) {
+            return;
+        }
+        foreach (self::languages() as $slug) {
+            $mo = new PLL_MO();
+            $mo->import_from_db($slug);
+            foreach ($originals as $original) {
+                $mo->add_entry($mo->make_entry($original, $value));
+            }
+            $mo->export_to_db($slug);
+        }
+    }
+
+    /**
+     * Put string translations back as `stringTranslationsBefore()` read them: an entry that was
+     * absent goes absent again. A language the site no longer has is skipped.
+     *
+     * @param array<string,array<string,string|null>> $before
+     */
+    public static function stringTranslationsRestore(array $before): void
+    {
+        if ($before === [] || !self::stringTranslationsAvailable()) {
+            return;
+        }
+        $known = self::languages();
+        foreach ($before as $slug => $entries) {
+            if (!is_array($entries) || !in_array((string) $slug, $known, true)) {
+                continue;
+            }
+            $mo = new PLL_MO();
+            $mo->import_from_db((string) $slug);
+            foreach ($entries as $original => $translation) {
+                if ($translation === null) {
+                    unset($mo->entries[(string) $original]);
+                } else {
+                    $mo->add_entry($mo->make_entry((string) $original, (string) $translation));
+                }
+            }
+            $mo->export_to_db((string) $slug);
+        }
+    }
+
     /** One Polylang language as a plain array (term_id, name, slug, locale, rtl, term_group, flag), or null. */
     public static function language(string $slug): ?array
     {

@@ -75,7 +75,11 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     (identity tokens `{site.*}` `{contact.*}` `{social.*}` are allowed), links limited to
     `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. One read and one
     write per row. The same `request_id` with the same content replays the stored result; a new
-    request under a used `apply_id` is refused.
+    request under a used `apply_id` is refused. With Polylang, a write of `blogname` or
+    `blogdescription` also writes the same value as every language's string translation of it
+    (`PLL_MO`, keyed by the value before the write, the profile's `sample` and the new value —
+    Polylang serves those entries in front of the option), the undo entry keeps each
+    language's `translations` as they were, and `apply.revert` restores them with the option.
   - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
     `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
     reported; refused while the site has a Polylang language the profile ships no edition for.
@@ -86,17 +90,19 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     onRecord}`. `set` takes `language` (a tag as the questionnaire spells it — `vi`, `de-de` —
     or the Polylang slug, matched like a retire's `keep`: exact, else primary subtag; a tag the
     archive ships no edition of is `bad_params`), `apply_id`, `request_id`, and makes that
-    edition Polylang's default: `default_lang` in the `polylang` option (`force_lang`,
-    `hide_default` and `rewrite` are left as they are, so `/` serves the default and the other
-    editions keep `/<slug>/`; the reply's `rewrite` says what they are), `WPLANG` set to the
+    edition Polylang's default: `default_lang` in the `polylang` option, with `hide_default`
+    set to `0` for a non-source edition so every edition keeps its `/<slug>/` prefix and the
+    links the archive baked into its navigation blocks keep answering (`force_lang` and
+    `rewrite` are left as they are; the reply's `rewrite` says what was written), `WPLANG` set to the
     edition's `wpLocale` from `editions.json`, and `page_on_front` / `page_for_posts` moved to
     that edition's copies when Polylang's translation groups name them. Nothing is translated
     and no row moves. Reply `{ok, status: 'completed', language: <slug>, from: <slug>, wplang,
     rewrite}`; the edition already the default answers `alreadySet: true`; a second `set` while
     one is on record under another `apply_id` is `conflict`. The binding records
-    `siteLanguage: {language, from, wplangFrom, pageOnFrontFrom, pageForPostsFrom, applyId,
-    requestId, at}` and `inspect` reports `siteLanguage: {language, from, applyId} | null`.
-    `revert` puts all four values back as recorded (`WPLANG` absent again when it was absent),
+    `siteLanguage: {language, from, wplangFrom, pageOnFrontFrom, pageForPostsFrom,
+    hideDefaultFrom, applyId, requestId, at}` and `inspect` reports `siteLanguage: {language,
+    from, applyId} | null`. `revert` puts all five values back as recorded (`WPLANG` absent
+    again when it was absent, `hide_default` as it was),
     clears the log and takes the record off: `{ok, status: 'reverted', language: <slug back>}`.
     `apply.revert` refuses an `slang-` id on a sealed site; on an unbound site it undoes the
     same step from the log. No Polylang is `unavailable`; no editions profile is `unsupported`.
