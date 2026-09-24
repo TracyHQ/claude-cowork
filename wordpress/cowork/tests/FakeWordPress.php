@@ -510,3 +510,9 @@ function pll_languages_list(array $args = []): array
 {
     return WP_Fake::$polylang ? array_keys(WP_Fake::$languages) : [];
 }
+
+/** The home of one language, as the front-end hooks ask for it when a switcher entry has no translation. */
+function pll_home_url(string $lang = ''): string
+{
+    return WP_Fake::$polylang ? 'http://test.local/' . $lang . '/' : '';
+}

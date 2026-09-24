@@ -24,7 +24,8 @@ function contractRoot(array $site): string
 
 /**
  * A site as the test-design quickstart ships it: two options, one page, two template parts,
- * three demo posts. With Polylang on, a German copy of the page sits beside the English one.
+ * three demo posts. With Polylang on, a German copy of the page and of one demo post sit beside
+ * the English ones.
  *
  * @return array{engine:Engine,writer:Claude_Cowork_Site_Writer,log:FakeApplyLog,media:FakeMediaWriter,root:string,contract:QuickstartContract}
  */
@@ -41,7 +42,8 @@ function contractSite(array $site, string $fixtures, bool $polylang = false, str
         'home' => 'http://test.local',
     ];
     WP_Fake::$posts[10] = ['ID' => 10, 'post_type' => 'page', 'post_name' => 'home', 'post_status' => 'publish', 'post_parent' => 0, 'post_title' => 'Home', 'post_content' => $site['home']];
-    foreach ([26, 27, 28] as $id) {
+    // 26-28 are the source edition's demo posts; 29 is the German edition's copy of one.
+    foreach ([26, 27, 28, 29] as $id) {
         WP_Fake::$posts[$id] = ['ID' => $id, 'post_type' => 'post', 'post_name' => 'demo-' . $id, 'post_status' => 'publish', 'post_parent' => 0, 'post_title' => 'Demo ' . $id, 'post_content' => '<!-- wp:paragraph --><p>demo</p><!-- /wp:paragraph -->'];
     }
     WP_Fake::$posts[70] = ['ID' => 70, 'post_type' => 'wp_template_part', 'post_name' => 'header', 'post_status' => 'publish', 'post_parent' => 0, 'post_title' => 'header', 'post_content' => $site['header']];
@@ -61,6 +63,7 @@ function contractSite(array $site, string $fixtures, bool $polylang = false, str
             WP_Fake::$postLanguage[$id] = 'en';
         }
         WP_Fake::$postLanguage[60] = 'de';
+        WP_Fake::$postLanguage[29] = 'de';
     }
     $root = contractRoot($site);
     $writer = new Claude_Cowork_Site_Writer();
@@ -356,21 +359,21 @@ $D = $d['engine'];
 check('a demo trim needs a bound site', $door($D, 'demoTrim.plan')['error'], 'contract_failed');
 $door($D, 'bind', ['contract' => 'test-design/wp7/1.0.0']);
 $tplan = $door($D, 'demoTrim.plan');
-check('the plan counts what it would hide', $tplan['hides'], ['post' => 3]);
-check('and reads every row as pending', array_column($tplan['rows'], 'state'), ['pending', 'pending', 'pending']);
+check('the plan counts what it would hide', $tplan['hides'], ['post' => 4]);
+check('and reads every row as pending', array_column($tplan['rows'], 'state'), ['pending', 'pending', 'pending', 'pending']);
 check('no trim on record yet', $tplan['status'], 'none');
 check('apply needs a dtrim- apply_id', $door($D, 'demoTrim.apply', ['apply_id' => 'contract-1', 'request_id' => 't1'])['error'], 'bad_params');
 WP_Fake::$posts[27]['post_status'] = 'private'; // the customer already moved this one
 $trimmed = $door($D, 'demoTrim.apply', ['apply_id' => 'dtrim-1', 'request_id' => 't1']);
 check('apply hides the rows that stand where the profile left them', $trimmed['status'], 'completed');
-check('two moved', $trimmed['moved'], 2);
+check('three moved', $trimmed['moved'], 3);
 check('the customer-edited one is skipped and named', $trimmed['skipped'], [['key' => 'post-27', 'id' => 27, 'status' => 'private']]);
-check('the posts are drafts now', [WP_Fake::$posts[26]['post_status'], WP_Fake::$posts[28]['post_status']], ['draft', 'draft']);
+check('the posts are drafts now', [WP_Fake::$posts[26]['post_status'], WP_Fake::$posts[28]['post_status'], WP_Fake::$posts[29]['post_status']], ['draft', 'draft', 'draft']);
 check('written raw, and the cache cleaned', isset(WP_Fake::$cleaned[26], WP_Fake::$cleaned[28]), true);
-check('each move logged with its before', array_column($d['log']->entries('dtrim-1'), 'before'), ['publish', 'publish']);
+check('each move logged with its before', array_column($d['log']->entries('dtrim-1'), 'before'), ['publish', 'publish', 'publish']);
 $trimState = $door($D, 'inspect');
 check('the binding records the trim', $trimState['demoTrim']['status'], 'complete');
-check('and how many it hid', $trimState['demoTrim']['hidden'], 2);
+check('and how many it hid', $trimState['demoTrim']['hidden'], 3);
 check('inspect stays clean', $trimState['problems'], []);
 check('a rerun is idempotent', $door($D, 'demoTrim.apply', ['apply_id' => 'dtrim-2', 'request_id' => 't2'])['alreadyTrimmed'], true);
 check('apply.revert of a trim is not the way back', $call($D, 'apply.revert', ['apply_id' => 'dtrim-1'])['error'], 'content_only');

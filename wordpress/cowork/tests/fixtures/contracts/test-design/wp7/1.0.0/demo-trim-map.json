@@ -33,6 +33,16 @@
             "to": "draft",
             "language": "en",
             "reason": "demo article"
+        },
+        {
+            "key": "post-29",
+            "kind": "post",
+            "id": 29,
+            "field": "post_status",
+            "from": "publish",
+            "to": "draft",
+            "language": "de",
+            "reason": "demo article, German edition"
         }
     ],
     "kept": [
@@ -42,7 +52,7 @@
         }
     ],
     "counts": {
-        "hide": 3,
+        "hide": 4,
         "kept": 1
     }
 }
