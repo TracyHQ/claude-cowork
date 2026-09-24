@@ -258,8 +258,9 @@ final class Engine
     // One action, several operations, because the relay admits actions by NAME and a sealed site
     // must not need a second door opened for any of this. Every operation says which of these it
     // is: `inspect` reads, `bind` seals, `apply` writes slot values, `demoTrim.*` hides the
-    // vendor's demo, `sourceLanguage.*` respells the source edition's locale, `multilingual.*`
-    // sets which of the archive's editions are live.
+    // vendor's demo, `sourceLanguage.*` respells the source edition's locale, `siteLanguage.*`
+    // makes one edition the site's default, `multilingual.*` sets which of the archive's
+    // editions are live.
 
     private function contentContract(array $p): array
     {
@@ -288,6 +289,9 @@ final class Engine
             }
             if (strpos($operation, 'sourceLanguage.') === 0) {
                 return $this->sourceLanguage($p, substr($operation, strlen('sourceLanguage.')));
+            }
+            if (strpos($operation, 'siteLanguage.') === 0) {
+                return $this->siteLanguage($p, substr($operation, strlen('siteLanguage.')));
             }
             if (strpos($operation, 'multilingual.') === 0) {
                 return $this->multilingual($p, substr($operation, strlen('multilingual.')));
@@ -424,7 +428,7 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims, source relabels and retired editions have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore)');
+            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
         }
         try {
             $state = $this->contract->inspectClean();
@@ -662,6 +666,193 @@ final class Engine
             'applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c'),
         ]);
         return $this->ok(['status' => 'completed', 'locale' => $locale, 'from' => $current]);
+    }
+
+    /**
+     * Which edition is the site's DEFAULT language: the one Polylang serves at `/` (the others
+     * live under `/<slug>/` when `force_lang` is on, and stay there — the URL shape is
+     * Polylang's, this door only moves the default), the locale WordPress itself speaks
+     * (`WPLANG`), and the front and posts pages shown at the root, moved to the chosen edition's
+     * copies when Polylang's translation groups name them. Nothing is translated and no row
+     * moves: a customer who asked for a Vietnamese site gets the Vietnamese edition first.
+     *
+     * Four values, one undo entry, one record on the binding. `revert` puts all four back as
+     * they were — `WPLANG` absent again when it was absent — and takes the record off.
+     */
+    private function siteLanguage(array $p, string $operation): array
+    {
+        if (QuickstartContract::polylang() === null) {
+            return $this->err('unavailable', 'this site has no translation plugin, so it has no editions to choose a default from');
+        }
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'Choosing the site language needs a bound site');
+        }
+        if ($this->contract->editions() === null) {
+            return $this->err('unsupported', 'This quickstart contract carries no editions profile; it has no editions to choose a default from');
+        }
+        $binding = $this->contract->binding();
+        $onRecord = isset($binding['siteLanguage']) && is_array($binding['siteLanguage']) ? $binding['siteLanguage'] : null;
+        $settings = self::polylangSettings();
+        $current = isset($settings['default_lang']) && is_string($settings['default_lang']) && $settings['default_lang'] !== '' ? $settings['default_lang'] : null;
+        if ($operation === 'plan') {
+            return $this->ok(['current' => $current, 'editions' => $this->contract->editionLanguages(), 'onRecord' => $onRecord]);
+        }
+        if ($operation !== 'set' && $operation !== 'revert') {
+            return $this->err('bad_params', 'Unknown siteLanguage operation: ' . $operation);
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null || strpos($apply, 'slang-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "slang-"');
+        }
+        if ($operation === 'revert') {
+            if ($onRecord === null) {
+                return $this->err('contract_failed', 'This site\'s default language was not set by this door; there is nothing to take back');
+            }
+            $this->restoreSiteLanguage([
+                'default_lang' => $onRecord['from'] ?? null, 'WPLANG' => $onRecord['wplangFrom'] ?? null,
+                'page_on_front' => $onRecord['pageOnFrontFrom'] ?? null, 'page_for_posts' => $onRecord['pageForPostsFrom'] ?? null,
+            ]);
+            $this->log->clear((string) ($onRecord['applyId'] ?? $apply));
+            $this->contract->record('siteLanguage', null);
+            $this->siteLanguageSettled();
+            return $this->ok(['status' => 'reverted', 'language' => (string) ($onRecord['from'] ?? '')]);
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        $tag = isset($p['language']) && is_string($p['language']) ? trim($p['language']) : '';
+        if ($tag === '' || !preg_match('/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/D', $tag)) {
+            return $this->err('bad_params', 'language names the edition to make the default, as a tag like en-us, vi, de-de or its Polylang slug');
+        }
+        // The same matching a retire's keep list gets: exact tag or slug, else the primary
+        // subtag; a tag naming nothing is named back, never guessed at.
+        $named = $this->contract->editionsKept([$tag]);
+        if ($named['kept'] === []) {
+            return $this->err('bad_params', 'This archive ships no edition of: ' . implode(', ', $named['unknown'] === [] ? [$tag] : $named['unknown']) . '. Nothing has been written.');
+        }
+        $slug = (string) $named['kept'][0];
+        if ($slug === $current) {
+            return $this->ok(['status' => 'completed', 'language' => $slug, 'alreadySet' => true]);
+        }
+        if ($onRecord !== null) {
+            if ((string) ($onRecord['applyId'] ?? '') === $apply && (string) ($onRecord['language'] ?? '') === $slug) {
+                return $this->ok(['status' => 'completed', 'language' => $slug, 'alreadySet' => true]);
+            }
+            return $this->err('conflict', 'This site\'s default language is already set to ' . (string) ($onRecord['language'] ?? '?') . ' under ' . (string) ($onRecord['applyId'] ?? '?') . '; take that back with siteLanguage.revert before choosing another');
+        }
+        if (QuickstartContract::language($slug) === null) {
+            return $this->err('contract_failed', 'This site has no Polylang language ' . $slug . '; the edition is in the archive but not on the site');
+        }
+        $edition = (array) ($this->contract->editions()['locales'][$slug] ?? []);
+        $wplang = isset($edition['wpLocale']) && is_string($edition['wpLocale']) && $edition['wpLocale'] !== '' ? $edition['wpLocale'] : (string) ($edition['locale'] ?? '');
+
+        $before = [
+            'default_lang' => $current,
+            'WPLANG' => get_option('WPLANG', null),
+            'page_on_front' => get_option('page_on_front', null),
+            'page_for_posts' => get_option('page_for_posts', null),
+        ];
+        // The undo lands BEFORE anything moves: a write that dies halfway leaves a log entry
+        // `apply.revert` can read on an unbound site, and is put back here on a sealed one.
+        $this->log->record($apply, ['op' => 'siteLanguage', 'language' => $slug, 'before' => $before]);
+        try {
+            $settings['default_lang'] = $slug;
+            update_option('polylang', $settings);
+            foreach (['page_on_front', 'page_for_posts'] as $key) {
+                $copy = self::editionCopy((int) $before[$key], $slug);
+                if ($copy !== null) {
+                    update_option($key, $copy);
+                }
+            }
+            if ($wplang !== '') {
+                update_option('WPLANG', $wplang);
+            }
+        } catch (Throwable $e) {
+            try {
+                $this->restoreSiteLanguage($before);
+                $this->log->clear($apply);
+            } catch (Throwable $ignored) {
+            }
+            throw new RuntimeException('Nothing was applied: ' . $e->getMessage());
+        }
+        $this->contract->record('siteLanguage', [
+            'language' => $slug, 'from' => $current, 'wplangFrom' => $before['WPLANG'],
+            'pageOnFrontFrom' => $before['page_on_front'], 'pageForPostsFrom' => $before['page_for_posts'],
+            'applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c'),
+        ]);
+        $this->siteLanguageSettled();
+        return $this->ok([
+            'status' => 'completed', 'language' => $slug, 'from' => $current, 'wplang' => $wplang === '' ? null : $wplang,
+            'rewrite' => [
+                'force_lang' => isset($settings['force_lang']) ? (int) $settings['force_lang'] : null,
+                'hide_default' => isset($settings['hide_default']) ? (int) $settings['hide_default'] : null,
+                'rewrite' => isset($settings['rewrite']) ? (int) $settings['rewrite'] : null,
+            ],
+        ]);
+    }
+
+    /** Polylang's settings as it stores them: the `polylang` option, an array or nothing. */
+    private static function polylangSettings(): array
+    {
+        $settings = get_option('polylang', []);
+        return is_array($settings) ? $settings : [];
+    }
+
+    /** The chosen edition's copy of a page, when Polylang's translation group names one; null when it does not, or the page is that copy already. */
+    private static function editionCopy(int $id, string $slug): ?int
+    {
+        if ($id <= 0 || !function_exists('pll_get_post')) {
+            return null;
+        }
+        $copy = pll_get_post($id, $slug);
+        $copy = is_numeric($copy) ? (int) $copy : 0;
+        return $copy > 0 && $copy !== $id ? $copy : null;
+    }
+
+    /**
+     * The four values of a site-language step, put back as recorded. `WPLANG` null means the
+     * option was absent, and goes absent again; a page option is written as it was, `0` included.
+     *
+     * @param array<string,mixed> $before
+     */
+    private function restoreSiteLanguage(array $before): void
+    {
+        $settings = self::polylangSettings();
+        $default = $before['default_lang'] ?? null;
+        if (is_string($default) && $default !== '') {
+            $settings['default_lang'] = $default;
+        } else {
+            unset($settings['default_lang']);
+        }
+        update_option('polylang', $settings);
+        foreach (['page_on_front', 'page_for_posts'] as $key) {
+            if (array_key_exists($key, $before) && $before[$key] !== null) {
+                update_option($key, $before[$key]);
+            }
+        }
+        if (($before['WPLANG'] ?? null) === null) {
+            delete_option('WPLANG');
+        } else {
+            update_option('WPLANG', $before['WPLANG']);
+        }
+    }
+
+    /** After the default language moved either way: Polylang's language cache, the rewrite rules, the page cache, the stamp. */
+    private function siteLanguageSettled(): void
+    {
+        $model = QuickstartContract::polylang();
+        if ($model !== null && method_exists($model, 'clean_languages_cache')) {
+            $model->clean_languages_cache();
+        }
+        if (function_exists('flush_rewrite_rules')) {
+            flush_rewrite_rules();
+        }
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        $this->stamped('content');
     }
 
     /**
@@ -2359,6 +2550,10 @@ final class Engine
         }
         if ($op === 'sourceLocale') {
             QuickstartContract::setLanguageLocale((string) ($entry['slug'] ?? ''), (string) ($entry['before'] ?? ''));
+            return;
+        }
+        if ($op === 'siteLanguage') {
+            $this->restoreSiteLanguage(is_array($entry['before'] ?? null) ? $entry['before'] : []);
             return;
         }
         throw new RuntimeException("unknown step: {$op}");

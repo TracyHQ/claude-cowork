@@ -45,7 +45,7 @@ quickstart contract (below). A read answers the same either way. A write is eith
 | `media.upload` | write | ok | allowed only at `wp-content/uploads/tracy-content/<sha256 of the bytes>.(png\|jpg\|webp)`, under an `apply_id` that does not start with `contract-` |
 | `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
 | `apply.list` | read | ok | ok |
-| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
@@ -62,7 +62,7 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
 - `content.contract` takes `operation`:
-  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, demoTrim, sourceLanguage, problems: []}`.
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme
     file changed or added under `fileRoots`, a pinned option, a template part, an entity
     missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
@@ -81,6 +81,25 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     reported; refused while the site has a Polylang language the profile ships no edition for.
   - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's
     locale (`en_US` → `en_GB`, `en_AU`, `en_CA`, `en_NZ`) in Polylang and `WPLANG`.
+  - `siteLanguage.plan | set | revert` (prefix `slang-`) — which edition is the site's DEFAULT
+    language. `plan` answers `{ok, current: <Polylang slug of the default>, editions: [slugs],
+    onRecord}`. `set` takes `language` (a tag as the questionnaire spells it — `vi`, `de-de` —
+    or the Polylang slug, matched like a retire's `keep`: exact, else primary subtag; a tag the
+    archive ships no edition of is `bad_params`), `apply_id`, `request_id`, and makes that
+    edition Polylang's default: `default_lang` in the `polylang` option (`force_lang`,
+    `hide_default` and `rewrite` are left as they are, so `/` serves the default and the other
+    editions keep `/<slug>/`; the reply's `rewrite` says what they are), `WPLANG` set to the
+    edition's `wpLocale` from `editions.json`, and `page_on_front` / `page_for_posts` moved to
+    that edition's copies when Polylang's translation groups name them. Nothing is translated
+    and no row moves. Reply `{ok, status: 'completed', language: <slug>, from: <slug>, wplang,
+    rewrite}`; the edition already the default answers `alreadySet: true`; a second `set` while
+    one is on record under another `apply_id` is `conflict`. The binding records
+    `siteLanguage: {language, from, wplangFrom, pageOnFrontFrom, pageForPostsFrom, applyId,
+    requestId, at}` and `inspect` reports `siteLanguage: {language, from, applyId} | null`.
+    `revert` puts all four values back as recorded (`WPLANG` absent again when it was absent),
+    clears the log and takes the record off: `{ok, status: 'reverted', language: <slug back>}`.
+    `apply.revert` refuses an `slang-` id on a sealed site; on an unbound site it undoes the
+    same step from the log. No Polylang is `unavailable`; no editions profile is `unsupported`.
   - `multilingual.retire` (prefix `mlang-`) — `keep: [tags as the questionnaire spells them:
     "en-us", "vi", "de-de"]`, `apply_id`, `request_id`. Sets the LIVE edition set: every edition
     `editions.json` ships whose tag (or primary subtag) is not in `keep` is retired — each of its
