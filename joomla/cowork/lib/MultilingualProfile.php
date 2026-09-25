@@ -482,9 +482,14 @@ final class MultilingualProfile
         // number (measured 23/09/2026 on `j-h0n2f4`, zh-CN).
         if (preg_match($scaled, $source, $which) && mb_strpos($target, trim($which[0])) === false) {
             $left = $target;
+            $figure = trim($which[0]);
             foreach (preg_split('~\s+~u', $source) as $word) {
                 $word = trim($word, ".,;:!?()[]\"'");
+                // "800" of "800 million" is this figure's own digits, split off by the space before
+                // the scale word — not another number the source carries. Struck out, it took the
+                // translation's "800 triệu" with it (measured 24/09/2026, `j-fmlavz`, vi-VN).
                 if ($word !== '' && preg_match('~\d~u', $word) && !preg_match($scaled, $word)
+                    && mb_strpos($figure, $word) === false
                     && mb_strpos($left, $word) !== false)
                     $left = str_replace($word, ' ', $left);
             }

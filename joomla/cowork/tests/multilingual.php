@@ -107,6 +107,10 @@ $scaled = [
     ['Verizon to sell Yahoo and AOL for $5 Billion to Apollo', 'Verizon vend Yahoo et AOL pour 5 milliards de dollars à Apollo', true],
     ['Raised $12m in Series B', 'B轮融资1200万美元', true],
     ['50k downloads', '5万次下载', true],
+    // The scale as a separate word: the digits of the figure itself are not "another number the
+    // source carries verbatim" (measured 24/09/2026 on `j-fmlavz`, vi-VN — refused on every retry).
+    ['A VND 800 million project: modernising power distribution', 'Dự án 800 triệu đồng: hiện đại hoá hệ thống phân phối điện', true],
+    ['A VND 800 million project: modernising power distribution', 'Dự án trị giá lớn: hiện đại hoá hệ thống phân phối điện', false],
     // Dropped entirely it is still a refusal — and the 2 of "O2" does not count as evidence: a
     // source word carrying a digit that survives verbatim is struck out before the target is read.
     ['UK Government approves $44bn O2, Virgin Media merger', '英国政府批准O2与Virgin Media合并交易', false],
