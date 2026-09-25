@@ -189,6 +189,45 @@ final class EngineFactory
      * out, and `close()` so nothing downstream — a template, another plugin, an error page — gets
      * to append to what the caller will parse.
      */
+    /** The same authenticated reader at both doors; the site token is a service credential. */
+    public static function answerContent($app, ?array $request = null): void
+    {
+        self::loadEngine();
+        require_once self::libDir() . '/ContentReader.php';
+        $app->setHeader('Content-Type', 'application/json; charset=utf-8', true);
+        $app->setHeader('Cache-Control', 'private, no-store', true);
+        $status=200;
+        try {
+            $configured=(string) ComponentHelper::getParams('com_claudecowork')->get('token','');
+            $provided=$request['token']??null;
+            if ($request===null) {
+                $header=$_SERVER['HTTP_AUTHORIZATION']??'';
+                $provided=preg_match('/^Bearer ([^\s]+)$/D',$header,$m)?$m[1]:null;
+            }
+            if (!is_string($provided) || !\Token::check($configured,$provided))
+                throw new \ContentReadError('CONTENT_UNAUTHENTICATED',401,'Authentication required');
+            if ($request===null && ($_SERVER['REQUEST_METHOD']??'')!=='GET') \ContentReader::bad();
+            $query=$request===null?\ContentReader::parse($_SERVER['QUERY_STRING']??''):($request['params']??[]);
+            if (!is_array($query) || (array_is_list($query) && $query!==[])) \ContentReader::bad();
+            // The relay identity is server-owned at Tracy's door. It scopes continuations only;
+            // it grants no CMS/write privileges. Direct Bearer calls use a distinct service scope.
+            $principal=$request===null?'service':($request['contentPrincipal']??'service');
+            if (!is_string($principal) || !preg_match('/^(service|seat:[a-f0-9]{64})$/D',$principal)) \ContentReader::bad();
+            $scope=$request===null?'published':($request['contentScope']??'published');
+            if ($scope!=='published') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content scope is not supported');
+            $principal=hash_hmac('sha256',$principal.':'.$scope,$configured);
+            \Door::reserveMemory();
+            \Door::reserveTime();
+            $reader=new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class),static fn()=>self::buildContract(),JPATH_ROOT,\Joomla\CMS\Uri\Uri::root());
+            $result=$reader->read($query,$principal);
+        } catch (\ContentReadError $e) { $status=$e->status; $result=$e->body(); }
+        catch (\Throwable $e) { $status=503; $result=['error'=>['code'=>'CONTENT_SOURCE_UNAVAILABLE','message'=>'Content source or binding could not be read']]; }
+        http_response_code($status);
+        $app->sendHeaders();
+        echo \ContentReader::encode($result);
+        $app->close();
+    }
+
     public static function answer(CMSApplicationInterface $app): void
     {
         self::loadEngine();
@@ -204,6 +243,7 @@ final class EngineFactory
             $request = [];
         }
 
+        if (($request['action'] ?? null) === 'content.read') { self::answerContent($app, $request); return; }
         $engine = self::build();
 
         $app->setHeader('Content-Type', 'application/json', true);

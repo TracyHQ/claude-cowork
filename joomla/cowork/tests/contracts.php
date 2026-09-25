@@ -141,6 +141,17 @@ file_put_contents($contractDir.'/'.$newCache,'regenerated from locked sources');
 $state=$contract->inspect();
 check('contract maps negative excluded menu IDs onto the installed site',$state['snapshot']['assignments']['hero'],[-121]);
 $contract->bind($state['snapshot']);
+$readBefore=[$cw->store,$cs->binding,$cs->job];
+$readMapping=$contract->readMapping();
+check('read mapping preserves binding, rows and jobs',[$cw->store,$cs->binding,$cs->job],$readBefore);
+check('read mapping uses bound IDs',$readMapping['ids'],$state['ids']);
+checkTrue('read mapping never exports sample values',!isset($readMapping['slots']['hero'][0]['sample']));
+$cs->job=['phase'=>'copy','locale'=>'vi-VN','ids'=>[]];
+try { $contract->readMapping(); check('unfinished job refuses pure reader',true,false); }
+catch (RuntimeException $e) { check('unfinished job refuses pure reader',$e->getMessage(),'Content mapping has an unfinished language job'); }
+check('pure reader does not adopt unfinished jobs',$cs->job,['phase'=>'copy','locale'=>'vi-VN','ids'=>[]]);
+$cs->job=null;
+
 $plan=$contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.0'=>'Customer & partners']]);
 check('contract updates the original module ID',$plan['operations'][0]['id'],110);
 checkTrue('HTML content stays escaped',str_contains($plan['operations'][0]['fields']['content'],'Customer &amp; partners'));
