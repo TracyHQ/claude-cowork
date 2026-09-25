@@ -145,9 +145,15 @@ summaries by default, one content in full by `id`, `type`/`locale`/`limit` filte
 cursors that expire (409) as soon as anything the listing read changes. It is read only — it
 renders nothing, runs no shortcode and writes nothing — and every answer is `private, no-store`.
 The same reader answers the `content.read` action, whose `scope` (`published` by default, or
-`editorial` to include drafts, scheduled and private rows) is chosen by the caller that relays a
-seat. A token in the query string is never read. The path is only taken when no file or post
-already answers it.
+`editorial` to include drafts, scheduled and private rows) and `principal` (`site-token`, or
+`seat:<opaque label>` so a cursor belongs to one seat) are set by the server that holds the token
+and relays a seat — never by an agent. A token in the query string is never read. The path is only
+taken when no file or post already answers it. `?id=…&blockId=…` reads one block without the page
+body, so a page whose HTML alone exceeds the 256 KiB budget stays readable block by block.
+
+Each request reads from one REPEATABLE READ snapshot, released once it is answered; a write that
+lands during a request is either wholly in the answer or wholly out of it, and the next page's
+cursor answers 409. A site with a persistent object cache answers 501 until that is measured.
 
 Content ids are opaque and survive a new title, slug or order: each row gets a random uid once.
 Until `content.identity` has run on a site, the reader answers 501; after it, rows WordPress
