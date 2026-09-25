@@ -21,3 +21,8 @@ check('an id the site cannot resolve stays empty', NavigationLinks::fillUrl($unk
 $other = ['blockName' => 'core/paragraph', 'attrs' => ['url' => '']];
 check('other blocks are untouched', NavigationLinks::fillUrl($other), $other);
 check('a non-array is returned as is', NavigationLinks::fillUrl('x'), 'x');
+
+$html = '<li class="wp-block-navigation-item"><a class="wp-block-navigation-item__content" href=""><span>Giới thiệu</span></a></li>';
+check('the rendered anchor of an id-only link gets the permalink', NavigationLinks::fillRenderedHref($html, ['blockName' => 'core/navigation-link', 'attrs' => ['id' => 1951, 'url' => '']]), str_replace('href=""', 'href="https://site.test/vi/gioi-thieu-vi/"', $html));
+check('rendered markup with a real href is untouched', NavigationLinks::fillRenderedHref(str_replace('href=""', 'href="/x/"', $html), ['blockName' => 'core/navigation-link', 'attrs' => ['id' => 1951, 'url' => '/x/']]), str_replace('href=""', 'href="/x/"', $html));
+check('other blocks\' markup is untouched', NavigationLinks::fillRenderedHref('<p href=""></p>', ['blockName' => 'core/paragraph', 'attrs' => []]), '<p href=""></p>');
