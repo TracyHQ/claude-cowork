@@ -6,6 +6,7 @@ require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ContractProblem.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -306,14 +307,14 @@ final class QuickstartContract
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
-            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))throw new RuntimeException('Presentation asset changed: '.$path);
+            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))throw new ContractProblem('PRESENTATION_DRIFT','Presentation asset changed: '.$path);
         }
         foreach($this->lock['fileRoots'] as $prefix) {
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if($this->generatedCache($relative) && !$file->isLink())continue;
-                if(!isset($this->lock['files'][$relative]))throw new RuntimeException('Unexpected presentation file: '.$relative);
+                if(!isset($this->lock['files'][$relative]))throw new ContractProblem('PRESENTATION_DRIFT','Unexpected presentation file: '.$relative);
             }
         }
     }
@@ -498,7 +499,7 @@ final class QuickstartContract
                 $differ=[];
                 foreach($expected as $field=>$value)if(!array_key_exists($field,$actual)||$actual[$field]!=$value)$differ[]=$field.' [want '.substr(json_encode($value),0,60).' got '.substr(json_encode($actual[$field]??null),0,60).']';
                 foreach($actual as $field=>$value)if(!array_key_exists($field,$expected))$differ[]=$field.' (unexpected)';
-                throw new RuntimeException('Presentation drift: '.$key.' — '.implode(', ',$differ));
+                throw new ContractProblem('PRESENTATION_DRIFT','Presentation drift: '.$key.' — '.implode(', ',$differ));
             }
             $protected[$key]=$actual;
         }
@@ -523,7 +524,7 @@ final class QuickstartContract
                 }
             }
             sort($expected);
-            if($menus!=$expected)throw new RuntimeException('Module assignment drift: '.$key);
+            if($menus!=$expected)throw new ContractProblem('PRESENTATION_DRIFT','Module assignment drift: '.$key);
             $assignments[$key]=$menus;
         }
         $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
@@ -541,7 +542,7 @@ final class QuickstartContract
                 )),0,6);
                 $where[]=$part.'('.implode(' ',$keysDiffer).')';
             }
-            throw new RuntimeException('Access-level or ACL definition changed: '.implode(', ',$where));
+            throw new ContractProblem('PRESENTATION_DRIFT','Access-level or ACL definition changed: '.implode(', ',$where));
         }
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
@@ -551,7 +552,7 @@ final class QuickstartContract
             foreach($state['ids'] as $baseKey=>$id)$expectedCounts[$this->baseEntities()[$baseKey]['kind']]++;
         }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
-        if($counts!=$expectedCounts)throw new RuntimeException('Quickstart inventory changed');
+        if($counts!=$expectedCounts)throw new ContractProblem('PRESENTATION_DRIFT','Quickstart inventory changed');
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
         // Carried through every rebind, or the next content edit would store a baseline that no
@@ -571,45 +572,99 @@ final class QuickstartContract
             'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null];
     }
 
-    /** Scalar content rules, applied identically to an original and to a translation of it. */
+    /**
+     * Scalar content rules, applied identically to an original and to a translation of it.
+     *
+     * Throws the slot's FIRST problem as a ContractProblem; the message is the one this rule has
+     * always said, the code and numbers are what an agent acts on.
+     */
     private function checkValue(array $slot, string $value, array $params): void {
         $key=$slot['key'];
+        $refuse=fn(string $code,string $message,array $extra=[])=>new ContractProblem($code,$message,$key,null,$extra);
         if (!empty($slot['requiresEvidence']) && $value!==$slot['sample']) {
             $evidence=$params['evidence'][$key]??null;
-            if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw new RuntimeException('Customer evidence required: '.$key);
+            if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw $refuse('SLOT_EVIDENCE_REQUIRED','Customer evidence required: '.$key);
         }
         // Empty ACM fields control conditional markup; changing occupancy changes layout. The one
         // exception is the identity module: it renders nothing itself, and a fact the customer does
         // not have (a TikTok page, a legal name) must be emptied, or the demo's value is shown instead.
         if(empty($slot['siteIdentity'])) {
-            if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
-            if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
+            if(trim($value)==='' && trim($slot['sample'])!=='')throw $refuse('SLOT_EMPTY_STATE','Content cannot remove an occupied slot: '.$key);
+            if(trim($value)!=='' && trim($slot['sample'])==='')throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
         }
-        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw new RuntimeException('Markup and control characters are not content: '.$key);
-        if(IdentityTokens::hasDirective($value))throw new RuntimeException('Joomla plugin directives are not content: '.$key);
-        if(mb_strlen($value)>$slot['maxCharacters'])throw new RuntimeException('Content too long: '.$key);
-        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw new RuntimeException('Unsupported CTA URL: '.$key);
-        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw new RuntimeException('Unsupported CTA URL: '.$key);
+        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
+        if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        if(mb_strlen($value)>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>mb_strlen($value)]);
+        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
+        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {
-            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw new RuntimeException('Image must already exist in the site media library: '.$key);
+            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw $refuse('SLOT_IMAGE_INVALID','Image must already exist in the site media library: '.$key);
             $resolved=realpath($this->root.'/'.$value);$imageRoot=realpath($this->root.'/images');
-            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw new RuntimeException('Image escapes the site media library: '.$key);
+            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw $refuse('SLOT_IMAGE_INVALID','Image escapes the site media library: '.$key);
             $before=@getimagesize($this->root.'/'.$slot['sample']);$after=@getimagesize($this->root.'/'.$value);
-            if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw new RuntimeException('Image aspect ratio does not match its slot');
+            if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
     }
 
-    public function plan(array $params): array {
+    /**
+     * Check an apply against the site as it stands, and turn it into row operations.
+     *
+     * Two ways to say what the change was based on. `expected_revision` is the whole-contract
+     * revision from inspect, which costs an inspect to learn (10–80 s on Joomla).
+     * `expected_content_revisions` maps each content `content.read` served to the revision it
+     * served, and is enough on its own: every changed slot's content must be named, and match.
+     * With both, both must hold. `$current` is that projection now ({@see ContentProjection::build}
+     * `revisions` + `owners`), handed in by the engine that can read the site's tables.
+     *
+     * 🔒 EVERY PROBLEM, THEN NOTHING WRITTEN. All changes are checked before any operation is built,
+     * and every refusal found is thrown together, so an agent fixes three slots in one round
+     * instead of three.
+     */
+    public function plan(array $params, ?array $current = null): array {
         $state=$this->inspect();
-        if(!isset($params['expected_revision'])||!hash_equals($state['revision'],$params['expected_revision']))throw new RuntimeException('Content changed; inspect again');
+        $byContent=$params['expected_content_revisions']??null;
+        if($byContent!==null) {
+            $valid=is_array($byContent);
+            if($valid)foreach($byContent as $id=>$revision)if(!is_string($id)||!is_string($revision)){$valid=false;break;}
+            if(!$valid)throw new ContractProblem('CONTRACT_FAILED','expected_content_revisions must map content ids to revisions');
+            if(!$byContent)$byContent=null;
+        }
+        $expected=$params['expected_revision']??null;
+        $problems=[];
+        if($byContent===null) {
+            // The only basis before per-content revisions existed, refused exactly as it always was.
+            if($expected===null)throw new ContractProblem('REVISION_REQUIRED','Content changed; inspect again');
+            if(!is_string($expected)||!hash_equals($state['revision'],$expected))
+                throw new ContractProblem('REVISION_STALE','Content changed; inspect again',null,null,['current'=>$state['revision']]);
+        } else {
+            if($expected!==null&&(!is_string($expected)||!hash_equals($state['revision'],$expected)))
+                $problems[]=new ContractProblem('REVISION_STALE','Content changed; inspect again',null,null,['current'=>$state['revision']]);
+            if($current===null)throw new ContractProblem('CONTRACT_FAILED','Content revisions are unavailable on this site; send expected_revision from inspect');
+        }
         $changes=$params['changes']??null;
-        if(!is_array($changes)||!count($changes)||count($changes)>1500)throw new RuntimeException('Expected 1–1500 scalar content changes');
+        if(!is_array($changes)||!count($changes)||count($changes)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
         $allowed=array_column($state['slots'],null,'key');$values=[];
+        $owners=$current['owners']??[];$checked=[];
         foreach ($changes as $key => $value) {
-            if(!isset($allowed[$key])||!is_string($value))throw new RuntimeException('Unknown content slot or non-string value');
-            $this->checkValue($allowed[$key],$value,$params);
+            $key=(string)$key;
+            $slot=$allowed[$key]??null;
+            $owner=$slot===null?null:($owners[$slot['entity']]??null);
+            if($slot===null||!is_string($value)){$problems[]=new ContractProblem('SLOT_UNKNOWN','Unknown content slot or non-string value',$key,$owner);continue;}
+            // One revision check per content, named by the first changed slot that lives in it.
+            if($byContent!==null&&!isset($checked[$owner??"\0".$key])) {
+                $checked[$owner??"\0".$key]=true;
+                // A slot content.read does not project (a hidden row, a category) has no content
+                // revision anyone could have read; only the whole-contract revision covers it.
+                if($owner===null){ if($expected===null)$problems[]=new ContractProblem('REVISION_REQUIRED','Content revision required: '.$key.' is not in content.read; send expected_revision from inspect',$key); }
+                elseif(!isset($byContent[$owner]))$problems[]=new ContractProblem('REVISION_REQUIRED','Content revision required: '.$owner,$key,$owner);
+                elseif(!hash_equals($current['revisions'][$owner],$byContent[$owner]))
+                    $problems[]=new ContractProblem('REVISION_STALE','Content changed; read it again: '.$owner,$key,$owner,['current'=>$current['revisions'][$owner]]);
+            }
+            try { $this->checkValue($slot,$value,$params); }
+            catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$value;
         }
+        if($problems)throw ContractProblem::all($problems);
         // 🔒 A PICTURE IS THE SAME PICTURE IN EVERY LANGUAGE. Words are translated, so a new source
         // sentence waits for its language job; a new source picture has nothing to wait for, and left
         // on the source alone it showed on /en/ only — measured 23/09/2026 on j-ee6vsk, a drawn photo
@@ -620,13 +675,13 @@ final class QuickstartContract
         foreach($values as $key=>$value)
             if(($allowed[$key]['type']??'')==='image')
                 foreach(array_keys($locales) as $locale)$values[MultilingualProfile::derivedKey($locale,$key)]=$value;
-        $operations=[];
+        $operations=[];$touched=[];
         foreach($state['keys'] as $key=>$meta) {
             $row=$state['rows'][$key];$next=$this->changeRow($row,$this->slotsOf($key,$meta),$values);$fields=[];$expected=[];
             foreach($next as $field=>$value)if($value!==$row[$field]){$fields[$field]=$value;$expected[$field]=$row[$field];}
-            if($fields)$operations[]=['kind'=>$meta['kind'],'id'=>$state['ids'][$key],'fields'=>$fields,'expected'=>$expected];
+            if($fields){$operations[]=['kind'=>$meta['kind'],'id'=>$state['ids'][$key],'fields'=>$fields,'expected'=>$expected];$touched[]=$key;}
         }
-        return ['operations'=>$operations,'snapshot'=>$state['snapshot']];
+        return ['operations'=>$operations,'snapshot'=>$state['snapshot'],'touched'=>$touched];
     }
     /** The protected field set the base contract captured for one entity, by name and value. */
     public function lockFields(string $baseKey): array {

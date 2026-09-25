@@ -17,17 +17,6 @@ final class JoomlaContentReader
         return $this->db->setQuery('SELECT * FROM #__'.$table.' ORDER BY '.$order)->loadAssocList();
     }
     private function hash($value): string { return hash('sha256',\ContentReader::encode($value)); }
-    private function date($value): ?string {
-        return !$value || substr($value,0,4)==='0000' ? null : gmdate('Y-m-d\TH:i:s\Z',strtotime($value.' UTC'));
-    }
-    private function visible(array $row, array $levels, int $now, string $kind): bool {
-        if (!in_array((int)($row['access']??0),$levels,true) || (int)($row[$kind==='article'?'state':'published']??0)!==1) return false;
-        foreach (['publish_up'=>true,'publish_down'=>false] as $key=>$up) {
-            $at=$this->date($row[$key]??null);
-            if ($at && ($up ? strtotime($at)>$now : strtotime($at)<=$now)) return false;
-        }
-        return true;
-    }
     private function media(): array {
         $out=[]; $base=$this->root.'/images';
         if (!is_dir($base)) return [];
@@ -62,7 +51,8 @@ final class JoomlaContentReader
         }
         ksort($paths); return $paths;
     }
-    public function read(array $query, string $principal): array {
+    /** The reader's opt-in row; a missing table is unsupported, a DB failure is unavailable. */
+    private function config(): array {
         try { $config=$this->db->setQuery('SELECT * FROM #__claudecowork_content_reader WHERE id=1')->loadAssoc(); }
         catch (\Throwable $e) {
             // Missing opt-in metadata is unsupported; a DB timeout/failure is unavailable.
@@ -71,6 +61,29 @@ final class JoomlaContentReader
             throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content reader is not enabled');
         }
         if (!$config || !(int)$config['enabled']) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content reader is not enabled');
+        return $config;
+    }
+    /**
+     * Every readable content's current revision, and which content each contract entity's slots
+     * are read in — what content.contract apply checks `expected_content_revisions` against.
+     *
+     * Opens no transaction: it runs inside the apply's own (after the write) or ahead of it, where
+     * the batch's per-row `expected` fields already catch a row that moves in between. Media bytes
+     * are not part of a content's revision, so nothing here scans files.
+     *
+     * @return array{revisions:array<string,string>,owners:array<string,string>}
+     */
+    public function revisions(): array {
+        $config=$this->config();
+        $data=[];
+        foreach (\ContentProjection::TABLES as $table=>$order) $data[$table]=$this->rows($table,$order);
+        $contract=($this->contractFactory)();
+        if (!$contract) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content mapping is unavailable');
+        $projection=\ContentProjection::build($data,$contract->readMapping(),$config['site_id'],$this->base,time(),[$contract,'slotValue']);
+        return ['revisions'=>$projection['revisions'],'owners'=>$projection['owners']];
+    }
+    public function read(array $query, string $principal): array {
+        $config=$this->config();
         // No opportunistic setup. Missing triggers or a nontransactional source refuse capability.
         $prefix=$this->db->getPrefix();
         $triggers=$this->db->setQuery('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()')->loadColumn();
@@ -98,165 +111,21 @@ final class JoomlaContentReader
             $this->db->transactionCommit();
         } catch (\Throwable $e) { $this->db->transactionRollback(); throw $e; }
         $mediaAfter=$this->media();
-        $levels=[];
-        foreach ($data['viewlevels'] as $row) if (in_array(1,json_decode($row['rules'],true)??[],true)) $levels[]=(int)$row['id'];
-        $identities=[];
-        foreach ($data['claudecowork_content_identity'] as $row) $identities[$row['kind']][(int)$row['native_id']]=$row['uid'];
-        $opaque=fn(string $domain,string $key)=>$domain.'_'.substr(hash_hmac('sha256',$domain.':'.$key,$config['site_id']),0,32);
-        $contents=[]; $keys=[]; $locales=[]; $visibility=[]; $native=[]; $contractKey=[];
-        $categories=array_column($data['categories'],null,'id');
-        $menus=array_column($data['menu'],null,'id');
-        // With a home per language, the language filter sends every visitor to one of them: the
-        // "All languages" home is never the page anyone reads. Left in the map it sat beside the
-        // real homes as a three-block "Home" and the agent opened it first (25/09, capijl1644).
-        $languageHomes=count(array_filter($data['menu'],fn($m)=>(int)($m['home']??0)===1 && ($m['language']??'*')!=='*' && (int)($m['published']??0)===1 && (int)($m['client_id']??0)===0));
-        foreach ($mapping['keys'] as $key=>$meta) {
-            $kind=['article'=>'article','menuItem'=>'page','module'=>'shared'][$meta['kind']]??null;
-            if ($kind===null || !empty($meta['switcher'])) continue;
-            $row=$mapping['rows'][$key]; $nativeId=(int)$mapping['ids'][$key];
-            $allowed=$this->visible($row,$levels,$now,$kind);
-            if ($kind==='article') {
-                $cat=$categories[$row['catid']]??null;
-                $seen=[];
-                while ($cat && (int)$cat['id']>1) {
-                    if (isset($seen[$cat['id']])) throw new \RuntimeException('Category cycle');
-                    $seen[$cat['id']]=true;
-                    if ((int)$cat['published']!==1 || !in_array((int)$cat['access'],$levels,true)) $allowed=false;
-                    $cat=$categories[$cat['parent_id']]??null;
-                }
-            }
-            if ($kind==='page') {
-                $parent=$menus[$row['parent_id']]??null; $seen=[];
-                while ($parent && (int)$parent['id']>1) {
-                    if (isset($seen[$parent['id']])) throw new \RuntimeException('Menu cycle');
-                    $seen[$parent['id']]=true;
-                    if (!$this->visible($parent,$levels,$now,'page')) $allowed=false;
-                    $parent=$menus[$parent['parent_id']]??null;
-                }
-            }
-            if ($kind==='page' && $languageHomes>0 && (int)($row['home']??0)===1 && ($row['language']??'*')==='*') $allowed=false;
-            $visibility[$key]=$allowed;
-            if (!$allowed) continue;
-            $uid=$identities[$kind][$nativeId]??null;
-            if (!$uid) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content identity registry is incomplete');
-            $id=$opaque('content',$uid); $keys[$key]=$id; $native[$kind][$nativeId]=$id; $contractKey[$id]??=$key;
-            if (isset($contents[$id])) continue;
-            $locale=($row['language']??'*')==='*'?null:$row['language'];
-            // Joomla's legacy sr-YU is not a canonical language tag. Do not silently relabel it.
-            if ($locale==='sr-YU') $locale=null;
-            if ($locale!==null) $locales[$locale]=true;
-            $url=$kind==='page'?$this->base.'/index.php?Itemid='.$nativeId:($kind==='article'?$this->base.'/index.php?option=com_content&view=article&id='.$nativeId:null);
-            $content=['id'=>$id,'type'=>$kind,'title'=>$row['title']??null,'slug'=>$row['alias']??null,'url'=>$url,'locale'=>$locale,'translationGroupId'=>null,'summary'=>null,
-                'publishedAt'=>$this->date($row['publish_up']??null),'createdAt'=>$this->date($row['created']??null),'updatedAt'=>$this->date($row['modified']??null),
-                'revision'=>'pending','detailState'=>'complete','links'=>['self'=>$this->base.'/content.json?id='.$id],
-                'publication'=>['status'=>'published','valueSource'=>'current','scheduledAt'=>null],
-                'bodyHtml'=>$kind==='article'?($row['introtext']??'').($row['fulltext']??''):($kind==='shared'&&($row['module']??'')==='mod_custom'?($row['content']??''):null),
-                'tags'=>[],'fields'=>[],'blocks'=>[],'images'=>[],'relations'=>[]];
-            $fields=[];
-            // 🔒 A FIELD SAYS WHAT IT IS. A slot key is positional (`module-441.9`); its name lives in the
-            // contract's jsonPath (`tb-hero[image-alt]`). Without it the agent could not tell the
-            // picture's alt from any other text and ran the contract inspect only to read labels — on
-            // the dev host 60–80 s a call (25/09/2026, local agent chat on r1j1734, 3 of 3 runs).
-            $semantic=function(array $slot): ?string {
-                $path=$slot['jsonPath']??null;
-                if (is_array($path) && isset($path[1]) && is_string($path[1]) && preg_match('/\[([^\]]+)\]$/',$path[1],$m))
-                    return $m[1].((int)($path[2]??0)>0?'.'.(int)$path[2]:'');
-                return isset($slot['column']) && is_string($slot['column']) && $slot['column']!=='params' ? $slot['column'] : null;
-            };
-            $alts=[];
-            foreach ($mapping['slots'][$key] as $slot) {
-                $name=$semantic($slot);
-                if ($name!==null && preg_match('/^(.*)-alt(\.\d+)?$/',$name,$m)) $alts[$m[1].($m[2]??'')]=$this->contract->slotValue($row,$slot);
-            }
-            foreach ($mapping['slots'][$key] as $slot) {
-                $value=$this->contract->slotValue($row,$slot);
-                $fields[]=['key'=>$slot['key'],'type'=>$slot['type'],'value'=>$value,'slotKey'=>$slot['key'],'semanticKey'=>$semantic($slot)];
-                if ($slot['type']==='image' && $value!=='') {
-                    $src=preg_match('~^https?://~',$value)?$value:$this->base.'/'.ltrim($value,'/');
-                    $mid=$opaque('media',$value);
-                    // The slot is its own block below (same opaque key), so the picture says which
-                    // block it belongs to. Alt stays null: a contract slot carries no alt of its own.
-                    $block=$opaque('block',$uid.':'.$slot['key']);
-                    $alt=$alts[$semantic($slot)??'']??null;
-                    if (isset($content['images'][$mid])) $content['images'][$mid]['usages'][]=['contentId'=>$id,'blockId'=>$block,'itemId'=>null];
-                    else $content['images'][$mid]=['id'=>$mid,'src'=>$src,'alt'=>is_string($alt)?$alt:null,'width'=>null,'height'=>null,'usages'=>[['contentId'=>$id,'blockId'=>$block,'itemId'=>null]]];
-                }
-            }
-            // Physical slots are fields, never manufactured repeater item identities. Bounded
-            // chunks contain stable slot keys; their IDs are based on keys, not array position.
-            foreach ($fields as $field) $content['blocks'][]=['id'=>$opaque('block',$uid.':'.$field['key']),'key'=>$field['key'],'role'=>null,'position'=>count($content['blocks']),
-                'sharedContentId'=>null,'visibility'=>'unknown','fields'=>[$field],'items'=>[]];
-            $content['images']=array_values($content['images']);
-            $contents[$id]=$content;
-        }
-        // Relations only from CMS foreign keys/associations. Assignment is a candidate occurrence,
-        // never evidence that a layout actually rendered a module.
-        $moduleRows=array_column($data['modules'],null,'id');
-        $assignments=$data['modules_menu'];
-        usort($assignments,fn($a,$b)=>[(int)$moduleRows[$a['moduleid']]['ordering'],(int)$a['moduleid'],(int)$a['menuid']]<=>[(int)$moduleRows[$b['moduleid']]['ordering'],(int)$b['moduleid'],(int)$b['menuid']]);
-        foreach ($assignments as $assignment) {
-            $source=$native['shared'][(int)$assignment['moduleid']]??null;
-            if (!$source) continue;
-            foreach ($native['page']??[] as $menuId=>$owner) {
-                $menu=(int)$assignment['menuid'];
-                if ($menu!==0 && $menu!==$menuId) continue;
-                if ($contents[$source]['locale']!==null && $contents[$owner]['locale']!==$contents[$source]['locale']) continue;
-                $blockId=$opaque('occurrence',$owner.':'.$source);
-                if (in_array($blockId,array_column($contents[$owner]['blocks'],'id'),true)) continue;
-                $contents[$owner]['blocks'][]=['id'=>$blockId,'key'=>$contractKey[$source]??$blockId,'role'=>$contents[$source]['title'],'position'=>count($contents[$owner]['blocks']),
-                    'sharedContentId'=>$source,'visibility'=>'unknown','fields'=>[],'items'=>[]];
-            }
-        }
-        // 🔒 A MODULE ONE PAGE PLACES IS THAT PAGE'S SECTION, NOT A SHARED PART. A Tracy Business
-        // home is a list of modules (hero, services, clients…); as references the agent had to open
-        // each one to see a word or a picture — 10 to 13 calls where WordPress takes 5 (25/09, local
-        // agent chat on capijl1644). Such a module is projected inline: the page block carries its
-        // fields (slotKey included) and its pictures point at that block. Modules placed on several
-        // pages — header, footer, topbar — stay shared references, read once.
-        $placements=[];
-        foreach ($contents as $ownerId=>$owner) foreach ($owner['blocks'] as $block)
-            if ($block['sharedContentId']!==null) $placements[$block['sharedContentId']][$ownerId]=true;
-        foreach ($placements as $source=>$owners) {
-            if (count($owners)!==1 || ($contents[$source]['type']??null)!=='shared') continue;
-            $ownerId=array_key_first($owners); $module=$contents[$source];
-            $fields=[]; foreach ($module['blocks'] as $block) foreach ($block['fields'] as $field) $fields[]=$field;
-            $images=array_column($contents[$ownerId]['images'],null,'id');
-            foreach ($contents[$ownerId]['blocks'] as &$block) {
-                if ($block['sharedContentId']!==$source) continue;
-                $block['sharedContentId']=null; $block['fields']=$fields;
-                foreach ($module['images'] as $image) {
-                    $usage=['contentId'=>$ownerId,'blockId'=>$block['id'],'itemId'=>null];
-                    if (isset($images[$image['id']])) $images[$image['id']]['usages'][]=$usage;
-                    else { $image['usages']=[$usage]; $images[$image['id']]=$image; }
-                }
-            }
-            unset($block);
-            $contents[$ownerId]['images']=array_values($images);
-            unset($contents[$source]);
-        }
-        $groups=[];
-        foreach ($data['associations'] as $association) {
-            $kind=['com_content.item'=>'article','com_menus.item'=>'page'][$association['context']]??null;
-            $id=$kind===null?null:($native[$kind][(int)$association['id']]??null);
-            if ($id && $contents[$id]['locale']!==null) $groups[$association['context'].':'.$association['key']][]=$id;
-        }
-        foreach ($groups as $group=>$members) {
-            if (count($members)<2 || count(array_unique(array_map(fn($id)=>$contents[$id]['locale'],$members)))!==count($members)) continue;
-            sort($members);
-            foreach ($members as $id) {
-                $contents[$id]['translationGroupId']=$opaque('translation',implode(':',$members));
-                foreach ($members as $other) if ($id!==$other) $contents[$id]['relations'][]=['type'=>'translation','contentId'=>$other];
-            }
-        }
+        $projection=\ContentProjection::build($data,$mapping,$config['site_id'],$this->base,$now,[$this->contract,'slotValue']);
+        $contents=$projection['contents'];
+        $opaque=\ContentProjection::opaque($config['site_id']);
         // Only authorized projection dependencies affect the public fingerprint. Hidden rows,
         // unrelated ACL labels and unrelated media cannot signal activity through a revision.
-        ksort($contents);
         $readableBefore=$this->readableMedia($contents,$mediaBefore);
         $readableAfter=$this->readableMedia($contents,$mediaAfter);
         if ($readableBefore!==$readableAfter) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
+        // The snapshot revision is hashed over every content still marked pending, exactly as before
+        // per-content revisions existed, so cursors issued by an older receiver keep their meaning.
         $revision=$this->hash([$contents,$mapping['contractHash'],$readableAfter]);
-        foreach ($contents as &$content) $content['revision']=$revision;
-        unset($content); $localeList=array_keys($locales); sort($localeList);
+        // Each content then carries its OWN revision (ContentProjection::revision), the one
+        // content.contract apply accepts in expected_content_revisions.
+        foreach ($contents as $id=>&$content) $content['revision']=$projection['revisions'][$id];
+        unset($content); $localeList=$projection['locales'];
         $manifest=$mapping['manifest'];
         $reader=new \ContentReader(['id'=>$opaque('site',$config['site_id']),'name'=>null,'url'=>$this->base,'defaultLocale'=>null,'locales'=>$localeList],
             ['quickstartTag'=>$manifest['quickstart']['release'],'quickstartVersion'=>$manifest['quickstart']['version'],'contractId'=>$manifest['id'],'contractHash'=>$mapping['contractHash']],
