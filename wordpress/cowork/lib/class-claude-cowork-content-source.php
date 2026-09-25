@@ -1152,6 +1152,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
             $marker['v'] = 1;
             $marker['state'] = 'running';
             self::putOption(self::MARKER_OPTION, (string) json_encode($marker));
+            // A run that dies from here on leaves `state: running`; the next call with the same
+            // request id does not rotate again and finishes the backfill.
+            self::checkpoint('identity-backfill');
             $counts = self::backfill();
             $marker['state'] = 'complete';
             $marker['at'] = gmdate('c');
