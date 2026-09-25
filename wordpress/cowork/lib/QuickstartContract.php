@@ -53,6 +53,7 @@ final class QuickstartContract
     /** `<design>/wp<major>/<version>` and nothing that could climb out of `lib/contracts/`. */
     public const ID_SHAPE = '~^[a-z][a-z0-9-]{1,40}/wp[0-9]{1,2}/[0-9]+\.[0-9]+\.[0-9]+$~D';
     public const EDITIONS_SCHEMA = 'tracy-quickstart-editions/wordpress/v1';
+    public const SUPERSEDED_SCHEMA = 'tracy-quickstart-superseded/wordpress/v1';
     /** The published source edition: Polylang slug and WordPress locale. */
     public const SOURCE_LANGUAGE = 'en';
     public const SOURCE_LOCALE = 'en_US';
@@ -75,6 +76,10 @@ final class QuickstartContract
     private string $contractHash = '';
     private ?DemoTrimProfile $demoTrim = null;
     private ?array $editions = null;
+    /** Base hashes of earlier bytes of THIS profile a binding may still name (superseded.json). */
+    private array $acceptedBases = [];
+    /** Demo-trim profile hashes those earlier bytes carried. */
+    private array $acceptedTrims = [];
     /** Options resolved once per inspect, so the URL allow-list does not read `home` per slot. */
     private ?string $homeHost = null;
 
@@ -147,6 +152,8 @@ final class QuickstartContract
         $this->contractHash = DemoTrimProfile::baseHash($directory);
         $this->demoTrim = null;
         $this->editions = null;
+        $this->acceptedBases = [];
+        $this->acceptedTrims = [];
 
         // Both extensions are optional and pinned to the base bytes. A profile whose extension does
         // not belong to it is refused WHOLE: a receiver that ignored the bad file would seal sites
@@ -174,6 +181,33 @@ final class QuickstartContract
                 }
             }
             $this->editions = $editions;
+        }
+
+        // A released profile corrected in place (a slot's limit or input) keeps the sites already
+        // sealed to its earlier bytes: `superseded.json` names those bytes' base hash, and it is
+        // honoured only when the seal they bound — the presentation lock — is these bytes exactly.
+        // A declaration that does not hold is refused whole, like any extension of the profile.
+        $supersededFile = $directory . '/superseded.json';
+        if (is_file($supersededFile)) {
+            $superseded = self::json((string) file_get_contents($supersededFile), 'superseded.json');
+            $lock = (string) hash_file('sha256', $directory . '/presentation-lock.json');
+            if (($superseded['schemaVersion'] ?? '') !== self::SUPERSEDED_SCHEMA || ($superseded['contract'] ?? '') !== $id
+                || !hash_equals($this->contractHash, (string) ($superseded['baseHash'] ?? ''))
+                || !isset($superseded['accepts']) || !is_array($superseded['accepts'])) {
+                throw new ContractUnavailable($id . ': the superseded profile list does not belong to this contract');
+            }
+            foreach ($superseded['accepts'] as $entry) {
+                $base = is_array($entry) ? (string) ($entry['baseHash'] ?? '') : '';
+                $trim = is_array($entry) && isset($entry['demoTrimHash']) ? (string) $entry['demoTrimHash'] : null;
+                if (!preg_match('/^[a-f0-9]{64}$/D', $base) || ($trim !== null && !preg_match('/^[a-f0-9]{64}$/D', $trim))
+                    || !hash_equals($lock, (string) ($entry['presentationLock'] ?? ''))) {
+                    throw new ContractUnavailable($id . ': a superseded profile was sealed to another presentation lock');
+                }
+                $this->acceptedBases[] = $base;
+                if ($trim !== null) {
+                    $this->acceptedTrims[] = $trim;
+                }
+            }
         }
         $this->id = $id;
     }
@@ -357,7 +391,23 @@ final class QuickstartContract
         }
         $binding['ids'] = $state['ids'];
         $binding['revision'] = $state['revision'];
-        $this->store->replace($binding);
+        $this->store->replace($this->current($binding));
+    }
+
+    /**
+     * A binding named by a declared predecessor (superseded.json) moves to the current profile on
+     * the first validated write: the same seal, the current write rules. Anything else is as stored.
+     */
+    private function current(array $binding): array
+    {
+        if (in_array((string) ($binding['contractHash'] ?? ''), $this->acceptedBases, true)) {
+            $binding['contractHash'] = $this->contractHash;
+            if (isset($binding['demoTrim']) && is_array($binding['demoTrim']) && $this->demoTrim !== null
+                && in_array((string) ($binding['demoTrim']['profileHash'] ?? ''), $this->acceptedTrims, true)) {
+                $binding['demoTrim']['profileHash'] = $this->demoTrim->hash();
+            }
+        }
+        return $binding;
     }
 
     /** Put a record on the binding under one key (`demoTrim`, `sourceLanguage`, `siteLanguage`), or take it off with null. */
@@ -368,7 +418,7 @@ final class QuickstartContract
             throw new RuntimeException('A ' . $field . ' record needs a bound site');
         }
         $binding[$field] = $record;
-        $this->store->replace($binding);
+        $this->store->replace($this->current($binding));
     }
 
     // ---- inspect ----------------------------------------------------------------------------
@@ -390,14 +440,21 @@ final class QuickstartContract
         $problems = [];
         $this->homeHost = null;
 
-        if ($binding !== null && !hash_equals($this->contractHash, (string) ($binding['contractHash'] ?? ''))) {
-            $problems[] = 'Installed content contract changed';
+        $lineage = null;
+        $boundHash = (string) ($binding['contractHash'] ?? '');
+        if ($binding !== null && !hash_equals($this->contractHash, $boundHash)) {
+            if (in_array($boundHash, $this->acceptedBases, true)) {
+                $lineage = ['from' => $boundHash, 'to' => $this->contractHash];
+            } else {
+                $problems[] = 'Installed content contract changed';
+            }
         }
         $trim = isset($binding['demoTrim']) && is_array($binding['demoTrim']) ? $binding['demoTrim'] : null;
         if ($trim !== null) {
             if ($this->demoTrim === null) {
                 $problems[] = 'This site has hidden demo rows but the plugin carries no demo-trim profile';
-            } elseif (!hash_equals($this->demoTrim->hash(), (string) ($trim['profileHash'] ?? ''))) {
+            } elseif (!hash_equals($this->demoTrim->hash(), (string) ($trim['profileHash'] ?? ''))
+                && !($lineage !== null && in_array((string) ($trim['profileHash'] ?? ''), $this->acceptedTrims, true))) {
                 $problems[] = 'The installed demo-trim profile changed';
             }
         }
@@ -531,6 +588,7 @@ final class QuickstartContract
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
             'multilingual' => self::multilingualState($binding),
             'siteLanguage' => self::siteLanguageState($binding),
+            'contractLineage' => $lineage,
             'problems' => $problems,
         ];
     }

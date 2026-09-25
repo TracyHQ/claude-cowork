@@ -1582,6 +1582,8 @@ check('content.language needs an apply_id',
 
 // The content-only seal: its own file, because it is its own boundary.
 require_once __DIR__ . '/contracts.php';
+// A profile corrected in place keeps the sites sealed to its earlier bytes (superseded.json).
+require_once __DIR__ . '/superseded-profile.php';
 // Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.
 require_once __DIR__ . '/multilingual.php';
 // The site's default language on a sealed multilingual site.

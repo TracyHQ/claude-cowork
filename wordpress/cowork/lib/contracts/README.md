@@ -10,6 +10,7 @@ held to:
 | `presentation-lock.json` | yes | What must stay as shipped: theme file hashes, pinned options, template-part hashes, each page's skeleton. |
 | `demo-trim-map.json` | no | The vendor's demo posts a bound site may hide, pinned to the three files above by `baseHash`. |
 | `editions.json` | no | Which Polylang languages the release ships copies for, and the post id of each copy. |
+| `superseded.json` | no | Earlier base hashes of this same profile a sealed site may still be bound to (a released profile corrected in place). Accepted only while `presentation-lock.json` is the same bytes; a binding moves to the current hash on its next validated write. Generated in TCH by `scripts/build-wordpress-superseded.mjs`. |
 
 **These files are COPIED from TCH** (`packages/cms/tracy-wordpress-quickstart/contracts/<id>/`)
 and must stay byte-identical to their source. Every site bound to a profile stores the hash of its
