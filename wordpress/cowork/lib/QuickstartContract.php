@@ -677,6 +677,9 @@ final class QuickstartContract
         if ($slug === '' || !function_exists('get_posts')) {
             return ['problem' => 'Entity has no slug, or the site cannot be queried'];
         }
+        // `lang => ''`: every language. Polylang narrows a query to the REQUEST's language through
+        // `parse_query`, which `suppress_filters` does not switch off — once the site's default was
+        // Vietnamese, inspect resolved 0 rows for every English entity (dev machine, 25/09/2026).
         $matches = get_posts([
             'post_type' => $type,
             'name' => $slug,
@@ -684,6 +687,7 @@ final class QuickstartContract
             'numberposts' => -1,
             'no_found_rows' => true,
             'suppress_filters' => true,
+            'lang' => '',
         ]);
         $language = isset($identity['language']) ? (string) $identity['language'] : '';
         $ids = [];
