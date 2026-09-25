@@ -154,3 +154,74 @@ this API boundary; drift is detected on the next contract request.
 Release activation is separate from source availability: 0.14.0 has been tested as a local package,
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use content-only mode. The published 1.1.0 profile is not the later, locally modified 8212 demo.
+
+## Unreleased Joomla 6 Content API pilot
+
+The opt-in `content.read` action and authenticated `GET /content.json` share
+`JoomlaContentReader`. GET requires the existing site token in `Authorization: Bearer …`;
+never put it in a URL. The existing token is a service credential, not a Tracy seat.
+The Tracy relay checks the current seat/policy on each request and supplies a server-owned
+`contentPrincipal` for cursor isolation. No new write permission is granted.
+
+The common machine contract is TCH `packages/cms/tracy-content-api` (foundation commit
+`1e724aad20c3be7df82aebf9e5e59db87e0a6aa2`, local/unpushed). Cross-repository protocol ownership:
+TracyHQ/tracy-docs `systems/content-api-v1.md`. This patch is not a receiver release.
+
+On a **private Joomla 6 test fixture**, install the locally built receiver, then explicitly run:
+
+```sh
+php tools/enable-content-reader.php --root=/path/to/joomla --new-site
+```
+
+`--new-site` is required when creating a distinct site from a database clone: it rekeys the site
+identity and cursor secret. Omit it only when enabling/rechecking the same site. The CLI needs
+CREATE TABLE and TRIGGER privileges. It creates private identity/config tables and six AFTER
+INSERT/DELETE triggers. Setup stays disabled if a step fails. GET never installs metadata,
+backfills identities, adopts orphans, repairs bindings or resumes language jobs. Disable the
+reader by setting `#__claudecowork_content_reader.enabled=0`; keep identities across a temporary
+disable. Do not drop/recreate the registry to repair an error: that changes published IDs.
+Reconcile missing triggers/identities administratively with the reader disabled and a backup.
+
+Scope is bound, public-audience, currently published pages/articles/modules. Publication windows,
+category/menu ancestors and viewlevels are applied. Module assignment is an occurrence candidate,
+not proof of rendering; visibility remains unknown. Physical contract slots carry current values
+and no inferred semantic key. Repeaters, exclusion assignments and media outside the mapped image
+slots remain unresolved. `readMapping()` is separate from mutating native inspect. A damaged
+binding fails closed; native inspect/apply/revert keep their existing write semantics.
+
+Each request loads a repeatable-read InnoDB snapshot. The revision hashes the authorized content
+projection, its contract hash and referenced local image bytes, rather than hidden source rows or
+unrelated ACL labels. Local `images/` files are still scanned before and after the DB snapshot;
+only image slots and `<img src>` references in readable markup contribute to the fingerprint.
+No transaction spans requests and no snapshot cache needs cleanup. Cursor expiry is 300 seconds
+and binds site, principal (including scope), filter, revision and owner. Source cost remains
+linear across the mapped site and image directory: timing isolation and constant-cost paging
+are not claimed. Remote images, CSS backgrounds and srcset bytes remain unresolved.
+The pilot caps serialized responses at 262144 bytes, continuing blocks by signed cursor. A scalar
+or unsegmentable metadata group that cannot fit returns 413, never truncated content. Item paging
+is not advertised until stable repeater mapping exists. Images changed after the final scan are
+seen on the next request; this does not claim a filesystem transaction with MariaDB.
+
+Runtime acceptance lives in TCH `scripts/test/content-api-joomla-runtime.test.mjs`; credentials,
+DB checkpoints and fixture configuration stay outside either repository. The test restores a full
+DB checkpoint and file bytes in `finally`, and recovers a persisted dirty marker on the next run.
+SQL stress mutations and real Joomla HTTP API saves are recorded separately. See TCH
+`tasks/evidence/content-api-p2/REPORT.md` for measured cases and remaining gaps.
+
+For partial detail, merge present properties as well as ordered blocks. A large raw body can be
+deferred to the final segment (with no blocks remaining); its absence in an earlier segment means
+not loaded, never an invented null/empty value. The shared P1 schema already permits this.
+
+
+Content API relay protocol note (unreleased): `contentScope` is server-owned at the Tracy hop;
+this pilot supports `published` only and returns501 for another scope. `contentPrincipal` binds
+the signed cursor to a verified seat context; a service credential is not a seat. List continuation
+can send only `cursor`; explicit filter/limit repetitions must match its signed query. No identity
+migration, permission widening or contract repair runs from a read request. WordPress and EmDash
+transport/identity evidence is tracked separately; this receiver does not certify their support.
+
+Protocol b0a40e0 discovery: an oversized body with mapped blocks returns 413 with
+`error.snapshot` and `error.links.firstBlock`. Follow its signed `blocksCursor` with the same
+authorization. Each block continuation retains the snapshot and original expiry; changing the
+principal, owner or block is rejected. Stop block scanning when `blocksPagination.nextCursor`
+is null; the full-content self link is not another block segment. This does not chunk bodyHtml.

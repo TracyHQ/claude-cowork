@@ -64,6 +64,13 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
         $app = $this->getApplication();
         $input = $app->getInput();
+        $root = rtrim(\Joomla\CMS\Uri\Uri::root(true), '/');
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        if ($app->isClient('site') && $path === $root . '/content.json') {
+            EngineFactory::answerContent($app);
+            return;
+        }
+
 
         // Before routing, `option` and `task` are read straight off the query string — which is
         // what the door has always been: the oldest routing contract Joomla has. Any array-valued

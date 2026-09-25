@@ -342,6 +342,67 @@ final class QuickstartContract
         return $expected;
     }
 
+    /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
+    private function resolveRows(array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
+        $ids=[];$rows=[];$lists=[];
+        foreach($keys as $key=>$meta) {
+            $kind=$meta['kind'];
+            if(($inventory || !$binding) && !isset($lists[$kind])) {
+                $lists[$kind]=[];
+                for($offset=0;$offset<20000;$offset+=100) {
+                    $page=$this->writer->list($kind,$offset,100);
+                    foreach($page as $item)$lists[$kind][]=$this->writer->read($kind,(int)$item['id']);
+                    if(count($page)<100)break;
+                    if($offset===19900)throw new RuntimeException('Inventory limit exceeded');
+                }
+            }
+            $derived = isset($meta['locale']) || !empty($meta['switcher']);
+            if($binding || $derived) {
+                // A copy is ALWAYS resolved through the binding: two rows that differ only by
+                // language cannot be told apart by the identity fields the base contract uses.
+                $id = $derived
+                    ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
+                    : (int)($binding['ids'][$key]??0);
+                $row = $this->writer->read($kind,$id);
+                if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
+            } else {
+                $entity=$this->baseEntities()[$key];
+                $matches=array_values(array_filter($lists[$kind],function($row)use($entity,$ids){
+                    foreach($entity['identityReferences']??[] as $field=>$ref)if((int)($row[$field]??0)!==($ids[$ref]??-1))return false;
+                    foreach($entity['identity'] as $field=>$value)if((string)($row[$field]??'')!==(string)$value)return false;
+                    return true;
+                }));
+                if(count($matches)!==1)throw new RuntimeException('Missing or ambiguous entity: '.$key);
+                $row=$matches[0];$id=(int)$row['id'];
+            }
+            $ids[$key]=$id;$rows[$key]=$row;
+        }
+        return ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists];
+    }
+
+    /**
+     * Read-only mapping. A binding is mandatory: an unbound site's labels are not identities.
+     * An interrupted language job must be resumed through the existing write door, never GET.
+     * Values are extracted by the reader only for authorized rows; no samples leave this method.
+     */
+    public function readMapping(): array {
+        $this->ready();
+        $binding = $this->store->load();
+        if (!$binding) throw new RuntimeException('Content reader requires a bound contract');
+        if (($binding['contractHash'] ?? null) !== $this->contractHash()) throw new RuntimeException('Installed content contract changed');
+        $job = $this->store->job();
+        if ($job && ($job['phase'] ?? '') !== 'completed') throw new RuntimeException('Content mapping has an unfinished language job');
+        $languages = $this->effectiveLanguages($binding, null);
+        $switcher = $binding['multilingual']['switcher'] ?? null;
+        $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
+        $resolved = $this->resolveRows($keys, $binding, $languages, $switcher);
+        $slots = [];
+        foreach ($keys as $key=>$meta) {
+            $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
+        }
+        return $resolved + ['keys'=>$keys, 'slots'=>$slots, 'manifest'=>$this->manifest, 'contractHash'=>$this->contractHash()];
+    }
+
     public function inspect(): array {
         $this->ready();
         $this->files(); $binding=$this->store->load();
@@ -374,39 +435,7 @@ final class QuickstartContract
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        $ids=[];$rows=[];$lists=[];
-        foreach($keys as $key=>$meta) {
-            $kind=$meta['kind'];
-            if(!isset($lists[$kind])) {
-                $lists[$kind]=[];
-                for($offset=0;$offset<20000;$offset+=100) {
-                    $page=$this->writer->list($kind,$offset,100);
-                    foreach($page as $item)$lists[$kind][]=$this->writer->read($kind,(int)$item['id']);
-                    if(count($page)<100)break;
-                    if($offset===19900)throw new RuntimeException('Inventory limit exceeded');
-                }
-            }
-            $derived = isset($meta['locale']) || !empty($meta['switcher']);
-            if($binding || $derived) {
-                // A copy is ALWAYS resolved through the binding: two rows that differ only by
-                // language cannot be told apart by the identity fields the base contract uses.
-                $id = $derived
-                    ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
-                    : (int)($binding['ids'][$key]??0);
-                $row = $this->writer->read($kind,$id);
-                if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
-            } else {
-                $entity=$this->baseEntities()[$key];
-                $matches=array_values(array_filter($lists[$kind],function($row)use($entity,$ids){
-                    foreach($entity['identityReferences']??[] as $field=>$ref)if((int)($row[$field]??0)!==($ids[$ref]??-1))return false;
-                    foreach($entity['identity'] as $field=>$value)if((string)($row[$field]??'')!==(string)$value)return false;
-                    return true;
-                }));
-                if(count($matches)!==1)throw new RuntimeException('Missing or ambiguous entity: '.$key);
-                $row=$matches[0];$id=(int)$row['id'];
-            }
-            $ids[$key]=$id;$rows[$key]=$row;
-        }
+        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($keys, $binding, $languages, $switcher, true);
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
         $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
