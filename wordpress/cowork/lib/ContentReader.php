@@ -411,15 +411,17 @@ final class ContentReader
 
     /**
      * A content-level scalar over budget: 413 naming it, with the snapshot of this read and —
-     * when the content has blocks — `links.firstBlock`, the signed start of a block scan that
-     * never builds the page body.
+     * when it is `bodyHtml` and the content has blocks — `links.firstBlock`, the signed start of
+     * a block scan that never builds the page body.
      */
     private function contentTooLarge(array $content, string $key): ContentReadError
     {
         $error = $this->tooLarge((string) $content['id'], null, $key);
         $error->extra['snapshot'] = ['revision' => $this->source->revision(), 'readAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now)];
         $blocks = array_values((array) ($content['blocks'] ?? []));
-        if ($blocks !== []) {
+        // Only an oversized BODY is discoverable block by block (protocol b0a40e0): the blocks are
+        // the body's own parts. Another oversized scalar stays a plain 413.
+        if ($key === 'bodyHtml' && $blocks !== []) {
             $url = parse_url($this->source->site()['url']);
             $origin = $url['scheme'] . '://' . $url['host'] . (isset($url['port']) ? ':' . $url['port'] : '');
             $error->extra['links'] = ['firstBlock' => $origin . $this->blockLink((string) $content['id'], $blocks, 0)['path']];

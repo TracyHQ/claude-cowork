@@ -289,6 +289,14 @@ try {
     check('an oversized scalar is 413 naming the field, never truncated', [$e->status, $e->body()['error']['field']], [413, ['contentId' => 'c004', 'blockId' => null, 'itemId' => null, 'key' => 'bodyHtml']]);
     check('a content with no blocks advertises no firstBlock', isset($e->body()['error']['links']), false);
 }
+$source->contents['c002']['bodyHtml'] = null;
+$source->contents['c002']['title'] = str_repeat('t', ContentReader::MAX_BYTES);
+try {
+    $reader()->read(['id' => 'c002']);
+} catch (ContentReadError $e) {
+    check('an oversized title is 413 without firstBlock, even with blocks', [$e->body()['error']['field']['key'], isset($e->body()['error']['links'])], ['title', false]);
+}
+$source->contents['c002']['title'] = 'T2';
 
 // ── ContentDoor ──────────────────────────────────────────────────────────────────────────────
 

@@ -272,7 +272,9 @@ function claude_cowork_exec(): void
                 : ['status' => 401, 'body' => (new ContentReadError('CONTENT_UNAUTHENTICATED', 401, 'Authentication required.'))->body()];
             status_header($answer['status']);
             echo json_encode($answer['body'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            wp_die('', '', ['response' => null]);
+            // `exit`, not wp_die(): admin-ajax's die handler sends its own no-cache header, and the
+            // Content API answer carries the same private, no-store value on both doors.
+            exit;
         }
         $params = isset($request['params']) && is_array($request['params']) ? $request['params'] : [];
         echo json_encode($authorized ? claude_cowork_content_identity($params)
