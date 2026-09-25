@@ -46,6 +46,8 @@ quickstart contract (below). A read answers the same either way. A write is eith
 | `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
+| `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
@@ -134,6 +136,34 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
   `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
   (another writer holds the site's lock).
+
+## Content API (`/content.json`)
+
+`GET <home>/content.json` with `Authorization: Bearer <token>` answers the site's live content in
+the `tracy-content/v1` shape (schema and validator live in TCH `packages/cms/tracy-content-api`):
+summaries by default, one content in full by `id`, `type`/`locale`/`limit` filters, and signed
+cursors that expire (409) as soon as anything the listing read changes. It is read only — it
+renders nothing, runs no shortcode and writes nothing — and every answer is `private, no-store`.
+The same reader answers the `content.read` action: `params` is the same flat query, and the
+authority sits beside it at the top level — `contentScope` (`published` by default, or `editorial`
+to include drafts, scheduled and private rows) and `contentPrincipal` (`site-token`, or
+`seat:<64 hex>` so a cursor belongs to one seat). Both are set by the server that holds the token
+and relays a seat — never by an agent. The answer is the envelope itself, or `{error}` with the
+HTTP status the spec gives. A token in the query string is never read. The path is only taken when
+no file or post already answers it. When a page's HTML alone exceeds the 256 KiB budget the detail
+is 413 with `error.links.firstBlock`: a signed walk, block by block, in the same snapshot.
+
+Each request reads from one REPEATABLE READ snapshot, released once it is answered; a write that
+lands during a request is either wholly in the answer or wholly out of it, and the next page's
+cursor answers 409. A site with a persistent object cache answers 501 until that is measured.
+
+Content ids are opaque and survive a new title, slug, order or domain: each row gets a random uid
+once, and ids are keyed by the site's content seed. Until `content.identity` has run on a site, the
+reader answers 501; after it, rows WordPress inserts get their uid at once. A fork calls
+`content.identity {newSite: true, requestId}` — a new seed, so new ids and no valid old cursor; the
+same request id never rotates twice. A restore of the same site keeps its seed. A database copied by
+hand keeps the seed too, and so the ids, until whoever copied it declares the fork. Writes still go
+through `content.contract` `apply`.
 
 ## Layout
 
