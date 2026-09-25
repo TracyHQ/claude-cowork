@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
+require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
@@ -121,8 +122,17 @@ final class QuickstartContract
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
     private function contractHash(): string { return $this->digest([$this->manifest,$this->map,$this->lock]); }
-    private function baseEntities(): array { return array_column($this->map['entities'], null, 'key'); }
-    private function slotsFor(string $key): array { return array_values(array_filter($this->map['slots'], fn($s)=>$s['entity']===$key)); }
+    /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
+    private ?array $baseEntities = null;
+    private function baseEntities(): array { return $this->baseEntities ??= array_column($this->map['entities'], null, 'key'); }
+    private ?array $slotsByEntity = null;
+    private function slotsFor(string $key): array {
+        if ($this->slotsByEntity === null) {
+            $this->slotsByEntity = [];
+            foreach ($this->map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $slot;
+        }
+        return $this->slotsByEntity[$key] ?? [];
+    }
 
     /**
      * Every entity this contract governs RIGHT NOW: the published quickstart's, plus one copy per
@@ -184,7 +194,7 @@ final class QuickstartContract
      *
      * @return array{0:array<string,array{ids:array<string,int>}>,1:?int}
      */
-    private function adoptOrphans(array $job, array $languages, ?int $switcher, ?array $binding): array {
+    private function adoptOrphans(ContractRows $source, array $job, array $languages, ?int $switcher, ?array $binding): array {
         $locale=$job['locale'];
         $missing=[];
         foreach($this->baseEntities() as $key=>$entity) {
@@ -196,12 +206,7 @@ final class QuickstartContract
         $switcherNote=$this->multilingual->switcherPresentation()['note'];
         foreach(['module','menuItem','article'] as $kind) {
             if(!isset($missing[$kind]) && !($kind==='module' && $switcher===null))continue;
-            $rows=[];
-            for($offset=0;$offset<20000;$offset+=100) {
-                $page=$this->writer->list($kind,$offset,100);
-                foreach($page as $row)$rows[]=$row;
-                if(count($page)<100)break;
-            }
+            $rows=$source->summaries($kind);
             // An id already claimed by another key is never claimed twice.
             $claimed=array_flip(array_map('intval',$languages[$locale]['ids']??[]));
             $byId=array_column($rows,null,'id');
@@ -343,27 +348,27 @@ final class QuickstartContract
     }
 
     /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
-    private function resolveRows(array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
+    private function resolveRows(ContractRows $source, array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
         $ids=[];$rows=[];$lists=[];
+        // A copy is ALWAYS resolved through the binding: two rows that differ only by language
+        // cannot be told apart by the identity fields the base contract uses.
+        $boundId = fn(string $key, array $meta): int => (isset($meta['locale']) || !empty($meta['switcher']))
+            ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
+            : (int)($binding['ids'][$key]??0);
+        // Without an inventory walk the bound rows are still hundreds of single reads; ask for
+        // each kind's ids at once instead. With one, every row is already in hand.
+        if(!$inventory && $binding) {
+            $wanted=[];
+            foreach($keys as $key=>$meta)$wanted[$meta['kind']][]=$boundId($key,$meta);
+            foreach($wanted as $kind=>$list)$source->prefetch($kind,$list);
+        }
         foreach($keys as $key=>$meta) {
             $kind=$meta['kind'];
-            if(($inventory || !$binding) && !isset($lists[$kind])) {
-                $lists[$kind]=[];
-                for($offset=0;$offset<20000;$offset+=100) {
-                    $page=$this->writer->list($kind,$offset,100);
-                    foreach($page as $item)$lists[$kind][]=$this->writer->read($kind,(int)$item['id']);
-                    if(count($page)<100)break;
-                    if($offset===19900)throw new RuntimeException('Inventory limit exceeded');
-                }
-            }
+            if(($inventory || !$binding) && !isset($lists[$kind])) $lists[$kind]=$source->all($kind);
             $derived = isset($meta['locale']) || !empty($meta['switcher']);
             if($binding || $derived) {
-                // A copy is ALWAYS resolved through the binding: two rows that differ only by
-                // language cannot be told apart by the identity fields the base contract uses.
-                $id = $derived
-                    ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
-                    : (int)($binding['ids'][$key]??0);
-                $row = $this->writer->read($kind,$id);
+                $id = $boundId($key,$meta);
+                $row = $source->row($kind,$id);
                 if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
             } else {
                 $entity=$this->baseEntities()[$key];
@@ -395,7 +400,7 @@ final class QuickstartContract
         $languages = $this->effectiveLanguages($binding, null);
         $switcher = $binding['multilingual']['switcher'] ?? null;
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        $resolved = $this->resolveRows($keys, $binding, $languages, $switcher);
+        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $binding, $languages, $switcher);
         $slots = [];
         foreach ($keys as $key=>$meta) {
             $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
@@ -408,11 +413,13 @@ final class QuickstartContract
         $this->files(); $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
+        // This call's rows, read in bulk and dropped when it returns (see ContractRows).
+        $source = new ContractRows($this->writer);
         $languages = $this->effectiveLanguages($binding, $job);
         $switcher = $binding['multilingual']['switcher'] ?? ($job['switcher'] ?? null);
         // A taken edition creates no rows, so a half-run job of one leaves none unnamed behind it.
         if ($job && $job['phase'] !== 'completed' && !($this->multilingual && $this->multilingual->edition((string) $job['locale'])))
-            [$languages, $switcher] = $this->adoptOrphans($job, $languages, $switcher, $binding);
+            [$languages, $switcher] = $this->adoptOrphans($source, $job, $languages, $switcher, $binding);
         if ($languages || $switcher !== null) {
             if (!$this->multilingual) throw new RuntimeException('This site has translations but the receiver carries no multilingual profile');
             foreach ([$binding['multilingual']['profileHash'] ?? null, $job['profileHash'] ?? null] as $seen)
@@ -435,7 +442,7 @@ final class QuickstartContract
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($keys, $binding, $languages, $switcher, true);
+        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
         $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
@@ -496,8 +503,9 @@ final class QuickstartContract
             $protected[$key]=$actual;
         }
         $assignments=[];
+        $source->prefetch('moduleAssignment',array_map(fn($key)=>$ids[$key],array_keys(array_filter($keys,fn($meta)=>$meta['kind']==='module'))));
         foreach($keys as $key=>$meta)if($meta['kind']==='module') {
-            $actual=$this->writer->read('moduleAssignment',$ids[$key]);
+            $actual=$source->row('moduleAssignment',$ids[$key]);
             $menus=json_decode($actual['menuids']??'[]',true,512,JSON_THROW_ON_ERROR);sort($menus);
             if (!empty($meta['switcher'])) {
                 $expected=$reusedSwitcher ? $assignments[$anchorKey] : [0];

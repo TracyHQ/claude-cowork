@@ -175,6 +175,38 @@ interface SiteWriter
     public function purgeCache(): void;
 }
 
+/**
+ * Optional: a writer that reads many rows in one round trip.
+ *
+ * Why it exists: a contract inspect on Tracy Business reads ~7,800 governed rows. Through
+ * `list()` + `read()` that was one query per row plus five per article (list enriches articles
+ * with a routed URL, menu lookups, author, tags and access name the contract never looks at):
+ * 21,931 queries per inspect, 65 s on a VPS where each round trip costs ~3 ms (measured
+ * 25/09/2026 on dev `fj1823`). Both methods return EXACTLY what `read()` returns for the same
+ * rows, so a caller may use them in place of a loop of reads without changing any answer.
+ * Nothing here caches: every call goes to the database.
+ */
+interface BulkSiteReader
+{
+    /**
+     * Every row of a kind inside the scope `read()` applies, as `read()` returns it, keyed by
+     * primary key in ascending order. At most $limit rows; a caller that needs to know whether
+     * there were more asks for one more than it accepts.
+     *
+     * @return array<int,array<string,?scalar>>
+     */
+    public function readAll(string $kind, int $limit): array;
+
+    /**
+     * `read()` for many ids at once, keyed by id. An id `read()` would answer null for is left
+     * out; a relation kind whose `read()` throws for a missing target throws the same here.
+     *
+     * @param int[] $ids
+     * @return array<int,array<string,?scalar>>
+     */
+    public function readMany(string $kind, array $ids): array;
+}
+
 interface MediaWriter
 {
     /** The bytes currently at a media path, or null when nothing is there (so the undo is a delete). */

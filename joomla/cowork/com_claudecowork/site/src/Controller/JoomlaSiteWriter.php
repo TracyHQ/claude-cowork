@@ -37,7 +37,7 @@ use Joomla\Database\ParameterType;
  * from-scratch article would have no ACL. Reskin edits existing rows, which is the path this is
  * built and tested for first; a create path grows an assets row here when a Proposal needs it.
  */
-final class JoomlaSiteWriter implements \SiteWriter
+final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
 {
     /**
      * The catalog (ADR 0080 §2): each kind declares its table, the only columns an Apply may set,
@@ -335,6 +335,45 @@ final class JoomlaSiteWriter implements \SiteWriter
         $row = $this->db->setQuery($query)->loadAssoc();
         return $row === null ? null : $row;
     }
+
+    /**
+     * `read()` for a whole kind: one `SELECT *` under the same scope, instead of a list walk plus
+     * one read per row (see \BulkSiteReader for the measurement that asked for it).
+     */
+    public function readAll(string $kind, int $limit): array
+    {
+        if (in_array($kind, self::RELATION_KINDS, true) || $kind === 'languageFilter') throw new \RuntimeException("{$kind} cannot be read whole");
+        $pk = $this->pkFor($kind);
+        $query = $this->db->getQuery(true)
+            ->select('*')
+            ->from($this->db->quoteName($this->tableFor($kind)))
+            ->order($this->db->quoteName($pk) . ' ASC');
+        $this->applyScope($kind, $query);
+        $out = [];
+        foreach ($this->db->setQuery($query, 0, max(1, $limit))->loadAssocList() ?? [] as $row) $out[(int) $row[$pk]] = $row;
+        return $out;
+    }
+
+    /** `read()` for many ids: one `SELECT * … IN (…)` per 500 ids, under the same scope. */
+    public function readMany(string $kind, array $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if (in_array($kind, self::RELATION_KINDS, true)) return (new JoomlaRelations($this->db))->readMany($kind, $ids);
+        $table = $this->tableFor($kind);
+        $pk = $this->pkFor($kind);
+        $out = [];
+        foreach (array_chunk(array_values(array_filter($ids, fn (int $id): bool => $id > 0)), 500) as $chunk) {
+            $query = $this->db->getQuery(true)
+                ->select('*')
+                ->from($this->db->quoteName($table))
+                ->where($this->db->quoteName($pk) . ' IN (' . implode(',', $chunk) . ')');
+            $this->applyScope($kind, $query);
+            foreach ($this->db->setQuery($query)->loadAssocList() ?? [] as $row) $out[(int) $row[$pk]] = $row;
+        }
+        return $out;
+    }
+
+    private const RELATION_KINDS = ['articleAssociation', 'menuAssociation', 'moduleAssignment'];
 
     /** The only column per kind setVisibility() may touch. */
     private const VISIBILITY = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
