@@ -148,7 +148,8 @@ final class Engine
                     }
                 });
             } catch (Throwable $e) {
-                return $this->err('writer_busy', $e->getMessage());
+                $busy = $this->err('writer_busy', $e->getMessage());
+                return $action === 'content.contract' ? self::withErrors($busy) : $busy;
             }
         }
 
@@ -264,6 +265,31 @@ final class Engine
 
     private function contentContract(array $p): array
     {
+        return self::withErrors($this->contentContractAnswer($p));
+    }
+
+    /**
+     * Every refusal of `content.contract` also carries `errors[]`: a code, the slot and content it
+     * is about, and whether a changed request can pass. A refusal that was not raised as a
+     * `ContractProblem` is one `CONTRACT_FAILED`; an inspect refused by drift is one
+     * `PRESENTATION_DRIFT` per problem. `error`, `message` and `problems` stay for older relays.
+     */
+    private static function withErrors(array $answer): array
+    {
+        if (($answer['ok'] ?? true) !== false || isset($answer['errors'])) {
+            return $answer;
+        }
+        if (isset($answer['problems']) && is_array($answer['problems']) && $answer['problems'] !== []) {
+            $answer['errors'] = array_map(static fn($problem) => ContractProblem::entry(ContractProblem::PRESENTATION_DRIFT, (string) $problem), $answer['problems']);
+            return $answer;
+        }
+        $code = ($answer['error'] ?? '') === 'writer_busy' ? ContractProblem::WRITER_BUSY : ContractProblem::CONTRACT_FAILED;
+        $answer['errors'] = [ContractProblem::entry($code, (string) ($answer['message'] ?? ''))];
+        return $answer;
+    }
+
+    private function contentContractAnswer(array $p): array
+    {
         if ($this->contract === null || $this->log === null || $this->writer === null) {
             return $this->err('unavailable', 'content contract receiver not wired');
         }
@@ -302,6 +328,15 @@ final class Engine
             return $this->contractApply($p);
         } catch (ContractUnavailable $e) {
             return $this->err('contract_unavailable', $e->getMessage());
+        } catch (ContractProblems $e) {
+            $answer = $this->err('contract_failed', $e->getMessage());
+            if ($e->drift() !== []) {
+                $answer['problems'] = $e->drift();
+            }
+            $answer['errors'] = $e->errors();
+            return $answer;
+        } catch (ContractProblem $e) {
+            return $this->err('contract_failed', $e->getMessage()) + ['errors' => [$e->toArray()]];
         } catch (Throwable $e) {
             return $this->err('contract_failed', $e->getMessage());
         }
@@ -422,12 +457,24 @@ final class Engine
             throw new RuntimeException('Nothing was applied: ' . $e->getMessage());
         }
 
-        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']]);
-        $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
         try {
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
+        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']]);
+        // The revision `content.read` now lists for every content this apply touched, read by the
+        // reader itself after the write, so the next apply can hold exactly these. Left out when
+        // the reader cannot answer on this site (no content identity yet): the write stands.
+        $revisions = [];
+        foreach ($this->contract->revisionsOf(array_map(static fn(array $w) => ['kind' => $w['kind'], 'id' => (int) $w['id'], 'key' => (string) ($w['key'] ?? '')], $written)) ?? [] as $found) {
+            if ($found !== null) {
+                $revisions[$found['id']] = $found['revision'];
+            }
+        }
+        if ($revisions !== []) {
+            $result['contentRevisions'] = $revisions;
+        }
+        $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
         $this->stamped('content');
         return $result;
     }

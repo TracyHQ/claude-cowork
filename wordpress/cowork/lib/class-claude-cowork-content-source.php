@@ -165,6 +165,43 @@ final class Claude_Cowork_Content_Source implements ContentSource
         return $out;
     }
 
+    /**
+     * The content id and revision of each row a contract write lands on, exactly as this reader
+     * lists them in `contents[]`: a post or a database template part by its native id, a theme
+     * file part by its slug, and every option (and a language's string translation of one) by the
+     * site identity content that shows it. Null for a row this scope lists no content for.
+     *
+     * @param array<int|string,array{kind:string,id:int,key:string}> $targets
+     * @return array<int|string,?array{id:string,revision:string}>
+     */
+    public function revisionsOf(array $targets): array
+    {
+        $this->load();
+        $out = [];
+        foreach ($targets as $index => $target) {
+            $id = $this->contentIdOf((string) ($target['kind'] ?? ''), (int) ($target['id'] ?? 0), (string) ($target['key'] ?? ''));
+            $out[$index] = $id !== null && isset($this->summaries[$id]) ? ['id' => $id, 'revision' => (string) $this->summaries[$id]['revision']] : null;
+        }
+        return $out;
+    }
+
+    private function contentIdOf(string $kind, int $native, string $key): ?string
+    {
+        if ($kind === 'option' || $kind === 'optionTranslation') {
+            return $this->siteContentId();
+        }
+        if ($kind !== 'post' && $kind !== 'templatePart') {
+            return null;
+        }
+        if ($native > 0 && isset($this->ids[$native])) {
+            return $this->ids[$native];
+        }
+        if ($kind === 'templatePart' && isset($this->themeParts[$key])) {
+            return $this->themePartId($this->themeParts[$key]);
+        }
+        return null;
+    }
+
     public function detail(string $id, bool $withBody = true): ?array
     {
         $this->load();
@@ -402,6 +439,18 @@ final class Claude_Cowork_Content_Source implements ContentSource
         return $prefix . substr(hash_hmac('sha256', $what, $this->key), 0, 26);
     }
 
+    /** The one shared content for the options every page prints. */
+    private function siteContentId(): string
+    {
+        return $this->opaque('c', 'option:site');
+    }
+
+    /** A template part served from the theme's file, not overridden by a database row. */
+    private function themePartId(array $part): string
+    {
+        return $this->opaque('c', 'theme-part:' . $part['theme'] . '//' . $part['slug']);
+    }
+
     private function buildSite(): void
     {
         $home = rtrim((string) ($this->options['home'] ?? ''), '/');
@@ -462,7 +511,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private function buildContents(): void
     {
         // The site identity first: one shared content for the options every page prints.
-        $siteId = $this->opaque('c', 'option:site');
+        $siteId = $this->siteContentId();
         $this->index[$siteId] = ['kind' => 'site', 'native' => null];
         $this->summaries[$siteId] = $this->summary($siteId, 'shared', (string) ($this->options['blogname'] ?? ''), null, null, null, null,
             hash('sha256', json_encode([$this->options['blogname'] ?? null, $this->options['blogdescription'] ?? null, $this->options['tracy_site_identity'] ?? null, $this->bindingSlotsHash()])),
@@ -519,7 +568,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             if (isset($overridden[$slug])) {
                 continue;
             }
-            $id = $this->opaque('c', 'theme-part:' . $part['theme'] . '//' . $slug);
+            $id = $this->themePartId($part);
             $this->index[$id] = ['kind' => 'theme-part', 'native' => $slug];
             $this->summaries[$id] = $this->summary($id, 'shared', $slug, $slug, null, null, null, $part['hash'],
                 ['status' => 'published', 'valueSource' => 'current', 'scheduledAt' => null], null);
@@ -747,7 +796,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             if ($part === null || ($theme !== null && $theme !== $part['theme'])) {
                 return null;
             }
-            $id = $this->opaque('c', 'theme-part:' . $part['theme'] . '//' . $part['slug']);
+            $id = $this->themePartId($part);
             return isset($this->summaries[$id]) ? $id : null;
         }
         $native = (int) $ref['id'];
@@ -1224,5 +1273,34 @@ final class Claude_Cowork_Content_Source implements ContentSource
             wp_cache_delete($id, 'post_meta');
         }
         return ['minted' => $minted, 'repaired' => $repaired, 'total' => count($ids)];
+    }
+}
+
+/**
+ * `content.contract apply`'s view of `content.read` revisions: a fresh reader per question, in
+ * the editorial scope (a governed page may be a draft), its consistent read released before the
+ * answer returns so no snapshot is held open across the writes that follow.
+ */
+final class Claude_Cowork_Content_Revisions implements ContentRevisions
+{
+    /** @var string */
+    private $contractsDir;
+    /** @var string */
+    private $version;
+
+    public function __construct(string $contractsDir, string $version)
+    {
+        $this->contractsDir = $contractsDir;
+        $this->version = $version;
+    }
+
+    public function of(array $targets): array
+    {
+        $source = new Claude_Cowork_Content_Source('editorial', $this->contractsDir, $this->version);
+        try {
+            return $source->revisionsOf($targets);
+        } finally {
+            $source->release();
+        }
     }
 }

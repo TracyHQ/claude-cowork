@@ -67,7 +67,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -315,7 +315,10 @@ function claude_cowork_exec(): void
             new Claude_Cowork_Contract_Store(),
             rtrim(ABSPATH, '/\\'),
             __DIR__ . '/lib/contracts',
-            (string) get_option(QuickstartContract::SETTING_OPTION, '')
+            (string) get_option(QuickstartContract::SETTING_OPTION, ''),
+            // The reader answers `expected_content_revisions` and the receipt's `contentRevisions`,
+            // so an apply holds the same revision `content.read` listed.
+            new Claude_Cowork_Content_Revisions(__DIR__ . '/lib/contracts', (string) claude_cowork_version())
         )
     );
 

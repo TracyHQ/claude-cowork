@@ -23,6 +23,7 @@
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/IdentityTokens.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ContractProblem.php';
 
 /**
  * Where the binding lives. The plugin keeps it in an option; the tests keep it in memory.
@@ -38,6 +39,22 @@ interface ContractStore
 
     /** A new baseline after a validated apply, trim or relabel. */
     public function replace(array $binding): void;
+}
+
+/**
+ * The `content.read` identity and revision of what a contract write touches, answered by the
+ * content reader itself, so `expected_content_revisions` compares against the very value
+ * `contents[].revision` showed and no second formula exists to drift from it.
+ */
+interface ContentRevisions
+{
+    /**
+     * @param array<int|string,array{kind:string,id:int,key:string}> $targets one row a write lands on:
+     *        `post`/`templatePart` by id (a theme-file part by its slug), `option`/`optionTranslation` by name
+     * @return array<int|string,?array{id:string,revision:string}> per target, same keys; null when the
+     *         reader lists no content for it
+     */
+    public function of(array $targets): array;
 }
 
 /** The profile this site names cannot be used at all — as opposed to the site failing its checks. */
@@ -82,14 +99,16 @@ final class QuickstartContract
     private array $acceptedTrims = [];
     /** Options resolved once per inspect, so the URL allow-list does not read `home` per slot. */
     private ?string $homeHost = null;
+    private ?ContentRevisions $revisions;
 
     /**
      * @param string $root         The webroot (no trailing slash), where `fileRoots` are checked.
      * @param string $contractsDir `lib/contracts`, holding one directory per profile id.
      * @param string $configured   The `claude_cowork_contract` setting, or '' when none is set.
      */
-    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '')
+    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '', ?ContentRevisions $revisions = null)
     {
+        $this->revisions = $revisions;
         $this->writer = $writer;
         $this->store = $store;
         $this->root = rtrim($root, '/');
@@ -792,20 +811,45 @@ final class QuickstartContract
 
     /**
      * What one apply would write, checked entirely before anything is. Every change is a known
-     * slot with a value the rules accept, and the site is at the revision the caller saw.
+     * slot with a value the rules accept, and the site is at the revision the caller saw — the
+     * whole site's (`expected_revision`), or each touched content's as `content.read` listed it
+     * (`expected_content_revisions`), or both.
+     *
+     * Every change is checked before any is refused: the refusal names each bad slot, not only
+     * the first, because WordPress gives the apply no transaction and the only safe order is
+     * "validate all, then write".
      *
      * @return array{operations:array<int,array{kind:string,id:int,key:string,fields:array}>,state:array}
      */
     public function plan(array $params): array
     {
-        $state = $this->inspectClean();
+        $state = $this->inspect();
+        if ($state['problems'] !== []) {
+            throw new ContractProblems(array_map(
+                static fn(string $problem) => new ContractProblem(ContractProblem::PRESENTATION_DRIFT, $problem),
+                $state['problems']
+            ), $state['problems']);
+        }
+        $errors = [];
         $expected = $params['expected_revision'] ?? null;
-        if (!is_string($expected) || !hash_equals($state['revision'], $expected)) {
-            throw new RuntimeException('Content changed; inspect again');
+        $perContent = $params['expected_content_revisions'] ?? null;
+        if ($perContent !== null && !self::isRevisionMap($perContent)) {
+            throw new ContractProblems([new ContractProblem(ContractProblem::CHANGES_INVALID,
+                'expected_content_revisions must map content ids to revisions')]);
+        }
+        $perContent = $perContent === [] ? null : $perContent;
+        if ($perContent === null || $expected !== null) {
+            if (!is_string($expected) || !hash_equals($state['revision'], $expected)) {
+                $errors[] = new ContractProblem(
+                    $expected === null ? ContractProblem::REVISION_REQUIRED : ContractProblem::REVISION_STALE,
+                    'Content changed; inspect again', null, null, ['current' => $state['revision']]
+                );
+            }
         }
         $changes = $params['changes'] ?? null;
         if (!is_array($changes) || $changes === [] || count($changes) > self::MAX_CHANGES) {
-            throw new RuntimeException('Expected 1-' . self::MAX_CHANGES . ' scalar content changes');
+            $errors[] = new ContractProblem(ContractProblem::CHANGES_INVALID, 'Expected 1-' . self::MAX_CHANGES . ' scalar content changes');
+            throw new ContractProblems($errors);
         }
         $slots = [];
         foreach ($this->slots() as $slot) {
@@ -817,9 +861,13 @@ final class QuickstartContract
         }
         // Grouped per target row: one read and one write per post, however many of its slots move.
         $byTarget = [];
+        // The row each change key lands on, for the per-content revision check and to name the
+        // content an error is about.
+        $owners = [];
         foreach ($changes as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
-                throw new RuntimeException('Unknown content slot or non-string value: ' . (string) $key);
+                $errors[] = new ContractProblem(ContractProblem::CHANGES_INVALID, 'Unknown content slot or non-string value: ' . (string) $key, is_string($key) ? $key : null);
+                continue;
             }
             $locale = null;
             $slotKey = $key;
@@ -827,54 +875,42 @@ final class QuickstartContract
                 [$locale, $slotKey] = explode('::', $key, 2);
             }
             if (!isset($slots[$slotKey])) {
-                throw new RuntimeException('Unknown content slot: ' . $key);
-            }
-            $slot = $slots[$slotKey];
-            $this->checkValue($slot, $value, $params, $key);
-            $entityKey = (string) $slot['entity'];
-            $entity = $entities[$entityKey];
-            $kind = (string) $entity['kind'];
-            if ($locale !== null && $kind === 'option') {
-                // `<locale>::site.tagline`: the words ONE language's front end shows for an option
-                // Polylang serves through its string translations. The option row itself has no
-                // edition; a translated option without a field is the only kind that has one.
-                $optionName = (string) ($entity['identity']['name'] ?? '');
-                if (!self::isTranslatedOption($optionName) || isset($slot['target']['field'])) {
-                    throw new RuntimeException('An option has no edition: ' . $key);
-                }
-                if ($this->editions === null || !isset($this->editions['locales'][$locale])) {
-                    throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
-                }
-                $target = 'optionTranslation:' . $optionName . ':' . $locale;
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'optionTranslation', 'id' => 0, 'key' => $optionName, 'locale' => $locale, 'changes' => []];
-                $byTarget[$target]['changes'][] = [$slot, $value];
+                $errors[] = new ContractProblem(ContractProblem::SLOT_UNKNOWN, 'Unknown content slot: ' . $key, $key);
                 continue;
             }
-            if ($locale !== null) {
-                $copy = $this->editions['locales'][$locale]['ids'][$entityKey] ?? null;
-                if ($this->editions === null || !is_int($copy) && !ctype_digit((string) $copy)) {
-                    throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
-                }
-                // An edition can ship without a block the source has (a translation that dropped
-                // a section). The profile names those; a change aimed at one is refused by name
-                // rather than found missing halfway through a write.
-                $missing = $this->editions['locales'][$locale]['missing'] ?? [];
-                if (is_array($missing) && in_array($entityKey . ':' . (string) ($slot['target']['block'] ?? ''), $missing, true)) {
-                    throw new RuntimeException('The ' . $locale . ' edition has no block for ' . $key);
-                }
-                $target = 'post:' . (int) $copy;
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'post', 'id' => (int) $copy, 'key' => '', 'changes' => []];
-            } elseif ($kind === 'option') {
-                $target = 'option:' . $entity['identity']['name'];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'option', 'id' => 0, 'key' => (string) $entity['identity']['name'], 'changes' => []];
-            } elseif ($kind === 'templatePart') {
-                $target = 'templatePart:' . $entity['identity']['slug'];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'templatePart', 'id' => (int) $state['ids'][$entityKey], 'key' => (string) $entity['identity']['slug'], 'changes' => []];
-            } else {
-                $target = 'post:' . $state['ids'][$entityKey];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'post', 'id' => (int) $state['ids'][$entityKey], 'key' => '', 'changes' => []];
+            $slot = $slots[$slotKey];
+            $edition = null;
+            $target = null;
+            try {
+                $target = $this->changeTarget($key, $locale, $slot, $entities[(string) $slot['entity']], $state);
+                $owners[$key] = ['kind' => $target['row']['kind'], 'id' => $target['row']['id'], 'key' => $target['row']['key']];
+            } catch (ContractProblem $e) {
+                $edition = $e;
             }
-            $byTarget[$target]['changes'][] = [$slot, $value];
+            try {
+                $this->checkValue($slot, $value, $params, $key);
+            } catch (ContractProblem $e) {
+                $errors[] = $e;
+                continue;
+            }
+            if ($edition !== null) {
+                $errors[] = $edition;
+                continue;
+            }
+            $byTarget[$target['name']] = $byTarget[$target['name']] ?? $target['row'] + ['changes' => []];
+            $byTarget[$target['name']]['changes'][] = [$slot, $value, $key];
+        }
+
+        if ($perContent !== null) {
+            $contentIds = $this->checkContentRevisions($owners, $perContent, $expected !== null, $errors);
+            foreach ($errors as $error) {
+                if ($error->slotKey !== null && $error->contentId === null && isset($contentIds[$error->slotKey])) {
+                    $error->contentId = $contentIds[$error->slotKey];
+                }
+            }
+        }
+        if ($errors !== []) {
+            throw new ContractProblems($errors);
         }
 
         $operations = [];
@@ -913,20 +949,156 @@ final class QuickstartContract
             } else {
                 $row = $this->writer->read('post', $target['id']);
                 if ($row === null) {
-                    throw new RuntimeException('Target post is missing: ' . $target['id']);
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'Target post is missing: ' . $target['id']);
+                    continue;
                 }
                 $content = (string) ($row['post_content'] ?? '');
                 $field = 'post_content';
             }
             $next = $content;
-            foreach ($target['changes'] as [$slot, $new]) {
-                $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new);
+            foreach ($target['changes'] as [$slot, $new, $key]) {
+                try {
+                    $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new);
+                } catch (RuntimeException $e) {
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, $e->getMessage(), $key);
+                }
             }
             if ($next !== $content) {
                 $operations[] = ['kind' => $target['kind'], 'id' => $target['id'], 'key' => $target['key'], 'fields' => [$field => $next]];
             }
         }
+        if ($errors !== []) {
+            throw new ContractProblems($errors);
+        }
         return ['operations' => $operations, 'state' => $state];
+    }
+
+    /**
+     * The row one change key lands on: `name` groups changes per row, `row` starts that group.
+     * Throws the edition refusals by name, before any write is planned.
+     *
+     * @return array{name:string,row:array{kind:string,id:int,key:string,locale?:string}}
+     */
+    private function changeTarget(string $key, ?string $locale, array $slot, array $entity, array $state): array
+    {
+        $entityKey = (string) $slot['entity'];
+        $kind = (string) $entity['kind'];
+        if ($locale !== null && $kind === 'option') {
+            // `<locale>::site.tagline`: the words ONE language's front end shows for an option
+            // Polylang serves through its string translations. The option row itself has no
+            // edition; a translated option without a field is the only kind that has one.
+            $optionName = (string) ($entity['identity']['name'] ?? '');
+            if (!self::isTranslatedOption($optionName) || isset($slot['target']['field'])) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'An option has no edition: ' . $key, $key);
+            }
+            if ($this->editions === null || !isset($this->editions['locales'][$locale])) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key, $key);
+            }
+            return ['name' => 'optionTranslation:' . $optionName . ':' . $locale,
+                'row' => ['kind' => 'optionTranslation', 'id' => 0, 'key' => $optionName, 'locale' => $locale]];
+        }
+        if ($locale !== null) {
+            $copy = $this->editions['locales'][$locale]['ids'][$entityKey] ?? null;
+            if ($this->editions === null || !is_int($copy) && !ctype_digit((string) $copy)) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key, $key);
+            }
+            // An edition can ship without a block the source has (a translation that dropped
+            // a section). The profile names those; a change aimed at one is refused by name
+            // rather than found missing halfway through a write.
+            $missing = $this->editions['locales'][$locale]['missing'] ?? [];
+            if (is_array($missing) && in_array($entityKey . ':' . (string) ($slot['target']['block'] ?? ''), $missing, true)) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'The ' . $locale . ' edition has no block for ' . $key, $key);
+            }
+            return ['name' => 'post:' . (int) $copy, 'row' => ['kind' => 'post', 'id' => (int) $copy, 'key' => '']];
+        }
+        if ($kind === 'option') {
+            $name = (string) $entity['identity']['name'];
+            return ['name' => 'option:' . $name, 'row' => ['kind' => 'option', 'id' => 0, 'key' => $name]];
+        }
+        if ($kind === 'templatePart') {
+            $slug = (string) $entity['identity']['slug'];
+            return ['name' => 'templatePart:' . $slug, 'row' => ['kind' => 'templatePart', 'id' => (int) $state['ids'][$entityKey], 'key' => $slug]];
+        }
+        return ['name' => 'post:' . $state['ids'][$entityKey], 'row' => ['kind' => 'post', 'id' => (int) $state['ids'][$entityKey], 'key' => '']];
+    }
+
+    /** `{contentId: revision}`, both strings, as `content.read` hands them out. */
+    private static function isRevisionMap($map): bool
+    {
+        if (!is_array($map)) {
+            return false;
+        }
+        foreach ($map as $id => $revision) {
+            if (!is_string($id) || $id === '' || !is_string($revision) || $revision === '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Each change key against the revision its content had when the caller read it. Appends
+     * the refusals to `$errors`; answers the content id of every key the reader resolved.
+     *
+     * A row the reader lists no content for (no content identity yet) cannot be held by id: it
+     * passes only when the site-wide `expected_revision` was also sent and matched.
+     *
+     * @param array<string,array{kind:string,id:int,key:string}> $owners
+     * @param array<string,string> $expected
+     * @param ContractProblem[] $errors
+     * @return array<string,string> change key → content id
+     */
+    private function checkContentRevisions(array $owners, array $expected, bool $siteRevisionSent, array &$errors): array
+    {
+        if ($owners === []) {
+            return [];
+        }
+        $siteRevisionHeld = $siteRevisionSent && !array_filter($errors, static fn(ContractProblem $e) => $e->slotKey === null
+            && in_array($e->errorCode, [ContractProblem::REVISION_STALE, ContractProblem::REVISION_REQUIRED], true));
+        $current = $this->revisionsOf($owners);
+        if ($current === null) {
+            $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'This site cannot read content revisions; send expected_revision instead');
+            return [];
+        }
+        $ids = [];
+        foreach ($owners as $key => $owner) {
+            $found = $current[$key] ?? null;
+            if ($found === null) {
+                if (!$siteRevisionHeld) {
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'No content.read id holds ' . $key . '; send expected_revision', $key);
+                }
+                continue;
+            }
+            $ids[$key] = $found['id'];
+            $given = $expected[$found['id']] ?? null;
+            if ($given === null) {
+                $errors[] = new ContractProblem(ContractProblem::REVISION_REQUIRED, 'Revision of ' . $found['id'] . ' required: ' . $key,
+                    $key, $found['id'], ['current' => $found['revision']]);
+            } elseif (!hash_equals($found['revision'], $given)) {
+                $errors[] = new ContractProblem(ContractProblem::REVISION_STALE, 'Content ' . $found['id'] . ' changed; read it again: ' . $key,
+                    $key, $found['id'], ['current' => $found['revision']]);
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * The `content.read` id and revision of each row, from the reader — or null when no reader
+     * is wired or it cannot answer on this site (no content identity, an object cache).
+     *
+     * @param array<int|string,array{kind:string,id:int,key:string}> $targets
+     * @return array<int|string,?array{id:string,revision:string}>|null
+     */
+    public function revisionsOf(array $targets): ?array
+    {
+        if ($this->revisions === null) {
+            return null;
+        }
+        try {
+            return $this->revisions->of($targets);
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /** Scalar content rules, applied identically to a source slot and to an edition of it. */
@@ -935,22 +1107,23 @@ final class QuickstartContract
         if (!empty($slot['requiresEvidence']) && $value !== (string) ($slot['sample'] ?? '')) {
             $evidence = $params['evidence'][$key] ?? null;
             if (!is_string($evidence) || trim($evidence) === '' || strlen($evidence) > 8000) {
-                throw new RuntimeException('Customer evidence required: ' . $key);
+                throw new ContractProblem(ContractProblem::SLOT_EVIDENCE_REQUIRED, 'Customer evidence required: ' . $key, $key);
             }
         }
         if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) {
-            throw new RuntimeException('Markup and control characters are not content: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Markup and control characters are not content: ' . $key, $key);
         }
         if (IdentityTokens::hasDirective($value)) {
-            throw new RuntimeException('Template directives are not content: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Template directives are not content: ' . $key, $key);
         }
         $max = (int) ($slot['maxCharacters'] ?? 1000);
         if (mb_strlen($value) > $max) {
-            throw new RuntimeException('Content too long: ' . $key . ' (' . mb_strlen($value) . ' > ' . $max . ')');
+            throw new ContractProblem(ContractProblem::SLOT_TOO_LONG, 'Content too long: ' . $key . ' (' . mb_strlen($value) . ' > ' . $max . ')', $key, null,
+                ['limit' => $max, 'actual' => mb_strlen($value)]);
         }
         $isUrl = ($slot['type'] ?? '') === 'url' || ($slot['target']['attr'] ?? '') === 'url';
         if ($isUrl && $value !== '' && !$this->urlAllowed($value)) {
-            throw new RuntimeException('Unsupported link: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_LINK_UNSUPPORTED, 'Unsupported link: ' . $key, $key);
         }
     }
 

@@ -1593,6 +1593,8 @@ require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
 // Content API v1: block projection, reader protocol and door (content.json).
 require __DIR__ . '/content-api.php';
+// Content API v2 on the write side: content revisions and structured errors (content.contract).
+require __DIR__ . '/content-revisions.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

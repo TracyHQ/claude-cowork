@@ -81,8 +81,12 @@ final class ContentReader
     public const MAX_LIMIT = 100;
     public const BLOCK_PAGE = 100;
     public const TYPES = ['page', 'article', 'service', 'project', 'shared', 'generic'];
-    /** Query names v1 defines. `itemsCursor` is defined but not served by this adapter. */
-    private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor'];
+    /**
+     * Query names v1 defines. `itemsCursor` is defined but not served by this adapter.
+     * `protocolVersions` is what a newer caller sends to say which protocols it speaks; this
+     * adapter speaks one, so the value is accepted and ignored rather than refused.
+     */
+    private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor', 'protocolVersions'];
     private const UNSERVED = ['itemsCursor'];
 
     /** @var ContentSource */
