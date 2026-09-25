@@ -31,11 +31,19 @@ interface ContentSource
     /** @return array<int,array<string,mixed>> every readable content as a summary, in listing order */
     public function summaries(): array;
 
-    /** @return array<string,mixed>|null one readable content in full, or null when it is not readable */
-    public function detail(string $id): ?array;
+    /**
+     * One readable content in full, or null when it is not readable. With `$withBody` false the
+     * source may leave `bodyHtml` unbuilt (null): a block read does not need the whole page's HTML.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function detail(string $id, bool $withBody = true): ?array;
 
     /** @return array<int,array{code:string,message:string}> what the scope does not cover */
     public function unresolved(): array;
+
+    /** The request is answered: end whatever consistent read the source holds open. */
+    public function release(): void;
 }
 
 final class ContentReadError extends RuntimeException
@@ -73,9 +81,9 @@ final class ContentReader
     public const MAX_LIMIT = 100;
     public const BLOCK_PAGE = 100;
     public const TYPES = ['page', 'article', 'service', 'project', 'shared', 'generic'];
-    /** Query names v1 defines. `blockId` and `itemsCursor` are defined but not served by this adapter. */
+    /** Query names v1 defines. `itemsCursor` is defined but not served by this adapter. */
     private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor'];
-    private const UNSERVED = ['blockId', 'itemsCursor'];
+    private const UNSERVED = ['itemsCursor'];
 
     /** @var ContentSource */
     private $source;
@@ -151,6 +159,15 @@ final class ContentReader
      */
     public function read(array $query): array
     {
+        try {
+            return $this->answer($query);
+        } finally {
+            $this->source->release();
+        }
+    }
+
+    private function answer(array $query): array
+    {
         foreach ($query as $key => $value) {
             if (!is_string($key) || !in_array($key, self::KNOWN, true)) {
                 throw self::bad();
@@ -174,9 +191,15 @@ final class ContentReader
                     throw self::bad();
                 }
             }
+            if (isset($query['blockId'])) {
+                if (isset($query['blocksCursor'])) {
+                    throw self::bad();
+                }
+                return $this->block($query['id'], $query['blockId']);
+            }
             return $this->detail($query['id'], $query['blocksCursor'] ?? null);
         }
-        if (isset($query['blocksCursor'])) {
+        if (isset($query['blocksCursor']) || isset($query['blockId'])) {
             throw self::bad();
         }
         return $this->listing($query);
@@ -317,6 +340,48 @@ final class ContentReader
             }
             $take = intdiv($take, 2);
         }
+    }
+
+    /**
+     * One block occurrence of a content, with the content's own metadata and the images that
+     * block uses — and nothing else: no bodyHtml, fields, tags or relations. It is `partial` by
+     * definition; `links.next` names the next block, or, after the last one, the content itself.
+     */
+    private function block(string $id, string $blockId): array
+    {
+        $content = $this->source->detail($id, false);
+        if ($content === null) {
+            throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
+        }
+        $all = array_values((array) ($content['blocks'] ?? []));
+        $index = null;
+        foreach ($all as $i => $block) {
+            if ($block['id'] === $blockId) {
+                $index = $i;
+                break;
+            }
+        }
+        if ($index === null) {
+            throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
+        }
+        $page = $content;
+        foreach (['bodyHtml', 'tags', 'fields', 'relations', 'blocksPagination'] as $key) {
+            unset($page[$key]);
+        }
+        $page['blocks'] = [$all[$index]];
+        $page['images'] = self::imagesFor((array) ($content['images'] ?? []), $page['blocks'], false);
+        $page['detailState'] = 'partial';
+        // The next block by its own id: a walk block by block never needs the page's whole body,
+        // so it also works where the full detail is 413 on bodyHtml.
+        $page['links']['next'] = $index + 1 < count($all)
+            ? $page['links']['self'] . '&blockId=' . rawurlencode((string) $all[$index + 1]['id'])
+            : $page['links']['self'];
+        $page['links']['self'] .= '&blockId=' . rawurlencode($blockId);
+        $envelope = $this->envelope([$page], 1, null, 1);
+        if (strlen(self::encode($envelope)) > $this->maxBytes) {
+            throw $this->tooLarge($id, $blockId, 'block');
+        }
+        return $envelope;
     }
 
     /**

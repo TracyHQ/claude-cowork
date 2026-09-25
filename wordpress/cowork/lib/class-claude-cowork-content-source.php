@@ -63,6 +63,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private $version;
 
     private $loaded = false;
+    private $open = false;
     private $key = '';
     private $siteRow = [];
     private $revision = '';
@@ -162,9 +163,10 @@ final class Claude_Cowork_Content_Source implements ContentSource
         return $out;
     }
 
-    public function detail(string $id): ?array
+    public function detail(string $id, bool $withBody = true): ?array
     {
         $this->load();
+        self::checkpoint('detail-before-body');
         if (!isset($this->index[$id])) {
             return null;
         }
@@ -191,6 +193,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
             return $content;
         }
         $this->fillFromMarkup($content, $markup, $row);
+        if (!$withBody) {
+            $content['bodyHtml'] = null;
+        }
         if (isset(self::CONTENT_TYPES[$row['post_type']])) {
             $content['tags'] = $this->tagNames($native);
             $content['relations'] = $this->relations($native);
@@ -209,6 +214,12 @@ final class Claude_Cowork_Content_Source implements ContentSource
 
     // ---- loading ------------------------------------------------------------------------------
 
+    /**
+     * Open ONE consistent read and keep it open until `release()`: the fingerprint, the rows, a
+     * detail's body, its template and its attachments are all read from the same state of the
+     * database, so a write landing at any point of the request is either wholly in it or wholly
+     * out of it — and the next page's cursor sees the new fingerprint and answers 409.
+     */
     private function load(): void
     {
         if ($this->loaded) {
@@ -218,13 +229,51 @@ final class Claude_Cowork_Content_Source implements ContentSource
         if (!is_object($wpdb) || !($wpdb->dbh instanceof mysqli)) {
             throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'This site does not use a MySQL connection the reader supports.');
         }
-        $wpdb->query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
+        // A persistent object cache answers get_post()/get_post_meta() from outside the snapshot;
+        // until that is measured, such a site is not served rather than served a mix.
+        if (function_exists('wp_using_ext_object_cache') && wp_using_ext_object_cache()) {
+            throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'This site uses a persistent object cache, which the reader does not support yet.');
+        }
+        $wpdb->query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        if ($wpdb->query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY') === false) {
+            throw new RuntimeException('Could not open a consistent read');
+        }
+        $this->open = true;
         try {
+            self::checkpoint('snapshot-open');
             $this->read();
-        } finally {
-            $wpdb->query('COMMIT');
+            self::checkpoint('snapshot-loaded');
+        } catch (Throwable $e) {
+            $this->release();
+            throw $e;
         }
         $this->loaded = true;
+    }
+
+    public function release(): void
+    {
+        if ($this->open) {
+            global $wpdb;
+            $wpdb->query('COMMIT');
+            $this->open = false;
+        }
+    }
+
+    public function __destruct()
+    {
+        $this->release();
+    }
+
+    /**
+     * A named point inside the consistent read. Nothing listens in production; the acceptance
+     * harness hooks it to hold a request there while it writes, so an interleaving is placed on
+     * purpose instead of hoped for.
+     */
+    private static function checkpoint(string $point): void
+    {
+        if (function_exists('do_action')) {
+            do_action('claude_cowork_content_checkpoint', $point);
+        }
     }
 
     private function query(string $sql): array
@@ -573,12 +622,8 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private function postContent(int $native): string
     {
         global $wpdb;
-        $wpdb->query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
-        try {
-            $row = $this->query($wpdb->prepare('SELECT post_content, MD5(post_content) AS content_md5 FROM ' . $wpdb->posts . ' WHERE ID = %d', $native));
-        } finally {
-            $wpdb->query('COMMIT');
-        }
+        // Same transaction as the fingerprint (see load()); the hash check stays as a second line.
+        $row = $this->query($wpdb->prepare('SELECT post_content, MD5(post_content) AS content_md5 FROM ' . $wpdb->posts . ' WHERE ID = %d', $native));
         // The body must be the one the fingerprint saw; a write between the two reads is a conflict, not a mix.
         if (!isset($row[0]) || $row[0]['content_md5'] !== $this->posts[$native]['content_md5']) {
             throw new ContentReadError('CONTENT_SNAPSHOT_EXPIRED', 409, 'The content changed while it was read; read it again.');

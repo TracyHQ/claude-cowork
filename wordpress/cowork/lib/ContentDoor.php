@@ -85,10 +85,17 @@ final class ContentDoor
         }
     }
 
+    /** A principal the relay names: the site token itself, or one seat under an opaque label. */
+    public const PRINCIPAL_SHAPE = '/^(site-token|seat:[A-Za-z0-9_-]{8,64})$/D';
+
     /**
-     * Answer the `content.read` action. `params.query` is the same name → value map the GET takes;
-     * `params.scope` is chosen by whoever relays the request for a seat (`published` by default).
-     * The token was already checked by the caller of this method.
+     * Answer the `content.read` action. `params.query` is the same name → value map the GET takes.
+     * `params.scope` (`published` by default, or `editorial`) and `params.principal` (`site-token`
+     * by default, or `seat:<opaque label>`) are set by the SERVER that holds this site's token and
+     * relays a seat — never by an agent: whoever holds the token can already read everything, so
+     * this door cannot tell a seat from a claim, and the relay must decide both from its own grant
+     * record. A cursor is bound to the principal, so one seat cannot continue another's scan.
+     * Any other parameter is refused. The token was already checked by the caller of this method.
      *
      * @return array<string,mixed> `{ok:true, status:200, content}` or `{ok:false, error, status, message, body}`
      */
@@ -97,10 +104,13 @@ final class ContentDoor
         try {
             $query = $params['query'] ?? [];
             $scope = $params['scope'] ?? self::GET_SCOPE;
-            if (!is_array($query) || !is_string($scope) || !in_array($scope, self::SCOPES, true)) {
+            $principal = $params['principal'] ?? self::PRINCIPAL;
+            if (array_diff(array_keys($params), ['query', 'scope', 'principal']) !== []
+                || !is_array($query) || !is_string($scope) || !in_array($scope, self::SCOPES, true)
+                || !is_string($principal) || !preg_match(self::PRINCIPAL_SHAPE, $principal)) {
                 throw ContentReader::bad();
             }
-            $content = $reader(self::PRINCIPAL, $scope, self::cursorSecret($token))->read($query);
+            $content = $reader($principal, $scope, self::cursorSecret($token))->read($query);
             return ['ok' => true, 'status' => 200, 'content' => $content];
         } catch (ContentReadError $e) {
             return ['ok' => false, 'error' => $e->reason, 'status' => $e->status, 'message' => $e->getMessage(), 'body' => $e->body()];
