@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Release candidate 4 of the Content API v1 reader: a contract inspect or apply reads each kind of row in one query instead of one per row (35 queries instead of 21,931 on Tracy Business), with the same answers; each map field names its semantic key and a picture takes its alt from its paired slot. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.4</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.4/pkg_claudecowork-0.18.0-rc.4.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Release candidate 3 of the Content API v1 reader: a module only one page places is read as that page's section, with its fields, slot keys and pictures; the all-languages home is left out when every language has its own. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
