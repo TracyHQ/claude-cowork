@@ -541,10 +541,11 @@ final class PLL_MO
     /** @var array<string,object> original => entry with `singular` and `translations` */
     public array $entries = [];
 
-    public function import_from_db(string $lang): void
+    /** Polylang 3.8 reads `$lang->slug` / `$lang->term_id`: a slug string here is the bug the real site had (25/09/2026). */
+    public function import_from_db(object $lang): void
     {
         $this->entries = [];
-        foreach (WP_Fake::$strings[$lang] ?? [] as $original => $translation) {
+        foreach (WP_Fake::$strings[(string) $lang->slug] ?? [] as $original => $translation) {
             $this->add_entry($this->make_entry((string) $original, (string) $translation));
         }
     }
@@ -559,13 +560,13 @@ final class PLL_MO
         $this->entries[(string) $entry->singular] = $entry;
     }
 
-    public function export_to_db(string $lang): void
+    public function export_to_db(object $lang): void
     {
         $strings = [];
         foreach ($this->entries as $original => $entry) {
             $strings[(string) $original] = (string) ($entry->translations[0] ?? '');
         }
-        WP_Fake::$strings[$lang] = $strings;
+        WP_Fake::$strings[(string) $lang->slug] = $strings;
     }
 }
 

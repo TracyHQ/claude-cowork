@@ -119,9 +119,9 @@
       },
       "type": "text",
       "sample": "A professional company site",
-      "maxCharacters": 160,
+      "maxCharacters": 70,
       "input": "tagline",
-      "label": "Tagline"
+      "label": "Tagline (one short slogan)"
     },
     {
       "key": "home.hero.eyebrow",

@@ -370,6 +370,19 @@ final class Engine
         $written = [];
         try {
             foreach ($plan['operations'] as $op) {
+                if ($op['kind'] === 'optionTranslation') {
+                    // One language's words for a translated option (`<locale>::site.tagline`): the
+                    // option row stays, only that language's string translation moves — keyed by
+                    // the row's value, the profile's demo value and the new value, as below.
+                    $row = $this->writer->read('option', 0, $op['key']);
+                    $originals = $this->translatedOptionOriginals($op, $row);
+                    $translations = QuickstartContract::stringTranslationsBefore($originals, [$op['locale']]);
+                    QuickstartContract::stringTranslationsWrite($originals, (string) $op['fields']['value'], [$op['locale']]);
+                    $done[] = ['optionTranslation', 0, $op['key'], null, $translations];
+                    $this->log->record($apply, ['op' => 'content', 'kind' => 'optionTranslation', 'id' => 0, 'key' => $op['key'], 'locale' => $op['locale'], 'before' => null, 'translations' => $translations]);
+                    $written[] = ['kind' => 'optionTranslation', 'id' => 0, 'key' => $op['key'], 'locale' => $op['locale']];
+                    continue;
+                }
                 $before = $this->writer->read($op['kind'], $op['id'], $op['key']);
                 // Polylang serves blogname/blogdescription from its per-language STRING
                 // translations, not the option row: read those before the write (Polylang's own
@@ -394,7 +407,9 @@ final class Engine
         } catch (Throwable $e) {
             foreach (array_reverse($done) as [$kind, $id, $key, $before, $translations]) {
                 try {
-                    $this->rollbackContent($kind, $id, $key, $before);
+                    if ($kind !== 'optionTranslation') {
+                        $this->rollbackContent($kind, $id, $key, $before);
+                    }
                     QuickstartContract::stringTranslationsRestore($translations);
                 } catch (Throwable $ignored) {
                     // Keep going: every other step still deserves its undo.
@@ -2556,6 +2571,13 @@ final class Engine
     private function revertOne(array $entry): void
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
+        if ($op === 'content' && ($entry['kind'] ?? '') === 'optionTranslation') {
+            // No row moved: only one language's string translation did.
+            if (isset($entry['translations']) && is_array($entry['translations'])) {
+                QuickstartContract::stringTranslationsRestore($entry['translations']);
+            }
+            return;
+        }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');
@@ -2650,7 +2672,7 @@ final class Engine
      */
     private function translatedOptionOriginals(array $op, ?array $before): array
     {
-        if (($op['kind'] ?? '') !== 'option' || !in_array((string) ($op['key'] ?? ''), QuickstartContract::TRANSLATED_OPTIONS, true)) {
+        if (!in_array($op['kind'] ?? '', ['option', 'optionTranslation'], true) || !QuickstartContract::isTranslatedOption((string) ($op['key'] ?? ''))) {
             return [];
         }
         $value = $op['fields']['value'] ?? null;

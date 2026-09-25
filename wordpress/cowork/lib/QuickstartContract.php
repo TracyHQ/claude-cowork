@@ -776,10 +776,23 @@ final class QuickstartContract
             $entityKey = (string) $slot['entity'];
             $entity = $entities[$entityKey];
             $kind = (string) $entity['kind'];
-            if ($locale !== null) {
-                if ($kind === 'option') {
+            if ($locale !== null && $kind === 'option') {
+                // `<locale>::site.tagline`: the words ONE language's front end shows for an option
+                // Polylang serves through its string translations. The option row itself has no
+                // edition; a translated option without a field is the only kind that has one.
+                $optionName = (string) ($entity['identity']['name'] ?? '');
+                if (!self::isTranslatedOption($optionName) || isset($slot['target']['field'])) {
                     throw new RuntimeException('An option has no edition: ' . $key);
                 }
+                if ($this->editions === null || !isset($this->editions['locales'][$locale])) {
+                    throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
+                }
+                $target = 'optionTranslation:' . $optionName . ':' . $locale;
+                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'optionTranslation', 'id' => 0, 'key' => $optionName, 'locale' => $locale, 'changes' => []];
+                $byTarget[$target]['changes'][] = [$slot, $value];
+                continue;
+            }
+            if ($locale !== null) {
                 $copy = $this->editions['locales'][$locale]['ids'][$entityKey] ?? null;
                 if ($this->editions === null || !is_int($copy) && !ctype_digit((string) $copy)) {
                     throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
@@ -808,6 +821,14 @@ final class QuickstartContract
 
         $operations = [];
         foreach ($byTarget as $target) {
+            if ($target['kind'] === 'optionTranslation') {
+                $new = null;
+                foreach ($target['changes'] as [, $value]) {
+                    $new = $value;
+                }
+                $operations[] = ['kind' => 'optionTranslation', 'id' => 0, 'key' => $target['key'], 'locale' => $target['locale'], 'fields' => ['value' => (string) $new]];
+                continue;
+            }
             if ($target['kind'] === 'option') {
                 $current = $this->writer->read('option', 0, $target['key']);
                 $value = $current === null ? null : $current['value'];
@@ -1093,6 +1114,43 @@ final class QuickstartContract
         return class_exists('PLL_MO') && function_exists('pll_languages_list') && self::languages() !== [];
     }
 
+    /** Whether Polylang serves this option through its string translations (see TRANSLATED_OPTIONS). */
+    public static function isTranslatedOption(string $name): bool
+    {
+        return in_array($name, self::TRANSLATED_OPTIONS, true);
+    }
+
+    /**
+     * Polylang's language OBJECT for a slug — what `PLL_MO::import_from_db()` / `export_to_db()`
+     * take (they read `->slug` and `->term_id`). Polylang 3.8 measured on 25/09/2026: handed the
+     * slug string instead, both emit "Attempt to read property on string" and read/write NOTHING,
+     * so every translation write below was a silent no-op while the tests' fake accepted the string.
+     */
+    private static function languageObject(string $slug): ?object
+    {
+        $model = self::polylang();
+        if ($model === null) {
+            return null;
+        }
+        $row = null;
+        if (isset($model->languages) && is_object($model->languages) && method_exists($model->languages, 'get')) {
+            $row = $model->languages->get($slug);
+        } elseif (method_exists($model, 'get_language')) {
+            $row = $model->get_language($slug);
+        }
+        return is_object($row) && isset($row->slug, $row->term_id) ? $row : null;
+    }
+
+    /** The languages a translation write reaches: the named ones the site has, or every language of the site. */
+    private static function translationLanguages(?array $languages): array
+    {
+        $known = self::languages();
+        if ($languages === null) {
+            return $known;
+        }
+        return array_values(array_filter(array_map('strval', $languages), static fn(string $slug): bool => in_array($slug, $known, true)));
+    }
+
     /**
      * What every language's string translation of each original says now: `[slug => [original
      * => translation|null]]`, null for an original that language has no entry for. `[]` without
@@ -1101,15 +1159,19 @@ final class QuickstartContract
      * @param string[] $originals
      * @return array<string,array<string,string|null>>
      */
-    public static function stringTranslationsBefore(array $originals): array
+    public static function stringTranslationsBefore(array $originals, ?array $languages = null): array
     {
         if ($originals === [] || !self::stringTranslationsAvailable()) {
             return [];
         }
         $before = [];
-        foreach (self::languages() as $slug) {
+        foreach (self::translationLanguages($languages) as $slug) {
+            $language = self::languageObject($slug);
+            if ($language === null) {
+                continue;
+            }
             $mo = new PLL_MO();
-            $mo->import_from_db($slug);
+            $mo->import_from_db($language);
             $before[$slug] = [];
             foreach ($originals as $original) {
                 $entry = $mo->entries[$original] ?? null;
@@ -1128,18 +1190,22 @@ final class QuickstartContract
      *
      * @param string[] $originals
      */
-    public static function stringTranslationsWrite(array $originals, string $value): void
+    public static function stringTranslationsWrite(array $originals, string $value, ?array $languages = null): void
     {
         if ($originals === [] || !self::stringTranslationsAvailable()) {
             return;
         }
-        foreach (self::languages() as $slug) {
+        foreach (self::translationLanguages($languages) as $slug) {
+            $language = self::languageObject($slug);
+            if ($language === null) {
+                continue;
+            }
             $mo = new PLL_MO();
-            $mo->import_from_db($slug);
+            $mo->import_from_db($language);
             foreach ($originals as $original) {
                 $mo->add_entry($mo->make_entry($original, $value));
             }
-            $mo->export_to_db($slug);
+            $mo->export_to_db($language);
         }
     }
 
@@ -1159,8 +1225,12 @@ final class QuickstartContract
             if (!is_array($entries) || !in_array((string) $slug, $known, true)) {
                 continue;
             }
+            $language = self::languageObject((string) $slug);
+            if ($language === null) {
+                continue;
+            }
             $mo = new PLL_MO();
-            $mo->import_from_db((string) $slug);
+            $mo->import_from_db($language);
             foreach ($entries as $original => $translation) {
                 if ($translation === null) {
                     unset($mo->entries[(string) $original]);
@@ -1168,7 +1238,7 @@ final class QuickstartContract
                     $mo->add_entry($mo->make_entry((string) $original, (string) $translation));
                 }
             }
-            $mo->export_to_db((string) $slug);
+            $mo->export_to_db($language);
         }
     }
 
