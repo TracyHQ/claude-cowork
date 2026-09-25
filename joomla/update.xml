@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Release candidate 2 of the Content API v1 reader: a picture read from a slot names the block it belongs to (usages[].blockId). For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.2</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.2</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.2/pkg_claudecowork-0.18.0-rc.2.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Release candidate for the Content API v1 reader (/content.json and content.read), for Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
