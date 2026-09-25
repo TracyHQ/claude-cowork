@@ -46,6 +46,8 @@ quickstart contract (below). A read answers the same either way. A write is eith
 | `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader, `params: {query, scope: published\|editorial}` | ok | ok |
+| `content.identity` | write, opt-in: a content key for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only) | ok | ok |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
@@ -134,6 +136,22 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
   `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
   (another writer holds the site's lock).
+
+## Content API (`/content.json`)
+
+`GET <home>/content.json` with `Authorization: Bearer <token>` answers the site's live content in
+the `tracy-content/v1` shape (schema and validator live in TCH `packages/cms/tracy-content-api`):
+summaries by default, one content in full by `id`, `type`/`locale`/`limit` filters, and signed
+cursors that expire (409) as soon as anything the listing read changes. It is read only — it
+renders nothing, runs no shortcode and writes nothing — and every answer is `private, no-store`.
+The same reader answers the `content.read` action, whose `scope` (`published` by default, or
+`editorial` to include drafts, scheduled and private rows) is chosen by the caller that relays a
+seat. A token in the query string is never read. The path is only taken when no file or post
+already answers it.
+
+Content ids are opaque and survive a new title, slug or order: each row gets a random uid once.
+Until `content.identity` has run on a site, the reader answers 501; after it, rows WordPress
+inserts get their uid at once. Writes still go through `content.contract` `apply`.
 
 ## Layout
 

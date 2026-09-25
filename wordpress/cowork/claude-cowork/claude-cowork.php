@@ -24,6 +24,10 @@ require_once __DIR__ . '/lib/MultilingualHooks.php';
 MultilingualHooks::register();
 require_once __DIR__ . '/lib/NavigationLinks.php';
 NavigationLinks::register();
+// Content API identity: a new row gets its content uid when WordPress inserts it, on a site that
+// opted in with `content.identity`. One small file, no engine.
+require_once __DIR__ . '/lib/ContentIdentity.php';
+add_action('wp_insert_post', [ContentIdentity::class, 'mintOnInsert'], 10, 3);
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.
@@ -63,7 +67,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -71,6 +75,7 @@ function claude_cowork_load_engine(): void
     // convention rather than to the PSR shape the engine inherited from the Joomla original.
     require_once $lib . '/class-claude-cowork-packages.php';
     require_once $lib . '/class-claude-cowork-writers.php';
+    require_once $lib . '/class-claude-cowork-content-source.php';
 }
 
 /**
@@ -252,6 +257,23 @@ function claude_cowork_exec(): void
         wp_die('', '', ['response' => null]);
     }
 
+    // The content reader (`content.read`) and its one opt-in write (`content.identity`) are answered
+    // here, not by the engine: they are WordPress projections (posts, Polylang, block templates),
+    // and the engine knows no CMS. Same token, same check, before anything is read.
+    if (in_array($request['action'] ?? '', ['content.read', 'content.identity'], true)) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: private, no-store, max-age=0');
+        if (!Token::check($token === '' ? null : $token, is_string($request['token'] ?? null) ? $request['token'] : null)) {
+            echo json_encode(['ok' => false, 'error' => 'unauthorized', 'message' => 'invalid or missing token']);
+            wp_die('', '', ['response' => null]);
+        }
+        $params = isset($request['params']) && is_array($request['params']) ? $request['params'] : [];
+        echo json_encode($request['action'] === 'content.identity'
+            ? claude_cowork_content_identity()
+            : ContentDoor::action($params, $token, 'claude_cowork_content_reader'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        wp_die('', '', ['response' => null]);
+    }
+
     // The log table is created on activation, but a site upgraded from a version that had no
     // write side may never run that hook again — and an Apply whose log is missing is an Apply
     // that cannot be reverted. Cheap enough to confirm on the requests that can write.
@@ -297,6 +319,103 @@ function claude_cowork_exec(): void
     echo json_encode($answer);
     wp_die('', '', ['response' => null]);
 }
+
+// ---- Content API: /content.json -------------------------------------------------------------
+
+/**
+ * A reader over this site for one principal and scope. Built only after the token was checked.
+ */
+function claude_cowork_content_reader(string $principal, string $scope, string $secret): ContentReader
+{
+    $source = new Claude_Cowork_Content_Source($scope, __DIR__ . '/lib/contracts', (string) claude_cowork_version());
+    return new ContentReader($source, $secret, $principal, $scope, time());
+}
+
+/** The opt-in write: a content key for the site and a uid for every row. Reports what it did. */
+function claude_cowork_content_identity(): array
+{
+    try {
+        return ['ok' => true, 'identity' => Claude_Cowork_Content_Source::ensureIdentity(), 'alias' => claude_cowork_content_alias()];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'error' => 'failed', 'message' => 'Content identity could not be set up'];
+    }
+}
+
+/**
+ * Where `/content.json` answers, and whether it may: `{path, available, collision}`. The alias
+ * never takes an address that already means something on this site — a file in the webroot or a
+ * post WordPress resolves that URL to — and says so instead of answering there.
+ */
+function claude_cowork_content_alias(): array
+{
+    $path = (string) parse_url(home_url('/content.json'), PHP_URL_PATH);
+    $collision = null;
+    $relative = ltrim(substr($path, strlen(rtrim((string) parse_url(home_url('/'), PHP_URL_PATH), '/'))), '/');
+    if (file_exists(rtrim(ABSPATH, '/') . '/' . $relative)) {
+        $collision = 'file';
+    } elseif (function_exists('url_to_postid') && url_to_postid(home_url('/content.json')) > 0) {
+        $collision = 'post';
+    }
+    return ['path' => $path, 'available' => $collision === null, 'collision' => $collision];
+}
+
+/** The request's Authorization header, wherever this server put it. */
+function claude_cowork_authorization_header(): ?string
+{
+    foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $key) {
+        if (isset($_SERVER[$key]) && is_string($_SERVER[$key]) && $_SERVER[$key] !== '') {
+            return $_SERVER[$key];
+        }
+    }
+    if (function_exists('getallheaders')) {
+        foreach ((array) getallheaders() as $name => $value) {
+            if (strtolower((string) $name) === 'authorization' && is_string($value)) {
+                return $value;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * `GET <home>/content.json`: answered before WordPress routes the request, so no rewrite rule,
+ * canonical redirect or template runs. Exact path only — `/content.json/`, `/vi/content.json` or
+ * `/content.JSON` are WordPress's as before. Never cached: every answer is private, no-store.
+ */
+function claude_cowork_content_json(): void
+{
+    if (!isset($_SERVER['REQUEST_URI']) || (defined('WP_CLI') && WP_CLI) || is_admin()) {
+        return;
+    }
+    $path = (string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $alias = (string) parse_url(home_url('/content.json'), PHP_URL_PATH);
+    if ($path !== $alias || !claude_cowork_content_alias()['available']) {
+        return;
+    }
+    require_once __DIR__ . '/lib/FatalGuard.php';
+    FatalGuard::arm();
+    claude_cowork_load_engine();
+    if (!defined('DONOTCACHEPAGE')) {
+        define('DONOTCACHEPAGE', true); // page-cache plugins that honour it keep this answer out of their store
+    }
+    $token = trim((string) get_option(CLAUDE_COWORK_TOKEN_OPTION, ''));
+    $query = (string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_QUERY);
+    $answer = ContentDoor::get(
+        (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+        claude_cowork_authorization_header(),
+        $query,
+        $token === '' ? null : $token,
+        'claude_cowork_content_reader'
+    );
+    status_header($answer['status']);
+    foreach ($answer['headers'] as $name => $value) {
+        header($name . ': ' . $value);
+    }
+    echo json_encode($answer['body'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+add_action('init', 'claude_cowork_content_json', 0);
 
 add_action('wp_ajax_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 add_action('wp_ajax_nopriv_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
