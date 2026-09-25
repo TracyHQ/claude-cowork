@@ -153,6 +153,7 @@ final class EngineFactory
     {
         $params = ComponentHelper::getParams('com_claudecowork');
         $token = trim((string) $params->get('token', ''));
+        $contract = self::buildContract();
 
         $engine = new \Engine(
             $token === '' ? null : $token,
@@ -174,8 +175,15 @@ final class EngineFactory
             new \ChangeStamp(JPATH_ROOT),
             new JoomlaCoreUpgrader(),
             new JoomlaFilesRestorer(),
-            self::buildContract()
+            $contract
         );
+        // Apply's `expected_content_revisions` are checked against the very projection content.read
+        // serves, read through the same connection as the write, so inside the apply's transaction
+        // the receipt's new revisions see the rows it just wrote.
+        if ($contract) $engine->contentRevisions(static function () use ($contract): array {
+            require_once self::libDir() . '/ContentProjection.php';
+            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => $contract, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->revisions();
+        });
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $baseline = self::constructionBaseline();
         if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);
@@ -193,7 +201,7 @@ final class EngineFactory
     public static function answerContent($app, ?array $request = null): void
     {
         self::loadEngine();
-        require_once self::libDir() . '/ContentReader.php';
+        require_once self::libDir() . '/ContentProjection.php';
         $app->setHeader('Content-Type', 'application/json; charset=utf-8', true);
         $app->setHeader('Cache-Control', 'private, no-store', true);
         $status=200;

@@ -1826,6 +1826,7 @@ require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
+require __DIR__ . "/content-revisions.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

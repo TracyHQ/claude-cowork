@@ -111,6 +111,20 @@ final class Engine
      */
     private ?string $constructionBaseline = null;
 
+    /**
+     * What `content.read` would serve right now, for apply's `expected_content_revisions`:
+     * `fn(): array{revisions:array<string,string>,owners:array<string,string>}`. Wired by the host,
+     * which alone can read the CMS tables the projection needs; absent, only `expected_revision` works.
+     */
+    private $contentRevisions = null;
+
+    /** Let content.contract apply check per-content revisions against the reader's projection. */
+    public function contentRevisions(callable $current): self
+    {
+        $this->contentRevisions = $current;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -139,7 +153,10 @@ final class Engine
                     $this->writing = true;
                     try { return $this->handle($req); } finally { $this->writing = false; }
                 });
-            } catch (Throwable $error) { return $this->err('writer_busy', $error->getMessage()); }
+            } catch (Throwable $error) {
+                return $this->err('writer_busy', $error->getMessage(),
+                    in_array($action, ['content.contract', 'apply.revert'], true) ? ['errors' => [ContractProblem::plain('WRITER_BUSY', $error->getMessage())]] : []);
+            }
         }
 
         try { $contractBound=$this->contract && $this->contract->bound(); }
@@ -158,10 +175,10 @@ final class Engine
         if ($contractBound && $action === 'apply.revert') {
             $entries = $this->log ? $this->log->entries($params['apply_id'] ?? '') : [];
             $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
-            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode');
+            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','Only content-contract applies can be reverted in this mode')]]);
             try {
                 $state=$this->contract->inspect();
-                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
                 $this->batching=true;
                 $result=$this->writer->transaction(function()use($params){
                     $result=$this->applyRevert($params);
@@ -173,7 +190,7 @@ final class Engine
                 try { $this->writer->purgeCache(); } catch(Throwable $ignored) {}
                 $this->stamped('revert');
                 return $result;
-            } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+            } catch(Throwable $error) { return $this->contractFailed($error); }
             finally { $this->batching=false; }
         }
         switch ($action) {
@@ -1174,11 +1191,31 @@ final class Engine
         return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
     }
 
+    /**
+     * Every refusal of the contract door carries `errors[]` beside the `error`/`message` it always
+     * had: a thrown ContractProblem brings its own; a returned refusal is classified by its code.
+     */
+    private function contentContract(array $p): array
+    {
+        $result = $this->contractDoor($p);
+        if (($result['ok'] ?? true) === false && !isset($result['errors'])) {
+            $code = ['conflict' => 'CONFLICT', 'writer_busy' => 'WRITER_BUSY'][$result['error'] ?? ''] ?? 'CONTRACT_FAILED';
+            $result['errors'] = [ContractProblem::plain($code, (string) ($result['message'] ?? ''))];
+        }
+        return $result;
+    }
+
+    /** A caught contract failure: the message it always had, and what it was, as `errors[]`. */
+    private function contractFailed(Throwable $error): array
+    {
+        return $this->err('contract_failed', $error->getMessage(), ['errors' => ContractProblem::errorsOf($error)]);
+    }
+
     /** A bounded transaction: the same request id returns its committed result after a lost reply.
      * Expected fields are checked under the site writer lock; all row changes and undo entries
      * share one database transaction. Files and extension installers are deliberately excluded.
      */
-    private function contentContract(array $p): array
+    private function contractDoor(array $p): array
     {
         if (!$this->contract && $this->constructionBaseline !== null) {
             // Under construction there is nothing to verify and nothing to write through: the door
@@ -1234,17 +1271,49 @@ final class Engine
             // content-only baseline").
             if (($job = $this->contract->job()) !== null)
                 return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . ': finish it, or take it back with multilingual.revert locale ' . $job['locale']);
-            $plan=$this->contract->plan($p);
-            if(count($plan['operations'])>300)throw new RuntimeException('Split the revision into at most 300 entities');
+            // Per-content revisions as content.read serves them, read only when the caller named
+            // some: an apply based on the inspect revision alone never pays for, or fails on, them.
+            $byContent=is_array($p['expected_content_revisions']??null) && $p['expected_content_revisions'];
+            $before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;
+            $plan=$this->contract->plan($p,$before);
+            if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
-            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash){
+            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
                 $this->contract->bind($plan['snapshot']);
                 $state=$this->contract->inspect();
+                $revisions=$this->revisionsAfter($plan['touched'],$before);
+                if($revisions!==null)$result['contentRevisions']=$revisions;
                 $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
+                return $result;
             });
-        } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+        } catch(Throwable $error) { return $this->contractFailed($error); }
     }
 
+
+    /**
+     * The revision of every content this apply changed, read inside its transaction after the write:
+     * the contents owning the entities written and, when the revisions before are known, any other
+     * content whose projection moved with them (a page naming a shared module by its title). Null
+     * when the projection cannot be read — a receipt is not worth rolling back a checked write for.
+     *
+     * @param list<string> $touched contract entity keys the apply wrote
+     * @return array<string,string>|null
+     */
+    private function revisionsAfter(array $touched, ?array $before): ?array
+    {
+        if (!$this->contentRevisions) return null;
+        try { $after = ($this->contentRevisions)(); } catch (Throwable $ignored) { return null; }
+        $out = [];
+        foreach ($touched as $key) {
+            $id = $after['owners'][$key] ?? null;
+            if ($id !== null && isset($after['revisions'][$id])) $out[$id] = $after['revisions'][$id];
+        }
+        if ($before !== null)
+            foreach ($after['revisions'] as $id => $revision)
+                if (($before['revisions'][$id] ?? null) !== $revision) $out[$id] = $revision;
+        ksort($out);
+        return $out;
+    }
 
     /**
      * Adding, checking and taking back a language version of a bound quickstart.
@@ -1315,7 +1384,7 @@ final class Engine
                     'remaining' => count($this->demoTrimPending($state, true)),
                     'profileVersion' => $this->contract->demoTrim()->version(), 'profileHash' => $this->contract->demoTrim()->hash(),
                 ]);
-            } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+            } catch (Throwable $error) { return $this->contractFailed($error); }
         }
         if ($operation !== 'apply' && $operation !== 'revert') return $this->err('bad_params', 'Unknown demoTrim operation');
         $apply = $this->applyId($p);
@@ -1386,7 +1455,7 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1481,7 +1550,7 @@ final class Engine
             $this->stamped('content');
             return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1563,7 +1632,7 @@ final class Engine
             ], null);
             return $this->ok(['status' => 'completed', 'source' => $locale, 'packVersion' => $pack['version'] ?? null]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1615,7 +1684,7 @@ final class Engine
         if ($this->extensions === null) return $this->err('unavailable', 'extension manager not wired');
         try {
             $pack = $this->contract->languagePackage($locale, $major);
-        } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        } catch (Throwable $error) { return $this->contractFailed($error); }
         if ($pack === null) return $this->ok(['locale' => $locale, 'installed' => true, 'source' => true]);
         try { $installed = $this->languagePackPresent($locale); }
         catch (Throwable $error) { return $this->err('read_failed', $error->getMessage()); }
@@ -1731,7 +1800,7 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1758,7 +1827,7 @@ final class Engine
             $this->stamped('revert');
             return $this->ok(['restored' => count($entries), 'applyId' => $apply]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1842,7 +1911,7 @@ final class Engine
                 'applyId' => $apply,
             ]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1914,7 +1983,7 @@ final class Engine
     private function multilingualVerify(string $locale): array
     {
         try { $state = $this->contract->inspect(); }
-        catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        catch (Throwable $error) { return $this->contractFailed($error); }
         if ($locale !== '' && !in_array($locale, $state['languages'], true))
             return $this->err('contract_failed', $locale . ' is not a language of this site' . ($state['job'] ? ' yet; a job is at phase ' . $state['job']['phase'] : ''));
         $binding = $state['binding']['multilingual'] ?? [];
@@ -1979,7 +2048,7 @@ final class Engine
             return $this->ok(['locale' => $locale, 'reverted' => $result['reverted'] ?? 0, 'removed' => true]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -2025,7 +2094,7 @@ final class Engine
                         $before = $this->writer->read($kind, (int) $id);
                         foreach ($step['expected'] as $key => $value) {
                             if (!$before || !array_key_exists($key, $before) || (string) $before[$key] !== (string) $value) {
-                                throw new RuntimeException("conflict at operation {$index}: {$key} changed");
+                                throw new ContractProblem('CONFLICT', "conflict at operation {$index}: {$key} changed");
                             }
                         }
                     }
@@ -2036,7 +2105,8 @@ final class Engine
                     $ids[$key] = $answer['id'];
                 }
                 $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
-                if ($verify) $verify($result);
+                // The contract door's check may add to the receipt (its content revisions).
+                if ($verify) $result = $verify($result) ?? $result;
                 $this->log->record($apply, ['op' => 'batch', 'request' => $request, 'hash' => $hash, 'result' => $result]);
                 return $result;
             });
@@ -2046,7 +2116,7 @@ final class Engine
             return $result;
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('batch_failed', $error->getMessage());
+            return $this->err('batch_failed', $error->getMessage(), $verify ? ['errors' => ContractProblem::errorsOf($error)] : []);
         }
     }
 

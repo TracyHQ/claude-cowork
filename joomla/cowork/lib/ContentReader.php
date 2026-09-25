@@ -69,7 +69,10 @@ final class ContentReader
     }
     public function read(array $query): array {
         if (isset($query['limit']) && is_int($query['limit'])) $query['limit']=(string)$query['limit'];
-        foreach ($query as $key=>$value) if (!in_array($key,['id','type','locale','limit','cursor','blocksCursor','blockId'],true) || !is_string($value) || $value==='') self::bad();
+        foreach ($query as $key=>$value) if (!in_array($key,['id','type','locale','limit','cursor','blocksCursor','blockId','protocolVersions'],true) || !is_string($value) || $value==='') self::bad();
+        // Accepted and ignored: a relay announcing the protocols it speaks (`tracy-content/v1`)
+        // must not meet a 400 here. It selects nothing today, so it never enters a cursor.
+        unset($query['protocolVersions']);
         // The signed cursor carries its filters; explicit repeats must still match below.
         if (isset($query['cursor'])) {
             $carried=$this->decode($query['cursor'])['query']??[];
