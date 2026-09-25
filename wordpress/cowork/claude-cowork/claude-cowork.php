@@ -261,16 +261,22 @@ function claude_cowork_exec(): void
     // here, not by the engine: they are WordPress projections (posts, Polylang, block templates),
     // and the engine knows no CMS. Same token, same check, before anything is read.
     if (in_array($request['action'] ?? '', ['content.read', 'content.identity'], true)) {
-        header('Content-Type: application/json; charset=utf-8');
-        header('Cache-Control: private, no-store, max-age=0');
-        if (!Token::check($token === '' ? null : $token, is_string($request['token'] ?? null) ? $request['token'] : null)) {
-            echo json_encode(['ok' => false, 'error' => 'unauthorized', 'message' => 'invalid or missing token']);
+        foreach (ContentDoor::headers() as $name => $value) {
+            header($name . ': ' . $value);
+        }
+        $authorized = Token::check($token === '' ? null : $token, is_string($request['token'] ?? null) ? $request['token'] : null);
+        if ($request['action'] === 'content.read') {
+            // The canonical Content API envelope: the answer IS the envelope or {error}, with its status.
+            $answer = $authorized
+                ? ContentDoor::action($request, $token, 'claude_cowork_content_reader')
+                : ['status' => 401, 'body' => (new ContentReadError('CONTENT_UNAUTHENTICATED', 401, 'Authentication required.'))->body()];
+            status_header($answer['status']);
+            echo json_encode($answer['body'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             wp_die('', '', ['response' => null]);
         }
         $params = isset($request['params']) && is_array($request['params']) ? $request['params'] : [];
-        echo json_encode($request['action'] === 'content.identity'
-            ? claude_cowork_content_identity()
-            : ContentDoor::action($params, $token, 'claude_cowork_content_reader'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        echo json_encode($authorized ? claude_cowork_content_identity($params)
+            : ['ok' => false, 'error' => 'unauthorized', 'message' => 'invalid or missing token']);
         wp_die('', '', ['response' => null]);
     }
 
@@ -328,14 +334,29 @@ function claude_cowork_exec(): void
 function claude_cowork_content_reader(string $principal, string $scope, string $secret): ContentReader
 {
     $source = new Claude_Cowork_Content_Source($scope, __DIR__ . '/lib/contracts', (string) claude_cowork_version());
-    return new ContentReader($source, $secret, $principal, $scope, time());
+    // The cursor key is the token-derived secret bound to the site's seed: a fork (new seed) or a
+    // new token voids every cursor issued before it.
+    $key = hash_hmac('sha256', 'tracy-content-cursor/v1|' . (string) Claude_Cowork_Content_Source::seed(), $secret);
+    return new ContentReader($source, $key, $principal, $scope, time());
 }
 
-/** The opt-in write: a content key for the site and a uid for every row. Reports what it did. */
-function claude_cowork_content_identity(): array
+/**
+ * The opt-in write: a content seed for the site and a uid for every row; `newSite: true` with a
+ * `requestId` is a fork (see ensureIdentity). Called by provisioning or an authorised operator,
+ * never by an agent. Reports what it did.
+ */
+function claude_cowork_content_identity(array $params): array
 {
+    $unknown = array_diff(array_keys($params), ['newSite', 'requestId']);
+    $newSite = $params['newSite'] ?? false;
+    $requestId = $params['requestId'] ?? null;
+    if ($unknown !== [] || !is_bool($newSite) || ($requestId !== null && !is_string($requestId))) {
+        return ['ok' => false, 'error' => 'bad_params', 'message' => 'content.identity takes newSite (boolean) and requestId'];
+    }
     try {
-        return ['ok' => true, 'identity' => Claude_Cowork_Content_Source::ensureIdentity(), 'alias' => claude_cowork_content_alias()];
+        return ['ok' => true, 'identity' => Claude_Cowork_Content_Source::ensureIdentity($newSite, $requestId), 'alias' => claude_cowork_content_alias()];
+    } catch (InvalidArgumentException $e) {
+        return ['ok' => false, 'error' => 'bad_params', 'message' => $e->getMessage()];
     } catch (Throwable $e) {
         return ['ok' => false, 'error' => 'failed', 'message' => 'Content identity could not be set up'];
     }

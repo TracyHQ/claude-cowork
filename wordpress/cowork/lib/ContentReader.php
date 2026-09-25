@@ -192,10 +192,7 @@ final class ContentReader
                 }
             }
             if (isset($query['blockId'])) {
-                if (isset($query['blocksCursor'])) {
-                    throw self::bad();
-                }
-                return $this->block($query['id'], $query['blockId']);
+                return $this->block($query['id'], $query['blockId'], $query['blocksCursor'] ?? null);
             }
             return $this->detail($query['id'], $query['blocksCursor'] ?? null);
         }
@@ -283,12 +280,12 @@ final class ContentReader
         $budget = $this->maxBytes - 2 * self::ENVELOPE_MARGIN;
         foreach (['title', 'summary', 'bodyHtml'] as $key) {
             if (strlen(self::encode($content[$key] ?? null)) > $budget) {
-                throw $this->tooLarge($id, null, $key);
+                throw $this->contentTooLarge($content, $key);
             }
         }
         foreach ((array) ($content['fields'] ?? []) as $field) {
             if (strlen(self::encode($field['value'])) > $budget) {
-                throw $this->tooLarge($id, null, (string) $field['key']);
+                throw $this->contentTooLarge($content, (string) $field['key']);
             }
         }
         $all = (array) ($content['blocks'] ?? []);
@@ -345,10 +342,21 @@ final class ContentReader
     /**
      * One block occurrence of a content, with the content's own metadata and the images that
      * block uses — and nothing else: no bodyHtml, fields, tags or relations. It is `partial` by
-     * definition; `links.next` names the next block, or, after the last one, the content itself.
+     * definition. A block scan (from `error.links.firstBlock`, or any block read) is signed: the
+     * cursor names the content, the block and its position in ONE snapshot, and each answer's
+     * `links.next` carries the cursor of the next block. The last block ends the scan with
+     * `blocksPagination.nextCursor: null` and `links.next` back at the content.
      */
-    private function block(string $id, string $blockId): array
+    private function block(string $id, string $blockId, ?string $cursor): array
     {
+        $at = null;
+        if ($cursor !== null) {
+            $state = $this->decode($cursor, 'block');
+            if (($state['id'] ?? null) !== $id || ($state['blockId'] ?? null) !== $blockId) {
+                throw self::bad();
+            }
+            $at = (int) $state['offset'];
+        }
         $content = $this->source->detail($id, false);
         if ($content === null) {
             throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
@@ -364,6 +372,9 @@ final class ContentReader
         if ($index === null) {
             throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
         }
+        if ($at !== null && $at !== $index) {
+            throw self::bad(); // the snapshot is the same (checked above), so the cursor lied about the position
+        }
         $page = $content;
         foreach (['bodyHtml', 'tags', 'fields', 'relations', 'blocksPagination'] as $key) {
             unset($page[$key]);
@@ -371,17 +382,49 @@ final class ContentReader
         $page['blocks'] = [$all[$index]];
         $page['images'] = self::imagesFor((array) ($content['images'] ?? []), $page['blocks'], false);
         $page['detailState'] = 'partial';
-        // The next block by its own id: a walk block by block never needs the page's whole body,
-        // so it also works where the full detail is 413 on bodyHtml.
-        $page['links']['next'] = $index + 1 < count($all)
-            ? $page['links']['self'] . '&blockId=' . rawurlencode((string) $all[$index + 1]['id'])
-            : $page['links']['self'];
+        $next = $index + 1 < count($all) ? $this->blockLink($id, $all, $index + 1) : null;
+        $page['blocksPagination'] = ['limit' => 1, 'nextCursor' => $next === null ? null : $next['cursor'], 'total' => count($all)];
+        $page['links']['next'] = $next === null ? $page['links']['self'] : $next['path'];
         $page['links']['self'] .= '&blockId=' . rawurlencode($blockId);
         $envelope = $this->envelope([$page], 1, null, 1);
         if (strlen(self::encode($envelope)) > $this->maxBytes) {
             throw $this->tooLarge($id, $blockId, 'block');
         }
         return $envelope;
+    }
+
+    /** @return array{cursor:string,path:string} the signed read of block `$index` of one content */
+    private function blockLink(string $id, array $blocks, int $index): array
+    {
+        $blockId = (string) $blocks[$index]['id'];
+        $cursor = $this->cursor(['kind' => 'block', 'id' => $id, 'blockId' => $blockId, 'offset' => $index]);
+        $path = $this->contentPath() . '?id=' . rawurlencode($id) . '&blockId=' . rawurlencode($blockId) . '&blocksCursor=' . rawurlencode($cursor);
+        return ['cursor' => $cursor, 'path' => $path];
+    }
+
+    /** The path of `/content.json` on this site, taken from the links the source writes. */
+    private function contentPath(): string
+    {
+        $path = (string) parse_url($this->source->site()['url'], PHP_URL_PATH);
+        return rtrim($path, '/') . '/content.json';
+    }
+
+    /**
+     * A content-level scalar over budget: 413 naming it, with the snapshot of this read and —
+     * when the content has blocks — `links.firstBlock`, the signed start of a block scan that
+     * never builds the page body.
+     */
+    private function contentTooLarge(array $content, string $key): ContentReadError
+    {
+        $error = $this->tooLarge((string) $content['id'], null, $key);
+        $error->extra['snapshot'] = ['revision' => $this->source->revision(), 'readAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now)];
+        $blocks = array_values((array) ($content['blocks'] ?? []));
+        if ($blocks !== []) {
+            $url = parse_url($this->source->site()['url']);
+            $origin = $url['scheme'] . '://' . $url['host'] . (isset($url['port']) ? ':' . $url['port'] : '');
+            $error->extra['links'] = ['firstBlock' => $origin . $this->blockLink((string) $content['id'], $blocks, 0)['path']];
+        }
+        return $error;
     }
 
     /**

@@ -22,9 +22,11 @@
  *
  * ## Identity
  *
- * A content id is an HMAC, under this site's content key and its home address, of a random uid
- * the site gives each row once (`_tracy_content_uid`). It survives a new title, slug, parent,
- * order or language; a deleted row takes its uid with it, so a row created again is new. The uid
+ * A content id is an HMAC, under this site's content seed, of a random uid the site gives each
+ * row once (`_tracy_content_uid`). It survives a new title, slug, parent, order, language and a
+ * new domain; a deleted row takes its uid with it, so a row created again is new; a fork rotates
+ * the seed (`newSite`) and with it every id and every cursor. A database copied by hand keeps the
+ * seed — two sites with the same ids — until whoever made the copy declares the fork. The uid
  * is minted when WordPress inserts a row (hook below) and by the explicit `content.identity`
  * action for rows older than this plugin — never by a read. A site that never ran that action
  * answers 501: without identities there is nothing stable to hand out.
@@ -303,9 +305,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
         if (!preg_match('/^[a-f0-9]{32,64}$/D', $siteKey)) {
             throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'Content identity is not set up on this site yet.');
         }
-        $home = rtrim((string) ($this->options['home'] ?? ''), '/');
-        // The key binds every id to this site AND its address: a copy imported elsewhere hands out new ids.
-        $this->key = hash_hmac('sha256', $home, $siteKey);
+        // The key is the site's seed alone: a new domain, HTTPS, a subdirectory or another server
+        // keep every id. Only `content.identity {newSite: true}` (a fork) changes it.
+        $this->key = hash_hmac('sha256', 'tracy-content-id/v1', $siteKey);
         $this->binding = self::decodeJson($this->options[QuickstartContract::STORE_OPTION] ?? null);
         $this->profile = $this->loadProfile();
 
@@ -1096,56 +1098,128 @@ final class Claude_Cowork_Content_Source implements ContentSource
         return is_array($out) ? $out : null;
     }
 
-    // ---- identity ---------------------------------------------------------------------------
+    // ---- identity ----------------------------------------------------------------------------
+
+    public const MARKER_OPTION = 'claude_cowork_content_identity';
+
+    /** The site's content seed, or null before opt-in. Read by the plugin to key cursors. */
+    public static function seed(): ?string
+    {
+        $seed = trim((string) get_option(self::SITE_OPTION, ''));
+        return preg_match('/^[a-f0-9]{32,64}$/D', $seed) ? $seed : null;
+    }
 
     /**
-     * Give every identified row a content uid, and the site its content key: the explicit,
-     * opt-in write behind the `content.identity` action. Idempotent; a uid a copy duplicated is
-     * replaced on the newer row, the older keeps its own.
+     * Give the site its content seed and every identified row a uid: the explicit, opt-in write
+     * behind `content.identity`. Idempotent; a uid a copy duplicated is replaced on the newer row.
      *
-     * @return array{site:bool,minted:int,repaired:int,total:int}
+     * `$newSite` is a FORK: a new seed, so a new `site.id`, new content/block/item/media ids and no
+     * valid cursor from before. Row uids stay. It is called by provisioning or a fork operation
+     * that already checked its own authority, with a `$requestId` it keeps across its retries: the
+     * same request id never rotates twice. A restore of the same site is not a fork and keeps the
+     * seed. One run at a time (MySQL named lock); a marker records a run that did not finish.
+     *
+     * @return array{site:bool,rotated:bool,replayed:bool,minted:int,repaired:int,total:int}
      */
-    public static function ensureIdentity(): array
+    public static function ensureIdentity(bool $newSite = false, ?string $requestId = null): array
     {
         global $wpdb;
-        $site = false;
-        if (!preg_match('/^[a-f0-9]{32,64}$/D', (string) get_option(self::SITE_OPTION, ''))) {
-            add_option(self::SITE_OPTION, bin2hex(random_bytes(16)), '', 'no');
-            $site = true;
+        if ($newSite && ($requestId === null || !preg_match('/^[A-Za-z0-9_-]{8,64}$/D', $requestId))) {
+            throw new InvalidArgumentException('A fork needs a request id');
         }
+        $lock = 'claude_cowork_content_identity_' . substr(md5((string) $wpdb->prefix), 0, 8);
+        if ((string) $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, 10)', $lock)) !== '1') {
+            throw new RuntimeException('Another content identity run holds the lock');
+        }
+        try {
+            $marker = self::decodeJson(get_option(self::MARKER_OPTION, '')) ?? [];
+            $site = false;
+            $rotated = false;
+            $replayed = false;
+            if (self::seed() === null) {
+                self::putOption(self::SITE_OPTION, bin2hex(random_bytes(16)));
+                $site = true;
+            }
+            if ($newSite) {
+                if (($marker['fork']['requestId'] ?? null) === $requestId) {
+                    $replayed = true;
+                } else {
+                    self::putOption(self::SITE_OPTION, bin2hex(random_bytes(16)));
+                    $marker['fork'] = ['requestId' => $requestId, 'at' => gmdate('c')];
+                    $rotated = true;
+                }
+            }
+            $marker['v'] = 1;
+            $marker['state'] = 'running';
+            self::putOption(self::MARKER_OPTION, (string) json_encode($marker));
+            $counts = self::backfill();
+            $marker['state'] = 'complete';
+            $marker['at'] = gmdate('c');
+            self::putOption(self::MARKER_OPTION, (string) json_encode($marker));
+            return ['site' => $site, 'rotated' => $rotated, 'replayed' => $replayed] + $counts;
+        } finally {
+            $wpdb->query($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock));
+        }
+    }
+
+    private static function putOption(string $name, string $value): void
+    {
+        global $wpdb;
+        // Written through the table, not update_option(): no filter may veto or transform the seed,
+        // and a failure is an error here rather than a silent `false`.
+        $done = $wpdb->query($wpdb->prepare('INSERT INTO ' . $wpdb->options . " (option_name, option_value, autoload) VALUES (%s, %s, 'off')"
+            . ' ON DUPLICATE KEY UPDATE option_value = VALUES(option_value)', $name, $value));
+        if ($done === false) {
+            throw new RuntimeException('Could not write ' . $name);
+        }
+        wp_cache_delete($name, 'options');
+        wp_cache_delete('alloptions', 'options');
+        wp_cache_delete('notoptions', 'options');
+    }
+
+    /** @return array{minted:int,repaired:int,total:int} */
+    private static function backfill(): array
+    {
+        global $wpdb;
         $rows = $wpdb->get_results('SELECT p.ID, m.meta_id, m.meta_value FROM ' . $wpdb->posts . ' p LEFT JOIN ' . $wpdb->postmeta
             . ' m ON m.post_id = p.ID AND m.meta_key = ' . $wpdb->prepare('%s', self::UID_META)
             . ' WHERE p.post_type IN (' . self::inList(self::IDENTIFIED_TYPES) . ") AND p.post_status NOT IN ('auto-draft','inherit') OR p.post_type = 'attachment'"
             . ' ORDER BY p.ID, m.meta_id', ARRAY_A);
+        if (!is_array($rows) || $wpdb->last_error !== '') {
+            throw new RuntimeException('Could not read the rows to identify');
+        }
         $minted = 0;
         $repaired = 0;
         $seen = [];
         $ids = [];
-        foreach ((array) $rows as $row) {
+        foreach ($rows as $row) {
             $id = (int) $row['ID'];
             $value = (string) ($row['meta_value'] ?? '');
             if (isset($ids[$id])) {
                 // A second uid row on one post: keep the first.
-                $wpdb->delete($wpdb->postmeta, ['meta_id' => (int) $row['meta_id']], ['%d']);
-                $repaired++;
-                continue;
-            }
-            $ids[$id] = true;
-            if (preg_match('/^[a-f0-9]{32}$/D', $value) && !isset($seen[$value])) {
-                $seen[$value] = true;
-                continue;
-            }
-            $uid = bin2hex(random_bytes(16));
-            if ($row['meta_id'] !== null) {
-                $wpdb->update($wpdb->postmeta, ['meta_value' => $uid], ['meta_id' => (int) $row['meta_id']], ['%s'], ['%d']);
+                $done = $wpdb->delete($wpdb->postmeta, ['meta_id' => (int) $row['meta_id']], ['%d']);
                 $repaired++;
             } else {
-                $wpdb->insert($wpdb->postmeta, ['post_id' => $id, 'meta_key' => self::UID_META, 'meta_value' => $uid], ['%d', '%s', '%s']);
-                $minted++;
+                $ids[$id] = true;
+                if (preg_match('/^[a-f0-9]{32}$/D', $value) && !isset($seen[$value])) {
+                    $seen[$value] = true;
+                    continue;
+                }
+                $uid = bin2hex(random_bytes(16));
+                if ($row['meta_id'] !== null) {
+                    $done = $wpdb->update($wpdb->postmeta, ['meta_value' => $uid], ['meta_id' => (int) $row['meta_id']], ['%s'], ['%d']);
+                    $repaired++;
+                } else {
+                    $done = $wpdb->insert($wpdb->postmeta, ['post_id' => $id, 'meta_key' => self::UID_META, 'meta_value' => $uid], ['%d', '%s', '%s']);
+                    $minted++;
+                }
+                $seen[$uid] = true;
             }
-            $seen[$uid] = true;
+            if ($done === false) {
+                throw new RuntimeException('Could not write a content uid');
+            }
             wp_cache_delete($id, 'post_meta');
         }
-        return ['site' => $site, 'minted' => $minted, 'repaired' => $repaired, 'total' => count($ids)];
+        return ['minted' => $minted, 'repaired' => $repaired, 'total' => count($ids)];
     }
 }

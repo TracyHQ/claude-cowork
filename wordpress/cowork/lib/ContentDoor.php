@@ -85,38 +85,37 @@ final class ContentDoor
         }
     }
 
-    /** A principal the relay names: the site token itself, or one seat under an opaque label. */
-    public const PRINCIPAL_SHAPE = '/^(site-token|seat:[A-Za-z0-9_-]{8,64})$/D';
+    /** `site-token`, or one seat as the relay's 64-hex HMAC (integration decision 25/09 §2). */
+    public const PRINCIPAL_SHAPE = '/^(site-token|seat:[0-9a-f]{64})$/D';
 
     /**
-     * Answer the `content.read` action. `params.query` is the same name → value map the GET takes.
-     * `params.scope` (`published` by default, or `editorial`) and `params.principal` (`site-token`
-     * by default, or `seat:<opaque label>`) are set by the SERVER that holds this site's token and
-     * relays a seat — never by an agent: whoever holds the token can already read everything, so
-     * this door cannot tell a seat from a claim, and the relay must decide both from its own grant
-     * record. A cursor is bound to the principal, so one seat cannot continue another's scan.
-     * Any other parameter is refused. The token was already checked by the caller of this method.
+     * Answer the `content.read` action in the canonical envelope: `params` is the flat query the
+     * GET takes, and the authority sits beside it at the top level — `contentPrincipal`
+     * (`site-token` by default, or `seat:<hmac>`) and `contentScope` (`published` by default, or
+     * `editorial`). Both are set by the server that holds this site's token and relays a seat,
+     * never by an agent: whoever holds the token can already read everything, so this door cannot
+     * tell a seat from a claim. A cursor is bound to the principal and scope. The answer is the
+     * envelope itself or `{error}`, with the HTTP status the spec gives. The token was already
+     * checked by the caller of this method.
      *
-     * @return array<string,mixed> `{ok:true, status:200, content}` or `{ok:false, error, status, message, body}`
+     * @return array{status:int,body:array<string,mixed>}
      */
-    public static function action(array $params, string $token, callable $reader): array
+    public static function action(array $request, string $token, callable $reader): array
     {
         try {
-            $query = $params['query'] ?? [];
-            $scope = $params['scope'] ?? self::GET_SCOPE;
-            $principal = $params['principal'] ?? self::PRINCIPAL;
-            if (array_diff(array_keys($params), ['query', 'scope', 'principal']) !== []
-                || !is_array($query) || !is_string($scope) || !in_array($scope, self::SCOPES, true)
+            $query = $request['params'] ?? [];
+            $scope = $request['contentScope'] ?? self::GET_SCOPE;
+            $principal = $request['contentPrincipal'] ?? self::PRINCIPAL;
+            if (!is_array($query) || ($query !== [] && array_keys($query) === range(0, count($query) - 1))
+                || !is_string($scope) || !in_array($scope, self::SCOPES, true)
                 || !is_string($principal) || !preg_match(self::PRINCIPAL_SHAPE, $principal)) {
                 throw ContentReader::bad();
             }
-            $content = $reader($principal, $scope, self::cursorSecret($token))->read($query);
-            return ['ok' => true, 'status' => 200, 'content' => $content];
+            return self::answer(200, [], $reader($principal, $scope, self::cursorSecret($token))->read($query));
         } catch (ContentReadError $e) {
-            return ['ok' => false, 'error' => $e->reason, 'status' => $e->status, 'message' => $e->getMessage(), 'body' => $e->body()];
+            return self::answer($e->status, [], $e->body());
         } catch (Throwable $e) {
-            $error = new ContentReadError('CONTENT_SOURCE_UNAVAILABLE', 503, 'The site could not be read.');
-            return ['ok' => false, 'error' => $error->reason, 'status' => 503, 'message' => $error->getMessage(), 'body' => $error->body()];
+            return self::answer(503, [], (new ContentReadError('CONTENT_SOURCE_UNAVAILABLE', 503, 'The site could not be read.'))->body());
         }
     }
 

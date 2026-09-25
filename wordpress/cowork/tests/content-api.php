@@ -238,12 +238,41 @@ $source->contents['c002']['bodyHtml'] = str_repeat('h', ContentReader::MAX_BYTES
 $one = $reader()->read(['id' => 'c002', 'blockId' => 'b5'])['contents'][0];
 check('a block read of a content whose body is over budget: one block, partial, no body',
     [array_column($one['blocks'], 'id'), $one['detailState'], array_key_exists('bodyHtml', $one), array_key_exists('fields', $one)], [['b5'], 'partial', false, false]);
-check('and it names the next block', $one['links']['next'], '/content.json?id=c002&blockId=b6');
+checkTrue('and it links the next block by a signed cursor', strpos($one['links']['next'], '/content.json?id=c002&blockId=b6&blocksCursor=') === 0);
+check('its pagination is one block of 250', [$one['blocksPagination']['limit'], $one['blocksPagination']['total'], is_string($one['blocksPagination']['nextCursor'])], [1, 250, true]);
 check('its images are the ones that block uses', $one['images'], []);
 check('the block read names itself', $one['links']['self'], '/content.json?id=c002&blockId=b5');
 $last = $reader()->read(['id' => 'c002', 'blockId' => 'b249'])['contents'][0];
-check('the last block points back at the content', [$last['links']['next'], array_column($last['images'][0]['usages'], 'blockId')], ['/content.json?id=c002', ['b249']]);
-check('blockId with blocksCursor is 400', $status(static fn() => $reader()->read(['id' => 'c002', 'blockId' => 'b5', 'blocksCursor' => 'x.y'])), '400 CONTENT_BAD_QUERY');
+check('the last block ends the scan and points back at the content', [$last['links']['next'], $last['blocksPagination']['nextCursor'], array_column($last['images'][0]['usages'], 'blockId')], ['/content.json?id=c002', null, ['b249']]);
+$q = static function (string $link): array {
+    parse_str((string) parse_url($link, PHP_URL_QUERY), $out);
+    return $out;
+};
+$step = $q($one['links']['next']);
+check('the signed next link reads the next block', $reader()->read($step)['contents'][0]['blocks'][0]['id'], 'b6');
+check('a block cursor for another block is refused', $status(static fn() => $reader()->read(['id' => 'c002', 'blockId' => 'b7', 'blocksCursor' => $step['blocksCursor']])), '400 CONTENT_BAD_QUERY');
+check('a forged block cursor is refused', $status(static fn() => $reader()->read(['id' => 'c002', 'blockId' => 'b6', 'blocksCursor' => 'eyJ2IjoxfQ.' . str_repeat('0', 64)])), '400 CONTENT_BAD_QUERY');
+check('another principal cannot walk it', $status(static fn() => $reader('seat:' . str_repeat('b', 64))->read($step)), '400 CONTENT_BAD_QUERY');
+$source->revision = 'rev-3';
+check('a change to the site ends the walk (409)', $status(static fn() => $reader()->read($step)), '409 CONTENT_SNAPSHOT_EXPIRED');
+$source->revision = 'rev-1';
+check('a block cursor past its five minutes is expired', $status(static fn() => $reader('site-token', 'published', 1000 + ContentReader::TTL)->read($step)), '409 CONTENT_SNAPSHOT_EXPIRED');
+try {
+    $reader()->read(['id' => 'c002']);
+    check('an over-budget body is 413', 'no error', '413');
+} catch (ContentReadError $e) {
+    $body = $e->body()['error'];
+    check('an over-budget body is 413 with the read\'s snapshot', [$e->status, $body['field']['key'], $body['snapshot']['revision']], [413, 'bodyHtml', 'rev-1']);
+    checkTrue('and a signed firstBlock link on the site origin', strpos($body['links']['firstBlock'], 'https://site.test/content.json?id=c002&blockId=b0&blocksCursor=') === 0);
+    $walked = [];
+    $next = $q($body['links']['firstBlock']);
+    while ($next !== null && count($walked) < 300) {
+        $page = $reader()->read($next)['contents'][0];
+        $walked[] = $page['blocks'][0]['position'];
+        $next = $page['blocksPagination']['nextCursor'] === null ? null : $q($page['links']['next']);
+    }
+    check('firstBlock walks every block once, in order, and stops', $walked, range(0, 249));
+}
 check('the full detail of that content is still 413 on bodyHtml', $status(static fn() => $reader()->read(['id' => 'c002'])), '413 CONTENT_FIELD_TOO_LARGE');
 $source->contents['c002']['bodyHtml'] = null;
 check('a blocks cursor for another id is refused', $status(static function () use ($reader) {
@@ -252,11 +281,13 @@ check('a blocks cursor for another id is refused', $status(static function () us
 }), '400 CONTENT_BAD_QUERY');
 
 $source->contents['c004']['bodyHtml'] = str_repeat('x', ContentReader::MAX_BYTES);
+// No blocks: 413 without a firstBlock link.
 try {
     $reader()->read(['id' => 'c004']);
     check('an oversized scalar is 413', 'no error', '413');
 } catch (ContentReadError $e) {
     check('an oversized scalar is 413 naming the field, never truncated', [$e->status, $e->body()['error']['field']], [413, ['contentId' => 'c004', 'blockId' => null, 'itemId' => null, 'key' => 'bodyHtml']]);
+    check('a content with no blocks advertises no firstBlock', isset($e->body()['error']['links']), false);
 }
 
 // ── ContentDoor ──────────────────────────────────────────────────────────────────────────────
@@ -289,16 +320,21 @@ check('a source failure is 503, never an empty listing', [$broken['status'], $br
 checkTrue('and does not leak the failure text', strpos(json_encode($broken['body']), 'SQLSTATE') === false);
 $gotCursor = $ok['body']['pagination']['nextCursor'];
 checkTrue('the GET cursor holds no token', strpos(base64_decode(strtr(explode('.', $gotCursor)[0], '-_', '+/')), $TOKEN) === false);
-check('the POST action reads the same listing', ContentDoor::action(['query' => ['limit' => '2']], $TOKEN, $factory)['content']['contents'], $ok['body']['contents']);
-check('the POST action refuses an unknown scope', ContentDoor::action(['scope' => 'admin'], $TOKEN, $factory)['status'], 400);
-check('a GET cursor is not an editorial cursor', ContentDoor::action(['scope' => 'editorial', 'query' => ['cursor' => $gotCursor]], $TOKEN, $factory)['status'], 400);
-
-$seatA = ContentDoor::action(['principal' => 'seat:alpha-0001', 'query' => ['limit' => '2']], $TOKEN, $factory);
+$SEAT_A = 'seat:' . str_repeat('a', 64);
+$SEAT_B = 'seat:' . str_repeat('b', 64);
+$post = static fn(array $request) => ContentDoor::action($request, $TOKEN, $factory);
+check('the POST action answers the envelope itself', [$post(['params' => ['limit' => '2']])['status'], $post(['params' => ['limit' => '2']])['body']['contents']], [200, $ok['body']['contents']]);
+check('and an error as {error} with its status', [$post(['params' => ['id' => 'nope']])['status'], array_keys($post(['params' => ['id' => 'nope']])['body'])], [404, ['error']]);
+check('the POST action refuses an unknown scope', $post(['contentScope' => 'admin'])['status'], 400);
+check('a GET cursor is not an editorial cursor', $post(['contentScope' => 'editorial', 'params' => ['cursor' => $gotCursor]])['status'], 400);
+check('scope in the query is an unknown query name', $post(['params' => ['scope' => 'editorial']])['status'], 400);
+check('principal in the query is an unknown query name', $post(['params' => ['contentPrincipal' => $SEAT_A]])['status'], 400);
+$seatA = $post(['contentPrincipal' => $SEAT_A, 'params' => ['limit' => '2']]);
 check('a relayed seat reads under its own principal', $seatA['status'], 200);
-check('another seat cannot continue that seat\'s cursor', ContentDoor::action(['principal' => 'seat:bravo-0002', 'query' => ['cursor' => $seatA['content']['pagination']['nextCursor']]], $TOKEN, $factory)['status'], 400);
-check('the site token cannot continue it either', ContentDoor::action(['query' => ['cursor' => $seatA['content']['pagination']['nextCursor']]], $TOKEN, $factory)['status'], 400);
-check('the same seat can', ContentDoor::action(['principal' => 'seat:alpha-0001', 'query' => ['cursor' => $seatA['content']['pagination']['nextCursor']]], $TOKEN, $factory)['status'], 200);
-foreach (['a principal that is not a seat label' => ['principal' => 'admin'], 'an empty seat label' => ['principal' => 'seat:'],
-    'an unknown parameter' => ['role' => 'owner'], 'a query that is not a map' => ['query' => 'limit=2']] as $name => $params) {
-    check('content.read refuses ' . $name, ContentDoor::action($params, $TOKEN, $factory)['status'], 400);
+check('another seat cannot continue that seat\'s cursor', $post(['contentPrincipal' => $SEAT_B, 'params' => ['cursor' => $seatA['body']['pagination']['nextCursor']]])['status'], 400);
+check('the site token cannot continue it either', $post(['params' => ['cursor' => $seatA['body']['pagination']['nextCursor']]])['status'], 400);
+check('the same seat can', $post(['contentPrincipal' => $SEAT_A, 'params' => ['cursor' => $seatA['body']['pagination']['nextCursor']]])['status'], 200);
+foreach (['a principal that is not a seat hmac' => ['contentPrincipal' => 'admin'], 'a short seat label' => ['contentPrincipal' => 'seat:alpha-0001'],
+    'an uppercase seat hmac' => ['contentPrincipal' => 'seat:' . str_repeat('A', 64)], 'a query that is a list' => ['params' => ['limit=2']]] as $name => $request) {
+    check('content.read refuses ' . $name, $post($request)['status'], 400);
 }
