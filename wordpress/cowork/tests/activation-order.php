@@ -13,3 +13,7 @@ check('activation can load the writers file on its own (Contract_Store resolves)
 $code = 'require ' . var_export(__DIR__ . '/../lib/MultilingualHooks.php', true) . '; MultilingualHooks::register(); echo MultilingualHooks::retired() === [] ? "ok" : "leaked";';
 $out = shell_exec(PHP_BINARY . ' -d display_errors=1 -r ' . escapeshellarg($code) . ' 2>&1');
 check('the multilingual hooks load and register without WordPress', trim((string) $out), 'ok');
+
+$code = 'define("ABSPATH", "/tmp/"); require ' . var_export(__DIR__ . '/../lib/NavigationLinks.php', true) . '; NavigationLinks::register(); echo class_exists("NavigationLinks") ? "ok" : "missing";';
+$out = shell_exec(PHP_BINARY . ' -d display_errors=1 -r ' . escapeshellarg($code) . ' 2>&1');
+check('the navigation-link hook file loads and registers outside WordPress', trim((string) $out), 'ok');
