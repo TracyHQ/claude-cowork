@@ -22,6 +22,8 @@ require_once __DIR__ . '/update.php';
 // reads the binding only when a Polylang filter fires, and does nothing on a site without one.
 require_once __DIR__ . '/lib/MultilingualHooks.php';
 MultilingualHooks::register();
+require_once __DIR__ . '/lib/NavigationLinks.php';
+NavigationLinks::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.

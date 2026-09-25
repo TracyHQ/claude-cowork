@@ -1588,6 +1588,7 @@ require_once __DIR__ . '/multilingual.php';
 require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
+require __DIR__ . '/navigation-links.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
