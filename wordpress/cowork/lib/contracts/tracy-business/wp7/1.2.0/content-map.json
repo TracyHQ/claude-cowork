@@ -120,7 +120,6 @@
       "type": "text",
       "sample": "A professional company site",
       "maxCharacters": 70,
-      "input": "tagline",
       "label": "Tagline (one short slogan)"
     },
     {
@@ -3473,8 +3472,7 @@
       "sample": "Design–build main contractor for industrial facilities in Russia since 2004.",
       "maxCharacters": 200,
       "siteIdentity": true,
-      "label": "site identity — site.slogan",
-      "input": "tagline"
+      "label": "site identity — site.slogan"
     },
     {
       "key": "identity.monogram",

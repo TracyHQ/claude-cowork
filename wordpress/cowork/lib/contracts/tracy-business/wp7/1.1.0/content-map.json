@@ -113,7 +113,6 @@
       "type": "text",
       "sample": "A professional company site",
       "maxCharacters": 70,
-      "input": "tagline",
       "label": "Tagline (one short slogan)"
     },
     {
