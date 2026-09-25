@@ -153,17 +153,33 @@ final class JoomlaContentReader
                 'bodyHtml'=>$kind==='article'?($row['introtext']??'').($row['fulltext']??''):($kind==='shared'&&($row['module']??'')==='mod_custom'?($row['content']??''):null),
                 'tags'=>[],'fields'=>[],'blocks'=>[],'images'=>[],'relations'=>[]];
             $fields=[];
+            // 🔒 A FIELD SAYS WHAT IT IS. A slot key is positional (`module-441.9`); its name lives in the
+            // contract's jsonPath (`tb-hero[image-alt]`). Without it the agent could not tell the
+            // picture's alt from any other text and ran the contract inspect only to read labels — on
+            // the dev host 60–80 s a call (25/09/2026, local agent chat on r1j1734, 3 of 3 runs).
+            $semantic=function(array $slot): ?string {
+                $path=$slot['jsonPath']??null;
+                if (is_array($path) && isset($path[1]) && is_string($path[1]) && preg_match('/\[([^\]]+)\]$/',$path[1],$m))
+                    return $m[1].((int)($path[2]??0)>0?'.'.(int)$path[2]:'');
+                return isset($slot['column']) && is_string($slot['column']) && $slot['column']!=='params' ? $slot['column'] : null;
+            };
+            $alts=[];
+            foreach ($mapping['slots'][$key] as $slot) {
+                $name=$semantic($slot);
+                if ($name!==null && preg_match('/^(.*)-alt(\.\d+)?$/',$name,$m)) $alts[$m[1].($m[2]??'')]=$this->contract->slotValue($row,$slot);
+            }
             foreach ($mapping['slots'][$key] as $slot) {
                 $value=$this->contract->slotValue($row,$slot);
-                $fields[]=['key'=>$slot['key'],'type'=>$slot['type'],'value'=>$value,'slotKey'=>$slot['key'],'semanticKey'=>null];
+                $fields[]=['key'=>$slot['key'],'type'=>$slot['type'],'value'=>$value,'slotKey'=>$slot['key'],'semanticKey'=>$semantic($slot)];
                 if ($slot['type']==='image' && $value!=='') {
                     $src=preg_match('~^https?://~',$value)?$value:$this->base.'/'.ltrim($value,'/');
                     $mid=$opaque('media',$value);
                     // The slot is its own block below (same opaque key), so the picture says which
                     // block it belongs to. Alt stays null: a contract slot carries no alt of its own.
                     $block=$opaque('block',$uid.':'.$slot['key']);
+                    $alt=$alts[$semantic($slot)??'']??null;
                     if (isset($content['images'][$mid])) $content['images'][$mid]['usages'][]=['contentId'=>$id,'blockId'=>$block,'itemId'=>null];
-                    else $content['images'][$mid]=['id'=>$mid,'src'=>$src,'alt'=>null,'width'=>null,'height'=>null,'usages'=>[['contentId'=>$id,'blockId'=>$block,'itemId'=>null]]];
+                    else $content['images'][$mid]=['id'=>$mid,'src'=>$src,'alt'=>is_string($alt)?$alt:null,'width'=>null,'height'=>null,'usages'=>[['contentId'=>$id,'blockId'=>$block,'itemId'=>null]]];
                 }
             }
             // Physical slots are fields, never manufactured repeater item identities. Bounded
