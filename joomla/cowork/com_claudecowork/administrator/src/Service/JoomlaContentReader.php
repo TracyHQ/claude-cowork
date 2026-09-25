@@ -154,7 +154,11 @@ final class JoomlaContentReader
                 if ($slot['type']==='image' && $value!=='') {
                     $src=preg_match('~^https?://~',$value)?$value:$this->base.'/'.ltrim($value,'/');
                     $mid=$opaque('media',$value);
-                    $content['images'][$mid]=['id'=>$mid,'src'=>$src,'alt'=>null,'width'=>null,'height'=>null,'usages'=>[['contentId'=>$id,'blockId'=>null,'itemId'=>null]]];
+                    // The slot is its own block below (same opaque key), so the picture says which
+                    // block it belongs to. Alt stays null: a contract slot carries no alt of its own.
+                    $block=$opaque('block',$uid.':'.$slot['key']);
+                    if (isset($content['images'][$mid])) $content['images'][$mid]['usages'][]=['contentId'=>$id,'blockId'=>$block,'itemId'=>null];
+                    else $content['images'][$mid]=['id'=>$mid,'src'=>$src,'alt'=>null,'width'=>null,'height'=>null,'usages'=>[['contentId'=>$id,'blockId'=>$block,'itemId'=>null]]];
                 }
             }
             // Physical slots are fields, never manufactured repeater item identities. Bounded
