@@ -95,3 +95,50 @@ check('and reverts as before', WP_Fake::$options['blogname'], 'Test Co');
 
 // Leave the fake as the next file expects it.
 WP_Fake::reset();
+
+// ── one language's words: `<locale>::site.name` moves that language's translation alone ─────
+// The seeder writes the source pass (every language gets the source words, above) and then each
+// chosen edition's own words; the option row is what `/` shows, each `/<lang>/` its own entry.
+// Measured 25/09/2026 on dev (`wpbghcqkm`): before this, `/` carried the Vietnamese tagline and
+// `/vi/` the archive's "Northgate", because the language-object bug above made every translation
+// write a no-op while Polylang had re-keyed the vi demo entry under the new name.
+
+$e = contractSite($SITE, $FIXTURES, true);
+$EE = $e['engine'];
+WP_Fake::$strings = ['en' => ['Test Co' => 'Test Co', 'A test' => 'A test'], 'de' => ['Test Co' => 'Test Co GmbH', 'A test' => 'Ein Test']];
+$tdoor($EE, 'bind', ['contract' => 'test-design/wp7/1.0.0']);
+$re0 = $tdoor($EE, 'inspect')['revision'];
+$one = $tdoor($EE, 'apply', ['expected_revision' => $re0, 'apply_id' => 'contract-e1', 'request_id' => 'e1', 'changes' => ['site.name' => 'Acme Corp', 'de::site.name' => 'Acme GmbH']]);
+check('the source write and the German edition land in one apply', [$one['ok'], array_map(static fn($w) => $w['kind'] . ':' . $w['key'] . (isset($w['locale']) ? '@' . $w['locale'] : ''), $one['written'] ?? [])], [true, ['option:blogname', 'optionTranslation:blogname@de']]);
+check('the option row holds the source words', WP_Fake::$options['blogname'], 'Acme Corp');
+check('English serves the source words under every key it may look up', WP_Fake::$strings['en'], ['Test Co' => 'Acme Corp', 'A test' => 'A test', 'Acme Corp' => 'Acme Corp']);
+check('German serves ITS words under the same keys, nothing else touched', WP_Fake::$strings['de'], ['Test Co' => 'Acme GmbH', 'A test' => 'Ein Test', 'Acme Corp' => 'Acme GmbH', 'Acme GmbH' => 'Acme GmbH']);
+$entries = $e['log']->entries('contract-e1');
+check('the edition entry names its language and moved no row', [$entries[1]['kind'], $entries[1]['locale'], $entries[1]['before']], ['optionTranslation', 'de', null]);
+check('and remembers what German said before, absent keys as null', $entries[1]['translations'], ['de' => ['Acme Corp' => 'Acme Corp', 'Test Co' => 'Acme Corp', 'Acme GmbH' => null]]);
+check('inspect stays clean', $tdoor($EE, 'inspect')['problems'], []);
+$undo = $EE->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-e1']]);
+check('apply.revert takes both back', [$undo['ok'], $undo['reverted']], [true, 3]);
+check('the option as it was', WP_Fake::$options['blogname'], 'Test Co');
+check('German as the archive shipped it', WP_Fake::$strings['de'], ['Test Co' => 'Test Co GmbH', 'A test' => 'Ein Test']);
+check('English as the archive shipped it', WP_Fake::$strings['en'], ['Test Co' => 'Test Co', 'A test' => 'A test']);
+
+// The German words alone, on a site whose option already carries the customer's: keyed by the
+// row's value too, so the front end finds it whichever key Polylang looks up.
+$re1 = $tdoor($EE, 'inspect')['revision'];
+$tdoor($EE, 'apply', ['expected_revision' => $re1, 'apply_id' => 'contract-e2', 'request_id' => 'e2', 'changes' => ['site.name' => 'Acme Corp']]);
+$re2 = $tdoor($EE, 'inspect')['revision'];
+$two = $tdoor($EE, 'apply', ['expected_revision' => $re2, 'apply_id' => 'contract-e3', 'request_id' => 'e3', 'changes' => ['de::site.name' => 'Acme GmbH']]);
+check('an edition write alone is an apply of its own', [$two['ok'], count($two['written'] ?? [])], [true, 1]);
+check('keyed by the row value, the demo value and itself', WP_Fake::$strings['de'], ['Test Co' => 'Acme GmbH', 'A test' => 'Ein Test', 'Acme Corp' => 'Acme GmbH', 'Acme GmbH' => 'Acme GmbH']);
+check('English untouched by it', WP_Fake::$strings['en']['Test Co'], 'Acme Corp');
+
+// What has no edition is refused by name, nothing written.
+$re3 = $tdoor($EE, 'inspect')['revision'];
+$noField = $tdoor($EE, 'apply', ['expected_revision' => $re3, 'apply_id' => 'contract-e4', 'request_id' => 'e4', 'changes' => ['de::identity.email' => 'x@acme.test']]);
+check('a field of an untranslated option has no edition', [$noField['ok'], $noField['error']], [false, 'contract_failed']);
+checkTrue('and says so by name', strpos((string) $noField['message'], 'An option has no edition: de::identity.email') !== false);
+$noLang = $tdoor($EE, 'apply', ['expected_revision' => $re3, 'apply_id' => 'contract-e5', 'request_id' => 'e5', 'changes' => ['fr::site.name' => 'Acme SARL']]);
+check('a language the archive does not ship is refused', $noLang['ok'], false);
+checkTrue('by name', strpos((string) $noLang['message'], 'No fr edition of option-blogname') !== false);
+check('nothing moved', WP_Fake::$strings['de']['Test Co'], 'Acme GmbH');
