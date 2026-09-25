@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Release candidate for the Content API v1 reader (/content.json and content.read), for Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.1/pkg_claudecowork-0.18.0-rc.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Carries the site-identity profiles of Tracy Apple 1.3.0 and the Airbnb design 1.2.0 on it: the site name, slogan and monogram live in one "[Tracy] Site identity" module the page reads through plg_system_tracyidentity, so those slots may be emptied or filled like Tracy Business 1.2.0. No code change; built on 0.17.3.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
