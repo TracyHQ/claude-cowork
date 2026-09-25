@@ -103,9 +103,13 @@ final class JoomlaContentReader
         $identities=[];
         foreach ($data['claudecowork_content_identity'] as $row) $identities[$row['kind']][(int)$row['native_id']]=$row['uid'];
         $opaque=fn(string $domain,string $key)=>$domain.'_'.substr(hash_hmac('sha256',$domain.':'.$key,$config['site_id']),0,32);
-        $contents=[]; $keys=[]; $locales=[]; $visibility=[]; $native=[];
+        $contents=[]; $keys=[]; $locales=[]; $visibility=[]; $native=[]; $contractKey=[];
         $categories=array_column($data['categories'],null,'id');
         $menus=array_column($data['menu'],null,'id');
+        // With a home per language, the language filter sends every visitor to one of them: the
+        // "All languages" home is never the page anyone reads. Left in the map it sat beside the
+        // real homes as a three-block "Home" and the agent opened it first (25/09, capijl1644).
+        $languageHomes=count(array_filter($data['menu'],fn($m)=>(int)($m['home']??0)===1 && ($m['language']??'*')!=='*' && (int)($m['published']??0)===1 && (int)($m['client_id']??0)===0));
         foreach ($mapping['keys'] as $key=>$meta) {
             $kind=['article'=>'article','menuItem'=>'page','module'=>'shared'][$meta['kind']]??null;
             if ($kind===null || !empty($meta['switcher'])) continue;
@@ -130,11 +134,12 @@ final class JoomlaContentReader
                     $parent=$menus[$parent['parent_id']]??null;
                 }
             }
+            if ($kind==='page' && $languageHomes>0 && (int)($row['home']??0)===1 && ($row['language']??'*')==='*') $allowed=false;
             $visibility[$key]=$allowed;
             if (!$allowed) continue;
             $uid=$identities[$kind][$nativeId]??null;
             if (!$uid) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content identity registry is incomplete');
-            $id=$opaque('content',$uid); $keys[$key]=$id; $native[$kind][$nativeId]=$id;
+            $id=$opaque('content',$uid); $keys[$key]=$id; $native[$kind][$nativeId]=$id; $contractKey[$id]??=$key;
             if (isset($contents[$id])) continue;
             $locale=($row['language']??'*')==='*'?null:$row['language'];
             // Joomla's legacy sr-YU is not a canonical language tag. Do not silently relabel it.
@@ -182,9 +187,36 @@ final class JoomlaContentReader
                 if ($contents[$source]['locale']!==null && $contents[$owner]['locale']!==$contents[$source]['locale']) continue;
                 $blockId=$opaque('occurrence',$owner.':'.$source);
                 if (in_array($blockId,array_column($contents[$owner]['blocks'],'id'),true)) continue;
-                $contents[$owner]['blocks'][]=['id'=>$blockId,'key'=>$blockId,'role'=>null,'position'=>count($contents[$owner]['blocks']),
+                $contents[$owner]['blocks'][]=['id'=>$blockId,'key'=>$contractKey[$source]??$blockId,'role'=>$contents[$source]['title'],'position'=>count($contents[$owner]['blocks']),
                     'sharedContentId'=>$source,'visibility'=>'unknown','fields'=>[],'items'=>[]];
             }
+        }
+        // 🔒 A MODULE ONE PAGE PLACES IS THAT PAGE'S SECTION, NOT A SHARED PART. A Tracy Business
+        // home is a list of modules (hero, services, clients…); as references the agent had to open
+        // each one to see a word or a picture — 10 to 13 calls where WordPress takes 5 (25/09, local
+        // agent chat on capijl1644). Such a module is projected inline: the page block carries its
+        // fields (slotKey included) and its pictures point at that block. Modules placed on several
+        // pages — header, footer, topbar — stay shared references, read once.
+        $placements=[];
+        foreach ($contents as $ownerId=>$owner) foreach ($owner['blocks'] as $block)
+            if ($block['sharedContentId']!==null) $placements[$block['sharedContentId']][$ownerId]=true;
+        foreach ($placements as $source=>$owners) {
+            if (count($owners)!==1 || ($contents[$source]['type']??null)!=='shared') continue;
+            $ownerId=array_key_first($owners); $module=$contents[$source];
+            $fields=[]; foreach ($module['blocks'] as $block) foreach ($block['fields'] as $field) $fields[]=$field;
+            $images=array_column($contents[$ownerId]['images'],null,'id');
+            foreach ($contents[$ownerId]['blocks'] as &$block) {
+                if ($block['sharedContentId']!==$source) continue;
+                $block['sharedContentId']=null; $block['fields']=$fields;
+                foreach ($module['images'] as $image) {
+                    $usage=['contentId'=>$ownerId,'blockId'=>$block['id'],'itemId'=>null];
+                    if (isset($images[$image['id']])) $images[$image['id']]['usages'][]=$usage;
+                    else { $image['usages']=[$usage]; $images[$image['id']]=$image; }
+                }
+            }
+            unset($block);
+            $contents[$ownerId]['images']=array_values($images);
+            unset($contents[$source]);
         }
         $groups=[];
         foreach ($data['associations'] as $association) {
