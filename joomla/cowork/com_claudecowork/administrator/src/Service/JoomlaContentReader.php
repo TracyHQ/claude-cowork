@@ -11,6 +11,7 @@ final class JoomlaContentReader
     private string $root;
     private string $base;
     public function __construct($db, callable $contractFactory, string $root, string $base) {
+        require_once dirname(__DIR__,2).'/lib/ContentIdentity.php';
         $this->db=$db; $this->contractFactory=$contractFactory; $this->root=$root; $this->base=rtrim($base,'/');
     }
     private function rows(string $table, string $order='id'): array {
@@ -75,6 +76,8 @@ final class JoomlaContentReader
      */
     public function revisions(): array {
         $config=$this->config();
+        // Page identities have no trigger (nested-set locking, see ContentIdentity): level them now.
+        \ContentIdentity::reconcile($this->db,'page');
         $data=[];
         foreach (\ContentProjection::TABLES as $table=>$order) $data[$table]=$this->rows($table,$order);
         $contract=($this->contractFactory)();
@@ -87,8 +90,9 @@ final class JoomlaContentReader
         // No opportunistic setup. Missing triggers or a nontransactional source refuse capability.
         $prefix=$this->db->getPrefix();
         $triggers=$this->db->setQuery('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()')->loadColumn();
-        foreach (['article','page','shared'] as $kind) foreach (['insert','delete'] as $event)
-            if (!in_array($prefix.'cc_content_'.$kind.'_'.$event,$triggers,true)) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content identity lifecycle is unavailable');
+        // `page` has no trigger on purpose (Joomla writes #__menu under LOCK TABLES): it is reconciled below.
+        foreach (\ContentIdentity::requiredTriggerNames($prefix) as $name)
+            if (!in_array($name,$triggers,true)) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content identity lifecycle is unavailable');
         if (file_exists($this->root.'/content.json')) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content route is already occupied');
         $tables=['content','menu','modules','modules_menu','categories','viewlevels','usergroups','assets','associations','languages','claudecowork_content_contract','claudecowork_content_identity'];
         $engines=$this->db->setQuery('SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()')->loadAssocList('TABLE_NAME','ENGINE');
@@ -100,6 +104,7 @@ final class JoomlaContentReader
         $now=time();
         $this->db->transactionStart();
         try {
+            \ContentIdentity::reconcile($this->db,'page');
             $data=[];
             foreach ($tables as $table) $data[$table]=$this->rows($table,match($table) {
                 'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',default=>'id'});

@@ -46,7 +46,11 @@ check('dropping the triggers is one DROP TRIGGER IF EXISTS per trigger and nothi
 $freshDb = new RecordingDb();
 ContentIdentity::install($freshDb);
 $created = array_values(array_filter($freshDb->queries, fn($q) => startsWith($q, 'CREATE TRIGGER')));
-check('install creates every trigger the database lacks', count($created), 6);
+check('install creates a trigger only for the tables Joomla writes without LOCK TABLES (content, modules)', count($created), 4);
+check('no trigger is ever created on #__menu', count(array_filter($created, fn($q) => str_contains($q, 'ON #__menu'))), 0);
+check('the reader requires exactly those four',
+    ContentIdentity::requiredTriggerNames('ng_'),
+    ['ng_cc_content_article_insert', 'ng_cc_content_article_delete', 'ng_cc_content_shared_insert', 'ng_cc_content_shared_delete']);
 check('the delete trigger removes exactly that row of the identity table',
     $created[1], "CREATE TRIGGER `ng_cc_content_article_delete` AFTER DELETE ON #__content FOR EACH ROW DELETE FROM #__claudecowork_content_identity WHERE kind='article' AND native_id=OLD.id");
 $sweeps = array_values(array_filter($freshDb->queries, fn($q) => startsWith($q, 'DELETE ci FROM')));
@@ -54,8 +58,15 @@ check('after backfilling, install sweeps the identities whose native row is gone
 check('the sweep joins the identity table to its native table and keeps only orphans',
     $sweeps[1], "DELETE ci FROM #__claudecowork_content_identity ci LEFT JOIN #__menu t ON t.id=ci.native_id WHERE ci.kind='page' AND t.id IS NULL");
 $order = array_values(array_filter($freshDb->queries, fn($q) => startsWith($q, 'CREATE TRIGGER') || startsWith($q, 'INSERT IGNORE INTO #__claudecowork_content_identity') || startsWith($q, 'DELETE ci FROM')));
-check('per kind the order is: triggers, then backfill, then sweep — so nothing inserted meanwhile is missed',
-    array_map(fn($q) => substr($q, 0, 6), array_slice($order, 0, 4)), ['CREATE', 'CREATE', 'INSERT', 'DELETE']);
+check('the order is: every trigger, then per kind backfill then sweep — so nothing inserted meanwhile is missed',
+    array_map(fn($q) => substr($q, 0, 6), $order), ['CREATE', 'CREATE', 'CREATE', 'CREATE', 'INSERT', 'DELETE', 'INSERT', 'DELETE', 'INSERT', 'DELETE']);
+
+$pageDb = new RecordingDb();
+ContentIdentity::reconcile($pageDb, 'page');
+check('reconciling page identities is the backfill and the sweep for #__menu, nothing else',
+    $pageDb->queries,
+    ["INSERT IGNORE INTO #__claudecowork_content_identity(kind,native_id,uid) SELECT 'page',id,REPLACE(UUID(),'-','') FROM #__menu",
+        "DELETE ci FROM #__claudecowork_content_identity ci LEFT JOIN #__menu t ON t.id=ci.native_id WHERE ci.kind='page' AND t.id IS NULL"]);
 
 $keptDb = new RecordingDb(['information_schema.TRIGGERS' => 1]);
 ContentIdentity::install($keptDb);
