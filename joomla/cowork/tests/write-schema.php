@@ -9,6 +9,7 @@ checkTrue('readable author and creation date are not advertised as writable', !i
 check('identity rows cannot be created', $schemaWriter->describeWrites('user')['createFields'], null);
 check('unknown relation schema stays unknown', $schemaWriter->describeWrites('articleAssociation'), null);
 $menuSchema = $schemaWriter->describeWrites('menuItem');
+checkTrue('nested updates include the engine move fields', $menuSchema['move'] && in_array('parent_id', $menuSchema['updateFields'], true) && in_array('move_after', $menuSchema['updateFields'], true));
 checkTrue('menu creation exposes its distinct required fields', in_array('menutype', $menuSchema['createFields'], true) && !in_array('menutype', $menuSchema['updateFields'], true));
 check('menu discovery reports the writer requirements', $menuSchema['requiredOnCreate'], ['title', 'menutype', 'link']);
 

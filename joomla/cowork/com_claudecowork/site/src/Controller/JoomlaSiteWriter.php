@@ -303,7 +303,8 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
         return [
             'schemaVersion' => 'tracy-native-write/v1',
             'kind' => $kind,
-            'updateFields' => array_merge(self::MAP[$kind]['columns'], $extra),
+            'updateFields' => array_values(array_unique(array_merge(self::MAP[$kind]['columns'], $extra,
+                isset(self::NESTED[$kind]) ? ['parent_id', 'move_after'] : []))),
             'createFields' => $this->canCreate($kind)
                 ? array_merge(self::NESTED[$kind]['createColumns'] ?? self::MAP[$kind]['columns'], $extra) : null,
             'requiredOnCreate' => self::NESTED[$kind]['require'] ?? null,
