@@ -73,6 +73,15 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private $posts = [];
     /** @var array<int,array<string,string>> meta by post id */
     private $meta = [];
+    /**
+     * `lockedBy` by native id, for rows someone has open in the editor. Kept OUT of `$meta`, of
+     * every content revision and of the snapshot fingerprint: the editor's heartbeat rewrites
+     * `_edit_lock` every few seconds, and a revision that moved with it would refuse every
+     * `expected_content_revisions` and expire every cursor while a person merely has a page open.
+     *
+     * @var array<int,array<string,mixed>>
+     */
+    private $locks = [];
     /** @var array<int,array<string,array<int,array<string,mixed>>>> terms by post id and taxonomy */
     private $terms = [];
     /** @var array<string,array<string,mixed>> Polylang languages by slug, in their order */
@@ -390,10 +399,61 @@ final class Claude_Cowork_Content_Source implements ContentSource
             }
         }
         $this->themeParts = $this->readThemeParts();
+        $this->locks = $this->readLocks();
 
         $this->buildSite();
         $this->buildContents();
         $this->revision = $this->fingerprint();
+    }
+
+    /**
+     * Who holds an editor lock on each listed row, by core's rule (EditLock), read in the same
+     * snapshot as the rows. A holder whose user row is gone is no lock, as in core.
+     *
+     * @return array<int,array<string,mixed>> native id => lockedBy
+     */
+    private function readLocks(): array
+    {
+        global $wpdb;
+        $ids = [];
+        foreach ($this->posts as $native => $row) {
+            if ($row['post_type'] !== 'attachment' && $row['post_type'] !== 'wp_template') {
+                $ids[] = (int) $native;
+            }
+        }
+        $meta = [];
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            foreach ($this->query('SELECT post_id, meta_key, meta_value FROM ' . $wpdb->postmeta . ' WHERE post_id IN (' . implode(',', $chunk) . ') AND meta_key IN ('
+                . self::inList([EditLock::META, EditLock::LAST_EDITOR_META]) . ') ORDER BY meta_id') as $row) {
+                if (!isset($meta[(int) $row['post_id']][$row['meta_key']])) {
+                    $meta[(int) $row['post_id']][$row['meta_key']] = $row['meta_value'];
+                }
+            }
+        }
+        $now = time();
+        $window = EditLock::window();
+        $holders = [];
+        foreach ($meta as $native => $values) {
+            $holder = EditLock::holder($values[EditLock::META] ?? null, $values[EditLock::LAST_EDITOR_META] ?? null, $now, $window);
+            if ($holder !== null) {
+                $holders[$native] = $holder;
+            }
+        }
+        if ($holders === []) {
+            return [];
+        }
+        $names = [];
+        $users = array_values(array_unique(array_map(static fn(array $holder) => (int) $holder['user'], $holders)));
+        foreach ($this->query('SELECT ID, display_name FROM ' . $wpdb->users . ' WHERE ID IN (' . implode(',', $users) . ')') as $row) {
+            $names[(int) $row['ID']] = (string) $row['display_name'];
+        }
+        $out = [];
+        foreach ($holders as $native => $holder) {
+            if (array_key_exists($holder['user'], $names)) {
+                $out[$native] = EditLock::lockedBy($holder, $names[$holder['user']]);
+            }
+        }
+        return $out;
     }
 
     /** The bound contract's profile, when this plugin carries it. */
@@ -611,6 +671,8 @@ final class Claude_Cowork_Content_Source implements ContentSource
         $revision = hash('sha256', json_encode([$row, $this->meta[$native] ?? [], $this->terms[$native] ?? [], $url, $locale, $this->bindingSlotsHash()]));
         $summary = $this->summary($id, $type, (string) $row['post_title'], $row['post_name'] === '' ? null : (string) $row['post_name'], $url, $locale, $group, $revision, $publication, $row);
         $summary['summary'] = trim((string) $row['post_excerpt']) === '' ? null : (string) $row['post_excerpt'];
+        // After the revision, never in it (see `$locks`).
+        $summary['lockedBy'] = $this->locks[$native] ?? null;
         return $summary;
     }
 
@@ -630,6 +692,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             'updatedAt' => $row !== null ? self::time($row['post_modified_gmt']) : null,
             'revision' => substr($revision, 0, 40),
             'publication' => $publication,
+            'lockedBy' => null,
             'detailState' => 'summary',
             'links' => ['self' => $this->link($id)],
         ];

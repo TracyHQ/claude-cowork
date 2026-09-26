@@ -92,6 +92,13 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     (`PLL_MO`, keyed by the value before the write, the profile's `sample` and the new value —
     Polylang serves those entries in front of the option), the undo entry keeps each
     language's `translations` as they were, and `apply.revert` restores them with the option.
+    A slot whose post or template part someone has open in the WordPress editor (a live
+    `_edit_lock`, by core's `wp_check_post_lock` rule: 150 s, filter
+    `wp_check_post_lock_window`) refuses the whole apply as `SLOT_LOCKED_BY_USER` (recoverable)
+    with `lockedBy`; there is no flag to write anyway. `content.update`, `content.delete`,
+    `content.language` and `apply.revert` refuse the same way (`error: "locked"`, `code`,
+    `lockedBy`), and `content.read` lists `lockedBy` on every row (null when nobody holds it) —
+    outside every revision, so a heartbeat moves none.
   - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
     `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
     reported; refused while the site has a Polylang language the profile ships no edition for.

@@ -29,6 +29,8 @@
  * row is state an undo has to clean up, so `write()` reports the attachment it created.
  */
 
+require_once __DIR__ . '/EditLock.php';
+
 interface SiteWriter
 {
     /**
@@ -78,6 +80,16 @@ interface SiteWriter
      * @param array<string,mixed> $fields
      */
     public function write(string $kind, int $id, array $fields, string $key = ''): int;
+
+    /**
+     * Who has this post open in the WordPress editor right now, as `content.read` lists it
+     * (`EditLock::lockedBy`), or null. Every write that lands on a post asks first and refuses a
+     * holder: the editor's next save would overwrite Tracy's words, or Tracy would overwrite
+     * words the person has not saved yet, and neither side would know.
+     *
+     * @return array{kind:string,name:?string,since:string,until:string}|null
+     */
+    public function editLock(int $postId): ?array;
 
     /** Remove one target. Used only to reverse a create this run made — never a user-facing delete. */
     public function delete(string $kind, int $id, string $key = ''): void;
