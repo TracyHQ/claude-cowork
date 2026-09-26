@@ -42,12 +42,62 @@ class com_claudecoworkInstallerScript
 
     public function uninstall($parent)
     {
+        // The triggers point at this component's table; left behind, the next INSERT into
+        // #__content, #__menu or #__modules would fail against a table nobody owns any more.
+        try {
+            $this->identity($parent)::dropTriggers(Factory::getDbo());
+        } catch (\Throwable $e) {
+            // Swallowed: an uninstall must finish even where the lib could not be read.
+        }
+
         return true;
     }
 
+    /**
+     * 🔒 THE IDENTITY TRIGGERS COME OFF BEFORE JOOMLA WRITES `#__menu`. On an update, Joomla deletes
+     * the component's admin menu item through the Menu table under `LOCK TABLES #__menu WRITE`
+     * (Nested::delete); the AFTER DELETE trigger then writes a table outside that lock, and
+     * MariaDB refuses the statement — the whole package install failed on every 0.18-RC site
+     * (measured 26/09/2026, "Can't update table … already used by statement which invoked this
+     * trigger"), while a site without triggers upgraded. `postflight` puts them back and backfills.
+     */
     public function preflight($route, $parent)
     {
+        try {
+            $this->identity($parent)::dropTriggers(Factory::getDbo());
+        } catch (\Throwable $e) {
+            // Swallowed: a site with no identity table has no triggers to drop; anything else
+            // surfaces at postflight, where install() runs with the new files in place.
+        }
+
         return true;
+    }
+
+    /**
+     * The identity lib of the package BEING INSTALLED, not the copy on disk: preflight runs before
+     * the files are copied, so the installed copy is the old release (and may lack these methods).
+     * Falls back to the installed copy at uninstall, when no source package exists.
+     */
+    private function identity($parent): string
+    {
+        if (!class_exists('ContentIdentity', false)) {
+            $candidates = [];
+            try {
+                $source = (string) $parent->getParent()->getPath('source');
+                if ($source !== '') $candidates[] = $source . '/administrator/lib/ContentIdentity.php';
+            } catch (\Throwable $e) {
+                // No source path on this generation: the installed copy below.
+            }
+            $candidates[] = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/ContentIdentity.php';
+            foreach ($candidates as $file) {
+                if (is_file($file)) {
+                    require_once $file;
+                    break;
+                }
+            }
+        }
+
+        return 'ContentIdentity';
     }
 
     /**
@@ -79,6 +129,17 @@ class com_claudecoworkInstallerScript
             // Swallowed: the read and connect features work without it; the write actions refuse to
             // run until the table exists, which a later upgrade will create. A component that
             // installed correctly must not report failure because one table could not be made.
+        }
+
+        // The triggers preflight dropped go back on, with a backfill and a sweep for what changed
+        // in between — only where the reader was ever enabled (the identity table exists): a site
+        // that never opted in gets no reader from an upgrade.
+        try {
+            $identity = $this->identity($parent);
+            if ($identity::installed($db)) $identity::install($db);
+        } catch (\Throwable $e) {
+            // Swallowed: install() switches the reader off before it starts, so a half-made setup
+            // stays disabled rather than wrong; `tools/enable-content-reader.php` repairs it by hand.
         }
 
         return true;

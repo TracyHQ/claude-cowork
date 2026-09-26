@@ -17,6 +17,7 @@ require_once __DIR__ . '/../lib/SiteWriter.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/../lib/Door.php';
+require_once __DIR__ . '/../lib/ContentIdentity.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
 // PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
@@ -1828,6 +1829,7 @@ require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/contract-cost.php";
+require __DIR__ . "/identity-install.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
