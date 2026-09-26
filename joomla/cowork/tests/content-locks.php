@@ -44,6 +44,13 @@ check('locks: the freshest of a user\'s sessions decides', $lkLive['module:9']['
 check('locks: a longer lifetime revives an older session', array_keys(JoomlaLocks::live($lkCheckouts, $lkSessions, $lkNames, $lkNow, 16)),
     ['article:1', 'article:2', 'article:3', 'article:7', 'module:9']);
 check('locks: nobody checked anything out, nothing is locked', JoomlaLocks::live([], $lkSessions, $lkNames, $lkNow, 15), []);
+// A check-out left behind days ago (a demo build, a closed tab) by a user who is signed in NOW is
+// not an editor at work: measured on dev capiv2j, 26/09/2026 — Home checked out since 13/09 by the
+// build's admin read as locked the moment that admin signed in.
+$lkOld = ['menuItem:30' => ['checked_out' => '42', 'checked_out_time' => gmdate('Y-m-d H:i:s', $lkNow - 13 * 86400)],
+    'menuItem:31' => ['checked_out' => '42', 'checked_out_time' => gmdate('Y-m-d H:i:s', $lkNow - JoomlaLocks::MAX_CHECKOUT_AGE + 60)]];
+check('locks: a check-out older than MAX_CHECKOUT_AGE is left behind, not an editor at work',
+    array_keys(JoomlaLocks::live($lkOld, $lkSessions, $lkNames, $lkNow, 15)), ['menuItem:31']);
 check('locks: the refusal says who, since when, and what to do',
     JoomlaLocks::message('About', $lkLive['article:1']),
     '"About" is open in the Joomla editor by Jane Admin since 2026-09-26T10:00:00Z: ask them to save and close it, then try again.');

@@ -18,6 +18,16 @@
 final class JoomlaLocks
 {
     /**
+     * A check-out older than this is left behind, not an editor at work. Joomla stamps
+     * `checked_out_time` when the form opens and never again, and leaves the row checked out when
+     * a tab is closed; with only the session test, a check-out from a demo build days earlier read
+     * as locked the moment the same admin signed in (dev capiv2j, 26/09/2026: Home since 13/09).
+     * Twelve hours is longer than anyone keeps one form open, and short enough that a leftover
+     * clears itself within the day.
+     */
+    public const MAX_CHECKOUT_AGE = 12 * 3600;
+
+    /**
      * The tables whose rows Joomla checks out, by the writer's kind. A kind missing here has no
      * check-out column (a user, a template style, a language) and is never locked.
      */
@@ -54,6 +64,9 @@ final class JoomlaLocks
         foreach ($checkouts as $key => $row) {
             $user = (int) ($row['checked_out'] ?? 0);
             if ($user <= 0 || !isset($seen[$user]) || $seen[$user] < $oldest) continue;
+            // An unknown time (NULL, a zero date) is kept: nothing says the form is not open.
+            $at = self::at($row['checked_out_time'] ?? null);
+            if ($at !== null && $now - $at > self::MAX_CHECKOUT_AGE) continue;
             $name = $names[$user] ?? $names[(string) $user] ?? null;
             $out[$key] = ['kind' => 'admin-user', 'name' => is_string($name) && $name !== '' ? $name : null,
                 'since' => self::since($row['checked_out_time'] ?? null), 'until' => null];
@@ -62,11 +75,17 @@ final class JoomlaLocks
     }
 
     /** `checked_out_time` is stored in UTC; a zero date (Joomla 3) or NULL (Joomla 4+) is unknown. */
-    private static function since($value): ?string
+    private static function at($value): ?int
     {
         if (!is_string($value) || $value === '' || substr($value, 0, 4) === '0000') return null;
         $at = strtotime($value . ' UTC');
-        return $at === false ? null : gmdate('Y-m-d\TH:i:s\Z', $at);
+        return $at === false ? null : $at;
+    }
+
+    private static function since($value): ?string
+    {
+        $at = self::at($value);
+        return $at === null ? null : gmdate('Y-m-d\TH:i:s\Z', $at);
     }
 
     /**
