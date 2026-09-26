@@ -17,6 +17,8 @@ class ContractProblem extends RuntimeException
     public const SLOT_EVIDENCE_REQUIRED = 'SLOT_EVIDENCE_REQUIRED';
     public const SLOT_NOT_CONTENT = 'SLOT_NOT_CONTENT';
     public const SLOT_LINK_UNSUPPORTED = 'SLOT_LINK_UNSUPPORTED';
+    /** A picture for an image slot that is not in the media library, or not in the slot's shape. */
+    public const SLOT_IMAGE_INVALID = 'SLOT_IMAGE_INVALID';
     public const SLOT_EDITION_MISSING = 'SLOT_EDITION_MISSING';
     public const REVISION_STALE = 'REVISION_STALE';
     public const REVISION_REQUIRED = 'REVISION_REQUIRED';
@@ -27,7 +29,7 @@ class ContractProblem extends RuntimeException
 
     /** Recoverable: the same request with other values (or fresh revisions, or later) can pass. */
     private const RECOVERABLE = [
-        self::SLOT_TOO_LONG, self::SLOT_EVIDENCE_REQUIRED, self::SLOT_NOT_CONTENT, self::SLOT_LINK_UNSUPPORTED,
+        self::SLOT_TOO_LONG, self::SLOT_EVIDENCE_REQUIRED, self::SLOT_NOT_CONTENT, self::SLOT_LINK_UNSUPPORTED, self::SLOT_IMAGE_INVALID,
         self::REVISION_STALE, self::REVISION_REQUIRED, self::WRITER_BUSY,
     ];
 

@@ -2,9 +2,9 @@
   "schemaVersion": "tracy-quickstart-superseded/wordpress/v1",
   "$comment": "Earlier bytes of this released profile a sealed site may still be bound to. The receiver accepts a binding to one of these base hashes only while presentation-lock.json is the same bytes, and moves the binding to this profile on its next validated write. Regenerate with scripts/build-wordpress-superseded.mjs after the profile; never list a base whose presentation lock differs.",
   "contract": "tracy-business/wp7/1.1.0",
-  "baseHash": "115c3fbd719a5d2c92e1117f617564b87fb846c1f7ddb235f27a68def619f520",
+  "baseHash": "f3063781924bd9279ffba834b3dcd6a740ad1d6c255d97f2c64930890714787d",
   "presentationLock": "80890db70a5c45ef76c04d743ad4df1730ca8fe0755e8f99406f64fbfe4bce4e",
-  "demoTrimHash": "fa646a521980da2bb4d72419cb0be13f952a9b9975fb7e3008fe57cd598e8e66",
+  "demoTrimHash": "d618458134e68e085bfb3106da6b74225a9f8c03e4c6265243d5173b380ff612",
   "accepts": [
     {
       "baseHash": "527d5bbf79425244d1c58080df9ebfd1957cd344fee3ef798d675111f91a3d63",
@@ -26,6 +26,12 @@
       "receivers": "0.13.6",
       "reason": "Released in place with other slot write rules (limit or input); the presentation lock is the same bytes.",
       "demoTrimHash": "1cebcdc4b00f66964a6df0e92aa3a9ce42e2211c6b7126d8ef469e93e7ea3d59"
+    },
+    {
+      "baseHash": "115c3fbd719a5d2c92e1117f617564b87fb846c1f7ddb235f27a68def619f520",
+      "presentationLock": "80890db70a5c45ef76c04d743ad4df1730ca8fe0755e8f99406f64fbfe4bce4e",
+      "reason": "Released in place with other slot write rules; the presentation lock is the same bytes.",
+      "demoTrimHash": "fa646a521980da2bb4d72419cb0be13f952a9b9975fb7e3008fe57cd598e8e66"
     }
   ]
 }

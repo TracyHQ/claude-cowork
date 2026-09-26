@@ -1,0 +1,41 @@
+{
+    "schemaVersion": "tracy-quickstart-content-map/wordpress/v1",
+    "entities": [
+        {
+            "key": "page-home",
+            "kind": "page",
+            "identity": {
+                "postType": "page",
+                "slug": "home",
+                "language": "en"
+            }
+        }
+    ],
+    "slots": [
+        {
+            "key": "home.hero.eyebrow",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.eyebrow",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Established 2004",
+            "maxCharacters": 80,
+            "label": "home — hero.eyebrow"
+        },
+        {
+            "key": "home.hero.img",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.img",
+                "attr": "src"
+            },
+            "type": "image",
+            "sample": "wp-content/uploads/2026/09/hero.png",
+            "sampleId": 91,
+            "maxCharacters": 255,
+            "label": "home — hero.img"
+        }
+    ]
+}

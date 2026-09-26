@@ -100,15 +100,25 @@ final class QuickstartContract
     /** Options resolved once per inspect, so the URL allow-list does not read `home` per slot. */
     private ?string $homeHost = null;
     private ?ContentRevisions $revisions;
+    private ?ImageLibrary $images;
+    /** @var array<string,int> attachment id of each picture an apply's checks resolved, by path */
+    private array $imageIds = [];
+
+    /**
+     * An image slot's value: a picture already in this site's uploads. The same folder
+     * `media.upload` writes to; `..` is refused separately because the pattern allows dots.
+     */
+    private const IMAGE_PATH = '~^wp-content/uploads/[A-Za-z0-9/_.-]+\.(png|jpe?g|webp)$~D';
 
     /**
      * @param string $root         The webroot (no trailing slash), where `fileRoots` are checked.
      * @param string $contractsDir `lib/contracts`, holding one directory per profile id.
      * @param string $configured   The `claude_cowork_contract` setting, or '' when none is set.
      */
-    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '', ?ContentRevisions $revisions = null)
+    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '', ?ContentRevisions $revisions = null, ?ImageLibrary $images = null)
     {
         $this->revisions = $revisions;
+        $this->images = $images;
         $this->writer = $writer;
         $this->store = $store;
         $this->root = rtrim($root, '/');
@@ -514,6 +524,7 @@ final class QuickstartContract
         $rows = [];
         $entities = [];
         $slotValues = [];
+        $imageSlots = [];
         $lockEntities = isset($this->lock['entities']) && is_array($this->lock['entities']) ? $this->lock['entities'] : [];
         foreach ($this->entities() as $entity) {
             $key = (string) ($entity['key'] ?? '');
@@ -583,7 +594,18 @@ final class QuickstartContract
                 $attr = (string) ($slot['target']['attr'] ?? 'content');
                 try {
                     $slotValues[$slot['key']] = self::getBlockValue($content, $block, $attr);
-                    $masked = self::setBlockValue($masked, $block, $attr, self::SLOT_MASK);
+                    if (($slot['type'] ?? '') === 'image') {
+                        // Not masked: the demo picture goes back, so a page nobody touched hashes
+                        // to the bytes it shipped as and a profile that gains image slots keeps
+                        // its presentation lock (TCH `capture-inventory.mjs` does the same).
+                        if (!is_string($slot['sample'] ?? null) || !is_int($slot['sampleId'] ?? null)) {
+                            throw new RuntimeException('an image slot needs sample and sampleId');
+                        }
+                        $imageSlots[$slot['key']] = $slot['sample'];
+                        $masked = self::setBlockValue($masked, $block, $attr, $slot['sample'], $slot['sampleId']);
+                    } else {
+                        $masked = self::setBlockValue($masked, $block, $attr, self::SLOT_MASK);
+                    }
                 } catch (RuntimeException $e) {
                     $problems[] = 'Slot ' . $slot['key'] . ': ' . $e->getMessage();
                     $broken = true;
@@ -602,6 +624,9 @@ final class QuickstartContract
             'ids' => $ids,
             'entities' => $entities,
             'slots' => $slotValues,
+            // Which slots take a picture, and the demo picture each replaces: its shape is the
+            // shape a new one must have.
+            'imageSlots' => $imageSlots,
             'rows' => $rows,
             'demoTrim' => $trim,
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
@@ -831,6 +856,7 @@ final class QuickstartContract
             ), $state['problems']);
         }
         $errors = [];
+        $this->imageIds = [];
         $expected = $params['expected_revision'] ?? null;
         $perContent = $params['expected_content_revisions'] ?? null;
         if ($perContent !== null && !self::isRevisionMap($perContent)) {
@@ -958,7 +984,8 @@ final class QuickstartContract
             $next = $content;
             foreach ($target['changes'] as [$slot, $new, $key]) {
                 try {
-                    $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new);
+                    $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new,
+                        ($slot['type'] ?? '') === 'image' ? ($this->imageIds[$new] ?? null) : null);
                 } catch (RuntimeException $e) {
                     $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, $e->getMessage(), $key);
                 }
@@ -1104,6 +1131,10 @@ final class QuickstartContract
     /** Scalar content rules, applied identically to a source slot and to an edition of it. */
     private function checkValue(array $slot, string $value, array $params, string $key): void
     {
+        if (($slot['type'] ?? '') === 'image') {
+            $this->checkImage($slot, $value, $key);
+            return;
+        }
         if (!empty($slot['requiresEvidence']) && $value !== (string) ($slot['sample'] ?? '')) {
             $evidence = $params['evidence'][$key] ?? null;
             if (!is_string($evidence) || trim($evidence) === '' || strlen($evidence) > 8000) {
@@ -1125,6 +1156,31 @@ final class QuickstartContract
         if ($isUrl && $value !== '' && !$this->urlAllowed($value)) {
             throw new ContractProblem(ContractProblem::SLOT_LINK_UNSUPPORTED, 'Unsupported link: ' . $key, $key);
         }
+    }
+
+    /**
+     * A picture for an image slot: a file in this site's uploads that the media library knows,
+     * in the shape of the demo picture it replaces (±0.02, the Joomla receiver's tolerance).
+     * Remembers the attachment id for the write.
+     */
+    private function checkImage(array $slot, string $value, string $key): void
+    {
+        $refuse = static function (string $why) use ($key): ContractProblem {
+            return new ContractProblem(ContractProblem::SLOT_IMAGE_INVALID, $why . ': ' . $key, $key);
+        };
+        if (!preg_match(self::IMAGE_PATH, $value) || strpos($value, '..') !== false) {
+            throw $refuse('Image must be a png, jpg or webp under wp-content/uploads/');
+        }
+        $found = $this->images === null ? null : $this->images->find($value);
+        if ($found === null) {
+            throw $refuse('Image must already be in the site media library');
+        }
+        $demo = is_string($slot['sample'] ?? null) && $this->images !== null ? $this->images->find((string) $slot['sample']) : null;
+        if ($demo !== null && $demo['height'] > 0 && $found['height'] > 0
+            && abs($demo['width'] / $demo['height'] - $found['width'] / $found['height']) > 0.02) {
+            throw $refuse('Image aspect ratio does not match its slot');
+        }
+        $this->imageIds[$value] = $found['id'];
     }
 
     /** `https://`, `http://` on this site's own host, `mailto:`, `tel:`, a path, or an anchor. */
@@ -1187,7 +1243,7 @@ final class QuickstartContract
      * the seeder's `setBlockValue` (TCH `apply-wordpress-contract.mjs`), so a skeleton hashed on
      * either side is the same hash.
      */
-    public static function setBlockValue(string $markup, string $name, string $attr, string $value): string
+    public static function setBlockValue(string $markup, string $name, string $attr, string $value, ?int $imageId = null): string
     {
         $found = self::findBlock($markup, $name);
         $inner = substr($markup, $found['innerStart'], $found['innerEnd'] - $found['innerStart']);
@@ -1223,6 +1279,29 @@ final class QuickstartContract
                 $attrs->url = $value;
                 $opening = '<!-- wp:' . $found['ns'] . $found['block'] . ' ' . json_encode($attrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' -->';
             }
+        } elseif ($attr === 'src') {
+            // A picture lives in three places: the img src, the block's `id` and the
+            // `wp-image-N` class. Each is rewritten in place, so bytes around them never move.
+            if (!preg_match('/<img\b[^>]*\bsrc="[^"]*"/', $inner)) {
+                throw new RuntimeException('block ' . $name . ' has no picture to write');
+            }
+            if ($imageId === null) {
+                throw new RuntimeException('block ' . $name . ' needs the attachment id of its picture');
+            }
+            $src = self::escapeHtml('/' . ltrim($value, '/'));
+            $inner = (string) preg_replace_callback('/(<img\b[^>]*\bsrc=")[^"]*(")/', static function (array $m) use ($src): string {
+                return $m[1] . $src . $m[2];
+            }, $inner, 1);
+            $inner = (string) preg_replace('/\bwp-image-\d+\b/', 'wp-image-' . $imageId, $inner, 1);
+            $attrs = json_decode($found['attrs'], true);
+            if (is_array($attrs) && isset($attrs['id']) && is_int($attrs['id'])) {
+                $was = '"id":' . $attrs['id'];
+                $at = strrpos($found['attrs'], $was);
+                if ($at !== false) {
+                    $rewritten = substr_replace($found['attrs'], '"id":' . $imageId, $at, strlen($was));
+                    $opening = str_replace($found['attrs'], $rewritten, $opening);
+                }
+            }
         } else {
             throw new RuntimeException('unsupported block attribute ' . $attr);
         }
@@ -1252,6 +1331,15 @@ final class QuickstartContract
                 throw new RuntimeException('block ' . $name . ' has no link to read');
             }
             return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        if ($attr === 'src') {
+            if (!preg_match('/<img\b[^>]*\bsrc="([^"]*)"/', $inner, $m)) {
+                throw new RuntimeException('block ' . $name . ' has no picture to read');
+            }
+            // The webroot path, whether the src was written root-relative or with the origin.
+            $src = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $path = (string) (parse_url($src, PHP_URL_PATH) ?? '');
+            return ltrim($path, '/');
         }
         throw new RuntimeException('unsupported block attribute ' . $attr);
     }

@@ -1272,6 +1272,51 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
  * string exactly. base64 keeps the result safe for a text column. On the way back the blob is
  * unserialized with classes forbidden, so a corrupted row can never instantiate anything.
  */
+/**
+ * The media library an image slot reads: `_wp_attached_file` names the attachment, the uploads
+ * folder holds the file, `getimagesize` gives its shape.
+ *
+ * The path is confined the same two ways the media writer confines one (string, then realpath),
+ * so a symlink inside uploads cannot hand a slot a file from elsewhere.
+ */
+final class Claude_Cowork_Image_Library implements ImageLibrary {
+
+	private const PREFIX = 'wp-content/uploads/';
+
+	public function find( string $path ): ?array {
+		global $wpdb;
+
+		if ( 0 !== strpos( $path, self::PREFIX ) || ! isset( $wpdb ) || ! function_exists( 'wp_upload_dir' ) ) {
+			return null;
+		}
+		$relative = substr( $path, strlen( self::PREFIX ) );
+		if ( in_array( '..', explode( '/', $relative ), true ) ) {
+			return null;
+		}
+		$uploads = wp_upload_dir( null, false );
+		$basedir = realpath( (string) ( $uploads['basedir'] ?? '' ) );
+		$file    = realpath( (string) ( $uploads['basedir'] ?? '' ) . '/' . $relative );
+		if ( false === $basedir || false === $file || 0 !== strncmp( $file, $basedir . '/', strlen( $basedir ) + 1 ) ) {
+			return null;
+		}
+		$id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value = %s LIMIT 1",
+				$relative
+			)
+		);
+		$size = @getimagesize( $file );
+		if ( null === $id || false === $size || $size[0] < 1 || $size[1] < 1 ) {
+			return null;
+		}
+		return array(
+			'id'     => (int) $id,
+			'width'  => (int) $size[0],
+			'height' => (int) $size[1],
+		);
+	}
+}
+
 final class Claude_Cowork_Apply_Log implements ApplyLog {
 
 	/** Raised whenever the table's shape changes, so an upgraded site rebuilds it. */

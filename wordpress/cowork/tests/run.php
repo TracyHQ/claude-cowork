@@ -1595,6 +1595,8 @@ require __DIR__ . '/navigation-links.php';
 require __DIR__ . '/content-api.php';
 // Content API v2 on the write side: content revisions and structured errors (content.contract).
 require __DIR__ . '/content-revisions.php';
+// Image slots: a picture from the media library into a core/image block of a sealed site.
+require __DIR__ . '/image-slots.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

@@ -318,7 +318,9 @@ function claude_cowork_exec(): void
             (string) get_option(QuickstartContract::SETTING_OPTION, ''),
             // The reader answers `expected_content_revisions` and the receipt's `contentRevisions`,
             // so an apply holds the same revision `content.read` listed.
-            new Claude_Cowork_Content_Revisions(__DIR__ . '/lib/contracts', (string) claude_cowork_version())
+            new Claude_Cowork_Content_Revisions(__DIR__ . '/lib/contracts', (string) claude_cowork_version()),
+            // An image slot's picture must be an attachment in this site's uploads, in its slot's shape.
+            new Claude_Cowork_Image_Library()
         )
     );
 

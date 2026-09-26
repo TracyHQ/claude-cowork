@@ -996,7 +996,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
                 continue;
             }
             $attr = (string) ($slot['target']['attr'] ?? 'content');
-            $out[$slot['target']['block'] . '|' . ($attr === 'text' ? 'content' : $attr)] = $match[$entity] . $slot['key'];
+            // A projected block has one field under its bare name: its text, or for a
+            // `core/image` its picture — so a `text` slot and an image (`src`) slot both land there.
+            $out[$slot['target']['block'] . '|' . ($attr === 'text' || $attr === 'src' ? 'content' : $attr)] = $match[$entity] . $slot['key'];
         }
         return $out;
     }

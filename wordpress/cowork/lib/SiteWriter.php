@@ -132,6 +132,30 @@ interface MediaWriter
     public function deleteAttachment(int $attachmentId): void;
 }
 
+/**
+ * The site's media library, as far as an image slot needs it: is this file a picture WordPress
+ * knows, which attachment is it, and what shape is it.
+ *
+ * An image slot writes a picture into a `core/image` block. The block carries the attachment id
+ * twice (`"id":N` and the `wp-image-N` class), and the editor uses both to find the file again, so
+ * a path alone is not enough to write: the path has to resolve to an attachment. The shape is what
+ * keeps a sealed layout intact — a 16:9 photo in a 4:5 frame is a different design.
+ *
+ * Behind an interface for the same reason as SiteWriter: the contract is tested against memory,
+ * and only the plugin speaks to `$wpdb` and the uploads folder.
+ */
+interface ImageLibrary
+{
+    /**
+     * The attachment and pixel size of one picture, or null when the path is not a readable image
+     * with an attachment in this site's uploads.
+     *
+     * @param string $path Webroot-relative, `wp-content/uploads/…` — already checked for shape.
+     * @return array{id:int,width:int,height:int}|null
+     */
+    public function find(string $path): ?array;
+}
+
 interface ApplyLog
 {
     /**

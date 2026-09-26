@@ -64,18 +64,25 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
 - `content.contract` takes `operation`:
-  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme
     file changed or added under `fileRoots`, a pinned option, a template part, an entity
     missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
-    slot masked as `{{slot}}`.
+    slot masked as `{{slot}}` — except an image slot, which is put back to its demo picture
+    (`sample` + `sampleId`), so a page nobody touched hashes to the bytes it shipped as.
+    `imageSlots` maps each image slot to that demo picture: a new one must have its shape.
   - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
     problem: the baseline is the released lock, never a snapshot of the site as found.
   - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:
     {slotKey | locale::slotKey: value}`, optional `evidence`. Every value is checked before any
     write: known slot, `maxCharacters`, no `<` `>` or control characters, no `{directive}`
     (identity tokens `{site.*}` `{contact.*}` `{social.*}` are allowed), links limited to
-    `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. One read and one
+    `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. An image slot
+    (`type: "image"`, target `attr: "src"` on a `core/image` block) takes a
+    `wp-content/uploads/….png|jpg|jpeg|webp` path that is an attachment of this site, within 0.02
+    of its demo picture's aspect ratio; the write sets the `src`, the block `id` and the
+    `wp-image-N` class. Anything else is `SLOT_IMAGE_INVALID` (recoverable). The usual road is
+    `media.upload` to `tracy-content/<sha256>` under a non-`contract-` id, then this apply. One read and one
     write per row. The same `request_id` with the same content replays the stored result; a new
     request under a used `apply_id` is refused. With Polylang, a write of `blogname` or
     `blogdescription` also writes the same value as every language's string translation of it

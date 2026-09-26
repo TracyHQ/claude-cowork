@@ -115,7 +115,9 @@ $realDir = __DIR__ . '/../lib/contracts/tracy-business/wp7/1.1.0';
 $real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
 $real->preview('tracy-business/wp7/1.1.0');
 check('the shipped Tracy Business profile has its ten entities', count($real->entities()), 10);
-check('and its 278 slots', count($real->slots()), 278);
+check('and its 303 slots', count($real->slots()), 303);
+check('25 of them pictures, each with the demo it replaces', count(array_filter($real->slots(),
+    static fn(array $slot): bool => ($slot['type'] ?? '') === 'image' && is_string($slot['sample'] ?? null) && is_int($slot['sampleId'] ?? null))), 25);
 check('and 205 demo rows to hide', count($real->demoTrim()->rows()), 205);
 check('and 41 editions', count($real->editionLanguages()), 41);
 $realBase = DemoTrimProfile::baseHash($realDir);
