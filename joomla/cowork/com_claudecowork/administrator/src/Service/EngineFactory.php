@@ -94,7 +94,9 @@ final class EngineFactory
         if ($configured !== '' && !$valid) $directory = self::libDir() . '/contracts/unconfigured';
         $writer = self::buildWriter();
         if (!$writer) return null;
-        return new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore(Factory::getContainer()->get(DatabaseInterface::class)), JPATH_ROOT, $directory);
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory))
+            ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
     }
 
     /**

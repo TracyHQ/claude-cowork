@@ -27,6 +27,19 @@ interface ContractStore {
     public function access(): array;
 }
 
+/**
+ * Where the locked files' proofs are remembered between door calls: path → [size, mtime, ctime,
+ * inode, sha256]. Private database state like the binding (never a file under the webroot), and in
+ * its own table: the content reader snapshots #__claudecowork_content_contract whole, and 600 KB of
+ * proofs there would ride along in every read.
+ */
+interface FileProofStore {
+    /** @return array<string, array{0:int,1:int,2:int,3:int,4:string}> */
+    public function load(): array;
+    /** @param array<string, array{0:int,1:int,2:int,3:int,4:string}> $proofs */
+    public function save(array $proofs): void;
+}
+
 /** Trusted package data, never a caller-supplied field allowlist. */
 final class QuickstartContract
 {
@@ -366,6 +379,12 @@ final class QuickstartContract
      * inspect hashes them all; false until the first inspect inside one has; then true.
      */
     private ?bool $filesProved = null;
+    /** Proofs from earlier door calls, when the host keeps them (`withFileProofs`); null hashes every file. */
+    private ?FileProofStore $proofs = null;
+    /** Remember the locked files' proofs between door calls; see {@see files()}. */
+    public function withFileProofs(FileProofStore $proofs): self { $this->proofs = $proofs; return $this; }
+    /** Seconds a file must stand unchanged before its proof is remembered (the racy-git rule). */
+    private const PROOF_SETTLE_SECONDS = 2;
     /**
      * Prove the locked files once for the rest of one door call: apply's plan and verify, revert's
      * inspect before and after (#316: 4,145 files hashed twice per apply). Only for a call that
@@ -374,14 +393,38 @@ final class QuickstartContract
      */
     public function beginCall(): void { $this->filesProved = false; }
     public function endCall(): void { $this->filesProved = null; }
+    /**
+     * 🔒 PROVE EVERY LOCKED FILE, AND HASH ONLY THE ONES A WRITE COULD HAVE CHANGED. Every inspect and
+     * every apply hashed all 4,145 files of the Business lock: 3.9 s of a 5.5 s inspect and 7.9 s of
+     * a 10.9 s apply whose write took 38 ms (0.18.0-rc.11, timing:true, Tracy bench clone 27/09/2026).
+     * A file whose size, mtime, ctime and inode all match the proof remembered for it is the file
+     * that was hashed then: ctime moves on every write and chmod, and no user-space call can set
+     * it back. What would slip is a write landing within the same second as the proof — so a file
+     * younger than {@see PROOF_SETTLE_SECONDS} is never remembered (git's racy-entry rule). Without
+     * a store, or when it fails, every file is hashed as before.
+     */
     private function files(): void {
         if($this->filesProved)return;
         $t=Timing::begin();
+        clearstatcache();
+        $known=[];
+        if($this->proofs)try{$known=$this->proofs->load();}catch(Throwable $ignored){$known=[];}
+        $remember=[];$hashed=0;$now=time();
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
-            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))$this->drift('Presentation asset changed: '.$path);
+            if(is_link($file)||!is_file($file)){$this->drift('Presentation asset changed: '.$path);continue;}
+            $st=@stat($file);
+            $key=$st===false?null:[(int)$st['size'],(int)$st['mtime'],(int)$st['ctime'],(int)$st['ino']];
+            $proof=$known[$path]??null;
+            if($key!==null && is_array($proof) && count($proof)===5 && array_slice($proof,0,4)===$key && is_string($proof[4]))$sum=$proof[4];
+            else {$sum=hash_file('sha256',$file);$hashed++;}
+            if(!is_string($sum)||!hash_equals($hash,$sum)){$this->drift('Presentation asset changed: '.$path);continue;}
+            if($key!==null && max($key[1],$key[2])<=$now-self::PROOF_SETTLE_SECONDS)$remember[$path]=[...$key,$sum];
         }
+        // Written only when something moved: an unchanged site reads its proofs and writes nothing.
+        if($this->proofs && $remember!=$known)try{$this->proofs->save($remember);}catch(Throwable $ignored){}
+        Timing::count('filesHashed',$hashed);
         foreach($this->lock['fileRoots'] as $prefix) {
             // A folder removed through Joomla is a difference like any other (Tracy ADR 0022).
             if(!is_dir($this->root.'/'.$prefix)){$this->drift('Presentation folder missing: '.$prefix);continue;}
