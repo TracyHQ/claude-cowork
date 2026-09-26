@@ -149,11 +149,12 @@ exclusions, template parameters, layout/override assets, language and effective 
 Joomla `{loadposition ...}` directives are structure, not editable copy. Factual slots require a
 provenance reference, whose truth still needs review. Bound media uploads use content-addressed
 paths under `images/tracy-content/`. Admin/direct database or filesystem access remains outside
-this API boundary; drift is detected on the next contract request.
+this API boundary; a difference from the quickstart's design is reported as a warning on the next
+contract request (Tracy ADR 0022), and refused only when the contract's own write made it.
 
 Release activation is separate from source availability: 0.14.0 has been tested as a local package,
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
-use content-only mode. The published 1.1.0 profile is not the later, locally modified 8212 demo.
+use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.
 
 ## Unreleased Joomla 6 Content API pilot
 

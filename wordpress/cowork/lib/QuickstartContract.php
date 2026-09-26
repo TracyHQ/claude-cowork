@@ -467,6 +467,12 @@ final class QuickstartContract
         $this->resolve($requested);
         $binding = $this->store->load();
         $problems = [];
+        // 🔒 WHERE THE SITE DIFFERS FROM ITS QUICKSTART'S DESIGN IS A WARNING, NOT A PROBLEM (Tracy ADR
+        // 0022, 26/09/2026): a theme file, an option, a template part or a page's blocks changed through
+        // WordPress itself. `problems` keeps what makes a slot unsafe to write (the profile changed, a
+        // bound entity moved or vanished, a slot that cannot be read); `drift` is reported, and a write
+        // is refused only for drift it made itself (`inspectClean`'s `$tolerated`).
+        $drift = [];
         $this->homeHost = null;
 
         $lineage = null;
@@ -489,7 +495,7 @@ final class QuickstartContract
         }
 
         foreach ($this->files() as $problem) {
-            $problems[] = $problem;
+            $drift[] = $problem;
         }
 
         // Option values the lock pins. Old profiles spell the key `options`; both are read.
@@ -497,7 +503,7 @@ final class QuickstartContract
         foreach (is_array($optionValues) ? $optionValues : [] as $name => $want) {
             $have = $this->writer->read('option', 0, (string) $name);
             if ($have === null || (string) $have['value'] !== (string) $want) {
-                $problems[] = 'Option ' . $name . ' differs from the lock';
+                $drift[] = 'Option ' . $name . ' differs from the lock';
             }
         }
 
@@ -514,9 +520,9 @@ final class QuickstartContract
             }
             $part = $this->writer->read('templatePart', 0, (string) $slug);
             if ($part === null) {
-                $problems[] = 'Template part ' . $slug . ' is missing (the theme file is in charge)';
+                $drift[] = 'Template part ' . $slug . ' is missing (the theme file is in charge)';
             } elseif (!hash_equals((string) ($pin['sha256'] ?? ''), hash('sha256', (string) $part['content']))) {
-                $problems[] = 'Template part ' . $slug . ' was edited';
+                $drift[] = 'Template part ' . $slug . ' was edited';
             }
         }
 
@@ -554,11 +560,11 @@ final class QuickstartContract
             if ($pin !== null && $kind !== 'option') {
                 foreach (['post_type', 'post_name'] as $field) {
                     if (isset($pin[$field]) && (string) ($row[$field] ?? '') !== (string) $pin[$field]) {
-                        $problems[] = 'Entity ' . $key . ' has another ' . $field;
+                        $drift[] = 'Entity ' . $key . ' has another ' . $field;
                     }
                 }
                 if (isset($pin['post_parent']) && (int) ($row['post_parent'] ?? 0) !== (int) $pin['post_parent']) {
-                    $problems[] = 'Entity ' . $key . ' has another parent';
+                    $drift[] = 'Entity ' . $key . ' has another parent';
                 }
                 if (isset($pin['post_status'])) {
                     $allowed = [(string) $pin['post_status']];
@@ -569,7 +575,7 @@ final class QuickstartContract
                         $allowed = [$trimRow['from'], $trimRow['to']];
                     }
                     if (!in_array((string) ($row['post_status'] ?? ''), $allowed, true)) {
-                        $problems[] = 'Entity ' . $key . ' has another status';
+                        $drift[] = 'Entity ' . $key . ' has another status';
                     }
                 }
             }
@@ -613,7 +619,7 @@ final class QuickstartContract
             }
             if ($pin !== null && isset($pin['skeleton']) && !$broken
                 && !hash_equals((string) $pin['skeleton'], hash('sha256', $masked))) {
-                $problems[] = 'Entity ' . $key . ' differs from the lock outside its slots';
+                $drift[] = 'Entity ' . $key . ' differs from the lock outside its slots';
             }
         }
 
@@ -634,6 +640,7 @@ final class QuickstartContract
             'siteLanguage' => self::siteLanguageState($binding),
             'contractLineage' => $lineage,
             'problems' => $problems,
+            'drift' => $drift,
         ];
     }
 
@@ -676,12 +683,18 @@ final class QuickstartContract
         ];
     }
 
-    /** An inspect that must be clean — what every write is conditioned on. */
-    public function inspectClean(?string $requested = null): array
+    /**
+     * An inspect that must be clean — what every write is conditioned on. With `$tolerated` (the
+     * drift a write began with), a difference from the design the write itself made is a problem too.
+     *
+     * @param string[]|null $tolerated
+     */
+    public function inspectClean(?string $requested = null, ?array $tolerated = null): array
     {
         $state = $this->inspect($requested);
-        if ($state['problems'] !== []) {
-            throw new RuntimeException(implode('; ', $state['problems']));
+        $made = $tolerated === null ? [] : array_values(array_diff($state['drift'], $tolerated));
+        if ($state['problems'] !== [] || $made !== []) {
+            throw new RuntimeException(implode('; ', array_merge($state['problems'], $made)));
         }
         return $state;
     }

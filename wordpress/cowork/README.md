@@ -9,41 +9,42 @@ POST /wp-admin/admin-ajax.php?action=claude_cowork
 
 ## What it can do
 
-Every action, and what happens to it once the site is **sealed** — bound to a content-only
-quickstart contract (below). A read answers the same either way. A write is either refused with
-`content_only`, or still allowed under the rule in the last column.
+Every action, and what happens to it once the site is **bound** to a quickstart contract (below).
+Since Tracy ADR 0022 (26/09/2026) a contract recommends how to keep the quickstart's design and
+locks nothing: a bound site takes every action an unbound one does, with the few rules in the last
+column. Where the site differs from its design, the contract door says so in `warnings`.
 
-| Action | Kind | Unbound site | Sealed site |
+| Action | Kind | Unbound site | Bound site |
 | --- | --- | --- | --- |
 | `info` | read | ok | ok |
 | `site.stats` | read | ok | ok |
 | `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
 | `db.tables` | read | ok | ok |
 | `db.dump` | read | ok | ok |
-| `db.cleanup` | write | ok | `content_only` |
-| `db.restore` | write | ok | `content_only` |
-| `db.purge` | write | ok | `content_only` |
+| `db.cleanup` | write | ok | ok |
+| `db.restore` | write | ok | ok |
+| `db.purge` | write | ok | ok |
 | `files.list` | read | ok | ok |
 | `files.pack` | read | ok | ok |
 | `file.read` | read | ok | ok |
 | `plugin.list` | read | ok | ok |
-| `plugin.install` | write | ok | `content_only` |
-| `plugin.activate` | write | ok | `content_only` |
-| `plugin.selfUpdate` | write | ok | `content_only` |
+| `plugin.install` | write | ok | ok |
+| `plugin.activate` | write | ok | ok |
+| `plugin.selfUpdate` | write | ok | ok |
 | `theme.list` | read | ok | ok |
-| `theme.install` | write | ok | `content_only` |
-| `theme.activate` | write | ok | `content_only` |
-| `theme.style` | write | ok | `content_only` |
-| `theme.palette` | read with no `colors`, else write | ok | read ok; write `content_only` |
+| `theme.install` | write | ok | ok |
+| `theme.activate` | write | ok | ok |
+| `theme.style` | write | ok | ok |
+| `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
-| `language.install` | write | ok | `content_only` |
+| `language.install` | write | ok | ok |
 | `content.list` | read | ok | ok |
 | `content.get` | read | ok | ok |
-| `content.update` | write | ok | `content_only` — slot values go through `content.contract` `apply` |
-| `content.language` | write | ok | `content_only` |
-| `content.delete` | write | ok | `content_only` — demo posts are hidden through `content.contract` `demoTrim.apply` |
-| `media.upload` | write | ok | allowed only at `wp-content/uploads/tracy-content/<sha256 of the bytes>.(png\|jpg\|webp)`, under an `apply_id` that does not start with `contract-` |
-| `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
+| `content.update` | write | ok | ok |
+| `content.language` | write | ok | ok |
+| `content.delete` | write | ok | ok |
+| `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
+| `apply.revert` | write | ok | ok; a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
 | `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
@@ -54,9 +55,11 @@ uninstall.
 
 ## The content contract
 
-A site built from a Tracy quickstart is **sealed**: it keeps the design the release shipped, and
-the customer's agent changes words — the value of every slot the profile's `content-map.json`
-names — and nothing else. The profiles live in [`lib/contracts/`](lib/contracts/README.md), one
+A site built from a Tracy quickstart is **bound** to its release's content contract: the
+profile's `content-map.json` names every slot a visitor's words live in, and `content.contract`
+changes them fast and undoably while keeping the design. The contract is the design's baseline, not
+a lock (Tracy ADR 0022): anything else changes the usual WordPress way, and the door reports where
+the site differs from the release as `warnings`; it refuses only a difference its own write makes. The profiles live in [`lib/contracts/`](lib/contracts/README.md), one
 directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
 
 - The seal is one option, `_tracy_content_contract` (JSON, not autoloaded). Which profile a site
@@ -113,7 +116,7 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     from, applyId} | null`. `revert` puts all five values back as recorded (`WPLANG` absent
     again when it was absent, `hide_default` as it was),
     clears the log and takes the record off: `{ok, status: 'reverted', language: <slug back>}`.
-    `apply.revert` refuses an `slang-` id on a sealed site; on an unbound site it undoes the
+    `apply.revert` refuses an `slang-` id on a bound site; on an unbound site it undoes the
     same step from the log. No Polylang is `unavailable`; no editions profile is `unsupported`.
   - `multilingual.retire` (prefix `mlang-`) — `keep: [tags as the questionnaire spells them:
     "en-us", "vi", "de-de"]`, `apply_id`, `request_id`. Sets the LIVE edition set: every edition
@@ -132,14 +135,15 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     every edition, and a restore brings back only what the retire hid.
   - `multilingual.restore` (`apply_id` = the `mlang-` id on record) — puts every row of that
     pass back (newest first), clears its log and takes the record off the binding:
-    `{ok, restored, applyId}`. `apply.revert` refuses an `mlang-` id on a sealed site.
+    `{ok, restored, applyId}`. `apply.revert` refuses an `mlang-` id on a bound site.
   - While a retired set is on record, `lib/MultilingualHooks.php` (loaded on every request,
     engine-free) keeps those languages out of Polylang's switcher — the html list and dropdown
     through `pll_the_languages`, the raw list through `pll_the_languages_args` +
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
-- Error codes: `content_only` (a structural write on a sealed site), `contract_unavailable`
+- Warnings: `PRESENTATION_DRIFT` with `severity: warning` on `inspect`, `bind` and `apply` answers,
+  one per difference from the released design. Error codes: `contract_unavailable`
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
   `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
   (another writer holds the site's lock).

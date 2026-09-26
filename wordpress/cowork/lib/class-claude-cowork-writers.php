@@ -70,8 +70,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		'user_roles',
 		'claude_cowork_token',
 		'claude_cowork_db_version',
-		// The content-only seal and which profile it names. Writable through `content.update`,
-		// either could unseal a customer's site with one option write, so both are refused here
+		// The contract's record and which profile it names. Writable through `content.update`,
+		// either could unbind a customer's site with one option write, so both are refused here
 		// and reached only through the contract door.
 		'_tracy_content_contract',
 		'claude_cowork_contract',

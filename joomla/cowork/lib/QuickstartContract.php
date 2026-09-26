@@ -43,6 +43,48 @@ final class QuickstartContract
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
     private ?DemoTrimProfile $demoTrim = null;
+
+    /**
+     * 🔒 THE DESIGN IS A BASELINE TO COMPARE, NOT A LOCK (Tracy ADR 0022, 26/09/2026). A site may
+     * change its template, layout, modules or files through Joomla itself; the contract then says
+     * where it differs from the quickstart — as warnings — and keeps its own door working. What it
+     * still refuses is a difference its OWN write made: the first inspect of a request records the
+     * differences already there (`$tolerated`), and every later inspect in the same request — the
+     * check after an apply, a revert, a language step — throws on any difference that was not.
+     * `newRequest()`/`endRequest()` (Engine::handle) bound the request; outside one, an inspect only reports.
+     *
+     * @var list<string>|null
+     */
+    private ?array $tolerated = null;
+    /** @var list<string> */
+    private array $drift = [];
+
+    /** Whether an Engine request is running: only then is a new difference a refusal. */
+    private bool $inRequest = false;
+
+    /** Start a request: the next inspect records what already differs. */
+    public function newRequest(): void { $this->inRequest = true; $this->tolerated = null; }
+
+    /** End it: an inspect outside a request only reports. */
+    public function endRequest(): void { $this->inRequest = false; $this->tolerated = null; }
+
+    /**
+     * The differences from the quickstart's design this request began with — what an apply's answer
+     * warns about, although its own write moved the baseline past them — or, outside a request, what
+     * the last inspect found. @return list<string>
+     */
+    public function driftWarnings(): array { return $this->tolerated ?? $this->drift; }
+
+    private function drift(string $message): void { $this->drift[] = $message; }
+
+    /** After an inspect has collected its differences: remember them, or refuse the new ones. */
+    private function settleDrift(): void {
+        if (!$this->inRequest) return;
+        if ($this->tolerated === null) { $this->tolerated = $this->drift; return; }
+        $new = array_values(array_diff($this->drift, $this->tolerated));
+        if ($new) throw new ContractProblem('PRESENTATION_DRIFT', $new[0]);
+    }
+
     public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
@@ -307,14 +349,14 @@ final class QuickstartContract
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
-            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))throw new ContractProblem('PRESENTATION_DRIFT','Presentation asset changed: '.$path);
+            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))$this->drift('Presentation asset changed: '.$path);
         }
         foreach($this->lock['fileRoots'] as $prefix) {
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if($this->generatedCache($relative) && !$file->isLink())continue;
-                if(!isset($this->lock['files'][$relative]))throw new ContractProblem('PRESENTATION_DRIFT','Unexpected presentation file: '.$relative);
+                if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }
     }
@@ -411,6 +453,7 @@ final class QuickstartContract
 
     public function inspect(): array {
         $this->ready();
+        $this->drift = [];
         $this->files(); $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
@@ -499,7 +542,7 @@ final class QuickstartContract
                 $differ=[];
                 foreach($expected as $field=>$value)if(!array_key_exists($field,$actual)||$actual[$field]!=$value)$differ[]=$field.' [want '.substr(json_encode($value),0,60).' got '.substr(json_encode($actual[$field]??null),0,60).']';
                 foreach($actual as $field=>$value)if(!array_key_exists($field,$expected))$differ[]=$field.' (unexpected)';
-                throw new ContractProblem('PRESENTATION_DRIFT','Presentation drift: '.$key.' — '.implode(', ',$differ));
+                $this->drift('Presentation drift: '.$key.' — '.implode(', ',$differ));
             }
             $protected[$key]=$actual;
         }
@@ -524,7 +567,7 @@ final class QuickstartContract
                 }
             }
             sort($expected);
-            if($menus!=$expected)throw new ContractProblem('PRESENTATION_DRIFT','Module assignment drift: '.$key);
+            if($menus!=$expected)$this->drift('Module assignment drift: '.$key);
             $assignments[$key]=$menus;
         }
         $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
@@ -542,7 +585,7 @@ final class QuickstartContract
                 )),0,6);
                 $where[]=$part.'('.implode(' ',$keysDiffer).')';
             }
-            throw new ContractProblem('PRESENTATION_DRIFT','Access-level or ACL definition changed: '.implode(', ',$where));
+            $this->drift('Access-level or ACL definition changed: '.implode(', ',$where));
         }
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
@@ -552,7 +595,8 @@ final class QuickstartContract
             foreach($state['ids'] as $baseKey=>$id)$expectedCounts[$this->baseEntities()[$baseKey]['kind']]++;
         }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
-        if($counts!=$expectedCounts)throw new ContractProblem('PRESENTATION_DRIFT','Quickstart inventory changed');
+        if($counts!=$expectedCounts)$this->drift('Quickstart inventory changed');
+        $this->settleDrift();
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
         // Carried through every rebind, or the next content edit would store a baseline that no
@@ -871,7 +915,17 @@ final class QuickstartContract
         return array_keys($this->store->load()['multilingual']['languages'] ?? []);
     }
 
-    public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); $this->syncSourceRelabel(); }
+    /**
+     * Save the baseline after a content write. It must equal the stored one — a content apply changes
+     * no structure — unless this request began on a site that already differs from its baseline
+     * (changed through Joomla itself, Tracy ADR 0022): the baseline then moves to where the site
+     * stands, and the check after the write still refuses any difference the write itself made.
+     */
+    public function bind(array $snapshot): void {
+        $this->ready();
+        if ($this->tolerated) $this->store->replace($snapshot); else $this->store->save($snapshot);
+        $this->syncSourceRelabel();
+    }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
     public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->syncSourceRelabel(); }
 

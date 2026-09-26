@@ -132,11 +132,12 @@ check('and applies with it', $rvH2['ok'], true);
 $rvFresh = fn() => [$rvHome => $rvOracle()['revisions'][$rvHome]];
 $rvWriter->store['module'][110]['position'] = 'elsewhere';
 $rvDrift = $rvApply('drift', ['expected_content_revisions' => $rvFresh(), 'changes' => ['hero.0' => 'Drift title']]);
-check('presentation drift refuses an apply with fresh content revisions', [$rvDrift['ok'], $rvDrift['errors'][0]['code'], $rvDrift['errors'][0]['severity']], [false, 'PRESENTATION_DRIFT', 'unrecoverable']);
+// Tracy ADR 0022: a site that differs from its quickstart still takes an apply; the difference is a warning.
+check('presentation drift is a warning on an apply with fresh content revisions', [$rvDrift['ok'], $rvDrift['warnings'][0]['code'], $rvDrift['warnings'][0]['severity']], [true, 'PRESENTATION_DRIFT', 'warning']);
 $rvWriter->store['module'][110]['position'] = 'masthead';
 file_put_contents($rvDir . '/assets/demo.css', '.hero { display: none }');
 $rvFiles = $rvApply('files', ['expected_content_revisions' => $rvFresh(), 'changes' => ['hero.0' => 'Drift title']]);
-check('a changed presentation file refuses it too', [$rvFiles['ok'], $rvFiles['message'], $rvFiles['errors'][0]['code']], [false, 'Presentation asset changed: assets/demo.css', 'PRESENTATION_DRIFT']);
+check('a changed presentation file is a warning too', [$rvFiles['ok'], $rvFiles['warnings'][0]['message'], $rvFiles['warnings'][0]['code']], [true, 'Presentation asset changed: assets/demo.css', 'PRESENTATION_DRIFT']);
 file_put_contents($rvDir . '/assets/demo.css', '.hero { color: red }');
 $rvNoOracle = new Engine($WTOKEN, [], null, null, null, null, $rvWriter, null, $rvLog, null, null, null, $rvContract);
 $rvN = $rvNoOracle->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'apply', 'apply_id' => 'contract-no-oracle', 'request_id' => 'n',

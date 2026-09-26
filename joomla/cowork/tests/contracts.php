@@ -159,9 +159,15 @@ function contractRejects(string $label, callable $work): void {
     try { $work();check($label,'accepted','rejected'); }
     catch (RuntimeException $error) { check($label,'rejected','rejected'); }
 }
+// Tracy ADR 0022 (26/09/2026): a site that differs from its quickstart's design is REPORTED, never
+// refused — the inspect answers, and the difference is in its warnings.
+function contractDrifts(string $label, QuickstartContract $contract, callable $work): void {
+    try { $work();check($label,$contract->driftWarnings()!==[]?'reported':'silent','reported'); }
+    catch (RuntimeException $error) { check($label,'refused: '.$error->getMessage(),'reported'); }
+}
 check('T4 cache regeneration keeps the source contract valid',$contract->inspect()['contract'],'test/v1');
 file_put_contents($contractDir.'/media/t4/optimize/css/injected.php','unexpected executable');
-contractRejects('cache exception never allows executable files',fn()=>$contract->inspect());
+contractDrifts('cache exception never allows executable files',$contract,fn()=>$contract->inspect());
 unlink($contractDir.'/media/t4/optimize/css/injected.php');
 // T4 compiles `media/t4/css/<styleId>-sub.css` the first time a style renders a "subpage" (a page
 // that is not its menu item's own target) — measured 23/09/2026 on j-cr4l1l (ja-kinetic): one
@@ -171,29 +177,29 @@ file_put_contents($contractDir.'/media/t4/css/36-sub.css','compiled from locked 
 check('a T4 subpage stylesheet is cache, not a presentation change',$contract->inspect()['contract'],'test/v1');
 foreach(['36-sub.css.php','evil.css','36-sub.js'] as $name) {
     file_put_contents($contractDir.'/media/t4/css/'.$name,'not a compiled stylesheet');
-    contractRejects('the subpage exception does not admit '.$name,fn()=>$contract->inspect());
+    contractDrifts('the subpage exception does not admit '.$name,$contract,fn()=>$contract->inspect());
     unlink($contractDir.'/media/t4/css/'.$name);
 }
 unlink($contractDir.'/media/t4/css/36-sub.css');rmdir($contractDir.'/media/t4/css');
 foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
     $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;
-    contractRejects('contract rejects module '.$field.' drift',fn()=>$contract->inspect());
+    contractDrifts('contract reports module '.$field.' drift',$contract,fn()=>$contract->inspect());
     $cw->store['module'][110][$field]=$before;
 }
 $cw->store['moduleAssignment'][110]['menuids']='[0]';
-contractRejects('contract rejects changing exclusions to all pages',fn()=>$contract->inspect());
+contractDrifts('contract reports changing exclusions to all pages',$contract,fn()=>$contract->inspect());
 $cw->store['moduleAssignment'][110]['menuids']='[-121]';
 $cw->store['menuItem'][120]['access']='2';
-contractRejects('contract rejects menu access drift',fn()=>$contract->inspect());
+contractDrifts('contract reports menu access drift',$contract,fn()=>$contract->inspect());
 $cw->store['menuItem'][120]['access']='1';
 $cs->acl['viewlevels'][0]['rules']=[2];
-contractRejects('same access ID cannot silently change its audience',fn()=>$contract->inspect());
+contractDrifts('same access ID cannot silently change its audience',$contract,fn()=>$contract->inspect());
 $cs->acl['viewlevels'][0]['rules']=[1];
 $cw->store['module'][111]=['id'=>'111']+$module;
-contractRejects('contract rejects an extra module',fn()=>$contract->inspect());
+contractDrifts('contract reports an extra module',$contract,fn()=>$contract->inspect());
 unset($cw->store['module'][111]);
 file_put_contents($contractDir.'/assets/demo.css','.hero { display: none }');
-contractRejects('contract rejects CSS drift',fn()=>$contract->inspect());
+contractDrifts('contract reports CSS drift',$contract,fn()=>$contract->inspect());
 file_put_contents($contractDir.'/assets/demo.css','.hero { color: red }');
 foreach(['hero.0'=>'','hero.99'=>'unknown'] as $key=>$value)contractRejects('contract rejects empty or unknown slot '.$key,fn()=>$contract->plan(['expected_revision'=>$state['revision'],'changes'=>[$key=>$value]]));
 $urlSlot=current(array_filter($slots,fn($s)=>$s['type']==='url'))['key'];
@@ -208,7 +214,9 @@ $cs->binding=null;
 $bind=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']];
 check('bootstrap binds before any customer write',$receiver->handle($bind)['bound'],true);
 check('bootstrap binding is idempotent',$receiver->handle($bind)['bound'],true);
-check('bootstrap immediately blocks generic writes',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'content_only');
+// Tracy ADR 0022: a bound site takes the writes any site takes; the ordinary revert takes them back.
+check('a bound site takes a generic write',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic-0','fields'=>['published'=>'0']]])['ok'],true);
+check('and the ordinary revert takes it back',$receiver->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic-0']])['ok'],true);
 $first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
 // Each refusal names the one id that is wrong: a single sentence for both sent an agent that had
 // both round fourteen retries with an apply_id that never carried the prefix.
@@ -224,7 +232,8 @@ $firstResult=$receiver->handle($first);
 check('contract receiver commits content in place',$firstResult['ok'],true);
 check('inspect exposes current content separately from immutable demo samples',$receiverContract->inspect()['slots'][0]['current'],'First customer title');
 check('contract receiver replays the identical committed receipt',$receiver->handle($first),$firstResult);
-check('bound receiver refuses generic module unpublishing',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['error'],'content_only');
+check('a bound receiver unpublishes a module through the ordinary door',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['ok'],true);
+check('and puts it back through the ordinary revert',$receiver->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic']])['ok'],true);
 $second=$first;$second['params']['apply_id']='contract-second';$second['params']['request_id']='second';
 $second['params']['expected_revision']=$receiverContract->inspect()['revision'];$second['params']['changes']['hero.0']='Second customer title';
 check('contract receiver commits a later revision',$receiver->handle($second)['ok'],true);
@@ -327,7 +336,7 @@ try { $reuseState=$reuse->inspect(); } catch (RuntimeException $error) { echo ' 
 check('a reused archive switcher is held to its own lock, not the new-switcher shape',$reuseState['switcher']??null,110);
 // Still strict: the reused module drifting from its lock is refused, as any governed module is.
 $rw->store['module'][110]['title']='Somebody renamed it';
-contractRejects('a reused switcher that drifts is still refused',fn()=>$reuse->inspect());
+contractDrifts('a reused switcher that drifts is still reported',$reuse,fn()=>$reuse->inspect());
 
 foreach(['manifest','content-map','presentation-lock','multilingual-map'] as $name)unlink($reuseDir.'/'.$name.'.json');
 unlink($reuseDir.'/assets/demo.css');rmdir($reuseDir.'/assets');rmdir($reuseDir);

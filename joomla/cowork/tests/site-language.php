@@ -70,7 +70,7 @@ check('a second language on top is refused, not stacked', $langCall(['operation'
 
 $copy = $langCall(['operation' => 'apply', 'apply_id' => 'contract-l1', 'request_id' => 'l1', 'expected_revision' => $langContract->inspect()['revision'], 'changes' => ['hero.0' => 'Tôn lợp Hà Nội']]);
 check('a content apply after it keeps the language on record', [$copy['ok'], $langStore->binding['siteLanguage']['locale'] ?? null], [true, 'vi-VN']);
-check('the generic revert does not take the language apart', $langEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-a']])['error'], 'content_only');
+check('the generic revert does not take the language apart', $langEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-a']])['error'], 'bad_params');
 
 $back = $langCall(['operation' => 'siteLanguage.revert', 'apply_id' => 'slang-undo', 'request_id' => 'u1']);
 check('revert restores the previous defaults and drops the record', [$back['ok'], $langWriter->store['languageDefaults'], isset($langStore->binding['siteLanguage'])], [true, ['site' => 'en-GB', 'administrator' => 'en-GB'], false]);

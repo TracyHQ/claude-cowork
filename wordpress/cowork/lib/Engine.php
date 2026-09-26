@@ -49,18 +49,8 @@ final class Engine
     private bool $writing = false;
 
     private const MAX_DB_LIMIT = 5000;
-    /**
-     * What a sealed site refuses — a specific list, no wildcard, so a new action is not blocked or
-     * allowed by accident but by somebody adding it to one of the two lists here.
-     */
-    private const CONTENT_ONLY_BLOCKED = [
-        'content.update', 'content.delete', 'content.language', 'language.install',
-        'plugin.install', 'plugin.activate', 'plugin.selfUpdate',
-        'theme.install', 'theme.activate', 'theme.style', 'theme.palette',
-        'db.cleanup', 'db.restore', 'db.purge',
-    ];
-    /** Writes a sealed site still takes, each under its own rule in handle(). */
-    private const CONTENT_ONLY_RULED = ['media.upload', 'apply.revert', 'content.contract'];
+    /** Writes that go through the contract's own rules on a bound site (see handle()). */
+    private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
     private const SERIALIZED = [
         'content.contract', 'content.update', 'content.delete', 'content.language',
@@ -160,31 +150,44 @@ final class Engine
             try {
                 $bound = $this->contract->bound();
             } catch (Throwable $e) {
-                if (in_array($action, self::CONTENT_ONLY_BLOCKED, true) || in_array($action, self::CONTENT_ONLY_RULED, true)) {
+                if (in_array($action, self::CONTRACT_RULED, true) || in_array($action, self::SERIALIZED, true)) {
                     return $this->err('contract_unavailable', $e->getMessage());
                 }
             }
         }
+        // The contract's own record is not an option like the others: written through content.update,
+        // one write could unbind the site or name another profile. It moves only through its door.
+        if (in_array($action, ['content.update', 'content.delete'], true) && ($params['kind'] ?? '') === 'option'
+            && in_array((string) ($params['key'] ?? ''), [QuickstartContract::STORE_OPTION, 'claude_cowork_contract'], true)) {
+            return $this->err('bad_params', "This option is the contract's own record; it changes only through content.contract");
+        }
+        // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
+        // 26/09/2026). A bound site takes every action an unbound one does; the contract's own rules
+        // stay on its own door and on the picture folder its image slots use.
         if ($bound) {
-            if (in_array($action, self::CONTENT_ONLY_BLOCKED, true)) {
-                return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
-            }
             if ($action === 'media.upload') {
                 $path = isset($params['path']) && is_string($params['path']) ? $params['path'] : '';
-                if (!preg_match(self::CONTRACT_MEDIA_PATH, $path)) {
-                    return $this->err('content_only', 'Use a new content-addressed image under wp-content/uploads/tracy-content/<sha256>.<png|jpg|webp>');
-                }
-                $b64 = isset($params['content_b64']) && is_string($params['content_b64']) ? $params['content_b64'] : '';
-                $bytes = base64_decode($b64, true);
-                if ($bytes === false || !hash_equals(hash('sha256', $bytes), (string) pathinfo($path, PATHINFO_FILENAME))) {
-                    return $this->err('content_only', 'The image name must be the sha256 of its bytes');
-                }
-                if (strpos((string) ($params['apply_id'] ?? ''), 'contract-') === 0) {
-                    return $this->err('content_only', 'Media uploads must use a separate apply receipt, not a contract- apply_id');
+                if (strpos($path, 'wp-content/uploads/tracy-content/') === 0) {
+                    if (!preg_match(self::CONTRACT_MEDIA_PATH, $path)) {
+                        return $this->err('bad_params', 'A picture under wp-content/uploads/tracy-content/ is named <sha256>.<png|jpg|webp>');
+                    }
+                    $b64 = isset($params['content_b64']) && is_string($params['content_b64']) ? $params['content_b64'] : '';
+                    $bytes = base64_decode($b64, true);
+                    if ($bytes === false || !hash_equals(hash('sha256', $bytes), (string) pathinfo($path, PATHINFO_FILENAME))) {
+                        return $this->err('bad_params', 'The image name must be the sha256 of its bytes');
+                    }
+                    if (strpos((string) ($params['apply_id'] ?? ''), 'contract-') === 0) {
+                        return $this->err('bad_params', 'Media uploads must use a separate apply receipt, not a contract- apply_id');
+                    }
                 }
             }
             if ($action === 'apply.revert') {
-                return $this->contractRevert($params);
+                // A contract apply, a trim, a language step or a relabel is taken back through the
+                // contract; any other receipt takes the ordinary revert below.
+                $ops = $this->log === null ? [] : array_column($this->log->entries((string) ($params['apply_id'] ?? '')), 'op');
+                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale']) !== []) {
+                    return $this->contractRevert($params);
+                }
             }
         }
 
@@ -308,7 +311,9 @@ final class Engine
                     return $this->inspectAnswer($state);
                 }
                 $this->contract->bind($state);
-                return $this->ok(['bound' => true, 'contract' => $state['contract'], 'revision' => $state['revision'], 'ids' => $state['ids']]);
+                $drift = $state['drift'] ?? [];
+                return $this->ok(['bound' => true, 'contract' => $state['contract'], 'revision' => $state['revision'], 'ids' => $state['ids']]
+                    + ($drift === [] ? [] : ['warnings' => self::driftWarnings($drift)]));
             }
             if (strpos($operation, 'demoTrim.') === 0) {
                 return $this->demoTrim($p, substr($operation, strlen('demoTrim.')));
@@ -346,6 +351,11 @@ final class Engine
     private function inspectAnswer(array $state): array
     {
         unset($state['rows']);
+        $drift = $state['drift'] ?? [];
+        unset($state['drift']);
+        if ($drift !== []) {
+            $state['warnings'] = self::driftWarnings($drift);
+        }
         if ($state['problems'] !== []) {
             return array_merge(
                 ['ok' => false, 'error' => 'contract_failed', 'message' => implode('; ', $state['problems'])],
@@ -362,6 +372,16 @@ final class Engine
      * the stored result, and a different request under an apply_id already used is refused, so
      * an agent that lost a reply can ask again without writing twice. One apply_id per revision.
      */
+    /**
+     * Where the site differs from its quickstart's design, as warnings (Tracy ADR 0022).
+     * @param string[] $drift
+     * @return list<array{code:string,message:string,severity:string}>
+     */
+    private static function driftWarnings(array $drift): array
+    {
+        return array_map(static fn(string $m) => ['code' => ContractProblem::PRESENTATION_DRIFT, 'message' => $m, 'severity' => 'warning'], array_values($drift));
+    }
+
     private function contractApply(array $p): array
     {
         $apply = $this->applyId($p);
@@ -394,8 +414,12 @@ final class Engine
         }
 
         $plan = $this->contract->plan($p);
+        // What already differs from the design is a warning on this answer; what this write would
+        // add to it is refused below (Tracy ADR 0022).
+        $tolerated = $plan['state']['drift'] ?? [];
+        $warn = $tolerated === [] ? [] : ['warnings' => self::driftWarnings($tolerated)];
         if ($plan['operations'] === []) {
-            return $this->ok(['unchanged' => true, 'revision' => $plan['state']['revision']]);
+            return $this->ok(['unchanged' => true, 'revision' => $plan['state']['revision']] + $warn);
         }
 
         // Written in order, each step logged before the next; on any failure every step already
@@ -437,7 +461,7 @@ final class Engine
                 $this->log->record($apply, $entry);
                 $written[] = ['kind' => $op['kind'], 'id' => $id, 'key' => $op['key'] === '' ? null : $op['key']];
             }
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspectClean(null, $tolerated);
             $this->contract->rebind($state);
         } catch (Throwable $e) {
             foreach (array_reverse($done) as [$kind, $id, $key, $before, $translations]) {
@@ -461,7 +485,7 @@ final class Engine
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
-        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']]);
+        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']] + $warn);
         // The revision `content.read` now lists for every content this apply touched, read by the
         // reader itself after the write, so the next apply can hold exactly these. Left out when
         // the reader cannot answer on this site (no content identity yet): the write stands.
@@ -504,18 +528,22 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
+            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
         }
         try {
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspect();
+            if ($state['problems'] !== []) {
+                throw new RuntimeException(implode('; ', $state['problems']));
+            }
+            $tolerated = $state['drift'];
             if (($receipts[0]['afterRevision'] ?? null) !== $state['revision']) {
-                return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                return $this->err('conflict', 'Later content exists; revert the latest revision first');
             }
             $result = $this->applyRevert($p);
             if (!$result['ok'] || !empty($result['failed'])) {
                 throw new RuntimeException('Contract revert failed: ' . json_encode($result['failed'] ?? $result));
             }
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspectClean(null, $tolerated);
             $this->contract->rebind($state);
             $result['revision'] = $state['revision'];
             return $result;

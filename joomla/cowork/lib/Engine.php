@@ -136,7 +136,20 @@ final class Engine
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
      */
+    /** Whether this receiver is inside a request already (a serialized write re-enters handle). */
+    private bool $inRequest = false;
+
     public function handle(array $req): array
+    {
+        if (!$this->contract || $this->inRequest) return $this->handleRequest($req);
+        // One request, one comparison with the quickstart (QuickstartContract::$tolerated).
+        $this->inRequest = true;
+        $this->contract->newRequest();
+        try { return $this->handleRequest($req); }
+        finally { $this->inRequest = false; $this->contract->endRequest(); }
+    }
+
+    private function handleRequest(array $req): array
     {
         $provided = isset($req['token']) && is_string($req['token']) ? $req['token'] : null;
         if (!Token::check($this->token, $provided)) {
@@ -164,21 +177,34 @@ final class Engine
         // means "this receiver does not carry the profile this site names", and an operator who
         // reads only "repair the component installation" goes looking in the wrong half.
         catch(Throwable $error) { return $this->err('contract_unavailable', $error->getMessage() ?: 'The private contract store is unavailable; repair the component installation'); }
-        if ($contractBound && in_array($action, ['content.batch','content.update','content.delete','extension.install','extension.enable','db.restore','db.rollback','db.cleanup','db.purge','core.upgrade','files.restore'], true)) {
-            return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
-        }
+        // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
+        // 26/09/2026). Every action a site without a contract takes, a bound site takes too; the
+        // contract's own rules stay on its own door (`content.contract`) and on the picture slots.
         if ($contractBound && $action === 'media.upload') {
             $path = $params['path'] ?? '';
-            if (!is_string($path) || !preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('content_only', 'Use a new content-addressed image in images/tracy-content');
-            if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('content_only', 'Media uploads must use a separate apply receipt');
+            // Only a picture for a contract slot has the slot's rules: content-addressed, and its own receipt.
+            if (is_string($path) && strpos($path, 'images/tracy-content/') === 0) {
+                if (!preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('bad_params', 'A picture under images/tracy-content/ is named by the sha256 of its bytes (<sha256>.png|jpg|webp)');
+                if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('bad_params', 'Media uploads must use a separate apply receipt');
+            }
         }
-        if ($contractBound && $action === 'apply.revert') {
-            $entries = $this->log ? $this->log->entries($params['apply_id'] ?? '') : [];
-            $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
-            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','Only content-contract applies can be reverted in this mode')]]);
+        // A trim, a language step or a relabel has its own way back; the ordinary revert would take it
+        // apart one row at a time and leave the baseline naming a state the site is no longer in.
+        if ($contractBound && $action === 'apply.revert' && $this->log) {
+            $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias']);
+            if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a language step or a source relabel: take it back with its own operation (demoTrim.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
+        }
+        $contractReceipts = $contractBound && $action === 'apply.revert' && $this->log
+            ? array_values(array_filter($this->log->entries($params['apply_id'] ?? ''), fn($e) => ($e['op'] ?? '') === 'contract'))
+            : [];
+        // A contract apply is taken back through the contract (its baseline moves with it); any other
+        // receipt on a bound site takes the ordinary revert below.
+        if ($contractReceipts !== []) {
+            $receipts = $contractReceipts;
+            if (count($receipts)!==1) return $this->err('conflict', 'One apply_id holds several contract receipts', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','One apply_id holds several contract receipts')]]);
             try {
                 $state=$this->contract->inspect();
-                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
+                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('conflict', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
                 $this->batching=true;
                 $result=$this->writer->transaction(function()use($params){
                     $result=$this->applyRevert($params);
@@ -1198,11 +1224,25 @@ final class Engine
     private function contentContract(array $p): array
     {
         $result = $this->contractDoor($p);
+        // Every answer the door gives while the site differs from its quickstart says where (ADR 0022).
+        if (($result['ok'] ?? false) === true && !isset($result['warnings']) && ($warnings = $this->driftWarnings()) !== [])
+            $result['warnings'] = $warnings;
         if (($result['ok'] ?? true) === false && !isset($result['errors'])) {
             $code = ['conflict' => 'CONFLICT', 'writer_busy' => 'WRITER_BUSY'][$result['error'] ?? ''] ?? 'CONTRACT_FAILED';
             $result['errors'] = [ContractProblem::plain($code, (string) ($result['message'] ?? ''))];
         }
         return $result;
+    }
+
+    /**
+     * Where the site differs from its quickstart's design, as warnings — never a refusal (Tracy
+     * ADR 0022). Each is `{code: PRESENTATION_DRIFT, message, severity: warning}`.
+     * @return list<array{code:string,message:string,severity:string}>
+     */
+    private function driftWarnings(): array
+    {
+        return array_map(static fn(string $m) => ['code' => 'PRESENTATION_DRIFT', 'message' => $m, 'severity' => 'warning'],
+            $this->contract ? $this->contract->driftWarnings() : []);
     }
 
     /** A caught contract failure: the message it always had, and what it was, as `errors[]`. */
@@ -2311,7 +2351,8 @@ final class Engine
             return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
         }
 
-        if ($this->contract && $this->contract->bound() && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('content_only', 'Image filename must match its SHA-256');
+        // Only a contract slot's picture folder is content-addressed (Tracy ADR 0022).
+        if ($this->contract && $this->contract->bound() && strpos($path, 'images/tracy-content/') === 0 && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('bad_params', 'Image filename must match its SHA-256');
 
         try {
             $before = $this->media->read($path); // null => new file, so its undo is a delete

@@ -273,9 +273,10 @@ check('a map that is not ids to revisions is refused as CHANGES_INVALID',
 file_put_contents($r['root'] . '/wp-content/themes/test-theme/style.css', '/* edited */');
 $fresh = $listed();
 $drift = $rdoor($E, 'apply', ['expected_content_revisions' => [$home => $fresh[$home]], 'apply_id' => 'contract-m9', 'request_id' => 'm9', 'changes' => ['home.hero.eyebrow' => 'Since 2003']]);
-check('a theme that drifted still blocks an apply held by content revisions', array_column($drift['errors'], 'code'), ['PRESENTATION_DRIFT']);
-check('unrecoverable, and named in problems too', [$drift['errors'][0]['severity'], $drift['problems']], ['unrecoverable', ['Theme file changed: wp-content/themes/test-theme/style.css']]);
-check('an inspect refused by drift carries the same errors', array_column($rdoor($E, 'inspect')['errors'], 'code'), ['PRESENTATION_DRIFT']);
+// Tracy ADR 0022: a theme changed through WordPress is a warning on the apply and on the inspect.
+check('a theme that drifted is a warning on an apply held by content revisions', [$drift['ok'], array_column($drift['warnings'], 'code')], [true, ['PRESENTATION_DRIFT']]);
+check('named, with the warning severity', [$drift['warnings'][0]['severity'], $drift['warnings'][0]['message']], ['warning', 'Theme file changed: wp-content/themes/test-theme/style.css']);
+check('an inspect of a drifted site answers, with the same warning', [$rdoor($E, 'inspect')['ok'], array_column($rdoor($E, 'inspect')['warnings'], 'code')], [true, ['PRESENTATION_DRIFT']]);
 
 // An edition's key is held by the content of THAT edition.
 $p = $revSite(true);
