@@ -421,6 +421,28 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * The editor lock by core's rule (see EditLock): the meta and the user through WordPress's own
+	 * API, so a heartbeat that just refreshed `_edit_lock` is what this sees.
+	 */
+	public function editLock( int $postId ): ?array {
+		if ( $postId <= 0 ) {
+			return null;
+		}
+		$holder = EditLock::holder(
+			get_post_meta( $postId, EditLock::META, true ),
+			get_post_meta( $postId, EditLock::LAST_EDITOR_META, true ),
+			time(),
+			EditLock::window()
+		);
+		if ( null === $holder ) {
+			return null;
+		}
+		// Core: a lock whose user is gone is no lock.
+		$user = get_userdata( $holder['user'] );
+		return $user ? EditLock::lockedBy( $holder, (string) $user->display_name ) : null;
+	}
+
+	/**
 	 * A post can go to the trash; a template part gives its slot back to the theme.
 	 *
 	 * Options and meta cannot: neither has a trash to sit in, and a caller who wants one gone is

@@ -969,6 +969,7 @@ final class QuickstartContract
             $byTarget[$target['name']]['changes'][] = [$slot, $value, $key];
         }
 
+        $contentIds = [];
         if ($perContent !== null) {
             $contentIds = $this->checkContentRevisions($owners, $perContent, $expected !== null, $errors);
             foreach ($errors as $error) {
@@ -977,6 +978,7 @@ final class QuickstartContract
                 }
             }
         }
+        $this->checkEditLocks($owners, $contentIds, $errors);
         if ($errors !== []) {
             throw new ContractProblems($errors);
         }
@@ -1089,6 +1091,52 @@ final class QuickstartContract
             return ['name' => 'templatePart:' . $slug, 'row' => ['kind' => 'templatePart', 'id' => (int) $state['ids'][$entityKey], 'key' => $slug]];
         }
         return ['name' => 'post:' . $state['ids'][$entityKey], 'row' => ['kind' => 'post', 'id' => (int) $state['ids'][$entityKey], 'key' => '']];
+    }
+
+    /**
+     * Refuses every change key whose row someone has open in the WordPress editor, before any
+     * write is planned, so a locked page refuses the whole apply and the rows beside it stay
+     * untouched. Only posts and database template parts carry an editor lock; an option or a
+     * theme-file part has none. The content id is named even when the caller held the apply by
+     * the site-wide revision alone, so the agent can say which page to ask about.
+     *
+     * @param array<string,array{kind:string,id:int,key:string}> $owners
+     * @param array<string,string> $contentIds change key → content id, as far as already known
+     * @param ContractProblem[] $errors
+     */
+    private function checkEditLocks(array $owners, array $contentIds, array &$errors): void
+    {
+        $locks = [];
+        $locked = [];
+        foreach ($owners as $key => $owner) {
+            $id = (int) $owner['id'];
+            if ($id <= 0 || !in_array($owner['kind'], ['post', 'templatePart'], true)) {
+                continue;
+            }
+            if (!array_key_exists($id, $locks)) {
+                $locks[$id] = $this->writer->editLock($id);
+            }
+            if ($locks[$id] !== null) {
+                $locked[(string) $key] = $owner;
+            }
+        }
+        if ($locked === []) {
+            return;
+        }
+        $unnamed = array_diff_key($locked, $contentIds);
+        if ($unnamed !== []) {
+            foreach ($this->revisionsOf($unnamed) ?? [] as $key => $found) {
+                if (is_array($found)) {
+                    $contentIds[(string) $key] = $found['id'];
+                }
+            }
+        }
+        foreach ($locked as $key => $owner) {
+            $lock = $locks[(int) $owner['id']];
+            $row = $this->writer->read('post', (int) $owner['id']);
+            $errors[] = new ContractProblem(ContractProblem::SLOT_LOCKED_BY_USER, EditLock::message((string) ($row['post_title'] ?? ''), $lock),
+                $key, $contentIds[$key] ?? null, ['lockedBy' => $lock]);
+        }
     }
 
     /** `{contentId: revision}`, both strings, as `content.read` hands them out. */

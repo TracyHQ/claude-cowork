@@ -10,6 +10,8 @@
  * pass is not something each throw site should get to decide on its own.
  */
 
+require_once __DIR__ . '/EditLock.php';
+
 class ContractProblem extends RuntimeException
 {
     public const SLOT_UNKNOWN = 'SLOT_UNKNOWN';
@@ -20,6 +22,12 @@ class ContractProblem extends RuntimeException
     /** A picture for an image slot that is not in the media library, or not in the slot's shape. */
     public const SLOT_IMAGE_INVALID = 'SLOT_IMAGE_INVALID';
     public const SLOT_EDITION_MISSING = 'SLOT_EDITION_MISSING';
+    /**
+     * The row a slot lives on is open in the WordPress editor (a live `_edit_lock`, EditLock).
+     * Recoverable: the same request passes once the person saves and closes it. There is no flag
+     * to write anyway — the editor's next save would silently undo it.
+     */
+    public const SLOT_LOCKED_BY_USER = EditLock::CODE;
     public const REVISION_STALE = 'REVISION_STALE';
     public const REVISION_REQUIRED = 'REVISION_REQUIRED';
     public const CHANGES_INVALID = 'CHANGES_INVALID';
@@ -30,7 +38,7 @@ class ContractProblem extends RuntimeException
     /** Recoverable: the same request with other values (or fresh revisions, or later) can pass. */
     private const RECOVERABLE = [
         self::SLOT_TOO_LONG, self::SLOT_EVIDENCE_REQUIRED, self::SLOT_NOT_CONTENT, self::SLOT_LINK_UNSUPPORTED, self::SLOT_IMAGE_INVALID,
-        self::REVISION_STALE, self::REVISION_REQUIRED, self::WRITER_BUSY,
+        self::REVISION_STALE, self::REVISION_REQUIRED, self::WRITER_BUSY, self::SLOT_LOCKED_BY_USER,
     ];
 
     /** @var string */
@@ -39,7 +47,7 @@ class ContractProblem extends RuntimeException
     public $slotKey;
     /** @var string|null */
     public $contentId;
-    /** @var array<string,int|string> limit / actual / current, only when known */
+    /** @var array<string,mixed> limit / actual / current / lockedBy, only when known */
     public $details;
 
     public function __construct(string $code, string $message, ?string $slotKey = null, ?string $contentId = null, array $details = [])
@@ -70,7 +78,7 @@ class ContractProblem extends RuntimeException
             'field' => ['slotKey' => $slotKey, 'contentId' => $contentId],
             'severity' => self::severity($code),
         ];
-        foreach (['limit', 'actual', 'current'] as $key) {
+        foreach (['limit', 'actual', 'current', 'lockedBy'] as $key) {
             if (array_key_exists($key, $details)) {
                 $out[$key] = $details[$key];
             }

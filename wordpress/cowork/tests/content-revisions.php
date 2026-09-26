@@ -37,6 +37,7 @@ final class WP_Fake_ContentDb
     public string $term_relationships = 'wp_term_relationships';
     public string $term_taxonomy = 'wp_term_taxonomy';
     public string $terms = 'wp_terms';
+    public string $users = 'wp_users';
     public string $last_error = '';
     public $dbh;
     public int $lockAnswer = 1;
@@ -148,6 +149,15 @@ final class WP_Fake_ContentDb
                             $out[] = ['object_id' => $id, 'taxonomy' => $taxonomy, 'term_taxonomy_id' => (string) crc32($taxonomy . $name), 'name' => $name, 'slug' => $name, 'description' => ''];
                         }
                     }
+                }
+            }
+            return $out;
+        }
+        if (strpos($sql, 'SELECT ID, display_name FROM wp_users WHERE ID IN') === 0) {
+            $out = [];
+            foreach (self::in($sql, 'ID') as $id) {
+                if (isset(WP_Fake::$users[(int) $id])) {
+                    $out[] = ['ID' => $id, 'display_name' => (string) WP_Fake::$users[(int) $id]['display_name']];
                 }
             }
             return $out;

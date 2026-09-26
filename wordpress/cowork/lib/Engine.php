@@ -540,6 +540,9 @@ final class Engine
                 return $this->err('conflict', 'Later content exists; revert the latest revision first');
             }
             $result = $this->applyRevert($p);
+            if (!$result['ok'] && ($result['code'] ?? null) === EditLock::CODE) {
+                return $result; // refused before anything moved; the lock is the answer, not a failure
+            }
             if (!$result['ok'] || !empty($result['failed'])) {
                 throw new RuntimeException('Contract revert failed: ' . json_encode($result['failed'] ?? $result));
             }
@@ -2091,6 +2094,10 @@ final class Engine
             return $this->err('bad_params', 'lang must be a language code');
         }
         $slug = strtolower(substr($lang, 0, 2));
+        $locked = $this->editLocked('post', $id, null);
+        if ($locked !== null) {
+            return $locked;
+        }
 
         $before = function_exists('pll_get_post_language') ? pll_get_post_language($id) : null;
 
@@ -2197,6 +2204,14 @@ final class Engine
 
         try {
             $before = $this->writer->read($kind, $id, $key); // null => a create, so its undo is a delete
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+        $locked = $this->editLocked($kind, $id, $before);
+        if ($locked !== null) {
+            return $locked;
+        }
+        try {
             $newId = $this->writer->write($kind, $id, $p['fields'], $key);
         } catch (Throwable $e) {
             return $this->err('write_failed', $e->getMessage());
@@ -2277,6 +2292,10 @@ final class Engine
         }
         if ('templatePart' === $kind) {
             $id = (int) ($before['id'] ?? 0);
+        }
+        $locked = $this->editLocked($kind, $id, $before);
+        if ($locked !== null) {
+            return $locked;
         }
 
         try {
@@ -2548,6 +2567,20 @@ final class Engine
             return $this->err('revert_failed', $e->getMessage());
         }
 
+        // Every row the undo lands on is checked BEFORE the first is put back: a revert refused
+        // halfway would leave the site in a state no receipt describes.
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') !== 'content') {
+                continue;
+            }
+            $kind = (string) ($entry['kind'] ?? '');
+            // A template part's entry carries its row id (a create's too), so it is checked as that post.
+            $locked = $this->editLocked($kind === 'templatePart' ? 'post' : $kind, (int) ($entry['id'] ?? 0), null);
+            if ($locked !== null) {
+                return $locked;
+            }
+        }
+
         $reverted = 0;
         $failed = [];
         foreach (array_reverse($entries) as $entry) {
@@ -2803,6 +2836,35 @@ final class Engine
     private function ok(array $extra): array
     {
         return array_merge(['ok' => true], $extra);
+    }
+
+    /**
+     * The open writes' refusal when the post a write lands on is open in the WordPress editor:
+     * the contract's rule and words (EditLock), in this surface's `{ok, error, message}` shape
+     * plus `code` and `lockedBy`. Null when the write may go ahead: an option, a term, a create,
+     * a theme-file template part (no row, so no editor holds it), or no live lock. No flag skips
+     * it — the person's next save would silently undo whatever landed.
+     */
+    private function editLocked(string $kind, int $id, ?array $before): ?array
+    {
+        if ($this->writer === null) {
+            return null;
+        }
+        $post = 0;
+        if (in_array($kind, ['post', 'postmeta', 'menuItem'], true)) {
+            $post = $id;
+        } elseif ($kind === 'templatePart') {
+            $post = (int) ($before['id'] ?? 0);
+        }
+        if ($post <= 0) {
+            return null;
+        }
+        $lock = $this->writer->editLock($post);
+        if ($lock === null) {
+            return null;
+        }
+        $row = $this->writer->read('post', $post);
+        return $this->err('locked', EditLock::message((string) ($row['post_title'] ?? ''), $lock)) + ['code' => EditLock::CODE, 'lockedBy' => $lock];
     }
 
     private function err(string $code, string $message): array

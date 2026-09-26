@@ -56,9 +56,15 @@ final class WP_Fake
     public static int $flushed = 0;
     /** @var array<string,array<string,string>> Polylang slug => [original string => its translation], what each language's `polylang_mo` post holds */
     public static array $strings = [];
+    /** @var array<int,array{display_name:string}> user id => the columns an editor lock's holder is named by */
+    public static array $users = [];
+    /** @var array<string,callable> hook => the one callback `apply_filters` runs for it */
+    public static array $filters = [];
 
     public static function reset(): void
     {
+        self::$users = [];
+        self::$filters = [];
         self::$polylang = false;
         self::$languages = [];
         self::$strings = [];
@@ -179,6 +185,18 @@ function delete_post_meta(int $id, string $key): bool
 {
     unset(WP_Fake::$meta[$id . ':' . $key]);
     return true;
+}
+
+/** False for a user that does not exist, as WordPress answers: a lock held by one is no lock. */
+function get_userdata(int $id)
+{
+    return isset(WP_Fake::$users[$id]) ? (object) (['ID' => $id] + WP_Fake::$users[$id]) : false;
+}
+
+/** One callback per hook, enough for the core filters this plugin honours. */
+function apply_filters(string $tag, $value, ...$args)
+{
+    return isset(WP_Fake::$filters[$tag]) ? (WP_Fake::$filters[$tag])($value, ...$args) : $value;
 }
 
 function get_option(string $key, $default = false)
