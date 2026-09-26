@@ -18,6 +18,36 @@
  * change being guaranteed at all. An Apply that cannot be undone cannot be offered for free.
  */
 
+/**
+ * The write lock is held by someone else. Its message stays the one the Tracy tools match on
+ * ("another writer is changing this site"); what it adds is WHO holds the lock and for how long, so
+ * the answer can say when to try again instead of a bare "busy". `holder` is empty when the lock's
+ * current owner left no record (an older writer, or a record that belongs to a finished call).
+ */
+final class WriterBusy extends RuntimeException
+{
+    /** @var array{action?:string,operation?:?string,applyId?:?string,since?:int} */
+    public array $holder;
+    public function __construct(string $message, array $holder = [])
+    {
+        parent::__construct($message);
+        $this->holder = $holder;
+    }
+    /** The facts a busy answer carries: the holder, how long it has held, when to try again. */
+    public function facts(int $now): array
+    {
+        if (!isset($this->holder['since'])) return ['retryAfterMs' => 3000];
+        $held = max(0, ($now - (int) $this->holder['since']) * 1000);
+        $holder = array_filter([
+            'action' => $this->holder['action'] ?? null,
+            'operation' => $this->holder['operation'] ?? null,
+            'applyId' => $this->holder['applyId'] ?? null,
+        ], fn($v) => $v !== null && $v !== '');
+        // A contract apply takes 2–4 s; one held longer is nearly done or stuck — ask again soon either way.
+        return ['holder' => $holder, 'heldForMs' => $held, 'retryAfterMs' => $held < 3000 ? 3500 - $held : 2000];
+    }
+}
+
 interface SiteWriter
 {
     /**

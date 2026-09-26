@@ -29,6 +29,8 @@ final class WP_Fake
     /** @var array<int,int> */
     public static array $cleaned = [];
     public static int $nextId = 500;
+    /** The active theme's folder, for a template part the site never stored (themeTemplatePart). */
+    public static string $themeDir = '/nonexistent-theme';
     /** @var array<string,string[]> "postId:taxonomy" => term names */
     public static array $terms = [];
     /** Stands in for KSES: a callable applied to post_content on the way in, or null for verbatim. */
@@ -63,6 +65,7 @@ final class WP_Fake
 
     public static function reset(): void
     {
+        self::$themeDir = '/nonexistent-theme';
         self::$users = [];
         self::$filters = [];
         self::$polylang = false;
@@ -245,6 +248,16 @@ class WP_Post
 function get_stylesheet(): string
 {
     return WP_Fake::$stylesheet;
+}
+
+function get_stylesheet_directory(): string
+{
+    return WP_Fake::$themeDir;
+}
+
+function get_template_directory(): string
+{
+    return WP_Fake::$themeDir;
 }
 
 function wp_set_object_terms(int $id, $terms, string $taxonomy, bool $append = false): array
