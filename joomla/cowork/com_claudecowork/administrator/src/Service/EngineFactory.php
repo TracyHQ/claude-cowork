@@ -252,11 +252,17 @@ final class EngineFactory
         }
 
         if (($request['action'] ?? null) === 'content.read') { self::answerContent($app, $request); return; }
-        $engine = self::build();
+        // Built inside the timed answer so a timed call counts it (`boot` decodes the profile), in
+        // the order the door always had: build, headers, handle, encode.
+        echo \Timing::body($request, static function () use ($app, $request) {
+            $t = \Timing::begin();
+            $engine = self::build();
+            \Timing::end('boot', $t);
 
-        $app->setHeader('Content-Type', 'application/json', true);
-        $app->sendHeaders();
-        echo json_encode($engine->handle($request));
+            $app->setHeader('Content-Type', 'application/json', true);
+            $app->sendHeaders();
+            return $engine->handle($request);
+        });
         $app->close();
     }
 

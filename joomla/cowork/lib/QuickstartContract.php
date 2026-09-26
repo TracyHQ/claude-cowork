@@ -7,6 +7,7 @@ require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
+require_once __DIR__ . '/Timing.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -122,7 +123,16 @@ final class QuickstartContract
         return $this->packs;
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
-    private function contractHash(): string { return $this->digest([$this->manifest,$this->map,$this->lock]); }
+    /**
+     * Hashed once per instance: the three files are read in the constructor and never change after,
+     * and re-encoding ~10 MB of profile JSON ran twice per inspect and twice per readMapping (#316).
+     */
+    private ?string $contractHash = null;
+    private function contractHash(): string {
+        if($this->contractHash!==null)return $this->contractHash;
+        $t=Timing::begin();$this->contractHash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
+        return $this->contractHash;
+    }
     /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
     private ?array $baseEntities = null;
     private function baseEntities(): array { return $this->baseEntities ??= array_column($this->map['entities'], null, 'key'); }
@@ -260,16 +270,21 @@ final class QuickstartContract
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         return $row;
     }
-    private function currentValue(array $row, array $slot): string {
-        $value=$row[$slot['column']];
+    /**
+     * @param array $parsed this ROW's columns already parsed, kept by the caller across its slots: an
+     * HTML body or nested JSON config holding many slots was parsed again for each one of them, on
+     * every inspect (Business 1.2.0: 1,509 JSON and 124 HTML slots; #316). Omitted, nothing is kept.
+     */
+    private function currentValue(array $row, array $slot, array &$parsed = []): string {
+        $column=$slot['column'];$value=$row[$column];
         if(isset($slot['xpath'])) {
-            $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+            $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
             return $nodes->item(0)->nodeValue;
         }
         if(isset($slot['jsonPath'])) {
-            $outer=json_decode($value,true,512,JSON_THROW_ON_ERROR);
-            $value=json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
+            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=$parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
             foreach($slot['jsonPath'] as $key)$value=$value[$key];
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
@@ -303,7 +318,22 @@ final class QuickstartContract
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
+    /**
+     * Whether this door call has already proved the locked files: null outside one, where every
+     * inspect hashes them all; false until the first inspect inside one has; then true.
+     */
+    private ?bool $filesProved = null;
+    /**
+     * Prove the locked files once for the rest of one door call: apply's plan and verify, revert's
+     * inspect before and after (#316: 4,145 files hashed twice per apply). Only for a call that
+     * writes no file between its inspects — a bound receiver writes none — so what this gives up is
+     * an edit from outside landing in the seconds between two of them, which the next call refuses.
+     */
+    public function beginCall(): void { $this->filesProved = false; }
+    public function endCall(): void { $this->filesProved = null; }
     private function files(): void {
+        if($this->filesProved)return;
+        $t=Timing::begin();
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
@@ -317,6 +347,8 @@ final class QuickstartContract
                 if(!isset($this->lock['files'][$relative]))throw new ContractProblem('PRESENTATION_DRIFT','Unexpected presentation file: '.$relative);
             }
         }
+        Timing::end('files',$t);
+        if($this->filesProved===false)$this->filesProved=true;
     }
 
     /**
@@ -411,7 +443,9 @@ final class QuickstartContract
 
     public function inspect(): array {
         $this->ready();
-        $this->files(); $binding=$this->store->load();
+        $inspect=Timing::begin();
+        $this->files();
+        $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
         // This call's rows, read in bulk and dropped when it returns (see ContractRows).
@@ -442,8 +476,10 @@ final class QuickstartContract
         // every state with no job at all, demands the finished answer.
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
+        $t=Timing::begin();
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
         ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
+        Timing::end('inventory',$t);
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
         $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
@@ -464,6 +500,7 @@ final class QuickstartContract
         // site that gained a language — measured 23/09/2026 on `j-ee6vsk`.
         $anchorKey=$this->multilingual ? $this->multilingual->switcherAnchor() : null;
         $reusedSwitcher=$switcher!==null && $anchorKey!==null && isset($ids[$anchorKey]) && (int)$ids[$anchorKey]===(int)$switcher;
+        $t=Timing::begin();
         $protected=[];
         foreach($keys as $key=>$meta) {
             $actual=$this->presentation($key,$rows[$key],$meta);
@@ -503,6 +540,8 @@ final class QuickstartContract
             }
             $protected[$key]=$actual;
         }
+        Timing::end('presentation',$t);
+        $t=Timing::begin();
         $assignments=[];
         $source->prefetch('moduleAssignment',array_map(fn($key)=>$ids[$key],array_keys(array_filter($keys,fn($meta)=>$meta['kind']==='module'))));
         foreach($keys as $key=>$meta)if($meta['kind']==='module') {
@@ -527,6 +566,8 @@ final class QuickstartContract
             if($menus!=$expected)throw new ContractProblem('PRESENTATION_DRIFT','Module assignment drift: '.$key);
             $assignments[$key]=$menus;
         }
+        Timing::end('assignments',$t);
+        $t=Timing::begin();
         $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
         if($actualAccess != $expectedAccess) {
             // Say WHICH audience moved. "Access-level or ACL definition changed" is true of a
@@ -544,6 +585,8 @@ final class QuickstartContract
             }
             throw new ContractProblem('PRESENTATION_DRIFT','Access-level or ACL definition changed: '.implode(', ',$where));
         }
+        Timing::end('access',$t);
+        $t=Timing::begin();
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
         foreach($languages as $locale=>$state) {
@@ -553,6 +596,7 @@ final class QuickstartContract
         }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
         if($counts!=$expectedCounts)throw new ContractProblem('PRESENTATION_DRIFT','Quickstart inventory changed');
+        Timing::end('counts',$t);
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
         // Carried through every rebind, or the next content edit would store a baseline that no
@@ -562,10 +606,14 @@ final class QuickstartContract
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
+        $t=Timing::begin();
         $slots=[];
-        foreach($keys as $key=>$meta)foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot);$slots[]=$slot;}
+        foreach($keys as $key=>$meta){$parsed=[];foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot,$parsed);$slots[]=$slot;}}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
-        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$this->digest($revisionRows),
+        Timing::end('slots',$t);
+        $t=Timing::begin();$revision=$this->digest($revisionRows);Timing::end('digest',$t);
+        Timing::end('inspect',$inspect);
+        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$revision,
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
