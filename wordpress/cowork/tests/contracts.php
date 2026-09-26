@@ -338,6 +338,30 @@ $drifted('a governed part changed outside its slots', static function (array $t)
 $drifted('a pinned option that differs', static function (array $t): void {
     WP_Fake::$options['stylesheet'] = 'other';
 }, 'Option stylesheet differs');
+// Tracy ADR 0022, measured 26/09 on the local stand: an agent renamed a bound page's slug through
+// WordPress, and every apply on the site refused "Missing or ambiguous entity (0 rows)". A bound
+// page is found by the id it was bound with; one gone from the site closes its own slots only.
+$boundSite = static function () use ($SITE, $FIXTURES, $door): array {
+    $t = contractSite($SITE, $FIXTURES);
+    check('a site to rename and delete from binds', $door($t['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0'])['ok'], true);
+    return $t;
+};
+$t = $boundSite();
+WP_Fake::$posts[10]['post_name'] = 'start';
+$seen = $door($t['engine'], 'inspect');
+check('a bound page with a new slug still inspects', $seen['ok'], true);
+checkTrue('and the new slug is a warning', in_array('Entity page-home has another post_name', array_column($seen['warnings'] ?? [], 'message'), true));
+$moved = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-slug', 'request_id' => 'slug', 'changes' => ['home.hero.eyebrow' => 'Since 1999']]);
+check('its slots are written through the id it was bound with', [$moved['ok'], strpos(WP_Fake::$posts[10]['post_content'], 'Since 1999') !== false], [true, true]);
+$t = $boundSite();
+unset(WP_Fake::$posts[10]);
+$seen = $door($t['engine'], 'inspect');
+check('a bound page gone from the site leaves the door open', $seen['ok'], true);
+checkTrue('and is named in the warnings', in_array('Missing or ambiguous entity (0 rows): page-home', array_column($seen['warnings'] ?? [], 'message'), true));
+$gone = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-gone', 'request_id' => 'gone', 'changes' => ['home.hero.eyebrow' => 'x']]);
+check('its own slots are refused, one by one', array_column($gone['errors'] ?? [], 'code'), ['SLOT_UNKNOWN']);
+$other = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-other', 'request_id' => 'other', 'changes' => ['site.name' => 'Acme']]);
+check('every other slot is still written', $other['ok'], true);
 $refused('a page that is not there', static function (array $t): void {
     unset(WP_Fake::$posts[10]);
 }, 'Missing or ambiguous entity (0 rows): page-home');

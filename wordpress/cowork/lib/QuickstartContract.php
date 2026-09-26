@@ -473,6 +473,7 @@ final class QuickstartContract
         // bound entity moved or vanished, a slot that cannot be read); `drift` is reported, and a write
         // is refused only for drift it made itself (`inspectClean`'s `$tolerated`).
         $drift = [];
+        $missing = [];
         $this->homeHost = null;
 
         $lineage = null;
@@ -536,11 +537,18 @@ final class QuickstartContract
             $key = (string) ($entity['key'] ?? '');
             $kind = (string) ($entity['kind'] ?? '');
             $identity = is_array($entity['identity'] ?? null) ? $entity['identity'] : [];
-            $found = $this->find($kind, $identity);
+            $found = $this->find($kind, $identity, $binding !== null && $kind !== 'option' ? (int) ($binding['ids'][$key] ?? 0) : 0);
             if (isset($found['problem'])) {
-                $problems[] = $found['problem'] . ': ' . $key;
+                // Gone from the site: its own slots cannot be written, every other slot still can.
+                if ($binding !== null) {
+                    $missing[] = $key;
+                    $drift[] = $found['problem'] . ': ' . $key;
+                } else {
+                    $problems[] = $found['problem'] . ': ' . $key;
+                }
                 continue;
             }
+            // A row found by its bound id after its slug changed: the pin below names the new slug.
             $id = (int) $found['id'];
             $row = $found['row'];
             if ($binding !== null && $kind !== 'option' && (int) ($binding['ids'][$key] ?? 0) !== $id) {
@@ -641,6 +649,7 @@ final class QuickstartContract
             'contractLineage' => $lineage,
             'problems' => $problems,
             'drift' => $drift,
+            'missing' => $missing,
         ];
     }
 
@@ -772,7 +781,23 @@ final class QuickstartContract
      *
      * @return array{id?:int,row?:array,problem?:string}
      */
-    private function find(string $kind, array $identity): array
+    private function find(string $kind, array $identity, int $boundId = 0): array
+    {
+        $found = $this->findBySlug($kind, $identity);
+        // 🔒 A BOUND PAGE IS ITS ID, NOT ITS SLUG (Tracy ADR 0022). A slug may change through WordPress
+        // itself; measured 26/09 on the local stand, renaming Services to industrial-services made every
+        // apply on the site refuse "Missing or ambiguous entity (0 rows): page-services". The row the
+        // site was bound to, still of its type, is the entity — and the new slug is a warning.
+        if (isset($found['problem']) && $boundId > 0 && ($kind === 'page' || $kind === 'post')) {
+            $row = $this->writer->read('post', $boundId);
+            if ($row !== null && (string) ($row['post_type'] ?? '') === (string) ($identity['postType'] ?? $kind)) {
+                return ['id' => $boundId, 'row' => $row, 'moved' => true];
+            }
+        }
+        return $found;
+    }
+
+    private function findBySlug(string $kind, array $identity): array
     {
         if ($kind === 'option') {
             $name = (string) ($identity['name'] ?? '');
@@ -918,6 +943,10 @@ final class QuickstartContract
                 continue;
             }
             $slot = $slots[$slotKey];
+            if (in_array((string) $slot['entity'], $state['missing'] ?? [], true)) {
+                $errors[] = new ContractProblem(ContractProblem::SLOT_UNKNOWN, 'The page or part that held this slot is not on the site any more: ' . $key, $key);
+                continue;
+            }
             $edition = null;
             $target = null;
             try {
