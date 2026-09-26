@@ -12,12 +12,29 @@ final class JoomlaContentReader
     private string $base;
     public function __construct($db, callable $contractFactory, string $root, string $base) {
         require_once dirname(__DIR__,2).'/lib/ContentIdentity.php';
+        require_once dirname(__DIR__,2).'/lib/JoomlaAddress.php';
         $this->db=$db; $this->contractFactory=$contractFactory; $this->root=$root; $this->base=rtrim($base,'/');
     }
     private function rows(string $table, string $order='id'): array {
         return $this->db->setQuery('SELECT * FROM #__'.$table.' ORDER BY '.$order)->loadAssocList();
     }
     private function hash($value): string { return hash('sha256',\ContentReader::encode($value)); }
+    /**
+     * Joomla's own site router, with the language prefix and alias rules the site applies when it
+     * renders (`JoomlaAddress`). Relative, because this request may have reached the site by an
+     * internal address.
+     */
+    private function router(array $data): callable {
+        $filter=$this->db->setQuery("SELECT enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssoc();
+        $params=json_decode((string)($filter['params']??'{}'),true)?:[];
+        $address=new \JoomlaAddress($data['menu'],$data['content'],$data['languages'],[
+            'enabled'=>(int)($filter['enabled']??0)===1,
+            'removeDefaultPrefix'=>!empty($params['remove_default_prefix']),
+            'defaultLanguage'=>(string)\Joomla\CMS\Component\ComponentHelper::getParams('com_languages')->get('site','en-GB'),
+        ],(string)(parse_url($this->base,PHP_URL_PATH)??'/'),static fn(string $query): ?string =>
+            \Joomla\CMS\Router\Route::link('site',$query,false,\Joomla\CMS\Router\Route::TLS_IGNORE,false));
+        return static fn(string $kind,int $id): string|false|null => $address->path($kind,$id);
+    }
     private function media(): array {
         $out=[]; $base=$this->root.'/images';
         if (!is_dir($base)) return [];
@@ -131,6 +148,8 @@ final class JoomlaContentReader
         // content.contract apply accepts in expected_content_revisions.
         foreach ($contents as $id=>&$content) $content['revision']=$projection['revisions'][$id];
         unset($content); $localeList=$projection['locales'];
+        // The address a visitor sees, after the revisions: the door hashes without a router.
+        $contents=\ContentProjection::addresses($contents,$this->base,$this->router($data));
         $manifest=$mapping['manifest'];
         $reader=new \ContentReader(['id'=>$opaque('site',$config['site_id']),'name'=>null,'url'=>$this->base,'defaultLocale'=>null,'locales'=>$localeList],
             ['quickstartTag'=>$manifest['quickstart']['release'],'quickstartVersion'=>$manifest['quickstart']['version'],'contractId'=>$manifest['id'],'contractHash'=>$mapping['contractHash']],

@@ -1828,6 +1828,7 @@ require __DIR__ . "/source-language.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
+require __DIR__ . "/content-addresses.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
 

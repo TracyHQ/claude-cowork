@@ -31,6 +31,38 @@ final class ContentProjection
         return hash('sha256', ContentReader::encode([$content, $contractHash]));
     }
 
+    /**
+     * The address a visitor sees, instead of the `index.php?Itemid=` form the projection is hashed
+     * with. A customer pastes `/ru/about-us`; the agent has to find that page by it (Tracy
+     * `content.read {view:"pages", url}`). Applied AFTER the revisions are computed and never inside
+     * `build`: the contract door hashes the same projection without a router, so a revision must not
+     * depend on the address. `$route(kind, nativeId)` answers the routed path (with the site's base
+     * path, as Joomla's own relative route has it), false for a row that is no page of this site (its
+     * address becomes null), or null; a failure keeps the address the reader had.
+     */
+    public static function addresses(array $contents, string $base, callable $route): array
+    {
+        $parts = parse_url($base) ?: [];
+        $origin = isset($parts['scheme'], $parts['host'])
+            ? $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '')
+            : rtrim($base, '/');
+        foreach ($contents as $id => $content) {
+            $url = $content['url'] ?? null;
+            if (!is_string($url)) continue;
+            if (preg_match('~[?&]Itemid=(\d+)$~', $url, $m)) $asked = ['page', (int) $m[1]];
+            elseif (preg_match('~option=com_content&view=article&id=(\d+)$~', $url, $m)) $asked = ['article', (int) $m[1]];
+            else continue;
+            try {
+                $path = $route($asked[0], $asked[1]);
+            } catch (\Throwable $e) {
+                $path = null;
+            }
+            if ($path === false) $contents[$id]['url'] = null;
+            elseif (is_string($path) && $path !== '' && $path[0] === '/') $contents[$id]['url'] = $origin . $path;
+        }
+        return $contents;
+    }
+
     public static function date($value): ?string
     {
         return !$value || substr($value, 0, 4) === '0000' ? null : gmdate('Y-m-d\TH:i:s\Z', strtotime($value . ' UTC'));
