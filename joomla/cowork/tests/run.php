@@ -1830,6 +1830,7 @@ require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
+require __DIR__ . "/write-schema.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

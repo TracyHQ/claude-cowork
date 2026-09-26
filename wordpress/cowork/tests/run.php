@@ -1597,6 +1597,7 @@ require __DIR__ . '/content-api.php';
 require __DIR__ . '/content-revisions.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
+require __DIR__ . '/write-schema.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
