@@ -26,6 +26,7 @@ require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
 require_once __DIR__ . '/QuickstartContract.php';
+require_once __DIR__ . '/Timing.php';
 
 final class Engine
 {
@@ -203,21 +204,24 @@ final class Engine
             $receipts = $contractReceipts;
             if (count($receipts)!==1) return $this->err('conflict', 'One apply_id holds several contract receipts', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','One apply_id holds several contract receipts')]]);
             try {
-                $state=$this->contract->inspect();
+                $this->contract->beginCall();
+                $t=Timing::begin();$state=$this->contract->inspect();Timing::end('revertPre',$t);
                 if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('conflict', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
                 $this->batching=true;
                 $result=$this->writer->transaction(function()use($params){
-                    $result=$this->applyRevert($params);
+                    $t=Timing::begin();$result=$this->applyRevert($params);Timing::end('revert',$t);
                     if(!$result['ok'] || !empty($result['failed']))throw new RuntimeException('Contract revert failed');
-                    $this->contract->inspect();
+                    $t=Timing::begin();$this->contract->inspect();Timing::end('revertPost',$t);
                     return $result;
                 });
                 $this->batching=false;
+                $t=Timing::begin();
                 try { $this->writer->purgeCache(); } catch(Throwable $ignored) {}
+                Timing::end('purge',$t);
                 $this->stamped('revert');
                 return $result;
             } catch(Throwable $error) { return $this->contractFailed($error); }
-            finally { $this->batching=false; }
+            finally { $this->batching=false; $this->contract->endCall(); }
         }
         switch ($action) {
             case 'info':
@@ -1300,8 +1304,12 @@ final class Engine
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {
                     if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');
-                    $this->contract->inspect();
-                    return $entry['result'];
+                    // The stored afterRevision only while the site still stands there: after another
+                    // writer it names a state that is gone, and an apply based on it is refused.
+                    $state=$this->contract->inspect();
+                    $result=$entry['result'];
+                    if(($result['afterRevision']??null)!==$state['revision'])unset($result['afterRevision']);
+                    return $result;
                 }
             }
             if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
@@ -1314,19 +1322,28 @@ final class Engine
             // Per-content revisions as content.read serves them, read only when the caller named
             // some: an apply based on the inspect revision alone never pays for, or fails on, them.
             $byContent=is_array($p['expected_content_revisions']??null) && $p['expected_content_revisions'];
-            $before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;
-            $plan=$this->contract->plan($p,$before);
+            // Plan and verify are two inspects with no file written between them: one proof of the files.
+            $this->contract->beginCall();
+            $t=Timing::begin();$before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;Timing::end('contentRevisions',$t);
+            $t=Timing::begin();$plan=$this->contract->plan($p,$before);Timing::end('plan',$t);
             if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
             return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
-                $this->contract->bind($plan['snapshot']);
-                $state=$this->contract->inspect();
-                $revisions=$this->revisionsAfter($plan['touched'],$before);
+                $t=Timing::begin();$this->contract->bind($plan['snapshot']);Timing::end('bind',$t);
+                $t=Timing::begin();$state=$this->contract->inspect();Timing::end('verify',$t);
+                $t=Timing::begin();$revisions=$this->revisionsAfter($plan['touched'],$before);Timing::end('revisionsAfter',$t);
                 if($revisions!==null)$result['contentRevisions']=$revisions;
+                // The inspect revision this apply left, so the next one needs no inspect to learn it.
+                // Not `revision`: that name is already this receipt's hash. In the stored result, so a
+                // replay answers it too.
+                $result['afterRevision']=$state['revision'];
+                $t=Timing::begin();
                 $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
+                Timing::end('log',$t);
                 return $result;
             });
         } catch(Throwable $error) { return $this->contractFailed($error); }
+        finally { $this->contract->endCall(); }
     }
 
 
@@ -2115,6 +2132,7 @@ final class Engine
                 }
                 $this->batching = true;
                 $ids = [];
+                $t = Timing::begin();
                 foreach ($steps as $index => $step) {
                     if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
                     $kind = $step['kind'];
@@ -2144,6 +2162,7 @@ final class Engine
                     if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
                     $ids[$key] = $answer['id'];
                 }
+                Timing::end('write', $t);
                 $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
                 // The contract door's check may add to the receipt (its content revisions).
                 if ($verify) $result = $verify($result) ?? $result;
@@ -2151,7 +2170,9 @@ final class Engine
                 return $result;
             });
             $this->batching = false;
+            $t = Timing::begin();
             $this->writer->purgeCache();
+            Timing::end('purge', $t);
             $this->stamped('content');
             return $result;
         } catch (Throwable $error) {

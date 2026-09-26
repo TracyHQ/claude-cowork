@@ -287,7 +287,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     public function serialize(callable $work): array
     {
         $lock = 'tracy-write-' . substr(hash('sha256', Factory::getApplication()->get('db') . ':' . $this->db->getPrefix()), 0, 32);
-        if ((int) $this->db->setQuery('SELECT GET_LOCK(' . $this->db->quote($lock) . ', 0)')->loadResult() !== 1) throw new \RuntimeException('another writer is changing this site');
+        $t = \Timing::begin();
+        $held = (int) $this->db->setQuery('SELECT GET_LOCK(' . $this->db->quote($lock) . ', 0)')->loadResult() === 1;
+        \Timing::end('lock', $t);
+        if (!$held) throw new \RuntimeException('another writer is changing this site');
         try { return $work(); }
         finally { $this->db->setQuery('SELECT RELEASE_LOCK(' . $this->db->quote($lock) . ')')->loadResult(); }
     }
