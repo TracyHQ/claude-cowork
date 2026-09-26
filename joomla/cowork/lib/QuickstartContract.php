@@ -313,7 +313,22 @@ final class QuickstartContract
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
+    /**
+     * Whether this door call has already proved the locked files: null outside one, where every
+     * inspect hashes them all; false until the first inspect inside one has; then true.
+     */
+    private ?bool $filesProved = null;
+    /**
+     * Prove the locked files once for the rest of one door call: apply's plan and verify, revert's
+     * inspect before and after (#316: 4,145 files hashed twice per apply). Only for a call that
+     * writes no file between its inspects — a bound receiver writes none — so what this gives up is
+     * an edit from outside landing in the seconds between two of them, which the next call refuses.
+     */
+    public function beginCall(): void { $this->filesProved = false; }
+    public function endCall(): void { $this->filesProved = null; }
     private function files(): void {
+        if($this->filesProved)return;
+        $t=Timing::begin();
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
@@ -327,6 +342,8 @@ final class QuickstartContract
                 if(!isset($this->lock['files'][$relative]))throw new ContractProblem('PRESENTATION_DRIFT','Unexpected presentation file: '.$relative);
             }
         }
+        Timing::end('files',$t);
+        if($this->filesProved===false)$this->filesProved=true;
     }
 
     /**
@@ -422,7 +439,7 @@ final class QuickstartContract
     public function inspect(): array {
         $this->ready();
         $inspect=Timing::begin();
-        $t=Timing::begin();$this->files();Timing::end('files',$t);
+        $this->files();
         $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();

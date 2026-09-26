@@ -93,3 +93,22 @@ check('two inspects and a read mapping on one instance hash the profile once', $
 check('and every one of them carries the same hash, the one the site is bound to',
     $costTwice['hashes'], [$costStore->binding['contractHash'], $costStore->binding['contractHash']]);
 check('and the same revision', $costTwice['revisions'][0], $costTwice['revisions'][1]);
+
+// ── The locked files, proved once per door call ─────────────────────────────────────────────────
+// An apply inspects twice (plan, verify) and a revert twice (before, after) with no file written in
+// between, so one proof of the locked files serves the whole call; the next call proves them again.
+$costOutside = $costContract->inspect();
+$costContract->beginCall(); $costInside = $costContract->inspect(); $costInside2 = $costContract->inspect(); $costContract->endCall();
+check('an inspect inside a door call answers exactly as one outside it', [$costInside, $costInside2], [$costOutside, $costOutside]);
+$costApply2 = $costApply; $costApply2['params']['apply_id'] = 'contract-cost-2'; $costApply2['params']['request_id'] = 'cost-2';
+$costApply2['params']['expected_revision'] = $costOutside['revision'];
+$costApplied2 = json_decode($costAnswer($costApply2), true);
+check('an apply proves the locked files once across its two inspects',
+    [$costApplied2['ok'], $costApplied2['timing']['inspect']['n'], $costApplied2['timing']['files']['n']], [true, 2, 1]);
+$costReverted2 = json_decode($costAnswer(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-cost-2', 'timing' => true]]), true);
+check('so does a revert', [$costReverted2['ok'], $costReverted2['timing']['inspect']['n'], $costReverted2['timing']['files']['n']], [true, 2, 1]);
+file_put_contents($costDir . '/assets/demo.css', '.hero { display: none }');
+contractRejects('once the call is over, the next inspect proves the files again', fn() => $costContract->inspect());
+check('and so does the next door call', $costEngine->handle($costInspect)['ok'], false);
+file_put_contents($costDir . '/assets/demo.css', '.hero { color: red }');
+check('the files restored, the site reads again', $costEngine->handle($costInspect)['ok'], true);

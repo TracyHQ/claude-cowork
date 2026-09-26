@@ -178,6 +178,7 @@ final class Engine
             $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
             if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','Only content-contract applies can be reverted in this mode')]]);
             try {
+                $this->contract->beginCall();
                 $t=Timing::begin();$state=$this->contract->inspect();Timing::end('revertPre',$t);
                 if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
                 $this->batching=true;
@@ -194,7 +195,7 @@ final class Engine
                 $this->stamped('revert');
                 return $result;
             } catch(Throwable $error) { return $this->contractFailed($error); }
-            finally { $this->batching=false; }
+            finally { $this->batching=false; $this->contract->endCall(); }
         }
         switch ($action) {
             case 'info':
@@ -1277,6 +1278,8 @@ final class Engine
             // Per-content revisions as content.read serves them, read only when the caller named
             // some: an apply based on the inspect revision alone never pays for, or fails on, them.
             $byContent=is_array($p['expected_content_revisions']??null) && $p['expected_content_revisions'];
+            // Plan and verify are two inspects with no file written between them: one proof of the files.
+            $this->contract->beginCall();
             $t=Timing::begin();$before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;Timing::end('contentRevisions',$t);
             $t=Timing::begin();$plan=$this->contract->plan($p,$before);Timing::end('plan',$t);
             if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
@@ -1292,6 +1295,7 @@ final class Engine
                 return $result;
             });
         } catch(Throwable $error) { return $this->contractFailed($error); }
+        finally { $this->contract->endCall(); }
     }
 
 
