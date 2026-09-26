@@ -7,6 +7,7 @@ require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
+require_once __DIR__ . '/Timing.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -122,7 +123,10 @@ final class QuickstartContract
         return $this->packs;
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
-    private function contractHash(): string { return $this->digest([$this->manifest,$this->map,$this->lock]); }
+    private function contractHash(): string {
+        $t=Timing::begin();$hash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
+        return $hash;
+    }
     /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
     private ?array $baseEntities = null;
     private function baseEntities(): array { return $this->baseEntities ??= array_column($this->map['entities'], null, 'key'); }
@@ -411,7 +415,9 @@ final class QuickstartContract
 
     public function inspect(): array {
         $this->ready();
-        $this->files(); $binding=$this->store->load();
+        $inspect=Timing::begin();
+        $t=Timing::begin();$this->files();Timing::end('files',$t);
+        $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
         // This call's rows, read in bulk and dropped when it returns (see ContractRows).
@@ -442,8 +448,10 @@ final class QuickstartContract
         // every state with no job at all, demands the finished answer.
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
+        $t=Timing::begin();
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
         ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
+        Timing::end('inventory',$t);
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
         $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
@@ -464,6 +472,7 @@ final class QuickstartContract
         // site that gained a language — measured 23/09/2026 on `j-ee6vsk`.
         $anchorKey=$this->multilingual ? $this->multilingual->switcherAnchor() : null;
         $reusedSwitcher=$switcher!==null && $anchorKey!==null && isset($ids[$anchorKey]) && (int)$ids[$anchorKey]===(int)$switcher;
+        $t=Timing::begin();
         $protected=[];
         foreach($keys as $key=>$meta) {
             $actual=$this->presentation($key,$rows[$key],$meta);
@@ -503,6 +512,8 @@ final class QuickstartContract
             }
             $protected[$key]=$actual;
         }
+        Timing::end('presentation',$t);
+        $t=Timing::begin();
         $assignments=[];
         $source->prefetch('moduleAssignment',array_map(fn($key)=>$ids[$key],array_keys(array_filter($keys,fn($meta)=>$meta['kind']==='module'))));
         foreach($keys as $key=>$meta)if($meta['kind']==='module') {
@@ -527,6 +538,8 @@ final class QuickstartContract
             if($menus!=$expected)throw new ContractProblem('PRESENTATION_DRIFT','Module assignment drift: '.$key);
             $assignments[$key]=$menus;
         }
+        Timing::end('assignments',$t);
+        $t=Timing::begin();
         $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
         if($actualAccess != $expectedAccess) {
             // Say WHICH audience moved. "Access-level or ACL definition changed" is true of a
@@ -544,6 +557,8 @@ final class QuickstartContract
             }
             throw new ContractProblem('PRESENTATION_DRIFT','Access-level or ACL definition changed: '.implode(', ',$where));
         }
+        Timing::end('access',$t);
+        $t=Timing::begin();
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
         foreach($languages as $locale=>$state) {
@@ -553,6 +568,7 @@ final class QuickstartContract
         }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
         if($counts!=$expectedCounts)throw new ContractProblem('PRESENTATION_DRIFT','Quickstart inventory changed');
+        Timing::end('counts',$t);
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
         // Carried through every rebind, or the next content edit would store a baseline that no
@@ -562,10 +578,14 @@ final class QuickstartContract
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
+        $t=Timing::begin();
         $slots=[];
         foreach($keys as $key=>$meta)foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot);$slots[]=$slot;}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
-        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$this->digest($revisionRows),
+        Timing::end('slots',$t);
+        $t=Timing::begin();$revision=$this->digest($revisionRows);Timing::end('digest',$t);
+        Timing::end('inspect',$inspect);
+        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$revision,
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
