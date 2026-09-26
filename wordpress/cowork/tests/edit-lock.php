@@ -1,7 +1,8 @@
 <?php
 /**
  * `lockedBy`: who has a post open in the WordPress editor, listed by `content.read` and refused by
- * every write that would land under them — the contract's `apply` and the open native writes.
+ * every write that would land under them — the contract's `apply`, its whole-post operations
+ * (demo trim, edition retire/restore, batched or not) and the open native writes.
  *
  * The rule is core's `wp_check_post_lock()`: `_edit_lock` = "<time>:<user>", live strictly before
  * time + `wp_check_post_lock_window` (150 s), held by a user that exists. The reader side runs the
@@ -147,5 +148,101 @@ $lockAt(70, 10);
 check('a database template part open in the Site Editor is refused', $wcall($L['E'], 'content.update', ['apply_id' => 'open-l5', 'kind' => 'templatePart', 'key' => 'header', 'fields' => ['content' => '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->']])['code'] ?? null, 'SLOT_LOCKED_BY_USER');
 $lockAt(10, 150);
 check('an expired lock lets content.update through', $wcall($L['E'], 'content.update', ['apply_id' => 'open-l6', 'kind' => 'post', 'id' => 10, 'fields' => ['post_title' => 'Hello']])['ok'], true);
+
+// ── every other content.contract operation that writes a post refuses it too ────────────────
+
+$status = static function (array $ids): array {
+    return array_map(static fn (int $id): string => WP_Fake::$posts[$id]['post_status'], $ids);
+};
+$lockCodes = static fn (array $answer): array => array_column($answer['errors'] ?? [], 'code');
+
+// demoTrim.apply: the whole trim is refused before its record lands, and lands once unlocked.
+$T = $revSite();
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+$demo = $idOf('post', 28);
+$lockAt(28, 10);
+$trim = $rdoor($T['E'], 'demoTrim.apply', ['apply_id' => 'dtrim-l1', 'request_id' => 'tl1']);
+check('demoTrim.apply with a demo post open in the editor is refused', [$trim['ok'], $trim['error']], [false, 'contract_failed']);
+check('as SLOT_LOCKED_BY_USER naming the content, with lockedBy', array_map(static fn ($e) => [$e['code'], $e['field']['contentId'], $e['lockedBy']['name'] ?? null], $trim['errors']),
+    [['SLOT_LOCKED_BY_USER', $demo, 'Ada Editor']]);
+check('and the sentence names the post', $trim['errors'][0]['message'], '"Demo 28" is open in the WordPress editor by Ada Editor: ask them to save and close it, then try again.');
+check('nothing moved: not the locked post, not the rows beside it', $status([26, 27, 28, 29]), ['publish', 'publish', 'publish', 'publish']);
+check('nothing logged, no trim on record', [$T['log']->entries('dtrim-l1'), $rdoor($T['E'], 'inspect')['demoTrim']], [[], null]);
+$lockAt(28, 200);
+$trim = $rdoor($T['E'], 'demoTrim.apply', ['apply_id' => 'dtrim-l1', 'request_id' => 'tl1']);
+check('once the lock expires the same trim lands', [$trim['ok'], $trim['status'], $status([26, 27, 28, 29])], [true, 'completed', ['draft', 'draft', 'draft', 'draft']]);
+
+// demoTrim.revert: shows the rows again only when none is open.
+$lockAt(26, 10);
+$untrim = $rdoor($T['E'], 'demoTrim.revert', ['apply_id' => 'dtrim-l2', 'request_id' => 'tl2']);
+check('demoTrim.revert onto a post open in the editor is refused', $lockCodes($untrim), ['SLOT_LOCKED_BY_USER']);
+check('and moved nothing back', [$status([26, 27, 28, 29]), $rdoor($T['E'], 'inspect')['demoTrim']['status']], [['draft', 'draft', 'draft', 'draft'], 'complete']);
+$lockAt(26, 200);
+check('once unlocked the revert lands', [$rdoor($T['E'], 'demoTrim.revert', ['apply_id' => 'dtrim-l2', 'request_id' => 'tl2'])['status'], $status([26, 27, 28, 29])],
+    ['reverted', ['publish', 'publish', 'publish', 'publish']]);
+
+// multilingual.retire / restore on the fixture site: the German page and the German demo post.
+$R = $revSite(true);
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+$lockAt(60, 10);
+$retire = $rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l1', 'request_id' => 'ml1', 'keep' => ['en-us']]);
+check('multilingual.retire with an edition page open in the editor is refused', [$retire['ok'], $lockCodes($retire)], [false, ['SLOT_LOCKED_BY_USER']]);
+check('naming the page and who holds it', [$retire['errors'][0]['field']['contentId'], $retire['errors'][0]['lockedBy']['name'] ?? null], [$idOf('post', 60), 'Ada Editor']);
+check('nothing drafted, nothing logged, nothing on record', [$status([60, 29]), $R['log']->entries('mlang-l1'), $rdoor($R['E'], 'inspect')['multilingual']],
+    [['publish', 'publish'], [], null]);
+$lockAt(60, 200);
+$retire = $rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l1', 'request_id' => 'ml1', 'keep' => ['en-us']]);
+check('once unlocked the retire lands', [$retire['status'], $retire['moved'], $status([60, 29])], ['completed', 2, ['draft', 'draft']]);
+$lockAt(29, 10);
+$restore = $rdoor($R['E'], 'multilingual.restore', ['apply_id' => 'mlang-l1']);
+check('multilingual.restore onto a post open in the editor is refused', $lockCodes($restore), ['SLOT_LOCKED_BY_USER']);
+check('and brought nothing back', [$status([60, 29]), count($R['log']->entries('mlang-l1')), $rdoor($R['E'], 'inspect')['multilingual']['applyId'] ?? null],
+    [['draft', 'draft'], 2, 'mlang-l1']);
+$lockAt(29, 200);
+check('once unlocked the restore lands', [$rdoor($R['E'], 'multilingual.restore', ['apply_id' => 'mlang-l1'])['restored'] ?? null, $status([60, 29])], [2, ['publish', 'publish']]);
+$lockAt(29, 10);
+$keepAgain = $rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l2', 'request_id' => 'ml2', 'keep' => ['en-us']]);
+check('the retire refuses a locked demo post of the edition as well', $lockCodes($keepAgain), ['SLOT_LOCKED_BY_USER']);
+$lockAt(29, 200);
+$rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l2', 'request_id' => 'ml2', 'keep' => ['en-us']]);
+$lockAt(60, 10);
+$keepAll = $rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l2', 'request_id' => 'ml3', 'keep' => ['en-us', 'de']]);
+check('keeping an edition again puts nothing back while one of its posts is open', [$lockCodes($keepAll), $status([60, 29])], [['SLOT_LOCKED_BY_USER'], ['draft', 'draft']]);
+$lockAt(60, 200);
+check('and puts both back once it is closed', [$rdoor($R['E'], 'multilingual.retire', ['apply_id' => 'mlang-l2', 'request_id' => 'ml3', 'keep' => ['en-us', 'de']])['restored'] ?? null, $status([60, 29])],
+    [2, ['publish', 'publish']]);
+
+// A phased retire (300 rows a call): refused at the call that would write the locked row, after
+// the calls before it landed; the job stays running and the same call resumes it.
+$P = multilingualSite($EDITIONS, $REAL_ID, $contractsDir);
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+$retiredSlugs = array_values(array_diff(array_keys($EDITIONS['locales']), [$EDITIONS['source']['language']]));
+$lastRow = end($P['rows'][end($retiredSlugs)]);
+$lockAt($lastRow, 10);
+$phase1 = $rdoor($P['engine'], 'multilingual.retire', ['apply_id' => 'mlang-p1', 'request_id' => 'p1', 'keep' => ['en-us']]);
+check('the first batch, which does not reach the locked row, lands', [$phase1['status'], $phase1['moved'], $phase1['remaining']], ['running', 300, 20]);
+$phase2 = $rdoor($P['engine'], 'multilingual.retire', ['apply_id' => 'mlang-p1', 'request_id' => 'p1', 'keep' => ['en-us']]);
+check('the batch that would draft the locked row is refused', [$phase2['ok'], $lockCodes($phase2)], [false, ['SLOT_LOCKED_BY_USER']]);
+check('saying which post and who holds it', [$phase2['errors'][0]['message'], $phase2['errors'][0]['lockedBy']['name'] ?? null],
+    ['"Header" is open in the WordPress editor by Ada Editor: ask them to save and close it, then try again.', 'Ada Editor']);
+check('none of that batch moved', [WP_Fake::$posts[$lastRow]['post_status'], count($P['log']->entries('mlang-p1'))], ['publish', 300]);
+check('and the job is still running, resumable', json_decode((string) WP_Fake::$options[QuickstartContract::STORE_OPTION], true)['multilingual']['status'], 'running');
+$lockAt($lastRow, 200);
+$phase3 = $rdoor($P['engine'], 'multilingual.retire', ['apply_id' => 'mlang-p1', 'request_id' => 'p1', 'keep' => ['en-us']]);
+check('the same call resumes it once the row is closed', [$phase3['status'], $phase3['moved'], WP_Fake::$posts[$lastRow]['post_status']], ['completed', 20, 'draft']);
+
+// siteLanguage.* and sourceLanguage.* write options and Polylang's language, never a post: an
+// open editor is no reason to refuse them.
+$S = $siteLanguageSite();
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+$lockAt($S['rows']['en'][0], 10);
+$lockAt($S['rows']['vi'][0], 10);
+check('siteLanguage.set writes no post, so an open front page does not refuse it', $rdoor($S['engine'], 'siteLanguage.set', ['apply_id' => 'slang-l1', 'request_id' => 'sl1', 'language' => 'vi'])['ok'], true);
+check('nor its revert', $rdoor($S['engine'], 'siteLanguage.revert', ['apply_id' => 'slang-l1'])['ok'], true);
+$G = $revSite(true);
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+$lockAt(10, 10);
+check('sourceLanguage.set writes no post either', $rdoor($G['E'], 'sourceLanguage.set', ['apply_id' => 'srclang-l1', 'request_id' => 'sg1', 'locale' => 'en_GB'])['ok'], true);
+check('nor its revert', $rdoor($G['E'], 'sourceLanguage.revert', ['apply_id' => 'srclang-l2', 'request_id' => 'sg2'])['ok'], true);
 
 $GLOBALS['wpdb'] = $previousLockDb;
