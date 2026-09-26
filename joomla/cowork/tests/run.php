@@ -1820,6 +1820,7 @@ check('batch undo restores and removes its create', $batchWriter->store['article
 
 require __DIR__ . "/contracts.php";
 require __DIR__ . "/content-reader.php";
+require __DIR__ . "/content-budget.php";
 require __DIR__ . "/multilingual.php";
 require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
