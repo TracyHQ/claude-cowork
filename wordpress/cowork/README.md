@@ -282,6 +282,11 @@ content), so standing a copy up elsewhere is a different job from Joomla's, wher
 `uploads/` has been made read-only answers every `media.upload` with `could not write`, while every
 content edit succeeds; that is the folder's permissions talking, not this plugin.
 
+## Native write discovery
+
+Native `post` reads carry optional [write discovery](../../docs/native-write-schema.md), generated
+from the installed writer's field allowlists. Older receivers and other kinds may omit it.
+
 ## Navigation links
 
 A `core/navigation-link` (or submenu) block that carries a page id but an empty `url` is given the page's permalink at render time (`lib/NavigationLinks.php`). The Tracy Business archive's translated menus were captured that way, so without this every item of a Vietnamese menu pointed nowhere (measured 25/09/2026).
