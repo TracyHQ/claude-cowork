@@ -67,6 +67,9 @@ final class Timing
         // Spliced into the encoded text, not added and encoded again: a second encode of a 1 MB
         // inspect would be time the block itself put there. Only a JSON object can take a key.
         if (!is_string($json) || !is_array($result) || $result === [] || array_is_list($result)) return (string) $json;
+        // The door is public: a caller without the token learns nothing, not even how long this
+        // site takes to decode its profile, nor that this build can time itself.
+        if (($result['error'] ?? null) === 'unauthorized') return $json;
         return substr($json, 0, -1) . ',"timing":' . json_encode((object) $report) . '}';
     }
 }

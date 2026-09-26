@@ -1264,8 +1264,12 @@ final class Engine
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {
                     if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');
-                    $this->contract->inspect();
-                    return $entry['result'];
+                    // The stored afterRevision only while the site still stands there: after another
+                    // writer it names a state that is gone, and an apply based on it is refused.
+                    $state=$this->contract->inspect();
+                    $result=$entry['result'];
+                    if(($result['afterRevision']??null)!==$state['revision'])unset($result['afterRevision']);
+                    return $result;
                 }
             }
             if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');

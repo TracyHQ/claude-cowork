@@ -60,6 +60,9 @@ check('an inspect is timed phase by phase',
     array_values(array_diff(['files', 'inventory', 'presentation', 'assignments', 'access', 'counts', 'slots', 'digest', 'inspect', 'encode'], array_keys($costTiming))), []);
 checkTrue('each phase is {ms, n}', !array_filter($costTiming, fn($p) => array_keys($p) !== ['ms', 'n'] || !is_numeric($p['ms']) || $p['ms'] < 0 || !is_int($p['n']) || $p['n'] < 1));
 check('one inspect ran', $costTiming['inspect']['n'], 1);
+$costNoToken = $costTimed; $costNoToken['token'] = 'wrong';
+check('a caller without the token gets no timing, only the refusal it always got',
+    $costAnswer($costNoToken), json_encode($costEngine->handle($costNoToken)));
 checkTrue('only timing: true asks — not 1, not "true"', !Timing::wanted(['params' => ['timing' => 1]]) && !Timing::wanted(['params' => ['timing' => 'true']]));
 putenv('CLAUDECOWORK_TIMING=1');
 checkTrue('the environment can force timing on for every call', array_key_exists('timing', json_decode($costAnswer($costInspect), true)));
@@ -146,6 +149,9 @@ $costNext = $costApply3; $costNext['params']['apply_id'] = 'contract-cost-4'; $c
 $costNext['params']['expected_revision'] = $costApplied3['afterRevision']; $costNext['params']['changes'] = ['identity.city' => 'Hue'];
 $costApplied4 = $costEngine->handle($costNext);
 check('the next apply can be based on it with no inspect between', $costApplied4['ok'], true);
+$costReplay3 = $costEngine->handle($costApply3);
+check('a replay after the site moved on answers without the revision it no longer stands at',
+    [$costReplay3['ok'], array_key_exists('afterRevision', $costReplay3), $costReplay3['revision']], [true, false, $costApplied3['revision']]);
 $costReceipt = current(array_filter($costLog->entries('contract-cost-4'), fn($e) => ($e['op'] ?? '') === 'contract'));
 check('it is the revision the receipt keeps for its revert', $costReceipt['afterRevision'], $costApplied4['afterRevision']);
 $costRevert = fn(string $apply) => $costEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => $apply]])['ok'];
