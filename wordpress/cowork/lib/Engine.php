@@ -627,23 +627,9 @@ final class Engine
                 return $this->err('conflict', 'A demo trim revert is already running under request ' . (string) ($trim['requestId'] ?? '?'));
             }
         }
-        $record = [
-            'status' => $hide ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
-            'profileHash' => $profile->hash(), 'profileVersion' => $profile->version(), 'at' => gmdate('c'),
-        ];
-        if ($hide) {
-            $record['hidden'] = (int) ($trim['hidden'] ?? 0);
-            $record['skipped'] = is_array($trim['skipped'] ?? null) ? $trim['skipped'] : [];
-        }
-        // The record lands BEFORE any row moves: a call that dies mid-batch leaves a site that
-        // says a trim is in flight, so its retry is welcome rather than refused as drift.
-        if ($trim === null || ($trim['status'] ?? '') !== $record['status'] || ($trim['requestId'] ?? '') !== $request) {
-            $this->contract->record('demoTrim', $record);
-        } else {
-            $record = $trim;
-        }
-
-        $moved = 0;
+        // What this call will move, decided before anything is written, so a row someone has
+        // open in the editor refuses the whole call while the site is still as it was.
+        $moves = [];
         $pending = 0;
         $skipped = [];
         // A row of a retired edition is `multilingual.retire`'s to hide and `multilingual.restore`'s
@@ -666,10 +652,32 @@ final class Engine
                 $skipped[] = ['key' => $row['key'], 'id' => $row['id'], 'status' => $status];
                 continue;
             }
-            if ($moved >= self::DEMO_TRIM_BATCH) {
+            if (count($moves) >= self::DEMO_TRIM_BATCH) {
                 $pending++;
                 continue;
             }
+            $moves[] = [$row, $want, $status];
+        }
+        $this->contract->refuseEditLocked(array_map(static fn(array $move): int => (int) $move[0]['id'], $moves));
+
+        $record = [
+            'status' => $hide ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
+            'profileHash' => $profile->hash(), 'profileVersion' => $profile->version(), 'at' => gmdate('c'),
+        ];
+        if ($hide) {
+            $record['hidden'] = (int) ($trim['hidden'] ?? 0);
+            $record['skipped'] = is_array($trim['skipped'] ?? null) ? $trim['skipped'] : [];
+        }
+        // The record lands BEFORE any row moves: a call that dies mid-batch leaves a site that
+        // says a trim is in flight, so its retry is welcome rather than refused as drift.
+        if ($trim === null || ($trim['status'] ?? '') !== $record['status'] || ($trim['requestId'] ?? '') !== $request) {
+            $this->contract->record('demoTrim', $record);
+        } else {
+            $record = $trim;
+        }
+
+        $moved = 0;
+        foreach ($moves as [$row, $want, $status]) {
             QuickstartContract::setPostStatus($row['id'], $want);
             $this->log->record($apply, ['op' => 'visibility', 'kind' => $row['kind'], 'id' => $row['id'], 'column' => 'post_status', 'before' => $status]);
             $moved++;
@@ -1030,11 +1038,11 @@ final class Engine
             if ((string) ($onRecord['applyId'] ?? '') !== $apply) {
                 return $this->err('conflict', 'The retired editions are on record under ' . (string) ($onRecord['applyId'] ?? '?') . ', not ' . $apply);
             }
+            $steps = array_values(array_filter($this->log->entries($apply), static fn(array $entry): bool => ($entry['op'] ?? '') === 'visibility'));
+            // Every row it brings back is asked first: one open in the editor refuses the restore whole.
+            $this->contract->refuseEditLocked(array_map(static fn(array $entry): int => (int) ($entry['id'] ?? 0), $steps));
             $restored = 0;
-            foreach (array_reverse($this->log->entries($apply)) as $entry) {
-                if (($entry['op'] ?? '') !== 'visibility') {
-                    continue;
-                }
+            foreach (array_reverse($steps) as $entry) {
                 $this->revertOne($entry);
                 $restored++;
             }
@@ -1082,14 +1090,10 @@ final class Engine
                 $retired[] = $slug;
             }
         }
-        // The record lands BEFORE any row moves, so a call that dies mid-batch leaves a site
-        // that says which set it was moving toward, and its retry is welcome.
-        $record = ['status' => 'running', 'applyId' => $apply, 'requestId' => $request, 'retired' => $retired, 'live' => $live, 'at' => gmdate('c')];
-        $this->contract->record('multilingual', $record);
-
+        // What this call will move — both phases, within one batch — decided before anything is
+        // written: a row someone has open in the editor refuses this call while the site is still
+        // as the previous call left it, and the same call resumes the job once it is closed.
         $budget = self::MULTILINGUAL_BATCH;
-        $moved = 0;
-        $restored = 0;
         $remaining = 0;
 
         // 1. Editions kept again: put back the before-image of each row this receipt hid, newest
@@ -1101,16 +1105,43 @@ final class Engine
                 $restorable[] = $index;
             }
         }
-        $dropped = [];
+        $toRestore = [];
         foreach (array_reverse($restorable) as $index) {
             if ($budget <= 0) {
                 $remaining++;
                 continue;
             }
+            $toRestore[] = $index;
+            $budget--;
+        }
+
+        // 2. Editions retired: draft every published row that is still standing.
+        $toDraft = [];
+        foreach ($this->retirableRows($retired, $source) as $row) {
+            if ($budget <= 0) {
+                $remaining++;
+                continue;
+            }
+            $toDraft[] = $row;
+            $budget--;
+        }
+        $this->contract->refuseEditLocked(array_merge(
+            array_map(static fn(int $index): int => (int) ($entries[$index]['id'] ?? 0), $toRestore),
+            array_map(static fn(array $row): int => (int) $row[1], $toDraft)
+        ));
+
+        // The record lands BEFORE any row moves, so a call that dies mid-batch leaves a site
+        // that says which set it was moving toward, and its retry is welcome.
+        $record = ['status' => 'running', 'applyId' => $apply, 'requestId' => $request, 'retired' => $retired, 'live' => $live, 'at' => gmdate('c')];
+        $this->contract->record('multilingual', $record);
+
+        $moved = 0;
+        $restored = 0;
+        $dropped = [];
+        foreach ($toRestore as $index) {
             $this->revertOne($entries[$index]);
             $dropped[$index] = true;
             $restored++;
-            $budget--;
         }
         if ($dropped !== []) {
             $this->log->clear($apply);
@@ -1120,18 +1151,11 @@ final class Engine
                 }
             }
         }
-
-        // 2. Editions retired: draft every published row that is still standing.
-        foreach ($this->retirableRows($retired, $source) as [$kind, $id, $language]) {
-            if ($budget <= 0) {
-                $remaining++;
-                continue;
-            }
+        foreach ($toDraft as [$kind, $id, $language]) {
             // Undo first, then the change: a row whose undo could not be recorded is never hidden.
             $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => 'post_status', 'before' => 'publish', 'language' => $language]);
             QuickstartContract::setPostStatus($id, 'draft');
             $moved++;
-            $budget--;
         }
 
         if ($remaining === 0) {

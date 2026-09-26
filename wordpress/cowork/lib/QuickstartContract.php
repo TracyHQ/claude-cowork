@@ -1139,6 +1139,46 @@ final class QuickstartContract
         }
     }
 
+    /**
+     * The same refusal for an operation that writes whole posts rather than slots — a demo trim,
+     * a retire or restore of editions: every post it is about to write is asked BEFORE the first
+     * moves, and one open in the editor refuses the whole call with SLOT_LOCKED_BY_USER, its
+     * content id when the reader lists it, and `lockedBy`. No slot key: the operation named none.
+     * A batched operation asks per call, about the rows that call would write.
+     *
+     * @param int[] $postIds
+     * @throws ContractProblems
+     */
+    public function refuseEditLocked(array $postIds): void
+    {
+        $locked = [];
+        foreach (array_unique(array_map('intval', $postIds)) as $id) {
+            if ($id <= 0) {
+                continue;
+            }
+            $lock = $this->writer->editLock($id);
+            if ($lock !== null) {
+                $locked[$id] = $lock;
+            }
+        }
+        if ($locked === []) {
+            return;
+        }
+        $targets = [];
+        foreach (array_keys($locked) as $id) {
+            $targets[$id] = ['kind' => 'post', 'id' => $id, 'key' => ''];
+        }
+        $found = $this->revisionsOf($targets) ?? [];
+        $errors = [];
+        foreach ($locked as $id => $lock) {
+            $row = $this->writer->read('post', $id);
+            $contentId = isset($found[$id]) && is_array($found[$id]) ? (string) $found[$id]['id'] : null;
+            $errors[] = new ContractProblem(ContractProblem::SLOT_LOCKED_BY_USER, EditLock::message((string) ($row['post_title'] ?? ''), $lock),
+                null, $contentId, ['lockedBy' => $lock]);
+        }
+        throw new ContractProblems($errors);
+    }
+
     /** `{contentId: revision}`, both strings, as `content.read` hands them out. */
     private static function isRevisionMap($map): bool
     {
