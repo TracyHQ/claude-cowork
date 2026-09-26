@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Release candidate 6: a quickstart contract recommends the design instead of locking it (Tracy ADR 0022). A bound site takes every action an unbound one does; where it differs from its quickstart's design the contract door answers with warnings, a bound row removed through Joomla closes only its own slots, and only a difference the contract's own write makes is refused. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.6</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.6</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.6/pkg_claudecowork-0.18.0-rc.6.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Release candidate 5 of the Content API reader: every content read carries its own revision, a contract apply accepts those revisions in place of an inspect and reports the new ones, and every contract refusal lists its problems with a code, the slot and content they concern, and whether a retry can succeed. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

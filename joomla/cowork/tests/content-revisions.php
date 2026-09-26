@@ -172,5 +172,16 @@ $rvBusyEngine = new Engine($WTOKEN, [], null, null, null, null, $rvBusy, null, $
 $rvB = $rvBusyEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'inspect']]);
 check('a busy writer is a recoverable refusal', [$rvB['error'], $rvB['errors'][0]['code'], $rvB['errors'][0]['severity']], ['writer_busy', 'WRITER_BUSY', 'recoverable']);
 
+// Tracy ADR 0022: a bound menu item removed through Joomla closes its own slots, not the door.
+$rvGone = $rvWriter->store['menuItem'][121];
+unset($rvWriter->store['menuItem'][121]);
+$rvSeen = $rvEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'inspect']]);
+check('a bound row removed through Joomla leaves the door open', $rvSeen['ok'], true);
+checkTrue('and is named in the warnings', in_array('Bound entity disappeared: menu-21', array_column($rvSeen['warnings'] ?? [], 'message'), true));
+$rvLost = $rvApply('gone-slot', ['expected_revision' => $rvSeen['revision'], 'changes' => ['menu-21.title' => 'About them']]);
+check('its own slot is refused as unknown, recoverable', [$rvLost['ok'], $rvLost['errors'][0]['code'] ?? null], [false, 'SLOT_UNKNOWN']);
+$rvStill = $rvApply('gone-other', ['expected_revision' => $rvSeen['revision'], 'changes' => ['hero.0' => 'Still here']]);
+check('every other slot is still written', $rvStill['ok'], true);
+$rvWriter->store['menuItem'][121] = $rvGone;
 foreach (array_keys($rvData) as $name) unlink($rvDir . '/' . $name . '.json');
 unlink($rvDir . '/assets/demo.css'); rmdir($rvDir . '/assets'); rmdir($rvDir);

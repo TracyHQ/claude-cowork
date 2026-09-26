@@ -352,6 +352,8 @@ final class QuickstartContract
             if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))$this->drift('Presentation asset changed: '.$path);
         }
         foreach($this->lock['fileRoots'] as $prefix) {
+            // A folder removed through Joomla is a difference like any other (Tracy ADR 0022).
+            if(!is_dir($this->root.'/'.$prefix)){$this->drift('Presentation folder missing: '.$prefix);continue;}
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
@@ -392,7 +394,7 @@ final class QuickstartContract
 
     /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
     private function resolveRows(ContractRows $source, array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
-        $ids=[];$rows=[];$lists=[];
+        $ids=[];$rows=[];$lists=[];$missing=[];
         // A copy is ALWAYS resolved through the binding: two rows that differ only by language
         // cannot be told apart by the identity fields the base contract uses.
         $boundId = fn(string $key, array $meta): int => (isset($meta['locale']) || !empty($meta['switcher']))
@@ -412,6 +414,10 @@ final class QuickstartContract
             if($binding || $derived) {
                 $id = $boundId($key,$meta);
                 $row = $source->row($kind,$id);
+                // 🔒 A BOUND ROW REMOVED THROUGH JOOMLA CLOSES ITS OWN SLOTS, NOT THE DOOR (Tracy ADR
+                // 0022): the site's other words still change. A copy made by a language job has no
+                // life of its own apart from its source, so a lost copy still refuses.
+                if(!$row && $binding && !$derived){$missing[]=$key;continue;}
                 if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
             } else {
                 $entity=$this->baseEntities()[$key];
@@ -425,7 +431,7 @@ final class QuickstartContract
             }
             $ids[$key]=$id;$rows[$key]=$row;
         }
-        return ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists];
+        return ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists, 'missing'=>$missing];
     }
 
     /**
@@ -444,6 +450,8 @@ final class QuickstartContract
         $switcher = $binding['multilingual']['switcher'] ?? null;
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
         $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $binding, $languages, $switcher);
+        foreach ($resolved['missing'] as $gone) unset($keys[$gone]);
+        unset($resolved['missing']);
         $slots = [];
         foreach ($keys as $key=>$meta) {
             $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
@@ -486,15 +494,16 @@ final class QuickstartContract
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
+        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists, 'missing'=>$missing] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
+        foreach($missing as $gone){unset($keys[$gone]);$this->drift('Bound entity disappeared: '.$gone);}
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
-        $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
+        $idMaps=[];foreach($this->baseEntities() as $key=>$entity)if(isset($ids[$key]))$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
         // link and a copied menu parent are rewritten with.
         $localeMaps=[];
         foreach($languages as $locale=>$state) {
             foreach($state['ids'] as $baseKey=>$id)
-                $localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
+                if(isset($ids[$baseKey]))$localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
             // A shipped edition's links and assignments point at ITS rows everywhere, the untranslated
             // ones included (a kit page, a category), so its whole map stands behind the job's ids.
             if($this->multilingual && $this->multilingual->edition($locale))
