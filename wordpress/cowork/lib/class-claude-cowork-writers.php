@@ -907,6 +907,47 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * A template part as the ACTIVE theme ships it, when the site never stored one: the raw bytes of
+	 * `<theme>/parts/<slug>.html` (or the older `block-template-parts/`), child theme first, then its
+	 * parent. Raw, not get_block_file_template()'s content, which injects theme attributes and hooked
+	 * blocks — its length would not be the file's. Null when no theme carries that part. read() stays
+	 * null for such a part on purpose: a write's undo is then a delete that puts the theme file back.
+	 *
+	 * @return array{id:int,title:string,content:string,area:string,source:string,file:string}|null
+	 */
+	public function themeTemplatePart( string $slug ): ?array {
+		if ( ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/i', $slug ) ) {
+			return null;
+		}
+		$dirs = array_unique( array( get_stylesheet_directory(), get_template_directory() ) );
+		foreach ( $dirs as $dir ) {
+			foreach ( array( 'parts', 'block-template-parts' ) as $folder ) {
+				$file = $dir . '/' . $folder . '/' . $slug . '.html';
+				if ( ! is_readable( $file ) ) {
+					continue;
+				}
+				$area = 'uncategorized';
+				if ( function_exists( 'get_block_file_template' ) ) {
+					$template = get_block_file_template( get_stylesheet() . '//' . $slug, 'wp_template_part' );
+					if ( $template && ! empty( $template->area ) ) {
+						$area = (string) $template->area;
+					}
+				}
+				$relative = defined( 'ABSPATH' ) && strpos( $file, ABSPATH ) === 0 ? substr( $file, strlen( ABSPATH ) ) : $file;
+				return array(
+					'id'      => 0,
+					'title'   => $slug,
+					'content' => (string) file_get_contents( $file ),
+					'area'    => $area,
+					'source'  => 'theme',
+					'file'    => $relative,
+				);
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * The override row for one template part of the ACTIVE theme, or null when the theme's own
 	 * file is still in charge.
 	 *

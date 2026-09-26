@@ -34,6 +34,8 @@ final class Engine
     private ?QuickstartContract $contract;
     private bool $batching = false;
     private bool $writing = false;
+    /** Inside an unlocked read (a contract inspect under a consistent snapshot). */
+    private bool $reading = false;
     private ?string $token;
     /** @var array<string,mixed> What the host says about itself, returned by the 'info' action. */
     private array $info;
@@ -239,13 +241,37 @@ final class Engine
         $action = isset($req['action']) && is_string($req['action']) ? $req['action'] : '';
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
 
-        if (!$this->writing && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
+        // 🔒 A CONTRACT INSPECT ONLY READS, SO IT TAKES NO WRITE LOCK. It held the lock for its whole
+        // run (5–8 s on the Business lock before rc.12), so an apply arriving meanwhile — or a second
+        // inspect — was answered writer_busy, and Tracy had to serialise every contract call per site.
+        // It reads under one InnoDB snapshot (the writer's readSnapshot), so a commit between two of its
+        // SELECTs is never half seen; the revision it answers is advisory, and the apply re-checks it
+        // under the lock (REVISION_STALE). Its one write is the file-proof upsert, idempotent.
+        $readOnly = $action === 'content.contract' && (($params['operation'] ?? 'inspect') === 'inspect');
+        if ($readOnly && !$this->writing && !$this->reading && $this->writer && method_exists($this->writer, 'readSnapshot')) {
+            try {
+                return $this->writer->readSnapshot(function () use ($req) {
+                    $this->reading = true;
+                    try { return $this->handle($req); } finally { $this->reading = false; }
+                });
+            } catch (Throwable $ignored) {
+                // No snapshot to be had (a driver that refuses it): read as before, under the lock.
+                $readOnly = false;
+            }
+        }
+        if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+            $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
+                'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
             try {
                 return $this->writer->serialize(function () use ($req) {
                     $this->writing = true;
                     try { return $this->handle($req); } finally { $this->writing = false; }
-                });
+                }, $holder);
+            } catch (WriterBusy $busy) {
+                // Same message the Tracy tools match on; who holds the lock, since when, and when to ask again beside it.
+                return $this->err('writer_busy', $busy->getMessage(), $busy->facts(time())
+                    + (in_array($action, ['content.contract', 'apply.revert'], true) ? ['errors' => [ContractProblem::plain('WRITER_BUSY', $busy->getMessage())]] : []));
             } catch (Throwable $error) {
                 return $this->err('writer_busy', $error->getMessage(),
                     in_array($action, ['content.contract', 'apply.revert'], true) ? ['errors' => [ContractProblem::plain('WRITER_BUSY', $error->getMessage())]] : []);
