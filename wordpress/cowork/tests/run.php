@@ -1593,6 +1593,8 @@ require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
 // Content API v1: block projection, reader protocol and door (content.json).
 require __DIR__ . '/content-api.php';
+// Content API v2 byte budget: pages cut by whole contents to maxBytes.
+require __DIR__ . '/content-budget.php';
 // Content API v2 on the write side: content revisions and structured errors (content.contract).
 require __DIR__ . '/content-revisions.php';
 // Editor locks: content.read lists who has a post open; every write refuses to land under them.

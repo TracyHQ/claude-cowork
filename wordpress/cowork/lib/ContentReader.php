@@ -73,9 +73,20 @@ final class ContentReadError extends RuntimeException
 final class ContentReader
 {
     public const SCHEMA_VERSION = 'tracy-content/v1';
+    /**
+     * The byte budget (`maxBytes`, Content API v2): the UTF-8 length of the JSON this reader
+     * returns, headers not counted. A caller may ask for MIN_BYTES..MAX_BYTES. Without it a listing
+     * is paged to DEFAULT_BYTES and an `{id}` read keeps its v1 budget, MAX_BYTES. Only a caller
+     * that SENDS maxBytes ever gets a content cut (`truncated`); for any other caller an
+     * oversized content is the v1 413, so a reader that predates the budget sees no difference.
+     */
+    public const MIN_BYTES = 8192;
     public const MAX_BYTES = 262144;
+    public const DEFAULT_BYTES = 65536;
     /** Headroom kept for the envelope around the payload when a page is cut to size. */
     private const ENVELOPE_MARGIN = 4096;
+    /** A field value is never cut below this many encoded bytes: shorter ones are not what overflows. */
+    private const CUT_FLOOR = 256;
     public const TTL = 300;
     public const DEFAULT_LIMIT = 30;
     public const MAX_LIMIT = 100;
@@ -86,7 +97,7 @@ final class ContentReader
      * `protocolVersions` is what a newer caller sends to say which protocols it speaks; this
      * adapter speaks one, so the value is accepted and ignored rather than refused.
      */
-    private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor', 'protocolVersions'];
+    private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor', 'protocolVersions', 'maxBytes'];
     private const UNSERVED = ['itemsCursor'];
 
     /** @var ContentSource */
@@ -101,13 +112,20 @@ final class ContentReader
     private $now;
     /** @var int */
     private $maxBytes;
+    /** @var int|null the budget the reader was built with, or null for the defaults above */
+    private $configured;
+    /** @var bool the request named `maxBytes`: only then may a content be cut */
+    private $sent = false;
+    /** @var bool the answer states `pagination.budget` (a listing, or a request that sent one) */
+    private $showBudget = true;
 
     /**
      * @param string $secret    key the cursor is signed with; changing it (a new token) voids every cursor
      * @param string $principal who is reading (`site-token` for the site's own token)
      * @param string $scope     what that principal may read (`published`, `editorial`)
+     * @param int|null $maxBytes the budget of a request that names no `maxBytes`; null for the defaults
      */
-    public function __construct(ContentSource $source, string $secret, string $principal, string $scope, int $now, int $maxBytes = self::MAX_BYTES)
+    public function __construct(ContentSource $source, string $secret, string $principal, string $scope, int $now, ?int $maxBytes = null)
     {
         if (strlen($secret) < 16) {
             throw new InvalidArgumentException('A cursor secret needs at least 16 bytes');
@@ -117,7 +135,8 @@ final class ContentReader
         $this->principal = $principal;
         $this->scope = $scope;
         $this->now = $now;
-        $this->maxBytes = $maxBytes;
+        $this->configured = $maxBytes;
+        $this->maxBytes = $maxBytes ?? self::DEFAULT_BYTES;
     }
 
     public static function encode($value): string
@@ -189,6 +208,21 @@ final class ContentReader
                 throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'This site does not serve ' . $key . ' yet.');
             }
         }
+        if (isset($query['maxBytes'])) {
+            // Not bound into any cursor: a cursor is a position in the content order, and the
+            // budget only decides how many whole contents one answer carries from there. A caller
+            // may raise it on the next page (to take a content the last page had to cut) or lower it.
+            if (!preg_match('/^[1-9][0-9]{0,5}$/D', $query['maxBytes'])
+                || (int) $query['maxBytes'] < self::MIN_BYTES || (int) $query['maxBytes'] > self::MAX_BYTES) {
+                throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'maxBytes must be an integer from ' . self::MIN_BYTES . ' to ' . self::MAX_BYTES . '.');
+            }
+            $this->maxBytes = (int) $query['maxBytes'];
+            $this->sent = true;
+        } else {
+            $this->sent = false;
+            $this->maxBytes = $this->configured ?? (isset($query['id']) ? self::MAX_BYTES : self::DEFAULT_BYTES);
+        }
+        $this->showBudget = $this->sent || !isset($query['id']);
         if (isset($query['id'])) {
             foreach (['cursor', 'type', 'locale', 'limit'] as $key) {
                 if (isset($query[$key])) {
@@ -247,22 +281,176 @@ final class ContentReader
         if ($offset > $total) {
             throw self::bad();
         }
+        // Whole contents while the answer stays within the budget. The size of a page of k
+        // contents is exact without encoding it k times: the envelope with no contents (and the
+        // cursor that page would carry) plus each content's own JSON and the commas between them.
+        $candidates = array_slice($rows, $offset, $limit);
         $out = [];
-        foreach (array_slice($rows, $offset, $limit) as $summary) {
-            $out[] = $summary;
-            if (strlen(self::encode($this->envelope($out, $limit, null, $total))) > $this->maxBytes - self::ENVELOPE_MARGIN) {
-                array_pop($out);
+        $sum = 0;
+        foreach ($candidates as $summary) {
+            $size = strlen(self::encode($summary));
+            $count = count($out) + 1;
+            if ($this->pageBase($filters, $offset + $count, $total, $limit) + $sum + $size + ($count - 1) > $this->maxBytes) {
                 break;
             }
+            $out[] = $summary;
+            $sum += $size;
         }
-        if ($out === [] && $offset < $total) {
-            throw $this->tooLarge((string) $rows[$offset]['id'], null, 'summary');
+        if ($out === [] && $candidates !== []) {
+            // The first content alone does not fit: send it, cut, rather than an empty page.
+            $first = $candidates[0];
+            $fits = function (array $content) use ($filters, $offset, $total, $limit): bool {
+                return $this->pageBase($filters, $offset + 1, $total, $limit) + strlen(self::encode($content)) <= $this->maxBytes;
+            };
+            // Cut only for a caller that asked for a budget; any other gets the v1 413.
+            $cut = $this->sent ? $this->truncated($first, $fits) : null;
+            if ($cut === null) {
+                throw $this->tooLarge((string) $first['id'], null, 'summary');
+            }
+            $out = [$cut];
         }
-        $next = null;
-        if ($offset + count($out) < $total) {
-            $next = $this->cursor(['kind' => 'list', 'filters' => $filters, 'offset' => $offset + count($out)]);
+        return $this->envelope($out, $limit, $this->listCursor($filters, $offset + count($out), $total), $total);
+    }
+
+    /** The cursor of a listing continuing at `$at`, or null when nothing is left. */
+    private function listCursor(array $filters, int $at, int $total): ?string
+    {
+        return $at < $total ? $this->cursor(['kind' => 'list', 'filters' => $filters, 'offset' => $at]) : null;
+    }
+
+    /** Bytes of a listing page with no contents, carrying the cursor it would carry when it ends before `$at`. */
+    private function pageBase(array $filters, int $at, int $total, int $limit): int
+    {
+        return strlen(self::encode($this->envelope([], $limit, $this->listCursor($filters, $at, $total), $total)));
+    }
+
+    /**
+     * One content cut until `$fits` accepts it, or null when no cut can make it fit. The longest
+     * text or html value (a field of the content, of one of its blocks or block items, or
+     * `bodyHtml`) is cut first, to at most maxBytes/2 characters — and as many encoded bytes, so a
+     * multibyte text still fits — and marked `truncated: true` (bodyHtml, a string, is not
+     * markable: the content's own `truncated: true` covers it). If that is not enough, the next
+     * longest is cut, and a value already cut may be halved again. The content's `revision` is
+     * left as it is: it names the stored state, and a cut changes only what this answer shows.
+     */
+    private function truncated(array $content, callable $fits): ?array
+    {
+        if ($fits($content)) {
+            return $content;
         }
-        return $this->envelope($out, $limit, $next, $total);
+        $target = intdiv($this->maxBytes, 2);
+        $cut = [];
+        while (true) {
+            $longest = null;
+            $size = self::CUT_FLOOR;
+            foreach (self::textPaths($content) as $path) {
+                $bytes = strlen(self::encode(self::valueAt($content, $path)));
+                if ($bytes > $size) {
+                    $longest = $path;
+                    $size = $bytes;
+                }
+            }
+            if ($longest === null) {
+                return null;
+            }
+            $key = implode('.', $longest);
+            $limit = isset($cut[$key]) ? intdiv($size, 2) : $target;
+            $cut[$key] = true;
+            $content = self::setValueAt($content, $longest, self::utf8Prefix((string) self::valueAt($content, $longest), $limit));
+            $content['truncated'] = true;
+            if (end($longest) === 'value') {
+                $field = array_slice($longest, 0, -1);
+                $content = self::setValueAt($content, array_merge($field, ['truncated']), true);
+            }
+            if ($fits($content)) {
+                return $content;
+            }
+        }
+    }
+
+    /** @return array<int,array<int,string|int>> where the cuttable string values of a content sit */
+    private static function textPaths(array $content): array
+    {
+        $paths = [];
+        if (is_string($content['bodyHtml'] ?? null)) {
+            $paths[] = ['bodyHtml'];
+        }
+        $fields = static function (array $list, array $prefix) use (&$paths): void {
+            foreach ($list as $i => $field) {
+                if (is_array($field) && in_array($field['type'] ?? null, ['text', 'html'], true) && is_string($field['value'] ?? null)) {
+                    $paths[] = array_merge($prefix, [$i, 'value']);
+                }
+            }
+        };
+        $fields((array) ($content['fields'] ?? []), ['fields']);
+        foreach ((array) ($content['blocks'] ?? []) as $b => $block) {
+            $fields((array) ($block['fields'] ?? []), ['blocks', $b, 'fields']);
+            foreach ((array) ($block['items'] ?? []) as $n => $item) {
+                $fields((array) ($item['fields'] ?? []), ['blocks', $b, 'items', $n, 'fields']);
+            }
+        }
+        return $paths;
+    }
+
+    private static function valueAt(array $data, array $path)
+    {
+        foreach ($path as $step) {
+            $data = $data[$step];
+        }
+        return $data;
+    }
+
+    private static function setValueAt(array $data, array $path, $value): array
+    {
+        $step = array_shift($path);
+        $data[$step] = $path === [] ? $value : self::setValueAt($data[$step], $path, $value);
+        return $data;
+    }
+
+    /**
+     * The start of a UTF-8 string: at most `$max` characters and at most `$max` bytes once
+     * JSON-encoded, never ending inside a character.
+     */
+    private static function utf8Prefix(string $value, int $max): string
+    {
+        $out = self::utf8Chars($value, $max);
+        // `- 2`: the quotes around a JSON string are not part of the value.
+        while ($out !== '' && strlen(self::encode($out)) - 2 > $max) {
+            $over = strlen(self::encode($out)) - 2 - $max;
+            $out = self::utf8Bytes($out, max(0, strlen($out) - max($over, 1)));
+        }
+        return $out;
+    }
+
+    /** At most `$chars` characters of a UTF-8 string. */
+    private static function utf8Chars(string $value, int $chars): string
+    {
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $chars, 'UTF-8');
+        }
+        $length = strlen($value);
+        $seen = 0;
+        for ($i = 0; $i < $length; $i++) {
+            if ((ord($value[$i]) & 0xC0) !== 0x80) {
+                if ($seen === $chars) {
+                    return substr($value, 0, $i);
+                }
+                $seen++;
+            }
+        }
+        return $value;
+    }
+
+    /** At most `$bytes` bytes of a UTF-8 string, backed off to a character boundary. */
+    private static function utf8Bytes(string $value, int $bytes): string
+    {
+        if ($bytes >= strlen($value)) {
+            return $value;
+        }
+        while ($bytes > 0 && (ord($value[$bytes]) & 0xC0) === 0x80) {
+            $bytes--;
+        }
+        return substr($value, 0, $bytes);
     }
 
     // ---- detail -----------------------------------------------------------------------------
@@ -281,7 +469,20 @@ final class ContentReader
         if ($content === null) {
             throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
         }
-        $budget = $this->maxBytes - 2 * self::ENVELOPE_MARGIN;
+        // Cut before paging, if the content's own parts beside its largest block would not fit:
+        // blocks are paged below, but a single value over the budget cannot be.
+        $margin = min(self::ENVELOPE_MARGIN, intdiv($this->maxBytes, 8));
+        $content = !$this->sent ? $content : $this->truncated($content, function (array $content) use ($margin): bool {
+            $largest = 0;
+            foreach ((array) ($content['blocks'] ?? []) as $block) {
+                $largest = max($largest, strlen(self::encode($block)));
+            }
+            $bare = $content;
+            $bare['blocks'] = [];
+            $bare['images'] = [];
+            return strlen(self::encode($this->envelope([$bare], 1, null, 1))) + $largest <= $this->maxBytes - $margin;
+        }) ?? $content;
+        $budget = $this->maxBytes - 2 * $margin;
         foreach (['title', 'summary', 'bodyHtml'] as $key) {
             if (strlen(self::encode($content[$key] ?? null)) > $budget) {
                 throw $this->contentTooLarge($content, $key);
@@ -470,7 +671,7 @@ final class ContentReader
             'site' => $this->source->site(),
             'provenance' => $this->source->provenance(),
             'snapshot' => ['revision' => $this->source->revision(), 'readAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now)],
-            'pagination' => ['limit' => $limit, 'nextCursor' => $next, 'total' => $total],
+            'pagination' => ['limit' => $limit, 'nextCursor' => $next, 'total' => $total] + ($this->showBudget ? ['budget' => $this->maxBytes] : []),
             'completeness' => ['scope' => 'supported-content', 'status' => $unresolved === [] ? 'complete' : 'partial', 'unresolved' => $unresolved],
             'contents' => $contents,
         ];
