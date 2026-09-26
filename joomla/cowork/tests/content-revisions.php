@@ -169,8 +169,21 @@ $rvLate = $rvEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'pa
 check('a revert under a later revision says it conflicts', [$rvLate['ok'], $rvLate['errors'][0]['code']], [false, 'CONFLICT']);
 $rvBusy = new class extends FakeSiteWriter { public function serialize(callable $work) { throw new RuntimeException('Another write holds the site'); } };
 $rvBusyEngine = new Engine($WTOKEN, [], null, null, null, null, $rvBusy, null, $rvLog, null, null, null, $rvContract);
+// An inspect only reads: it takes no write lock, so a writer holding it does not refuse the read.
 $rvB = $rvBusyEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'inspect']]);
-check('a busy writer is a recoverable refusal', [$rvB['error'], $rvB['errors'][0]['code'], $rvB['errors'][0]['severity']], ['writer_busy', 'WRITER_BUSY', 'recoverable']);
+check('an inspect reads while another writer holds the lock', [$rvB['ok'], is_string($rvB['revision'] ?? null)], [true, true]);
+$rvBA = $rvBusyEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'apply', 'apply_id' => 'contract-busy', 'request_id' => 'busy', 'expected_revision' => $rvB['revision'], 'changes' => ['hero.0' => 'x']]]);
+check('an apply under a busy writer is a recoverable refusal', [$rvBA['error'], $rvBA['errors'][0]['code'], $rvBA['errors'][0]['severity']], ['writer_busy', 'WRITER_BUSY', 'recoverable']);
+// A writer that knows who holds the lock says so: the same message, the holder, its age, when to ask again.
+$rvHeld = new class extends FakeSiteWriter { public function serialize(callable $work, array $holder = []) {
+    throw new WriterBusy('another writer is changing this site', ['action' => 'content.contract', 'operation' => 'apply', 'applyId' => 'contract-other', 'since' => time() - 1]); } };
+$rvHeldEngine = new Engine($WTOKEN, [], null, null, null, null, $rvHeld, null, $rvLog, null, null, null, $rvContract);
+$rvH = $rvHeldEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'apply', 'apply_id' => 'contract-mine', 'request_id' => 'mine', 'expected_revision' => $rvB['revision'], 'changes' => ['hero.0' => 'x']]]);
+check('a busy answer keeps the message the tools match on', [$rvH['error'], $rvH['message']], ['writer_busy', 'another writer is changing this site']);
+check('and names who holds the lock', $rvH['holder'], ['action' => 'content.contract', 'operation' => 'apply', 'applyId' => 'contract-other']);
+checkTrue('for how long, and when to ask again', $rvH['heldForMs'] >= 1000 && $rvH['retryAfterMs'] >= 500 && $rvH['retryAfterMs'] <= 3500);
+$rvAnon = (new WriterBusy('another writer is changing this site'))->facts(time());
+check('a lock with no record of its holder still says when to ask again', $rvAnon, ['retryAfterMs' => 3000]);
 
 // Tracy ADR 0022: a bound menu item removed through Joomla closes its own slots, not the door.
 $rvGone = $rvWriter->store['menuItem'][121];

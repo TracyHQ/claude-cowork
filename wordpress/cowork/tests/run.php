@@ -1169,6 +1169,23 @@ $tpWriter = new Claude_Cowork_Site_Writer();
 // and a delete is what hands the part back to the theme's own file.
 check('an untouched part reads as absent', $tpWriter->read('templatePart', 0, 'header'), null);
 
+// A part the site never stored is still what visitors see — the theme's own file. content.get serves
+// it (stored:false) so a caller reads the bytes it would be writing over; read() stays null, so the
+// undo of a first write is still the delete that hands the part back to the file.
+$tpTheme = sys_get_temp_dir() . '/cowork-theme-' . bin2hex(random_bytes(4));
+mkdir($tpTheme . '/parts', 0777, true);
+file_put_contents($tpTheme . '/parts/footer.html', '<!-- wp:paragraph --><p>Call 8 800 550-67-89</p><!-- /wp:paragraph -->');
+WP_Fake::$themeDir = $tpTheme;
+$tpEngine = new Engine($WTOKEN, [], null, null, null, null, $tpWriter, null, new FakeApplyLog());
+$tpGot = $tpEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'templatePart', 'key' => 'footer']]);
+check('a theme-only part is read from the theme file', [$tpGot['ok'], $tpGot['stored'], $tpGot['item']['content'], $tpGot['item']['source']],
+    [true, false, '<!-- wp:paragraph --><p>Call 8 800 550-67-89</p><!-- /wp:paragraph -->', 'theme']);
+check('and the writer still reads it as absent, so a first write undoes by delete', $tpWriter->read('templatePart', 0, 'footer'), null);
+check('a part neither stored nor in the theme is not found', $tpEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'templatePart', 'key' => 'sidebar']])['error'], 'not_found');
+check('a slug with a path in it never reaches the file system', $tpWriter->themeTemplatePart('../x'), null);
+unlink($tpTheme . '/parts/footer.html'); rmdir($tpTheme . '/parts'); rmdir($tpTheme);
+WP_Fake::$themeDir = '/nonexistent-theme';
+
 $tpId = $tpWriter->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
 checkTrue('writing one yields an id', $tpId > 0);
 
