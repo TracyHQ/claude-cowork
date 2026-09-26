@@ -44,6 +44,13 @@ final class Timing
         self::$phases[$phase] = [(self::$phases[$phase][0] ?? 0) + $spent, (self::$phases[$phase][1] ?? 0) + 1];
     }
 
+    /** Count `$n` things under `$phase`, with no time of its own (how many locked files were hashed). */
+    public static function count(string $phase, int $n): void
+    {
+        if (!self::$on) return;
+        self::$phases[$phase] = [self::$phases[$phase][0] ?? 0, (self::$phases[$phase][1] ?? 0) + $n];
+    }
+
     /**
      * The JSON body of one door call: `$answer()` encoded exactly as the door always has, plus a
      * `timing` block when the request asked for one.

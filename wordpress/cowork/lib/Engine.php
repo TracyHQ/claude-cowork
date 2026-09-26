@@ -405,8 +405,14 @@ final class Engine
                 if (!hash_equals((string) ($entry['hash'] ?? ''), $hash)) {
                     throw new RuntimeException('request_id reused with different content');
                 }
-                $this->contract->inspectClean();
-                return $entry['result'];
+                $now = $this->contract->inspectClean();
+                $result = $entry['result'];
+                // The revision a replay answers is the site's only if nothing moved since: otherwise the
+                // caller must read again, as the Joomla receiver answers (#316).
+                if (($result['afterRevision'] ?? null) !== ($now['revision'] ?? null)) {
+                    unset($result['afterRevision']);
+                }
+                return $result;
             }
         }
         if ($entries !== []) {
@@ -485,7 +491,9 @@ final class Engine
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
-        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']] + $warn);
+        // `afterRevision`, as the Joomla receiver answers (#316): the contract revision this apply left,
+        // read under the lock — the next apply can send it as expected_revision without inspecting again.
+        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision'], 'afterRevision' => $state['revision']] + $warn);
         // The revision `content.read` now lists for every content this apply touched, read by the
         // reader itself after the write, so the next apply can hold exactly these. Left out when
         // the reader cannot answer on this site (no content identity yet): the write stands.
@@ -2069,6 +2077,15 @@ final class Engine
             $item = $this->writer->read($kind, $id, $key);
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
+        }
+        if ($item === null && $kind === 'templatePart' && $key !== '' && method_exists($this->writer, 'themeTemplatePart')) {
+            // A part the site never stored is still what visitors see: the theme's own file. Served as
+            // read (stored:false), so a write to it is judged against those bytes; the writer's read()
+            // stays null there on purpose — its undo is a delete that puts the theme file back.
+            $theme = $this->writer->themeTemplatePart($key);
+            if ($theme !== null) {
+                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false]);
+            }
         }
         if ($item === null) {
             // Both halves of the address, because a null here means either "no such record" or

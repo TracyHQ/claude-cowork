@@ -183,6 +183,11 @@ class com_claudecoworkInstallerScript
     private function ensureApplyLogTable($db): void
     {
         $db->setQuery('CREATE TABLE IF NOT EXISTS #__claudecowork_content_contract (id INT NOT NULL PRIMARY KEY, binding LONGTEXT NOT NULL) ENGINE=InnoDB')->execute();
+        // The locked files' proofs between door calls (JoomlaFileProofStore) — its own table, never
+        // a row of the one above: the content reader snapshots that one whole.
+        $db->setQuery('CREATE TABLE IF NOT EXISTS #__claudecowork_file_proof (id INT NOT NULL PRIMARY KEY, proofs LONGTEXT NOT NULL) ENGINE=InnoDB')->execute();
+        // Who holds the write lock, and since when (JoomlaSiteWriter::serialize) — so a busy answer can say.
+        $db->setQuery('CREATE TABLE IF NOT EXISTS #__claudecowork_writer (id INT NOT NULL PRIMARY KEY, holder LONGTEXT NOT NULL) ENGINE=InnoDB')->execute();
         $db->setQuery(
             'CREATE TABLE IF NOT EXISTS ' . $db->quoteName('#__claudecowork_apply_log') . ' ('
             . $db->quoteName('id') . ' INT UNSIGNED NOT NULL AUTO_INCREMENT, '
