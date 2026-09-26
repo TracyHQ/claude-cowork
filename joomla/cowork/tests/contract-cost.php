@@ -55,8 +55,9 @@ $costTimedBody = $costAnswer($costTimed);
 check('a timed body is the untimed one with one key added at its end', substr($costTimedBody, 0, strlen($costPlain) - 1), substr($costPlain, 0, -1));
 $costTiming = json_decode($costTimedBody, true)['timing'];
 check('asking for timing changes nothing else in the answer', array_diff_key(json_decode($costTimedBody, true), ['timing' => 0]), json_decode($costPlain, true));
+// No contractHash here: this instance hashed its profile when it bound, and hashes it once.
 check('an inspect is timed phase by phase',
-    array_values(array_diff(['files', 'contractHash', 'inventory', 'presentation', 'assignments', 'access', 'counts', 'slots', 'digest', 'inspect', 'encode'], array_keys($costTiming))), []);
+    array_values(array_diff(['files', 'inventory', 'presentation', 'assignments', 'access', 'counts', 'slots', 'digest', 'inspect', 'encode'], array_keys($costTiming))), []);
 checkTrue('each phase is {ms, n}', !array_filter($costTiming, fn($p) => array_keys($p) !== ['ms', 'n'] || !is_numeric($p['ms']) || $p['ms'] < 0 || !is_int($p['n']) || $p['n'] < 1));
 check('one inspect ran', $costTiming['inspect']['n'], 1);
 checkTrue('only timing: true asks — not 1, not "true"', !Timing::wanted(['params' => ['timing' => 1]]) && !Timing::wanted(['params' => ['timing' => 'true']]));
@@ -79,3 +80,16 @@ $costReverted = json_decode($costAnswer(['token' => $WTOKEN, 'action' => 'apply.
 check('a timed revert succeeds', $costReverted['ok'], true);
 check('a timed revert is timed phase by phase',
     array_values(array_diff(['revertPre', 'revert', 'revertPost', 'purge'], array_keys($costReverted['timing']))), []);
+
+// ── The profile hash, once per instance ──────────────────────────────────────────────────────────
+// Manifest, content map and lock are read in the constructor and never change after; the hash of
+// them was re-encoded twice per inspect and twice per readMapping.
+$costFresh = new QuickstartContract($costWriter, $costStore, $costDir, $costDir);
+$costTwice = json_decode(Timing::body(['params' => ['timing' => true]], function () use ($costFresh) {
+    $first = $costFresh->inspect(); $second = $costFresh->inspect(); $costFresh->readMapping();
+    return ['ok' => true, 'hashes' => [$first['snapshot']['contractHash'], $second['snapshot']['contractHash']], 'revisions' => [$first['revision'], $second['revision']]];
+}), true);
+check('two inspects and a read mapping on one instance hash the profile once', $costTwice['timing']['contractHash']['n'], 1);
+check('and every one of them carries the same hash, the one the site is bound to',
+    $costTwice['hashes'], [$costStore->binding['contractHash'], $costStore->binding['contractHash']]);
+check('and the same revision', $costTwice['revisions'][0], $costTwice['revisions'][1]);

@@ -123,9 +123,15 @@ final class QuickstartContract
         return $this->packs;
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
+    /**
+     * Hashed once per instance: the three files are read in the constructor and never change after,
+     * and re-encoding ~10 MB of profile JSON ran twice per inspect and twice per readMapping (#316).
+     */
+    private ?string $contractHash = null;
     private function contractHash(): string {
-        $t=Timing::begin();$hash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
-        return $hash;
+        if($this->contractHash!==null)return $this->contractHash;
+        $t=Timing::begin();$this->contractHash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
+        return $this->contractHash;
     }
     /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
     private ?array $baseEntities = null;
