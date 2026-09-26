@@ -112,3 +112,21 @@ contractRejects('once the call is over, the next inspect proves the files again'
 check('and so does the next door call', $costEngine->handle($costInspect)['ok'], false);
 file_put_contents($costDir . '/assets/demo.css', '.hero { color: red }');
 check('the files restored, the site reads again', $costEngine->handle($costInspect)['ok'], true);
+
+// ── Each row's columns parsed once per inspect ───────────────────────────────────────────────────
+// slotValue() still reads a slot the way inspect always did — its column parsed afresh for that one
+// slot — so it is the oracle for what inspect now reads with each row's columns parsed once.
+// Tracy Business 1.2.0 as shipped is three of them (1,797 slots, 1,509 in nested JSON); the content
+// revisions fixture is not, because its own tests end on a drifted stylesheet.
+$costFixtures = ['cost' => $costContract, 'identity' => $idContract, 'bulk rows' => $bc, 'paged rows' => $pc,
+    'a shipped profile after its gate run' => $gc, 'demo trim' => $trimContract, 'site language' => $langContract, 'source language' => $relContract];
+$costSlotCount = 0;
+foreach ($costFixtures as $costName => $costFixture) {
+    $costState = $costFixture->inspect();
+    $costSlotCount += count($costState['slots']);
+    check('parsing each row once reads every slot as before: ' . $costName,
+        array_column($costState['slots'], 'current'),
+        array_map(fn($slot) => $costFixture->slotValue($costState['rows'][$slot['entity']], $slot), $costState['slots']));
+}
+checkTrue('the fixtures hold several slots per column, in HTML and in nested JSON', $costSlotCount > 3000
+    && count(array_filter($costContract->inspect()['slots'], fn($s) => isset($s['jsonPath']))) === 3);

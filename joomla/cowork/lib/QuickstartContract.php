@@ -270,16 +270,21 @@ final class QuickstartContract
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         return $row;
     }
-    private function currentValue(array $row, array $slot): string {
-        $value=$row[$slot['column']];
+    /**
+     * @param array $parsed this ROW's columns already parsed, kept by the caller across its slots: an
+     * HTML body or nested JSON config holding many slots was parsed again for each one of them, on
+     * every inspect (Business 1.2.0: 1,509 JSON and 124 HTML slots; #316). Omitted, nothing is kept.
+     */
+    private function currentValue(array $row, array $slot, array &$parsed = []): string {
+        $column=$slot['column'];$value=$row[$column];
         if(isset($slot['xpath'])) {
-            $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+            $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
             return $nodes->item(0)->nodeValue;
         }
         if(isset($slot['jsonPath'])) {
-            $outer=json_decode($value,true,512,JSON_THROW_ON_ERROR);
-            $value=json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
+            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=$parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
             foreach($slot['jsonPath'] as $key)$value=$value[$key];
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
@@ -603,7 +608,7 @@ final class QuickstartContract
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $t=Timing::begin();
         $slots=[];
-        foreach($keys as $key=>$meta)foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot);$slots[]=$slot;}
+        foreach($keys as $key=>$meta){$parsed=[];foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot,$parsed);$slots[]=$slot;}}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
         Timing::end('slots',$t);
         $t=Timing::begin();$revision=$this->digest($revisionRows);Timing::end('digest',$t);
