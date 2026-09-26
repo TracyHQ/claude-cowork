@@ -105,6 +105,47 @@ final class MultilingualApply
         return $job;
     }
 
+    /**
+     * The rows that already stand on the site and that the job's CURRENT phase would write, as
+     * (kind, id) — every one of them, not only the next chunk's. What the Engine asks before a phase
+     * runs, so a row open in the Joomla editor refuses the phase that would write it, and nothing
+     * of that phase is written. Rows a phase creates are not here: nobody can have them open yet.
+     * Associations and the language/filter rows are not here either: Joomla checks none of them out.
+     *
+     * @return list<array{0:string,1:int}>
+     */
+    public function pendingRows(array $job, array $state): array
+    {
+        $locale = $job['locale'];
+        $rows = [];
+        switch ($job['phase']) {
+            case 'prepare':
+                foreach ($state['keys'] as $key => $meta) {
+                    if (isset($meta['locale']) || !empty($meta['switcher'])) continue;
+                    if ($this->profile->isTranslated($key) && (string) $state['rows'][$key]['language'] === '*') $rows[] = [$meta['kind'], (int) $state['ids'][$key]];
+                }
+                break;
+            case 'articles': case 'menu': case 'modules':
+                $kind = ['articles' => 'article', 'menu' => 'menuItem', 'modules' => 'module'][$job['phase']];
+                if ($edition = $this->profile->edition($locale)) {
+                    foreach ($this->sources($state, $kind) as $key)
+                        if (!isset($job['ids'][$key]) && (int) ($edition['ids'][$key] ?? 0) > 0) $rows[] = [$kind, (int) $edition['ids'][$key]];
+                } elseif ($kind === 'menuItem') {
+                    foreach ($this->aliasHolders($state, $locale) as $row) $rows[] = ['menuItem', (int) $row['id']];
+                }
+                break;
+            case 'finish':
+                if ($edition = $this->profile->edition($locale))
+                    foreach (['module' => 'published', 'menuItem' => 'published', 'article' => 'state'] as $kind => $column)
+                        foreach ($edition['reveal'][$kind] ?? [] as $id) {
+                            $row = $this->writer->read($kind, (int) $id);
+                            if ($row && (int) ($row[$column] ?? 0) !== 1) $rows[] = [$kind, (int) $id];
+                        }
+                break;
+        }
+        return $rows;
+    }
+
     /** Base keys of one kind that get a copy, in the order their rows must be created. */
     private function sources(array $state, string $kind): array
     {
@@ -281,6 +322,24 @@ final class MultilingualApply
      */
     private function clearMenuAliases(array $state, string $locale): void
     {
+        foreach ($this->aliasHolders($state, $locale) as $row) {
+            if ($this->aside === null) throw new RuntimeException('Menu item ' . $row['id'] . ' holds the alias ' . $row['alias'] . ' in ' . $locale);
+            ($this->aside)((int) $row['id'], (string) $row['alias'], (string) $row['alias'] . '-archive');
+        }
+    }
+
+    /** @var array<string,list<array>>|null the alias holders found in this call, by locale */
+    private ?array $holders = null;
+
+    /**
+     * The archive's own menu items standing on an alias a copy is about to take (clearMenuAliases).
+     * Found once per call: the lock check before the phase and the phase itself ask the same thing.
+     *
+     * @return list<array> listing rows of `#__menu`
+     */
+    private function aliasHolders(array $state, string $locale): array
+    {
+        if (isset($this->holders[$locale])) return $this->holders[$locale];
         $sources = $this->sources($state, 'menuItem');
         $copied = [];
         foreach ($sources as $key) $copied[(int) $state['ids'][$key]] = true;
@@ -290,19 +349,21 @@ final class MultilingualApply
             if (isset($copied[(int) $row['parent_id']])) continue;
             $taken[(int) $row['parent_id'] . "\0" . $this->profile->derivedAlias('menuItem', (string) $row['alias'], $locale)] = true;
         }
-        if (!$taken) return;
-        $governed = array_flip(array_map('intval', $state['ids']));
-        for ($offset = 0; $offset < 20000; $offset += 100) {
-            $page = $this->writer->list('menuItem', $offset, 100);
-            foreach ($page as $row) {
-                if ((string) ($row['language'] ?? '') !== $locale || (int) ($row['client_id'] ?? 0) !== 0) continue;
-                if (!isset($taken[(int) $row['parent_id'] . "\0" . (string) $row['alias']])) continue;
-                if (isset($governed[(int) $row['id']]) || strpos((string) ($row['note'] ?? ''), 'tracy-ml:') === 0) continue;
-                if ($this->aside === null) throw new RuntimeException('Menu item ' . $row['id'] . ' holds the alias ' . $row['alias'] . ' in ' . $locale);
-                ($this->aside)((int) $row['id'], (string) $row['alias'], (string) $row['alias'] . '-archive');
+        $out = [];
+        if ($taken) {
+            $governed = array_flip(array_map('intval', $state['ids']));
+            for ($offset = 0; $offset < 20000; $offset += 100) {
+                $page = $this->writer->list('menuItem', $offset, 100);
+                foreach ($page as $row) {
+                    if ((string) ($row['language'] ?? '') !== $locale || (int) ($row['client_id'] ?? 0) !== 0) continue;
+                    if (!isset($taken[(int) $row['parent_id'] . "\0" . (string) $row['alias']])) continue;
+                    if (isset($governed[(int) $row['id']]) || strpos((string) ($row['note'] ?? ''), 'tracy-ml:') === 0) continue;
+                    $out[] = $row;
+                }
+                if (count($page) < 100) break;
             }
-            if (count($page) < 100) break;
         }
+        return $this->holders[$locale] = $out;
     }
 
     private function phaseArticles(array &$job, array $state, array $translations, string $locale): bool

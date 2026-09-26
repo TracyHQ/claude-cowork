@@ -168,6 +168,43 @@ final class Engine
         return $this->err('locked', implode('; ', $messages), ['code' => 'SLOT_LOCKED_BY_USER', 'lockedBy' => $locked[0]['lockedBy'], 'locked' => $locked]);
     }
 
+    /**
+     * The contract door's refusal for rows open in the Joomla editor: throws SLOT_LOCKED_BY_USER, one
+     * problem per open row, before the operation writes anything — so a demo trim, a retire, a
+     * relabel or a language phase is refused whole, exactly as `apply` is (QuickstartContract::plan).
+     * Each problem names the record (`record`: kind, id), the content it is read in when the row is
+     * a contract entity (`field.contentId`), and `lockedBy`; `$extra` adds what the operation knows
+     * (a language job's `phase`). No flag skips it: the admin's next Save would undo the write.
+     *
+     * @param list<array{0:string,1:int}> $rows (kind, id) of existing rows the operation would write
+     */
+    private function refuseLocked(array $rows, array $extra = []): void
+    {
+        $unique = [];
+        foreach ($rows as [$kind, $id])
+            if ((int) $id > 0 && isset(JoomlaLocks::TABLES[$kind])) $unique[JoomlaLocks::key($kind, (int) $id)] = [$kind, (int) $id];
+        if (!$this->locks || $unique === []) return;
+        $held = ($this->locks)(array_values($unique));
+        if (!$held) return;
+        $owners = null; $problems = [];
+        foreach ($unique as $key => [$kind, $id]) {
+            $lockedBy = $held[$key] ?? null;
+            if (!$lockedBy) continue;
+            $entity = null;
+            try { $entity = $this->contract ? $this->contract->entityAt($kind, $id) : null; } catch (Throwable $ignored) {}
+            // A failed read only costs the refusal its contentId; the refusal itself stands.
+            if ($entity !== null && $owners === null) {
+                $owners = [];
+                try { $owners = $this->contentRevisions ? (($this->contentRevisions)()['owners'] ?? []) : []; } catch (Throwable $ignored) {}
+            }
+            $row = $this->writer ? $this->writer->read($kind, $id) : null;
+            $title = $row['title'] ?? $row['name'] ?? null;
+            $problems[] = new ContractProblem('SLOT_LOCKED_BY_USER', JoomlaLocks::message(is_string($title) ? $title : null, $lockedBy),
+                null, $entity !== null ? ($owners[$entity] ?? null) : null, ['lockedBy' => $lockedBy, 'record' => ['kind' => $kind, 'id' => $id]] + $extra);
+        }
+        if ($problems) throw ContractProblem::all($problems);
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -1515,18 +1552,25 @@ final class Engine
             // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit. A batch that dies after
             // Joomla committed some rows must leave a site that says a trim is in flight — otherwise
             // those rows read as drift, and the retry that would finish them is refused with the rest.
+            // 🔒 NOT UNDER AN OPEN EDITOR, AND NOT EVEN THE RECORD. The rows this call would move are
+            // checked before the first write of the call, the record included: a refused call leaves
+            // the site, and a trim in flight, exactly where they were, so the same request resumes.
+            $hide = $operation === 'apply';
+            $checked = false;
             if ($trim === null || $trim['status'] !== $record['status'] || $trim['requestId'] !== $request) {
-                $this->writer->transaction(function () use ($record) {
+                $this->writer->transaction(function () use ($record, $hide) {
                     $state = $this->contract->inspect();
+                    $this->refuseLocked($this->demoTrimRows($state, $hide));
                     if (!$state['binding']) $this->contract->bind($state['snapshot']);
                     $this->contract->rebind($this->contract->bindingWithTrim($record));
                     return [];
                 });
+                $checked = true;
             }
-            $hide = $operation === 'apply';
             $this->batching = true;
-            $step = $this->writer->transaction(function () use ($hide, $apply) {
+            $step = $this->writer->transaction(function () use ($hide, $apply, $checked) {
                 $state = $this->contract->inspect();
+                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide));
                 $pending = $this->demoTrimPending($state, $hide);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
                 foreach ($batch as $key => [$kind, $field, $value]) {
@@ -1703,6 +1747,7 @@ final class Engine
             $onRecord = $binding['sourceRelabel'] ?? null;
             if ($operation === 'revert') {
                 if ($onRecord === null) return $this->err('contract_failed', 'This site’s source edition still carries its published tag; there is nothing to take back');
+                $this->refuseLocked($this->rowsInLanguage((string) $onRecord['to']));
                 $this->relabelSource($apply, (string) $onRecord['to'], $published, null, $onRecord);
                 return $this->ok(['status' => 'reverted', 'source' => $published]);
             }
@@ -1713,6 +1758,9 @@ final class Engine
                 return $this->err('conflict', 'This site’s source edition is already called ' . $current . '; take that back with sourceLanguage.revert before choosing another');
             if (in_array($locale, $this->contract->derivedLanguages(), true))
                 return $this->err('conflict', 'This site already has a ' . $locale . ' edition; the source cannot take its name');
+            // Before the pack too: an installer is a write, and a relabel refused afterwards would
+            // leave its content language behind for nothing.
+            $this->refuseLocked($this->rowsInLanguage($current));
             $pack = $this->contract->languagePackage($locale, $major);
             if ($pack !== null && !$this->languagePackPresent($locale)) {
                 if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -1736,6 +1784,25 @@ final class Engine
         }
     }
 
+    /**
+     * Every row a relabel from `$tag` rewrites (SiteWriter::relabelLanguage), as (kind, id): each
+     * kind the editor checks out, read by its listing, kept where it carries the tag. A relabel is
+     * rare and one-off, so a listing of every such table is what its lock check costs.
+     */
+    private function rowsInLanguage(string $tag): array
+    {
+        $rows = [];
+        if (!$this->locks) return $rows;
+        foreach (['article', 'category', 'tag', 'field', 'contact', 'newsfeed', 'banner', 'module', 'menuItem'] as $kind)
+            for ($offset = 0; $offset < 20000; $offset += 100) {
+                $page = $this->writer->list($kind, $offset, 100);
+                foreach ($page as $row)
+                    if ((string) ($row['language'] ?? '') === $tag && (int) ($row['client_id'] ?? 0) === 0) $rows[] = [$kind, (int) $row['id']];
+                if (count($page) < 100) break;
+            }
+        return $rows;
+    }
+
     /** One relabel, logged, recorded and proven in a single transaction; $record null takes it back. */
     private function relabelSource(string $apply, string $from, string $to, ?array $record, ?array $undoing): void
     {
@@ -1755,6 +1822,15 @@ final class Engine
         });
         try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
         $this->stamped('content');
+    }
+
+    /** The rows the next demo-trim batch would move, as (kind, id). */
+    private function demoTrimRows(array $state, bool $hide): array
+    {
+        $rows = [];
+        foreach (array_slice($this->demoTrimPending($state, $hide), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
+            $rows[] = [$kind, (int) $state['ids'][$key]];
+        return $rows;
     }
 
     /**
@@ -1853,24 +1929,41 @@ final class Engine
                 );
                 $job = MultilingualApply::start($locale, $apply, $request, $hash, $state['snapshot']['contractHash'], $plan['profileHash'], $state['revision']);
             }
-            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply): int {
+            // Rows the phase was checked for before it began (see the transaction below). A write to an
+            // existing row outside that list is checked on its own before it lands, so no path through
+            // a phase writes under an open editor, even one pendingRows() did not foresee.
+            $checked = [];
+            $phase = $job['phase'];
+            $guard = function (string $kind, int $id) use (&$checked, $phase): void {
+                if ($id > 0 && !isset($checked[JoomlaLocks::key($kind, $id)])) $this->refuseLocked([[$kind, $id]], ['phase' => $phase]);
+            };
+            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply, $guard): int {
+                $guard($kind, $id);
                 $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => $id, 'fields' => $fields]);
                 if (empty($answer['ok'])) throw new RuntimeException($kind . ' ' . $id . ': ' . ($answer['message'] ?? json_encode($answer['error'])));
                 return (int) $answer['id'];
-            }, function (int $id, string $before, string $after) use ($apply): void {
+            }, function (int $id, string $before, string $after) use ($apply, $guard): void {
+                $guard('menuItem', $id);
                 // Undo first, as retire does: a row whose way back was not recorded is never moved.
                 $this->log->record($apply, ['op' => 'alias', 'kind' => 'menuItem', 'id' => $id, 'before' => $before]);
                 $this->writer->realiasMenuItem($id, $after);
-            }, function (string $kind, int $id, string $column, int $value) use ($apply): void {
+            }, function (string $kind, int $id, string $column, int $value) use ($apply, $guard): void {
+                $guard($kind, $id);
                 $before = (int) (($this->writer->read($kind, $id) ?? [])[$column] ?? 0);
                 $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => $before]);
                 $this->setVisible($kind, $id, $column, $value);
             });
             $this->batching = true;
-            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
+            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale, &$checked) {
                 // A fresh read inside the transaction: the phase must act on the site as it is now,
                 // not on a picture taken before another writer had its turn.
                 $state = $this->contract->inspect();
+                // 🔒 THE PHASE THAT WOULD WRITE AN OPEN RECORD IS REFUSED BEFORE ITS FIRST WRITE. Every
+                // existing row the phase writes, not just this chunk's; the job is not advanced and not
+                // saved, so the same request resumes at the same phase once the editor is closed.
+                $rows = $executor->pendingRows($job, $state);
+                $this->refuseLocked($rows, ['phase' => $job['phase']]);
+                foreach ($rows as [$kind, $id]) $checked[JoomlaLocks::key($kind, (int) $id)] = true;
                 $next = $executor->step($job, $state, $translations);
                 if ($next['phase'] === 'completed') {
                     $this->contract->saveJob(null);
@@ -1918,6 +2011,7 @@ final class Engine
         try {
             $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
             if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
+            $this->refuseLocked($this->undoRows($entries));
             $this->writer->transaction(function () use ($entries) {
                 foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
                 return [];
@@ -1991,6 +2085,8 @@ final class Engine
             $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
             $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            // Every row this pass hides, before the first: one open in the editor refuses the pass.
+            $this->refuseLocked(array_map(fn ($write) => [$write[0], (int) $write[1]], $slice));
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
                 foreach ($slice as [$kind, $id, $fields]) {
@@ -2127,6 +2223,10 @@ final class Engine
                 return $this->err('conflict', 'The site changed since it was read; inspect again');
             $applyId = $abandon ? $job['applyId'] : $language['applyId'];
             $leftovers = $abandon ? ($state['languages'] === [] ? $this->orphansOf($state, $locale) : []) : [];
+            // Every row the undo log would put back and every leftover it would remove, before any.
+            $rows = $this->undoRows($this->log->entries($applyId));
+            foreach ($leftovers as $kind => $ids) foreach ($ids as $id) $rows[] = [$kind, (int) $id];
+            $this->refuseLocked($rows);
             $this->batching = true;
             $result = $this->writer->transaction(function () use ($applyId, $locale, $abandon, $leftovers) {
                 $reverted = $this->applyRevert(['apply_id' => $applyId]);
@@ -2471,10 +2571,7 @@ final class Engine
             return $this->err('revert_failed', $e->getMessage());
         }
         // Taking a change back is a write too: not under an open editor, and not half of it.
-        $rows = [];
-        foreach ($entries as $entry)
-            if (in_array($entry['op'] ?? '', ['content', 'move'], true) && is_string($entry['kind'] ?? null)) $rows[] = [$entry['kind'], (int) ($entry['id'] ?? 0)];
-        if (($refusal = $this->lockRefusal($rows)) !== null) return $refusal;
+        if (($refusal = $this->lockRefusal($this->undoRows($entries))) !== null) return $refusal;
 
         $reverted = 0;
         $failed = [];
@@ -2508,6 +2605,19 @@ final class Engine
             return $this->ok(['reverted' => $reverted]);
         }
         return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
+    }
+
+    /**
+     * The rows an undo log would write back, as (kind, id): a content write, a move, and the raw
+     * alias and visibility changes a language step or a retire records.
+     */
+    private function undoRows(array $entries): array
+    {
+        $rows = [];
+        foreach ($entries as $entry)
+            if (in_array($entry['op'] ?? '', ['content', 'move', 'alias', 'visibility'], true) && is_string($entry['kind'] ?? null))
+                $rows[] = [$entry['kind'], (int) ($entry['id'] ?? 0)];
+        return $rows;
     }
 
     /**

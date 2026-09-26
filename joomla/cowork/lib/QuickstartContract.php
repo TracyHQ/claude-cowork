@@ -989,6 +989,24 @@ final class QuickstartContract
         return $out;
     }
 
+    /**
+     * The contract entity one row is bound as — a base key, or a language copy's derived key — or
+     * null for a row the contract does not govern. Read from the binding, without an inspect: a
+     * refusal asks it only for the few rows it names.
+     */
+    public function entityAt(string $kind, int $id): ?string {
+        $this->ready();
+        $binding = $this->store->load();
+        if ($binding === null) return null;
+        $base = $this->baseEntities();
+        foreach ($binding['ids'] ?? [] as $key => $bound)
+            if ((int) $bound === $id && ($base[$key]['kind'] ?? null) === $kind) return (string) $key;
+        foreach ($binding['multilingual']['languages'] ?? [] as $tag => $language)
+            foreach ($language['ids'] ?? [] as $baseKey => $bound)
+                if ((int) $bound === $id && ($base[$baseKey]['kind'] ?? null) === $kind) return MultilingualProfile::derivedKey((string) $tag, (string) $baseKey);
+        return null;
+    }
+
     /** The content languages this site has been given copies of, per its binding. */
     public function derivedLanguages(): array {
         $this->ready();
