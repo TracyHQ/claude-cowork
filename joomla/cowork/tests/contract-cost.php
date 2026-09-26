@@ -130,3 +130,24 @@ foreach ($costFixtures as $costName => $costFixture) {
 }
 checkTrue('the fixtures hold several slots per column, in HTML and in nested JSON', $costSlotCount > 3000
     && count(array_filter($costContract->inspect()['slots'], fn($s) => isset($s['jsonPath']))) === 3);
+
+// ── The revision an apply leaves ─────────────────────────────────────────────────────────────────
+// Returned so the next apply needs no inspect to learn it; `revision` stays the receipt's own hash.
+$costBefore = $costContract->inspect()['revision'];
+$costApply3 = $costApply; unset($costApply3['params']['timing']);
+$costApply3['params']['apply_id'] = 'contract-cost-3'; $costApply3['params']['request_id'] = 'cost-3';
+$costApply3['params']['expected_revision'] = $costBefore; $costApply3['params']['changes'] = ['identity.city' => 'Da Nang'];
+$costApplied3 = $costEngine->handle($costApply3);
+check('an apply answers the revision it left, the one an inspect right after reads',
+    [$costApplied3['ok'], $costApplied3['afterRevision'] ?? null], [true, $costContract->inspect()['revision']]);
+checkTrue('which is a new revision, and not the receipt hash', $costApplied3['afterRevision'] !== $costBefore && $costApplied3['afterRevision'] !== $costApplied3['revision']);
+check('a replay answers it too', $costEngine->handle($costApply3)['afterRevision'] ?? null, $costApplied3['afterRevision']);
+$costNext = $costApply3; $costNext['params']['apply_id'] = 'contract-cost-4'; $costNext['params']['request_id'] = 'cost-4';
+$costNext['params']['expected_revision'] = $costApplied3['afterRevision']; $costNext['params']['changes'] = ['identity.city' => 'Hue'];
+$costApplied4 = $costEngine->handle($costNext);
+check('the next apply can be based on it with no inspect between', $costApplied4['ok'], true);
+$costReceipt = current(array_filter($costLog->entries('contract-cost-4'), fn($e) => ($e['op'] ?? '') === 'contract'));
+check('it is the revision the receipt keeps for its revert', $costReceipt['afterRevision'], $costApplied4['afterRevision']);
+$costRevert = fn(string $apply) => $costEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => $apply]])['ok'];
+check('so both applies revert, latest first', [$costRevert('contract-cost-4'), $costRevert('contract-cost-3')], [true, true]);
+check('back to the revision before them', $costContract->inspect()['revision'], $costBefore);

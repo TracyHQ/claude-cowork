@@ -1289,6 +1289,10 @@ final class Engine
                 $t=Timing::begin();$state=$this->contract->inspect();Timing::end('verify',$t);
                 $t=Timing::begin();$revisions=$this->revisionsAfter($plan['touched'],$before);Timing::end('revisionsAfter',$t);
                 if($revisions!==null)$result['contentRevisions']=$revisions;
+                // The inspect revision this apply left, so the next one needs no inspect to learn it.
+                // Not `revision`: that name is already this receipt's hash. In the stored result, so a
+                // replay answers it too.
+                $result['afterRevision']=$state['revision'];
                 $t=Timing::begin();
                 $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
                 Timing::end('log',$t);
