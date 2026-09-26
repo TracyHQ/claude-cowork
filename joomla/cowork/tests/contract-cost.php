@@ -159,3 +159,48 @@ check('it is the revision the receipt keeps for its revert', $costReceipt['after
 $costRevert = fn(string $apply) => $costEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => $apply]])['ok'];
 check('so both applies revert, latest first', [$costRevert('contract-cost-4'), $costRevert('contract-cost-3')], [true, true]);
 check('back to the revision before them', $costContract->inspect()['revision'], $costBefore);
+
+/* ------------------------------------------------ the locked files' proofs, between door calls */
+
+// Every inspect and every apply hashed every locked file: 3.9 s of a 5.5 s inspect and 7.9 s of a
+// 10.9 s apply whose write took 38 ms (Business lock, 4,145 files, Tracy bench 27/09/2026). A proof
+// remembered under the file's size, mtime, ctime and inode stands in for the hash until a write
+// moves one of them — and a file younger than the settle time is never remembered (racy-git rule).
+final class MemoryFileProofStore implements FileProofStore {
+    public array $proofs = [];
+    public int $saves = 0;
+    public bool $broken = false;
+    public function load(): array { if ($this->broken) throw new RuntimeException('store down'); return $this->proofs; }
+    public function save(array $proofs): void { if ($this->broken) throw new RuntimeException('store down'); $this->proofs = $proofs; $this->saves++; }
+}
+$proofCss = $costDir . '/assets/demo.css';
+$proofStore = new MemoryFileProofStore();
+$proofContract = (new QuickstartContract($costWriter, $costStore, $costDir, $costDir))->withFileProofs($proofStore);
+touch($proofCss); // a write just now: ctime is this second
+$proofContract->inspect();
+check('a file written moments ago is proved by hashing and not remembered', $proofStore->proofs, []);
+sleep(3);
+$proofContract->inspect();
+check('a settled file is remembered, under its stat, with the hash the lock names',
+    [array_keys($proofStore->proofs), $proofStore->proofs['assets/demo.css'][4] ?? null], [['assets/demo.css'], hash_file('sha256', $proofCss)]);
+$proofSaves = $proofStore->saves;
+$proofContract->inspect();
+check('an unchanged site reads its proofs and writes nothing', [$proofStore->saves, $proofContract->driftWarnings()], [$proofSaves, []]);
+// The remembered proof IS what is read: a wrong hash under a matching stat is believed. That is why
+// only a stat a write cannot fake — ctime — keys it; this is the check that the hash was skipped.
+$proofTrue = $proofStore->proofs['assets/demo.css'];
+$proofStore->proofs['assets/demo.css'][4] = str_repeat('0', 64);
+$proofContract->inspect();
+check('a remembered proof stands in for the hash', $proofContract->driftWarnings(), ['Presentation asset changed: assets/demo.css']);
+$proofStore->proofs['assets/demo.css'] = $proofTrue;
+$proofOriginal = file_get_contents($proofCss);
+file_put_contents($proofCss, '.hero { color: tan }'); // same size as the locked bytes
+check('the edit keeps the size the proof remembers', filesize($proofCss), $proofTrue[0]);
+$proofContract->inspect();
+check('a write moves ctime, so the file is hashed again and the edit is seen',
+    $proofContract->driftWarnings(), ['Presentation asset changed: assets/demo.css']);
+check('and a drifted file is not remembered', array_key_exists('assets/demo.css', $proofStore->proofs), false);
+file_put_contents($proofCss, $proofOriginal);
+$proofStore->broken = true;
+$proofContract->inspect();
+check('a store that fails costs the hash, never the answer', $proofContract->driftWarnings(), []);
