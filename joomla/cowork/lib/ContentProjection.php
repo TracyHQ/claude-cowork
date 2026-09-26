@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/ContentReader.php';
+require_once __DIR__ . '/JoomlaLocks.php';
 /**
  * The mapped-content projection: CMS rows in, `content.read` contents out. No Joomla globals, no
  * database and no writes, so the contract door can compute the SAME revisions the reader served.
@@ -63,6 +64,32 @@ final class ContentProjection
         return $contents;
     }
 
+    /**
+     * Who holds each content open in the Joomla editor (`lockedBy`, see JoomlaLocks), or null.
+     * Applied AFTER the revisions, like `addresses`: a check-out is who is looking, not what the
+     * content says, and the contract door hashes the same projection without asking — so opening
+     * a record in the editor must never move its revision and turn an agent's fresh read stale.
+     *
+     * A content is locked by the first live lock among the rows it is read from, its own row first:
+     * a page's menu item, then the section modules inlined into it (their slots are written through
+     * that page, and an apply to them is refused while the module is open).
+     *
+     * @param array<string,list<array{0:string,1:int}>> $rows {@see build()} `rows`
+     * @param callable(list<array{0:string,1:int}>):array<string,array> $lockOf every row at once => "kind:id" => lockedBy
+     */
+    public static function locks(array $contents, array $rows, callable $lockOf): array
+    {
+        $targets = [];
+        foreach ($contents as $id => $content) foreach ($rows[$id] ?? [] as $row) $targets[JoomlaLocks::key($row[0], $row[1])] = $row;
+        $held = $targets ? $lockOf(array_values($targets)) : [];
+        foreach ($contents as $id => $content) {
+            $contents[$id]['lockedBy'] = null;
+            foreach ($rows[$id] ?? [] as $row)
+                if (isset($held[JoomlaLocks::key($row[0], $row[1])])) { $contents[$id]['lockedBy'] = $held[JoomlaLocks::key($row[0], $row[1])]; break; }
+        }
+        return $contents;
+    }
+
     public static function date($value): ?string
     {
         return !$value || substr($value, 0, 4) === '0000' ? null : gmdate('Y-m-d\TH:i:s\Z', strtotime($value . ' UTC'));
@@ -82,9 +109,10 @@ final class ContentProjection
      * @param array<string,list<array>> $data rows of every table in {@see TABLES}
      * @param array $mapping QuickstartContract::readMapping()
      * @param callable(array,array):string $slotValue QuickstartContract::slotValue
-     * @return array{contents:array<string,array>,revisions:array<string,string>,owners:array<string,string>,locales:list<string>}
+     * @return array{contents:array<string,array>,revisions:array<string,string>,owners:array<string,string>,locales:list<string>,rows:array<string,list<array{0:string,1:int}>>}
      *   `contents` carry `revision: 'pending'` (the snapshot revision is hashed over that shape);
-     *   `owners` maps each projected contract entity key to the content its slots are read in.
+     *   `owners` maps each projected contract entity key to the content its slots are read in;
+     *   `rows` names, per content, the native rows (writer kind, id) it is read from, its own first.
      */
     public static function build(array $data, array $mapping, string $siteId, string $base, int $now, callable $slotValue): array
     {
@@ -94,7 +122,7 @@ final class ContentProjection
         $identities = [];
         foreach ($data['claudecowork_content_identity'] as $row) $identities[$row['kind']][(int)$row['native_id']] = $row['uid'];
         $opaque = self::opaque($siteId);
-        $contents = []; $keys = []; $locales = []; $native = []; $contractKey = [];
+        $contents = []; $keys = []; $locales = []; $native = []; $contractKey = []; $rowsOf = [];
         $categories = array_column($data['categories'], null, 'id');
         $menus = array_column($data['menu'], null, 'id');
         // With a home per language, the language filter sends every visitor to one of them: the
@@ -131,6 +159,7 @@ final class ContentProjection
             if (!$uid) throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'Content identity registry is incomplete');
             $id = $opaque('content', $uid); $keys[$key] = $id; $native[$kind][$nativeId] = $id; $contractKey[$id] ??= $key;
             if (isset($contents[$id])) continue;
+            $rowsOf[$id] = [[$meta['kind'], $nativeId]];
             $locale = ($row['language'] ?? '*') === '*' ? null : $row['language'];
             // Joomla's legacy sr-YU is not a canonical language tag. Do not silently relabel it.
             if ($locale === 'sr-YU') $locale = null;
@@ -223,6 +252,7 @@ final class ContentProjection
             unset($block);
             $contents[$ownerId]['images'] = array_values($images);
             unset($contents[$source]);
+            $rowsOf[$ownerId] = array_merge($rowsOf[$ownerId], $rowsOf[$source]); unset($rowsOf[$source]);
             // The inlined module's slots are now read, and so revised, in the page that carries them.
             foreach ($keys as $key => $id) if ($id === $source) $keys[$key] = $ownerId;
         }
@@ -244,6 +274,6 @@ final class ContentProjection
         $revisions = [];
         foreach ($contents as $id => $content) $revisions[$id] = self::revision($content, $mapping['contractHash']);
         $localeList = array_keys($locales); sort($localeList);
-        return ['contents' => $contents, 'revisions' => $revisions, 'owners' => $keys, 'locales' => $localeList];
+        return ['contents' => $contents, 'revisions' => $revisions, 'owners' => $keys, 'locales' => $localeList, 'rows' => $rowsOf];
     }
 }

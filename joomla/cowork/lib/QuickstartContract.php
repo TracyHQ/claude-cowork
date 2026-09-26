@@ -3,6 +3,7 @@ require_once __DIR__ . '/ContentSlots.php';
 require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
+require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
@@ -720,8 +721,15 @@ final class QuickstartContract
      * 🔒 EVERY PROBLEM, THEN NOTHING WRITTEN. All changes are checked before any operation is built,
      * and every refusal found is thrown together, so an agent fixes three slots in one round
      * instead of three.
+     *
+     * 🔒 NEVER UNDER AN OPEN EDITOR. `$locks` (the host's JoomlaContentReader::locks: rows =>
+     * "kind:id" => lockedBy) is asked once, for the rows this apply would write; one of them open
+     * in the Joomla editor refuses the WHOLE apply with SLOT_LOCKED_BY_USER, because the admin's
+     * next Save posts the form they loaded and puts the old words back over ours. No flag skips it.
+     * `$ownersOf` answers the projection's `owners` when `$current` did not carry them, so the refusal
+     * names its content too; asked only once a lock is found, so an apply pays nothing for it.
      */
-    public function plan(array $params, ?array $current = null): array {
+    public function plan(array $params, ?array $current = null, ?callable $locks = null, ?callable $ownersOf = null): array {
         $state=$this->inspect();
         $byContent=$params['expected_content_revisions']??null;
         if($byContent!==null) {
@@ -781,6 +789,21 @@ final class QuickstartContract
             $row=$state['rows'][$key];$next=$this->changeRow($row,$this->slotsOf($key,$meta),$values);$fields=[];$expected=[];
             foreach($next as $field=>$value)if($value!==$row[$field]){$fields[$field]=$value;$expected[$field]=$row[$field];}
             if($fields){$operations[]=['kind'=>$meta['kind'],'id'=>$state['ids'][$key],'fields'=>$fields,'expected'=>$expected];$touched[]=$key;}
+        }
+        if($locks&&$operations) {
+            $held=$locks(array_map(fn($op)=>[$op['kind'],(int)$op['id']],$operations));
+            // A failed read only costs the refusal its contentId; the refusal itself stands.
+            if($held&&$current===null&&$ownersOf){ try { $owners=$ownersOf()['owners']??[]; } catch(Throwable $ignored) {} }
+            foreach($operations as $index=>$op) {
+                $lockedBy=$held[JoomlaLocks::key($op['kind'],(int)$op['id'])]??null;
+                if(!$lockedBy)continue;
+                // Named by the first changed slot the open row carries, and the content it is read in.
+                $key=$touched[$index];$slotKey=null;
+                foreach($this->slotsOf($key,$state['keys'][$key]) as $slot)if(array_key_exists($slot['key'],$values)){$slotKey=$slot['key'];break;}
+                $title=$state['rows'][$key]['title']??null;
+                $problems[]=new ContractProblem('SLOT_LOCKED_BY_USER',JoomlaLocks::message(is_string($title)?$title:null,$lockedBy),$slotKey,$owners[$key]??null,['lockedBy'=>$lockedBy]);
+            }
+            if($problems)throw ContractProblem::all($problems);
         }
         return ['operations'=>$operations,'snapshot'=>$state['snapshot'],'touched'=>$touched];
     }

@@ -13,6 +13,7 @@ final class JoomlaContentReader
     public function __construct($db, callable $contractFactory, string $root, string $base) {
         require_once dirname(__DIR__,2).'/lib/ContentIdentity.php';
         require_once dirname(__DIR__,2).'/lib/JoomlaAddress.php';
+        require_once dirname(__DIR__,2).'/lib/JoomlaLocks.php';
         $this->db=$db; $this->contractFactory=$contractFactory; $this->root=$root; $this->base=rtrim($base,'/');
     }
     private function rows(string $table, string $order='id'): array {
@@ -68,6 +69,33 @@ final class JoomlaContentReader
             }
         }
         ksort($paths); return $paths;
+    }
+    /**
+     * The LIVE check-outs among some rows: "kind:id" => lockedBy (JoomlaLocks decides). Three small
+     * reads, none inside the snapshot: who checked each row out, those users' administrator
+     * sessions, their names. The session lifetime is the site's own (Global Configuration, minutes).
+     * Also what every write asks before it changes a row (EngineFactory wires it into the engine).
+     *
+     * @param list<array{0:string,1:int}> $rows (writer kind, id)
+     * @return array<string,array>
+     */
+    public function locks(array $rows): array {
+        $byTable=[];
+        foreach ($rows as [$kind,$id]) if (isset(\JoomlaLocks::TABLES[$kind]) && (int)$id>0) $byTable[\JoomlaLocks::TABLES[$kind]][$kind][(int)$id]=true;
+        $checkouts=[];
+        foreach ($byTable as $table=>$kinds) {
+            $ids=[]; foreach ($kinds as $set) $ids+=$set;
+            // `checked_out > 0` also skips Joomla 4+'s NULL (never checked out).
+            $found=$this->db->setQuery('SELECT id, checked_out, checked_out_time FROM #__'.$table.' WHERE checked_out > 0 AND id IN ('.implode(',',array_map('intval',array_keys($ids))).')')->loadAssocList();
+            foreach ($found as $row) foreach ($kinds as $kind=>$set)
+                if (isset($set[(int)$row['id']])) $checkouts[\JoomlaLocks::key($kind,(int)$row['id'])]=$row;
+        }
+        if (!$checkouts) return [];
+        $users=implode(',',array_unique(array_map(fn($row)=>(int)$row['checked_out'],$checkouts)));
+        $sessions=$this->db->setQuery('SELECT userid, client_id, '.$this->db->quoteName('time').' FROM #__session WHERE client_id = 1 AND userid IN ('.$users.')')->loadAssocList();
+        $names=$this->db->setQuery('SELECT id, name FROM #__users WHERE id IN ('.$users.')')->loadAssocList('id','name');
+        try { $lifetime=(int)\Joomla\CMS\Factory::getApplication()->get('lifetime',15); } catch (\Throwable $e) { $lifetime=15; }
+        return \JoomlaLocks::live($checkouts,$sessions,$names,time(),$lifetime>0?$lifetime:15);
     }
     /** The reader's opt-in row; a missing table is unsupported, a DB failure is unavailable. */
     private function config(): array {
@@ -150,6 +178,9 @@ final class JoomlaContentReader
         unset($content); $localeList=$projection['locales'];
         // The address a visitor sees, after the revisions: the door hashes without a router.
         $contents=\ContentProjection::addresses($contents,$this->base,$this->router($data));
+        // Who has each content open in the Joomla editor, also after the revisions: a check-out is
+        // who is looking, not what the content says (ContentProjection::locks).
+        $contents=\ContentProjection::locks($contents,$projection['rows'],[$this,'locks']);
         $manifest=$mapping['manifest'];
         $reader=new \ContentReader(['id'=>$opaque('site',$config['site_id']),'name'=>null,'url'=>$this->base,'defaultLocale'=>null,'locales'=>$localeList],
             ['quickstartTag'=>$manifest['quickstart']['release'],'quickstartVersion'=>$manifest['quickstart']['version'],'contractId'=>$manifest['id'],'contractHash'=>$mapping['contractHash']],

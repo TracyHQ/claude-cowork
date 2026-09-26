@@ -184,6 +184,11 @@ final class EngineFactory
             require_once self::libDir() . '/ContentProjection.php';
             return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => $contract, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->revisions();
         });
+        // Every write refuses a row an administrator has open in the Joomla editor — on any site,
+        // bound to a contract or not, since the admin's next Save would put the old words back.
+        $engine->locks(static function (array $rows): array {
+            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
+        });
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $baseline = self::constructionBaseline();
         if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);

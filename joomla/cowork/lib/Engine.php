@@ -26,6 +26,7 @@ require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
 require_once __DIR__ . '/QuickstartContract.php';
+require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
 
 final class Engine
@@ -126,6 +127,47 @@ final class Engine
         return $this;
     }
 
+    /**
+     * Who holds rows open in the Joomla editor: `fn(list<array{0:string,1:int}> $rows): array`
+     * answering "kind:id" => lockedBy for the LIVE check-outs among them (JoomlaLocks). Wired by
+     * the host, which alone can read `#__session`; absent, nothing is refused for a lock.
+     */
+    private $locks = null;
+
+    /** Let every write refuse a row an administrator has open in the Joomla editor. */
+    public function locks(callable $lockOf): self
+    {
+        $this->locks = $lockOf;
+        return $this;
+    }
+
+    /**
+     * The open surface's refusal for rows open in the Joomla editor, or null when none is. Its own
+     * shape (`error`, `message`), plus the contract door's `code` and `lockedBy` so one reader of
+     * both surfaces knows it by the same name; `locked` lists every open row, not just the first.
+     * There is no flag to write anyway: the admin's next Save would put the old words back.
+     *
+     * @param list<array{0:string,1:int}> $rows (kind, id) this write would change
+     */
+    private function lockRefusal(array $rows): ?array
+    {
+        $rows = array_values(array_filter($rows, fn($row) => $row[1] > 0 && isset(JoomlaLocks::TABLES[$row[0]])));
+        if (!$this->locks || $rows === []) return null;
+        $held = ($this->locks)($rows);
+        $locked = []; $messages = [];
+        foreach ($rows as [$kind, $id]) {
+            $lockedBy = $held[JoomlaLocks::key($kind, $id)] ?? null;
+            if (!$lockedBy || isset($locked[JoomlaLocks::key($kind, $id)])) continue;
+            $locked[JoomlaLocks::key($kind, $id)] = ['kind' => $kind, 'id' => $id, 'lockedBy' => $lockedBy];
+            $row = $this->writer ? $this->writer->read($kind, $id) : null;
+            $title = $row['title'] ?? $row['name'] ?? null;
+            $messages[] = JoomlaLocks::message(is_string($title) ? $title : null, $lockedBy);
+        }
+        if ($locked === []) return null;
+        $locked = array_values($locked);
+        return $this->err('locked', implode('; ', $messages), ['code' => 'SLOT_LOCKED_BY_USER', 'lockedBy' => $locked[0]['lockedBy'], 'locked' => $locked]);
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -210,6 +252,7 @@ final class Engine
                 $this->batching=true;
                 $result=$this->writer->transaction(function()use($params){
                     $t=Timing::begin();$result=$this->applyRevert($params);Timing::end('revert',$t);
+                    if(($result['code']??null)==='SLOT_LOCKED_BY_USER')throw new ContractProblem('SLOT_LOCKED_BY_USER',$result['message'],null,null,['lockedBy'=>$result['lockedBy']]);
                     if(!$result['ok'] || !empty($result['failed']))throw new RuntimeException('Contract revert failed');
                     $t=Timing::begin();$this->contract->inspect();Timing::end('revertPost',$t);
                     return $result;
@@ -1325,7 +1368,7 @@ final class Engine
             // Plan and verify are two inspects with no file written between them: one proof of the files.
             $this->contract->beginCall();
             $t=Timing::begin();$before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;Timing::end('contentRevisions',$t);
-            $t=Timing::begin();$plan=$this->contract->plan($p,$before);Timing::end('plan',$t);
+            $t=Timing::begin();$plan=$this->contract->plan($p,$before,$this->locks,$this->contentRevisions);Timing::end('plan',$t);
             if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
             return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
@@ -2122,6 +2165,14 @@ final class Engine
             return $this->err('bad_params', 'apply_id, request_id and 1–100 operations required');
         }
         $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
+        // Every existing row the batch names, checked before the first write so an open one refuses
+        // the whole batch. The contract door checked its own rows in plan(), with slot and content.
+        if (!$verify) {
+            $rows = [];
+            foreach ($steps as $step)
+                if (is_array($step) && is_string($step['kind'] ?? null) && is_numeric($step['id'] ?? null)) $rows[] = [$step['kind'], (int) $step['id']];
+            if (($refusal = $this->lockRefusal($rows)) !== null) return $refusal;
+        }
         try {
             $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
@@ -2199,6 +2250,8 @@ final class Engine
         }
         $fields = $p['fields'];
         $id = max(0, (int) ($p['id'] ?? 0));
+        // A batch checked all its rows before writing any; a lone update checks its own.
+        if (!$this->batching && ($refusal = $this->lockRefusal([[$kind, $id]])) !== null) return $refusal;
         if ($id === 0 && !$this->writer->canCreate($kind)) {
             // The refusal must NAME the boundary (ADR 0080 §4): the agent has no other door to
             // wander to, so this sentence is all it gets to explain itself to the user.
@@ -2315,6 +2368,7 @@ final class Engine
         if ($id <= 0) {
             return $this->err('bad_params', 'id required');
         }
+        if (($refusal = $this->lockRefusal([[$kind, $id]])) !== null) return $refusal;
 
         try {
             $before = $this->writer->read($kind, $id);
@@ -2416,6 +2470,11 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('revert_failed', $e->getMessage());
         }
+        // Taking a change back is a write too: not under an open editor, and not half of it.
+        $rows = [];
+        foreach ($entries as $entry)
+            if (in_array($entry['op'] ?? '', ['content', 'move'], true) && is_string($entry['kind'] ?? null)) $rows[] = [$entry['kind'], (int) ($entry['id'] ?? 0)];
+        if (($refusal = $this->lockRefusal($rows)) !== null) return $refusal;
 
         $reverted = 0;
         $failed = [];
