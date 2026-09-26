@@ -122,6 +122,13 @@ $realBase = DemoTrimProfile::baseHash($realDir);
 check('its demo-trim map is pinned to the three base files', json_decode((string) file_get_contents($realDir . '/demo-trim-map.json'), true)['baseHash'], $realBase);
 check('and so is its editions profile', json_decode((string) file_get_contents($realDir . '/editions.json'), true)['baseHash'], $realBase);
 
+// A site built from the Tracy Base quickstart names this profile; without it that site cannot bind.
+$base = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+$base->preview('tracy-base/wp7/1.1.0');
+check('the shipped Tracy Base profile loads', $base->id(), 'tracy-base/wp7/1.1.0');
+check('with its seven entities', count($base->entities()), 7);
+check('and its ten slots', count($base->slots()), 10);
+
 // ── unbound: nothing changes ────────────────────────────────────────────────────────────────
 
 $s = contractSite($SITE, $FIXTURES);
