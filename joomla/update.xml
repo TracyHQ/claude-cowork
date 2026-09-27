@@ -16,23 +16,6 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Render stamps for Tracy's page picker. For a request carrying the X-Tracy-Preview: pick header that Tracy's site proxy adds after checking a preview ticket, on a site with a cowork token, the API system plugin marks what printed each part of the page: data-tracy-src="module:ID block:TYPE" on every module, a template data-tracy-owner="article:ID:ALIAS" marker inside every article render and "category:ID:ALIAS" inside a category description, and article:ID:ALIAS on each item of an article-list module (mod_articles*, mod_related_items, and JA ACM when it lists two or more articles), tied to its article by building that article's route. Such a response is kept out of Joomla's page, view and module caches and sent no-store with Vary: Cookie; every other request is byte-identical. Built on 0.17.4.</description>
-        <element>pkg_claudecowork</element>
-        <type>package</type>
-        <version>0.18.0</version>
-        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0</infourl>
-        <downloads>
-            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0/pkg_claudecowork-0.18.0.zip</downloadurl>
-        </downloads>
-        <tags>
-            <tag>stable</tag>
-        </tags>
-        <maintainer>Tracy</maintainer>
-        <maintainerurl>https://tracy.ai</maintainerurl>
-        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
-    </update>
-    <update>
-        <name>Joomla Claude Cowork</name>
         <description>Carries the site-identity profiles of Tracy Apple 1.3.0 and the Airbnb design 1.2.0 on it: the site name, slogan and monogram live in one "[Tracy] Site identity" module the page reads through plg_system_tracyidentity, so those slots may be emptied or filled like Tracy Business 1.2.0. No code change; built on 0.17.3.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
