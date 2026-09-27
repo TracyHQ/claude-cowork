@@ -208,49 +208,49 @@ contractRejects('contract rejects stale revision',fn()=>$contract->plan(['expect
 contractRejects('contract rejects injected Joomla module directives',fn()=>$contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.0'=>'{loadposition new-position}']]));
 
 $contractLog=new FakeApplyLog();$transactional=new ContractTestWriter($contractLog,$cs);$transactional->store=$cw->store;
-$receiverContract=new QuickstartContract($transactional,$cs,$contractDir,$contractDir);
-$receiver=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$receiverContract);
+$coworkContract=new QuickstartContract($transactional,$cs,$contractDir,$contractDir);
+$cowork=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$coworkContract);
 $cs->binding=null;
 $bind=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']];
-check('bootstrap binds before any customer write',$receiver->handle($bind)['bound'],true);
-check('bootstrap binding is idempotent',$receiver->handle($bind)['bound'],true);
+check('bootstrap binds before any customer write',$cowork->handle($bind)['bound'],true);
+check('bootstrap binding is idempotent',$cowork->handle($bind)['bound'],true);
 // Tracy ADR 0022: a bound site takes the writes any site takes; the ordinary revert takes them back.
-check('a bound site takes a generic write',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic-0','fields'=>['published'=>'0']]])['ok'],true);
-check('and the ordinary revert takes it back',$receiver->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic-0']])['ok'],true);
-$first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$receiverContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
+check('a bound site takes a generic write',$cowork->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic-0','fields'=>['published'=>'0']]])['ok'],true);
+check('and the ordinary revert takes it back',$cowork->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic-0']])['ok'],true);
+$first=['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'apply','apply_id'=>'contract-first','request_id'=>'first','expected_revision'=>$coworkContract->inspect()['revision'],'changes'=>['hero.0'=>'First customer title']]];
 // Each refusal names the one id that is wrong: a single sentence for both sent an agent that had
 // both round fourteen retries with an apply_id that never carried the prefix.
-$untouched=$receiverContract->inspect()['revision'];
-$unprefixed=$first;$unprefixed['params']['apply_id']='h1-home-toyota';$refused=$receiver->handle($unprefixed);
+$untouched=$coworkContract->inspect()['revision'];
+$unprefixed=$first;$unprefixed['params']['apply_id']='h1-home-toyota';$refused=$cowork->handle($unprefixed);
 check('an apply_id without the contract- prefix is refused by name',[$refused['ok'],$refused['error'],$refused['message']],[false,'contract_failed','apply_id must start with "contract-", got "h1-home-toyota"']);
 $unnamed=$first;unset($unnamed['params']['apply_id']);
-check('a missing apply_id is refused by name',$receiver->handle($unnamed)['message'],'apply_id required; it must start with "contract-"');
+check('a missing apply_id is refused by name',$cowork->handle($unnamed)['message'],'apply_id required; it must start with "contract-"');
 $unrequested=$first;unset($unrequested['params']['request_id']);
-check('a missing request_id is refused on its own',$receiver->handle($unrequested)['message'],'request_id required: any string, the same on a retry and new for a different change');
-check('a refused apply writes nothing',$receiverContract->inspect()['revision'],$untouched);
-$firstResult=$receiver->handle($first);
-check('contract receiver commits content in place',$firstResult['ok'],true);
-check('inspect exposes current content separately from immutable demo samples',$receiverContract->inspect()['slots'][0]['current'],'First customer title');
-check('contract receiver replays the identical committed receipt',$receiver->handle($first),$firstResult);
-check('a bound receiver unpublishes a module through the ordinary door',$receiver->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['ok'],true);
-check('and puts it back through the ordinary revert',$receiver->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic']])['ok'],true);
+check('a missing request_id is refused on its own',$cowork->handle($unrequested)['message'],'request_id required: any string, the same on a retry and new for a different change');
+check('a refused apply writes nothing',$coworkContract->inspect()['revision'],$untouched);
+$firstResult=$cowork->handle($first);
+check('contract Claude Cowork plugin commits content in place',$firstResult['ok'],true);
+check('inspect exposes current content separately from immutable demo samples',$coworkContract->inspect()['slots'][0]['current'],'First customer title');
+check('contract Claude Cowork plugin replays the identical committed receipt',$cowork->handle($first),$firstResult);
+check('a bound Claude Cowork plugin unpublishes a module through the ordinary door',$cowork->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'apply_id'=>'generic','fields'=>['published'=>'0']]])['ok'],true);
+check('and puts it back through the ordinary revert',$cowork->handle(['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'generic']])['ok'],true);
 $second=$first;$second['params']['apply_id']='contract-second';$second['params']['request_id']='second';
-$second['params']['expected_revision']=$receiverContract->inspect()['revision'];$second['params']['changes']['hero.0']='Second customer title';
-check('contract receiver commits a later revision',$receiver->handle($second)['ok'],true);
+$second['params']['expected_revision']=$coworkContract->inspect()['revision'];$second['params']['changes']['hero.0']='Second customer title';
+check('contract Claude Cowork plugin commits a later revision',$cowork->handle($second)['ok'],true);
 $revert=['token'=>$WTOKEN,'action'=>'apply.revert','params'=>['apply_id'=>'contract-first']];
-check('contract undo cannot overwrite a later revision',$receiver->handle($revert)['ok'],false);
-$revert['params']['apply_id']='contract-second';check('latest contract revision can be undone',$receiver->handle($revert)['ok'],true);
-$revert['params']['apply_id']='contract-first';check('earlier revision can then be undone',$receiver->handle($revert)['ok'],true);
+check('contract undo cannot overwrite a later revision',$cowork->handle($revert)['ok'],false);
+$revert['params']['apply_id']='contract-second';check('latest contract revision can be undone',$cowork->handle($revert)['ok'],true);
+$revert['params']['apply_id']='contract-first';check('earlier revision can then be undone',$cowork->handle($revert)['ok'],true);
 check('contract undo restores original HTML byte for byte',$transactional->store['module'][110]['content'],$module['content']);
 
 $beforeFailure=[$transactional->store,$contractLog->log,$cs->binding];
 $transactional->drift=true;
-check('post-write presentation drift fails the whole apply',$receiver->handle($first)['ok'],false);
+check('post-write presentation drift fails the whole apply',$cowork->handle($first)['ok'],false);
 check('failed apply rolls back rows, receipt and binding',[$transactional->store,$contractLog->log,$cs->binding],$beforeFailure);
 // ── A base archive that serves more than one design ──────────────────────────────────────────
 // Apple and Airbnb are the same quickstart with a different template activated on top, so the
-// receiver now carries several profiles and picks one from the component's own params. Two things
-// have to hold: a site bound to one profile must refuse to be read under another, and a receiver
+// Claude Cowork plugin now carries several profiles and picks one from the component's own params. Two things
+// have to hold: a site bound to one profile must refuse to be read under another, and a Claude Cowork plugin
 // that does not carry the profile a site names must refuse everything rather than read as a site
 // with no contract at all — the one state where every structural write is allowed.
 $secondDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
@@ -261,24 +261,24 @@ foreach($secondData as $name=>$body)file_put_contents($secondDir.'/'.$name.'.jso
 $secondContract=new QuickstartContract($transactional,$cs,$contractDir,$secondDir);
 $cs->binding=null;
 check('a second design profile reads the same site on its own terms',$secondContract->inspect()['contract'],'test-airbnb/v1');
-$cs->binding=$receiverContract->inspect()['snapshot'];
-check('the first design profile still reads the site it is bound to',$receiverContract->inspect()['contract'],'test/v1');
+$cs->binding=$coworkContract->inspect()['snapshot'];
+check('the first design profile still reads the site it is bound to',$coworkContract->inspect()['contract'],'test/v1');
 contractRejects('a site bound to one design refuses to be read under another',fn()=>$secondContract->inspect());
 
 $missingDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));
 $absent=new QuickstartContract($transactional,$cs,$contractDir,$missingDir);
-contractRejects('a receiver without the named profile refuses to answer bound()',fn()=>$absent->bound());
-contractRejects('a receiver without the named profile refuses to inspect',fn()=>$absent->inspect());
-contractRejects('a receiver without the named profile refuses to bind',fn()=>$absent->bind([]));
+contractRejects('a Claude Cowork plugin without the named profile refuses to answer bound()',fn()=>$absent->bound());
+contractRejects('a Claude Cowork plugin without the named profile refuses to inspect',fn()=>$absent->inspect());
+contractRejects('a Claude Cowork plugin without the named profile refuses to bind',fn()=>$absent->bind([]));
 $absentEngine=new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog,null,null,null,$absent);
-check('a receiver without the named profile refuses generic writes instead of allowing them',
+check('a Claude Cowork plugin without the named profile refuses generic writes instead of allowing them',
     $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.update','params'=>['kind'=>'module','id'=>110,'fields'=>['published'=>'0']]])['error'],'contract_unavailable');
-check('a receiver without the named profile refuses the contract door too',
+check('a Claude Cowork plugin without the named profile refuses the contract door too',
     $absentEngine->handle(['token'=>$WTOKEN,'action'=>'content.contract','params'=>['operation'=>'bind']])['error'],'contract_unavailable');
 
 // A site under construction: provisioned from the Base archive with `tracy_build_baseline` and no
 // `contract` yet, because the template is still to be built. Measured 14/09 on a fresh Base site:
-// the receiver fell back to the Apple profile, hashed Base's files against Apple's lock and refused
+// the Claude Cowork plugin fell back to the Apple profile, hashed Base's files against Apple's lock and refused
 // the first inspection with "Presentation asset changed: templates/tracy/acm/accordion/css/style.css"
 // — a file nobody had touched. Under construction there is no lock to verify and no default to guess.
 $construction=(new Engine($WTOKEN,[],null,null,null,null,$transactional,null,$contractLog))->underConstruction('tracy-base/j6/1.0.0');
@@ -346,14 +346,14 @@ foreach(array_keys($data) as $name)unlink($contractDir.'/'.$name.'.json');
 unlink($contractDir.'/assets/demo.css');rmdir($contractDir.'/assets');rmdir($contractDir);
 
 /* ------------------------------------------------- every profile the package carries loads */
-// The receiver reads a profile from disk on every request, and the constructor above throws on a
+// The Claude Cowork plugin reads a profile from disk on every request, and the constructor above throws on a
 // multilingual map whose shape it does not know (`policies`, `sourceDelta`), on one pinned to other
 // bytes, or on a missing file. A profile committed in that state is a site that refuses every
 // action after the upgrade that was meant to seal it — the one failure the customer meets first.
 // So every directory under lib/contracts/ is loaded here, exactly the way the engine loads it.
 $bundledRoot=realpath(__DIR__.'/../lib/contracts');
 // Loaded the way the door loads them: behind the memory reserve. Without it this file dies at
-// PHP's 128M default on the Business lock — the same fatal the receiver had before the reserve.
+// PHP's 128M default on the Business lock — the same fatal the Claude Cowork plugin had before the reserve.
 Door::reserveMemory();
 $entityRules=[];
 $bundled=[];
@@ -379,7 +379,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
                 json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR),$dir,$raw);
             $loaded=true;
         }catch(Throwable $e){$loaded=$e->getMessage();}
-        check("$id demo-trim map is one this receiver can load",$loaded,true);
+        check("$id demo-trim map is one this Claude Cowork plugin can load",$loaded,true);
         $trimmed[]=$id;
     }
     if(!is_file("$dir/multilingual-map.json"))continue;
@@ -391,7 +391,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
             json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR),$dir,$raw);
         $loaded=true;
     }catch(Throwable $e){$loaded=$e->getMessage();}
-    check("$id multilingual map is one this receiver can load",$loaded,true);
+    check("$id multilingual map is one this Claude Cowork plugin can load",$loaded,true);
 }
 foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
@@ -430,7 +430,7 @@ foreach($bizMap['entities'] as $entity){
 }
 check('the Business profile copies no row outside the en-GB edition',$copiedNonSource,[]);
 // The archive already publishes a `mod_languages` module, with the template's own layout. The
-// receiver finds an existing switcher by the profile's `note` and only creates one when it finds
+// Claude Cowork plugin finds an existing switcher by the profile's `note` and only creates one when it finds
 // none, so this note is what stands between one switcher in the topbar and two.
 check('the Business profile reuses the switcher the archive ships',
     [$biz->switcherPresentation()['note'],$biz->switcherPresentation()['position'],$biz->switcherAnchor()],

@@ -166,9 +166,9 @@ The Tracy relay checks the current seat/policy on each request and supplies a se
 
 The common machine contract is TCH `packages/cms/tracy-content-api` (foundation commit
 `1e724aad20c3be7df82aebf9e5e59db87e0a6aa2`, local/unpushed). Cross-repository protocol ownership:
-TracyHQ/tracy-docs `systems/content-api-v1.md`. This patch is not a receiver release.
+TracyHQ/tracy-docs `systems/content-api-v1.md`. This patch is not a Claude Cowork plugin release.
 
-On a **private Joomla 6 test fixture**, install the locally built receiver, then explicitly run:
+On a **private Joomla 6 test fixture**, install the locally built Claude Cowork plugin, then explicitly run:
 
 ```sh
 php tools/enable-content-reader.php --root=/path/to/joomla --new-site
@@ -219,7 +219,7 @@ this pilot supports `published` only and returns501 for another scope. `contentP
 the signed cursor to a verified seat context; a service credential is not a seat. List continuation
 can send only `cursor`; explicit filter/limit repetitions must match its signed query. No identity
 migration, permission widening or contract repair runs from a read request. WordPress and EmDash
-transport/identity evidence is tracked separately; this receiver does not certify their support.
+transport/identity evidence is tracked separately; this Claude Cowork plugin does not certify their support.
 
 Protocol b0a40e0 discovery: an oversized body with mapped blocks returns 413 with
 `error.snapshot` and `error.links.firstBlock`. Follow its signed `blocksCursor` with the same

@@ -207,7 +207,7 @@ final class Engine
         if ($problems) throw ContractProblem::all($problems);
     }
 
-    /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
+    /** Mark this Claude Cowork plugin as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
         $this->constructionBaseline = $baseline;
@@ -218,7 +218,7 @@ final class Engine
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
      */
-    /** Whether this receiver is inside a request already (a serialized write re-enters handle). */
+    /** Whether this Claude Cowork plugin is inside a request already (a serialized write re-enters handle). */
     private bool $inRequest = false;
 
     public function handle(array $req): array
@@ -280,7 +280,7 @@ final class Engine
 
         try { $contractBound=$this->contract && $this->contract->bound(); }
         // The reason travels: since one base archive serves several designs, "unavailable" now also
-        // means "this receiver does not carry the profile this site names", and an operator who
+        // means "this Claude Cowork plugin does not carry the profile this site names", and an operator who
         // reads only "repair the component installation" goes looking in the wrong half.
         catch(Throwable $error) { return $this->err('contract_unavailable', $error->getMessage() ?: 'The private contract store is unavailable; repair the component installation'); }
         // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
@@ -1374,7 +1374,7 @@ final class Engine
                 return $this->ok(['bound' => false, 'contract' => '', 'baseline' => $this->constructionBaseline, 'construction' => true]);
             return $this->err('contract_unbound', 'This site is under construction (baseline ' . $this->constructionBaseline . '): capture and name its profile before binding or applying content');
         }
-        if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
+        if (!$this->contract || !$this->log) return $this->err('unavailable', 'The Claude Cowork plugin’s quickstart contract is unavailable');
         try {
             if (($p['operation'] ?? '') === 'bind') {
                 if(!$this->writer || !method_exists($this->writer,'transaction'))throw new RuntimeException('Transactional writer required');
@@ -1490,7 +1490,7 @@ final class Engine
     private function multilingual(array $p): array
     {
         if (!$this->contract->multilingualAvailable())
-            return $this->err('unsupported', 'This quickstart contract carries no multilingual profile; the site cannot be given a second language by this receiver');
+            return $this->err('unsupported', 'This quickstart contract carries no multilingual profile; the site cannot be given a second language by this Claude Cowork plugin');
         if (!$this->contract->bound()) return $this->err('contract_failed', 'A language needs a bound site');
         $operation = substr((string) $p['operation'], strlen('multilingual.'));
         $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
@@ -1500,7 +1500,7 @@ final class Engine
         // bytes. On a bound site what may arrive is decided in review, in language-packs.json.
         foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
             if (isset($p[$mine]))
-                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the Claude Cowork plugin’s reviewed catalog');
         $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
         if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
         switch ($operation) {
@@ -1537,7 +1537,7 @@ final class Engine
     private function demoTrim(array $p): array
     {
         if (!$this->contract->demoTrimAvailable())
-            return $this->err('unsupported', 'This quickstart contract carries no demo-trim profile; its demo rows cannot be hidden by this receiver');
+            return $this->err('unsupported', 'This quickstart contract carries no demo-trim profile; its demo rows cannot be hidden by this Claude Cowork plugin');
         $operation = substr((string) $p['operation'], strlen('demoTrim.'));
         if ($operation === 'plan') {
             try {
@@ -1642,11 +1642,11 @@ final class Engine
     private function siteLanguage(array $p): array
     {
         if (!$this->contract->siteLanguageAvailable())
-            return $this->err('unsupported', 'This receiver carries no language-pack catalog for this site');
+            return $this->err('unsupported', 'This Claude Cowork plugin carries no language-pack catalog for this site');
         $operation = substr((string) $p['operation'], strlen('siteLanguage.'));
         foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
             if (isset($p[$mine]))
-                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the Claude Cowork plugin’s reviewed catalog');
         $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
         if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
         $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
@@ -1738,11 +1738,11 @@ final class Engine
     private function sourceLanguage(array $p): array
     {
         if (!$this->contract->siteLanguageAvailable())
-            return $this->err('unsupported', 'This receiver carries no language-pack catalog for this site');
+            return $this->err('unsupported', 'This Claude Cowork plugin carries no language-pack catalog for this site');
         $operation = substr((string) $p['operation'], strlen('sourceLanguage.'));
         foreach (['url', 'sha256', 'bytes', 'package'] as $mine)
             if (isset($p[$mine]))
-                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the receiver’s reviewed catalog');
+                return $this->err('bad_params', 'Name a locale, not a package: `' . $mine . '` is decided by the Claude Cowork plugin’s reviewed catalog');
         $major = (int) (explode('.', (string) ($this->info['joomla'] ?? '0'))[0]);
         if ($major < 1) return $this->err('contract_failed', 'The site did not report its Joomla version');
         $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
@@ -1875,7 +1875,7 @@ final class Engine
     }
 
     /**
-     * Install the language pack this receiver has pinned for a locale.
+     * Install the language pack this Claude Cowork plugin has pinned for a locale.
      *
      * The caller names a LOCALE. It does not get to name a URL, a hash or a size even correctly:
      * accepting those fields would accept the shape of a request that could carry wrong ones, and

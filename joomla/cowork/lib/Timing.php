@@ -2,7 +2,7 @@
 /**
  * Where one door call's time went, phase by phase — measured only when the caller asks for it.
  *
- * Issue #316: a content-contract call took 35–108 s and nothing in the receiver could say where.
+ * Issue #316: a content-contract call took 35–108 s and nothing in the Claude Cowork plugin could say where.
  * Joomla's own profiler cannot help, because the door ends the response with `close()` before
  * anything could print it. A caller that sends `timing: true` in `params` now gets a `timing`
  * block beside the answer, `{phase: {ms, n}}`: the wall time summed over every run of that phase

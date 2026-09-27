@@ -5,7 +5,7 @@ require_once __DIR__ . '/MultilingualProfile.php';
  * Adding one language to a bound quickstart, as a sequence of committed steps.
  *
  * 🔒 WHY PHASES AND NOT ONE CALL. A language is roughly 350 writes plus an installer that touches
- * the filesystem, and PHP is killed at `max_execution_time` on the kind of host this receiver
+ * the filesystem, and PHP is killed at `max_execution_time` on the kind of host this Claude Cowork plugin
  * exists for. One call would be a change that cannot finish on a large site and cannot say how far
  * it got on any site. Each phase here is one call with one recorded position, so after a crash the
  * answer to "what has been committed" is read, not guessed.
@@ -611,7 +611,7 @@ final class MultilingualApply
             $fields = array_intersect_key($patched, array_flip($columns));
             if ($kind === 'module' && !$this->profile->showsTitle($key, $this->contract->lockFields($key))) unset($fields['title']);
             // A language's home page is decided per language, and Joomla takes the flag off the old
-            // holder whenever another row claims it — a copy made on this site by an older receiver
+            // holder whenever another row claims it — a copy made on this site by an older Claude Cowork plugin
             // left the edition's `home` at 0 after its revert (j-ee6vsk, 23/09/2026). Mirrored here.
             if ($kind === 'menuItem' && (int) ($row['home'] ?? 0) !== (int) ($state['rows'][$key]['home'] ?? 0))
                 $fields['home'] = (int) $state['rows'][$key]['home'];

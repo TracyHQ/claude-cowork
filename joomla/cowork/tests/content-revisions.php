@@ -142,7 +142,7 @@ file_put_contents($rvDir . '/assets/demo.css', '.hero { color: red }');
 $rvNoOracle = new Engine($WTOKEN, [], null, null, null, null, $rvWriter, null, $rvLog, null, null, null, $rvContract);
 $rvN = $rvNoOracle->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => 'apply', 'apply_id' => 'contract-no-oracle', 'request_id' => 'n',
     'expected_content_revisions' => $rvFresh(), 'changes' => ['hero.0' => 'Some title']]]);
-check('a receiver that cannot project refuses content revisions instead of trusting them', [$rvN['ok'], $rvN['errors'][0]['code']], [false, 'CONTRACT_FAILED']);
+check('a Claude Cowork plugin that cannot project refuses content revisions instead of trusting them', [$rvN['ok'], $rvN['errors'][0]['code']], [false, 'CONTRACT_FAILED']);
 
 /* ---------------------------------------------------- W3: every problem, one round, no write */
 $rvBefore = [$rvWriter->store, $rvLog->log, $rvStore->binding];

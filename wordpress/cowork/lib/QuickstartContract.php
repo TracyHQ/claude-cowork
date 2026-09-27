@@ -9,14 +9,14 @@
  * reads and writes slot values inside block markup, and keeps the binding — which profile the
  * site is sealed to and the revision of its governed content — in one option.
  *
- * Ported by IDEA from the Joomla receiver's `QuickstartContract`, not by code. WordPress keeps
+ * Ported by IDEA from the Joomla Claude Cowork plugin's `QuickstartContract`, not by code. WordPress keeps
  * words in block markup (a slot is a block named by `metadata.name` and one attribute of it) and
  * identity in a slug plus a Polylang language, so the checks are different in kind: a page is
  * held by the sha256 of its content with every slot MASKED (the skeleton), and the theme by the
  * hashes of its files.
  *
  * The one rule every method keeps: a profile that cannot be loaded REFUSES, it never reads as an
- * unbound site. Unbound is the one state where every structural write is allowed, and a receiver
+ * unbound site. Unbound is the one state where every structural write is allowed, and a Claude Cowork plugin
  * too old to carry the profile a site names must not fall into it by accident.
  */
 
@@ -185,7 +185,7 @@ final class QuickstartContract
         $this->acceptedTrims = [];
 
         // Both extensions are optional and pinned to the base bytes. A profile whose extension does
-        // not belong to it is refused WHOLE: a receiver that ignored the bad file would seal sites
+        // not belong to it is refused WHOLE: a Claude Cowork plugin that ignored the bad file would seal sites
         // against three files while claiming a fourth it cannot vouch for.
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
@@ -358,7 +358,7 @@ final class QuickstartContract
         return array_values(array_map('strval', $retired));
     }
 
-    /** Load the profile a caller names, without a site to check — what a receiver's own tests do. */
+    /** Load the profile a caller names, without a site to check — what a Claude Cowork plugin's own tests do. */
     public function preview(string $id): void
     {
         if (!preg_match(self::ID_SHAPE, $id)) {
@@ -1290,7 +1290,7 @@ final class QuickstartContract
 
     /**
      * A picture for an image slot: a file in this site's uploads that the media library knows,
-     * in the shape of the demo picture it replaces (±0.02, the Joomla receiver's tolerance).
+     * in the shape of the demo picture it replaces (±0.02, the Joomla Claude Cowork plugin's tolerance).
      * Remembers the attachment id for the write.
      */
     private function checkImage(array $slot, string $value, string $key): void

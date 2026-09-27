@@ -88,8 +88,8 @@ final class EngineFactory
             && preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured);
         $directory = self::libDir() . '/contracts/' . ($valid ? $configured : self::DEFAULT_CONTRACT);
         // No contract configured and no default profile on disk is the one legacy shape that means
-        // "this receiver carries no contracts at all"; everything else hands back a contract that
-        // refuses, so a receiver older than the site's profile cannot read as an unbound site.
+        // "this Claude Cowork plugin carries no contracts at all"; everything else hands back a contract that
+        // refuses, so a Claude Cowork plugin older than the site's profile cannot read as an unbound site.
         if ($configured === '' && !is_file($directory . '/manifest.json')) return null;
         if ($configured !== '' && !$valid) $directory = self::libDir() . '/contracts/unconfigured';
         $writer = self::buildWriter();

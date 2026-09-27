@@ -2,7 +2,7 @@
 /**
  * One reason a content-contract operation refused, in a shape an agent can act on without parsing prose.
  *
- * The prose stays: `message` is exactly the sentence the receiver always said, because relays and
+ * The prose stays: `message` is exactly the sentence the Claude Cowork plugin always said, because relays and
  * tests written against it still read it. What this adds is the part prose cannot carry reliably —
  * a stable code, WHICH slot and WHICH content, whether a retry with different input can succeed,
  * and the numbers (a limit, the current revision) the next attempt needs.

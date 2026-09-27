@@ -7,7 +7,7 @@
  * twins was captured as `{"id": 1946, "url": ""}` — the editor keeps the id, the front end prints
  * the url, and an empty url renders an anchor that goes nowhere. Measured on the dev machine
  * 25/09/2026 (site wpbgfeoy6, `/vi/`: every menu item `href=""`). Filling the url from the id is
- * what the block editor would do on the next save; the receiver does it on every page view so a
+ * what the block editor would do on the next save; the Claude Cowork plugin does it on every page view so a
  * site provisioned from the archive as released is right the moment it is handed over. Guarded on
  * every WordPress function it touches, so loading the file outside WordPress (activation, tests)
  * is safe.

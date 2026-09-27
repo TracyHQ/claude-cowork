@@ -2,7 +2,7 @@
 // Loaded by run.php, after contracts.php (ContractTestWriter, TestContractStore) and run.php's fakes.
 //
 // 🔒 EVERY SHIPPED MULTILINGUAL PROFILE CAN ADD A LANGUAGE, HIDE THE REST, AND TAKE A JOB BACK — ON ITS
-// OWN ARCHIVE'S SHAPE, BEFORE A RELEASE. On 23/09/2026 the Business profile met three receiver
+// OWN ARCHIVE'S SHAPE, BEFORE A RELEASE. On 23/09/2026 the Business profile met three Claude Cowork plugin
 // assumptions one site retry at a time, each hidden behind the last: a switcher the archive already
 // ships was held to the shape of a new one, a job taken back deleted that governed switcher, and an
 // article copy dropped the note the archive puts on every article. Apple and Airbnb have none of those
@@ -147,7 +147,7 @@ function gateSite(string $dir, GateContractStore $store, FakeApplyLog $log): Con
     $next = 900000;
     // An archive that ships its own editions (editions.json): each translated row of vi-VN and fr-FR
     // stands at the id the map names, written by the archive's `add-language` rules — implemented
-    // here a second time, apart from the receiver's, so the gate does not grade its own answer.
+    // here a second time, apart from the Claude Cowork plugin's, so the gate does not grade its own answer.
     $editionsFile = $dir . '/editions.json';
     $editions = is_file($editionsFile) ? json_decode(file_get_contents($editionsFile), true, 512, JSON_THROW_ON_ERROR) : null;
     foreach (['vi-VN', 'fr-FR'] as $edition) {
@@ -283,7 +283,7 @@ foreach ($gateContracts as $profileFile) {
     if (!$step('relabel the source en-US', $call(['operation' => 'sourceLanguage.set', 'locale' => 'en-US', 'apply_id' => 'srclang-gate', 'request_id' => 'gate-src']))) continue;
     check("$id: no row keeps the published source tag", array_sum(array_map(fn ($k) => count(array_filter($gw->store[$k] ?? [], fn ($r) => ($r['language'] ?? '') === 'en-GB')), ['article', 'menuItem', 'module', 'category'])), 0);
 
-    // Hide what the customer did not ask for, until the receiver says it is done.
+    // Hide what the customer did not ask for, until the Claude Cowork plugin says it is done.
     $retire = ['operation' => 'multilingual.retire', 'keep' => ['en-US', 'vi-VN'], 'apply_id' => 'mlang-gate-retire'];
     for ($i = 0, $r = ['ok' => true, 'status' => 'running']; $i < 20 && ($r['status'] ?? '') === 'running'; $i++) $r = $call($retire);
     if (!$step('retire', $r)) continue;

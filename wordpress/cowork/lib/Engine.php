@@ -294,7 +294,7 @@ final class Engine
     private function contentContractAnswer(array $p): array
     {
         if ($this->contract === null || $this->log === null || $this->writer === null) {
-            return $this->err('unavailable', 'content contract receiver not wired');
+            return $this->err('unavailable', 'content contract door not wired');
         }
         $operation = isset($p['operation']) && is_string($p['operation']) && $p['operation'] !== '' ? $p['operation'] : 'inspect';
         $requested = isset($p['contract']) && is_string($p['contract']) && trim($p['contract']) !== '' ? trim($p['contract']) : null;
@@ -408,7 +408,7 @@ final class Engine
                 $now = $this->contract->inspectClean();
                 $result = $entry['result'];
                 // The revision a replay answers is the site's only if nothing moved since: otherwise the
-                // caller must read again, as the Joomla receiver answers (#316).
+                // caller must read again, as the Joomla Claude Cowork plugin answers (#316).
                 if (($result['afterRevision'] ?? null) !== ($now['revision'] ?? null)) {
                     unset($result['afterRevision']);
                 }
@@ -491,7 +491,7 @@ final class Engine
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
-        // `afterRevision`, as the Joomla receiver answers (#316): the contract revision this apply left,
+        // `afterRevision`, as the Joomla Claude Cowork plugin answers (#316): the contract revision this apply left,
         // read under the lock — the next apply can send it as expected_revision without inspecting again.
         $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision'], 'afterRevision' => $state['revision']] + $warn);
         // The revision `content.read` now lists for every content this apply touched, read by the

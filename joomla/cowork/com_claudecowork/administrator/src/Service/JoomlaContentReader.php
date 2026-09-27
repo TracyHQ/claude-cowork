@@ -170,7 +170,7 @@ final class JoomlaContentReader
         $readableAfter=$this->readableMedia($contents,$mediaAfter);
         if ($readableBefore!==$readableAfter) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
         // The snapshot revision is hashed over every content still marked pending, exactly as before
-        // per-content revisions existed, so cursors issued by an older receiver keep their meaning.
+        // per-content revisions existed, so cursors issued by an older Claude Cowork plugin keep their meaning.
         $revision=$this->hash([$contents,$mapping['contractHash'],$readableAfter]);
         // Each content then carries its OWN revision (ContentProjection::revision), the one
         // content.contract apply accepts in expected_content_revisions.

@@ -21,9 +21,9 @@ mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
 mkdir -p com_claudecowork/administrator/lib/contracts
 cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
-# The language-pack catalog is receiver-wide, not part of any contract, so it is copied beside the
+# The language-pack catalog is cowork-wide, not part of any contract, so it is copied beside the
 # engine rather than swept up by the contracts copy above. Named explicitly because a file the
-# package forgets is a receiver that reports every locale as unverified, with no error anywhere.
+# package forgets is a Claude Cowork plugin that reports every locale as unverified, with no error anywhere.
 cp lib/language-packs.json com_claudecowork/administrator/lib/
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
