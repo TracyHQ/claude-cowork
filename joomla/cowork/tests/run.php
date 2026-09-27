@@ -1793,6 +1793,7 @@ require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
 require __DIR__ . "/multilingual-contracts.php";
+require __DIR__ . "/render-stamps.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

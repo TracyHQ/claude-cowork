@@ -53,6 +53,15 @@ final class EngineFactory
     }
 
     /**
+     * Only the render-stamp rules, for the system plugin on an ordinary page render. Loading the
+     * whole engine for that would read a dozen files on a request that uses none of them.
+     */
+    public static function loadRenderStamps(): void
+    {
+        require_once self::libDir() . '/RenderStamps.php';
+    }
+
+    /**
      * The published contract profile this site is held to.
      *
      * One base archive now carries more than one design — Airbnb is the same Apple quickstart with
