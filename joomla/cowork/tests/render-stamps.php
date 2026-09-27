@@ -19,7 +19,7 @@ check('module stamp', RenderStamps::src(RenderStamps::owner('module', 443), 'mod
 check('article owner carries the alias', RenderStamps::owner('article', '734', 'our-story'), 'article:734:our-story');
 check('an alias that would split the value is left off', RenderStamps::owner('article', 734, 'a b'), 'article:734');
 check('a colon in an alias would add a part: left off', RenderStamps::owner('article', 734, 'a:b'), 'article:734');
-check('a unicode alias is kept (unicodeslugs)', RenderStamps::owner('article', 9, 'giới-thiệu'), 'article:9:giới-thiệu');
+check('a unicode alias is kept (unicodeslugs)', RenderStamps::owner('article', 9, 'о-компании'), 'article:9:о-компании');
 check('id 0 is no record', RenderStamps::owner('module', 0), null);
 check('marker form the runtime reads', RenderStamps::marker('article:734:our-story'),
     '<template data-tracy-owner="article:734:our-story"></template>');
