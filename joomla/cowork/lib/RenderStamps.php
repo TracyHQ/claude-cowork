@@ -18,6 +18,8 @@
  *   <template data-tracy-owner="article:<id>[:<alias>]">      inside every article render
  *   <template data-tracy-owner="category:<id>[:<alias>]">     inside a category's description
  *   data-tracy-src="article:<id>[:<alias>] block:<module type>"  on each item of an article-list module
+ *   data-tracy-src="category:<id>[:<alias>]" / "tag:<id>[:<alias>]"  on each link to a category or a
+ *                                              tag page, in a module's output and in the component's
  *
  * The format is a contract shared with the page runtime and the resolver in Tracy
  * (`<kind>:<id>[:<slug>] block:<name>`); change it there first. Menu items need nothing: Joomla
@@ -291,6 +293,77 @@ final class RenderStamps
             $alias = $m[2];
         }
         return ['nonSef' => null, 'path' => self::normaliseLink($href), 'id' => $id, 'alias' => $alias === '' ? null : $alias];
+    }
+
+    /**
+     * {@see hrefHints()} for a link to another kind of page: a category (`com_content` /
+     * `category`) or a tag (`com_tags` / `tag`). The raw form names its id the way that view takes
+     * it (`&id=N`, or `&id[0]=N` for a tag).
+     *
+     * @return array{nonSef:?int, path:?string, id:?int, alias:?string}|null
+     */
+    public static function viewHints(string $href, string $siteHost, string $option, string $view): ?array
+    {
+        $href = trim($href);
+        $parts = $href === '' || $href[0] === '#' ? false : parse_url($href);
+        if ($parts === false) {
+            return null;
+        }
+        parse_str($parts['query'] ?? '', $query);
+        if (($query['option'] ?? null) === $option && ($query['view'] ?? null) === $view) {
+            if (isset($parts['host']) && strcasecmp($parts['host'], $siteHost) !== 0) {
+                return null;
+            }
+            $id = $query['id'] ?? null;
+            if (is_array($id)) {
+                $id = count($id) === 1 ? reset($id) : null;
+            }
+            return is_string($id) && preg_match('/^(\d+)/', $id, $m)
+                ? ['nonSef' => (int) $m[1], 'path' => null, 'id' => (int) $m[1], 'alias' => null]
+                : null;
+        }
+        $hint = self::hrefHints($href, $siteHost);
+        return $hint === null || $hint['nonSef'] !== null ? null : $hint;
+    }
+
+    /**
+     * Stamp each link to a record page — a category, a tag — with that record, on the `<a>` itself.
+     *
+     * Not the largest element, as for article lists: a category or tag link is a label ("Disclosure"
+     * in a breadcrumb, a filter chip, the category line of a news card) sitting inside an item that
+     * belongs to something else (the article the card shows). The `<a>` is the one element whose
+     * words are the record's. A link already stamped keeps its stamp.
+     *
+     * @param callable $resolve fn(string[] $hrefs): array<string, string> — the owner
+     *                          (`category:12:alias`) each href links to; others absent.
+     */
+    public static function stampLinks(string $html, callable $resolve, string $block = ''): string
+    {
+        if (stripos($html, '<a') === false) {
+            return $html;
+        }
+        $nodes = self::scan($html);
+        $hrefs = [];
+        foreach ($nodes as $node) {
+            if ($node['href'] !== null) {
+                $hrefs[$node['href']] = true;
+            }
+        }
+        if ($hrefs === [] || count($hrefs) > self::MAX_LINKS) {
+            return $html;
+        }
+        $owners = $resolve(array_keys($hrefs));
+        $inserts = [];
+        foreach ($nodes as $node) {
+            if ($node['href'] !== null && !$node['stamped'] && is_string($owners[$node['href']] ?? null)) {
+                $inserts[$node['at']] = self::src($owners[$node['href']], $block);
+            }
+        }
+        krsort($inserts);
+        foreach ($inserts as $at => $value) {
+            $html = self::insertAttribute($html, $at, $value);
+        }
+        return $html;
     }
 
     /**

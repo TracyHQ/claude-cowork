@@ -97,6 +97,8 @@ renders. So `plg_system_claudecoworkapi` marks the page — for one kind of requ
 | `<template data-tracy-owner="article:<id>:<alias>">` | inside every article render: the article page and each blog/featured item |
 | `<template data-tracy-owner="category:<id>:<alias>">` | inside a category's description (context `com_content.categories`) |
 | `data-tracy-src="article:<id>:<alias> block:<module type>"` | each item of an article-list module: `mod_articles`, `mod_articles_news`, `mod_articles_latest`, `mod_articles_category`, `mod_articles_popular`, `mod_related_items`, and `mod_ja_acm` when it links to two articles or more |
+| `data-tracy-src="category:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a category page, in module output (not menu modules) and in the component output (unreleased) |
+| `data-tracy-src="tag:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a tag page, same places (unreleased) |
 
 Menu items need nothing: Joomla and T4 already print the id on each `<li>`. The format is shared
 with the picker runtime and the resolver in Tracy; change it there first. The rules are plain PHP in
@@ -193,6 +195,14 @@ Release activation is separate from source availability: 0.14.0 has been tested 
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.
 
+**Category and tag links (unreleased).** A category or tag name printed as a link — a breadcrumb, a
+blog's filter chips, the category line of a news card, a sidebar category list — is stamped on the
+`<a>` itself, since the item around it usually belongs to something else (the article a card shows).
+The link is tied to a record the same way article links are (`TaxonomyLinks`: candidates by id or
+alias, confirmed by building the route Joomla's category/tag view builds). A category or tag that a
+published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
+not the category's. Menu modules get no such stamps for the same reason.
+
 ## Unreleased Joomla 6 Content API pilot
 
 The opt-in `content.read` action and authenticated `GET /content.json` share
@@ -226,6 +236,36 @@ not proof of rendering; visibility remains unknown. Physical contract slots carr
 and no inferred semantic key. Repeaters, exclusion assignments and media outside the mapped image
 slots remain unresolved. `readMapping()` is separate from mutating native inspect. A damaged
 binding fails closed; native inspect/apply/revert keep their existing write semantics.
+
+### Records and fields beside the contract slots (unreleased)
+
+A page prints words that no contract slot holds. `content.read` carries them too, each group as one
+block keyed by the Joomla row's **native id** — the id a render stamp names (`article:548` resolves
+to a block whose key starts `article-548`). None of these fields has a `slotKey`, so
+`content.contract` never writes them; the column says how each one IS written.
+
+| Record | Block key | Field keys | Source | Written through |
+| --- | --- | --- | --- | --- |
+| article | `article-<id>.images` | `article-<id>.image_intro`, `.image_intro_caption`, `.image_fulltext`, `.image_fulltext_caption` | the `images` column; Joomla's `#joomlaImage://…` suffix removed; alt text on the picture in `images[]` | `content.update` article (`images`) |
+| article | `article-<id>.fields` | `article-<id>.field.<name>` | published, public custom field values of type text, textarea, editor (html) and media (image), in the article's language | read-only (values live outside the article row) |
+| article | `article-<id>.author` | `article-<id>.author` | `created_by_alias`, else the author's display name (`#__users.name` only) | read-only |
+| page | `menuItem-<id>.params` | `menuItem-<id>.params.<name>` | menu item params written as words (see below) | `content.update` menuItem (`params`) |
+| page | `menuItem-<id>.megamenu` | `menuItem-<id>.megamenu[<template>:<profile>].caption`, `….column.<row>.<col>` | T4 mega menu: item caption and mega column titles, from the template's navigation profile (`local/etc/navigation/<profile>.json`, else `etc/…`) | read-only (a template file) |
+| page (inlined module) | the module's block | `module-<id>.title` | the module title, when the module shows it and is inlined into its one page (a shared module already has its title as the record's own) | `content.update` module (`title`) |
+| category (`shared`, id from `category:<id>`) | `category-<id>` | `category-<id>.description`, `category-<id>.image` | the categories readable articles and category pages live in, with their ancestors; public and published | `content.update` category (`title`, `description`, `params`) |
+| tag (`shared`, id from `tag:<id>`) | `tag-<id>` | `tag-<id>.description`, `tag-<id>.image` | the published public tags on readable articles | `content.update` tag |
+
+An article also lists its tag names in `tags` and its category record as a `parent` relation; a
+category names its parent category the same way. Every record carries its own revision, so a new
+caption, field value or category description moves exactly the record that shows it — which also
+means every page, article and module revision changes once on the upgrade that brings them.
+
+Menu item params are chosen by the **shape of the value**, a heuristic: Joomla keeps a template's own
+menu params (Tracy Business `ng_cta_title`, `ng_all_label`…) without a form saying which are text. A
+param is offered when its value is a string with a letter in it, contains a space or starts with a
+capital, and is not markup, JSON, an address or a path; params named for metadata, classes, icons,
+images, links, targets, layouts, order, style or `rel` are never offered. Generated values (dates,
+counts, numbering) are not stored anywhere and are never offered as fields.
 
 Each request loads a repeatable-read InnoDB snapshot. The revision hashes the authorized content
 projection, its contract hash and referenced local image bytes, rather than hidden source rows or
