@@ -51,6 +51,25 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		'tags_input',
 	);
 
+	/** Fields handled outside wp_insert_post; the write and discovery share this list. */
+	private const POST_EXTRA_FIELDS = array( 'categories', 'tags', 'featured_image_id', 'template', 'seo' );
+
+	/** Native post discovery. Other kinds remain unknown until their writer exposes a schema. */
+	public function describeWrites( string $kind ): ?array {
+		if ( 'post' !== $kind ) return null;
+		$fields = array_merge( self::POST_FIELDS, self::POST_EXTRA_FIELDS );
+		return array(
+			'schemaVersion' => 'tracy-native-write/v1',
+			'kind' => $kind,
+			'updateFields' => array_values( array_diff( $fields, array( 'post_type' ) ) ),
+			'createFields' => $fields,
+			'requiredOnCreate' => null,
+			'delete' => $this->canTrash( $kind ),
+			'move' => false,
+			'note' => 'Fields accepted by content.update, not a seat grant. CMS validation still applies. post_content replaces the whole body; post_type is creation-only.'
+		);
+	}
+
 	/**
 	 * Options this endpoint will not write, whatever the caller says.
 	 *
@@ -732,7 +751,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 
 		$this->touched[ $written ] = $written;
-		$this->write_beyond_the_row( $written, $fields );
+		$this->write_beyond_the_row( $written, array_intersect_key( $fields, array_flip( self::POST_EXTRA_FIELDS ) ) );
 		return $written;
 	}
 

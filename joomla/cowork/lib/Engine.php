@@ -1140,6 +1140,14 @@ final class Engine
         ]);
     }
 
+    /** Add discovery only when the installed writer can prove its accepted fields. */
+    private function writeSchema(string $kind): array
+    {
+        if ($this->writer === null || !method_exists($this->writer, 'describeWrites')) return [];
+        $schema = $this->writer->describeWrites($kind);
+        return $schema === null ? [] : ['writeSchema' => $schema];
+    }
+
     /**
      * Apply one edit to the site's content, and remember how to undo it in the same breath.
      *
@@ -1187,7 +1195,7 @@ final class Engine
             return $this->err('read_failed', $e->getMessage());
         }
 
-        return $this->ok(['kind' => $kind, 'offset' => $offset, 'items' => $items]);
+        return $this->ok(['kind' => $kind, 'offset' => $offset, 'items' => $items] + $this->writeSchema($kind));
     }
 
     /**
@@ -1218,7 +1226,7 @@ final class Engine
             return $this->err('not_found', "no {$kind} with id {$id}");
         }
 
-        return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
+        return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item] + $this->writeSchema($kind));
     }
 
     /**

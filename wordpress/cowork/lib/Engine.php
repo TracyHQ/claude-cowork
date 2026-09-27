@@ -1923,6 +1923,14 @@ final class Engine
     // the caller chose for the whole deliverable. That is what `apply.revert` replays, and it is
     // the condition ADR 0048 puts on a change being guaranteed at all.
 
+    /** Add discovery only when the installed writer can prove its accepted fields. */
+    private function writeSchema(string $kind): array
+    {
+        if ($this->writer === null || !method_exists($this->writer, 'describeWrites')) return [];
+        $schema = $this->writer->describeWrites($kind);
+        return $schema === null ? [] : ['writeSchema' => $schema];
+    }
+
     /**
      * Edit one piece of the site's content: a post, one of its meta values, or an option.
      *
@@ -1994,7 +2002,7 @@ final class Engine
             return $this->err('read_failed', $e->getMessage());
         }
 
-        return $this->ok(['kind' => 'post', 'offset' => $offset, 'items' => $items]);
+        return $this->ok(['kind' => 'post', 'offset' => $offset, 'items' => $items] + $this->writeSchema('post'));
     }
 
     /**
@@ -2050,7 +2058,7 @@ final class Engine
             return $this->err('not_found', sprintf('no %s at id %d, key "%s"', $kind, $id, $key));
         }
 
-        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item]);
+        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item] + $this->writeSchema($kind));
     }
 
     /**

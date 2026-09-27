@@ -295,6 +295,25 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
         finally { $this->db->setQuery('SELECT RELEASE_LOCK(' . $this->db->quote($lock) . ')')->loadResult(); }
     }
 
+    /** The exact field allowlists used below; no row values and no database read. */
+    public function describeWrites(string $kind): ?array
+    {
+        if (!isset(self::MAP[$kind]) || in_array($kind, self::RELATION_KINDS, true)) return null;
+        $extra = $kind === 'article' ? ['tags'] : [];
+        return [
+            'schemaVersion' => 'tracy-native-write/v1',
+            'kind' => $kind,
+            'updateFields' => array_values(array_unique(array_merge(self::MAP[$kind]['columns'], $extra,
+                isset(self::NESTED[$kind]) ? ['parent_id', 'move_after'] : []))),
+            'createFields' => $this->canCreate($kind)
+                ? array_merge(self::NESTED[$kind]['createColumns'] ?? self::MAP[$kind]['columns'], $extra) : null,
+            'requiredOnCreate' => self::NESTED[$kind]['require'] ?? null,
+            'delete' => $this->trashColumn($kind) !== null,
+            'move' => isset(self::NESTED[$kind]),
+            'note' => 'Fields accepted by content.update, not a seat grant. CMS validation still applies. Move uses parent_id/move_after.'
+        ];
+    }
+
     public function canCreate(string $kind): bool
     {
         $this->tableFor($kind); // validates the kind
