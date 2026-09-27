@@ -36,15 +36,31 @@ final class JoomlaContentReader
             \Joomla\CMS\Router\Route::link('site',$query,false,\Joomla\CMS\Router\Route::TLS_IGNORE,false));
         return static fn(string $kind,int $id): string|false|null => $address->path($kind,$id);
     }
+    /**
+     * Every file under images/ with its stat signature (size, mtime, ctime, inode): what brackets
+     * the DB snapshot. Signatures, not bytes: hashing the whole folder twice per read was half of
+     * every content.read on the stand's Northgate site (245 files, 26 MB: ~380 ms of ~780 ms,
+     * 27/09/2026). Only the files a content actually shows are hashed, once (`hashes`).
+     */
     private function media(): array {
         $out=[]; $base=$this->root.'/images';
+        clearstatcache();
         if (!is_dir($base)) return [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($base,\FilesystemIterator::SKIP_DOTS)) as $file) {
             if ($file->isLink() || !$file->isFile()) continue;
             $path=substr($file->getPathname(),strlen($this->root)+1);
-            $out[$path]=hash_file('sha256',$file->getPathname());
+            $out[$path]=$file->getSize().':'.$file->getMTime().':'.$file->getCTime().':'.$file->getInode();
         }
         ksort($out); return $out;
+    }
+    /** The bytes of the readable files (path => sha256, null for a file that is not there). */
+    private function hashes(array $readable): array {
+        foreach ($readable as $path=>$signature) if ($signature!==null) {
+            $hash=@hash_file('sha256',$this->root.'/'.$path);
+            if ($hash===false) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
+            $readable[$path]=$hash;
+        }
+        return $readable;
     }
     private function readableMedia(array $contents, array $scan): array {
         $paths=[];
@@ -167,7 +183,8 @@ final class JoomlaContentReader
     public function revisions(): array {
         $config=$this->config();
         // Page identities have no trigger (nested-set locking, see ContentIdentity): level them now.
-        \ContentIdentity::reconcile($this->db,'page');
+        // One try: this runs inside the apply's transaction, where a deadlock victim is rolled back whole.
+        \ContentIdentity::level($this->db,'page',1);
         $data=[];
         foreach (\ContentProjection::TABLES as $table=>$order) $data[$table]=$this->rows($table,$order);
         $contract=($this->contractFactory)();
@@ -190,26 +207,40 @@ final class JoomlaContentReader
             'fields','fields_values','tags','contentitem_tag_map'];
         $engines=$this->db->setQuery('SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()')->loadAssocList('TABLE_NAME','ENGINE');
         foreach ($tables as $table) if (($engines[$prefix.$table]??'')!=='InnoDB') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content snapshot requires transactional tables');
-        // File bytes bracket the DB snapshot. Changed bytes force a retry by the caller. Nothing
-        // is cached between requests and no transaction spans an HTTP boundary.
+        // File signatures (size, mtime, ctime, inode) bracket the DB snapshot; a readable file whose
+        // signature moved forces a retry by the caller, and the revision hashes the readable files'
+        // bytes (`hashes`). Nothing is cached between requests and no transaction spans an HTTP
+        // boundary.
         $mediaBefore=$this->media();
-        $this->db->setQuery('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
+        // Nothing is written inside the snapshot, so reads that overlap never lock each other. Page
+        // identities (no trigger, see ContentIdentity) are levelled BEFORE it, and only when a menu
+        // item appeared or went; the snapshot then checks it holds an identity for every menu item
+        // it read, and a menu item created in between costs a fresh snapshot, never a page with no id.
         $now=time();
-        $this->db->transactionStart();
-        try {
-            \ContentIdentity::reconcile($this->db,'page');
-            $data=[];
-            foreach ($tables as $table) $data[$table]=$this->rows($table,match($table) {
-                'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',
-                'fields_values'=>\ContentProjection::TABLES['fields_values'],'contentitem_tag_map'=>\ContentProjection::TABLES['contentitem_tag_map'],default=>'id'});
-            foreach ($data['menu'] as $menu) if (trim((string)$menu['path'],'/')==='content.json') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content route is already occupied');
-            $contract=($this->contractFactory)();
-            if (!$contract) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content mapping is unavailable');
-            $this->contract=$contract;
-            $mapping=$this->contract->readMapping();
-            $data+=$this->supplement($mapping);
-            $this->db->transactionCommit();
-        } catch (\Throwable $e) { $this->db->transactionRollback(); throw $e; }
+        for ($attempt=1; ; $attempt++) {
+            \ContentIdentity::level($this->db,'page');
+            $this->db->setQuery('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
+            $this->db->transactionStart();
+            try {
+                $data=[];
+                foreach ($tables as $table) $data[$table]=$this->rows($table,match($table) {
+                    'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',
+                    'fields_values'=>\ContentProjection::TABLES['fields_values'],'contentitem_tag_map'=>\ContentProjection::TABLES['contentitem_tag_map'],default=>'id'});
+                if (!\ContentIdentity::covers($data['menu'],$data['claudecowork_content_identity'],'page')) {
+                    $this->db->transactionRollback();
+                    if ($attempt>=3) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Menu items changed during the read; restart');
+                    continue;
+                }
+                foreach ($data['menu'] as $menu) if (trim((string)$menu['path'],'/')==='content.json') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content route is already occupied');
+                $contract=($this->contractFactory)();
+                if (!$contract) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content mapping is unavailable');
+                $this->contract=$contract;
+                $mapping=$this->contract->readMapping();
+                $data+=$this->supplement($mapping);
+                $this->db->transactionCommit();
+                break;
+            } catch (\Throwable $e) { $this->db->transactionRollback(); throw $e; }
+        }
         $mediaAfter=$this->media();
         $projection=\ContentProjection::build($data,$mapping,$config['site_id'],$this->base,$now,[$this->contract,'slotValue']);
         $contents=$projection['contents'];
@@ -219,6 +250,7 @@ final class JoomlaContentReader
         $readableBefore=$this->readableMedia($contents,$mediaBefore);
         $readableAfter=$this->readableMedia($contents,$mediaAfter);
         if ($readableBefore!==$readableAfter) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
+        $readableAfter=$this->hashes($readableAfter);
         // The snapshot revision is hashed over every content still marked pending, exactly as before
         // per-content revisions existed, so cursors issued by an older receiver keep their meaning.
         $revision=$this->hash([$contents,$mapping['contractHash'],$readableAfter]);

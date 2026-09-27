@@ -55,6 +55,53 @@ final class ContentIdentity
         $db->setQuery('DELETE ci FROM #__claudecowork_content_identity ci LEFT JOIN #__'.$table.' t ON t.id=ci.native_id WHERE ci.kind='.$db->quote($kind).' AND t.id IS NULL')->execute();
     }
 
+    /** MariaDB/MySQL's "deadlock, transaction rolled back" and "lock wait timeout". */
+    public const LOCK_VICTIM = [1213, 1205];
+
+    /**
+     * `reconcile`, but only when one kind's identities are actually out of step — what every read
+     * calls. The look is one plain SELECT (a consistent read: it takes no row lock), so reads that
+     * overlap never lock each other; the two writes run only when a row appeared or went since the
+     * last read. Measured 27/09/2026 on capijl1644: an unconditional reconcile inside the reader's
+     * snapshot deadlocked 17 of 24 parallel reads (INSERT IGNORE … SELECT takes shared locks on
+     * every duplicate, the DELETE then waits for an exclusive one).
+     *
+     * $tries > 1 only OUTSIDE a transaction: InnoDB rolls back the whole transaction of a deadlock
+     * victim, so inside one (an apply) the error must go up, not be retried on half a transaction.
+     *
+     * @return bool whether it wrote
+     */
+    public static function level($db, string $kind, int $tries = 3): bool
+    {
+        $table=self::TABLES[$kind]; $k=$db->quote($kind);
+        $drift=(int)$db->setQuery('SELECT (SELECT COUNT(*) FROM #__'.$table.' t LEFT JOIN #__claudecowork_content_identity ci ON ci.kind='.$k.' AND ci.native_id=t.id WHERE ci.native_id IS NULL)'
+            .'+(SELECT COUNT(*) FROM #__claudecowork_content_identity ci LEFT JOIN #__'.$table.' t ON t.id=ci.native_id WHERE ci.kind='.$k.' AND t.id IS NULL)')->loadResult();
+        if ($drift===0) return false;
+        for ($try=1; ; $try++) {
+            try { self::reconcile($db, $kind); return true; }
+            catch (\Throwable $e) {
+                if ($try>=$tries || !in_array((int)$e->getCode(), self::LOCK_VICTIM, true)) throw $e;
+                usleep(20000*$try);
+            }
+        }
+    }
+
+    /**
+     * Whether every native row read has an identity row read with it — what a reader checks inside
+     * its snapshot instead of writing there. An identity whose row went is harmless (nothing looks
+     * it up); a row without one would refuse the whole read (ContentProjection).
+     *
+     * @param list<array{id:mixed}> $rows the kind's native rows
+     * @param list<array{kind:string,native_id:mixed}> $identities
+     */
+    public static function covers(array $rows, array $identities, string $kind): bool
+    {
+        $known=[];
+        foreach ($identities as $row) if ($row['kind']===$kind) $known[(int)$row['native_id']]=true;
+        foreach ($rows as $row) if (!isset($known[(int)$row['id']])) return false;
+        return true;
+    }
+
     /** Whether the reader was ever enabled here: the identity table exists. */
     public static function installed($db): bool
     {
