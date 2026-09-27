@@ -85,6 +85,43 @@ Nothing in the plugin knows about any particular gatekeeper; it ships inside thi
 install or update brings it, its install script enables it and orders it first, and both answerers
 share one engine wiring (`EngineFactory`) so neither can drift.
 
+## Render stamps for the page picker (0.18.0)
+
+Tracy's page picker lets a person click an element of their site and ask for a change. To change
+the right record it needs to know what printed that element, and only Joomla knows that while it
+renders. So `plg_system_claudecoworkapi` marks the page — for one kind of request only:
+
+| Stamp | Where |
+| --- | --- |
+| `data-tracy-src="module:<id> block:<module type>"` | first element of every module (id 0, a template's on-the-fly module, is skipped) |
+| `<template data-tracy-owner="article:<id>:<alias>">` | inside every article render: the article page and each blog/featured item |
+| `<template data-tracy-owner="category:<id>:<alias>">` | inside a category's description (context `com_content.categories`) |
+| `data-tracy-src="article:<id>:<alias> block:<module type>"` | each item of an article-list module: `mod_articles`, `mod_articles_news`, `mod_articles_latest`, `mod_articles_category`, `mod_articles_popular`, `mod_related_items`, and `mod_ja_acm` when it links to two articles or more |
+
+Menu items need nothing: Joomla and T4 already print the id on each `<li>`. The format is shared
+with the picker runtime and the resolver in Tracy; change it there first. The rules are plain PHP in
+`lib/RenderStamps.php`, tested in `tests/render-stamps.php`.
+
+**Who gets them.** A site-client request carrying `X-Tracy-Preview: pick` — added by Tracy's site
+proxy only after it verified a preview ticket, and stripped when a browser sends it — on a site with
+a cowork token. A site reachable without the proxy (an imported site) cannot tell that header from
+anyone else's; what such a caller gets is the ids of records already public on that page, never
+cached. A signed ticket for those sites is a later step. Every other request is byte-identical to
+a site without this plugin (measured on Joomla 6.1.3: same session, plugin on vs off, `cmp` equal).
+
+**Never cached.** For a stamped request the plugin switches Joomla caching off at
+`onAfterInitialise` (so the conservative view and module caches neither serve nor store), answers
+`false` to the page cache's `onPageCacheSetCaching` and `true` to `onPageCacheIsExcluded`, and sends
+the response uncachable (`no-store`) with `Vary: Cookie`.
+
+**List modules.** They build their lists in their own helpers and fire no content event per item,
+and Joomla has no hook between fetching the items and printing them. What every layout does print
+is a link to each article, so the plugin scans the module's own output with a small tag scanner
+(not DOMDocument, which would re-serialise the markup), ties each link to an article by building the
+candidate's route exactly as the article modules do and requiring an exact match, and stamps the
+largest element around the link that links to that one article only. A link it cannot tie to
+exactly one article is left alone.
+
 ## Why a component, not a plugin
 
 This started as `plg_ajax_tracymigration`, reached through `com_ajax`. That works, but

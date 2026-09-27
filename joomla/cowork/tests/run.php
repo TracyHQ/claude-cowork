@@ -1835,6 +1835,7 @@ require __DIR__ . "/content-natives.php";
 require __DIR__ . "/contract-ops-locks.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
+require __DIR__ . "/render-stamps.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
