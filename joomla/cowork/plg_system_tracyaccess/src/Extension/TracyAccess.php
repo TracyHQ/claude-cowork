@@ -85,6 +85,17 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             return;
         }
 
+        // The public site stays as a visitor sees it: an editor is logged in to the administrator
+        // only. A front-end login changed what Tracy's site preview shows — measured 27/09/2026 on a
+        // Tracy Business Joomla site: core `System - Privacy Consent` (enabled there) sends every
+        // logged-in user who has not consented to the profile edit form, on every page, so the
+        // Browser tab showed that form instead of the site and nothing could be picked. Nothing on
+        // the front end needs the login: editing goes through the administrator and the Cowork API.
+        // A front-end login the person made themselves is left alone.
+        if ($app->isClient('site')) {
+            return;
+        }
+
         // Already this person: nothing to do. Re-verifying every request is cheap; re-logging in
         // every request is not, and would churn the session needlessly.
         if ($current instanceof User && !$current->guest && strtolower((string) $current->email) === $email) {
