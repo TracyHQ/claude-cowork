@@ -175,6 +175,15 @@ Each request reads from one REPEATABLE READ snapshot, released once it is answer
 lands during a request is either wholly in the answer or wholly out of it, and the next page's
 cursor answers 409. A site with a persistent object cache answers 501 until that is measured.
 
+`ids` asks for up to 100 contents in full in one call — a list in the action's `params`, one
+comma-separated value over GET — and may carry `maxBytes`, nothing else. Building the projection is
+nearly the whole cost of a read (~100 ms on a 950-row site, against 1-5 ms per detail), so a relay
+indexing a site reads it in batches instead of one call per content. Each content that fits whole is
+answered exactly as `{id}` answers it; the rest are named in `pagination.pending` (did not fit, pages
+its blocks, or holds a value over budget: read it alone) and `pagination.missing` (no readable
+content now). Nothing is cut and nothing pages. A batch is one snapshot and writes nothing, like
+every read, so reads may overlap freely.
+
 Content ids are opaque and survive a new title, slug, order or domain: each row gets a random uid
 once, and ids are keyed by the site's content seed. Until `content.identity` has run on a site, the
 reader answers 501; after it, rows WordPress inserts get their uid at once. A fork calls

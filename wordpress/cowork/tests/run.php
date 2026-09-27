@@ -1618,6 +1618,8 @@ require __DIR__ . '/content-revisions.php';
 require __DIR__ . '/edit-lock.php';
 // Native ids: each content names its own WordPress record.
 require __DIR__ . '/content-natives.php';
+// Many details in one read: content.read ids.
+require __DIR__ . '/content-batch.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.

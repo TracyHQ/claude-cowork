@@ -102,6 +102,10 @@ final class Claude_Cowork_Content_Source implements ContentSource
     /** Counted while one content is read in full, and reported with it. */
     private $unkeyedBlocks = 0;
     private $ambiguousSections = 0;
+    /** Contents read in full by this request: one for `{id}`, up to 100 for `{ids}`. */
+    private $detailed = 0;
+    /** @var array<string,string>|null theme template files, globbed once per request */
+    private $templateFiles = null;
 
     public function __construct(string $scope, string $contractsDir, string $version)
     {
@@ -159,11 +163,13 @@ final class Claude_Cowork_Content_Source implements ContentSource
         if ($this->languages !== []) {
             $out[] = ['code' => 'WP_STRING_TRANSLATIONS', 'message' => 'Polylang string translations (such as the site name per language) are not listed.'];
         }
+        // Counted over every content this request read in full: one for `{id}`, several for `{ids}`.
+        $whose = $this->detailed > 1 ? 'the contents read in full' : 'this content';
         if ($this->unkeyedBlocks > 0) {
-            $out[] = ['code' => 'WP_UNKEYED_BLOCKS', 'message' => $this->unkeyedBlocks . ' top-level blocks of this content carry no block name and are only in bodyHtml.'];
+            $out[] = ['code' => 'WP_UNKEYED_BLOCKS', 'message' => $this->unkeyedBlocks . ' top-level blocks of ' . $whose . ' carry no block name and are only in bodyHtml.'];
         }
         if ($this->ambiguousSections > 0) {
-            $out[] = ['code' => 'WP_AMBIGUOUS_SECTIONS', 'message' => $this->ambiguousSections . ' sections of this content hold the same block names as another section and are only in bodyHtml.'];
+            $out[] = ['code' => 'WP_AMBIGUOUS_SECTIONS', 'message' => $this->ambiguousSections . ' sections of ' . $whose . ' hold the same block names as another section and are only in bodyHtml.'];
         }
         if ($this->missingIdentity > 0) {
             $out[] = ['code' => 'WP_IDENTITY_MISSING', 'message' => $this->missingIdentity . ' readable rows have no content identity yet and are not listed; run content.identity.'];
@@ -218,6 +224,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
         if (!isset($this->index[$id])) {
             return null;
         }
+        $this->detailed++;
         $entry = $this->index[$id];
         $content = $this->summaries[$id];
         unset($content['detailState']);
@@ -939,6 +946,11 @@ final class Claude_Cowork_Content_Source implements ContentSource
     /** @return array<string,string> theme template files by slug (child theme first) */
     private function themeTemplates(): array
     {
+        // Files are not part of the database snapshot; one glob per request keeps the fingerprint
+        // and every detail of a batch on the same list.
+        if ($this->templateFiles !== null) {
+            return $this->templateFiles;
+        }
         $out = [];
         foreach (array_unique(array_filter([(string) ($this->options['stylesheet'] ?? ''), (string) ($this->options['template'] ?? '')])) as $theme) {
             $dir = get_theme_root($theme) . '/' . $theme . '/templates';
@@ -948,7 +960,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             }
         }
         ksort($out);
-        return $out;
+        return $this->templateFiles = $out;
     }
 
     /**
