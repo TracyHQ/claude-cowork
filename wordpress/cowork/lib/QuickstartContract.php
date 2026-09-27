@@ -923,12 +923,24 @@ final class QuickstartContract
         foreach ($this->entities() as $entity) {
             $entities[(string) $entity['key']] = $entity;
         }
+        [$changes, $copied] = $this->withEditionPictures($changes, $slots);
         // Grouped per target row: one read and one write per post, however many of its slots move.
         $byTarget = [];
         // The row each change key lands on, for the per-content revision check and to name the
         // content an error is about.
         $owners = [];
+        // The edition rows a source picture is copied to. The caller read the source only, so they
+        // are held by the edit lock but not by a content revision.
+        $copiedOwners = [];
         foreach ($changes as $key => $value) {
+            if (isset($copied[$key])) {
+                $slot = $slots[explode('::', $key, 2)[1]];
+                $target = $this->changeTarget($key, explode('::', $key, 2)[0], $slot, $entities[(string) $slot['entity']], $state);
+                $copiedOwners[$key] = ['kind' => $target['row']['kind'], 'id' => $target['row']['id'], 'key' => $target['row']['key']];
+                $byTarget[$target['name']] = $byTarget[$target['name']] ?? $target['row'] + ['changes' => []];
+                $byTarget[$target['name']]['changes'][] = [$slot, $value, $key];
+                continue;
+            }
             if (!is_string($key) || !is_string($value)) {
                 $errors[] = new ContractProblem(ContractProblem::CHANGES_INVALID, 'Unknown content slot or non-string value: ' . (string) $key, is_string($key) ? $key : null);
                 continue;
@@ -978,7 +990,7 @@ final class QuickstartContract
                 }
             }
         }
-        $this->checkEditLocks($owners, $contentIds, $errors);
+        $this->checkEditLocks($owners + $copiedOwners, $contentIds, $errors);
         if ($errors !== []) {
             throw new ContractProblems($errors);
         }
@@ -1042,6 +1054,46 @@ final class QuickstartContract
             throw new ContractProblems($errors);
         }
         return ['operations' => $operations, 'state' => $state];
+    }
+
+    /**
+     * 🔒 A PICTURE IS THE SAME PICTURE IN EVERY LANGUAGE. Words are translated, so a new source
+     * sentence waits for its language job; a new source picture has nothing to wait for, and left
+     * on the source alone it showed on the English page only — measured 27/09/2026 on the r1w1734
+     * stand site, a drawn hero on /en/ and the demo's on /vi/ while the agent said every language
+     * had it. So a source image change is copied to every edition that shows that block, as
+     * `<locale>::<key>`, the way the Joomla component does in its own `plan()`. A picture the
+     * caller sent for an edition by name is kept; an edition that ships without the block is skipped.
+     *
+     * @param array<string,array> $slots slot key → slot
+     * @return array{0:array,1:array<string,true>} the changes with the copies added, and the copies' keys
+     */
+    private function withEditionPictures(array $changes, array $slots): array
+    {
+        $copied = [];
+        if ($this->editions === null) {
+            return [$changes, $copied];
+        }
+        $source = $this->sourceLanguage();
+        foreach ($changes as $key => $value) {
+            if (!is_string($key) || !is_string($value) || strpos($key, '::') !== false
+                || !isset($slots[$key]) || ($slots[$key]['type'] ?? '') !== 'image') {
+                continue;
+            }
+            $entityKey = (string) $slots[$key]['entity'];
+            $block = $entityKey . ':' . (string) ($slots[$key]['target']['block'] ?? '');
+            foreach ($this->editions['locales'] as $locale => $edition) {
+                $copy = $edition['ids'][$entityKey] ?? null;
+                if ((string) $locale === $source || !is_int($copy) && !ctype_digit((string) $copy)
+                    || in_array($block, (array) ($edition['missing'] ?? []), true)
+                    || array_key_exists($locale . '::' . $key, $changes)) {
+                    continue;
+                }
+                $changes[$locale . '::' . $key] = $value;
+                $copied[$locale . '::' . $key] = true;
+            }
+        }
+        return [$changes, $copied];
     }
 
     /**
