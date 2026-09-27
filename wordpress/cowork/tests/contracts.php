@@ -240,7 +240,7 @@ $applied = $door($E, 'apply', $applyParams([
     'header.tagline' => 'Loud since 1999',
 ]));
 check('an apply of every slot lands', $applied['ok'], true);
-// As the Joomla receiver answers since #316: the revision this apply left, so the next apply needs no inspect.
+// As the Joomla Claude Cowork plugin answers since #316: the revision this apply left, so the next apply needs no inspect.
 check('the apply names the revision it left', $applied['afterRevision'] ?? null, $applied['revision']);
 check('one write per row: two options, one page, one part', array_column($applied['written'], 'kind'), ['option', 'option', 'post', 'templatePart']);
 checkTrue('at a new revision', $applied['revision'] !== $revision0);

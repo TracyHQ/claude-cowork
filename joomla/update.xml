@@ -271,7 +271,7 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>A customer can take any language the quickstart already ships, one or several, and keep it the way the archive built it. Tracy Business ships 41 editions made by its own add-language tool, each with its own menus (`tb-main-vi`), megamenu, modules and categories; a copy made from the source sat in `tb-main-en` while the template reads `tb-main-&lt;sef&gt;`, so `/vi/` lost its main menu. A contract may now carry `editions.json`, generated from the release database and pinned to the base: for such a language the receiver writes the translation into the edition's own rows, shows them, spares them from retire, joins the edition's association group, and a revert returns words and visibility without deleting anything. Inspect holds each taken row to the add-language rules the generator proved against every edition of the release. For a language without an edition the copy road stays, now with: the archive's own rows moved off an alias a copy needs, association groups kept whole, a new switcher placed even when its id matches another kind's, and a second Build able to bind and seed while a language is half made. Carries 0.16.11.</description>
+        <description>A customer can take any language the quickstart already ships, one or several, and keep it the way the archive built it. Tracy Business ships 41 editions made by its own add-language tool, each with its own menus (`tb-main-vi`), megamenu, modules and categories; a copy made from the source sat in `tb-main-en` while the template reads `tb-main-&lt;sef&gt;`, so `/vi/` lost its main menu. A contract may now carry `editions.json`, generated from the release database and pinned to the base: for such a language the Claude Cowork plugin writes the translation into the edition's own rows, shows them, spares them from retire, joins the edition's association group, and a revert returns words and visibility without deleting anything. Inspect holds each taken row to the add-language rules the generator proved against every edition of the release. For a language without an edition the copy road stays, now with: the archive's own rows moved off an alias a copy needs, association groups kept whole, a new switcher placed even when its id matches another kind's, and a second Build able to bind and seed while a language is half made. Carries 0.16.11.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.16.12</version>
@@ -373,7 +373,7 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the Tracy Business profiles, tracy-business/j6/1.0.0 and tracy-business/j6/1.1.0, so a site built on the tracy-business quickstart verifies against its own contract and its build passes the check stage instead of dying at bind. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the Tracy Business profiles, tracy-business/j6/1.0.0 and tracy-business/j6/1.1.0, so a site built on the tracy-business quickstart verifies against its own contract and its build passes the check stage instead of dying at bind. A Claude Cowork plugin that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.16.3</version>
@@ -390,7 +390,7 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara 1.0.2 profile, the archive that ships the template's agent documentation (AGENTS.md, CLAUDE.md and docs/) inside templates/ja_voyara, so a site built on it verifies against its own contract instead of reading those files as unexpected presentation. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara 1.0.2 profile, the archive that ships the template's agent documentation (AGENTS.md, CLAUDE.md and docs/) inside templates/ja_voyara, so a site built on it verifies against its own contract instead of reading those files as unexpected presentation. A Claude Cowork plugin that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.16.2</version>
@@ -407,7 +407,7 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara profile, so a site built on the JoomlArt ja_voyara quickstart verifies against its own contract. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara profile, so a site built on the JoomlArt ja_voyara quickstart verifies against its own contract. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A Claude Cowork plugin that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.16.1</version>
@@ -424,7 +424,7 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
+        <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A Claude Cowork plugin that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.16.0</version>

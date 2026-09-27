@@ -199,7 +199,7 @@ check('revert: an open record is not rolled back under its editor', [$lkR['ok'],
 $lkHeld = [];
 check('revert: once closed it rolls back', [$lkOpen->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'open-2']])['ok'], $lkOpenWriter->store['article'][6]['introtext']], [true, 'Old']);
 $lkNoLocks = new Engine($WTOKEN, [], null, null, null, null, $lkOpenWriter, null, $lkOpenLog);
-check('update: a receiver with no lock lookup writes as before', $lkNoLocks->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => ['apply_id' => 'open-6', 'kind' => 'article', 'id' => 5, 'fields' => ['introtext' => 'New']]])['ok'], true);
+check('update: a Claude Cowork plugin with no lock lookup writes as before', $lkNoLocks->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => ['apply_id' => 'open-6', 'kind' => 'article', 'id' => 5, 'fields' => ['introtext' => 'New']]])['ok'], true);
 
 foreach (array_keys($lkData) as $name) unlink($lkDir . '/' . $name . '.json');
 rmdir($lkDir);

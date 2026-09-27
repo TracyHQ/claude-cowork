@@ -84,7 +84,7 @@ check('the binding records the relabel and the label it replaced', [$relStore->b
 check('the contract now names the source by its new tag', [$relContract->sourceLanguage(), $relContract->publishedSourceLanguage()], ['en-US', 'en-GB']);
 check('the relabelled site inspects clean', $relContract->inspect()['contract'], 'rel/j6/1.0.0');
 $again = new QuickstartContract($relWriter, $relStore, $relDir, $relDir);
-check('a fresh receiver reads the relabel back from the binding', [$again->sourceLanguage(), $again->inspect()['contract']], ['en-US', 'rel/j6/1.0.0']);
+check('a fresh Claude Cowork plugin reads the relabel back from the binding', [$again->sourceLanguage(), $again->inspect()['contract']], ['en-US', 'rel/j6/1.0.0']);
 check('asking again installs nothing twice', [$relCall(['operation' => 'sourceLanguage.set', 'locale' => 'en-US', 'apply_id' => 'srclang-a', 'request_id' => 'r1'])['alreadySet'] ?? null, count($relExtensions->asked)], [true, 1]);
 check('a second variant on top is refused, not stacked', $relCall(['operation' => 'sourceLanguage.set', 'locale' => 'en-AU', 'apply_id' => 'srclang-b', 'request_id' => 'r2'])['error'], 'conflict');
 

@@ -7,7 +7,7 @@
  * tokens as the page is rendered. Those braces look exactly like a template directive, which a
  * content-only contract refuses as executable structure. So the list is CLOSED and spelled out
  * here: these names, nothing else, and every other `{...}` stays a directive. Same list as the
- * Joomla receiver's `IdentityTokens::NAMES`, because the same copy is written for both platforms.
+ * Joomla Claude Cowork plugin's `IdentityTokens::NAMES`, because the same copy is written for both platforms.
  */
 final class IdentityTokens
 {

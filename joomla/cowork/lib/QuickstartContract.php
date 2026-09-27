@@ -49,7 +49,7 @@ final class QuickstartContract
     private string $root;
     /**
      * Why a missing profile is carried rather than thrown from the constructor: the caller decides
-     * whether a site has a contract by whether it was handed one, and a receiver too old to carry
+     * whether a site has a contract by whether it was handed one, and a Claude Cowork plugin too old to carry
      * the profile a site was provisioned for would otherwise look like a site with NO contract —
      * which is the one state where every structural write is allowed. Refusing from every method
      * keeps that mistake closed and says which half is out of date.
@@ -104,19 +104,19 @@ final class QuickstartContract
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
             $file = $directory . '/' . $name . '.json';
-            if (!is_file($file)) { $this->unavailable = 'This site names a content contract this receiver does not carry'; return; }
+            if (!is_file($file)) { $this->unavailable = 'This site names a content contract this Claude Cowork plugin does not carry'; return; }
             $value = json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
             if ($name === 'manifest') $this->manifest=$value;
             elseif ($name === 'content-map') $this->map=$value;
             else $this->lock=$value;
         }
         // The multilingual extension is OPTIONAL and separately versioned: a contract published
-        // before it exists keeps working untouched, and a receiver carrying it does not claim the
+        // before it exists keeps working untouched, and a Claude Cowork plugin carrying it does not claim the
         // capability for a contract whose profile is absent.
         $profileFile = $directory . '/multilingual-map.json';
         // 🔒 THE CATALOG IS NOT CONTRACT BYTES, SO IT DOES NOT LIVE WITH THEM. `lib/contracts/<id>/`
         // holds what a SITE is held to — the files whose hashes are pinned and whose drift refuses
-        // the site. A list of language packages this receiver may download is receiver-wide and
+        // the site. A list of language packages this Claude Cowork plugin may download is cowork-wide and
         // verifies nothing about the site, so it sits beside the engine instead. Keeping it in a
         // profile directory would have made the contract gate demand it be pinned as contract
         // bytes, which would be the gate telling the reader something untrue.
@@ -127,7 +127,7 @@ final class QuickstartContract
                 json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw
             );
         }
-        // The catalog is the receiver's reviewed list of packs, not part of any profile, so a contract
+        // The catalog is the Claude Cowork plugin's reviewed list of packs, not part of any profile, so a contract
         // with no multilingual profile can still be given ONE language from it (siteLanguage.*).
         if (is_file($catalogFile))
             $this->packs = new LanguagePackCatalog(
@@ -135,7 +135,7 @@ final class QuickstartContract
                 $this->multilingual ? $this->multilingual->publishedSourceLanguage() : self::DEFAULT_SOURCE
             );
         // The demo-trim extension is optional in the same way, and for the same reason: a contract
-        // published before it keeps working, and a receiver carrying the code claims nothing for a
+        // published before it keeps working, and a Claude Cowork plugin carrying the code claims nothing for a
         // contract that ships no list of what its demo is.
         $this->syncSourceRelabel();
         $trimFile = $directory . '/demo-trim-map.json';
@@ -149,9 +149,9 @@ final class QuickstartContract
     /**
      * Whether THIS SITE's profile carries the multilingual extension.
      *
-     * Not a property of the receiver. One base archive now serves more than one design, so a site
+     * Not a property of the Claude Cowork plugin. One base archive now serves more than one design, so a site
      * bound to a profile that ships no `multilingual-map.json` answers no here while the site next
-     * to it answers yes. A receiver that cannot load the site's profile at all answers no too —
+     * to it answers yes. A Claude Cowork plugin that cannot load the site's profile at all answers no too —
      * asking it anything further would be asking a half that has already said it is the wrong one.
      */
     public function multilingualAvailable(): bool {
@@ -162,7 +162,7 @@ final class QuickstartContract
         if (!$this->multilingual) throw new RuntimeException('This contract has no multilingual profile');
         return $this->multilingual;
     }
-    /** Whether THIS SITE's profile lists demo rows it may hide — a property of the contract, not the receiver. */
+    /** Whether THIS SITE's profile lists demo rows it may hide — a property of the contract, not the Claude Cowork plugin. */
     /** Whether this site can be given one default language from the reviewed catalog. */
     public function siteLanguageAvailable(): bool { return $this->unavailable === null && $this->packs !== null; }
     public function demoTrimAvailable(): bool { return $this->unavailable === null && $this->demoTrim !== null; }
@@ -175,7 +175,7 @@ final class QuickstartContract
     public function binding(): ?array { $this->ready(); return $this->store->load(); }
     public function catalog(): LanguagePackCatalog {
         $this->ready();
-        if (!$this->packs) throw new RuntimeException('This receiver carries no language-pack catalog');
+        if (!$this->packs) throw new RuntimeException('This Claude Cowork plugin carries no language-pack catalog');
         return $this->packs;
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
@@ -255,7 +255,7 @@ final class QuickstartContract
      *
      * 🔒 THIS IS NOT A GENERAL AMNESTY. It adopts only rows carrying the provenance note THIS
      * profile writes, only for the locale of the job that is actually in flight, and only while
-     * that job exists — the job row is private receiver state, so there is no request that can put
+     * that job exists — the job row is private Claude Cowork plugin state, so there is no request that can put
      * the contract into this mode. An article has no note column an Apply may write, so it is
      * matched on the alias this profile derives for it plus its language, which no other row has.
      *
@@ -388,7 +388,7 @@ final class QuickstartContract
     /**
      * Prove the locked files once for the rest of one door call: apply's plan and verify, revert's
      * inspect before and after (#316: 4,145 files hashed twice per apply). Only for a call that
-     * writes no file between its inspects — a bound receiver writes none — so what this gives up is
+     * writes no file between its inspects — a bound Claude Cowork plugin writes none — so what this gives up is
      * an edit from outside landing in the seconds between two of them, which the next call refuses.
      */
     public function beginCall(): void { $this->filesProved = false; }
@@ -551,14 +551,14 @@ final class QuickstartContract
         if ($job && $job['phase'] !== 'completed' && !($this->multilingual && $this->multilingual->edition((string) $job['locale'])))
             [$languages, $switcher] = $this->adoptOrphans($source, $job, $languages, $switcher, $binding);
         if ($languages || $switcher !== null) {
-            if (!$this->multilingual) throw new RuntimeException('This site has translations but the receiver carries no multilingual profile');
+            if (!$this->multilingual) throw new RuntimeException('This site has translations but the Claude Cowork plugin carries no multilingual profile');
             foreach ([$binding['multilingual']['profileHash'] ?? null, $job['profileHash'] ?? null] as $seen)
                 if ($seen !== null && !hash_equals((string)$seen, $this->multilingual->hash()))
                     throw new RuntimeException('The installed multilingual profile changed');
         }
         $trim = $binding['demoTrim'] ?? null;
         if ($trim !== null) {
-            if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the receiver carries no demo-trim profile');
+            if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the Claude Cowork plugin carries no demo-trim profile');
             if (!hash_equals((string) $trim['profileHash'], $this->demoTrim->hash())) throw new RuntimeException('The installed demo-trim profile changed');
         }
         // While a trim or its revert is in flight, a listed row may stand at either end of its move:

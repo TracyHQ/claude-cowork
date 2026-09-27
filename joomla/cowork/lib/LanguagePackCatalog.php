@@ -1,7 +1,7 @@
 <?php
 /**
  * The packages this site will install to add a language — a reviewed file shipped inside the
- * receiver, never a URL a caller hands over.
+ * Claude Cowork plugin, never a URL a caller hands over.
  *
  * 🔒 THE CALLER NAMES A LOCALE, NOT AN ARCHIVE. `extension.install` takes a URL, which is right for
  * a site nobody has bound: a caller holding the token may add to it. A site under a content-only
@@ -39,7 +39,7 @@ final class LanguagePackCatalog
         if (!$this->packs) throw new RuntimeException('The language-pack catalog carries no packs');
     }
 
-    /** Every locale this receiver can add on this Joomla, the source language included. */
+    /** Every locale this Claude Cowork plugin can add on this Joomla, the source language included. */
     public function locales(int $major): array
     {
         $tags = [];
