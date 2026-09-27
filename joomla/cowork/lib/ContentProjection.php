@@ -90,6 +90,25 @@ final class ContentProjection
         return $contents;
     }
 
+    /**
+     * The Joomla rows each content is made of, as `native: [{kind, id}]` in the kinds content.get,
+     * content.update and content.delete take (`menuItem`, `article`, `module`). Without it the agent
+     * held a page's opaque id and ran an inspect or a content.list only to learn which row to write.
+     * Applied AFTER the revisions, like {@see locks()}: a row id never changes what a content says,
+     * and a revision that moved on upgrade would read as a change to every page.
+     *
+     * @param array<string,list<array{0:string,1:int}>> $rows {@see build()} `rows`
+     */
+    public static function natives(array $contents, array $rows): array
+    {
+        foreach ($contents as $id => $content) {
+            $native = [];
+            foreach ($rows[$id] ?? [] as [$kind, $nativeId]) $native[$kind . ':' . $nativeId] = ['kind' => $kind, 'id' => (int) $nativeId];
+            $contents[$id]['native'] = array_values($native);
+        }
+        return $contents;
+    }
+
     public static function date($value): ?string
     {
         return !$value || substr($value, 0, 4) === '0000' ? null : gmdate('Y-m-d\TH:i:s\Z', strtotime($value . ' UTC'));

@@ -181,6 +181,7 @@ final class JoomlaContentReader
         // Who has each content open in the Joomla editor, also after the revisions: a check-out is
         // who is looking, not what the content says (ContentProjection::locks).
         $contents=\ContentProjection::locks($contents,$projection['rows'],[$this,'locks']);
+        $contents=\ContentProjection::natives($contents,$projection['rows']);
         $manifest=$mapping['manifest'];
         $reader=new \ContentReader(['id'=>$opaque('site',$config['site_id']),'name'=>null,'url'=>$this->base,'defaultLocale'=>null,'locales'=>$localeList],
             ['quickstartTag'=>$manifest['quickstart']['release'],'quickstartVersion'=>$manifest['quickstart']['version'],'contractId'=>$manifest['id'],'contractHash'=>$mapping['contractHash']],

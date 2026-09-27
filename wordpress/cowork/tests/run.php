@@ -1616,6 +1616,8 @@ require __DIR__ . '/content-budget.php';
 require __DIR__ . '/content-revisions.php';
 // Editor locks: content.read lists who has a post open; every write refuses to land under them.
 require __DIR__ . '/edit-lock.php';
+// Native ids: each content names its own WordPress record.
+require __DIR__ . '/content-natives.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
 

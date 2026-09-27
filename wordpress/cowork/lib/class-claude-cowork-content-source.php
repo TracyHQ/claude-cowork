@@ -632,6 +632,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             $this->index[$id] = ['kind' => 'theme-part', 'native' => $slug];
             $this->summaries[$id] = $this->summary($id, 'shared', $slug, $slug, null, null, null, $part['hash'],
                 ['status' => 'published', 'valueSource' => 'current', 'scheduledAt' => null], null);
+            $this->summaries[$id]['native'] = [['kind' => 'templatePart', 'key' => (string) $slug]];
         }
     }
 
@@ -673,6 +674,11 @@ final class Claude_Cowork_Content_Source implements ContentSource
         $summary['summary'] = trim((string) $row['post_excerpt']) === '' ? null : (string) $row['post_excerpt'];
         // After the revision, never in it (see `$locks`).
         $summary['lockedBy'] = $this->locks[$native] ?? null;
+        // The record content.get / content.update / content.delete take, so the agent writes without
+        // a lookup first. A database template part is written by its slug, like a theme-file one.
+        $summary['native'] = $row['post_type'] === 'wp_template_part'
+            ? [['kind' => 'templatePart', 'key' => (string) $row['post_name']]]
+            : [['kind' => 'post', 'id' => $native]];
         return $summary;
     }
 
@@ -693,6 +699,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             'revision' => substr($revision, 0, 40),
             'publication' => $publication,
             'lockedBy' => null,
+            'native' => [],
             'detailState' => 'summary',
             'links' => ['self' => $this->link($id)],
         ];
