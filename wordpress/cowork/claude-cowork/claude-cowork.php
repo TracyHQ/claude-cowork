@@ -28,6 +28,11 @@ NavigationLinks::register();
 // opted in with `content.identity`. One small file, no engine.
 require_once __DIR__ . '/lib/ContentIdentity.php';
 add_action('wp_insert_post', [ContentIdentity::class, 'mintOnInsert'], 10, 3);
+// Render stamps for Tracy's element picker: which record rendered each block. Adds no hook at all
+// unless the request carries `X-Tracy-Preview: pick` and this site has a token (lib/ProvenanceStamps.php),
+// so an ordinary visitor's page is byte-identical.
+require_once __DIR__ . '/lib/ProvenanceStamps.php';
+ProvenanceStamps::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.
