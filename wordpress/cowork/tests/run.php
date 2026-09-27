@@ -1591,6 +1591,8 @@ require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
+// Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.
+require __DIR__ . '/provenance-stamps.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
