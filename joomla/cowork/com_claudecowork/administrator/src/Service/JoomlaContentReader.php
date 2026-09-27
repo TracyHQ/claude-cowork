@@ -97,6 +97,51 @@ final class JoomlaContentReader
         try { $lifetime=(int)\Joomla\CMS\Factory::getApplication()->get('lifetime',15); } catch (\Throwable $e) { $lifetime=15; }
         return \JoomlaLocks::live($checkouts,$sessions,$names,time(),$lifetime>0?$lifetime:15);
     }
+    /**
+     * What the projection reads beside the tables (ContentProjection::build `$data`): the display
+     * names of the readable articles' authors — `id` and `name` only, never another column of
+     * `#__users` — and the T4 mega menu settings of every navigation profile a site template style
+     * uses. Both readers call this, so `content.read` and the contract door hash the same projection.
+     */
+    public function supplement(array $mapping): array {
+        $authors=[];
+        foreach ($mapping['keys'] as $key=>$meta) if ($meta['kind']==='article') $authors[(int)($mapping['rows'][$key]['created_by']??0)]=true;
+        unset($authors[0]);
+        $users=$authors ? $this->db->setQuery('SELECT id, name FROM #__users WHERE id IN ('.implode(',',array_map('intval',array_keys($authors))).') ORDER BY id')->loadAssocList() : [];
+        return ['users'=>$users,'megamenu'=>$this->megamenu()];
+    }
+    /**
+     * T4's navigation profiles in use, read the way T4 reads them (`Path::findInTheme`): the style's
+     * `typelist-navigation` profile (T4 falls back to `default` when that file is missing), found
+     * first in `templates/<template>/local/etc/navigation/`, then the template's own `etc/`, then
+     * T4's base theme. A template without T4 has no such file and contributes nothing. Read outside
+     * the DB snapshot, like media: a file saved mid-read is seen on the next read.
+     *
+     * @return list<array{template:string,profile:string,settings:array}>
+     */
+    private function megamenu(): array {
+        $styles=$this->db->setQuery('SELECT template, params FROM #__template_styles WHERE client_id=0 ORDER BY id')->loadAssocList();
+        $out=[];
+        foreach ($styles as $style) {
+            $template=(string)$style['template'];
+            if (!preg_match('/^[A-Za-z0-9_-]+$/',$template)) continue;
+            $params=json_decode((string)$style['params'],true)?:[];
+            $wanted=is_string($params['typelist-navigation']??null) && $params['typelist-navigation']!=='' ? $params['typelist-navigation'] : 'default';
+            foreach (array_unique([$wanted,'default']) as $profile) {
+                if (!preg_match('/^[A-Za-z0-9_. -]+$/',$profile) || str_contains($profile,'..')) break;
+                $file=null;
+                foreach (['/templates/'.$template.'/local/etc/navigation/','/templates/'.$template.'/etc/navigation/','/plugins/system/t4/themes/base/etc/navigation/'] as $dir)
+                    if (is_file($this->root.$dir.$profile.'.json')) { $file=$this->root.$dir.$profile.'.json'; break; }
+                if ($file===null) continue;
+                $body=json_decode((string)file_get_contents($file),true);
+                $settings=is_array($body) ? ($body['mega_settings']??null) : null;
+                if (is_string($settings)) $settings=json_decode($settings,true);
+                if (is_array($settings) && !isset($out[$template.':'.$profile])) $out[$template.':'.$profile]=['template'=>$template,'profile'=>$profile,'settings'=>$settings];
+                break;
+            }
+        }
+        return array_values($out);
+    }
     /** The reader's opt-in row; a missing table is unsupported, a DB failure is unavailable. */
     private function config(): array {
         try { $config=$this->db->setQuery('SELECT * FROM #__claudecowork_content_reader WHERE id=1')->loadAssoc(); }
@@ -127,7 +172,9 @@ final class JoomlaContentReader
         foreach (\ContentProjection::TABLES as $table=>$order) $data[$table]=$this->rows($table,$order);
         $contract=($this->contractFactory)();
         if (!$contract) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content mapping is unavailable');
-        $projection=\ContentProjection::build($data,$contract->readMapping(),$config['site_id'],$this->base,time(),[$contract,'slotValue']);
+        $mapping=$contract->readMapping();
+        $data+=$this->supplement($mapping);
+        $projection=\ContentProjection::build($data,$mapping,$config['site_id'],$this->base,time(),[$contract,'slotValue']);
         return ['revisions'=>$projection['revisions'],'owners'=>$projection['owners']];
     }
     public function read(array $query, string $principal): array {
@@ -139,7 +186,8 @@ final class JoomlaContentReader
         foreach (\ContentIdentity::requiredTriggerNames($prefix) as $name)
             if (!in_array($name,$triggers,true)) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content identity lifecycle is unavailable');
         if (file_exists($this->root.'/content.json')) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content route is already occupied');
-        $tables=['content','menu','modules','modules_menu','categories','viewlevels','usergroups','assets','associations','languages','claudecowork_content_contract','claudecowork_content_identity'];
+        $tables=['content','menu','modules','modules_menu','categories','viewlevels','usergroups','assets','associations','languages','claudecowork_content_contract','claudecowork_content_identity',
+            'fields','fields_values','tags','contentitem_tag_map'];
         $engines=$this->db->setQuery('SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()')->loadAssocList('TABLE_NAME','ENGINE');
         foreach ($tables as $table) if (($engines[$prefix.$table]??'')!=='InnoDB') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content snapshot requires transactional tables');
         // File bytes bracket the DB snapshot. Changed bytes force a retry by the caller. Nothing
@@ -152,12 +200,14 @@ final class JoomlaContentReader
             \ContentIdentity::reconcile($this->db,'page');
             $data=[];
             foreach ($tables as $table) $data[$table]=$this->rows($table,match($table) {
-                'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',default=>'id'});
+                'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',
+                'fields_values'=>\ContentProjection::TABLES['fields_values'],'contentitem_tag_map'=>\ContentProjection::TABLES['contentitem_tag_map'],default=>'id'});
             foreach ($data['menu'] as $menu) if (trim((string)$menu['path'],'/')==='content.json') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content route is already occupied');
             $contract=($this->contractFactory)();
             if (!$contract) throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content mapping is unavailable');
             $this->contract=$contract;
             $mapping=$this->contract->readMapping();
+            $data+=$this->supplement($mapping);
             $this->db->transactionCommit();
         } catch (\Throwable $e) { $this->db->transactionRollback(); throw $e; }
         $mediaAfter=$this->media();
@@ -186,7 +236,7 @@ final class JoomlaContentReader
         $reader=new \ContentReader(['id'=>$opaque('site',$config['site_id']),'name'=>null,'url'=>$this->base,'defaultLocale'=>null,'locales'=>$localeList],
             ['quickstartTag'=>$manifest['quickstart']['release'],'quickstartVersion'=>$manifest['quickstart']['version'],'contractId'=>$manifest['id'],'contractHash'=>$mapping['contractHash']],
             $contents,$revision,$config['secret'],$principal,$now,[
-                ['code'=>'MAPPED_SCOPE','message'=>'Only bound pages, articles and modules in the public CMS audience are included.'],
+                ['code'=>'MAPPED_SCOPE','message'=>'Only bound pages, articles and modules in the public CMS audience are included, with the categories and tags those articles live in.'],
                 ['code'=>'RENDERING_UNKNOWN','message'=>'Module assignments are candidates; layout rendering and exclusion assignments are unresolved.'],
                 ['code'=>'ITEM_MAPPING_UNSUPPORTED','message'=>'Positional HTML and ACM slots are fields; stable repeater item mapping is unavailable.'],
                 ['code'=>'MEDIA_SCOPE','message'=>'Images outside mapped image slots and remote media bytes are unresolved.'],

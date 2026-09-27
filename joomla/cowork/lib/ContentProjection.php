@@ -11,9 +11,29 @@ require_once __DIR__ . '/JoomlaLocks.php';
  */
 final class ContentProjection
 {
-    /** Tables the projection reads, each with the order it is read in. */
+    /**
+     * Tables the projection reads, each with the order it is read in. The last four feed what an
+     * article prints beside its own columns (custom field values, tags); both readers load them, so
+     * both hash the same projection. A caller that leaves them out gets articles without those
+     * fields, never an error — {@see build()} reads each with `?? []`.
+     */
     public const TABLES = ['menu' => 'id', 'modules' => 'id', 'modules_menu' => 'moduleid,menuid', 'categories' => 'id',
-        'viewlevels' => 'id', 'associations' => 'context,id', 'claudecowork_content_identity' => 'kind,native_id'];
+        'viewlevels' => 'id', 'associations' => 'context,id', 'claudecowork_content_identity' => 'kind,native_id',
+        'fields' => 'id', 'fields_values' => 'field_id,item_id', 'tags' => 'id', 'contentitem_tag_map' => 'type_alias,content_item_id,tag_id'];
+
+    /**
+     * Custom field types whose stored value is the words a visitor reads: text as typed, an editor's
+     * HTML, a media field's picture. A list, radio or checkbox value is an option KEY (its label
+     * lives in the field's params, per language), a subform is a JSON repeater, a calendar is a date
+     * the layout formats — none of them is the printed text, so none is offered as if it were.
+     */
+    private const FIELD_TYPES = ['text' => 'text', 'textarea' => 'text', 'editor' => 'html', 'media' => 'image'];
+
+    /**
+     * Menu item params that are settings, whatever their value looks like: metadata a visitor
+     * never sees on the page, and switches, classes, icons, links and layout choices.
+     */
+    private const SETTING_PARAM = '/^(menu-meta_|robots$)|(^|[-_])(css|class|icon|image|link|url|href|target|layout|order|style|rel)($|[-_])/i';
 
     /** Opaque, site-scoped ids: `<domain>_<32 hex>`. */
     public static function opaque(string $siteId): Closure
@@ -125,7 +145,246 @@ final class ContentProjection
     }
 
     /**
-     * @param array<string,list<array>> $data rows of every table in {@see TABLES}
+     * One field this projection adds beside the contract's slots: no slot key (it is not a contract
+     * slot, so `content.contract` cannot write it) and a semantic key naming what it is. No
+     * `writable`: in the Content API that means "writable through content.contract apply", which
+     * Tracy's relay decides from the slot key. Which of these fields `content.update` can change on
+     * the record's native row, and which are read-only, is stated per group in {@see extraBlocks()}
+     * and in the README.
+     */
+    private static function extraField(string $key, string $type, string $value, string $semantic): array
+    {
+        return ['key' => $key, 'type' => $type, 'value' => $value, 'slotKey' => null, 'semanticKey' => $semantic];
+    }
+
+    /** A stored image value as a visitor's browser asks for it: Joomla's `#joomlaImage://…` suffix off. */
+    private static function mediaValue(string $value): string
+    {
+        return trim(explode('#', $value, 2)[0]);
+    }
+
+    private static function mediaSrc(string $value, string $base): string
+    {
+        return preg_match('~^https?://~', $value) ? $value : $base . '/' . ltrim($value, '/');
+    }
+
+    /** Whether a row is published to the public audience ($levels) now: state, access, window. */
+    private static function isPublic(array $row, array $levels, string $stateColumn): bool
+    {
+        return (int)($row[$stateColumn] ?? 0) === 1 && in_array((int)($row['access'] ?? 0), $levels, true);
+    }
+
+    /**
+     * Everything {@see extraBlocks()} and {@see taxonomyContents()} look up, indexed once.
+     *
+     * @return array{levels:list<int>,fields:array<int,array>,values:array<int,array<int,string>>,
+     *   tags:array<int,array>,tagsOf:array<int,list<int>>,articleTags:array<int,list<string>>,
+     *   users:array<int,string>,megamenu:list<array>,categories:array<int,array>,
+     *   articleCategory:array<int,int>,pageCategories:array<int,true>}
+     */
+    private static function extrasContext(array $data, array $levels): array
+    {
+        $fields = [];
+        foreach ($data['fields'] ?? [] as $field)
+            if (($field['context'] ?? '') === 'com_content.article' && isset(self::FIELD_TYPES[$field['type'] ?? '']) && self::isPublic($field, $levels, 'state'))
+                $fields[(int)$field['id']] = $field;
+        $values = [];
+        foreach ($data['fields_values'] ?? [] as $value)
+            if (isset($fields[(int)$value['field_id']])) $values[(int)$value['item_id']][(int)$value['field_id']] = (string)$value['value'];
+        $tags = [];
+        foreach ($data['tags'] ?? [] as $tag) if ((int)$tag['id'] > 1 && self::isPublic($tag, $levels, 'published')) $tags[(int)$tag['id']] = $tag;
+        $tagsOf = []; $articleTags = [];
+        foreach ($data['contentitem_tag_map'] ?? [] as $map)
+            if (($map['type_alias'] ?? '') === 'com_content.article' && isset($tags[(int)$map['tag_id']])) $tagsOf[(int)$map['content_item_id']][] = (int)$map['tag_id'];
+        foreach ($tagsOf as $item => $ids) {
+            $names = array_map(fn($tid) => (string)$tags[$tid]['title'], $ids);
+            sort($names); $articleTags[$item] = array_values(array_unique($names));
+        }
+        $users = [];
+        foreach ($data['users'] ?? [] as $user) $users[(int)$user['id']] = (string)$user['name'];
+        return ['levels' => $levels, 'fields' => $fields, 'values' => $values, 'tags' => $tags, 'tagsOf' => $tagsOf, 'articleTags' => $articleTags,
+            'users' => $users, 'megamenu' => $data['megamenu'] ?? [], 'categories' => array_column($data['categories'], null, 'id'),
+            'articleCategory' => [], 'pageCategories' => []];
+    }
+
+    /**
+     * What a Joomla row prints that no contract slot holds — each group one block, keyed by the
+     * row's NATIVE id (`article-548.images`), because a render stamp names the native id
+     * (`article:548`) and Tracy's resolver ties a stamp to the block whose key starts with it.
+     *
+     * - article: `article-<id>.images` — the intro and full-text pictures (`image_intro`,
+     *   `image_fulltext`, with `_caption`; alt text travels on the picture in `images[]`, not as a
+     *   field, since it usually repeats the title); `article-<id>.fields` — published custom field
+     *   values (`field.<name>`, read-only: Joomla keeps them outside the article row);
+     *   `article-<id>.author` — the author's display name (`created_by_alias`, else the user's name;
+     *   read-only).
+     * - page: `menuItem-<id>.params` — menu item params written as words (`params.<name>`: a page
+     *   heading, a call-to-action label a template reads from the menu item) — and
+     *   `menuItem-<id>.megamenu` — what a T4 mega menu prints for the item (read-only: T4 keeps it
+     *   in the template's navigation file, not in the database).
+     *
+     * @return list<array{key:string,role:string,fields:list<array>,images:list<array{0:string,1:?string}>}>
+     */
+    private static function extraBlocks(string $kind, int $id, array $row, array $x): array
+    {
+        $out = [];
+        if ($kind === 'article') {
+            $images = json_decode((string)($row['images'] ?? ''), true);
+            $fields = []; $pictures = [];
+            foreach (['image_intro', 'image_fulltext'] as $slot) {
+                $value = self::mediaValue((string)(is_array($images) ? ($images[$slot] ?? '') : ''));
+                if ($value === '') continue;
+                $alt = is_array($images) && is_string($images[$slot . '_alt'] ?? null) && $images[$slot . '_alt'] !== '' ? $images[$slot . '_alt'] : null;
+                $fields[] = self::extraField("article-$id.$slot", 'image', $value, $slot);
+                $caption = is_array($images) ? (string)($images[$slot . '_caption'] ?? '') : '';
+                if ($caption !== '') $fields[] = self::extraField("article-$id.{$slot}_caption", 'text', $caption, $slot . '_caption');
+                if (!in_array($value, array_column($pictures, 0), true)) $pictures[] = [$value, $alt];
+            }
+            if ($fields) $out[] = ['key' => "article-$id.images", 'role' => 'images', 'fields' => $fields, 'images' => $pictures];
+            $fields = []; $pictures = [];
+            foreach ($x['values'][$id] ?? [] as $fieldId => $value) {
+                $field = $x['fields'][$fieldId];
+                $language = (string)($field['language'] ?? '*');
+                if ($language !== '*' && $language !== (string)($row['language'] ?? '*')) continue;
+                $type = self::FIELD_TYPES[$field['type']];
+                if ($type === 'image') {
+                    // Joomla 4+ stores a media field as JSON ({imagefile, alt_text}); older values are a bare path.
+                    $media = json_decode($value, true);
+                    $value = self::mediaValue(is_array($media) ? (string)($media['imagefile'] ?? '') : $value);
+                    if ($value !== '') $pictures[] = [$value, is_array($media) && ($media['alt_text'] ?? '') !== '' ? (string)$media['alt_text'] : null];
+                }
+                if (trim($value) === '') continue;
+                $fields[] = self::extraField("article-$id.field." . $field['name'], $type, $value, (string)$field['name']);
+            }
+            if ($fields) $out[] = ['key' => "article-$id.fields", 'role' => 'custom fields', 'fields' => $fields, 'images' => $pictures];
+            $author = trim((string)($row['created_by_alias'] ?? ''));
+            if ($author === '') $author = $x['users'][(int)($row['created_by'] ?? 0)] ?? '';
+            if ($author !== '') $out[] = ['key' => "article-$id.author", 'role' => 'author', 'fields' => [self::extraField("article-$id.author", 'text', $author, 'author')], 'images' => []];
+        }
+        if ($kind === 'menuItem') {
+            $params = json_decode((string)($row['params'] ?? ''), true);
+            $fields = [];
+            foreach (is_array($params) ? $params : [] as $name => $value)
+                if (is_string($name) && self::isProse($value) && !preg_match(self::SETTING_PARAM, $name))
+                    $fields[] = self::extraField("menuItem-$id.params.$name", 'text', $value, $name);
+            if ($fields) $out[] = ['key' => "menuItem-$id.params", 'role' => 'menu item params', 'fields' => $fields, 'images' => []];
+            $fields = self::megamenuFields($id, (string)($row['menutype'] ?? ''), $x['megamenu']);
+            if ($fields) $out[] = ['key' => "menuItem-$id.megamenu", 'role' => 'mega menu', 'fields' => $fields, 'images' => []];
+        }
+        return $out;
+    }
+
+    /**
+     * Whether a param value reads as words a page prints, not a setting: a string with a letter in
+     * it, containing a space or starting with a capital ("Need advice on …", "All", "Next →"), and
+     * shaped like neither markup, JSON, an address nor a path. Settings are lower-case tokens
+     * (`blog`, `rdate`, `published`). A HEURISTIC, named so: Joomla keeps a template's own menu
+     * params without any form saying which are text (the Tracy Business ones are seeded, not
+     * declared), so the shape of the value is all there is to go on.
+     */
+    private static function isProse($value): bool
+    {
+        if (!is_string($value) || $value === '' || strlen($value) > 2000 || !preg_match('/\p{L}/u', $value)) return false;
+        if (preg_match('~^([{\[<#/]|https?:|mailto:|tel:|index\.php)~i', trim($value))) return false;
+        return preg_match('/\s/u', trim($value)) === 1 || preg_match('/^\p{Lu}/u', $value) === 1;
+    }
+
+    /**
+     * What a T4 mega menu prints for one menu item: its caption (`megamenu[<template>:<profile>].caption`,
+     * the line under the item's title) and the titles of its mega columns
+     * (`megamenu[<template>:<profile>].column.<row>.<col>` — "Marketing Kit", "Recent projects").
+     * T4 keeps these per navigation profile, keyed by menu type and item id, in the template's
+     * `etc/navigation/<profile>.json` (a `local/` copy wins); the Joomla reader hands in every
+     * profile a site template style uses, so a key names the template and profile it came from.
+     * Column keys are positional, like the contract's own slot keys: T4 gives a column no id.
+     *
+     * @param list<array{template:string,profile:string,settings:array}> $profiles
+     */
+    private static function megamenuFields(int $id, string $menutype, array $profiles): array
+    {
+        $fields = [];
+        foreach ($profiles as $profile) {
+            $item = $profile['settings'][$menutype][(string)$id] ?? $profile['settings'][$menutype][$id] ?? null;
+            if (!is_array($item)) continue;
+            $prefix = "menuItem-$id.megamenu[" . $profile['template'] . ':' . $profile['profile'] . ']';
+            if (is_string($item['caption'] ?? null) && trim($item['caption']) !== '') $fields[] = self::extraField("$prefix.caption", 'text', $item['caption'], 'caption');
+            foreach (is_array($item['settings'] ?? null) ? array_values($item['settings']) : [] as $r => $settingsRow)
+                foreach (is_array($settingsRow['contents'] ?? null) ? array_values($settingsRow['contents']) : [] as $c => $column)
+                    if (is_array($column) && is_string($column['title'] ?? null) && trim($column['title']) !== '')
+                        $fields[] = self::extraField("$prefix.column.$r.$c", 'text', $column['title'], 'megaColumn');
+        }
+        return $fields;
+    }
+
+    /**
+     * Records of their own for the categories and tags the readable articles live in: every
+     * category an article or a page (a category view) points at, with its ancestors, and every
+     * tag on an article — public and published, the same audience as the articles. Not every
+     * category on the site: a 41-language quickstart ships hundreds, most in languages nobody reads.
+     *
+     * Each is a `shared` record, like a module: its name is printed across pages (breadcrumbs,
+     * filters, an article's meta line) rather than being a page of its own. Its id is fixed by
+     * the native id (`category:<id>` / `tag:<id>`, the ids Joomla never reuses), its title is the
+     * record's title, and its description, picture and nothing else are the fields of one block
+     * keyed `category-<id>` / `tag-<id>` — the block a render stamp `category:<id>` resolves to.
+     * All three are written through `content.update` on the native row.
+     *
+     * @param array<int,string> $articles native article id => content id (the readable articles)
+     * @return array<string,array{0:array,1:array{0:string,1:int}}> content id => [content, native row]
+     */
+    private static function taxonomyContents(array $x, array $articles, Closure $opaque, string $base): array
+    {
+        $wanted = $x['pageCategories'];
+        foreach (array_keys($articles) as $articleId) if (isset($x['articleCategory'][$articleId])) $wanted[$x['articleCategory'][$articleId]] = true;
+        $categories = [];
+        foreach (array_keys($wanted) as $catId) {
+            $chain = []; $cat = $x['categories'][$catId] ?? null; $public = true; $seen = [];
+            while ($cat && (int)$cat['id'] > 1 && !isset($seen[$cat['id']])) {
+                $seen[$cat['id']] = true;
+                if (($cat['extension'] ?? '') !== 'com_content' || !self::isPublic($cat, $x['levels'], 'published')) $public = false;
+                $chain[] = $cat;
+                $cat = $x['categories'][$cat['parent_id']] ?? null;
+            }
+            // A category under an unpublished or non-public parent is not shown to the audience.
+            if ($public) foreach ($chain as $one) $categories[(int)$one['id']] = $one;
+        }
+        $tags = [];
+        foreach (array_keys($articles) as $articleId) foreach ($x['tagsOf'][$articleId] ?? [] as $tagId) $tags[$tagId] = $x['tags'][$tagId];
+        ksort($categories); ksort($tags);
+        $out = [];
+        foreach (['category' => $categories, 'tag' => $tags] as $kind => $rows) foreach ($rows as $nativeId => $row) {
+            $id = $opaque('content', $kind . ':' . $nativeId);
+            $params = json_decode((string)($row['params'] ?? ''), true);
+            $image = self::mediaValue(is_array($params) ? (string)($params['image'] ?? ($params['image_intro'] ?? '')) : '');
+            $fields = [self::extraField("$kind-$nativeId.description", 'html', (string)($row['description'] ?? ''), 'description')];
+            if ($image !== '') $fields[] = self::extraField("$kind-$nativeId.image", 'image', $image, 'image');
+            $locale = ($row['language'] ?? '*') === '*' || $row['language'] === 'sr-YU' ? null : $row['language'];
+            $blockId = $opaque('block', $kind . ':' . $nativeId);
+            $content = ['id' => $id, 'type' => 'shared', 'title' => $row['title'] ?? null, 'slug' => $row['alias'] ?? null, 'url' => null, 'locale' => $locale,
+                'translationGroupId' => null, 'summary' => null, 'publishedAt' => null,
+                'createdAt' => self::date($row['created_time'] ?? null), 'updatedAt' => self::date($row['modified_time'] ?? null),
+                'revision' => 'pending', 'detailState' => 'complete', 'links' => ['self' => $base . '/content.json?id=' . $id],
+                'publication' => ['status' => 'published', 'valueSource' => 'current', 'scheduledAt' => null],
+                'bodyHtml' => null, 'tags' => [], 'fields' => [],
+                'blocks' => [['id' => $blockId, 'key' => "$kind-$nativeId", 'role' => $kind, 'position' => 0, 'sharedContentId' => null, 'visibility' => 'unknown', 'fields' => $fields, 'items' => []]],
+                'images' => [], 'relations' => []];
+            if ($image !== '') {
+                $alt = is_array($params) && is_string($params['image_alt'] ?? null) && $params['image_alt'] !== '' ? $params['image_alt'] : null;
+                $content['images'][] = ['id' => $opaque('media', $image), 'src' => self::mediaSrc($image, $base), 'alt' => $alt, 'width' => null, 'height' => null,
+                    'usages' => [['contentId' => $id, 'blockId' => $blockId, 'itemId' => null]]];
+            }
+            if ($kind === 'category' && isset($categories[(int)$row['parent_id']]))
+                $content['relations'][] = ['type' => 'parent', 'contentId' => $opaque('content', 'category:' . (int)$row['parent_id'])];
+            $out[$id] = [$content, [$kind, (int)$nativeId]];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,list<array>> $data rows of every table in {@see TABLES}, plus two things
+     *   the Joomla reader gathers beside them ({@see JoomlaContentReader::supplement}): `users`
+     *   (`id`, `name` of the articles' authors) and `megamenu` (the T4 navigation profiles in use,
+     *   see {@see megamenuFields()}). Every one of the extra inputs may be absent.
      * @param array $mapping QuickstartContract::readMapping()
      * @param callable(array,array):string $slotValue QuickstartContract::slotValue
      * @return array{contents:array<string,array>,revisions:array<string,string>,owners:array<string,string>,locales:list<string>,rows:array<string,list<array{0:string,1:int}>>}
@@ -144,6 +403,7 @@ final class ContentProjection
         $contents = []; $keys = []; $locales = []; $native = []; $contractKey = []; $rowsOf = [];
         $categories = array_column($data['categories'], null, 'id');
         $menus = array_column($data['menu'], null, 'id');
+        $extras = self::extrasContext($data, $levels);
         // With a home per language, the language filter sends every visitor to one of them: the
         // "All languages" home is never the page anyone reads. Left in the map it sat beside the
         // real homes as a three-block "Home" and the agent opened it first (25/09, capijl1644).
@@ -174,6 +434,8 @@ final class ContentProjection
             }
             if ($kind === 'page' && $languageHomes > 0 && (int)($row['home'] ?? 0) === 1 && ($row['language'] ?? '*') === '*') $allowed = false;
             if (!$allowed) continue;
+            if ($kind === 'article') $extras['articleCategory'][$nativeId] = (int)($row['catid'] ?? 0);
+            if ($kind === 'page' && preg_match('~[?&]option=com_content&view=category(?:&[^&]*)*?&id=(\d+)~', (string)($row['link'] ?? ''), $m)) $extras['pageCategories'][(int)$m[1]] = true;
             $uid = $identities[$kind][$nativeId] ?? null;
             if (!$uid) throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'Content identity registry is incomplete');
             $id = $opaque('content', $uid); $keys[$key] = $id; $native[$kind][$nativeId] = $id; $contractKey[$id] ??= $key;
@@ -224,6 +486,19 @@ final class ContentProjection
             // chunks contain stable slot keys; their IDs are based on keys, not array position.
             foreach ($fields as $field) $content['blocks'][] = ['id' => $opaque('block', $uid . ':' . $field['key']), 'key' => $field['key'], 'role' => null, 'position' => count($content['blocks']),
                 'sharedContentId' => null, 'visibility' => 'unknown', 'fields' => [$field], 'items' => []];
+            // What the row prints beside its contract slots (see extraBlocks). After the slots, so a
+            // slot keeps its position; keyed by the NATIVE id, the id a render stamp names.
+            foreach (self::extraBlocks($meta['kind'], $nativeId, $row, $extras) as $extra) {
+                $blockId = $opaque('block', $uid . ':' . $extra['key']);
+                $content['blocks'][] = ['id' => $blockId, 'key' => $extra['key'], 'role' => $extra['role'], 'position' => count($content['blocks']),
+                    'sharedContentId' => null, 'visibility' => 'unknown', 'fields' => $extra['fields'], 'items' => []];
+                foreach ($extra['images'] as [$value, $alt]) {
+                    $mid = $opaque('media', $value); $usage = ['contentId' => $id, 'blockId' => $blockId, 'itemId' => null];
+                    if (isset($content['images'][$mid])) { $content['images'][$mid]['usages'][] = $usage; $content['images'][$mid]['alt'] ??= $alt; }
+                    else $content['images'][$mid] = ['id' => $mid, 'src' => self::mediaSrc($value, $base), 'alt' => $alt, 'width' => null, 'height' => null, 'usages' => [$usage]];
+                }
+            }
+            if ($meta['kind'] === 'article') $content['tags'] = $extras['articleTags'][$nativeId] ?? [];
             $content['images'] = array_values($content['images']);
             $contents[$id] = $content;
         }
@@ -257,7 +532,15 @@ final class ContentProjection
         foreach ($placements as $source => $owners) {
             if (count($owners) !== 1 || ($contents[$source]['type'] ?? null) !== 'shared') continue;
             $ownerId = array_key_first($owners); $module = $contents[$source];
-            $fields = []; foreach ($module['blocks'] as $block) foreach ($block['fields'] as $field) $fields[] = $field;
+            $fields = [];
+            // A shared module is read with its title as the record's own; inlined, the record is gone,
+            // so the title it prints ("Categories", "Latest articles" over a sidebar list) goes with
+            // its fields — or no record would hold it at all (27/09, capijl1644 /en/news).
+            [, $moduleId] = $rowsOf[$source][0];
+            $moduleRow = $moduleRows[$moduleId] ?? null;
+            if ($moduleRow && (int)($moduleRow['showtitle'] ?? 0) === 1 && trim((string)($moduleRow['title'] ?? '')) !== '')
+                $fields[] = self::extraField('module-' . $moduleId . '.title', 'text', (string)$moduleRow['title'], 'module-title');
+            foreach ($module['blocks'] as $block) foreach ($block['fields'] as $field) $fields[] = $field;
             $images = array_column($contents[$ownerId]['images'], null, 'id');
             foreach ($contents[$ownerId]['blocks'] as &$block) {
                 if ($block['sharedContentId'] !== $source) continue;
@@ -274,6 +557,16 @@ final class ContentProjection
             $rowsOf[$ownerId] = array_merge($rowsOf[$ownerId], $rowsOf[$source]); unset($rowsOf[$source]);
             // The inlined module's slots are now read, and so revised, in the page that carries them.
             foreach ($keys as $key => $id) if ($id === $source) $keys[$key] = $ownerId;
+        }
+        // Categories and tags the readable articles live in (see taxonomyContents): their own records,
+        // so a name printed on a page ("Disclosure" in a breadcrumb, a filter chip) has one to answer.
+        foreach (self::taxonomyContents($extras, $native['article'] ?? [], $opaque, $base) as $tid => [$taxonomy, $row]) {
+            $contents[$tid] = $taxonomy; $rowsOf[$tid] = [$row];
+            if ($taxonomy['locale'] !== null) $locales[$taxonomy['locale']] = true;
+        }
+        foreach ($native['article'] ?? [] as $articleId => $cid) {
+            $category = $opaque('content', 'category:' . (int)($extras['articleCategory'][$articleId] ?? 0));
+            if (isset($contents[$category], $contents[$cid])) $contents[$cid]['relations'][] = ['type' => 'parent', 'contentId' => $category];
         }
         $groups = [];
         foreach ($data['associations'] as $association) {

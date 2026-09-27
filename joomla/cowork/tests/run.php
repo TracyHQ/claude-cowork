@@ -1832,6 +1832,7 @@ require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/content-addresses.php";
 require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";
+require __DIR__ . "/content-extras.php";
 require __DIR__ . "/contract-ops-locks.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
