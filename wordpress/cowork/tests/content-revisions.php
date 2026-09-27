@@ -162,6 +162,10 @@ final class WP_Fake_ContentDb
             }
             return $out;
         }
+        if (preg_match('/^SELECT post_content, MD5\(post_content\) AS content_md5 FROM wp_posts WHERE ID = (\d+)$/D', $sql, $m)) {
+            $content = (string) (WP_Fake::$posts[(int) $m[1]]['post_content'] ?? '');
+            return isset(WP_Fake::$posts[(int) $m[1]]) ? [['post_content' => $content, 'content_md5' => md5($content)]] : [];
+        }
         throw new RuntimeException('WP_Fake_ContentDb does not answer: ' . substr($sql, 0, 120));
     }
 }
