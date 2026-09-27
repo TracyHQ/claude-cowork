@@ -1,0 +1,109 @@
+<!-- wp:template-part {"slug":"header","tagName":"header","className":"tracy-header","area":"header"} /-->
+<!-- root: source `category/blog.php` wraps the page in `<div class="com-content-category-blog blog
+     hx-content">`, not a `main`. -->
+<!-- wp:group {"className":"com-content-category-blog blog hx-content","layout":{"type":"default"}} -->
+<div class="wp-block-group com-content-category-blog blog hx-content">
+<!-- wp:group {"tagName":"header","className":"hx-blogmast hx-grid-bg","layout":{"type":"default"}} -->
+<header class="wp-block-group hx-blogmast hx-grid-bg">
+<!-- wp:group {"className":"hx-container hx-pad","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-pad">
+<!-- wp:paragraph {"className":"hx-eyebrow"} -->
+<p class="hx-eyebrow">Blog</p>
+<!-- /wp:paragraph -->
+<!-- wp:query-title {"type":"archive","level":1,"className":"hx-h1 hx-blogmast__title","showPrefix":false} /-->
+<!-- wp:term-description {"className":"hx-blogmast__desc"} /-->
+</div>
+<!-- /wp:group -->
+</header>
+<!-- /wp:group -->
+<!-- wp:group {"tagName":"nav","className":"hx-blogtopics","layout":{"type":"default"}} -->
+<nav class="wp-block-group hx-blogtopics" aria-label="Browse">
+<!-- wp:group {"className":"hx-container hx-pad","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-pad">
+<!-- source: `<span class="hx-blogtopics__lbl">` (`category/blog.php:167`). -->
+<!-- wp:group {"tagName":"span","className":"hx-blogtopics__lbl","layout":{"type":"default"}} -->
+<span class="wp-block-group hx-blogtopics__lbl">Browse</span>
+<!-- /wp:group -->
+<!-- wp:list {"className":"hx-blogtopics__list"} -->
+<ul class="wp-block-list hx-blogtopics__list">
+<!-- wp:wp-ja-kinetic/blog-topics-items /-->
+</ul>
+<!-- /wp:list -->
+</div>
+<!-- /wp:group -->
+</nav>
+<!-- /wp:group -->
+<!-- wp:wp-ja-kinetic/field-notes-featured /-->
+<!-- wp:group {"tagName":"section","className":"hx-section hx-blog-section","layout":{"type":"default"}} -->
+<section class="wp-block-group hx-section hx-blog-section">
+<!-- wp:group {"className":"hx-container hx-pad","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-pad">
+<!-- this is the generic category template — every OTHER category than the dedicated
+     `field-notes-from-the-on-call`/`engineering` ones falls through to it, but on THIS site
+     that is exactly the 5 child categories (incident-retros, product, tutorials, practice,
+     culture). Source `railOn = maxLevel != 0 && count($children) > 0` (`category/blog.php:48`):
+     a leaf category (none of these 5 has children of its own) never gets the sticky topics
+     rail — `hx-blog--norail`, no `wp-ja-kinetic/blog-rail` call — matching the dedicated blog
+     template above it exactly otherwise (masthead, browse strip, featured card, count header,
+     styled pager, CTA band all render identically per-category, see
+     `blocks/blog-topics-items`, `blocks/field-notes-featured`, `blocks/blog-ledger-header`). -->
+<!-- wp:group {"className":"hx-blog hx-blog--norail","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-blog hx-blog--norail">
+<!-- perPage 6: source `category/blog.php:53-64`, `num_leading_articles` default 0 +
+     `num_intro_articles` 6 (the same per-item-type default the top blog and engineering both
+     carry) — measured live, `/product/blog/30-incident-retros` renders "Page 1 of 5" off 29
+     posts (`ceil(29/6) = 5`). -->
+<!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"className":"hx-bloglist","layout":{"type":"default"}} -->
+<div class="wp-block-query hx-bloglist">
+<!-- wp:wp-ja-kinetic/blog-ledger-header /-->
+<!-- wp:post-template {"layout":{"type":"default"}} -->
+<!-- wp:group {"className":"hx-blogrow","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-blogrow">
+<!-- wp:group {"className":"hx-blogdate","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-blogdate">
+<!-- wp:post-date {"format":"d","className":"hx-blogdate__d"} /-->
+<!-- wp:post-date {"format":"M","className":"hx-blogdate__m"} /-->
+</div>
+<!-- /wp:group -->
+<!-- wp:group {"className":"hx-blogmain","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-blogmain">
+<!-- wp:wp-ja-kinetic/post-topic-eyebrow /-->
+<!-- wp:post-title {"level":3,"isLink":true,"className":"hx-blogtitle"} /-->
+<!-- wp:post-excerpt {"className":"hx-blogexcerpt"} /-->
+</div>
+<!-- /wp:group -->
+<!-- wp:group {"className":"hx-blogmeta","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-blogmeta">
+<!-- wp:post-author-name {"className":"hx-blogauthor"} /-->
+<!-- wp:post-date {"format":"M j Y","className":"hx-blogdatetxt"} /-->
+<!-- wp:wp-ja-kinetic/post-readtime /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- /wp:post-template -->
+<!-- wp:query-no-results -->
+<!-- wp:paragraph {"className":"hx-muted hx-blog-empty"} -->
+<p class="hx-muted hx-blog-empty">No articles found.</p>
+<!-- /wp:paragraph -->
+<!-- /wp:query-no-results -->
+<!-- wp:group {"className":"hx-blog-pagination pagination-wrap","layout":{"type":"flex"}} -->
+<div class="wp-block-group hx-blog-pagination pagination-wrap">
+<!-- wp:wp-ja-kinetic/kinetic-pagination /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:query -->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+</section>
+<!-- /wp:group -->
+<!-- the source's `blog-page` module position: ACM `cta` module 234 "[Kinetic] Blog - CTA", edited in the
+     source's admin — here the synced pattern of that name (slug `wp-ja-kinetic-cta-blog`), written by
+     tasks/ja-kinetic-wp7/post-seed.mjs and edited under Patterns; inc/owner-text.php fills the reference (D-40). -->
+<!-- wp:block {"metadata":{"name":"cta.blog"}} /-->
+</div>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer","tagName":"footer","className":"tracy-footer","area":"footer"} /-->

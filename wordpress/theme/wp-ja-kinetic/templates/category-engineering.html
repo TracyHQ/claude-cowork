@@ -1,0 +1,95 @@
+<!-- wp:template-part {"slug":"header","tagName":"header","className":"tracy-header","area":"header"} /-->
+<!-- wp:group {"tagName":"main","className":"hxcat hx-content","layout":{"type":"default"}} -->
+<main class="wp-block-group hxcat hx-content">
+<!-- wp:group {"tagName":"header","className":"hxcat-mast","layout":{"type":"default"}} -->
+<header class="wp-block-group hxcat-mast">
+<!-- wp:group {"className":"hxcat-mast__inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hxcat-mast__inner">
+<!-- this template is dedicated to exactly one category (Engineering), so its breadcrumb is
+     the source's own: NOT the taxonomy's real ancestor name, a FIXED "Blog" label pointing at
+     the blog listing (`category/thumbs.php:130-138`, `TPL_JA_KINETIC_BLOG_KICKER_CAP="Blog"`)
+     — the generic `wp:breadcrumbs` block instead walks the real category tree and would show
+     this category's actual WordPress parent term name, which the source never does here.
+     Static markup, matching the source's own single-text-node `.hxcat-bc__rest` span; the
+     `<p>` the paragraph block forces is neutralised with `display: contents`
+     (wp-ja-kinetic-article.css), the same technique already used for `.hx-blogdate`. -->
+<!-- wp:group {"tagName":"nav","className":"hxcat-bc"} -->
+<nav class="wp-block-group hxcat-bc" aria-label="Breadcrumb">
+<!-- wp:paragraph -->
+<p><a class="hxcat-bc__home" href="/">Home</a><span class="hxcat-bc__rest">/ <a class="hxcat-bc__crumb" href="/product/blog">Blog</a> / Engineering</span></p>
+<!-- /wp:paragraph -->
+</nav>
+<!-- /wp:group -->
+<!-- wp:paragraph {"className":"hxcat-pill"} -->
+<p class="hxcat-pill">Category</p>
+<!-- /wp:paragraph -->
+<!-- wp:query-title {"type":"archive","level":1,"className":"hxcat-h1","showPrefix":false} /-->
+<!-- wp:term-description {"className":"hxcat-sub"} /-->
+</div>
+<!-- /wp:group -->
+</header>
+<!-- /wp:group -->
+<!-- wp:group {"tagName":"section","className":"hxcat-body","layout":{"type":"default"}} -->
+<section class="wp-block-group hxcat-body">
+<!-- wp:group {"className":"hxcat-grid","layout":{"type":"flex","flexWrap":"nowrap"}} -->
+<div class="wp-block-group hxcat-grid">
+<!-- wp:group {"className":"hxcat-main","layout":{"type":"default"}} -->
+<div class="wp-block-group hxcat-main">
+<!-- perPage 6: source `category/thumbs.php:63-64`, `num_leading_articles` default 0 +
+     `num_intro_articles` default 6 (no featured-post lift on this layout, unlike blog.php). -->
+<!-- Card: cover, eyebrow and meta come from `wp-ja-kinetic/category-card-part` (see its block.json):
+     the source's background-image span, plain-text category (a `core/post-terms` link inside this
+     row's own `<a>` is split apart by the HTML parser) and one "author · date" text node. The
+     post-title link stays the row's only anchor; `inc/tag-parity.php` lifts it onto the row. -->
+<!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"layout":{"type":"default"}} -->
+<div class="wp-block-query">
+<!-- wp:post-template {"layout":{"type":"default"}} -->
+<!-- wp:group {"className":"hxcat-row","layout":{"type":"flex","flexWrap":"nowrap"}} -->
+<div class="wp-block-group hxcat-row">
+<!-- wp:wp-ja-kinetic/category-card-part {"part":"cover"} /-->
+<!-- wp:group {"className":"hxcat-row__body","layout":{"type":"default"}} -->
+<div class="wp-block-group hxcat-row__body">
+<!-- wp:wp-ja-kinetic/category-card-part {"part":"eyebrow"} /-->
+<!-- wp:post-title {"level":3,"isLink":true,"className":"hxcat-row__title"} /-->
+<!-- wp:post-excerpt {"className":"hxcat-row__excerpt"} /-->
+<!-- wp:wp-ja-kinetic/category-card-part {"part":"meta"} /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- /wp:post-template -->
+<!-- wp:query-no-results -->
+<!-- wp:paragraph {"className":"hxcat-empty hx-muted"} -->
+<p class="hxcat-empty hx-muted">No articles found.</p>
+<!-- /wp:paragraph -->
+<!-- /wp:query-no-results -->
+<!-- the source NEVER renders a pager on this page, at any post count: its own model total for
+     this menu item's bucket query stays 0 (measured live — `thumbs.php`'s own fallback-query
+     comment above), so `$this->pagination->pagesTotal` is permanently stuck at 1 regardless of
+     how many articles the fallback query it actually displays finds. Not data-dependent: leaving
+     the pager block out here (rather than gating it on a count) reproduces that permanently, the
+     same way the source's own thumbs.php does. -->
+</div>
+<!-- /wp:query -->
+</div>
+<!-- /wp:group -->
+<!-- wp:group {"tagName":"aside","className":"hxcat-aside","layout":{"type":"default"}} -->
+<aside class="wp-block-group hxcat-aside">
+<!-- wp:wp-ja-kinetic/category-siblings /-->
+<!-- wp:group {"className":"hxcat-card hxcat-tags","layout":{"type":"default"}} -->
+<div class="wp-block-group hxcat-card hxcat-tags">
+<!-- wp:paragraph {"className":"hxcat-card__h"} -->
+<p class="hxcat-card__h">Popular tags</p>
+<!-- /wp:paragraph -->
+<!-- wp:wp-ja-kinetic/popular-tags {"numberOfTags":10,"className":"hxcat-cloud","linkClassName":"hxcat-chip"} /-->
+</div>
+<!-- /wp:group -->
+</aside>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+</section>
+<!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer","tagName":"footer","className":"tracy-footer","area":"footer"} /-->

@@ -1,0 +1,68 @@
+<!-- wp:template-part {"slug":"header","tagName":"header","className":"tracy-header","area":"header"} /-->
+<!-- wp:group {"tagName":"main","className":"hx-author","layout":{"type":"default"}} -->
+<main class="wp-block-group hx-author">
+<!-- wp:group {"tagName":"header","className":"hx-author__head hx-grid-bg","layout":{"type":"default"}} -->
+<header class="wp-block-group hx-author__head hx-grid-bg">
+<!-- wp:group {"className":"hx-container hx-author__head-inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-author__head-inner">
+<!-- static except the current author's name (`author.php:59-63`): the source's crumb is
+     "Home / Authors / {name}", `hx-author__bc-home`/`hx-author__bc-trail`/`hx-author__bc-link`
+     — a fixed "Authors" label, not the generic `wp:breadcrumbs` block's auto-generated
+     ancestor chain (which has no "Authors" segment at all on an author archive, and cannot
+     be told to add one). The `<p>` the paragraph block forces is dropped from the box model
+     with `display: contents`, same technique as `.hx-blogdate`/`.hxcat-bc`. -->
+<!-- wp:group {"tagName":"nav","className":"hx-author__bc"} -->
+<nav class="wp-block-group hx-author__bc" aria-label="Breadcrumb">
+<!-- wp:paragraph -->
+<p><a class="hx-author__bc-home" href="/">Home</a><span class="hx-author__bc-trail">/ <a class="hx-author__bc-link" href="/product/authors">Authors</a> / </span></p>
+<!-- /wp:paragraph -->
+<!-- wp:post-author-name /-->
+</nav>
+<!-- /wp:group -->
+<!-- wp:paragraph {"className":"hx-au-pill"} -->
+<p class="hx-au-pill"><span class="hx-au-pill__dot"></span><span class="hx-au-pill__t">Author</span></p>
+<!-- /wp:paragraph -->
+<!-- wp:query-title {"type":"archive","level":1,"className":"hx-author__title","showPrefix":false} /-->
+<!-- wp:post-author-biography {"className":"hx-author__sub"} /-->
+</div>
+<!-- /wp:group -->
+</header>
+<!-- /wp:group -->
+<!-- wp:group {"tagName":"section","className":"hx-author__body","layout":{"type":"default"}} -->
+<section class="wp-block-group hx-author__body">
+<!-- wp:group {"className":"hx-container hx-author__inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-author__inner">
+<!-- wp:wp-ja-kinetic/author-identity /-->
+<!-- `.hx-auposts` sits on the query block itself so its own `<div>` is the source's list
+     container (`author.php:82`); the `ul`/`li` core/post-template always adds are dropped from
+     the box model in the author CSS. The source lists `num_intro_articles` (4) of the author's
+     articles, no pager markup (`author_posts.php`); an inherited query ignores `perPage`, so
+     the count is set on the main query in `inc/blog-dynamic.php`. -->
+<!-- wp:query {"queryId":1,"query":{"perPage":4,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"className":"hx-auposts","layout":{"type":"default"}} -->
+<div class="wp-block-query hx-auposts">
+<!-- wp:post-template {"layout":{"type":"default"}} -->
+<!-- wp:group {"className":"hx-aupost","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-aupost">
+<!-- source: `<span class="hx-aupost__tag">` — plain text, the article's own category title,
+     never a tag (`author_posts.php:27,38`). -->
+<!-- wp:wp-ja-kinetic/post-topic-eyebrow {"className":"hx-aupost__tag","categoryOnly":true} /-->
+<!-- wp:post-title {"level":3,"isLink":true,"className":"hx-aupost__t"} /-->
+<!-- wp:post-excerpt {"className":"hx-aupost__e"} /-->
+<!-- wp:wp-ja-kinetic/post-readtime {"wrapperClassName":"hx-aupost__m","dateFormat":"M j"} /-->
+</div>
+<!-- /wp:group -->
+<!-- /wp:post-template -->
+<!-- wp:query-no-results -->
+<!-- wp:paragraph {"className":"hx-auposts__empty"} -->
+<p class="hx-auposts__empty">No articles yet.</p>
+<!-- /wp:paragraph -->
+<!-- /wp:query-no-results -->
+</div>
+<!-- /wp:query -->
+</div>
+<!-- /wp:group -->
+</section>
+<!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer","tagName":"footer","className":"tracy-footer","area":"footer"} /-->

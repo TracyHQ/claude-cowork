@@ -1,0 +1,29 @@
+<!-- The template `scripts/seed.mjs` names for every page whose Joomla layout is `no-sidebar` (its
+     BASE_TEMPLATES: "Templates every Tracy theme ships"). This theme had none, so WordPress fell
+     back to templates/page.html — and refused any later update of such a page ("Invalid page
+     template"). The same frame as templates/page.html, which is what those pages render today. -->
+<!-- wp:template-part {"slug":"header","tagName":"header","className":"tracy-header","area":"header"} /-->
+<!-- wp:group {"tagName":"main","className":"tracy-main tracy-page","layout":{"type":"default"}} -->
+<main class="wp-block-group tracy-main tracy-page">
+<!-- wp:group {"className":"tracy-page__head","layout":{"type":"default"}} -->
+<div class="wp-block-group tracy-page__head">
+<!-- wp:group {"className":"tracy-container","layout":{"type":"default"}} -->
+<div class="wp-block-group tracy-container">
+<!-- wp:breadcrumbs {"showHomeItem":true,"showCurrentItem":true,"separator":"/","className":"tracy-crumbs"} /-->
+<!-- wp:post-title {"level":1,"className":"tracy-display"} /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- wp:group {"className":"tracy-container","layout":{"type":"default"}} -->
+<div class="wp-block-group tracy-container">
+<!-- wp:group {"className":"hx-prose","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-prose">
+<!-- wp:post-content {"className":"tracy-page__body tracy-prose article-body","layout":{"type":"default"}} /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer","tagName":"footer","className":"tracy-footer","area":"footer"} /-->
