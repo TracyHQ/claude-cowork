@@ -5,10 +5,11 @@
     <creationDate>2026-09</creationDate>
     <copyright>(C) 2026 Tracy</copyright>
     <license>GPL-2.0-or-later</license>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <description><![CDATA[
         Answers the Claude Cowork API door before Joomla routes the request, on the site and the
-        administrator alike. Installed and updated as part of the Claude Cowork package.
+        administrator alike, and prints render stamps for Tracy's page picker on requests Tracy's
+        site proxy marks. Installed and updated as part of the Claude Cowork package.
     ]]></description>
     <namespace path="src">Tracy\Plugin\System\ClaudeCoworkApi</namespace>
     <scriptfile>script.php</scriptfile>
