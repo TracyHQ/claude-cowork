@@ -130,6 +130,48 @@ final class ContentReader
         }
         throw new ContentReadError('CONTENT_FIELD_TOO_LARGE',413,'A content field exceeds the response budget',$extra);
     }
+    /**
+     * `ids`: several details from this one projection, which is what a read costs on Joomla (all
+     * mapped tables, the contract and the router, rebuilt per request). Each content listed is
+     * answered exactly as `{id}` answers it when it fits whole: same shape, same revision, state
+     * `complete`. The budget (maxBytes, else MAX_BYTES) fills in the order asked; a content that
+     * does not fit, or that needs block segments, is named in `pagination.pending` and never cut —
+     * the caller asks again, or reads it alone with `{id}`. An id with no content now is named in
+     * `pagination.missing`. No cursor: nothing here pages.
+     *
+     * @param array{ids:list<string>|string} $query a list (the door), or one comma-separated value (GET)
+     */
+    private function batch(array $query, bool $explicit): array {
+        $ids=$query['ids']; unset($query['ids'],$query['protocolVersions']);
+        if ($query) self::bad('ids is read with maxBytes only');
+        if (is_string($ids)) $ids=explode(',',$ids);
+        if (!is_array($ids) || !$ids || !array_is_list($ids) || count($ids)>100) self::bad('ids must list 1 to 100 content ids');
+        foreach ($ids as $id) if (!is_string($id) || $id==='' || strlen($id)>128 || strpos($id,',')!==false) self::bad('ids must list 1 to 100 content ids');
+        if (count(array_unique($ids))!==count($ids)) self::bad('ids must not repeat an id');
+        if (!$explicit) $this->budget=self::MAX_BYTES;
+        $missing=array_values(array_filter($ids,fn($id)=>!isset($this->contents[$id])));
+        $page=function(array $out, array $pending) use ($ids,$missing): array {
+            $envelope=$this->envelope($out,count($ids),null,count($ids));
+            $envelope['pagination']+=['pending'=>$pending,'missing'=>$missing];
+            return $envelope;
+        };
+        $out=[]; $pending=[]; $sum=0;
+        foreach ($ids as $at=>$id) {
+            $content=$this->contents[$id]??null;
+            if ($content===null) continue;
+            if (count($content['blocks'])>100) { $pending[]=$id; continue; }
+            $content['detailState']='complete'; unset($content['links']['next']);
+            $bytes=strlen(self::encode($content));
+            // Sized against the longest `pending` this answer could still end with (every id not
+            // yet decided), so the final envelope can only be smaller. An encoded list of k items
+            // is `[` + items joined by `,` + `]`: exact arithmetic, as for a listing.
+            $undecided=array_values(array_filter(array_slice($ids,$at+1),fn($later)=>isset($this->contents[$later])));
+            $size=self::solve(strlen(self::encode($page([],array_merge($pending,$undecided))))+$sum+$bytes+count($out));
+            if ($size>$this->budget) { $pending[]=$id; continue; }
+            $out[]=$content; $sum+=$bytes;
+        }
+        return self::finish($page($out,$pending));
+    }
     public function read(array $query): array {
         if (isset($query['limit']) && is_int($query['limit'])) $query['limit']=(string)$query['limit'];
         // `maxBytes`: the UTF-8 bytes of this response's whole JSON. Never part of a cursor: a
@@ -142,6 +184,7 @@ final class ContentReader
                 self::bad('maxBytes must be an integer from '.self::MIN_BUDGET.' to '.self::MAX_BYTES);
             $this->budget=(int)$raw;
         }
+        if (array_key_exists('ids',$query)) return $this->batch($query,$explicit);
         foreach ($query as $key=>$value) if (!in_array($key,['id','type','locale','limit','cursor','blocksCursor','blockId','protocolVersions'],true) || !is_string($value) || $value==='') self::bad();
         // Accepted and ignored: a relay announcing the protocols it speaks (`tracy-content/v1`)
         // must not meet a 400 here. It selects nothing today, so it never enters a cursor.

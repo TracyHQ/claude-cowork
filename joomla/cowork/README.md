@@ -237,6 +237,19 @@ and no inferred semantic key. Repeaters, exclusion assignments and media outside
 slots remain unresolved. `readMapping()` is separate from mutating native inspect. A damaged
 binding fails closed; native inspect/apply/revert keep their existing write semantics.
 
+### Many details in one read, and reads that overlap (unreleased)
+
+Every read builds the site's whole projection (all mapped tables, the contract, the router), so
+its cost barely depends on how much it answers. `ids` asks for up to 100 details in one call — a
+list in the door's `params`, one comma-separated value over GET — and may carry `maxBytes`,
+nothing else. Each content that fits is answered exactly as `{id}` answers it; the rest are named
+in `pagination.pending` (did not fit, or needs block segments: ask again, or read it alone) and
+`pagination.missing` (no such content now). Nothing is cut and nothing pages.
+
+A read writes nothing while it holds its database snapshot, so any number of reads may overlap.
+Page identities (no trigger, see `ContentIdentity`) are levelled before the snapshot, and only
+when a menu item appeared or went since the last read.
+
 ### Records and fields beside the contract slots (unreleased)
 
 A page prints words that no contract slot holds. `content.read` carries them too, each group as one

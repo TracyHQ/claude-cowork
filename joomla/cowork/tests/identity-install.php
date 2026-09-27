@@ -80,3 +80,51 @@ check('whether the identity table exists is asked of information_schema, not gue
     ContentIdentity::installed(new RecordingDb(['information_schema.TABLES' => 1])), true);
 check('a site whose reader was never enabled has no identity table',
     ContentIdentity::installed(new RecordingDb()), false);
+
+// A READ NEVER WRITES WHILE IT HOLDS ITS SNAPSHOT. `reconcile` inside the reader's REPEATABLE READ
+// transaction made every content.read an INSERT IGNORE … SELECT (shared locks on every identity
+// row, duplicates included) followed by a DELETE (exclusive locks): two overlapping reads locked
+// each other, and MariaDB killed one — 17 of 24 parallel reads failed with "Deadlock found when
+// trying to get lock" on capijl1644 (27/09/2026, SHOW ENGINE INNODB STATUS names that DELETE).
+// `level` looks first with one plain (non-locking) read and writes only when a menu item appeared
+// or went since the last read — outside any snapshot, retried when MariaDB picks it as a victim.
+$levelDb = new RecordingDb();
+check('page identities already level: one plain read and no write', [ContentIdentity::level($levelDb, 'page'), count($levelDb->queries), startsWith($levelDb->queries[0], 'SELECT ')], [false, 1, true]);
+check('the look counts menu items without an identity and identities without a menu item',
+    $levelDb->queries[0],
+    "SELECT (SELECT COUNT(*) FROM #__menu t LEFT JOIN #__claudecowork_content_identity ci ON ci.kind='page' AND ci.native_id=t.id WHERE ci.native_id IS NULL)+(SELECT COUNT(*) FROM #__claudecowork_content_identity ci LEFT JOIN #__menu t ON t.id=ci.native_id WHERE ci.kind='page' AND t.id IS NULL)");
+$driftDb = new RecordingDb(['LEFT JOIN #__menu t' => 2]);
+check('page identities out of step: the look, then the backfill and the sweep', [ContentIdentity::level($driftDb, 'page'), array_map(fn($q) => substr($q, 0, 6), $driftDb->queries)], [true, ['SELECT', 'INSERT', 'DELETE']]);
+
+final class DeadlockingDb
+{
+    public array $queries = [];
+    private string $pending = '';
+    public function __construct(public int $failures, public int $code = 1213) {}
+    public function getPrefix(): string { return 'ng_'; }
+    public function quote($v): string { return "'" . $v . "'"; }
+    public function setQuery($q): self { $this->pending = (string) $q; return $this; }
+    public function loadResult() { $this->queries[] = $this->pending; return 1; }
+    public function execute(): bool
+    {
+        $this->queries[] = $this->pending;
+        if (str_starts_with($this->pending, 'DELETE') && $this->failures-- > 0) throw new RuntimeException('Deadlock found when trying to get lock', $this->code);
+        return true;
+    }
+}
+$victim = new DeadlockingDb(1);
+check('a reconcile chosen as a deadlock victim is run again', [ContentIdentity::level($victim, 'page'), count(array_filter($victim->queries, fn($q) => str_starts_with($q, 'DELETE')))], [true, 2]);
+$stubborn = new DeadlockingDb(9);
+check('but not forever', (function () use ($stubborn) { try { ContentIdentity::level($stubborn, 'page'); return null; } catch (RuntimeException $e) { return $e->getCode(); } })(), 1213);
+$inside = new DeadlockingDb(1);
+check('inside a caller\'s transaction (tries = 1) the deadlock goes up: InnoDB already rolled that transaction back',
+    (function () use ($inside) { try { ContentIdentity::level($inside, 'page', 1); return null; } catch (RuntimeException $e) { return $e->getCode(); } })(), 1213);
+$other = new DeadlockingDb(1, 1146);
+check('any other failure is not retried', (function () use ($other) { try { ContentIdentity::level($other, 'page'); return null; } catch (RuntimeException $e) { return count(array_filter($other->queries, fn($q) => str_starts_with($q, 'DELETE'))); } })(), 1);
+
+// What the reader checks INSIDE its snapshot instead of writing: every native row it read has an
+// identity row it read. A menu item created between `level` and the snapshot fails this, and the
+// reader takes a fresh snapshot rather than answer a page with no id.
+check('every native row has an identity: level', ContentIdentity::covers([['id' => '1'], ['id' => '7']], [['kind' => 'page', 'native_id' => '7'], ['kind' => 'page', 'native_id' => '1'], ['kind' => 'article', 'native_id' => '9']], 'page'), true);
+check('a native row without its identity: not level', ContentIdentity::covers([['id' => '1'], ['id' => '8']], [['kind' => 'page', 'native_id' => '1'], ['kind' => 'article', 'native_id' => '8']], 'page'), false);
+check('an identity whose row went is harmless to a read', ContentIdentity::covers([['id' => '1']], [['kind' => 'page', 'native_id' => '1'], ['kind' => 'page', 'native_id' => '5']], 'page'), true);
