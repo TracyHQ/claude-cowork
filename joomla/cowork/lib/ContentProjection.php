@@ -539,7 +539,7 @@ final class ContentProjection
             [, $moduleId] = $rowsOf[$source][0];
             $moduleRow = $moduleRows[$moduleId] ?? null;
             if ($moduleRow && (int)($moduleRow['showtitle'] ?? 0) === 1 && trim((string)($moduleRow['title'] ?? '')) !== '')
-                $fields[] = self::extraField('module-' . $moduleId . '.title', 'text', (string)$moduleRow['title'], 'title');
+                $fields[] = self::extraField('module-' . $moduleId . '.title', 'text', (string)$moduleRow['title'], 'module-title');
             foreach ($module['blocks'] as $block) foreach ($block['fields'] as $field) $fields[] = $field;
             $images = array_column($contents[$ownerId]['images'], null, 'id');
             foreach ($contents[$ownerId]['blocks'] as &$block) {

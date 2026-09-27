@@ -150,3 +150,4 @@ $exCatData = $exData(); $exCatData['categories'][2]['description'] = '<p>Regulat
 check('revision: a new category description moves that category, alone', $exMoved($exCatData), [$exCat['id']]);
 $exBare = $exData(); foreach (['fields', 'fields_values', 'tags', 'contentitem_tag_map', 'users', 'megamenu'] as $table) unset($exBare[$table]);
 checkTrue('a caller without the extra inputs still gets a projection (articles without those fields)', isset($exBuild($exBare)['contents'][$exPost]));
+check('module: the inlined title says it is the module\'s, not the page\'s', $ex['contents'][$exNews]['blocks'][array_search('module-200', array_column($ex['contents'][$exNews]['blocks'], 'key'))]['fields'][0]['semanticKey'], 'module-title');
