@@ -1620,6 +1620,8 @@ require __DIR__ . '/edit-lock.php';
 require __DIR__ . '/content-natives.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
+// Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.
+require __DIR__ . '/provenance-stamps.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
