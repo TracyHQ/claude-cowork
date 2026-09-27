@@ -24,6 +24,11 @@ require_once __DIR__ . '/lib/MultilingualHooks.php';
 MultilingualHooks::register();
 require_once __DIR__ . '/lib/NavigationLinks.php';
 NavigationLinks::register();
+// Render stamps for Tracy's element picker: which record rendered each block. Adds no hook at all
+// unless the request carries `X-Tracy-Preview: pick` and this site has a token (lib/ProvenanceStamps.php),
+// so an ordinary visitor's page is byte-identical.
+require_once __DIR__ . '/lib/ProvenanceStamps.php';
+ProvenanceStamps::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.

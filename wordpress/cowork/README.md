@@ -244,3 +244,27 @@ content edit succeeds; that is the folder's permissions talking, not this plugin
 ## Navigation links
 
 A `core/navigation-link` (or submenu) block that carries a page id but an empty `url` is given the page's permalink at render time (`lib/NavigationLinks.php`). The Tracy Business archive's translated menus were captured that way, so without this every item of a Vietnamese menu pointed nowhere (measured 25/09/2026).
+
+## Render stamps for Tracy's element picker
+
+When a page is requested with `X-Tracy-Preview: pick` **and** the site has a token, every rendered block carries `data-tracy-src="<owner> block:<blockName>"` on its first element, and the footer carries one `<template data-tracy-owner="<owner>">` for anything the theme printed outside every block (`lib/ProvenanceStamps.php`). Tracy's site proxy sets the header after it has verified a preview ticket and strips any `x-tracy-*` header a browser sent; the picker reads the stamps to tell which record produced the element a person clicked.
+
+| Owner | Stamped on |
+| --- | --- |
+| `post:<id>:<slug>` | the viewed post or page and its content; each query-loop item (at any nesting depth); post title/excerpt/date/featured image/terms of the post in context; top-level blocks of the posts page |
+| `part:<slug>` | a template part and everything inside it |
+| `ref:<id>:<slug>` | any block with a numeric `ref` (navigation menu, synced pattern) and everything inside it |
+| `site:identity` | site title, tagline, logo |
+| `term:<taxonomy>:<id>:<slug>` | query title and term description on a category/tag/taxonomy archive, and that archive's top-level blocks |
+| `template:<slug>` | top-level blocks of a page about no record (search, date archive, 404) |
+
+A stamping response is kept out of caches: `nocache_headers()`, `DONOTCACHEPAGE`, `LSCACHE_NO_CACHE`, LiteSpeed's no-cache call, `Cache-Control: private, no-store`, `Vary: Cookie`, `Referrer-Policy: no-referrer`. Without the header no hook is added at all, so an ordinary visitor's page is byte-identical. To check that on a site:
+
+```bash
+curl -s https://site.test/news/ > plain.html
+curl -s -H 'X-Tracy-Preview: pick' https://site.test/news/ > stamped.html
+grep -c data-tracy plain.html                                  # 0
+sed 's/ data-tracy-src="[^"]*"//g; s#<template data-tracy-owner="[^"]*"></template>##' stamped.html | cmp - plain.html && echo same
+```
+
+Measured 27/09/2026 on WordPress 7.1.2 with the Tracy theme (single post with a related-posts loop inside a synced pattern, the posts page, a category archive, the front page): plain pages identical, stamped pages identical to them once the stamps are removed, and the related-post teasers stamped with their own posts.
