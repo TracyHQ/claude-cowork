@@ -960,8 +960,7 @@ try {
 checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
 
 // ------------------------------------------------------- taking an update on request --
-// WordPress finds updates on its own clock: our manifest answer is cached six hours, and the cron
-// that acts on it runs twice a day. Right for a site nobody watches; wrong for the minutes after a
+// WordPress finds updates on its own clock: the cron that acts on its update set runs twice a day. Right for a site nobody watches; wrong for the minutes after a
 // release, when a fix can be published and still be half a day from the site it was written for.
 // This action is the same work brought forward, and it takes no parameters — which version to
 // install is `update.json`'s answer, never a caller's.
@@ -1032,6 +1031,33 @@ checkTrue(
     'and only for its own file',
     (bool) preg_match('/claude_cowork_auto_update/', $updateSource)
 );
+
+// Twice a day is WordPress's clock, not ours: a site opened right after a release kept the old
+// version for half a day. Our own quarter-hour event brings the same work forward, and the manifest
+// cache must be no longer than that interval or the event keeps reading an answer from before it.
+checkTrue(
+    'the plugin looks for itself every quarter hour',
+    (bool) preg_match('/CLAUDE_COWORK_UPDATE_EVERY\s*=\s*15\s*\*\s*MINUTE_IN_SECONDS/', $updateSource)
+);
+checkTrue(
+    'and keeps a manifest answer no longer than that',
+    (bool) preg_match('/CLAUDE_COWORK_UPDATE_TTL\s*=\s*CLAUDE_COWORK_UPDATE_EVERY\s*;/', $updateSource)
+);
+checkTrue(
+    'on a wp-cron event, so no visitor waits behind a download',
+    (bool) preg_match('/wp_schedule_event\([^;]*[\'"]claude_cowork_update_check[\'"]/', $updateSource)
+);
+// self_update() asks api.wordpress.org about every plugin on the site. Every quarter hour on every
+// site would be abuse of somebody else's service, so our own file must say "newer" first.
+$take = substr($updateSource, strpos($updateSource, 'function claude_cowork_take_update'));
+checkTrue(
+    'and reads its own manifest before the full update path',
+    strpos($take, 'claude_cowork_update_manifest()') !== false
+        && strpos($take, 'claude_cowork_update_manifest()') < strpos($take, 'self_update()')
+);
+// An owner or host that forbids file changes is obeyed, and our install never overlaps WordPress's.
+checkTrue('it stands down when automatic updates are disabled', str_contains($take, '->is_disabled()'));
+checkTrue('and holds WordPress\'s own auto_updater lock', str_contains($take, "create_lock('auto_updater')"));
 
 // the read half of the content mirror (ADR 0071)
 $writer->posts = [

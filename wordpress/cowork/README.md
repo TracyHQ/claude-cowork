@@ -246,7 +246,13 @@ asks, gets an older number than it already has, and reports "up to date" forever
 **Joomla and WordPress both record the update address when the extension is INSTALLED.** A site
 running a version cut before this existed has no address to ask, and stays silent until somebody
 updates it once by hand. That first update is the price of adding this late; every one after it
-is a click.
+is taken without one.
+
+**The site takes a release by itself, within a quarter hour of the next visit.** `update.php`
+schedules a wp-cron event every 15 minutes (wp-cron runs on a visit, in a background request): it
+reads `wordpress/update.json` and, only when that names a newer version, installs it through the
+same path as `plugin.selfUpdate`. It stands down when the site forbids file changes
+(`DISALLOW_FILE_MODS`, `AUTOMATIC_UPDATER_DISABLED`) and logs a failed install with `error_log`.
 
 ## Why admin-ajax, not the REST API
 

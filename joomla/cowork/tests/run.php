@@ -1403,6 +1403,8 @@ checkTrue('and it switches itself on when installed', str_contains(
 ));
 // After the response, never before it: a visitor must not wait behind a download.
 checkTrue('it works after the page has gone to the browser', str_contains($updaterSrc, "'onAfterRespond' => 'onAfterRespond'"));
+// A quarter hour: a release reaches a site the next time somebody opens it, not six hours later.
+checkTrue('it looks every quarter hour', str_contains($updaterSrc, 'private const EVERY = 900;'));
 // Without a declared server Joomla has nowhere to ask, and the backend never mentions an update.
 check('the package declares where to ask',
     trim((string) $pkg->updateservers->server),
