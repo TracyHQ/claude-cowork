@@ -107,16 +107,16 @@ check('the trimmed site inspects clean', $trimContract->inspect()['contract'], '
 check('asking again is a no-op, not a second trim', [$trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-c', 'request_id' => 'r3'])['status']], ['completed']);
 
 $trimWriter->store['article'][202]['state'] = '1';
-contractRejects('a hidden row that reappears is drift', fn() => $trimContract->inspect());
+contractDrifts('a hidden row that reappears is reported as drift', $trimContract, fn() => $trimContract->inspect());
 $trimWriter->store['article'][202]['state'] = '0';
 $trimWriter->store['article'][201]['state'] = '0';
-contractRejects('a row the profile does not list is still held to its locked state', fn() => $trimContract->inspect());
+contractDrifts('a row the profile does not list is still compared to its locked state', $trimContract, fn() => $trimContract->inspect());
 $trimWriter->store['article'][201]['state'] = '1';
 
 $copy = $trimCall(['operation' => 'apply', 'apply_id' => 'contract-t1', 'request_id' => 't1', 'expected_revision' => $trimContract->inspect()['revision'], 'changes' => ['hero.0' => 'Customer title']]);
 check('an ordinary content apply still lands on a trimmed site', $copy['ok'], true);
 check('and it does not bring the demo rows back', [$trimWriter->store['article'][202]['state'], $trimStore->binding['demoTrim']['status']], ['0', 'complete']);
-check('the generic revert does not take a trim apart', $trimEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'dtrim-a']])['error'], 'content_only');
+check('the generic revert does not take a trim apart', $trimEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'dtrim-a']])['error'], 'bad_params');
 
 $back = $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo', 'request_id' => 'u1']);
 check('revert brings every hidden row back', [$back['ok'], $back['status'], $trimWriter->store['article'][202]['state'], $trimWriter->store['article'][203]['state'], $trimWriter->store['menuItem'][330]['published']], [true, 'reverted', '1', '1', '1']);

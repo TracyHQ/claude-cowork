@@ -1169,6 +1169,23 @@ $tpWriter = new Claude_Cowork_Site_Writer();
 // and a delete is what hands the part back to the theme's own file.
 check('an untouched part reads as absent', $tpWriter->read('templatePart', 0, 'header'), null);
 
+// A part the site never stored is still what visitors see — the theme's own file. content.get serves
+// it (stored:false) so a caller reads the bytes it would be writing over; read() stays null, so the
+// undo of a first write is still the delete that hands the part back to the file.
+$tpTheme = sys_get_temp_dir() . '/cowork-theme-' . bin2hex(random_bytes(4));
+mkdir($tpTheme . '/parts', 0777, true);
+file_put_contents($tpTheme . '/parts/footer.html', '<!-- wp:paragraph --><p>Call 8 800 550-67-89</p><!-- /wp:paragraph -->');
+WP_Fake::$themeDir = $tpTheme;
+$tpEngine = new Engine($WTOKEN, [], null, null, null, null, $tpWriter, null, new FakeApplyLog());
+$tpGot = $tpEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'templatePart', 'key' => 'footer']]);
+check('a theme-only part is read from the theme file', [$tpGot['ok'], $tpGot['stored'], $tpGot['item']['content'], $tpGot['item']['source']],
+    [true, false, '<!-- wp:paragraph --><p>Call 8 800 550-67-89</p><!-- /wp:paragraph -->', 'theme']);
+check('and the writer still reads it as absent, so a first write undoes by delete', $tpWriter->read('templatePart', 0, 'footer'), null);
+check('a part neither stored nor in the theme is not found', $tpEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['kind' => 'templatePart', 'key' => 'sidebar']])['error'], 'not_found');
+check('a slug with a path in it never reaches the file system', $tpWriter->themeTemplatePart('../x'), null);
+unlink($tpTheme . '/parts/footer.html'); rmdir($tpTheme . '/parts'); rmdir($tpTheme);
+WP_Fake::$themeDir = '/nonexistent-theme';
+
 $tpId = $tpWriter->write('templatePart', 0, ['content' => '<!-- wp:site-title /-->', 'area' => 'header'], 'header');
 checkTrue('writing one yields an id', $tpId > 0);
 
@@ -1591,6 +1608,20 @@ require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
+// Content API v1: block projection, reader protocol and door (content.json).
+require __DIR__ . '/content-api.php';
+// Content API v2 byte budget: pages cut by whole contents to maxBytes.
+require __DIR__ . '/content-budget.php';
+// Content API v2 on the write side: content revisions and structured errors (content.contract).
+require __DIR__ . '/content-revisions.php';
+// Editor locks: content.read lists who has a post open; every write refuses to land under them.
+require __DIR__ . '/edit-lock.php';
+// Native ids: each content names its own WordPress record.
+require __DIR__ . '/content-natives.php';
+// Many details in one read: content.read ids.
+require __DIR__ . '/content-batch.php';
+// Image slots: a picture from the media library into a core/image block of a sealed site.
+require __DIR__ . '/image-slots.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.
 require __DIR__ . '/provenance-stamps.php';
 

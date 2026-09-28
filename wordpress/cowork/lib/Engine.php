@@ -49,18 +49,8 @@ final class Engine
     private bool $writing = false;
 
     private const MAX_DB_LIMIT = 5000;
-    /**
-     * What a sealed site refuses — a specific list, no wildcard, so a new action is not blocked or
-     * allowed by accident but by somebody adding it to one of the two lists here.
-     */
-    private const CONTENT_ONLY_BLOCKED = [
-        'content.update', 'content.delete', 'content.language', 'language.install',
-        'plugin.install', 'plugin.activate', 'plugin.selfUpdate',
-        'theme.install', 'theme.activate', 'theme.style', 'theme.palette',
-        'db.cleanup', 'db.restore', 'db.purge',
-    ];
-    /** Writes a sealed site still takes, each under its own rule in handle(). */
-    private const CONTENT_ONLY_RULED = ['media.upload', 'apply.revert', 'content.contract'];
+    /** Writes that go through the contract's own rules on a bound site (see handle()). */
+    private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
     private const SERIALIZED = [
         'content.contract', 'content.update', 'content.delete', 'content.language',
@@ -148,7 +138,8 @@ final class Engine
                     }
                 });
             } catch (Throwable $e) {
-                return $this->err('writer_busy', $e->getMessage());
+                $busy = $this->err('writer_busy', $e->getMessage());
+                return $action === 'content.contract' ? self::withErrors($busy) : $busy;
             }
         }
 
@@ -159,31 +150,44 @@ final class Engine
             try {
                 $bound = $this->contract->bound();
             } catch (Throwable $e) {
-                if (in_array($action, self::CONTENT_ONLY_BLOCKED, true) || in_array($action, self::CONTENT_ONLY_RULED, true)) {
+                if (in_array($action, self::CONTRACT_RULED, true) || in_array($action, self::SERIALIZED, true)) {
                     return $this->err('contract_unavailable', $e->getMessage());
                 }
             }
         }
+        // The contract's own record is not an option like the others: written through content.update,
+        // one write could unbind the site or name another profile. It moves only through its door.
+        if (in_array($action, ['content.update', 'content.delete'], true) && ($params['kind'] ?? '') === 'option'
+            && in_array((string) ($params['key'] ?? ''), [QuickstartContract::STORE_OPTION, 'claude_cowork_contract'], true)) {
+            return $this->err('bad_params', "This option is the contract's own record; it changes only through content.contract");
+        }
+        // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
+        // 26/09/2026). A bound site takes every action an unbound one does; the contract's own rules
+        // stay on its own door and on the picture folder its image slots use.
         if ($bound) {
-            if (in_array($action, self::CONTENT_ONLY_BLOCKED, true)) {
-                return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
-            }
             if ($action === 'media.upload') {
                 $path = isset($params['path']) && is_string($params['path']) ? $params['path'] : '';
-                if (!preg_match(self::CONTRACT_MEDIA_PATH, $path)) {
-                    return $this->err('content_only', 'Use a new content-addressed image under wp-content/uploads/tracy-content/<sha256>.<png|jpg|webp>');
-                }
-                $b64 = isset($params['content_b64']) && is_string($params['content_b64']) ? $params['content_b64'] : '';
-                $bytes = base64_decode($b64, true);
-                if ($bytes === false || !hash_equals(hash('sha256', $bytes), (string) pathinfo($path, PATHINFO_FILENAME))) {
-                    return $this->err('content_only', 'The image name must be the sha256 of its bytes');
-                }
-                if (strpos((string) ($params['apply_id'] ?? ''), 'contract-') === 0) {
-                    return $this->err('content_only', 'Media uploads must use a separate apply receipt, not a contract- apply_id');
+                if (strpos($path, 'wp-content/uploads/tracy-content/') === 0) {
+                    if (!preg_match(self::CONTRACT_MEDIA_PATH, $path)) {
+                        return $this->err('bad_params', 'A picture under wp-content/uploads/tracy-content/ is named <sha256>.<png|jpg|webp>');
+                    }
+                    $b64 = isset($params['content_b64']) && is_string($params['content_b64']) ? $params['content_b64'] : '';
+                    $bytes = base64_decode($b64, true);
+                    if ($bytes === false || !hash_equals(hash('sha256', $bytes), (string) pathinfo($path, PATHINFO_FILENAME))) {
+                        return $this->err('bad_params', 'The image name must be the sha256 of its bytes');
+                    }
+                    if (strpos((string) ($params['apply_id'] ?? ''), 'contract-') === 0) {
+                        return $this->err('bad_params', 'Media uploads must use a separate apply receipt, not a contract- apply_id');
+                    }
                 }
             }
             if ($action === 'apply.revert') {
-                return $this->contractRevert($params);
+                // A contract apply, a trim, a language step or a relabel is taken back through the
+                // contract; any other receipt takes the ordinary revert below.
+                $ops = $this->log === null ? [] : array_column($this->log->entries((string) ($params['apply_id'] ?? '')), 'op');
+                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale']) !== []) {
+                    return $this->contractRevert($params);
+                }
             }
         }
 
@@ -264,6 +268,31 @@ final class Engine
 
     private function contentContract(array $p): array
     {
+        return self::withErrors($this->contentContractAnswer($p));
+    }
+
+    /**
+     * Every refusal of `content.contract` also carries `errors[]`: a code, the slot and content it
+     * is about, and whether a changed request can pass. A refusal that was not raised as a
+     * `ContractProblem` is one `CONTRACT_FAILED`; an inspect refused by drift is one
+     * `PRESENTATION_DRIFT` per problem. `error`, `message` and `problems` stay for older relays.
+     */
+    private static function withErrors(array $answer): array
+    {
+        if (($answer['ok'] ?? true) !== false || isset($answer['errors'])) {
+            return $answer;
+        }
+        if (isset($answer['problems']) && is_array($answer['problems']) && $answer['problems'] !== []) {
+            $answer['errors'] = array_map(static fn($problem) => ContractProblem::entry(ContractProblem::PRESENTATION_DRIFT, (string) $problem), $answer['problems']);
+            return $answer;
+        }
+        $code = ($answer['error'] ?? '') === 'writer_busy' ? ContractProblem::WRITER_BUSY : ContractProblem::CONTRACT_FAILED;
+        $answer['errors'] = [ContractProblem::entry($code, (string) ($answer['message'] ?? ''))];
+        return $answer;
+    }
+
+    private function contentContractAnswer(array $p): array
+    {
         if ($this->contract === null || $this->log === null || $this->writer === null) {
             return $this->err('unavailable', 'content contract receiver not wired');
         }
@@ -282,7 +311,9 @@ final class Engine
                     return $this->inspectAnswer($state);
                 }
                 $this->contract->bind($state);
-                return $this->ok(['bound' => true, 'contract' => $state['contract'], 'revision' => $state['revision'], 'ids' => $state['ids']]);
+                $drift = $state['drift'] ?? [];
+                return $this->ok(['bound' => true, 'contract' => $state['contract'], 'revision' => $state['revision'], 'ids' => $state['ids']]
+                    + ($drift === [] ? [] : ['warnings' => self::driftWarnings($drift)]));
             }
             if (strpos($operation, 'demoTrim.') === 0) {
                 return $this->demoTrim($p, substr($operation, strlen('demoTrim.')));
@@ -302,6 +333,15 @@ final class Engine
             return $this->contractApply($p);
         } catch (ContractUnavailable $e) {
             return $this->err('contract_unavailable', $e->getMessage());
+        } catch (ContractProblems $e) {
+            $answer = $this->err('contract_failed', $e->getMessage());
+            if ($e->drift() !== []) {
+                $answer['problems'] = $e->drift();
+            }
+            $answer['errors'] = $e->errors();
+            return $answer;
+        } catch (ContractProblem $e) {
+            return $this->err('contract_failed', $e->getMessage()) + ['errors' => [$e->toArray()]];
         } catch (Throwable $e) {
             return $this->err('contract_failed', $e->getMessage());
         }
@@ -311,6 +351,11 @@ final class Engine
     private function inspectAnswer(array $state): array
     {
         unset($state['rows']);
+        $drift = $state['drift'] ?? [];
+        unset($state['drift']);
+        if ($drift !== []) {
+            $state['warnings'] = self::driftWarnings($drift);
+        }
         if ($state['problems'] !== []) {
             return array_merge(
                 ['ok' => false, 'error' => 'contract_failed', 'message' => implode('; ', $state['problems'])],
@@ -327,6 +372,16 @@ final class Engine
      * the stored result, and a different request under an apply_id already used is refused, so
      * an agent that lost a reply can ask again without writing twice. One apply_id per revision.
      */
+    /**
+     * Where the site differs from its quickstart's design, as warnings (Tracy ADR 0022).
+     * @param string[] $drift
+     * @return list<array{code:string,message:string,severity:string}>
+     */
+    private static function driftWarnings(array $drift): array
+    {
+        return array_map(static fn(string $m) => ['code' => ContractProblem::PRESENTATION_DRIFT, 'message' => $m, 'severity' => 'warning'], array_values($drift));
+    }
+
     private function contractApply(array $p): array
     {
         $apply = $this->applyId($p);
@@ -350,8 +405,14 @@ final class Engine
                 if (!hash_equals((string) ($entry['hash'] ?? ''), $hash)) {
                     throw new RuntimeException('request_id reused with different content');
                 }
-                $this->contract->inspectClean();
-                return $entry['result'];
+                $now = $this->contract->inspectClean();
+                $result = $entry['result'];
+                // The revision a replay answers is the site's only if nothing moved since: otherwise the
+                // caller must read again, as the Joomla receiver answers (#316).
+                if (($result['afterRevision'] ?? null) !== ($now['revision'] ?? null)) {
+                    unset($result['afterRevision']);
+                }
+                return $result;
             }
         }
         if ($entries !== []) {
@@ -359,8 +420,12 @@ final class Engine
         }
 
         $plan = $this->contract->plan($p);
+        // What already differs from the design is a warning on this answer; what this write would
+        // add to it is refused below (Tracy ADR 0022).
+        $tolerated = $plan['state']['drift'] ?? [];
+        $warn = $tolerated === [] ? [] : ['warnings' => self::driftWarnings($tolerated)];
         if ($plan['operations'] === []) {
-            return $this->ok(['unchanged' => true, 'revision' => $plan['state']['revision']]);
+            return $this->ok(['unchanged' => true, 'revision' => $plan['state']['revision']] + $warn);
         }
 
         // Written in order, each step logged before the next; on any failure every step already
@@ -402,7 +467,7 @@ final class Engine
                 $this->log->record($apply, $entry);
                 $written[] = ['kind' => $op['kind'], 'id' => $id, 'key' => $op['key'] === '' ? null : $op['key']];
             }
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspectClean(null, $tolerated);
             $this->contract->rebind($state);
         } catch (Throwable $e) {
             foreach (array_reverse($done) as [$kind, $id, $key, $before, $translations]) {
@@ -422,12 +487,26 @@ final class Engine
             throw new RuntimeException('Nothing was applied: ' . $e->getMessage());
         }
 
-        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision']]);
-        $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
         try {
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
+        // `afterRevision`, as the Joomla receiver answers (#316): the contract revision this apply left,
+        // read under the lock — the next apply can send it as expected_revision without inspecting again.
+        $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision'], 'afterRevision' => $state['revision']] + $warn);
+        // The revision `content.read` now lists for every content this apply touched, read by the
+        // reader itself after the write, so the next apply can hold exactly these. Left out when
+        // the reader cannot answer on this site (no content identity yet): the write stands.
+        $revisions = [];
+        foreach ($this->contract->revisionsOf(array_map(static fn(array $w) => ['kind' => $w['kind'], 'id' => (int) $w['id'], 'key' => (string) ($w['key'] ?? '')], $written)) ?? [] as $found) {
+            if ($found !== null) {
+                $revisions[$found['id']] = $found['revision'];
+            }
+        }
+        if ($revisions !== []) {
+            $result['contentRevisions'] = $revisions;
+        }
+        $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
         $this->stamped('content');
         return $result;
     }
@@ -457,18 +536,25 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('content_only', 'Only content-contract applies can be reverted on a sealed site; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
+            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
         }
         try {
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspect();
+            if ($state['problems'] !== []) {
+                throw new RuntimeException(implode('; ', $state['problems']));
+            }
+            $tolerated = $state['drift'];
             if (($receipts[0]['afterRevision'] ?? null) !== $state['revision']) {
-                return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                return $this->err('conflict', 'Later content exists; revert the latest revision first');
             }
             $result = $this->applyRevert($p);
+            if (!$result['ok'] && ($result['code'] ?? null) === EditLock::CODE) {
+                return $result; // refused before anything moved; the lock is the answer, not a failure
+            }
             if (!$result['ok'] || !empty($result['failed'])) {
                 throw new RuntimeException('Contract revert failed: ' . json_encode($result['failed'] ?? $result));
             }
-            $state = $this->contract->inspectClean();
+            $state = $this->contract->inspectClean(null, $tolerated);
             $this->contract->rebind($state);
             $result['revision'] = $state['revision'];
             return $result;
@@ -549,23 +635,9 @@ final class Engine
                 return $this->err('conflict', 'A demo trim revert is already running under request ' . (string) ($trim['requestId'] ?? '?'));
             }
         }
-        $record = [
-            'status' => $hide ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
-            'profileHash' => $profile->hash(), 'profileVersion' => $profile->version(), 'at' => gmdate('c'),
-        ];
-        if ($hide) {
-            $record['hidden'] = (int) ($trim['hidden'] ?? 0);
-            $record['skipped'] = is_array($trim['skipped'] ?? null) ? $trim['skipped'] : [];
-        }
-        // The record lands BEFORE any row moves: a call that dies mid-batch leaves a site that
-        // says a trim is in flight, so its retry is welcome rather than refused as drift.
-        if ($trim === null || ($trim['status'] ?? '') !== $record['status'] || ($trim['requestId'] ?? '') !== $request) {
-            $this->contract->record('demoTrim', $record);
-        } else {
-            $record = $trim;
-        }
-
-        $moved = 0;
+        // What this call will move, decided before anything is written, so a row someone has
+        // open in the editor refuses the whole call while the site is still as it was.
+        $moves = [];
         $pending = 0;
         $skipped = [];
         // A row of a retired edition is `multilingual.retire`'s to hide and `multilingual.restore`'s
@@ -588,10 +660,32 @@ final class Engine
                 $skipped[] = ['key' => $row['key'], 'id' => $row['id'], 'status' => $status];
                 continue;
             }
-            if ($moved >= self::DEMO_TRIM_BATCH) {
+            if (count($moves) >= self::DEMO_TRIM_BATCH) {
                 $pending++;
                 continue;
             }
+            $moves[] = [$row, $want, $status];
+        }
+        $this->contract->refuseEditLocked(array_map(static fn(array $move): int => (int) $move[0]['id'], $moves));
+
+        $record = [
+            'status' => $hide ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
+            'profileHash' => $profile->hash(), 'profileVersion' => $profile->version(), 'at' => gmdate('c'),
+        ];
+        if ($hide) {
+            $record['hidden'] = (int) ($trim['hidden'] ?? 0);
+            $record['skipped'] = is_array($trim['skipped'] ?? null) ? $trim['skipped'] : [];
+        }
+        // The record lands BEFORE any row moves: a call that dies mid-batch leaves a site that
+        // says a trim is in flight, so its retry is welcome rather than refused as drift.
+        if ($trim === null || ($trim['status'] ?? '') !== $record['status'] || ($trim['requestId'] ?? '') !== $request) {
+            $this->contract->record('demoTrim', $record);
+        } else {
+            $record = $trim;
+        }
+
+        $moved = 0;
+        foreach ($moves as [$row, $want, $status]) {
             QuickstartContract::setPostStatus($row['id'], $want);
             $this->log->record($apply, ['op' => 'visibility', 'kind' => $row['kind'], 'id' => $row['id'], 'column' => 'post_status', 'before' => $status]);
             $moved++;
@@ -952,11 +1046,11 @@ final class Engine
             if ((string) ($onRecord['applyId'] ?? '') !== $apply) {
                 return $this->err('conflict', 'The retired editions are on record under ' . (string) ($onRecord['applyId'] ?? '?') . ', not ' . $apply);
             }
+            $steps = array_values(array_filter($this->log->entries($apply), static fn(array $entry): bool => ($entry['op'] ?? '') === 'visibility'));
+            // Every row it brings back is asked first: one open in the editor refuses the restore whole.
+            $this->contract->refuseEditLocked(array_map(static fn(array $entry): int => (int) ($entry['id'] ?? 0), $steps));
             $restored = 0;
-            foreach (array_reverse($this->log->entries($apply)) as $entry) {
-                if (($entry['op'] ?? '') !== 'visibility') {
-                    continue;
-                }
+            foreach (array_reverse($steps) as $entry) {
                 $this->revertOne($entry);
                 $restored++;
             }
@@ -1004,14 +1098,10 @@ final class Engine
                 $retired[] = $slug;
             }
         }
-        // The record lands BEFORE any row moves, so a call that dies mid-batch leaves a site
-        // that says which set it was moving toward, and its retry is welcome.
-        $record = ['status' => 'running', 'applyId' => $apply, 'requestId' => $request, 'retired' => $retired, 'live' => $live, 'at' => gmdate('c')];
-        $this->contract->record('multilingual', $record);
-
+        // What this call will move — both phases, within one batch — decided before anything is
+        // written: a row someone has open in the editor refuses this call while the site is still
+        // as the previous call left it, and the same call resumes the job once it is closed.
         $budget = self::MULTILINGUAL_BATCH;
-        $moved = 0;
-        $restored = 0;
         $remaining = 0;
 
         // 1. Editions kept again: put back the before-image of each row this receipt hid, newest
@@ -1023,16 +1113,43 @@ final class Engine
                 $restorable[] = $index;
             }
         }
-        $dropped = [];
+        $toRestore = [];
         foreach (array_reverse($restorable) as $index) {
             if ($budget <= 0) {
                 $remaining++;
                 continue;
             }
+            $toRestore[] = $index;
+            $budget--;
+        }
+
+        // 2. Editions retired: draft every published row that is still standing.
+        $toDraft = [];
+        foreach ($this->retirableRows($retired, $source) as $row) {
+            if ($budget <= 0) {
+                $remaining++;
+                continue;
+            }
+            $toDraft[] = $row;
+            $budget--;
+        }
+        $this->contract->refuseEditLocked(array_merge(
+            array_map(static fn(int $index): int => (int) ($entries[$index]['id'] ?? 0), $toRestore),
+            array_map(static fn(array $row): int => (int) $row[1], $toDraft)
+        ));
+
+        // The record lands BEFORE any row moves, so a call that dies mid-batch leaves a site
+        // that says which set it was moving toward, and its retry is welcome.
+        $record = ['status' => 'running', 'applyId' => $apply, 'requestId' => $request, 'retired' => $retired, 'live' => $live, 'at' => gmdate('c')];
+        $this->contract->record('multilingual', $record);
+
+        $moved = 0;
+        $restored = 0;
+        $dropped = [];
+        foreach ($toRestore as $index) {
             $this->revertOne($entries[$index]);
             $dropped[$index] = true;
             $restored++;
-            $budget--;
         }
         if ($dropped !== []) {
             $this->log->clear($apply);
@@ -1042,18 +1159,11 @@ final class Engine
                 }
             }
         }
-
-        // 2. Editions retired: draft every published row that is still standing.
-        foreach ($this->retirableRows($retired, $source) as [$kind, $id, $language]) {
-            if ($budget <= 0) {
-                $remaining++;
-                continue;
-            }
+        foreach ($toDraft as [$kind, $id, $language]) {
             // Undo first, then the change: a row whose undo could not be recorded is never hidden.
             $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => 'post_status', 'before' => 'publish', 'language' => $language]);
             QuickstartContract::setPostStatus($id, 'draft');
             $moved++;
-            $budget--;
         }
 
         if ($remaining === 0) {
@@ -1968,6 +2078,15 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
+        if ($item === null && $kind === 'templatePart' && $key !== '' && method_exists($this->writer, 'themeTemplatePart')) {
+            // A part the site never stored is still what visitors see: the theme's own file. Served as
+            // read (stored:false), so a write to it is judged against those bytes; the writer's read()
+            // stays null there on purpose — its undo is a delete that puts the theme file back.
+            $theme = $this->writer->themeTemplatePart($key);
+            if ($theme !== null) {
+                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false]);
+            }
+        }
         if ($item === null) {
             // Both halves of the address, because a null here means either "no such record" or
             // "that kind is not addressed the way you addressed it", and the caller cannot tell
@@ -2016,6 +2135,10 @@ final class Engine
             return $this->err('bad_params', 'lang must be a language code');
         }
         $slug = strtolower(substr($lang, 0, 2));
+        $locked = $this->editLocked('post', $id, null);
+        if ($locked !== null) {
+            return $locked;
+        }
 
         $before = function_exists('pll_get_post_language') ? pll_get_post_language($id) : null;
 
@@ -2122,6 +2245,14 @@ final class Engine
 
         try {
             $before = $this->writer->read($kind, $id, $key); // null => a create, so its undo is a delete
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+        $locked = $this->editLocked($kind, $id, $before);
+        if ($locked !== null) {
+            return $locked;
+        }
+        try {
             $newId = $this->writer->write($kind, $id, $p['fields'], $key);
         } catch (Throwable $e) {
             return $this->err('write_failed', $e->getMessage());
@@ -2202,6 +2333,10 @@ final class Engine
         }
         if ('templatePart' === $kind) {
             $id = (int) ($before['id'] ?? 0);
+        }
+        $locked = $this->editLocked($kind, $id, $before);
+        if ($locked !== null) {
+            return $locked;
         }
 
         try {
@@ -2473,6 +2608,20 @@ final class Engine
             return $this->err('revert_failed', $e->getMessage());
         }
 
+        // Every row the undo lands on is checked BEFORE the first is put back: a revert refused
+        // halfway would leave the site in a state no receipt describes.
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') !== 'content') {
+                continue;
+            }
+            $kind = (string) ($entry['kind'] ?? '');
+            // A template part's entry carries its row id (a create's too), so it is checked as that post.
+            $locked = $this->editLocked($kind === 'templatePart' ? 'post' : $kind, (int) ($entry['id'] ?? 0), null);
+            if ($locked !== null) {
+                return $locked;
+            }
+        }
+
         $reverted = 0;
         $failed = [];
         foreach (array_reverse($entries) as $entry) {
@@ -2728,6 +2877,35 @@ final class Engine
     private function ok(array $extra): array
     {
         return array_merge(['ok' => true], $extra);
+    }
+
+    /**
+     * The open writes' refusal when the post a write lands on is open in the WordPress editor:
+     * the contract's rule and words (EditLock), in this surface's `{ok, error, message}` shape
+     * plus `code` and `lockedBy`. Null when the write may go ahead: an option, a term, a create,
+     * a theme-file template part (no row, so no editor holds it), or no live lock. No flag skips
+     * it — the person's next save would silently undo whatever landed.
+     */
+    private function editLocked(string $kind, int $id, ?array $before): ?array
+    {
+        if ($this->writer === null) {
+            return null;
+        }
+        $post = 0;
+        if (in_array($kind, ['post', 'postmeta', 'menuItem'], true)) {
+            $post = $id;
+        } elseif ($kind === 'templatePart') {
+            $post = (int) ($before['id'] ?? 0);
+        }
+        if ($post <= 0) {
+            return null;
+        }
+        $lock = $this->writer->editLock($post);
+        if ($lock === null) {
+            return null;
+        }
+        $row = $this->writer->read('post', $post);
+        return $this->err('locked', EditLock::message((string) ($row['post_title'] ?? ''), $lock)) + ['code' => EditLock::CODE, 'lockedBy' => $lock];
     }
 
     private function err(string $code, string $message): array

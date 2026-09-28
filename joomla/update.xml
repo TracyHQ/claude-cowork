@@ -16,6 +16,142 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.18.3 plus: tracyaccess logs a Tracy editor into the administrator only, so a site whose Privacy Consent plugin is on shows Tracy's Browser tab the site instead of the profile form (TracyHQ/tch#516)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.4</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.4/pkg_claudecowork-0.18.4.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>0.18.2 plus: content.read carries what a page prints beyond the contract's slots (mega menu captions and columns, menu item parameters, inlined module titles, article pictures, custom fields and author, and the categories and tags the readable articles live in), with render stamps on category and tag links; content.read takes ids to answer up to 100 details from one projection; and a read no longer writes inside its snapshot, so overlapping reads stop deadlocking each other.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.3</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.3</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.3/pkg_claudecowork-0.18.3.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate 6: a quickstart contract recommends the design instead of locking it (Tracy ADR 0022). A bound site takes every action an unbound one does; where it differs from its quickstart's design the contract door answers with warnings, a bound row removed through Joomla closes only its own slots, and only a difference the contract's own write makes is refused. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.2</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.2</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.2/pkg_claudecowork-0.18.2.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate 5 of the Content API reader: every content read carries its own revision, a contract apply accepts those revisions in place of an inspect and reports the new ones, and every contract refusal lists its problems with a code, the slot and content they concern, and whether a retry can succeed. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.5</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.5</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.5/pkg_claudecowork-0.18.0-rc.5.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate 4 of the Content API v1 reader: a contract inspect or apply reads each kind of row in one query instead of one per row (35 queries instead of 21,931 on Tracy Business), with the same answers; each map field names its semantic key and a picture takes its alt from its paired slot. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.4</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.4/pkg_claudecowork-0.18.0-rc.4.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate 3 of the Content API v1 reader: a module only one page places is read as that page's section, with its fields, slot keys and pictures; the all-languages home is left out when every language has its own. For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.3</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.3</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.3/pkg_claudecowork-0.18.0-rc.3.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate 2 of the Content API v1 reader: a picture read from a slot names the block it belongs to (usages[].blockId). For Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.2</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.2</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.2/pkg_claudecowork-0.18.0-rc.2.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Release candidate for the Content API v1 reader (/content.json and content.read), for Tracy dev sites only. Not announced to installed sites.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.0-rc.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.0-rc.1/pkg_claudecowork-0.18.0-rc.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Carries the site-identity profiles of Tracy Apple 1.3.0 and the Airbnb design 1.2.0 on it: the site name, slogan and monogram live in one "[Tracy] Site identity" module the page reads through plg_system_tracyidentity, so those slots may be emptied or filled like Tracy Business 1.2.0. No code change; built on 0.17.3.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

@@ -60,6 +60,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             'onPageCacheSetCaching' => 'onPageCacheSetCaching',
             'onPageCacheIsExcluded' => 'onPageCacheIsExcluded',
             'onAfterRenderModule' => 'onAfterRenderModule',
+            'onAfterDispatch' => 'onAfterDispatch',
             'onContentBeforeDisplay' => 'onContentBeforeDisplay',
             'onAfterRender' => 'onAfterRender',
         ];
@@ -108,7 +109,9 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     /**
      * Every module, whatever its type or position: `module:<id> block:<type>` on its first element,
      * and — for the modules that print a list of articles — `article:<id>:<alias> block:<type>` on
-     * each item (why over the HTML and not a hook: `RenderStamps::stampListItems`).
+     * each item (why over the HTML and not a hook: `RenderStamps::stampListItems`). Each link to a
+     * category or tag page gets that record (`RenderStamps::stampLinks`), except in a menu module:
+     * a menu prints menu item titles, whatever page the item opens.
      */
     public function onAfterRenderModule(EventInterface $event): void
     {
@@ -123,8 +126,35 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             }
             $type = (string) ($module->module ?? '');
             $content = \RenderStamps::stampListItems((string) $module->content, $type, [ArticleLinks::class, 'resolve']);
+            if ($type !== 'mod_menu') {
+                $content = \RenderStamps::stampLinks($content, [TaxonomyLinks::class, 'resolve'], $type);
+            }
             $owner = \RenderStamps::owner('module', $module->id);
             $module->content = \RenderStamps::stampFirst($content, \RenderStamps::src($owner, $type));
+        } catch (\Throwable $e) {
+            Log::add('claudecoworkapi stamps: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The component's output: each link to a category or tag page gets that record — the filter
+     * chips of a blog, the category line of each card, an article's tag list. Nothing else is
+     * stamped here: articles name themselves through `onContentBeforeDisplay`.
+     */
+    public function onAfterDispatch(): void
+    {
+        if (!$this->stamping) {
+            return;
+        }
+        try {
+            $document = $this->getApplication()->getDocument();
+            if (!$document || $document->getType() !== 'html') {
+                return;
+            }
+            $buffer = $document->getBuffer('component');
+            if (\is_string($buffer) && $buffer !== '') {
+                $document->setBuffer(\RenderStamps::stampLinks($buffer, [TaxonomyLinks::class, 'resolve']), ['type' => 'component']);
+            }
         } catch (\Throwable $e) {
             Log::add('claudecoworkapi stamps: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
@@ -253,6 +283,13 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
         $app = $this->getApplication();
         $input = $app->getInput();
+        $root = rtrim(\Joomla\CMS\Uri\Uri::root(true), '/');
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        if ($app->isClient('site') && $path === $root . '/content.json') {
+            EngineFactory::answerContent($app);
+            return;
+        }
+
 
         // Before routing, `option` and `task` are read straight off the query string — which is
         // what the door has always been: the oldest routing contract Joomla has. Any array-valued

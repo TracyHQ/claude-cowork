@@ -29,6 +29,8 @@
  * row is state an undo has to clean up, so `write()` reports the attachment it created.
  */
 
+require_once __DIR__ . '/EditLock.php';
+
 interface SiteWriter
 {
     /**
@@ -78,6 +80,16 @@ interface SiteWriter
      * @param array<string,mixed> $fields
      */
     public function write(string $kind, int $id, array $fields, string $key = ''): int;
+
+    /**
+     * Who has this post open in the WordPress editor right now, as `content.read` lists it
+     * (`EditLock::lockedBy`), or null. Every write that lands on a post asks first and refuses a
+     * holder: the editor's next save would overwrite Tracy's words, or Tracy would overwrite
+     * words the person has not saved yet, and neither side would know.
+     *
+     * @return array{kind:string,name:?string,since:string,until:string}|null
+     */
+    public function editLock(int $postId): ?array;
 
     /** Remove one target. Used only to reverse a create this run made — never a user-facing delete. */
     public function delete(string $kind, int $id, string $key = ''): void;
@@ -130,6 +142,30 @@ interface MediaWriter
      * all, which a plain file delete leaves behind as orphans nobody will ever find.
      */
     public function deleteAttachment(int $attachmentId): void;
+}
+
+/**
+ * The site's media library, as far as an image slot needs it: is this file a picture WordPress
+ * knows, which attachment is it, and what shape is it.
+ *
+ * An image slot writes a picture into a `core/image` block. The block carries the attachment id
+ * twice (`"id":N` and the `wp-image-N` class), and the editor uses both to find the file again, so
+ * a path alone is not enough to write: the path has to resolve to an attachment. The shape is what
+ * keeps a sealed layout intact — a 16:9 photo in a 4:5 frame is a different design.
+ *
+ * Behind an interface for the same reason as SiteWriter: the contract is tested against memory,
+ * and only the plugin speaks to `$wpdb` and the uploads folder.
+ */
+interface ImageLibrary
+{
+    /**
+     * The attachment and pixel size of one picture, or null when the path is not a readable image
+     * with an attachment in this site's uploads.
+     *
+     * @param string $path Webroot-relative, `wp-content/uploads/…` — already checked for shape.
+     * @return array{id:int,width:int,height:int}|null
+     */
+    public function find(string $path): ?array;
 }
 
 interface ApplyLog

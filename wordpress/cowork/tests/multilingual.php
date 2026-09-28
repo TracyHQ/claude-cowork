@@ -228,7 +228,7 @@ check('drafts the German page and the German demo post', [WP_Fake::$posts[60]['p
 $insp = $mdoor($B, 'inspect');
 check('inspect stays clean', $insp['problems'], []);
 check('and reports the retired set', $insp['multilingual'], ['retired' => ['de'], 'live' => ['en'], 'applyId' => 'mlang-b']);
-check('apply.revert is not the way back', $call('apply.revert', ['apply_id' => 'mlang-b'])['error'], 'content_only');
+check('apply.revert is not the way back', $call('apply.revert', ['apply_id' => 'mlang-b'])['error'], 'bad_params');
 checkTrue('and says which is', strpos($call('apply.revert', ['apply_id' => 'mlang-b'])['message'], 'multilingual.restore') !== false);
 $trim = $mdoor($B, 'demoTrim.apply', ['apply_id' => 'dtrim-b', 'request_id' => 't1']);
 check('a demo trim beside a retired set is not refused', $trim['status'], 'completed');

@@ -37,7 +37,7 @@ use Joomla\Database\ParameterType;
  * from-scratch article would have no ACL. Reskin edits existing rows, which is the path this is
  * built and tested for first; a create path grows an assets row here when a Proposal needs it.
  */
-final class JoomlaSiteWriter implements \SiteWriter
+final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
 {
     /**
      * The catalog (ADR 0080 §2): each kind declares its table, the only columns an Apply may set,
@@ -283,13 +283,61 @@ final class JoomlaSiteWriter implements \SiteWriter
         });
     }
 
-    /** All component writers share this database advisory lock, including old single edits. */
-    public function serialize(callable $work): array
+    /**
+     * All component writers share this database advisory lock, including old single edits.
+     *
+     * `$holder` ({action, operation, applyId}) is recorded beside the lock — one row, written in
+     * autocommit before the work starts its own transaction — so a caller that misses the lock learns
+     * who holds it and since when (WriterBusy). The record counts only while the lock's current owner
+     * is the connection that wrote it (IS_USED_LOCK), so a stale row is never reported.
+     */
+    public function serialize(callable $work, array $holder = []): array
     {
         $lock = 'tracy-write-' . substr(hash('sha256', Factory::getApplication()->get('db') . ':' . $this->db->getPrefix()), 0, 32);
-        if ((int) $this->db->setQuery('SELECT GET_LOCK(' . $this->db->quote($lock) . ', 0)')->loadResult() !== 1) throw new \RuntimeException('another writer is changing this site');
+        $t = \Timing::begin();
+        $held = (int) $this->db->setQuery('SELECT GET_LOCK(' . $this->db->quote($lock) . ', 0)')->loadResult() === 1;
+        \Timing::end('lock', $t);
+        if (!$held) throw new \WriterBusy('another writer is changing this site', $this->lockHolder($lock));
+        try {
+            $record = json_encode(['conn' => (int) $this->db->setQuery('SELECT CONNECTION_ID()')->loadResult(), 'since' => time()] + $holder);
+            $this->db->setQuery('INSERT INTO #__claudecowork_writer (id,holder) VALUES (1,' . $this->db->quote($record) . ') ON DUPLICATE KEY UPDATE holder=VALUES(holder)')->execute();
+        } catch (\Throwable $ignored) {
+            // A site whose update has not created the table yet still writes; its busy answer names no holder.
+        }
         try { return $work(); }
         finally { $this->db->setQuery('SELECT RELEASE_LOCK(' . $this->db->quote($lock) . ')')->loadResult(); }
+    }
+
+    /** Who holds `$lock` now, from the row its holder wrote — empty unless that row is the holder's own. */
+    private function lockHolder(string $lock): array
+    {
+        try {
+            $owner = (int) $this->db->setQuery('SELECT IS_USED_LOCK(' . $this->db->quote($lock) . ')')->loadResult();
+            $raw = $this->db->setQuery('SELECT holder FROM #__claudecowork_writer WHERE id=1')->loadResult();
+            $record = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($record) || $owner === 0 || (int) ($record['conn'] ?? -1) !== $owner) return [];
+            unset($record['conn']);
+            return $record;
+        } catch (\Throwable $ignored) {
+            return [];
+        }
+    }
+
+    /**
+     * A read that takes no lock, seen at one instant: InnoDB's consistent snapshot, so a writer that
+     * commits while the read is between two SELECTs is never half seen — and never blocked by it.
+     */
+    public function readSnapshot(callable $work): array
+    {
+        $this->db->setQuery('START TRANSACTION WITH CONSISTENT SNAPSHOT')->execute();
+        try {
+            $result = $work();
+            $this->db->setQuery('COMMIT')->execute();
+            return $result;
+        } catch (\Throwable $error) {
+            try { $this->db->setQuery('ROLLBACK')->execute(); } catch (\Throwable $ignored) {}
+            throw $error;
+        }
     }
 
     public function canCreate(string $kind): bool
@@ -335,6 +383,45 @@ final class JoomlaSiteWriter implements \SiteWriter
         $row = $this->db->setQuery($query)->loadAssoc();
         return $row === null ? null : $row;
     }
+
+    /**
+     * `read()` for a whole kind: one `SELECT *` under the same scope, instead of a list walk plus
+     * one read per row (see \BulkSiteReader for the measurement that asked for it).
+     */
+    public function readAll(string $kind, int $limit): array
+    {
+        if (in_array($kind, self::RELATION_KINDS, true) || $kind === 'languageFilter') throw new \RuntimeException("{$kind} cannot be read whole");
+        $pk = $this->pkFor($kind);
+        $query = $this->db->getQuery(true)
+            ->select('*')
+            ->from($this->db->quoteName($this->tableFor($kind)))
+            ->order($this->db->quoteName($pk) . ' ASC');
+        $this->applyScope($kind, $query);
+        $out = [];
+        foreach ($this->db->setQuery($query, 0, max(1, $limit))->loadAssocList() ?? [] as $row) $out[(int) $row[$pk]] = $row;
+        return $out;
+    }
+
+    /** `read()` for many ids: one `SELECT * … IN (…)` per 500 ids, under the same scope. */
+    public function readMany(string $kind, array $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if (in_array($kind, self::RELATION_KINDS, true)) return (new JoomlaRelations($this->db))->readMany($kind, $ids);
+        $table = $this->tableFor($kind);
+        $pk = $this->pkFor($kind);
+        $out = [];
+        foreach (array_chunk(array_values(array_filter($ids, fn (int $id): bool => $id > 0)), 500) as $chunk) {
+            $query = $this->db->getQuery(true)
+                ->select('*')
+                ->from($this->db->quoteName($table))
+                ->where($this->db->quoteName($pk) . ' IN (' . implode(',', $chunk) . ')');
+            $this->applyScope($kind, $query);
+            foreach ($this->db->setQuery($query)->loadAssocList() ?? [] as $row) $out[(int) $row[$pk]] = $row;
+        }
+        return $out;
+    }
+
+    private const RELATION_KINDS = ['articleAssociation', 'menuAssociation', 'moduleAssignment'];
 
     /** The only column per kind setVisibility() may touch. */
     private const VISIBILITY = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];

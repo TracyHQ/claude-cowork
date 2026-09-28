@@ -103,7 +103,9 @@ final class EngineFactory
         if ($configured !== '' && !$valid) $directory = self::libDir() . '/contracts/unconfigured';
         $writer = self::buildWriter();
         if (!$writer) return null;
-        return new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore(Factory::getContainer()->get(DatabaseInterface::class)), JPATH_ROOT, $directory);
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory))
+            ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
     }
 
     /**
@@ -162,6 +164,7 @@ final class EngineFactory
     {
         $params = ComponentHelper::getParams('com_claudecowork');
         $token = trim((string) $params->get('token', ''));
+        $contract = self::buildContract();
 
         $engine = new \Engine(
             $token === '' ? null : $token,
@@ -183,8 +186,20 @@ final class EngineFactory
             new \ChangeStamp(JPATH_ROOT),
             new JoomlaCoreUpgrader(),
             new JoomlaFilesRestorer(),
-            self::buildContract()
+            $contract
         );
+        // Apply's `expected_content_revisions` are checked against the very projection content.read
+        // serves, read through the same connection as the write, so inside the apply's transaction
+        // the receipt's new revisions see the rows it just wrote.
+        if ($contract) $engine->contentRevisions(static function () use ($contract): array {
+            require_once self::libDir() . '/ContentProjection.php';
+            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => $contract, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->revisions();
+        });
+        // Every write refuses a row an administrator has open in the Joomla editor — on any site,
+        // bound to a contract or not, since the admin's next Save would put the old words back.
+        $engine->locks(static function (array $rows): array {
+            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
+        });
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $baseline = self::constructionBaseline();
         if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);
@@ -198,6 +213,45 @@ final class EngineFactory
      * out, and `close()` so nothing downstream — a template, another plugin, an error page — gets
      * to append to what the caller will parse.
      */
+    /** The same authenticated reader at both doors; the site token is a service credential. */
+    public static function answerContent($app, ?array $request = null): void
+    {
+        self::loadEngine();
+        require_once self::libDir() . '/ContentProjection.php';
+        $app->setHeader('Content-Type', 'application/json; charset=utf-8', true);
+        $app->setHeader('Cache-Control', 'private, no-store', true);
+        $status=200;
+        try {
+            $configured=(string) ComponentHelper::getParams('com_claudecowork')->get('token','');
+            $provided=$request['token']??null;
+            if ($request===null) {
+                $header=$_SERVER['HTTP_AUTHORIZATION']??'';
+                $provided=preg_match('/^Bearer ([^\s]+)$/D',$header,$m)?$m[1]:null;
+            }
+            if (!is_string($provided) || !\Token::check($configured,$provided))
+                throw new \ContentReadError('CONTENT_UNAUTHENTICATED',401,'Authentication required');
+            if ($request===null && ($_SERVER['REQUEST_METHOD']??'')!=='GET') \ContentReader::bad();
+            $query=$request===null?\ContentReader::parse($_SERVER['QUERY_STRING']??''):($request['params']??[]);
+            if (!is_array($query) || (array_is_list($query) && $query!==[])) \ContentReader::bad();
+            // The relay identity is server-owned at Tracy's door. It scopes continuations only;
+            // it grants no CMS/write privileges. Direct Bearer calls use a distinct service scope.
+            $principal=$request===null?'service':($request['contentPrincipal']??'service');
+            if (!is_string($principal) || !preg_match('/^(service|seat:[a-f0-9]{64})$/D',$principal)) \ContentReader::bad();
+            $scope=$request===null?'published':($request['contentScope']??'published');
+            if ($scope!=='published') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content scope is not supported');
+            $principal=hash_hmac('sha256',$principal.':'.$scope,$configured);
+            \Door::reserveMemory();
+            \Door::reserveTime();
+            $reader=new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class),static fn()=>self::buildContract(),JPATH_ROOT,\Joomla\CMS\Uri\Uri::root());
+            $result=$reader->read($query,$principal);
+        } catch (\ContentReadError $e) { $status=$e->status; $result=$e->body(); }
+        catch (\Throwable $e) { $status=503; $result=['error'=>['code'=>'CONTENT_SOURCE_UNAVAILABLE','message'=>'Content source or binding could not be read']]; }
+        http_response_code($status);
+        $app->sendHeaders();
+        echo \ContentReader::encode($result);
+        $app->close();
+    }
+
     public static function answer(CMSApplicationInterface $app): void
     {
         self::loadEngine();
@@ -213,11 +267,18 @@ final class EngineFactory
             $request = [];
         }
 
-        $engine = self::build();
+        if (($request['action'] ?? null) === 'content.read') { self::answerContent($app, $request); return; }
+        // Built inside the timed answer so a timed call counts it (`boot` decodes the profile), in
+        // the order the door always had: build, headers, handle, encode.
+        echo \Timing::body($request, static function () use ($app, $request) {
+            $t = \Timing::begin();
+            $engine = self::build();
+            \Timing::end('boot', $t);
 
-        $app->setHeader('Content-Type', 'application/json', true);
-        $app->sendHeaders();
-        echo json_encode($engine->handle($request));
+            $app->setHeader('Content-Type', 'application/json', true);
+            $app->sendHeaders();
+            return $engine->handle($request);
+        });
         $app->close();
     }
 

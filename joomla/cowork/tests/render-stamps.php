@@ -154,3 +154,39 @@ checkTrue('the page cache is refused for it', str_contains($apiSrc, 'self::addRe
 checkTrue('and it is sent as uncachable (Joomla then adds no-store)', str_contains($apiSrc, '$app->allowCache(false)'));
 checkTrue('the category view names a category, never an article with its id', str_contains($apiSrc, "'com_content.categories'"));
 checkTrue('build.sh ships the rules with the engine', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'cp lib/*.php'));
+
+// --- category and tag links (unreleased) ------------------------------------------------------------
+check('a raw category link names its id', RenderStamps::viewHints('/index.php?option=com_content&view=category&id=12&Itemid=3', 'site.test', 'com_content', 'category'),
+    ['nonSef' => 12, 'path' => null, 'id' => 12, 'alias' => null]);
+check('a raw tag link names its id in the array form the tag view takes', RenderStamps::viewHints('/index.php?option=com_tags&view=tag&id[0]=7', 'site.test', 'com_tags', 'tag'),
+    ['nonSef' => 7, 'path' => null, 'id' => 7, 'alias' => null]);
+check('two tags in one link are no single record', RenderStamps::viewHints('/index.php?option=com_tags&view=tag&id[0]=7&id[1]=8', 'site.test', 'com_tags', 'tag'), null);
+check('a raw article link is not a category', RenderStamps::viewHints('/index.php?option=com_content&view=article&id=12', 'site.test', 'com_content', 'category'), null);
+check('a SEF link names the alias its route is checked against', RenderStamps::viewHints('/en/news/disclosure', 'site.test', 'com_content', 'category'),
+    ['nonSef' => null, 'path' => '/en/news/disclosure', 'id' => null, 'alias' => 'disclosure']);
+check('a raw link to another host is not this site', RenderStamps::viewHints('https://elsewhere.test/index.php?option=com_content&view=category&id=12', 'site.test', 'com_content', 'category'), null);
+
+$taxResolve = static function (array $hrefs): array {
+    $known = ['/en/news/disclosure' => 'category:260:disclosure', '/en/tags/factory' => 'tag:25:factory'];
+    return array_intersect_key($known, array_flip($hrefs));
+};
+$crumbs = '<ol class="crumbs"><li><a href="/en/news">News</a></li><li><a href="/en/news/disclosure"><span>Disclosure</span></a></li><li>Tender</li></ol>';
+check('each link to a category is stamped on the <a> itself, nothing else',
+    RenderStamps::stampLinks($crumbs, $taxResolve, 'mod_breadcrumbs'),
+    '<ol class="crumbs"><li><a href="/en/news">News</a></li><li><a data-tracy-src="category:260:disclosure block:mod_breadcrumbs" href="/en/news/disclosure"><span>Disclosure</span></a></li><li>Tender</li></ol>');
+$card = '<li data-tracy-src="article:550:tender"><p class="cat"><a href="/en/news/disclosure">Disclosure</a></p><h3><a href="/en/news/disclosure/tender">Tender</a></h3><a class="tag" href="/en/tags/factory">factory</a></li>';
+check('inside an article card, the category and tag links name their own records (component: no block)',
+    RenderStamps::stampLinks($card, $taxResolve),
+    '<li data-tracy-src="article:550:tender"><p class="cat"><a data-tracy-src="category:260:disclosure" href="/en/news/disclosure">Disclosure</a></p><h3><a href="/en/news/disclosure/tender">Tender</a></h3><a data-tracy-src="tag:25:factory" class="tag" href="/en/tags/factory">factory</a></li>');
+check('a link already stamped keeps its stamp', RenderStamps::stampLinks('<a data-tracy-src="module:1" href="/en/news/disclosure">D</a>', $taxResolve),
+    '<a data-tracy-src="module:1" href="/en/news/disclosure">D</a>');
+check('a fragment without links is returned as it is, the resolver never asked',
+    RenderStamps::stampLinks('<p>No links</p>', static function () { throw new RuntimeException('asked'); }), '<p>No links</p>');
+$many = str_repeat('<a href="/x">x</a>', 1) . implode('', array_map(fn($i) => '<a href="/p' . $i . '">p</a>', range(1, RenderStamps::MAX_LINKS + 1)));
+check('a fragment with more links than the cap is left alone', RenderStamps::stampLinks($many, $taxResolve), $many);
+checkTrue('the plugin listens to onAfterDispatch (the component output)', str_contains($apiSrc, "'onAfterDispatch' => 'onAfterDispatch'"));
+checkTrue('the component output gets category and tag stamps', str_contains($apiSrc, "setBuffer(\\RenderStamps::stampLinks(\$buffer, [TaxonomyLinks::class, 'resolve'])"));
+checkTrue('a menu module never gets them: a menu prints menu item titles', str_contains($apiSrc, "if (\$type !== 'mod_menu') {"));
+$taxSrc = file_get_contents(__DIR__ . '/../plg_system_claudecoworkapi/src/Extension/TaxonomyLinks.php');
+checkTrue('a category a menu item opens directly is not stamped as the category', str_contains($taxSrc, 'if (isset($shown[(int) $row->id]))'));
+checkTrue('a link is tied only when exactly one candidate route is that link', str_contains($taxSrc, "if (\\count(\$confirmed) === 1)"));

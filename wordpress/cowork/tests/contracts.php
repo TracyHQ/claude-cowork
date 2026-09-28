@@ -115,12 +115,21 @@ $realDir = __DIR__ . '/../lib/contracts/tracy-business/wp7/1.1.0';
 $real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
 $real->preview('tracy-business/wp7/1.1.0');
 check('the shipped Tracy Business profile has its ten entities', count($real->entities()), 10);
-check('and its 278 slots', count($real->slots()), 278);
+check('and its 303 slots', count($real->slots()), 303);
+check('25 of them pictures, each with the demo it replaces', count(array_filter($real->slots(),
+    static fn(array $slot): bool => ($slot['type'] ?? '') === 'image' && is_string($slot['sample'] ?? null) && is_int($slot['sampleId'] ?? null))), 25);
 check('and 205 demo rows to hide', count($real->demoTrim()->rows()), 205);
 check('and 41 editions', count($real->editionLanguages()), 41);
 $realBase = DemoTrimProfile::baseHash($realDir);
 check('its demo-trim map is pinned to the three base files', json_decode((string) file_get_contents($realDir . '/demo-trim-map.json'), true)['baseHash'], $realBase);
 check('and so is its editions profile', json_decode((string) file_get_contents($realDir . '/editions.json'), true)['baseHash'], $realBase);
+
+// A site built from the Tracy Base quickstart names this profile; without it that site cannot bind.
+$base = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+$base->preview('tracy-base/wp7/1.1.0');
+check('the shipped Tracy Base profile loads', $base->id(), 'tracy-base/wp7/1.1.0');
+check('with its seven entities', count($base->entities()), 7);
+check('and its ten slots', count($base->slots()), 10);
 
 // ── unbound: nothing changes ────────────────────────────────────────────────────────────────
 
@@ -165,18 +174,13 @@ check('inspect on a bound site reads bound', $insp['bound'], true);
 check('and needs no contract parameter any more', $insp['contract'], 'test-design/wp7/1.0.0');
 check('another contract named on a bound site is refused', $door($E, 'inspect', ['contract' => 'bad-trim/wp7/1.0.0'])['error'], 'contract_unavailable');
 
-// ── the blocked list, and the reads that stay open ─────────────────────────────────────────
-
-foreach (['content.update', 'content.delete', 'content.language', 'language.install', 'plugin.install', 'plugin.activate',
-    'plugin.selfUpdate', 'theme.install', 'theme.activate', 'theme.style', 'theme.palette', 'db.cleanup', 'db.restore', 'db.purge'] as $blocked) {
-    check("bound: {$blocked} is content_only", $call($E, $blocked, ['apply_id' => 'x', 'id' => 10, 'kind' => 'post', 'fields' => ['post_title' => 'x'], 'tables' => ['t']])['error'], 'content_only');
-}
+// ── nothing is blocked (Tracy ADR 0022), and the reads stay open ───────────────────────────
 check('bound: info still answers', $call($E, 'info')['ok'], true);
 check('bound: content.get still answers', $call($E, 'content.get', ['id' => 10])['ok'], true);
 check('bound: apply.list still answers', $call($E, 'apply.list', ['apply_id' => 'none'])['ok'], true);
 check('bound: site.stats still answers', $call($E, 'site.stats')['ok'], true);
-check('bound: the store option is not writable through the seal either',
-    $call($E, 'content.update', ['apply_id' => 'x', 'kind' => 'option', 'key' => '_tracy_content_contract', 'fields' => ['value' => '']])['error'], 'content_only');
+check("bound: the contract's own record is not writable through content.update",
+    $call($E, 'content.update', ['apply_id' => 'x', 'kind' => 'option', 'key' => '_tracy_content_contract', 'fields' => ['value' => '']])['error'], 'bad_params');
 
 // The reads that need a dumper, walker or package manager: an engine on fakes, sealed by its store.
 WP_Fake::$options['_tracy_content_contract'] = json_encode(['schemaVersion' => 1, 'contract' => 'test-design/wp7/1.0.0', 'contractHash' => 'x', 'revision' => 'y', 'ids' => [], 'demoTrim' => null, 'sourceLanguage' => null, 'boundAt' => 'now']);
@@ -191,7 +195,13 @@ foreach (['db.tables' => [], 'db.dump' => ['table' => 'wp_posts'], 'files.list' 
     'plugin.list' => [], 'theme.list' => [], 'core.manifest' => [], 'content.list' => [], 'content.get' => ['id' => 1]] as $read => $params) {
     check("bound: {$read} still answers", $call($R, $read, $params)['ok'], true);
 }
-check('bound: db.cleanup on the fakes engine is content_only too', $call($R, 'db.cleanup', ['params' => ['tables' => ['wp_x']]])['error'], 'content_only');
+// Tracy ADR 0022: every write an unbound site takes, a bound one takes — on the fakes engine, so the
+// real site the tests below write through is left as it was.
+foreach (['content.update', 'content.delete', 'content.language', 'language.install', 'plugin.install', 'plugin.activate',
+    'plugin.selfUpdate', 'theme.install', 'theme.activate', 'theme.style', 'theme.palette', 'db.cleanup', 'db.restore', 'db.purge'] as $open) {
+    $answer = $call($R, $open, ['apply_id' => 'open-' . $open, 'id' => 1, 'kind' => 'post', 'fields' => ['post_title' => 'x'], 'tables' => ['wp_x']]);
+    checkTrue("bound: {$open} is not refused by the contract", ($answer['error'] ?? '') !== 'content_only' && ($answer['error'] ?? '') !== 'contract_unavailable');
+}
 
 // A corrupt store locks, it never opens.
 WP_Fake::$options['_tracy_content_contract'] = '{"not":"a binding"}';
@@ -230,6 +240,8 @@ $applied = $door($E, 'apply', $applyParams([
     'header.tagline' => 'Loud since 1999',
 ]));
 check('an apply of every slot lands', $applied['ok'], true);
+// As the Joomla receiver answers since #316: the revision this apply left, so the next apply needs no inspect.
+check('the apply names the revision it left', $applied['afterRevision'] ?? null, $applied['revision']);
 check('one write per row: two options, one page, one part', array_column($applied['written'], 'kind'), ['option', 'option', 'post', 'templatePart']);
 checkTrue('at a new revision', $applied['revision'] !== $revision0);
 check('the option changed', WP_Fake::$options['blogname'], 'Acme {site.name}');
@@ -254,16 +266,17 @@ $revision1 = $applied['revision'];
 
 $png = "\x89PNG\r\n\x1a\nfake";
 $mediaPath = 'wp-content/uploads/tracy-content/' . hash('sha256', $png) . '.png';
-check('bound: media.upload refuses a path outside tracy-content', $call($E, 'media.upload', ['apply_id' => 'm1', 'path' => 'wp-content/uploads/logo.png', 'content_b64' => base64_encode($png)])['error'], 'content_only');
-check('bound: and a name that is not the sha256 of the bytes', $call($E, 'media.upload', ['apply_id' => 'm1', 'path' => 'wp-content/uploads/tracy-content/' . str_repeat('a', 64) . '.png', 'content_b64' => base64_encode($png)])['error'], 'content_only');
-check('bound: and a contract- apply_id', $call($E, 'media.upload', ['apply_id' => 'contract-9', 'path' => $mediaPath, 'content_b64' => base64_encode($png)])['error'], 'content_only');
+check('bound: media.upload outside tracy-content is an ordinary upload', $call($E, 'media.upload', ['apply_id' => 'm0', 'path' => 'wp-content/uploads/logo.png', 'content_b64' => base64_encode($png)])['ok'], true);
+check('bound: which the ordinary revert takes back', $call($E, 'apply.revert', ['apply_id' => 'm0'])['ok'], true);
+check('bound: and a name that is not the sha256 of the bytes', $call($E, 'media.upload', ['apply_id' => 'm1', 'path' => 'wp-content/uploads/tracy-content/' . str_repeat('a', 64) . '.png', 'content_b64' => base64_encode($png)])['error'], 'bad_params');
+check('bound: and a contract- apply_id', $call($E, 'media.upload', ['apply_id' => 'contract-9', 'path' => $mediaPath, 'content_b64' => base64_encode($png)])['error'], 'bad_params');
 check('bound: a content-addressed image under its own apply lands', $call($E, 'media.upload', ['apply_id' => 'm1', 'path' => $mediaPath, 'content_b64' => base64_encode($png)])['ok'], true);
-check('bound: reverting a non-contract apply is refused', $call($E, 'apply.revert', ['apply_id' => 'm1'])['error'], 'content_only');
+check('bound: a non-contract apply takes the ordinary revert', $call($E, 'apply.revert', ['apply_id' => 'm1'])['ok'], true);
 
 $second = $door($E, 'apply', ['expected_revision' => $revision1, 'apply_id' => 'contract-2', 'request_id' => 'r3', 'changes' => ['home.hero.eyebrow' => 'Since 2000']]);
 check('a second apply at the new revision lands', $second['ok'], true);
 $lifo = $call($E, 'apply.revert', ['apply_id' => 'contract-1']);
-check('the earlier apply cannot be reverted over a later one', $lifo['error'], 'content_only');
+check('the earlier apply cannot be reverted over a later one', $lifo['error'], 'conflict');
 checkTrue('and says so', strpos($lifo['message'], 'Later content') !== false);
 $rev2 = $call($E, 'apply.revert', ['apply_id' => 'contract-2']);
 check('the latest apply reverts', $rev2['reverted'], 2);
@@ -293,24 +306,64 @@ $refused = static function (string $name, callable $break, string $expect) use (
     checkTrue("and names it: {$expect}", $found);
     check('leaving the site unbound', WP_Fake::$options['_tracy_content_contract'] ?? null, null);
 };
-$refused('a drifted theme file', static function (array $t): void {
+// Tracy ADR 0022: a site that differs from the released design is bound all the same — the
+// difference is a warning that names it. What makes a slot unsafe (below: a page that is not there,
+// a slug twice) is still refused.
+$drifted = static function (string $name, callable $break, string $expect) use ($SITE, $FIXTURES, $door): void {
+    $t = contractSite($SITE, $FIXTURES);
+    $break($t);
+    $answer = $door($t['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0']);
+    check("bind takes {$name}", $answer['ok'] ?? false, true);
+    $found = false;
+    foreach ($answer['warnings'] ?? [] as $warning) {
+        if (strpos((string) $warning['message'], $expect) !== false && $warning['severity'] === 'warning') {
+            $found = true;
+        }
+    }
+    checkTrue("and warns about it: {$expect}", $found);
+};
+$drifted('a drifted theme file', static function (array $t): void {
     file_put_contents($t['root'] . '/wp-content/themes/test-theme/style.css', '/* edited */');
 }, 'Theme file changed');
-$refused('an unexpected theme file', static function (array $t): void {
+$drifted('an unexpected theme file', static function (array $t): void {
     file_put_contents($t['root'] . '/wp-content/themes/test-theme/extra.php', '<?php');
 }, 'Unexpected theme file');
-$refused('an edited template part', static function (array $t): void {
+$drifted('an edited template part', static function (array $t): void {
     WP_Fake::$posts[71]['post_content'] = '<!-- wp:paragraph --><p>Edited footer</p><!-- /wp:paragraph -->';
 }, 'Template part footer was edited');
-$refused('a page changed outside its slots', static function (array $t): void {
+$drifted('a page changed outside its slots', static function (array $t): void {
     WP_Fake::$posts[10]['post_content'] = str_replace('class="eyebrow"', 'class="eyebrow big"', WP_Fake::$posts[10]['post_content']);
 }, 'differs from the lock outside its slots');
-$refused('a governed part changed outside its slots', static function (array $t): void {
+$drifted('a governed part changed outside its slots', static function (array $t): void {
     WP_Fake::$posts[70]['post_content'] = str_replace('<!-- wp:site-title /-->', '', WP_Fake::$posts[70]['post_content']);
 }, 'differs from the lock outside its slots');
-$refused('a pinned option that differs', static function (array $t): void {
+$drifted('a pinned option that differs', static function (array $t): void {
     WP_Fake::$options['stylesheet'] = 'other';
 }, 'Option stylesheet differs');
+// Tracy ADR 0022, measured 26/09 on the local stand: an agent renamed a bound page's slug through
+// WordPress, and every apply on the site refused "Missing or ambiguous entity (0 rows)". A bound
+// page is found by the id it was bound with; one gone from the site closes its own slots only.
+$boundSite = static function () use ($SITE, $FIXTURES, $door): array {
+    $t = contractSite($SITE, $FIXTURES);
+    check('a site to rename and delete from binds', $door($t['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0'])['ok'], true);
+    return $t;
+};
+$t = $boundSite();
+WP_Fake::$posts[10]['post_name'] = 'start';
+$seen = $door($t['engine'], 'inspect');
+check('a bound page with a new slug still inspects', $seen['ok'], true);
+checkTrue('and the new slug is a warning', in_array('Entity page-home has another post_name', array_column($seen['warnings'] ?? [], 'message'), true));
+$moved = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-slug', 'request_id' => 'slug', 'changes' => ['home.hero.eyebrow' => 'Since 1999']]);
+check('its slots are written through the id it was bound with', [$moved['ok'], strpos(WP_Fake::$posts[10]['post_content'], 'Since 1999') !== false], [true, true]);
+$t = $boundSite();
+unset(WP_Fake::$posts[10]);
+$seen = $door($t['engine'], 'inspect');
+check('a bound page gone from the site leaves the door open', $seen['ok'], true);
+checkTrue('and is named in the warnings', in_array('Missing or ambiguous entity (0 rows): page-home', array_column($seen['warnings'] ?? [], 'message'), true));
+$gone = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-gone', 'request_id' => 'gone', 'changes' => ['home.hero.eyebrow' => 'x']]);
+check('its own slots are refused, one by one', array_column($gone['errors'] ?? [], 'code'), ['SLOT_UNKNOWN']);
+$other = $door($t['engine'], 'apply', ['expected_revision' => $seen['revision'], 'apply_id' => 'contract-other', 'request_id' => 'other', 'changes' => ['site.name' => 'Acme']]);
+check('every other slot is still written', $other['ok'], true);
 $refused('a page that is not there', static function (array $t): void {
     unset(WP_Fake::$posts[10]);
 }, 'Missing or ambiguous entity (0 rows): page-home');
@@ -318,7 +371,7 @@ $refused('a slug that is there twice without a language to tell them apart', sta
     WP_Fake::$posts[11] = WP_Fake::$posts[10] + [];
     WP_Fake::$posts[11]['ID'] = 11;
 }, 'Missing or ambiguous entity (2 rows)');
-$refused('a page whose status moved', static function (array $t): void {
+$drifted('a page whose status moved', static function (array $t): void {
     WP_Fake::$posts[10]['post_status'] = 'draft';
 }, 'another status');
 $refused('a slot whose block is gone', static function (array $t): void {
@@ -376,7 +429,7 @@ check('the binding records the trim', $trimState['demoTrim']['status'], 'complet
 check('and how many it hid', $trimState['demoTrim']['hidden'], 3);
 check('inspect stays clean', $trimState['problems'], []);
 check('a rerun is idempotent', $door($D, 'demoTrim.apply', ['apply_id' => 'dtrim-2', 'request_id' => 't2'])['alreadyTrimmed'], true);
-check('apply.revert of a trim is not the way back', $call($D, 'apply.revert', ['apply_id' => 'dtrim-1'])['error'], 'content_only');
+check('apply.revert of a trim is not the way back', $call($D, 'apply.revert', ['apply_id' => 'dtrim-1'])['error'], 'bad_params');
 $untrimmed = $door($D, 'demoTrim.revert', ['apply_id' => 'dtrim-3', 'request_id' => 't3']);
 check('revert shows them again', $untrimmed['status'], 'reverted');
 check('restoring from', [WP_Fake::$posts[26]['post_status'], WP_Fake::$posts[28]['post_status']], ['publish', 'publish']);

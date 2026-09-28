@@ -9,52 +9,57 @@ POST /wp-admin/admin-ajax.php?action=claude_cowork
 
 ## What it can do
 
-Every action, and what happens to it once the site is **sealed** — bound to a content-only
-quickstart contract (below). A read answers the same either way. A write is either refused with
-`content_only`, or still allowed under the rule in the last column.
+Every action, and what happens to it once the site is **bound** to a quickstart contract (below).
+Since Tracy ADR 0022 (26/09/2026) a contract recommends how to keep the quickstart's design and
+locks nothing: a bound site takes every action an unbound one does, with the few rules in the last
+column. Where the site differs from its design, the contract door says so in `warnings`.
 
-| Action | Kind | Unbound site | Sealed site |
+| Action | Kind | Unbound site | Bound site |
 | --- | --- | --- | --- |
 | `info` | read | ok | ok |
 | `site.stats` | read | ok | ok |
 | `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
 | `db.tables` | read | ok | ok |
 | `db.dump` | read | ok | ok |
-| `db.cleanup` | write | ok | `content_only` |
-| `db.restore` | write | ok | `content_only` |
-| `db.purge` | write | ok | `content_only` |
+| `db.cleanup` | write | ok | ok |
+| `db.restore` | write | ok | ok |
+| `db.purge` | write | ok | ok |
 | `files.list` | read | ok | ok |
 | `files.pack` | read | ok | ok |
 | `file.read` | read | ok | ok |
 | `plugin.list` | read | ok | ok |
-| `plugin.install` | write | ok | `content_only` |
-| `plugin.activate` | write | ok | `content_only` |
-| `plugin.selfUpdate` | write | ok | `content_only` |
+| `plugin.install` | write | ok | ok |
+| `plugin.activate` | write | ok | ok |
+| `plugin.selfUpdate` | write | ok | ok |
 | `theme.list` | read | ok | ok |
-| `theme.install` | write | ok | `content_only` |
-| `theme.activate` | write | ok | `content_only` |
-| `theme.style` | write | ok | `content_only` |
-| `theme.palette` | read with no `colors`, else write | ok | read ok; write `content_only` |
+| `theme.install` | write | ok | ok |
+| `theme.activate` | write | ok | ok |
+| `theme.style` | write | ok | ok |
+| `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
-| `language.install` | write | ok | `content_only` |
+| `language.install` | write | ok | ok |
 | `content.list` | read | ok | ok |
 | `content.get` | read | ok | ok |
-| `content.update` | write | ok | `content_only` — slot values go through `content.contract` `apply` |
-| `content.language` | write | ok | `content_only` |
-| `content.delete` | write | ok | `content_only` — demo posts are hidden through `content.contract` `demoTrim.apply` |
-| `media.upload` | write | ok | allowed only at `wp-content/uploads/tracy-content/<sha256 of the bytes>.(png\|jpg\|webp)`, under an `apply_id` that does not start with `contract-` |
-| `apply.revert` | write | ok | allowed only for an `apply_id` holding exactly one `content.contract` receipt, and only the latest one (its `afterRevision` must be the current revision); the site must pass its inspect afterwards |
+| `content.update` | write | ok | ok |
+| `content.language` | write | ok | ok |
+| `content.delete` | write | ok | ok |
+| `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
+| `apply.revert` | write | ok | ok; a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
+| `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
 
 ## The content contract
 
-A site built from a Tracy quickstart is **sealed**: it keeps the design the release shipped, and
-the customer's agent changes words — the value of every slot the profile's `content-map.json`
-names — and nothing else. The profiles live in [`lib/contracts/`](lib/contracts/README.md), one
+A site built from a Tracy quickstart is **bound** to its release's content contract: the
+profile's `content-map.json` names every slot a visitor's words live in, and `content.contract`
+changes them fast and undoably while keeping the design. The contract is the design's baseline, not
+a lock (Tracy ADR 0022): anything else changes the usual WordPress way, and the door reports where
+the site differs from the release as `warnings`; it refuses only a difference its own write makes. The profiles live in [`lib/contracts/`](lib/contracts/README.md), one
 directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
 
 - The seal is one option, `_tracy_content_contract` (JSON, not autoloaded). Which profile a site
@@ -62,24 +67,38 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
 - `content.contract` takes `operation`:
-  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme
     file changed or added under `fileRoots`, a pinned option, a template part, an entity
     missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
-    slot masked as `{{slot}}`.
+    slot masked as `{{slot}}` — except an image slot, which is put back to its demo picture
+    (`sample` + `sampleId`), so a page nobody touched hashes to the bytes it shipped as.
+    `imageSlots` maps each image slot to that demo picture: a new one must have its shape.
   - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
     problem: the baseline is the released lock, never a snapshot of the site as found.
   - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:
     {slotKey | locale::slotKey: value}`, optional `evidence`. Every value is checked before any
     write: known slot, `maxCharacters`, no `<` `>` or control characters, no `{directive}`
     (identity tokens `{site.*}` `{contact.*}` `{social.*}` are allowed), links limited to
-    `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. One read and one
+    `https://`, same-host `http://`, `mailto:`, `tel:`, a path or an anchor. An image slot
+    (`type: "image"`, target `attr: "src"` on a `core/image` block) takes a
+    `wp-content/uploads/….png|jpg|jpeg|webp` path that is an attachment of this site, within 0.02
+    of its demo picture's aspect ratio; the write sets the `src`, the block `id` and the
+    `wp-image-N` class. Anything else is `SLOT_IMAGE_INVALID` (recoverable). The usual road is
+    `media.upload` to `tracy-content/<sha256>` under a non-`contract-` id, then this apply. One read and one
     write per row. The same `request_id` with the same content replays the stored result; a new
     request under a used `apply_id` is refused. With Polylang, a write of `blogname` or
     `blogdescription` also writes the same value as every language's string translation of it
     (`PLL_MO`, keyed by the value before the write, the profile's `sample` and the new value —
     Polylang serves those entries in front of the option), the undo entry keeps each
     language's `translations` as they were, and `apply.revert` restores them with the option.
+    A slot whose post or template part someone has open in the WordPress editor (a live
+    `_edit_lock`, by core's `wp_check_post_lock` rule: 150 s, filter
+    `wp_check_post_lock_window`) refuses the whole apply as `SLOT_LOCKED_BY_USER` (recoverable)
+    with `lockedBy`; there is no flag to write anyway. `content.update`, `content.delete`,
+    `content.language` and `apply.revert` refuse the same way (`error: "locked"`, `code`,
+    `lockedBy`), and `content.read` lists `lockedBy` on every row (null when nobody holds it) —
+    outside every revision, so a heartbeat moves none.
   - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
     `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
     reported; refused while the site has a Polylang language the profile ships no edition for.
@@ -104,7 +123,7 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     from, applyId} | null`. `revert` puts all five values back as recorded (`WPLANG` absent
     again when it was absent, `hide_default` as it was),
     clears the log and takes the record off: `{ok, status: 'reverted', language: <slug back>}`.
-    `apply.revert` refuses an `slang-` id on a sealed site; on an unbound site it undoes the
+    `apply.revert` refuses an `slang-` id on a bound site; on an unbound site it undoes the
     same step from the log. No Polylang is `unavailable`; no editions profile is `unsupported`.
   - `multilingual.retire` (prefix `mlang-`) — `keep: [tags as the questionnaire spells them:
     "en-us", "vi", "de-de"]`, `apply_id`, `request_id`. Sets the LIVE edition set: every edition
@@ -123,17 +142,55 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     every edition, and a restore brings back only what the retire hid.
   - `multilingual.restore` (`apply_id` = the `mlang-` id on record) — puts every row of that
     pass back (newest first), clears its log and takes the record off the binding:
-    `{ok, restored, applyId}`. `apply.revert` refuses an `mlang-` id on a sealed site.
+    `{ok, restored, applyId}`. `apply.revert` refuses an `mlang-` id on a bound site.
   - While a retired set is on record, `lib/MultilingualHooks.php` (loaded on every request,
     engine-free) keeps those languages out of Polylang's switcher — the html list and dropdown
     through `pll_the_languages`, the raw list through `pll_the_languages_args` +
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
-- Error codes: `content_only` (a structural write on a sealed site), `contract_unavailable`
+- Warnings: `PRESENTATION_DRIFT` with `severity: warning` on `inspect`, `bind` and `apply` answers,
+  one per difference from the released design. Error codes: `contract_unavailable`
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
   `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
   (another writer holds the site's lock).
+
+## Content API (`/content.json`)
+
+`GET <home>/content.json` with `Authorization: Bearer <token>` answers the site's live content in
+the `tracy-content/v1` shape (schema and validator live in TCH `packages/cms/tracy-content-api`):
+summaries by default, one content in full by `id`, `type`/`locale`/`limit` filters, and signed
+cursors that expire (409) as soon as anything the listing read changes. It is read only — it
+renders nothing, runs no shortcode and writes nothing — and every answer is `private, no-store`.
+The same reader answers the `content.read` action: `params` is the same flat query, and the
+authority sits beside it at the top level — `contentScope` (`published` by default, or `editorial`
+to include drafts, scheduled and private rows) and `contentPrincipal` (`site-token`, or
+`seat:<64 hex>` so a cursor belongs to one seat). Both are set by the server that holds the token
+and relays a seat — never by an agent. The answer is the envelope itself, or `{error}` with the
+HTTP status the spec gives. A token in the query string is never read. The path is only taken when
+no file or post already answers it. When a page's HTML alone exceeds the 256 KiB budget the detail
+is 413 with `error.links.firstBlock`: a signed walk, block by block, in the same snapshot.
+
+Each request reads from one REPEATABLE READ snapshot, released once it is answered; a write that
+lands during a request is either wholly in the answer or wholly out of it, and the next page's
+cursor answers 409. A site with a persistent object cache answers 501 until that is measured.
+
+`ids` asks for up to 100 contents in full in one call — a list in the action's `params`, one
+comma-separated value over GET — and may carry `maxBytes`, nothing else. Building the projection is
+nearly the whole cost of a read (~100 ms on a 950-row site, against 1-5 ms per detail), so a relay
+indexing a site reads it in batches instead of one call per content. Each content that fits whole is
+answered exactly as `{id}` answers it; the rest are named in `pagination.pending` (did not fit, pages
+its blocks, or holds a value over budget: read it alone) and `pagination.missing` (no readable
+content now). Nothing is cut and nothing pages. A batch is one snapshot and writes nothing, like
+every read, so reads may overlap freely.
+
+Content ids are opaque and survive a new title, slug, order or domain: each row gets a random uid
+once, and ids are keyed by the site's content seed. Until `content.identity` has run on a site, the
+reader answers 501; after it, rows WordPress inserts get their uid at once. A fork calls
+`content.identity {newSite: true, requestId}` — a new seed, so new ids and no valid old cursor; the
+same request id never rotates twice. A restore of the same site keeps its seed. A database copied by
+hand keeps the seed too, and so the ids, until whoever copied it declares the fork. Writes still go
+through `content.contract` `apply`.
 
 ## Layout
 

@@ -17,6 +17,7 @@ require_once __DIR__ . '/../lib/SiteWriter.php';
 require_once __DIR__ . '/../lib/ChangeStamp.php';
 require_once __DIR__ . '/../lib/Engine.php';
 require_once __DIR__ . '/../lib/Door.php';
+require_once __DIR__ . '/../lib/ContentIdentity.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
 // PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
@@ -831,7 +832,7 @@ check('a wrong token installs nothing', $noToken['error'], 'unauthorized');
 // exactly what was there, and an edit whose undo cannot be recorded is rolled back rather than
 // left standing (ADR 0048).
 
-class FakeSiteWriter implements SiteWriter
+class FakeSiteWriterBase implements SiteWriter
 {
     /** @var array<string,array<int,array<string,?scalar>>> */
     public array $store = [];
@@ -960,6 +961,37 @@ class FakeSiteWriter implements SiteWriter
     public function purgeCache(): void
     {
         $this->purges++;
+    }
+}
+
+// Every double reads the way the real writer does — in bulk — unless COWORK_TEST_READS=paged, which
+// runs the whole suite again through the list-and-read walk a writer without BulkSiteReader gets.
+// The two runs must agree test for test: that is the proof the bulk path changes no answer.
+if (getenv('COWORK_TEST_READS') === 'paged') {
+    class FakeSiteWriter extends FakeSiteWriterBase {}
+} else {
+    class FakeSiteWriter extends FakeSiteWriterBase implements BulkSiteReader
+    {
+        /** Calls per method, so a test can show a contract call reads in bulk. */
+        public array $reads = ['read' => 0, 'list' => 0, 'readAll' => 0, 'readMany' => 0];
+        public function read(string $kind, int $id): ?array { $this->reads['read']++; return parent::read($kind, $id); }
+        public function list(string $kind, int $offset, int $limit): array { $this->reads['list']++; return parent::list($kind, $offset, $limit); }
+        // Built from read() on purpose — a subclass that overrides read() is answered the same way here.
+        public function readAll(string $kind, int $limit): array
+        {
+            $this->reads['readAll']++;
+            $ids = array_keys($this->store[$kind] ?? []); sort($ids);
+            $out = [];
+            foreach (array_slice($ids, 0, $limit) as $id) { $row = $this->read($kind, (int) $id); $this->reads['read']--; if ($row !== null) $out[(int) $id] = $row; }
+            return $out;
+        }
+        public function readMany(string $kind, array $ids): array
+        {
+            $this->reads['readMany']++;
+            $out = [];
+            foreach ($ids as $id) { $row = $this->read($kind, (int) $id); $this->reads['read']--; if ($row !== null) $out[(int) $id] = $row; }
+            return $out;
+        }
     }
 }
 
@@ -1787,12 +1819,24 @@ check('batch undo succeeds', $undo['ok'], true);
 check('batch undo restores and removes its create', $batchWriter->store['article'], [1 => ['title' => 'Original']]);
 
 require __DIR__ . "/contracts.php";
+require __DIR__ . "/content-reader.php";
+require __DIR__ . "/content-budget.php";
+require __DIR__ . "/content-batch.php";
 require __DIR__ . "/multilingual.php";
 require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
 require __DIR__ . "/multilingual-contracts.php";
+require __DIR__ . "/contract-rows.php";
+require __DIR__ . "/content-revisions.php";
+require __DIR__ . "/content-addresses.php";
+require __DIR__ . "/content-locks.php";
+require __DIR__ . "/content-natives.php";
+require __DIR__ . "/content-extras.php";
+require __DIR__ . "/contract-ops-locks.php";
+require __DIR__ . "/contract-cost.php";
+require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";

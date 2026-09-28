@@ -23,6 +23,7 @@
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/IdentityTokens.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ContractProblem.php';
 
 /**
  * Where the binding lives. The plugin keeps it in an option; the tests keep it in memory.
@@ -38,6 +39,22 @@ interface ContractStore
 
     /** A new baseline after a validated apply, trim or relabel. */
     public function replace(array $binding): void;
+}
+
+/**
+ * The `content.read` identity and revision of what a contract write touches, answered by the
+ * content reader itself, so `expected_content_revisions` compares against the very value
+ * `contents[].revision` showed and no second formula exists to drift from it.
+ */
+interface ContentRevisions
+{
+    /**
+     * @param array<int|string,array{kind:string,id:int,key:string}> $targets one row a write lands on:
+     *        `post`/`templatePart` by id (a theme-file part by its slug), `option`/`optionTranslation` by name
+     * @return array<int|string,?array{id:string,revision:string}> per target, same keys; null when the
+     *         reader lists no content for it
+     */
+    public function of(array $targets): array;
 }
 
 /** The profile this site names cannot be used at all — as opposed to the site failing its checks. */
@@ -82,14 +99,26 @@ final class QuickstartContract
     private array $acceptedTrims = [];
     /** Options resolved once per inspect, so the URL allow-list does not read `home` per slot. */
     private ?string $homeHost = null;
+    private ?ContentRevisions $revisions;
+    private ?ImageLibrary $images;
+    /** @var array<string,int> attachment id of each picture an apply's checks resolved, by path */
+    private array $imageIds = [];
+
+    /**
+     * An image slot's value: a picture already in this site's uploads. The same folder
+     * `media.upload` writes to; `..` is refused separately because the pattern allows dots.
+     */
+    private const IMAGE_PATH = '~^wp-content/uploads/[A-Za-z0-9/_.-]+\.(png|jpe?g|webp)$~D';
 
     /**
      * @param string $root         The webroot (no trailing slash), where `fileRoots` are checked.
      * @param string $contractsDir `lib/contracts`, holding one directory per profile id.
      * @param string $configured   The `claude_cowork_contract` setting, or '' when none is set.
      */
-    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '')
+    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $contractsDir, string $configured = '', ?ContentRevisions $revisions = null, ?ImageLibrary $images = null)
     {
+        $this->revisions = $revisions;
+        $this->images = $images;
         $this->writer = $writer;
         $this->store = $store;
         $this->root = rtrim($root, '/');
@@ -438,6 +467,13 @@ final class QuickstartContract
         $this->resolve($requested);
         $binding = $this->store->load();
         $problems = [];
+        // 🔒 WHERE THE SITE DIFFERS FROM ITS QUICKSTART'S DESIGN IS A WARNING, NOT A PROBLEM (Tracy ADR
+        // 0022, 26/09/2026): a theme file, an option, a template part or a page's blocks changed through
+        // WordPress itself. `problems` keeps what makes a slot unsafe to write (the profile changed, a
+        // bound entity moved or vanished, a slot that cannot be read); `drift` is reported, and a write
+        // is refused only for drift it made itself (`inspectClean`'s `$tolerated`).
+        $drift = [];
+        $missing = [];
         $this->homeHost = null;
 
         $lineage = null;
@@ -460,7 +496,7 @@ final class QuickstartContract
         }
 
         foreach ($this->files() as $problem) {
-            $problems[] = $problem;
+            $drift[] = $problem;
         }
 
         // Option values the lock pins. Old profiles spell the key `options`; both are read.
@@ -468,7 +504,7 @@ final class QuickstartContract
         foreach (is_array($optionValues) ? $optionValues : [] as $name => $want) {
             $have = $this->writer->read('option', 0, (string) $name);
             if ($have === null || (string) $have['value'] !== (string) $want) {
-                $problems[] = 'Option ' . $name . ' differs from the lock';
+                $drift[] = 'Option ' . $name . ' differs from the lock';
             }
         }
 
@@ -485,9 +521,9 @@ final class QuickstartContract
             }
             $part = $this->writer->read('templatePart', 0, (string) $slug);
             if ($part === null) {
-                $problems[] = 'Template part ' . $slug . ' is missing (the theme file is in charge)';
+                $drift[] = 'Template part ' . $slug . ' is missing (the theme file is in charge)';
             } elseif (!hash_equals((string) ($pin['sha256'] ?? ''), hash('sha256', (string) $part['content']))) {
-                $problems[] = 'Template part ' . $slug . ' was edited';
+                $drift[] = 'Template part ' . $slug . ' was edited';
             }
         }
 
@@ -495,16 +531,24 @@ final class QuickstartContract
         $rows = [];
         $entities = [];
         $slotValues = [];
+        $imageSlots = [];
         $lockEntities = isset($this->lock['entities']) && is_array($this->lock['entities']) ? $this->lock['entities'] : [];
         foreach ($this->entities() as $entity) {
             $key = (string) ($entity['key'] ?? '');
             $kind = (string) ($entity['kind'] ?? '');
             $identity = is_array($entity['identity'] ?? null) ? $entity['identity'] : [];
-            $found = $this->find($kind, $identity);
+            $found = $this->find($kind, $identity, $binding !== null && $kind !== 'option' ? (int) ($binding['ids'][$key] ?? 0) : 0);
             if (isset($found['problem'])) {
-                $problems[] = $found['problem'] . ': ' . $key;
+                // Gone from the site: its own slots cannot be written, every other slot still can.
+                if ($binding !== null) {
+                    $missing[] = $key;
+                    $drift[] = $found['problem'] . ': ' . $key;
+                } else {
+                    $problems[] = $found['problem'] . ': ' . $key;
+                }
                 continue;
             }
+            // A row found by its bound id after its slug changed: the pin below names the new slug.
             $id = (int) $found['id'];
             $row = $found['row'];
             if ($binding !== null && $kind !== 'option' && (int) ($binding['ids'][$key] ?? 0) !== $id) {
@@ -524,11 +568,11 @@ final class QuickstartContract
             if ($pin !== null && $kind !== 'option') {
                 foreach (['post_type', 'post_name'] as $field) {
                     if (isset($pin[$field]) && (string) ($row[$field] ?? '') !== (string) $pin[$field]) {
-                        $problems[] = 'Entity ' . $key . ' has another ' . $field;
+                        $drift[] = 'Entity ' . $key . ' has another ' . $field;
                     }
                 }
                 if (isset($pin['post_parent']) && (int) ($row['post_parent'] ?? 0) !== (int) $pin['post_parent']) {
-                    $problems[] = 'Entity ' . $key . ' has another parent';
+                    $drift[] = 'Entity ' . $key . ' has another parent';
                 }
                 if (isset($pin['post_status'])) {
                     $allowed = [(string) $pin['post_status']];
@@ -539,7 +583,7 @@ final class QuickstartContract
                         $allowed = [$trimRow['from'], $trimRow['to']];
                     }
                     if (!in_array((string) ($row['post_status'] ?? ''), $allowed, true)) {
-                        $problems[] = 'Entity ' . $key . ' has another status';
+                        $drift[] = 'Entity ' . $key . ' has another status';
                     }
                 }
             }
@@ -564,7 +608,18 @@ final class QuickstartContract
                 $attr = (string) ($slot['target']['attr'] ?? 'content');
                 try {
                     $slotValues[$slot['key']] = self::getBlockValue($content, $block, $attr);
-                    $masked = self::setBlockValue($masked, $block, $attr, self::SLOT_MASK);
+                    if (($slot['type'] ?? '') === 'image') {
+                        // Not masked: the demo picture goes back, so a page nobody touched hashes
+                        // to the bytes it shipped as and a profile that gains image slots keeps
+                        // its presentation lock (TCH `capture-inventory.mjs` does the same).
+                        if (!is_string($slot['sample'] ?? null) || !is_int($slot['sampleId'] ?? null)) {
+                            throw new RuntimeException('an image slot needs sample and sampleId');
+                        }
+                        $imageSlots[$slot['key']] = $slot['sample'];
+                        $masked = self::setBlockValue($masked, $block, $attr, $slot['sample'], $slot['sampleId']);
+                    } else {
+                        $masked = self::setBlockValue($masked, $block, $attr, self::SLOT_MASK);
+                    }
                 } catch (RuntimeException $e) {
                     $problems[] = 'Slot ' . $slot['key'] . ': ' . $e->getMessage();
                     $broken = true;
@@ -572,7 +627,7 @@ final class QuickstartContract
             }
             if ($pin !== null && isset($pin['skeleton']) && !$broken
                 && !hash_equals((string) $pin['skeleton'], hash('sha256', $masked))) {
-                $problems[] = 'Entity ' . $key . ' differs from the lock outside its slots';
+                $drift[] = 'Entity ' . $key . ' differs from the lock outside its slots';
             }
         }
 
@@ -583,6 +638,9 @@ final class QuickstartContract
             'ids' => $ids,
             'entities' => $entities,
             'slots' => $slotValues,
+            // Which slots take a picture, and the demo picture each replaces: its shape is the
+            // shape a new one must have.
+            'imageSlots' => $imageSlots,
             'rows' => $rows,
             'demoTrim' => $trim,
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
@@ -590,6 +648,8 @@ final class QuickstartContract
             'siteLanguage' => self::siteLanguageState($binding),
             'contractLineage' => $lineage,
             'problems' => $problems,
+            'drift' => $drift,
+            'missing' => $missing,
         ];
     }
 
@@ -632,12 +692,18 @@ final class QuickstartContract
         ];
     }
 
-    /** An inspect that must be clean — what every write is conditioned on. */
-    public function inspectClean(?string $requested = null): array
+    /**
+     * An inspect that must be clean — what every write is conditioned on. With `$tolerated` (the
+     * drift a write began with), a difference from the design the write itself made is a problem too.
+     *
+     * @param string[]|null $tolerated
+     */
+    public function inspectClean(?string $requested = null, ?array $tolerated = null): array
     {
         $state = $this->inspect($requested);
-        if ($state['problems'] !== []) {
-            throw new RuntimeException(implode('; ', $state['problems']));
+        $made = $tolerated === null ? [] : array_values(array_diff($state['drift'], $tolerated));
+        if ($state['problems'] !== [] || $made !== []) {
+            throw new RuntimeException(implode('; ', array_merge($state['problems'], $made)));
         }
         return $state;
     }
@@ -715,7 +781,23 @@ final class QuickstartContract
      *
      * @return array{id?:int,row?:array,problem?:string}
      */
-    private function find(string $kind, array $identity): array
+    private function find(string $kind, array $identity, int $boundId = 0): array
+    {
+        $found = $this->findBySlug($kind, $identity);
+        // 🔒 A BOUND PAGE IS ITS ID, NOT ITS SLUG (Tracy ADR 0022). A slug may change through WordPress
+        // itself; measured 26/09 on the local stand, renaming Services to industrial-services made every
+        // apply on the site refuse "Missing or ambiguous entity (0 rows): page-services". The row the
+        // site was bound to, still of its type, is the entity — and the new slug is a warning.
+        if (isset($found['problem']) && $boundId > 0 && ($kind === 'page' || $kind === 'post')) {
+            $row = $this->writer->read('post', $boundId);
+            if ($row !== null && (string) ($row['post_type'] ?? '') === (string) ($identity['postType'] ?? $kind)) {
+                return ['id' => $boundId, 'row' => $row, 'moved' => true];
+            }
+        }
+        return $found;
+    }
+
+    private function findBySlug(string $kind, array $identity): array
     {
         if ($kind === 'option') {
             $name = (string) ($identity['name'] ?? '');
@@ -792,20 +874,46 @@ final class QuickstartContract
 
     /**
      * What one apply would write, checked entirely before anything is. Every change is a known
-     * slot with a value the rules accept, and the site is at the revision the caller saw.
+     * slot with a value the rules accept, and the site is at the revision the caller saw — the
+     * whole site's (`expected_revision`), or each touched content's as `content.read` listed it
+     * (`expected_content_revisions`), or both.
+     *
+     * Every change is checked before any is refused: the refusal names each bad slot, not only
+     * the first, because WordPress gives the apply no transaction and the only safe order is
+     * "validate all, then write".
      *
      * @return array{operations:array<int,array{kind:string,id:int,key:string,fields:array}>,state:array}
      */
     public function plan(array $params): array
     {
-        $state = $this->inspectClean();
+        $state = $this->inspect();
+        if ($state['problems'] !== []) {
+            throw new ContractProblems(array_map(
+                static fn(string $problem) => new ContractProblem(ContractProblem::PRESENTATION_DRIFT, $problem),
+                $state['problems']
+            ), $state['problems']);
+        }
+        $errors = [];
+        $this->imageIds = [];
         $expected = $params['expected_revision'] ?? null;
-        if (!is_string($expected) || !hash_equals($state['revision'], $expected)) {
-            throw new RuntimeException('Content changed; inspect again');
+        $perContent = $params['expected_content_revisions'] ?? null;
+        if ($perContent !== null && !self::isRevisionMap($perContent)) {
+            throw new ContractProblems([new ContractProblem(ContractProblem::CHANGES_INVALID,
+                'expected_content_revisions must map content ids to revisions')]);
+        }
+        $perContent = $perContent === [] ? null : $perContent;
+        if ($perContent === null || $expected !== null) {
+            if (!is_string($expected) || !hash_equals($state['revision'], $expected)) {
+                $errors[] = new ContractProblem(
+                    $expected === null ? ContractProblem::REVISION_REQUIRED : ContractProblem::REVISION_STALE,
+                    'Content changed; inspect again', null, null, ['current' => $state['revision']]
+                );
+            }
         }
         $changes = $params['changes'] ?? null;
         if (!is_array($changes) || $changes === [] || count($changes) > self::MAX_CHANGES) {
-            throw new RuntimeException('Expected 1-' . self::MAX_CHANGES . ' scalar content changes');
+            $errors[] = new ContractProblem(ContractProblem::CHANGES_INVALID, 'Expected 1-' . self::MAX_CHANGES . ' scalar content changes');
+            throw new ContractProblems($errors);
         }
         $slots = [];
         foreach ($this->slots() as $slot) {
@@ -817,9 +925,13 @@ final class QuickstartContract
         }
         // Grouped per target row: one read and one write per post, however many of its slots move.
         $byTarget = [];
+        // The row each change key lands on, for the per-content revision check and to name the
+        // content an error is about.
+        $owners = [];
         foreach ($changes as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
-                throw new RuntimeException('Unknown content slot or non-string value: ' . (string) $key);
+                $errors[] = new ContractProblem(ContractProblem::CHANGES_INVALID, 'Unknown content slot or non-string value: ' . (string) $key, is_string($key) ? $key : null);
+                continue;
             }
             $locale = null;
             $slotKey = $key;
@@ -827,54 +939,48 @@ final class QuickstartContract
                 [$locale, $slotKey] = explode('::', $key, 2);
             }
             if (!isset($slots[$slotKey])) {
-                throw new RuntimeException('Unknown content slot: ' . $key);
-            }
-            $slot = $slots[$slotKey];
-            $this->checkValue($slot, $value, $params, $key);
-            $entityKey = (string) $slot['entity'];
-            $entity = $entities[$entityKey];
-            $kind = (string) $entity['kind'];
-            if ($locale !== null && $kind === 'option') {
-                // `<locale>::site.tagline`: the words ONE language's front end shows for an option
-                // Polylang serves through its string translations. The option row itself has no
-                // edition; a translated option without a field is the only kind that has one.
-                $optionName = (string) ($entity['identity']['name'] ?? '');
-                if (!self::isTranslatedOption($optionName) || isset($slot['target']['field'])) {
-                    throw new RuntimeException('An option has no edition: ' . $key);
-                }
-                if ($this->editions === null || !isset($this->editions['locales'][$locale])) {
-                    throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
-                }
-                $target = 'optionTranslation:' . $optionName . ':' . $locale;
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'optionTranslation', 'id' => 0, 'key' => $optionName, 'locale' => $locale, 'changes' => []];
-                $byTarget[$target]['changes'][] = [$slot, $value];
+                $errors[] = new ContractProblem(ContractProblem::SLOT_UNKNOWN, 'Unknown content slot: ' . $key, $key);
                 continue;
             }
-            if ($locale !== null) {
-                $copy = $this->editions['locales'][$locale]['ids'][$entityKey] ?? null;
-                if ($this->editions === null || !is_int($copy) && !ctype_digit((string) $copy)) {
-                    throw new RuntimeException('No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key);
-                }
-                // An edition can ship without a block the source has (a translation that dropped
-                // a section). The profile names those; a change aimed at one is refused by name
-                // rather than found missing halfway through a write.
-                $missing = $this->editions['locales'][$locale]['missing'] ?? [];
-                if (is_array($missing) && in_array($entityKey . ':' . (string) ($slot['target']['block'] ?? ''), $missing, true)) {
-                    throw new RuntimeException('The ' . $locale . ' edition has no block for ' . $key);
-                }
-                $target = 'post:' . (int) $copy;
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'post', 'id' => (int) $copy, 'key' => '', 'changes' => []];
-            } elseif ($kind === 'option') {
-                $target = 'option:' . $entity['identity']['name'];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'option', 'id' => 0, 'key' => (string) $entity['identity']['name'], 'changes' => []];
-            } elseif ($kind === 'templatePart') {
-                $target = 'templatePart:' . $entity['identity']['slug'];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'templatePart', 'id' => (int) $state['ids'][$entityKey], 'key' => (string) $entity['identity']['slug'], 'changes' => []];
-            } else {
-                $target = 'post:' . $state['ids'][$entityKey];
-                $byTarget[$target] = $byTarget[$target] ?? ['kind' => 'post', 'id' => (int) $state['ids'][$entityKey], 'key' => '', 'changes' => []];
+            $slot = $slots[$slotKey];
+            if (in_array((string) $slot['entity'], $state['missing'] ?? [], true)) {
+                $errors[] = new ContractProblem(ContractProblem::SLOT_UNKNOWN, 'The page or part that held this slot is not on the site any more: ' . $key, $key);
+                continue;
             }
-            $byTarget[$target]['changes'][] = [$slot, $value];
+            $edition = null;
+            $target = null;
+            try {
+                $target = $this->changeTarget($key, $locale, $slot, $entities[(string) $slot['entity']], $state);
+                $owners[$key] = ['kind' => $target['row']['kind'], 'id' => $target['row']['id'], 'key' => $target['row']['key']];
+            } catch (ContractProblem $e) {
+                $edition = $e;
+            }
+            try {
+                $this->checkValue($slot, $value, $params, $key);
+            } catch (ContractProblem $e) {
+                $errors[] = $e;
+                continue;
+            }
+            if ($edition !== null) {
+                $errors[] = $edition;
+                continue;
+            }
+            $byTarget[$target['name']] = $byTarget[$target['name']] ?? $target['row'] + ['changes' => []];
+            $byTarget[$target['name']]['changes'][] = [$slot, $value, $key];
+        }
+
+        $contentIds = [];
+        if ($perContent !== null) {
+            $contentIds = $this->checkContentRevisions($owners, $perContent, $expected !== null, $errors);
+            foreach ($errors as $error) {
+                if ($error->slotKey !== null && $error->contentId === null && isset($contentIds[$error->slotKey])) {
+                    $error->contentId = $contentIds[$error->slotKey];
+                }
+            }
+        }
+        $this->checkEditLocks($owners, $contentIds, $errors);
+        if ($errors !== []) {
+            throw new ContractProblems($errors);
         }
 
         $operations = [];
@@ -913,45 +1019,298 @@ final class QuickstartContract
             } else {
                 $row = $this->writer->read('post', $target['id']);
                 if ($row === null) {
-                    throw new RuntimeException('Target post is missing: ' . $target['id']);
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'Target post is missing: ' . $target['id']);
+                    continue;
                 }
                 $content = (string) ($row['post_content'] ?? '');
                 $field = 'post_content';
             }
             $next = $content;
-            foreach ($target['changes'] as [$slot, $new]) {
-                $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new);
+            foreach ($target['changes'] as [$slot, $new, $key]) {
+                try {
+                    $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new,
+                        ($slot['type'] ?? '') === 'image' ? ($this->imageIds[$new] ?? null) : null);
+                } catch (RuntimeException $e) {
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, $e->getMessage(), $key);
+                }
             }
             if ($next !== $content) {
                 $operations[] = ['kind' => $target['kind'], 'id' => $target['id'], 'key' => $target['key'], 'fields' => [$field => $next]];
             }
         }
+        if ($errors !== []) {
+            throw new ContractProblems($errors);
+        }
         return ['operations' => $operations, 'state' => $state];
+    }
+
+    /**
+     * The row one change key lands on: `name` groups changes per row, `row` starts that group.
+     * Throws the edition refusals by name, before any write is planned.
+     *
+     * @return array{name:string,row:array{kind:string,id:int,key:string,locale?:string}}
+     */
+    private function changeTarget(string $key, ?string $locale, array $slot, array $entity, array $state): array
+    {
+        $entityKey = (string) $slot['entity'];
+        $kind = (string) $entity['kind'];
+        if ($locale !== null && $kind === 'option') {
+            // `<locale>::site.tagline`: the words ONE language's front end shows for an option
+            // Polylang serves through its string translations. The option row itself has no
+            // edition; a translated option without a field is the only kind that has one.
+            $optionName = (string) ($entity['identity']['name'] ?? '');
+            if (!self::isTranslatedOption($optionName) || isset($slot['target']['field'])) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'An option has no edition: ' . $key, $key);
+            }
+            if ($this->editions === null || !isset($this->editions['locales'][$locale])) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key, $key);
+            }
+            return ['name' => 'optionTranslation:' . $optionName . ':' . $locale,
+                'row' => ['kind' => 'optionTranslation', 'id' => 0, 'key' => $optionName, 'locale' => $locale]];
+        }
+        if ($locale !== null) {
+            $copy = $this->editions['locales'][$locale]['ids'][$entityKey] ?? null;
+            if ($this->editions === null || !is_int($copy) && !ctype_digit((string) $copy)) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'No ' . ($locale === '' ? '?' : $locale) . ' edition of ' . $entityKey . ': ' . $key, $key);
+            }
+            // An edition can ship without a block the source has (a translation that dropped
+            // a section). The profile names those; a change aimed at one is refused by name
+            // rather than found missing halfway through a write.
+            $missing = $this->editions['locales'][$locale]['missing'] ?? [];
+            if (is_array($missing) && in_array($entityKey . ':' . (string) ($slot['target']['block'] ?? ''), $missing, true)) {
+                throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'The ' . $locale . ' edition has no block for ' . $key, $key);
+            }
+            return ['name' => 'post:' . (int) $copy, 'row' => ['kind' => 'post', 'id' => (int) $copy, 'key' => '']];
+        }
+        if ($kind === 'option') {
+            $name = (string) $entity['identity']['name'];
+            return ['name' => 'option:' . $name, 'row' => ['kind' => 'option', 'id' => 0, 'key' => $name]];
+        }
+        if ($kind === 'templatePart') {
+            $slug = (string) $entity['identity']['slug'];
+            return ['name' => 'templatePart:' . $slug, 'row' => ['kind' => 'templatePart', 'id' => (int) $state['ids'][$entityKey], 'key' => $slug]];
+        }
+        return ['name' => 'post:' . $state['ids'][$entityKey], 'row' => ['kind' => 'post', 'id' => (int) $state['ids'][$entityKey], 'key' => '']];
+    }
+
+    /**
+     * Refuses every change key whose row someone has open in the WordPress editor, before any
+     * write is planned, so a locked page refuses the whole apply and the rows beside it stay
+     * untouched. Only posts and database template parts carry an editor lock; an option or a
+     * theme-file part has none. The content id is named even when the caller held the apply by
+     * the site-wide revision alone, so the agent can say which page to ask about.
+     *
+     * @param array<string,array{kind:string,id:int,key:string}> $owners
+     * @param array<string,string> $contentIds change key → content id, as far as already known
+     * @param ContractProblem[] $errors
+     */
+    private function checkEditLocks(array $owners, array $contentIds, array &$errors): void
+    {
+        $locks = [];
+        $locked = [];
+        foreach ($owners as $key => $owner) {
+            $id = (int) $owner['id'];
+            if ($id <= 0 || !in_array($owner['kind'], ['post', 'templatePart'], true)) {
+                continue;
+            }
+            if (!array_key_exists($id, $locks)) {
+                $locks[$id] = $this->writer->editLock($id);
+            }
+            if ($locks[$id] !== null) {
+                $locked[(string) $key] = $owner;
+            }
+        }
+        if ($locked === []) {
+            return;
+        }
+        $unnamed = array_diff_key($locked, $contentIds);
+        if ($unnamed !== []) {
+            foreach ($this->revisionsOf($unnamed) ?? [] as $key => $found) {
+                if (is_array($found)) {
+                    $contentIds[(string) $key] = $found['id'];
+                }
+            }
+        }
+        foreach ($locked as $key => $owner) {
+            $lock = $locks[(int) $owner['id']];
+            $row = $this->writer->read('post', (int) $owner['id']);
+            $errors[] = new ContractProblem(ContractProblem::SLOT_LOCKED_BY_USER, EditLock::message((string) ($row['post_title'] ?? ''), $lock),
+                $key, $contentIds[$key] ?? null, ['lockedBy' => $lock]);
+        }
+    }
+
+    /**
+     * The same refusal for an operation that writes whole posts rather than slots — a demo trim,
+     * a retire or restore of editions: every post it is about to write is asked BEFORE the first
+     * moves, and one open in the editor refuses the whole call with SLOT_LOCKED_BY_USER, its
+     * content id when the reader lists it, and `lockedBy`. No slot key: the operation named none.
+     * A batched operation asks per call, about the rows that call would write.
+     *
+     * @param int[] $postIds
+     * @throws ContractProblems
+     */
+    public function refuseEditLocked(array $postIds): void
+    {
+        $locked = [];
+        foreach (array_unique(array_map('intval', $postIds)) as $id) {
+            if ($id <= 0) {
+                continue;
+            }
+            $lock = $this->writer->editLock($id);
+            if ($lock !== null) {
+                $locked[$id] = $lock;
+            }
+        }
+        if ($locked === []) {
+            return;
+        }
+        $targets = [];
+        foreach (array_keys($locked) as $id) {
+            $targets[$id] = ['kind' => 'post', 'id' => $id, 'key' => ''];
+        }
+        $found = $this->revisionsOf($targets) ?? [];
+        $errors = [];
+        foreach ($locked as $id => $lock) {
+            $row = $this->writer->read('post', $id);
+            $contentId = isset($found[$id]) && is_array($found[$id]) ? (string) $found[$id]['id'] : null;
+            $errors[] = new ContractProblem(ContractProblem::SLOT_LOCKED_BY_USER, EditLock::message((string) ($row['post_title'] ?? ''), $lock),
+                null, $contentId, ['lockedBy' => $lock]);
+        }
+        throw new ContractProblems($errors);
+    }
+
+    /** `{contentId: revision}`, both strings, as `content.read` hands them out. */
+    private static function isRevisionMap($map): bool
+    {
+        if (!is_array($map)) {
+            return false;
+        }
+        foreach ($map as $id => $revision) {
+            if (!is_string($id) || $id === '' || !is_string($revision) || $revision === '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Each change key against the revision its content had when the caller read it. Appends
+     * the refusals to `$errors`; answers the content id of every key the reader resolved.
+     *
+     * A row the reader lists no content for (no content identity yet) cannot be held by id: it
+     * passes only when the site-wide `expected_revision` was also sent and matched.
+     *
+     * @param array<string,array{kind:string,id:int,key:string}> $owners
+     * @param array<string,string> $expected
+     * @param ContractProblem[] $errors
+     * @return array<string,string> change key → content id
+     */
+    private function checkContentRevisions(array $owners, array $expected, bool $siteRevisionSent, array &$errors): array
+    {
+        if ($owners === []) {
+            return [];
+        }
+        $siteRevisionHeld = $siteRevisionSent && !array_filter($errors, static fn(ContractProblem $e) => $e->slotKey === null
+            && in_array($e->errorCode, [ContractProblem::REVISION_STALE, ContractProblem::REVISION_REQUIRED], true));
+        $current = $this->revisionsOf($owners);
+        if ($current === null) {
+            $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'This site cannot read content revisions; send expected_revision instead');
+            return [];
+        }
+        $ids = [];
+        foreach ($owners as $key => $owner) {
+            $found = $current[$key] ?? null;
+            if ($found === null) {
+                if (!$siteRevisionHeld) {
+                    $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'No content.read id holds ' . $key . '; send expected_revision', $key);
+                }
+                continue;
+            }
+            $ids[$key] = $found['id'];
+            $given = $expected[$found['id']] ?? null;
+            if ($given === null) {
+                $errors[] = new ContractProblem(ContractProblem::REVISION_REQUIRED, 'Revision of ' . $found['id'] . ' required: ' . $key,
+                    $key, $found['id'], ['current' => $found['revision']]);
+            } elseif (!hash_equals($found['revision'], $given)) {
+                $errors[] = new ContractProblem(ContractProblem::REVISION_STALE, 'Content ' . $found['id'] . ' changed; read it again: ' . $key,
+                    $key, $found['id'], ['current' => $found['revision']]);
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * The `content.read` id and revision of each row, from the reader — or null when no reader
+     * is wired or it cannot answer on this site (no content identity, an object cache).
+     *
+     * @param array<int|string,array{kind:string,id:int,key:string}> $targets
+     * @return array<int|string,?array{id:string,revision:string}>|null
+     */
+    public function revisionsOf(array $targets): ?array
+    {
+        if ($this->revisions === null) {
+            return null;
+        }
+        try {
+            return $this->revisions->of($targets);
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /** Scalar content rules, applied identically to a source slot and to an edition of it. */
     private function checkValue(array $slot, string $value, array $params, string $key): void
     {
+        if (($slot['type'] ?? '') === 'image') {
+            $this->checkImage($slot, $value, $key);
+            return;
+        }
         if (!empty($slot['requiresEvidence']) && $value !== (string) ($slot['sample'] ?? '')) {
             $evidence = $params['evidence'][$key] ?? null;
             if (!is_string($evidence) || trim($evidence) === '' || strlen($evidence) > 8000) {
-                throw new RuntimeException('Customer evidence required: ' . $key);
+                throw new ContractProblem(ContractProblem::SLOT_EVIDENCE_REQUIRED, 'Customer evidence required: ' . $key, $key);
             }
         }
         if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) {
-            throw new RuntimeException('Markup and control characters are not content: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Markup and control characters are not content: ' . $key, $key);
         }
         if (IdentityTokens::hasDirective($value)) {
-            throw new RuntimeException('Template directives are not content: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Template directives are not content: ' . $key, $key);
         }
         $max = (int) ($slot['maxCharacters'] ?? 1000);
         if (mb_strlen($value) > $max) {
-            throw new RuntimeException('Content too long: ' . $key . ' (' . mb_strlen($value) . ' > ' . $max . ')');
+            throw new ContractProblem(ContractProblem::SLOT_TOO_LONG, 'Content too long: ' . $key . ' (' . mb_strlen($value) . ' > ' . $max . ')', $key, null,
+                ['limit' => $max, 'actual' => mb_strlen($value)]);
         }
         $isUrl = ($slot['type'] ?? '') === 'url' || ($slot['target']['attr'] ?? '') === 'url';
         if ($isUrl && $value !== '' && !$this->urlAllowed($value)) {
-            throw new RuntimeException('Unsupported link: ' . $key);
+            throw new ContractProblem(ContractProblem::SLOT_LINK_UNSUPPORTED, 'Unsupported link: ' . $key, $key);
         }
+    }
+
+    /**
+     * A picture for an image slot: a file in this site's uploads that the media library knows,
+     * in the shape of the demo picture it replaces (±0.02, the Joomla receiver's tolerance).
+     * Remembers the attachment id for the write.
+     */
+    private function checkImage(array $slot, string $value, string $key): void
+    {
+        $refuse = static function (string $why) use ($key): ContractProblem {
+            return new ContractProblem(ContractProblem::SLOT_IMAGE_INVALID, $why . ': ' . $key, $key);
+        };
+        if (!preg_match(self::IMAGE_PATH, $value) || strpos($value, '..') !== false) {
+            throw $refuse('Image must be a png, jpg or webp under wp-content/uploads/');
+        }
+        $found = $this->images === null ? null : $this->images->find($value);
+        if ($found === null) {
+            throw $refuse('Image must already be in the site media library');
+        }
+        $demo = is_string($slot['sample'] ?? null) && $this->images !== null ? $this->images->find((string) $slot['sample']) : null;
+        if ($demo !== null && $demo['height'] > 0 && $found['height'] > 0
+            && abs($demo['width'] / $demo['height'] - $found['width'] / $found['height']) > 0.02) {
+            throw $refuse('Image aspect ratio does not match its slot');
+        }
+        $this->imageIds[$value] = $found['id'];
     }
 
     /** `https://`, `http://` on this site's own host, `mailto:`, `tel:`, a path, or an anchor. */
@@ -1014,7 +1373,7 @@ final class QuickstartContract
      * the seeder's `setBlockValue` (TCH `apply-wordpress-contract.mjs`), so a skeleton hashed on
      * either side is the same hash.
      */
-    public static function setBlockValue(string $markup, string $name, string $attr, string $value): string
+    public static function setBlockValue(string $markup, string $name, string $attr, string $value, ?int $imageId = null): string
     {
         $found = self::findBlock($markup, $name);
         $inner = substr($markup, $found['innerStart'], $found['innerEnd'] - $found['innerStart']);
@@ -1050,6 +1409,29 @@ final class QuickstartContract
                 $attrs->url = $value;
                 $opening = '<!-- wp:' . $found['ns'] . $found['block'] . ' ' . json_encode($attrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' -->';
             }
+        } elseif ($attr === 'src') {
+            // A picture lives in three places: the img src, the block's `id` and the
+            // `wp-image-N` class. Each is rewritten in place, so bytes around them never move.
+            if (!preg_match('/<img\b[^>]*\bsrc="[^"]*"/', $inner)) {
+                throw new RuntimeException('block ' . $name . ' has no picture to write');
+            }
+            if ($imageId === null) {
+                throw new RuntimeException('block ' . $name . ' needs the attachment id of its picture');
+            }
+            $src = self::escapeHtml('/' . ltrim($value, '/'));
+            $inner = (string) preg_replace_callback('/(<img\b[^>]*\bsrc=")[^"]*(")/', static function (array $m) use ($src): string {
+                return $m[1] . $src . $m[2];
+            }, $inner, 1);
+            $inner = (string) preg_replace('/\bwp-image-\d+\b/', 'wp-image-' . $imageId, $inner, 1);
+            $attrs = json_decode($found['attrs'], true);
+            if (is_array($attrs) && isset($attrs['id']) && is_int($attrs['id'])) {
+                $was = '"id":' . $attrs['id'];
+                $at = strrpos($found['attrs'], $was);
+                if ($at !== false) {
+                    $rewritten = substr_replace($found['attrs'], '"id":' . $imageId, $at, strlen($was));
+                    $opening = str_replace($found['attrs'], $rewritten, $opening);
+                }
+            }
         } else {
             throw new RuntimeException('unsupported block attribute ' . $attr);
         }
@@ -1079,6 +1461,15 @@ final class QuickstartContract
                 throw new RuntimeException('block ' . $name . ' has no link to read');
             }
             return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        if ($attr === 'src') {
+            if (!preg_match('/<img\b[^>]*\bsrc="([^"]*)"/', $inner, $m)) {
+                throw new RuntimeException('block ' . $name . ' has no picture to read');
+            }
+            // The webroot path, whether the src was written root-relative or with the origin.
+            $src = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $path = (string) (parse_url($src, PHP_URL_PATH) ?? '');
+            return ltrim($path, '/');
         }
         throw new RuntimeException('unsupported block attribute ' . $attr);
     }

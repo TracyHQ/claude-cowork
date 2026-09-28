@@ -18,6 +18,36 @@
  * change being guaranteed at all. An Apply that cannot be undone cannot be offered for free.
  */
 
+/**
+ * The write lock is held by someone else. Its message stays the one the Tracy tools match on
+ * ("another writer is changing this site"); what it adds is WHO holds the lock and for how long, so
+ * the answer can say when to try again instead of a bare "busy". `holder` is empty when the lock's
+ * current owner left no record (an older writer, or a record that belongs to a finished call).
+ */
+final class WriterBusy extends RuntimeException
+{
+    /** @var array{action?:string,operation?:?string,applyId?:?string,since?:int} */
+    public array $holder;
+    public function __construct(string $message, array $holder = [])
+    {
+        parent::__construct($message);
+        $this->holder = $holder;
+    }
+    /** The facts a busy answer carries: the holder, how long it has held, when to try again. */
+    public function facts(int $now): array
+    {
+        if (!isset($this->holder['since'])) return ['retryAfterMs' => 3000];
+        $held = max(0, ($now - (int) $this->holder['since']) * 1000);
+        $holder = array_filter([
+            'action' => $this->holder['action'] ?? null,
+            'operation' => $this->holder['operation'] ?? null,
+            'applyId' => $this->holder['applyId'] ?? null,
+        ], fn($v) => $v !== null && $v !== '');
+        // A contract apply takes 2–4 s; one held longer is nearly done or stuck — ask again soon either way.
+        return ['holder' => $holder, 'heldForMs' => $held, 'retryAfterMs' => $held < 3000 ? 3500 - $held : 2000];
+    }
+}
+
 interface SiteWriter
 {
     /**
@@ -173,6 +203,38 @@ interface SiteWriter
      * so the implementation swallows its own errors and this returns nothing to report.
      */
     public function purgeCache(): void;
+}
+
+/**
+ * Optional: a writer that reads many rows in one round trip.
+ *
+ * Why it exists: a contract inspect on Tracy Business reads ~7,800 governed rows. Through
+ * `list()` + `read()` that was one query per row plus five per article (list enriches articles
+ * with a routed URL, menu lookups, author, tags and access name the contract never looks at):
+ * 21,931 queries per inspect, 65 s on a VPS where each round trip costs ~3 ms (measured
+ * 25/09/2026 on dev `fj1823`). Both methods return EXACTLY what `read()` returns for the same
+ * rows, so a caller may use them in place of a loop of reads without changing any answer.
+ * Nothing here caches: every call goes to the database.
+ */
+interface BulkSiteReader
+{
+    /**
+     * Every row of a kind inside the scope `read()` applies, as `read()` returns it, keyed by
+     * primary key in ascending order. At most $limit rows; a caller that needs to know whether
+     * there were more asks for one more than it accepts.
+     *
+     * @return array<int,array<string,?scalar>>
+     */
+    public function readAll(string $kind, int $limit): array;
+
+    /**
+     * `read()` for many ids at once, keyed by id. An id `read()` would answer null for is left
+     * out; a relation kind whose `read()` throws for a missing target throws the same here.
+     *
+     * @param int[] $ids
+     * @return array<int,array<string,?scalar>>
+     */
+    public function readMany(string $kind, array $ids): array;
 }
 
 interface MediaWriter

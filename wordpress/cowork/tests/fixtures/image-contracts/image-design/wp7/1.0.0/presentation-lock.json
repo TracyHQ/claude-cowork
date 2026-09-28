@@ -1,0 +1,24 @@
+{
+    "schemaVersion": "tracy-quickstart-presentation-lock/wordpress/v1",
+    "options": {
+        "stylesheet": "test-theme",
+        "template": "test-theme"
+    },
+    "fileRoots": [
+        "wp-content/themes/test-theme"
+    ],
+    "files": {
+        "wp-content/themes/test-theme/style.css": "cee549a6be78437da980942ee76c1649f4d1b4ca1af9eeeed5b0c98e12f0b18e",
+        "wp-content/themes/test-theme/theme.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    "entities": {
+        "page-home": {
+            "post_type": "page",
+            "post_name": "home",
+            "post_status": "publish",
+            "post_parent": 0,
+            "language": "en",
+            "skeleton": "da1b16a4c43bdcfe423c6449a3b6ded5a14a355a4ca461735121a4daaf2388a1"
+        }
+    }
+}

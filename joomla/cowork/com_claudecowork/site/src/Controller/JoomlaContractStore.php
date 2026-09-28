@@ -21,7 +21,7 @@ final class JoomlaContractStore implements \ContractStore
     public function save(array $binding): void {
         $current=$this->load();
         if($current!==null) {
-            if($current!=$binding)throw new \RuntimeException('Cannot replace a content-only baseline');
+            if($current!=$binding)throw new \RuntimeException('Cannot replace a bound baseline');
             return;
         }
         $this->write(1,$binding);

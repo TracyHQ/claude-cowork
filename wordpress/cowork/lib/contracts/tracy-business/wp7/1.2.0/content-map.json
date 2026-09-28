@@ -3619,6 +3619,331 @@
       "maxCharacters": 255,
       "siteIdentity": true,
       "label": "site identity — social.youtube"
+    },
+    {
+      "key": "home.hero.img",
+      "entity": "page-home",
+      "target": {
+        "block": "hero.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/hero-ru.png",
+      "sampleId": 91,
+      "maxCharacters": 255,
+      "label": "home — hero.img"
+    },
+    {
+      "key": "home.projects.item.1.img",
+      "entity": "page-home",
+      "target": {
+        "block": "projects.item.1.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/factory-ru-1.png",
+      "sampleId": 87,
+      "maxCharacters": 255,
+      "label": "home — projects.item.1.img"
+    },
+    {
+      "key": "home.projects.item.2.img",
+      "entity": "page-home",
+      "target": {
+        "block": "projects.item.2.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/proj-ru-2.png",
+      "sampleId": 92,
+      "maxCharacters": 255,
+      "label": "home — projects.item.2.img"
+    },
+    {
+      "key": "home.projects.item.3.img",
+      "entity": "page-home",
+      "target": {
+        "block": "projects.item.3.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/proj-ru-3.png",
+      "sampleId": 93,
+      "maxCharacters": 255,
+      "label": "home — projects.item.3.img"
+    },
+    {
+      "key": "home.text.img",
+      "entity": "page-home",
+      "target": {
+        "block": "text.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "home — text.img"
+    },
+    {
+      "key": "home.news.item.1.img",
+      "entity": "page-home",
+      "target": {
+        "block": "news.item.1.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/blog-feat-2.png",
+      "sampleId": 83,
+      "maxCharacters": 255,
+      "label": "home — news.item.1.img"
+    },
+    {
+      "key": "home.news.item.2.img",
+      "entity": "page-home",
+      "target": {
+        "block": "news.item.2.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/art-hero-2.png",
+      "sampleId": 82,
+      "maxCharacters": 255,
+      "label": "home — news.item.2.img"
+    },
+    {
+      "key": "home.news.item.3.img",
+      "entity": "page-home",
+      "target": {
+        "block": "news.item.3.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/safety-1.png",
+      "sampleId": 90,
+      "maxCharacters": 255,
+      "label": "home — news.item.3.img"
+    },
+    {
+      "key": "home.gallery.item.1.img",
+      "entity": "page-home",
+      "target": {
+        "block": "gallery.item.1.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/logo-ru-1.png",
+      "sampleId": 96,
+      "maxCharacters": 255,
+      "label": "home — gallery.item.1.img"
+    },
+    {
+      "key": "home.gallery.item.2.img",
+      "entity": "page-home",
+      "target": {
+        "block": "gallery.item.2.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/logo-ru-2.png",
+      "sampleId": 97,
+      "maxCharacters": 255,
+      "label": "home — gallery.item.2.img"
+    },
+    {
+      "key": "home.gallery.item.3.img",
+      "entity": "page-home",
+      "target": {
+        "block": "gallery.item.3.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/logo-ru-3.png",
+      "sampleId": 98,
+      "maxCharacters": 255,
+      "label": "home — gallery.item.3.img"
+    },
+    {
+      "key": "home.gallery.item.4.img",
+      "entity": "page-home",
+      "target": {
+        "block": "gallery.item.4.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/logo-ru-4.png",
+      "sampleId": 99,
+      "maxCharacters": 255,
+      "label": "home — gallery.item.4.img"
+    },
+    {
+      "key": "home.gallery.item.5.img",
+      "entity": "page-home",
+      "target": {
+        "block": "gallery.item.5.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/logo-ru-5.png",
+      "sampleId": 100,
+      "maxCharacters": 255,
+      "label": "home — gallery.item.5.img"
+    },
+    {
+      "key": "about.text.img",
+      "entity": "page-about",
+      "target": {
+        "block": "text.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/factory-ru-1.png",
+      "sampleId": 87,
+      "maxCharacters": 255,
+      "label": "about — text.img"
+    },
+    {
+      "key": "about.team.item.1.img",
+      "entity": "page-about",
+      "target": {
+        "block": "team.item.1.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "about — team.item.1.img"
+    },
+    {
+      "key": "about.team.item.2.img",
+      "entity": "page-about",
+      "target": {
+        "block": "team.item.2.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "about — team.item.2.img"
+    },
+    {
+      "key": "about.team.item.3.img",
+      "entity": "page-about",
+      "target": {
+        "block": "team.item.3.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "about — team.item.3.img"
+    },
+    {
+      "key": "about.team.item.4.img",
+      "entity": "page-about",
+      "target": {
+        "block": "team.item.4.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "about — team.item.4.img"
+    },
+    {
+      "key": "projects.text.img",
+      "entity": "page-projects",
+      "target": {
+        "block": "text.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/proj-big.png",
+      "sampleId": 101,
+      "maxCharacters": 255,
+      "label": "projects — text.img"
+    },
+    {
+      "key": "careers.text.img",
+      "entity": "page-careers",
+      "target": {
+        "block": "text.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/team-crew.png",
+      "sampleId": 89,
+      "maxCharacters": 255,
+      "label": "careers — text.img"
+    },
+    {
+      "key": "project-detail.text.img",
+      "entity": "page-project-detail",
+      "target": {
+        "block": "text.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/factory-ru-1.png",
+      "sampleId": 87,
+      "maxCharacters": 255,
+      "label": "project-detail — text.img"
+    },
+    {
+      "key": "project-detail.projects.item.1.img",
+      "entity": "page-project-detail",
+      "target": {
+        "block": "projects.item.1.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/factory-ru-1.png",
+      "sampleId": 87,
+      "maxCharacters": 255,
+      "label": "project-detail — projects.item.1.img"
+    },
+    {
+      "key": "project-detail.projects.item.2.img",
+      "entity": "page-project-detail",
+      "target": {
+        "block": "projects.item.2.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/proj-ru-2.png",
+      "sampleId": 92,
+      "maxCharacters": 255,
+      "label": "project-detail — projects.item.2.img"
+    },
+    {
+      "key": "project-detail.projects.item.3.img",
+      "entity": "page-project-detail",
+      "target": {
+        "block": "projects.item.3.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/proj-ru-3.png",
+      "sampleId": 93,
+      "maxCharacters": 255,
+      "label": "project-detail — projects.item.3.img"
+    },
+    {
+      "key": "project-detail.projects.item.4.img",
+      "entity": "page-project-detail",
+      "target": {
+        "block": "projects.item.4.img",
+        "attr": "src"
+      },
+      "type": "image",
+      "sample": "wp-content/uploads/2026/09/factory-ru-2.png",
+      "sampleId": 86,
+      "maxCharacters": 255,
+      "label": "project-detail — projects.item.4.img"
     }
   ]
 }

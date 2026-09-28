@@ -26,12 +26,16 @@ require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
 require_once __DIR__ . '/QuickstartContract.php';
+require_once __DIR__ . '/JoomlaLocks.php';
+require_once __DIR__ . '/Timing.php';
 
 final class Engine
 {
     private ?QuickstartContract $contract;
     private bool $batching = false;
     private bool $writing = false;
+    /** Inside an unlocked read (a contract inspect under a consistent snapshot). */
+    private bool $reading = false;
     private ?string $token;
     /** @var array<string,mixed> What the host says about itself, returned by the 'info' action. */
     private array $info;
@@ -111,6 +115,98 @@ final class Engine
      */
     private ?string $constructionBaseline = null;
 
+    /**
+     * What `content.read` would serve right now, for apply's `expected_content_revisions`:
+     * `fn(): array{revisions:array<string,string>,owners:array<string,string>}`. Wired by the host,
+     * which alone can read the CMS tables the projection needs; absent, only `expected_revision` works.
+     */
+    private $contentRevisions = null;
+
+    /** Let content.contract apply check per-content revisions against the reader's projection. */
+    public function contentRevisions(callable $current): self
+    {
+        $this->contentRevisions = $current;
+        return $this;
+    }
+
+    /**
+     * Who holds rows open in the Joomla editor: `fn(list<array{0:string,1:int}> $rows): array`
+     * answering "kind:id" => lockedBy for the LIVE check-outs among them (JoomlaLocks). Wired by
+     * the host, which alone can read `#__session`; absent, nothing is refused for a lock.
+     */
+    private $locks = null;
+
+    /** Let every write refuse a row an administrator has open in the Joomla editor. */
+    public function locks(callable $lockOf): self
+    {
+        $this->locks = $lockOf;
+        return $this;
+    }
+
+    /**
+     * The open surface's refusal for rows open in the Joomla editor, or null when none is. Its own
+     * shape (`error`, `message`), plus the contract door's `code` and `lockedBy` so one reader of
+     * both surfaces knows it by the same name; `locked` lists every open row, not just the first.
+     * There is no flag to write anyway: the admin's next Save would put the old words back.
+     *
+     * @param list<array{0:string,1:int}> $rows (kind, id) this write would change
+     */
+    private function lockRefusal(array $rows): ?array
+    {
+        $rows = array_values(array_filter($rows, fn($row) => $row[1] > 0 && isset(JoomlaLocks::TABLES[$row[0]])));
+        if (!$this->locks || $rows === []) return null;
+        $held = ($this->locks)($rows);
+        $locked = []; $messages = [];
+        foreach ($rows as [$kind, $id]) {
+            $lockedBy = $held[JoomlaLocks::key($kind, $id)] ?? null;
+            if (!$lockedBy || isset($locked[JoomlaLocks::key($kind, $id)])) continue;
+            $locked[JoomlaLocks::key($kind, $id)] = ['kind' => $kind, 'id' => $id, 'lockedBy' => $lockedBy];
+            $row = $this->writer ? $this->writer->read($kind, $id) : null;
+            $title = $row['title'] ?? $row['name'] ?? null;
+            $messages[] = JoomlaLocks::message(is_string($title) ? $title : null, $lockedBy);
+        }
+        if ($locked === []) return null;
+        $locked = array_values($locked);
+        return $this->err('locked', implode('; ', $messages), ['code' => 'SLOT_LOCKED_BY_USER', 'lockedBy' => $locked[0]['lockedBy'], 'locked' => $locked]);
+    }
+
+    /**
+     * The contract door's refusal for rows open in the Joomla editor: throws SLOT_LOCKED_BY_USER, one
+     * problem per open row, before the operation writes anything — so a demo trim, a retire, a
+     * relabel or a language phase is refused whole, exactly as `apply` is (QuickstartContract::plan).
+     * Each problem names the record (`record`: kind, id), the content it is read in when the row is
+     * a contract entity (`field.contentId`), and `lockedBy`; `$extra` adds what the operation knows
+     * (a language job's `phase`). No flag skips it: the admin's next Save would undo the write.
+     *
+     * @param list<array{0:string,1:int}> $rows (kind, id) of existing rows the operation would write
+     */
+    private function refuseLocked(array $rows, array $extra = []): void
+    {
+        $unique = [];
+        foreach ($rows as [$kind, $id])
+            if ((int) $id > 0 && isset(JoomlaLocks::TABLES[$kind])) $unique[JoomlaLocks::key($kind, (int) $id)] = [$kind, (int) $id];
+        if (!$this->locks || $unique === []) return;
+        $held = ($this->locks)(array_values($unique));
+        if (!$held) return;
+        $owners = null; $problems = [];
+        foreach ($unique as $key => [$kind, $id]) {
+            $lockedBy = $held[$key] ?? null;
+            if (!$lockedBy) continue;
+            $entity = null;
+            try { $entity = $this->contract ? $this->contract->entityAt($kind, $id) : null; } catch (Throwable $ignored) {}
+            // A failed read only costs the refusal its contentId; the refusal itself stands.
+            if ($entity !== null && $owners === null) {
+                $owners = [];
+                try { $owners = $this->contentRevisions ? (($this->contentRevisions)()['owners'] ?? []) : []; } catch (Throwable $ignored) {}
+            }
+            $row = $this->writer ? $this->writer->read($kind, $id) : null;
+            $title = $row['title'] ?? $row['name'] ?? null;
+            $problems[] = new ContractProblem('SLOT_LOCKED_BY_USER', JoomlaLocks::message(is_string($title) ? $title : null, $lockedBy),
+                null, $entity !== null ? ($owners[$entity] ?? null) : null, ['lockedBy' => $lockedBy, 'record' => ['kind' => $kind, 'id' => $id]] + $extra);
+        }
+        if ($problems) throw ContractProblem::all($problems);
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -122,7 +218,20 @@ final class Engine
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
      */
+    /** Whether this receiver is inside a request already (a serialized write re-enters handle). */
+    private bool $inRequest = false;
+
     public function handle(array $req): array
+    {
+        if (!$this->contract || $this->inRequest) return $this->handleRequest($req);
+        // One request, one comparison with the quickstart (QuickstartContract::$tolerated).
+        $this->inRequest = true;
+        $this->contract->newRequest();
+        try { return $this->handleRequest($req); }
+        finally { $this->inRequest = false; $this->contract->endRequest(); }
+    }
+
+    private function handleRequest(array $req): array
     {
         $provided = isset($req['token']) && is_string($req['token']) ? $req['token'] : null;
         if (!Token::check($this->token, $provided)) {
@@ -132,14 +241,41 @@ final class Engine
         $action = isset($req['action']) && is_string($req['action']) ? $req['action'] : '';
         $params = isset($req['params']) && is_array($req['params']) ? $req['params'] : [];
 
-        if (!$this->writing && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
+        // 🔒 A CONTRACT INSPECT ONLY READS, SO IT TAKES NO WRITE LOCK. It held the lock for its whole
+        // run (5–8 s on the Business lock before rc.12), so an apply arriving meanwhile — or a second
+        // inspect — was answered writer_busy, and Tracy had to serialise every contract call per site.
+        // It reads under one InnoDB snapshot (the writer's readSnapshot), so a commit between two of its
+        // SELECTs is never half seen; the revision it answers is advisory, and the apply re-checks it
+        // under the lock (REVISION_STALE). Its one write is the file-proof upsert, idempotent.
+        $readOnly = $action === 'content.contract' && (($params['operation'] ?? 'inspect') === 'inspect');
+        if ($readOnly && !$this->writing && !$this->reading && $this->writer && method_exists($this->writer, 'readSnapshot')) {
+            try {
+                return $this->writer->readSnapshot(function () use ($req) {
+                    $this->reading = true;
+                    try { return $this->handle($req); } finally { $this->reading = false; }
+                });
+            } catch (Throwable $ignored) {
+                // No snapshot to be had (a driver that refuses it): read as before, under the lock.
+                $readOnly = false;
+            }
+        }
+        if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+            $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
+                'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
             try {
                 return $this->writer->serialize(function () use ($req) {
                     $this->writing = true;
                     try { return $this->handle($req); } finally { $this->writing = false; }
-                });
-            } catch (Throwable $error) { return $this->err('writer_busy', $error->getMessage()); }
+                }, $holder);
+            } catch (WriterBusy $busy) {
+                // Same message the Tracy tools match on; who holds the lock, since when, and when to ask again beside it.
+                return $this->err('writer_busy', $busy->getMessage(), $busy->facts(time())
+                    + (in_array($action, ['content.contract', 'apply.revert'], true) ? ['errors' => [ContractProblem::plain('WRITER_BUSY', $busy->getMessage())]] : []));
+            } catch (Throwable $error) {
+                return $this->err('writer_busy', $error->getMessage(),
+                    in_array($action, ['content.contract', 'apply.revert'], true) ? ['errors' => [ContractProblem::plain('WRITER_BUSY', $error->getMessage())]] : []);
+            }
         }
 
         try { $contractBound=$this->contract && $this->contract->bound(); }
@@ -147,34 +283,51 @@ final class Engine
         // means "this receiver does not carry the profile this site names", and an operator who
         // reads only "repair the component installation" goes looking in the wrong half.
         catch(Throwable $error) { return $this->err('contract_unavailable', $error->getMessage() ?: 'The private contract store is unavailable; repair the component installation'); }
-        if ($contractBound && in_array($action, ['content.batch','content.update','content.delete','extension.install','extension.enable','db.restore','db.rollback','db.cleanup','db.purge','core.upgrade','files.restore'], true)) {
-            return $this->err('content_only', 'This site is bound to a content-only quickstart contract');
-        }
+        // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
+        // 26/09/2026). Every action a site without a contract takes, a bound site takes too; the
+        // contract's own rules stay on its own door (`content.contract`) and on the picture slots.
         if ($contractBound && $action === 'media.upload') {
             $path = $params['path'] ?? '';
-            if (!is_string($path) || !preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('content_only', 'Use a new content-addressed image in images/tracy-content');
-            if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('content_only', 'Media uploads must use a separate apply receipt');
+            // Only a picture for a contract slot has the slot's rules: content-addressed, and its own receipt.
+            if (is_string($path) && strpos($path, 'images/tracy-content/') === 0) {
+                if (!preg_match('~^images/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D', $path)) return $this->err('bad_params', 'A picture under images/tracy-content/ is named by the sha256 of its bytes (<sha256>.png|jpg|webp)');
+                if (strpos((string)($params['apply_id']??''),'contract-')===0) return $this->err('bad_params', 'Media uploads must use a separate apply receipt');
+            }
         }
-        if ($contractBound && $action === 'apply.revert') {
-            $entries = $this->log ? $this->log->entries($params['apply_id'] ?? '') : [];
-            $receipts=array_values(array_filter($entries, fn($e) => ($e['op'] ?? '') === 'contract'));
-            if (count($receipts)!==1) return $this->err('content_only', 'Only content-contract applies can be reverted in this mode');
+        // A trim, a language step or a relabel has its own way back; the ordinary revert would take it
+        // apart one row at a time and leave the baseline naming a state the site is no longer in.
+        if ($contractBound && $action === 'apply.revert' && $this->log) {
+            $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias']);
+            if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a language step or a source relabel: take it back with its own operation (demoTrim.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
+        }
+        $contractReceipts = $contractBound && $action === 'apply.revert' && $this->log
+            ? array_values(array_filter($this->log->entries($params['apply_id'] ?? ''), fn($e) => ($e['op'] ?? '') === 'contract'))
+            : [];
+        // A contract apply is taken back through the contract (its baseline moves with it); any other
+        // receipt on a bound site takes the ordinary revert below.
+        if ($contractReceipts !== []) {
+            $receipts = $contractReceipts;
+            if (count($receipts)!==1) return $this->err('conflict', 'One apply_id holds several contract receipts', ['errors'=>[ContractProblem::plain('CONTRACT_FAILED','One apply_id holds several contract receipts')]]);
             try {
-                $state=$this->contract->inspect();
-                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('content_only', 'Later content exists; revert the latest revision first');
+                $this->contract->beginCall();
+                $t=Timing::begin();$state=$this->contract->inspect();Timing::end('revertPre',$t);
+                if(($receipts[0]['afterRevision']??null)!==$state['revision']) return $this->err('conflict', 'Later content exists; revert the latest revision first', ['errors'=>[ContractProblem::plain('CONFLICT','Later content exists; revert the latest revision first')]]);
                 $this->batching=true;
                 $result=$this->writer->transaction(function()use($params){
-                    $result=$this->applyRevert($params);
+                    $t=Timing::begin();$result=$this->applyRevert($params);Timing::end('revert',$t);
+                    if(($result['code']??null)==='SLOT_LOCKED_BY_USER')throw new ContractProblem('SLOT_LOCKED_BY_USER',$result['message'],null,null,['lockedBy'=>$result['lockedBy']]);
                     if(!$result['ok'] || !empty($result['failed']))throw new RuntimeException('Contract revert failed');
-                    $this->contract->inspect();
+                    $t=Timing::begin();$this->contract->inspect();Timing::end('revertPost',$t);
                     return $result;
                 });
                 $this->batching=false;
+                $t=Timing::begin();
                 try { $this->writer->purgeCache(); } catch(Throwable $ignored) {}
+                Timing::end('purge',$t);
                 $this->stamped('revert');
                 return $result;
-            } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
-            finally { $this->batching=false; }
+            } catch(Throwable $error) { return $this->contractFailed($error); }
+            finally { $this->batching=false; $this->contract->endCall(); }
         }
         switch ($action) {
             case 'info':
@@ -1174,11 +1327,45 @@ final class Engine
         return $this->ok(['kind' => $kind, 'id' => $id, 'item' => $item]);
     }
 
+    /**
+     * Every refusal of the contract door carries `errors[]` beside the `error`/`message` it always
+     * had: a thrown ContractProblem brings its own; a returned refusal is classified by its code.
+     */
+    private function contentContract(array $p): array
+    {
+        $result = $this->contractDoor($p);
+        // Every answer the door gives while the site differs from its quickstart says where (ADR 0022).
+        if (($result['ok'] ?? false) === true && !isset($result['warnings']) && ($warnings = $this->driftWarnings()) !== [])
+            $result['warnings'] = $warnings;
+        if (($result['ok'] ?? true) === false && !isset($result['errors'])) {
+            $code = ['conflict' => 'CONFLICT', 'writer_busy' => 'WRITER_BUSY'][$result['error'] ?? ''] ?? 'CONTRACT_FAILED';
+            $result['errors'] = [ContractProblem::plain($code, (string) ($result['message'] ?? ''))];
+        }
+        return $result;
+    }
+
+    /**
+     * Where the site differs from its quickstart's design, as warnings — never a refusal (Tracy
+     * ADR 0022). Each is `{code: PRESENTATION_DRIFT, message, severity: warning}`.
+     * @return list<array{code:string,message:string,severity:string}>
+     */
+    private function driftWarnings(): array
+    {
+        return array_map(static fn(string $m) => ['code' => 'PRESENTATION_DRIFT', 'message' => $m, 'severity' => 'warning'],
+            $this->contract ? $this->contract->driftWarnings() : []);
+    }
+
+    /** A caught contract failure: the message it always had, and what it was, as `errors[]`. */
+    private function contractFailed(Throwable $error): array
+    {
+        return $this->err('contract_failed', $error->getMessage(), ['errors' => ContractProblem::errorsOf($error)]);
+    }
+
     /** A bounded transaction: the same request id returns its committed result after a lost reply.
      * Expected fields are checked under the site writer lock; all row changes and undo entries
      * share one database transaction. Files and extension installers are deliberately excluded.
      */
-    private function contentContract(array $p): array
+    private function contractDoor(array $p): array
     {
         if (!$this->contract && $this->constructionBaseline !== null) {
             // Under construction there is nothing to verify and nothing to write through: the door
@@ -1223,8 +1410,12 @@ final class Engine
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {
                     if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');
-                    $this->contract->inspect();
-                    return $entry['result'];
+                    // The stored afterRevision only while the site still stands there: after another
+                    // writer it names a state that is gone, and an apply based on it is refused.
+                    $state=$this->contract->inspect();
+                    $result=$entry['result'];
+                    if(($result['afterRevision']??null)!==$state['revision'])unset($result['afterRevision']);
+                    return $result;
                 }
             }
             if ($this->log->entries($apply)) throw new RuntimeException('Use one new apply_id per content revision');
@@ -1234,17 +1425,58 @@ final class Engine
             // content-only baseline").
             if (($job = $this->contract->job()) !== null)
                 return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . ': finish it, or take it back with multilingual.revert locale ' . $job['locale']);
-            $plan=$this->contract->plan($p);
-            if(count($plan['operations'])>300)throw new RuntimeException('Split the revision into at most 300 entities');
+            // Per-content revisions as content.read serves them, read only when the caller named
+            // some: an apply based on the inspect revision alone never pays for, or fails on, them.
+            $byContent=is_array($p['expected_content_revisions']??null) && $p['expected_content_revisions'];
+            // Plan and verify are two inspects with no file written between them: one proof of the files.
+            $this->contract->beginCall();
+            $t=Timing::begin();$before=$byContent && $this->contentRevisions ? ($this->contentRevisions)() : null;Timing::end('contentRevisions',$t);
+            $t=Timing::begin();$plan=$this->contract->plan($p,$before,$this->locks,$this->contentRevisions);Timing::end('plan',$t);
+            if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
-            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash){
-                $this->contract->bind($plan['snapshot']);
-                $state=$this->contract->inspect();
+            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
+                $t=Timing::begin();$this->contract->bind($plan['snapshot']);Timing::end('bind',$t);
+                $t=Timing::begin();$state=$this->contract->inspect();Timing::end('verify',$t);
+                $t=Timing::begin();$revisions=$this->revisionsAfter($plan['touched'],$before);Timing::end('revisionsAfter',$t);
+                if($revisions!==null)$result['contentRevisions']=$revisions;
+                // The inspect revision this apply left, so the next one needs no inspect to learn it.
+                // Not `revision`: that name is already this receipt's hash. In the stored result, so a
+                // replay answers it too.
+                $result['afterRevision']=$state['revision'];
+                $t=Timing::begin();
                 $this->log->record($apply,['op'=>'contract','request'=>$request,'hash'=>$hash,'result'=>$result,'afterRevision'=>$state['revision']]);
+                Timing::end('log',$t);
+                return $result;
             });
-        } catch(Throwable $error) { return $this->err('contract_failed',$error->getMessage()); }
+        } catch(Throwable $error) { return $this->contractFailed($error); }
+        finally { $this->contract->endCall(); }
     }
 
+
+    /**
+     * The revision of every content this apply changed, read inside its transaction after the write:
+     * the contents owning the entities written and, when the revisions before are known, any other
+     * content whose projection moved with them (a page naming a shared module by its title). Null
+     * when the projection cannot be read — a receipt is not worth rolling back a checked write for.
+     *
+     * @param list<string> $touched contract entity keys the apply wrote
+     * @return array<string,string>|null
+     */
+    private function revisionsAfter(array $touched, ?array $before): ?array
+    {
+        if (!$this->contentRevisions) return null;
+        try { $after = ($this->contentRevisions)(); } catch (Throwable $ignored) { return null; }
+        $out = [];
+        foreach ($touched as $key) {
+            $id = $after['owners'][$key] ?? null;
+            if ($id !== null && isset($after['revisions'][$id])) $out[$id] = $after['revisions'][$id];
+        }
+        if ($before !== null)
+            foreach ($after['revisions'] as $id => $revision)
+                if (($before['revisions'][$id] ?? null) !== $revision) $out[$id] = $revision;
+        ksort($out);
+        return $out;
+    }
 
     /**
      * Adding, checking and taking back a language version of a bound quickstart.
@@ -1315,7 +1547,7 @@ final class Engine
                     'remaining' => count($this->demoTrimPending($state, true)),
                     'profileVersion' => $this->contract->demoTrim()->version(), 'profileHash' => $this->contract->demoTrim()->hash(),
                 ]);
-            } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+            } catch (Throwable $error) { return $this->contractFailed($error); }
         }
         if ($operation !== 'apply' && $operation !== 'revert') return $this->err('bad_params', 'Unknown demoTrim operation');
         $apply = $this->applyId($p);
@@ -1346,18 +1578,25 @@ final class Engine
             // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit. A batch that dies after
             // Joomla committed some rows must leave a site that says a trim is in flight — otherwise
             // those rows read as drift, and the retry that would finish them is refused with the rest.
+            // 🔒 NOT UNDER AN OPEN EDITOR, AND NOT EVEN THE RECORD. The rows this call would move are
+            // checked before the first write of the call, the record included: a refused call leaves
+            // the site, and a trim in flight, exactly where they were, so the same request resumes.
+            $hide = $operation === 'apply';
+            $checked = false;
             if ($trim === null || $trim['status'] !== $record['status'] || $trim['requestId'] !== $request) {
-                $this->writer->transaction(function () use ($record) {
+                $this->writer->transaction(function () use ($record, $hide) {
                     $state = $this->contract->inspect();
+                    $this->refuseLocked($this->demoTrimRows($state, $hide));
                     if (!$state['binding']) $this->contract->bind($state['snapshot']);
                     $this->contract->rebind($this->contract->bindingWithTrim($record));
                     return [];
                 });
+                $checked = true;
             }
-            $hide = $operation === 'apply';
             $this->batching = true;
-            $step = $this->writer->transaction(function () use ($hide, $apply) {
+            $step = $this->writer->transaction(function () use ($hide, $apply, $checked) {
                 $state = $this->contract->inspect();
+                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide));
                 $pending = $this->demoTrimPending($state, $hide);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
                 foreach ($batch as $key => [$kind, $field, $value]) {
@@ -1386,7 +1625,7 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1481,7 +1720,7 @@ final class Engine
             $this->stamped('content');
             return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1534,6 +1773,7 @@ final class Engine
             $onRecord = $binding['sourceRelabel'] ?? null;
             if ($operation === 'revert') {
                 if ($onRecord === null) return $this->err('contract_failed', 'This site’s source edition still carries its published tag; there is nothing to take back');
+                $this->refuseLocked($this->rowsInLanguage((string) $onRecord['to']));
                 $this->relabelSource($apply, (string) $onRecord['to'], $published, null, $onRecord);
                 return $this->ok(['status' => 'reverted', 'source' => $published]);
             }
@@ -1544,6 +1784,9 @@ final class Engine
                 return $this->err('conflict', 'This site’s source edition is already called ' . $current . '; take that back with sourceLanguage.revert before choosing another');
             if (in_array($locale, $this->contract->derivedLanguages(), true))
                 return $this->err('conflict', 'This site already has a ' . $locale . ' edition; the source cannot take its name');
+            // Before the pack too: an installer is a write, and a relabel refused afterwards would
+            // leave its content language behind for nothing.
+            $this->refuseLocked($this->rowsInLanguage($current));
             $pack = $this->contract->languagePackage($locale, $major);
             if ($pack !== null && !$this->languagePackPresent($locale)) {
                 if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -1563,8 +1806,27 @@ final class Engine
             ], null);
             return $this->ok(['status' => 'completed', 'source' => $locale, 'packVersion' => $pack['version'] ?? null]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
+    }
+
+    /**
+     * Every row a relabel from `$tag` rewrites (SiteWriter::relabelLanguage), as (kind, id): each
+     * kind the editor checks out, read by its listing, kept where it carries the tag. A relabel is
+     * rare and one-off, so a listing of every such table is what its lock check costs.
+     */
+    private function rowsInLanguage(string $tag): array
+    {
+        $rows = [];
+        if (!$this->locks) return $rows;
+        foreach (['article', 'category', 'tag', 'field', 'contact', 'newsfeed', 'banner', 'module', 'menuItem'] as $kind)
+            for ($offset = 0; $offset < 20000; $offset += 100) {
+                $page = $this->writer->list($kind, $offset, 100);
+                foreach ($page as $row)
+                    if ((string) ($row['language'] ?? '') === $tag && (int) ($row['client_id'] ?? 0) === 0) $rows[] = [$kind, (int) $row['id']];
+                if (count($page) < 100) break;
+            }
+        return $rows;
     }
 
     /** One relabel, logged, recorded and proven in a single transaction; $record null takes it back. */
@@ -1586,6 +1848,15 @@ final class Engine
         });
         try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
         $this->stamped('content');
+    }
+
+    /** The rows the next demo-trim batch would move, as (kind, id). */
+    private function demoTrimRows(array $state, bool $hide): array
+    {
+        $rows = [];
+        foreach (array_slice($this->demoTrimPending($state, $hide), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
+            $rows[] = [$kind, (int) $state['ids'][$key]];
+        return $rows;
     }
 
     /**
@@ -1615,7 +1886,7 @@ final class Engine
         if ($this->extensions === null) return $this->err('unavailable', 'extension manager not wired');
         try {
             $pack = $this->contract->languagePackage($locale, $major);
-        } catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        } catch (Throwable $error) { return $this->contractFailed($error); }
         if ($pack === null) return $this->ok(['locale' => $locale, 'installed' => true, 'source' => true]);
         try { $installed = $this->languagePackPresent($locale); }
         catch (Throwable $error) { return $this->err('read_failed', $error->getMessage()); }
@@ -1684,24 +1955,41 @@ final class Engine
                 );
                 $job = MultilingualApply::start($locale, $apply, $request, $hash, $state['snapshot']['contractHash'], $plan['profileHash'], $state['revision']);
             }
-            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply): int {
+            // Rows the phase was checked for before it began (see the transaction below). A write to an
+            // existing row outside that list is checked on its own before it lands, so no path through
+            // a phase writes under an open editor, even one pendingRows() did not foresee.
+            $checked = [];
+            $phase = $job['phase'];
+            $guard = function (string $kind, int $id) use (&$checked, $phase): void {
+                if ($id > 0 && !isset($checked[JoomlaLocks::key($kind, $id)])) $this->refuseLocked([[$kind, $id]], ['phase' => $phase]);
+            };
+            $executor = new MultilingualApply($this->contract, $this->writer, function (string $kind, int $id, array $fields) use ($apply, $guard): int {
+                $guard($kind, $id);
                 $answer = $this->contentUpdate(['apply_id' => $apply, 'kind' => $kind, 'id' => $id, 'fields' => $fields]);
                 if (empty($answer['ok'])) throw new RuntimeException($kind . ' ' . $id . ': ' . ($answer['message'] ?? json_encode($answer['error'])));
                 return (int) $answer['id'];
-            }, function (int $id, string $before, string $after) use ($apply): void {
+            }, function (int $id, string $before, string $after) use ($apply, $guard): void {
+                $guard('menuItem', $id);
                 // Undo first, as retire does: a row whose way back was not recorded is never moved.
                 $this->log->record($apply, ['op' => 'alias', 'kind' => 'menuItem', 'id' => $id, 'before' => $before]);
                 $this->writer->realiasMenuItem($id, $after);
-            }, function (string $kind, int $id, string $column, int $value) use ($apply): void {
+            }, function (string $kind, int $id, string $column, int $value) use ($apply, $guard): void {
+                $guard($kind, $id);
                 $before = (int) (($this->writer->read($kind, $id) ?? [])[$column] ?? 0);
                 $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => $before]);
                 $this->setVisible($kind, $id, $column, $value);
             });
             $this->batching = true;
-            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale) {
+            $done = $this->writer->transaction(function () use ($executor, $job, $translations, $locale, &$checked) {
                 // A fresh read inside the transaction: the phase must act on the site as it is now,
                 // not on a picture taken before another writer had its turn.
                 $state = $this->contract->inspect();
+                // 🔒 THE PHASE THAT WOULD WRITE AN OPEN RECORD IS REFUSED BEFORE ITS FIRST WRITE. Every
+                // existing row the phase writes, not just this chunk's; the job is not advanced and not
+                // saved, so the same request resumes at the same phase once the editor is closed.
+                $rows = $executor->pendingRows($job, $state);
+                $this->refuseLocked($rows, ['phase' => $job['phase']]);
+                foreach ($rows as [$kind, $id]) $checked[JoomlaLocks::key($kind, (int) $id)] = true;
                 $next = $executor->step($job, $state, $translations);
                 if ($next['phase'] === 'completed') {
                     $this->contract->saveJob(null);
@@ -1731,7 +2019,7 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1749,6 +2037,7 @@ final class Engine
         try {
             $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
             if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
+            $this->refuseLocked($this->undoRows($entries));
             $this->writer->transaction(function () use ($entries) {
                 foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
                 return [];
@@ -1758,7 +2047,7 @@ final class Engine
             $this->stamped('revert');
             return $this->ok(['restored' => count($entries), 'applyId' => $apply]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1822,6 +2111,8 @@ final class Engine
             $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
             $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            // Every row this pass hides, before the first: one open in the editor refuses the pass.
+            $this->refuseLocked(array_map(fn ($write) => [$write[0], (int) $write[1]], $slice));
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
                 foreach ($slice as [$kind, $id, $fields]) {
@@ -1842,7 +2133,7 @@ final class Engine
                 'applyId' => $apply,
             ]);
         } catch (Throwable $error) {
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1914,7 +2205,7 @@ final class Engine
     private function multilingualVerify(string $locale): array
     {
         try { $state = $this->contract->inspect(); }
-        catch (Throwable $error) { return $this->err('contract_failed', $error->getMessage()); }
+        catch (Throwable $error) { return $this->contractFailed($error); }
         if ($locale !== '' && !in_array($locale, $state['languages'], true))
             return $this->err('contract_failed', $locale . ' is not a language of this site' . ($state['job'] ? ' yet; a job is at phase ' . $state['job']['phase'] : ''));
         $binding = $state['binding']['multilingual'] ?? [];
@@ -1958,6 +2249,10 @@ final class Engine
                 return $this->err('conflict', 'The site changed since it was read; inspect again');
             $applyId = $abandon ? $job['applyId'] : $language['applyId'];
             $leftovers = $abandon ? ($state['languages'] === [] ? $this->orphansOf($state, $locale) : []) : [];
+            // Every row the undo log would put back and every leftover it would remove, before any.
+            $rows = $this->undoRows($this->log->entries($applyId));
+            foreach ($leftovers as $kind => $ids) foreach ($ids as $id) $rows[] = [$kind, (int) $id];
+            $this->refuseLocked($rows);
             $this->batching = true;
             $result = $this->writer->transaction(function () use ($applyId, $locale, $abandon, $leftovers) {
                 $reverted = $this->applyRevert(['apply_id' => $applyId]);
@@ -1979,7 +2274,7 @@ final class Engine
             return $this->ok(['locale' => $locale, 'reverted' => $result['reverted'] ?? 0, 'removed' => true]);
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('contract_failed', $error->getMessage());
+            return $this->contractFailed($error);
         }
     }
 
@@ -1996,6 +2291,14 @@ final class Engine
             return $this->err('bad_params', 'apply_id, request_id and 1–100 operations required');
         }
         $hash = hash('sha256', json_encode($steps, JSON_THROW_ON_ERROR));
+        // Every existing row the batch names, checked before the first write so an open one refuses
+        // the whole batch. The contract door checked its own rows in plan(), with slot and content.
+        if (!$verify) {
+            $rows = [];
+            foreach ($steps as $step)
+                if (is_array($step) && is_string($step['kind'] ?? null) && is_numeric($step['id'] ?? null)) $rows[] = [$step['kind'], (int) $step['id']];
+            if (($refusal = $this->lockRefusal($rows)) !== null) return $refusal;
+        }
         try {
             $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
@@ -2006,6 +2309,7 @@ final class Engine
                 }
                 $this->batching = true;
                 $ids = [];
+                $t = Timing::begin();
                 foreach ($steps as $index => $step) {
                     if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
                     $kind = $step['kind'];
@@ -2025,7 +2329,7 @@ final class Engine
                         $before = $this->writer->read($kind, (int) $id);
                         foreach ($step['expected'] as $key => $value) {
                             if (!$before || !array_key_exists($key, $before) || (string) $before[$key] !== (string) $value) {
-                                throw new RuntimeException("conflict at operation {$index}: {$key} changed");
+                                throw new ContractProblem('CONFLICT', "conflict at operation {$index}: {$key} changed");
                             }
                         }
                     }
@@ -2035,18 +2339,22 @@ final class Engine
                     if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
                     $ids[$key] = $answer['id'];
                 }
+                Timing::end('write', $t);
                 $result = $this->ok(['ids' => $ids, 'revision' => hash('sha256', $apply . ':' . $request . ':' . $hash)]);
-                if ($verify) $verify($result);
+                // The contract door's check may add to the receipt (its content revisions).
+                if ($verify) $result = $verify($result) ?? $result;
                 $this->log->record($apply, ['op' => 'batch', 'request' => $request, 'hash' => $hash, 'result' => $result]);
                 return $result;
             });
             $this->batching = false;
+            $t = Timing::begin();
             $this->writer->purgeCache();
+            Timing::end('purge', $t);
             $this->stamped('content');
             return $result;
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('batch_failed', $error->getMessage());
+            return $this->err('batch_failed', $error->getMessage(), $verify ? ['errors' => ContractProblem::errorsOf($error)] : []);
         }
     }
 
@@ -2068,6 +2376,8 @@ final class Engine
         }
         $fields = $p['fields'];
         $id = max(0, (int) ($p['id'] ?? 0));
+        // A batch checked all its rows before writing any; a lone update checks its own.
+        if (!$this->batching && ($refusal = $this->lockRefusal([[$kind, $id]])) !== null) return $refusal;
         if ($id === 0 && !$this->writer->canCreate($kind)) {
             // The refusal must NAME the boundary (ADR 0080 §4): the agent has no other door to
             // wander to, so this sentence is all it gets to explain itself to the user.
@@ -2184,6 +2494,7 @@ final class Engine
         if ($id <= 0) {
             return $this->err('bad_params', 'id required');
         }
+        if (($refusal = $this->lockRefusal([[$kind, $id]])) !== null) return $refusal;
 
         try {
             $before = $this->writer->read($kind, $id);
@@ -2241,7 +2552,8 @@ final class Engine
             return $this->err('too_large', 'media exceeds the inline limit; use the signed-URL path');
         }
 
-        if ($this->contract && $this->contract->bound() && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('content_only', 'Image filename must match its SHA-256');
+        // Only a contract slot's picture folder is content-addressed (Tracy ADR 0022).
+        if ($this->contract && $this->contract->bound() && strpos($path, 'images/tracy-content/') === 0 && basename($path, '.' . pathinfo($path, PATHINFO_EXTENSION)) !== hash('sha256', $bytes)) return $this->err('bad_params', 'Image filename must match its SHA-256');
 
         try {
             $before = $this->media->read($path); // null => new file, so its undo is a delete
@@ -2284,6 +2596,8 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('revert_failed', $e->getMessage());
         }
+        // Taking a change back is a write too: not under an open editor, and not half of it.
+        if (($refusal = $this->lockRefusal($this->undoRows($entries))) !== null) return $refusal;
 
         $reverted = 0;
         $failed = [];
@@ -2317,6 +2631,19 @@ final class Engine
             return $this->ok(['reverted' => $reverted]);
         }
         return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
+    }
+
+    /**
+     * The rows an undo log would write back, as (kind, id): a content write, a move, and the raw
+     * alias and visibility changes a language step or a retire records.
+     */
+    private function undoRows(array $entries): array
+    {
+        $rows = [];
+        foreach ($entries as $entry)
+            if (in_array($entry['op'] ?? '', ['content', 'move', 'alias', 'visibility'], true) && is_string($entry['kind'] ?? null))
+                $rows[] = [$entry['kind'], (int) ($entry['id'] ?? 0)];
+        return $rows;
     }
 
     /**

@@ -90,7 +90,7 @@ $second = $sdoor($S, 'siteLanguage.set', ['apply_id' => 'slang-2', 'request_id' 
 check('a second language must take the first back', $second['error'], 'conflict');
 checkTrue('and the message says how', strpos($second['message'], 'siteLanguage.revert') !== false);
 check('nothing moved for it', [WP_Fake::$options['polylang']['default_lang'], WP_Fake::$options['WPLANG']], ['vi', 'vi']);
-check('apply.revert is not the way back on a sealed site', $S->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-1']])['error'], 'content_only');
+check('apply.revert is not the way back on a sealed site', $S->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-1']])['error'], 'bad_params');
 checkTrue('and says which is', strpos($S->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'slang-1']])['message'], 'siteLanguage.revert') !== false);
 check('so the default is still vi', WP_Fake::$options['polylang']['default_lang'], 'vi');
 

@@ -1,10 +1,14 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
+require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
+require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ContractProblem.php';
+require_once __DIR__ . '/Timing.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -21,6 +25,19 @@ interface ContractStore {
     public function job(): ?array;
     public function saveJob(?array $job): void;
     public function access(): array;
+}
+
+/**
+ * Where the locked files' proofs are remembered between door calls: path → [size, mtime, ctime,
+ * inode, sha256]. Private database state like the binding (never a file under the webroot), and in
+ * its own table: the content reader snapshots #__claudecowork_content_contract whole, and 600 KB of
+ * proofs there would ride along in every read.
+ */
+interface FileProofStore {
+    /** @return array<string, array{0:int,1:int,2:int,3:int,4:string}> */
+    public function load(): array;
+    /** @param array<string, array{0:int,1:int,2:int,3:int,4:string}> $proofs */
+    public function save(array $proofs): void;
 }
 
 /** Trusted package data, never a caller-supplied field allowlist. */
@@ -41,6 +58,48 @@ final class QuickstartContract
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
     private ?DemoTrimProfile $demoTrim = null;
+
+    /**
+     * 🔒 THE DESIGN IS A BASELINE TO COMPARE, NOT A LOCK (Tracy ADR 0022, 26/09/2026). A site may
+     * change its template, layout, modules or files through Joomla itself; the contract then says
+     * where it differs from the quickstart — as warnings — and keeps its own door working. What it
+     * still refuses is a difference its OWN write made: the first inspect of a request records the
+     * differences already there (`$tolerated`), and every later inspect in the same request — the
+     * check after an apply, a revert, a language step — throws on any difference that was not.
+     * `newRequest()`/`endRequest()` (Engine::handle) bound the request; outside one, an inspect only reports.
+     *
+     * @var list<string>|null
+     */
+    private ?array $tolerated = null;
+    /** @var list<string> */
+    private array $drift = [];
+
+    /** Whether an Engine request is running: only then is a new difference a refusal. */
+    private bool $inRequest = false;
+
+    /** Start a request: the next inspect records what already differs. */
+    public function newRequest(): void { $this->inRequest = true; $this->tolerated = null; }
+
+    /** End it: an inspect outside a request only reports. */
+    public function endRequest(): void { $this->inRequest = false; $this->tolerated = null; }
+
+    /**
+     * The differences from the quickstart's design this request began with — what an apply's answer
+     * warns about, although its own write moved the baseline past them — or, outside a request, what
+     * the last inspect found. @return list<string>
+     */
+    public function driftWarnings(): array { return $this->tolerated ?? $this->drift; }
+
+    private function drift(string $message): void { $this->drift[] = $message; }
+
+    /** After an inspect has collected its differences: remember them, or refuse the new ones. */
+    private function settleDrift(): void {
+        if (!$this->inRequest) return;
+        if ($this->tolerated === null) { $this->tolerated = $this->drift; return; }
+        $new = array_values(array_diff($this->drift, $this->tolerated));
+        if ($new) throw new ContractProblem('PRESENTATION_DRIFT', $new[0]);
+    }
+
     public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
@@ -120,9 +179,27 @@ final class QuickstartContract
         return $this->packs;
     }
     private function digest($value): string { return hash('sha256', json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); }
-    private function contractHash(): string { return $this->digest([$this->manifest,$this->map,$this->lock]); }
-    private function baseEntities(): array { return array_column($this->map['entities'], null, 'key'); }
-    private function slotsFor(string $key): array { return array_values(array_filter($this->map['slots'], fn($s)=>$s['entity']===$key)); }
+    /**
+     * Hashed once per instance: the three files are read in the constructor and never change after,
+     * and re-encoding ~10 MB of profile JSON ran twice per inspect and twice per readMapping (#316).
+     */
+    private ?string $contractHash = null;
+    private function contractHash(): string {
+        if($this->contractHash!==null)return $this->contractHash;
+        $t=Timing::begin();$this->contractHash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
+        return $this->contractHash;
+    }
+    /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
+    private ?array $baseEntities = null;
+    private function baseEntities(): array { return $this->baseEntities ??= array_column($this->map['entities'], null, 'key'); }
+    private ?array $slotsByEntity = null;
+    private function slotsFor(string $key): array {
+        if ($this->slotsByEntity === null) {
+            $this->slotsByEntity = [];
+            foreach ($this->map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $slot;
+        }
+        return $this->slotsByEntity[$key] ?? [];
+    }
 
     /**
      * Every entity this contract governs RIGHT NOW: the published quickstart's, plus one copy per
@@ -184,7 +261,7 @@ final class QuickstartContract
      *
      * @return array{0:array<string,array{ids:array<string,int>}>,1:?int}
      */
-    private function adoptOrphans(array $job, array $languages, ?int $switcher, ?array $binding): array {
+    private function adoptOrphans(ContractRows $source, array $job, array $languages, ?int $switcher, ?array $binding): array {
         $locale=$job['locale'];
         $missing=[];
         foreach($this->baseEntities() as $key=>$entity) {
@@ -196,12 +273,7 @@ final class QuickstartContract
         $switcherNote=$this->multilingual->switcherPresentation()['note'];
         foreach(['module','menuItem','article'] as $kind) {
             if(!isset($missing[$kind]) && !($kind==='module' && $switcher===null))continue;
-            $rows=[];
-            for($offset=0;$offset<20000;$offset+=100) {
-                $page=$this->writer->list($kind,$offset,100);
-                foreach($page as $row)$rows[]=$row;
-                if(count($page)<100)break;
-            }
+            $rows=$source->summaries($kind);
             // An id already claimed by another key is never claimed twice.
             $claimed=array_flip(array_map('intval',$languages[$locale]['ids']??[]));
             $byId=array_column($rows,null,'id');
@@ -254,16 +326,21 @@ final class QuickstartContract
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         return $row;
     }
-    private function currentValue(array $row, array $slot): string {
-        $value=$row[$slot['column']];
+    /**
+     * @param array $parsed this ROW's columns already parsed, kept by the caller across its slots: an
+     * HTML body or nested JSON config holding many slots was parsed again for each one of them, on
+     * every inspect (Business 1.2.0: 1,509 JSON and 124 HTML slots; #316). Omitted, nothing is kept.
+     */
+    private function currentValue(array $row, array $slot, array &$parsed = []): string {
+        $column=$slot['column'];$value=$row[$column];
         if(isset($slot['xpath'])) {
-            $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+            $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
             return $nodes->item(0)->nodeValue;
         }
         if(isset($slot['jsonPath'])) {
-            $outer=json_decode($value,true,512,JSON_THROW_ON_ERROR);
-            $value=json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
+            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=$parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
             foreach($slot['jsonPath'] as $key)$value=$value[$key];
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
@@ -297,20 +374,69 @@ final class QuickstartContract
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
+    /**
+     * Whether this door call has already proved the locked files: null outside one, where every
+     * inspect hashes them all; false until the first inspect inside one has; then true.
+     */
+    private ?bool $filesProved = null;
+    /** Proofs from earlier door calls, when the host keeps them (`withFileProofs`); null hashes every file. */
+    private ?FileProofStore $proofs = null;
+    /** Remember the locked files' proofs between door calls; see {@see files()}. */
+    public function withFileProofs(FileProofStore $proofs): self { $this->proofs = $proofs; return $this; }
+    /** Seconds a file must stand unchanged before its proof is remembered (the racy-git rule). */
+    private const PROOF_SETTLE_SECONDS = 2;
+    /**
+     * Prove the locked files once for the rest of one door call: apply's plan and verify, revert's
+     * inspect before and after (#316: 4,145 files hashed twice per apply). Only for a call that
+     * writes no file between its inspects — a bound receiver writes none — so what this gives up is
+     * an edit from outside landing in the seconds between two of them, which the next call refuses.
+     */
+    public function beginCall(): void { $this->filesProved = false; }
+    public function endCall(): void { $this->filesProved = null; }
+    /**
+     * 🔒 PROVE EVERY LOCKED FILE, AND HASH ONLY THE ONES A WRITE COULD HAVE CHANGED. Every inspect and
+     * every apply hashed all 4,145 files of the Business lock: 3.9 s of a 5.5 s inspect and 7.9 s of
+     * a 10.9 s apply whose write took 38 ms (0.18.0-rc.11, timing:true, Tracy bench clone 27/09/2026).
+     * A file whose size, mtime, ctime and inode all match the proof remembered for it is the file
+     * that was hashed then: ctime moves on every write and chmod, and no user-space call can set
+     * it back. What would slip is a write landing within the same second as the proof — so a file
+     * younger than {@see PROOF_SETTLE_SECONDS} is never remembered (git's racy-entry rule). Without
+     * a store, or when it fails, every file is hashed as before.
+     */
     private function files(): void {
+        if($this->filesProved)return;
+        $t=Timing::begin();
+        clearstatcache();
+        $known=[];
+        if($this->proofs)try{$known=$this->proofs->load();}catch(Throwable $ignored){$known=[];}
+        $remember=[];$hashed=0;$now=time();
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
-            if(is_link($file)||!is_file($file)||!hash_equals($hash,hash_file('sha256',$file)))throw new RuntimeException('Presentation asset changed: '.$path);
+            if(is_link($file)||!is_file($file)){$this->drift('Presentation asset changed: '.$path);continue;}
+            $st=@stat($file);
+            $key=$st===false?null:[(int)$st['size'],(int)$st['mtime'],(int)$st['ctime'],(int)$st['ino']];
+            $proof=$known[$path]??null;
+            if($key!==null && is_array($proof) && count($proof)===5 && array_slice($proof,0,4)===$key && is_string($proof[4]))$sum=$proof[4];
+            else {$sum=hash_file('sha256',$file);$hashed++;}
+            if(!is_string($sum)||!hash_equals($hash,$sum)){$this->drift('Presentation asset changed: '.$path);continue;}
+            if($key!==null && max($key[1],$key[2])<=$now-self::PROOF_SETTLE_SECONDS)$remember[$path]=[...$key,$sum];
         }
+        // Written only when something moved: an unchanged site reads its proofs and writes nothing.
+        if($this->proofs && $remember!=$known)try{$this->proofs->save($remember);}catch(Throwable $ignored){}
+        Timing::count('filesHashed',$hashed);
         foreach($this->lock['fileRoots'] as $prefix) {
+            // A folder removed through Joomla is a difference like any other (Tracy ADR 0022).
+            if(!is_dir($this->root.'/'.$prefix)){$this->drift('Presentation folder missing: '.$prefix);continue;}
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if($this->generatedCache($relative) && !$file->isLink())continue;
-                if(!isset($this->lock['files'][$relative]))throw new RuntimeException('Unexpected presentation file: '.$relative);
+                if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }
+        Timing::end('files',$t);
+        if($this->filesProved===false)$this->filesProved=true;
     }
 
     /**
@@ -342,16 +468,88 @@ final class QuickstartContract
         return $expected;
     }
 
+    /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
+    private function resolveRows(ContractRows $source, array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
+        $ids=[];$rows=[];$lists=[];$missing=[];
+        // A copy is ALWAYS resolved through the binding: two rows that differ only by language
+        // cannot be told apart by the identity fields the base contract uses.
+        $boundId = fn(string $key, array $meta): int => (isset($meta['locale']) || !empty($meta['switcher']))
+            ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
+            : (int)($binding['ids'][$key]??0);
+        // Without an inventory walk the bound rows are still hundreds of single reads; ask for
+        // each kind's ids at once instead. With one, every row is already in hand.
+        if(!$inventory && $binding) {
+            $wanted=[];
+            foreach($keys as $key=>$meta)$wanted[$meta['kind']][]=$boundId($key,$meta);
+            foreach($wanted as $kind=>$list)$source->prefetch($kind,$list);
+        }
+        foreach($keys as $key=>$meta) {
+            $kind=$meta['kind'];
+            if(($inventory || !$binding) && !isset($lists[$kind])) $lists[$kind]=$source->all($kind);
+            $derived = isset($meta['locale']) || !empty($meta['switcher']);
+            if($binding || $derived) {
+                $id = $boundId($key,$meta);
+                $row = $source->row($kind,$id);
+                // 🔒 A BOUND ROW REMOVED THROUGH JOOMLA CLOSES ITS OWN SLOTS, NOT THE DOOR (Tracy ADR
+                // 0022): the site's other words still change. A copy made by a language job has no
+                // life of its own apart from its source, so a lost copy still refuses.
+                if(!$row && $binding && !$derived){$missing[]=$key;continue;}
+                if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
+            } else {
+                $entity=$this->baseEntities()[$key];
+                $matches=array_values(array_filter($lists[$kind],function($row)use($entity,$ids){
+                    foreach($entity['identityReferences']??[] as $field=>$ref)if((int)($row[$field]??0)!==($ids[$ref]??-1))return false;
+                    foreach($entity['identity'] as $field=>$value)if((string)($row[$field]??'')!==(string)$value)return false;
+                    return true;
+                }));
+                if(count($matches)!==1)throw new RuntimeException('Missing or ambiguous entity: '.$key);
+                $row=$matches[0];$id=(int)$row['id'];
+            }
+            $ids[$key]=$id;$rows[$key]=$row;
+        }
+        return ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists, 'missing'=>$missing];
+    }
+
+    /**
+     * Read-only mapping. A binding is mandatory: an unbound site's labels are not identities.
+     * An interrupted language job must be resumed through the existing write door, never GET.
+     * Values are extracted by the reader only for authorized rows; no samples leave this method.
+     */
+    public function readMapping(): array {
+        $this->ready();
+        $binding = $this->store->load();
+        if (!$binding) throw new RuntimeException('Content reader requires a bound contract');
+        if (($binding['contractHash'] ?? null) !== $this->contractHash()) throw new RuntimeException('Installed content contract changed');
+        $job = $this->store->job();
+        if ($job && ($job['phase'] ?? '') !== 'completed') throw new RuntimeException('Content mapping has an unfinished language job');
+        $languages = $this->effectiveLanguages($binding, null);
+        $switcher = $binding['multilingual']['switcher'] ?? null;
+        $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
+        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $binding, $languages, $switcher);
+        foreach ($resolved['missing'] as $gone) unset($keys[$gone]);
+        unset($resolved['missing']);
+        $slots = [];
+        foreach ($keys as $key=>$meta) {
+            $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
+        }
+        return $resolved + ['keys'=>$keys, 'slots'=>$slots, 'manifest'=>$this->manifest, 'contractHash'=>$this->contractHash()];
+    }
+
     public function inspect(): array {
         $this->ready();
-        $this->files(); $binding=$this->store->load();
+        $inspect=Timing::begin();
+        $this->drift = [];
+        $this->files();
+        $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
+        // This call's rows, read in bulk and dropped when it returns (see ContractRows).
+        $source = new ContractRows($this->writer);
         $languages = $this->effectiveLanguages($binding, $job);
         $switcher = $binding['multilingual']['switcher'] ?? ($job['switcher'] ?? null);
         // A taken edition creates no rows, so a half-run job of one leaves none unnamed behind it.
         if ($job && $job['phase'] !== 'completed' && !($this->multilingual && $this->multilingual->edition((string) $job['locale'])))
-            [$languages, $switcher] = $this->adoptOrphans($job, $languages, $switcher, $binding);
+            [$languages, $switcher] = $this->adoptOrphans($source, $job, $languages, $switcher, $binding);
         if ($languages || $switcher !== null) {
             if (!$this->multilingual) throw new RuntimeException('This site has translations but the receiver carries no multilingual profile');
             foreach ([$binding['multilingual']['profileHash'] ?? null, $job['profileHash'] ?? null] as $seen)
@@ -373,48 +571,19 @@ final class QuickstartContract
         // every state with no job at all, demands the finished answer.
         $transitional = $job !== null && $job['phase'] === 'prepare';
         $retagged = $languages !== [] && ($binding['multilingual']['languages'] ?? []) !== [] || ($job['retagged'] ?? false);
+        $t=Timing::begin();
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        $ids=[];$rows=[];$lists=[];
-        foreach($keys as $key=>$meta) {
-            $kind=$meta['kind'];
-            if(!isset($lists[$kind])) {
-                $lists[$kind]=[];
-                for($offset=0;$offset<20000;$offset+=100) {
-                    $page=$this->writer->list($kind,$offset,100);
-                    foreach($page as $item)$lists[$kind][]=$this->writer->read($kind,(int)$item['id']);
-                    if(count($page)<100)break;
-                    if($offset===19900)throw new RuntimeException('Inventory limit exceeded');
-                }
-            }
-            $derived = isset($meta['locale']) || !empty($meta['switcher']);
-            if($binding || $derived) {
-                // A copy is ALWAYS resolved through the binding: two rows that differ only by
-                // language cannot be told apart by the identity fields the base contract uses.
-                $id = $derived
-                    ? (int)(!empty($meta['switcher']) ? $switcher : $languages[$meta['locale']]['ids'][$meta['base']])
-                    : (int)($binding['ids'][$key]??0);
-                $row = $this->writer->read($kind,$id);
-                if(!$row)throw new RuntimeException('Bound entity disappeared: '.$key);
-            } else {
-                $entity=$this->baseEntities()[$key];
-                $matches=array_values(array_filter($lists[$kind],function($row)use($entity,$ids){
-                    foreach($entity['identityReferences']??[] as $field=>$ref)if((int)($row[$field]??0)!==($ids[$ref]??-1))return false;
-                    foreach($entity['identity'] as $field=>$value)if((string)($row[$field]??'')!==(string)$value)return false;
-                    return true;
-                }));
-                if(count($matches)!==1)throw new RuntimeException('Missing or ambiguous entity: '.$key);
-                $row=$matches[0];$id=(int)$row['id'];
-            }
-            $ids[$key]=$id;$rows[$key]=$row;
-        }
+        ['ids'=>$ids, 'rows'=>$rows, 'lists'=>$lists, 'missing'=>$missing] = $this->resolveRows($source, $keys, $binding, $languages, $switcher, true);
+        foreach($missing as $gone){unset($keys[$gone]);$this->drift('Bound entity disappeared: '.$gone);}
+        Timing::end('inventory',$t);
         // Resolve foreign keys from the archive's IDs to this installation's IDs.
-        $idMaps=[];foreach($this->baseEntities() as $key=>$entity)$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
+        $idMaps=[];foreach($this->baseEntities() as $key=>$entity)if(isset($ids[$key]))$idMaps[$entity['kind']][$entity['sourceId']]=$ids[$key];
         // And, per language, from an INSTALLED source id to the id of its copy — what a copied
         // link and a copied menu parent are rewritten with.
         $localeMaps=[];
         foreach($languages as $locale=>$state) {
             foreach($state['ids'] as $baseKey=>$id)
-                $localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
+                if(isset($ids[$baseKey]))$localeMaps[$locale][$this->baseEntities()[$baseKey]['kind']][$ids[$baseKey]]=(int)$id;
             // A shipped edition's links and assignments point at ITS rows everywhere, the untranslated
             // ones included (a kit page, a category), so its whole map stands behind the job's ids.
             if($this->multilingual && $this->multilingual->edition($locale))
@@ -427,6 +596,7 @@ final class QuickstartContract
         // site that gained a language — measured 23/09/2026 on `j-ee6vsk`.
         $anchorKey=$this->multilingual ? $this->multilingual->switcherAnchor() : null;
         $reusedSwitcher=$switcher!==null && $anchorKey!==null && isset($ids[$anchorKey]) && (int)$ids[$anchorKey]===(int)$switcher;
+        $t=Timing::begin();
         $protected=[];
         foreach($keys as $key=>$meta) {
             $actual=$this->presentation($key,$rows[$key],$meta);
@@ -462,13 +632,16 @@ final class QuickstartContract
                 $differ=[];
                 foreach($expected as $field=>$value)if(!array_key_exists($field,$actual)||$actual[$field]!=$value)$differ[]=$field.' [want '.substr(json_encode($value),0,60).' got '.substr(json_encode($actual[$field]??null),0,60).']';
                 foreach($actual as $field=>$value)if(!array_key_exists($field,$expected))$differ[]=$field.' (unexpected)';
-                throw new RuntimeException('Presentation drift: '.$key.' — '.implode(', ',$differ));
+                $this->drift('Presentation drift: '.$key.' — '.implode(', ',$differ));
             }
             $protected[$key]=$actual;
         }
+        Timing::end('presentation',$t);
+        $t=Timing::begin();
         $assignments=[];
+        $source->prefetch('moduleAssignment',array_map(fn($key)=>$ids[$key],array_keys(array_filter($keys,fn($meta)=>$meta['kind']==='module'))));
         foreach($keys as $key=>$meta)if($meta['kind']==='module') {
-            $actual=$this->writer->read('moduleAssignment',$ids[$key]);
+            $actual=$source->row('moduleAssignment',$ids[$key]);
             $menus=json_decode($actual['menuids']??'[]',true,512,JSON_THROW_ON_ERROR);sort($menus);
             if (!empty($meta['switcher'])) {
                 $expected=$reusedSwitcher ? $assignments[$anchorKey] : [0];
@@ -486,9 +659,11 @@ final class QuickstartContract
                 }
             }
             sort($expected);
-            if($menus!=$expected)throw new RuntimeException('Module assignment drift: '.$key);
+            if($menus!=$expected)$this->drift('Module assignment drift: '.$key);
             $assignments[$key]=$menus;
         }
+        Timing::end('assignments',$t);
+        $t=Timing::begin();
         $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
         if($actualAccess != $expectedAccess) {
             // Say WHICH audience moved. "Access-level or ACL definition changed" is true of a
@@ -504,8 +679,10 @@ final class QuickstartContract
                 )),0,6);
                 $where[]=$part.'('.implode(' ',$keysDiffer).')';
             }
-            throw new RuntimeException('Access-level or ACL definition changed: '.implode(', ',$where));
+            $this->drift('Access-level or ACL definition changed: '.implode(', ',$where));
         }
+        Timing::end('access',$t);
+        $t=Timing::begin();
         $counts=array_map('count',$lists);
         $expectedCounts=$this->lock['inventoryCounts'];
         foreach($languages as $locale=>$state) {
@@ -514,7 +691,9 @@ final class QuickstartContract
             foreach($state['ids'] as $baseKey=>$id)$expectedCounts[$this->baseEntities()[$baseKey]['kind']]++;
         }
         if($switcher !== null && !$reusedSwitcher)$expectedCounts['module']++;
-        if($counts!=$expectedCounts)throw new RuntimeException('Quickstart inventory changed');
+        if($counts!=$expectedCounts)$this->drift('Quickstart inventory changed');
+        Timing::end('counts',$t);
+        $this->settleDrift();
         $snapshot=['contractHash'=>$this->contractHash(),'ids'=>$ids,'presentation'=>$protected,'assignments'=>$assignments,'counts'=>$counts,'access'=>$this->lock['access']];
         if(isset($binding['multilingual']))$snapshot['multilingual']=$binding['multilingual'];
         // Carried through every rebind, or the next content edit would store a baseline that no
@@ -524,55 +703,120 @@ final class QuickstartContract
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
+        $t=Timing::begin();
         $slots=[];
-        foreach($keys as $key=>$meta)foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot);$slots[]=$slot;}
+        foreach($keys as $key=>$meta){$parsed=[];foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot,$parsed);$slots[]=$slot;}}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
-        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$this->digest($revisionRows),
+        Timing::end('slots',$t);
+        $t=Timing::begin();$revision=$this->digest($revisionRows);Timing::end('digest',$t);
+        Timing::end('inspect',$inspect);
+        return ['contract'=>$this->manifest['id'],'snapshot'=>$snapshot,'revision'=>$revision,
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
             'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null];
     }
 
-    /** Scalar content rules, applied identically to an original and to a translation of it. */
+    /**
+     * Scalar content rules, applied identically to an original and to a translation of it.
+     *
+     * Throws the slot's FIRST problem as a ContractProblem; the message is the one this rule has
+     * always said, the code and numbers are what an agent acts on.
+     */
     private function checkValue(array $slot, string $value, array $params): void {
         $key=$slot['key'];
+        $refuse=fn(string $code,string $message,array $extra=[])=>new ContractProblem($code,$message,$key,null,$extra);
         if (!empty($slot['requiresEvidence']) && $value!==$slot['sample']) {
             $evidence=$params['evidence'][$key]??null;
-            if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw new RuntimeException('Customer evidence required: '.$key);
+            if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw $refuse('SLOT_EVIDENCE_REQUIRED','Customer evidence required: '.$key);
         }
         // Empty ACM fields control conditional markup; changing occupancy changes layout. The one
         // exception is the identity module: it renders nothing itself, and a fact the customer does
         // not have (a TikTok page, a legal name) must be emptied, or the demo's value is shown instead.
         if(empty($slot['siteIdentity'])) {
-            if(trim($value)==='' && trim($slot['sample'])!=='')throw new RuntimeException('Content cannot remove an occupied slot: '.$key);
-            if(trim($value)!=='' && trim($slot['sample'])==='')throw new RuntimeException('Content cannot activate an empty slot: '.$key);
+            if(trim($value)==='' && trim($slot['sample'])!=='')throw $refuse('SLOT_EMPTY_STATE','Content cannot remove an occupied slot: '.$key);
+            if(trim($value)!=='' && trim($slot['sample'])==='')throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
         }
-        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw new RuntimeException('Markup and control characters are not content: '.$key);
-        if(IdentityTokens::hasDirective($value))throw new RuntimeException('Joomla plugin directives are not content: '.$key);
-        if(mb_strlen($value)>$slot['maxCharacters'])throw new RuntimeException('Content too long: '.$key);
-        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw new RuntimeException('Unsupported CTA URL: '.$key);
-        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw new RuntimeException('Unsupported CTA URL: '.$key);
+        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
+        if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        if(mb_strlen($value)>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>mb_strlen($value)]);
+        if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
+        if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {
-            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw new RuntimeException('Image must already exist in the site media library: '.$key);
+            if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw $refuse('SLOT_IMAGE_INVALID','Image must already exist in the site media library: '.$key);
             $resolved=realpath($this->root.'/'.$value);$imageRoot=realpath($this->root.'/images');
-            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw new RuntimeException('Image escapes the site media library: '.$key);
+            if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw $refuse('SLOT_IMAGE_INVALID','Image escapes the site media library: '.$key);
             $before=@getimagesize($this->root.'/'.$slot['sample']);$after=@getimagesize($this->root.'/'.$value);
-            if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw new RuntimeException('Image aspect ratio does not match its slot');
+            if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
     }
 
-    public function plan(array $params): array {
+    /**
+     * Check an apply against the site as it stands, and turn it into row operations.
+     *
+     * Two ways to say what the change was based on. `expected_revision` is the whole-contract
+     * revision from inspect, which costs an inspect to learn (10–80 s on Joomla).
+     * `expected_content_revisions` maps each content `content.read` served to the revision it
+     * served, and is enough on its own: every changed slot's content must be named, and match.
+     * With both, both must hold. `$current` is that projection now ({@see ContentProjection::build}
+     * `revisions` + `owners`), handed in by the engine that can read the site's tables.
+     *
+     * 🔒 EVERY PROBLEM, THEN NOTHING WRITTEN. All changes are checked before any operation is built,
+     * and every refusal found is thrown together, so an agent fixes three slots in one round
+     * instead of three.
+     *
+     * 🔒 NEVER UNDER AN OPEN EDITOR. `$locks` (the host's JoomlaContentReader::locks: rows =>
+     * "kind:id" => lockedBy) is asked once, for the rows this apply would write; one of them open
+     * in the Joomla editor refuses the WHOLE apply with SLOT_LOCKED_BY_USER, because the admin's
+     * next Save posts the form they loaded and puts the old words back over ours. No flag skips it.
+     * `$ownersOf` answers the projection's `owners` when `$current` did not carry them, so the refusal
+     * names its content too; asked only once a lock is found, so an apply pays nothing for it.
+     */
+    public function plan(array $params, ?array $current = null, ?callable $locks = null, ?callable $ownersOf = null): array {
         $state=$this->inspect();
-        if(!isset($params['expected_revision'])||!hash_equals($state['revision'],$params['expected_revision']))throw new RuntimeException('Content changed; inspect again');
+        $byContent=$params['expected_content_revisions']??null;
+        if($byContent!==null) {
+            $valid=is_array($byContent);
+            if($valid)foreach($byContent as $id=>$revision)if(!is_string($id)||!is_string($revision)){$valid=false;break;}
+            if(!$valid)throw new ContractProblem('CONTRACT_FAILED','expected_content_revisions must map content ids to revisions');
+            if(!$byContent)$byContent=null;
+        }
+        $expected=$params['expected_revision']??null;
+        $problems=[];
+        if($byContent===null) {
+            // The only basis before per-content revisions existed, refused exactly as it always was.
+            if($expected===null)throw new ContractProblem('REVISION_REQUIRED','Content changed; inspect again');
+            if(!is_string($expected)||!hash_equals($state['revision'],$expected))
+                throw new ContractProblem('REVISION_STALE','Content changed; inspect again',null,null,['current'=>$state['revision']]);
+        } else {
+            if($expected!==null&&(!is_string($expected)||!hash_equals($state['revision'],$expected)))
+                $problems[]=new ContractProblem('REVISION_STALE','Content changed; inspect again',null,null,['current'=>$state['revision']]);
+            if($current===null)throw new ContractProblem('CONTRACT_FAILED','Content revisions are unavailable on this site; send expected_revision from inspect');
+        }
         $changes=$params['changes']??null;
-        if(!is_array($changes)||!count($changes)||count($changes)>1500)throw new RuntimeException('Expected 1–1500 scalar content changes');
+        if(!is_array($changes)||!count($changes)||count($changes)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
         $allowed=array_column($state['slots'],null,'key');$values=[];
+        $owners=$current['owners']??[];$checked=[];
         foreach ($changes as $key => $value) {
-            if(!isset($allowed[$key])||!is_string($value))throw new RuntimeException('Unknown content slot or non-string value');
-            $this->checkValue($allowed[$key],$value,$params);
+            $key=(string)$key;
+            $slot=$allowed[$key]??null;
+            $owner=$slot===null?null:($owners[$slot['entity']]??null);
+            if($slot===null||!is_string($value)){$problems[]=new ContractProblem('SLOT_UNKNOWN','Unknown content slot or non-string value',$key,$owner);continue;}
+            // One revision check per content, named by the first changed slot that lives in it.
+            if($byContent!==null&&!isset($checked[$owner??"\0".$key])) {
+                $checked[$owner??"\0".$key]=true;
+                // A slot content.read does not project (a hidden row, a category) has no content
+                // revision anyone could have read; only the whole-contract revision covers it.
+                if($owner===null){ if($expected===null)$problems[]=new ContractProblem('REVISION_REQUIRED','Content revision required: '.$key.' is not in content.read; send expected_revision from inspect',$key); }
+                elseif(!isset($byContent[$owner]))$problems[]=new ContractProblem('REVISION_REQUIRED','Content revision required: '.$owner,$key,$owner);
+                elseif(!hash_equals($current['revisions'][$owner],$byContent[$owner]))
+                    $problems[]=new ContractProblem('REVISION_STALE','Content changed; read it again: '.$owner,$key,$owner,['current'=>$current['revisions'][$owner]]);
+            }
+            try { $this->checkValue($slot,$value,$params); }
+            catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$value;
         }
+        if($problems)throw ContractProblem::all($problems);
         // 🔒 A PICTURE IS THE SAME PICTURE IN EVERY LANGUAGE. Words are translated, so a new source
         // sentence waits for its language job; a new source picture has nothing to wait for, and left
         // on the source alone it showed on /en/ only — measured 23/09/2026 on j-ee6vsk, a drawn photo
@@ -583,13 +827,28 @@ final class QuickstartContract
         foreach($values as $key=>$value)
             if(($allowed[$key]['type']??'')==='image')
                 foreach(array_keys($locales) as $locale)$values[MultilingualProfile::derivedKey($locale,$key)]=$value;
-        $operations=[];
+        $operations=[];$touched=[];
         foreach($state['keys'] as $key=>$meta) {
             $row=$state['rows'][$key];$next=$this->changeRow($row,$this->slotsOf($key,$meta),$values);$fields=[];$expected=[];
             foreach($next as $field=>$value)if($value!==$row[$field]){$fields[$field]=$value;$expected[$field]=$row[$field];}
-            if($fields)$operations[]=['kind'=>$meta['kind'],'id'=>$state['ids'][$key],'fields'=>$fields,'expected'=>$expected];
+            if($fields){$operations[]=['kind'=>$meta['kind'],'id'=>$state['ids'][$key],'fields'=>$fields,'expected'=>$expected];$touched[]=$key;}
         }
-        return ['operations'=>$operations,'snapshot'=>$state['snapshot']];
+        if($locks&&$operations) {
+            $held=$locks(array_map(fn($op)=>[$op['kind'],(int)$op['id']],$operations));
+            // A failed read only costs the refusal its contentId; the refusal itself stands.
+            if($held&&$current===null&&$ownersOf){ try { $owners=$ownersOf()['owners']??[]; } catch(Throwable $ignored) {} }
+            foreach($operations as $index=>$op) {
+                $lockedBy=$held[JoomlaLocks::key($op['kind'],(int)$op['id'])]??null;
+                if(!$lockedBy)continue;
+                // Named by the first changed slot the open row carries, and the content it is read in.
+                $key=$touched[$index];$slotKey=null;
+                foreach($this->slotsOf($key,$state['keys'][$key]) as $slot)if(array_key_exists($slot['key'],$values)){$slotKey=$slot['key'];break;}
+                $title=$state['rows'][$key]['title']??null;
+                $problems[]=new ContractProblem('SLOT_LOCKED_BY_USER',JoomlaLocks::message(is_string($title)?$title:null,$lockedBy),$slotKey,$owners[$key]??null,['lockedBy'=>$lockedBy]);
+            }
+            if($problems)throw ContractProblem::all($problems);
+        }
+        return ['operations'=>$operations,'snapshot'=>$state['snapshot'],'touched'=>$touched];
     }
     /** The protected field set the base contract captured for one entity, by name and value. */
     public function lockFields(string $baseKey): array {
@@ -773,13 +1032,41 @@ final class QuickstartContract
         return $out;
     }
 
+    /**
+     * The contract entity one row is bound as — a base key, or a language copy's derived key — or
+     * null for a row the contract does not govern. Read from the binding, without an inspect: a
+     * refusal asks it only for the few rows it names.
+     */
+    public function entityAt(string $kind, int $id): ?string {
+        $this->ready();
+        $binding = $this->store->load();
+        if ($binding === null) return null;
+        $base = $this->baseEntities();
+        foreach ($binding['ids'] ?? [] as $key => $bound)
+            if ((int) $bound === $id && ($base[$key]['kind'] ?? null) === $kind) return (string) $key;
+        foreach ($binding['multilingual']['languages'] ?? [] as $tag => $language)
+            foreach ($language['ids'] ?? [] as $baseKey => $bound)
+                if ((int) $bound === $id && ($base[$baseKey]['kind'] ?? null) === $kind) return MultilingualProfile::derivedKey((string) $tag, (string) $baseKey);
+        return null;
+    }
+
     /** The content languages this site has been given copies of, per its binding. */
     public function derivedLanguages(): array {
         $this->ready();
         return array_keys($this->store->load()['multilingual']['languages'] ?? []);
     }
 
-    public function bind(array $snapshot): void { $this->ready(); $this->store->save($snapshot); $this->syncSourceRelabel(); }
+    /**
+     * Save the baseline after a content write. It must equal the stored one — a content apply changes
+     * no structure — unless this request began on a site that already differs from its baseline
+     * (changed through Joomla itself, Tracy ADR 0022): the baseline then moves to where the site
+     * stands, and the check after the write still refuses any difference the write itself made.
+     */
+    public function bind(array $snapshot): void {
+        $this->ready();
+        if ($this->tolerated) $this->store->replace($snapshot); else $this->store->save($snapshot);
+        $this->syncSourceRelabel();
+    }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
     public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->syncSourceRelabel(); }
 

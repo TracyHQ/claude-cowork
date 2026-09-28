@@ -1,6 +1,6 @@
 # Quickstart content contracts
 
-A contract binds one published quickstart to its editable content slots and protected presentation.
+A contract maps one published quickstart to its content slots and records the presentation it shipped with.
 The canonical files live here; the exact same files ship with the seeder and Joomla Cowork.
 Never accept a contract supplied by an agent in a write request.
 
@@ -9,13 +9,16 @@ Never accept a contract supplied by an agent in a write request.
 - `presentation-lock.json`: protected database fields, module assignments and executable asset hashes.
 
 The receiver resolves identities against the installed site and stores the binding and initial snapshot
-in its private database table. IDs are installation data, not public files. A missing or ambiguous
-identity, changed presentation, unsupported field or incompatible package fails closed.
+in its private database table. IDs are installation data, not public files. A package the receiver does
+not recognise, or a profile it does not carry, is refused at bind time.
 
-Content-only means no new module, article or menu; no unpublishing; no layout, ordering, module
-assignment, ACM variation, class, CSS, script or font changes. Requests requiring a different structure
-must use a separately authorized design workflow. Missing factual content remains a validation issue;
-it must never turn into fabricated testimonials, customers, prices or statistics.
+A contract is a recommendation, not a lock (Tracy ADR 0022, 26/09/2026). Slots are the fast, reversible
+road for the words and images a visitor sees, and new text should stay close to the length of the text
+it replaces (0.75× to 1.25×). Everything else on the site — modules, articles, menus, layout, template
+styles — can still be changed the usual Joomla way. A presentation that no longer matches the recorded
+baseline is reported as a drift warning, not refused; a bound row that disappears closes only its own
+slots. Writing the database directly is the one thing Tracy refuses. Missing factual content remains a
+validation issue; it must never turn into fabricated testimonials, customers, prices or statistics.
 
 ## Content and display are one contract
 

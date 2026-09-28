@@ -60,6 +60,14 @@ final class FakeSiteWriter implements SiteWriter
     /** @var array<int,string> Rows this fake sent to the trash, in order. */
     public array $trashed = [];
 
+    /** @var array<int,array<string,mixed>> post id => the `lockedBy` its editor lock answers */
+    public array $locks = [];
+
+    public function editLock(int $postId): ?array
+    {
+        return $this->locks[$postId] ?? null;
+    }
+
     public function canTrash(string $kind): bool
     {
         return in_array($kind, ['post', 'templatePart'], true);

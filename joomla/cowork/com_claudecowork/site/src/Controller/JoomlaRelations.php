@@ -21,6 +21,28 @@ final class JoomlaRelations
         $members = $key ? $this->db->setQuery('SELECT id, context, `key` FROM #__associations WHERE context=' . $context . ' AND `key`=' . $this->db->quote($key))->loadAssocList() : [];
         return ['members' => json_encode($members)];
     }
+    /**
+     * `read()` for many ids, keyed by id: two queries for any number of modules instead of two
+     * per module. Throws exactly as `read()` does when one target is missing. Associations keep
+     * the per-id path — nothing reads them in bulk yet.
+     */
+    public function readMany(string $kind, array $ids): array {
+        if ($kind !== 'moduleAssignment') { $out = []; foreach ($ids as $id) $out[(int) $id] = $this->read($kind, (int) $id); return $out; }
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if (!$ids) return [];
+        foreach ($ids as $id) if ($id < 1) throw new \RuntimeException('relation target missing');
+        $menus = array_fill_keys($ids, []);
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $in = implode(',', $chunk);
+            $found = array_map('intval', $this->db->setQuery('SELECT id FROM #__modules WHERE id IN (' . $in . ')')->loadColumn() ?: []);
+            if (count(array_intersect($chunk, $found)) !== count($chunk)) throw new \RuntimeException('relation target missing');
+            foreach ($this->db->setQuery('SELECT moduleid, menuid FROM #__modules_menu WHERE moduleid IN (' . $in . ') ORDER BY moduleid, menuid')->loadAssocList() ?: [] as $pair)
+                $menus[(int) $pair['moduleid']][] = (int) $pair['menuid'];
+        }
+        $out = [];
+        foreach ($menus as $id => $list) $out[$id] = ['menuids' => json_encode($list)];
+        return $out;
+    }
     public function write(string $kind, int $id, array $fields): int {
         $this->target($kind, $id);
         if ($kind === 'moduleAssignment') {

@@ -1,0 +1,839 @@
+<?php
+/**
+ * ContentReader — the `tracy-content/v1` protocol over a projection a site has already built.
+ *
+ * Content API v1 (TCH `docs/references/content-api-v1.md`) is one read-only listing: summaries by
+ * default, one content in full by `id`, filters that AND, continuation by opaque cursor. This class
+ * owns everything in that sentence that is not WordPress: which query is valid, how a page is cut
+ * to the byte budget, how a cursor is signed and when it is refused. The site's side — which rows
+ * exist, what they say, who may read them — arrives as a `ContentSource`.
+ *
+ * A cursor is bound to the site, the principal, the read scope, the filters and the snapshot
+ * revision, and signed with a key only the site holds. The revision is the site's fingerprint of
+ * everything the projection read; if it moved between two pages, the scan is refused (409) rather
+ * than stitched from two states of the site. Nothing here keeps state between requests.
+ *
+ * Plain PHP, no WordPress.
+ */
+
+/** Everything the reader needs from a site, already filtered to what the caller may read. */
+interface ContentSource
+{
+    /** @return array{id:string,name:?string,url:string,defaultLocale:?string,locales:string[]} */
+    public function site(): array;
+
+    /** @return array{quickstartTag:string,quickstartVersion:string,contractId:?string,contractHash:?string}|null */
+    public function provenance(): ?array;
+
+    /** The snapshot revision of the readable scope: changes when anything the projection reads changes. */
+    public function revision(): string;
+
+    /** @return array<int,array<string,mixed>> every readable content as a summary, in listing order */
+    public function summaries(): array;
+
+    /**
+     * One readable content in full, or null when it is not readable. With `$withBody` false the
+     * source may leave `bodyHtml` unbuilt (null): a block read does not need the whole page's HTML.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function detail(string $id, bool $withBody = true): ?array;
+
+    /** @return array<int,array{code:string,message:string}> what the scope does not cover */
+    public function unresolved(): array;
+
+    /** The request is answered: end whatever consistent read the source holds open. */
+    public function release(): void;
+}
+
+final class ContentReadError extends RuntimeException
+{
+    /** @var string one of the Content API error codes */
+    public $reason;
+    /** @var int HTTP status */
+    public $status;
+    /** @var array<string,mixed> */
+    public $extra;
+
+    public function __construct(string $reason, int $status, string $message, array $extra = [])
+    {
+        parent::__construct($message);
+        $this->reason = $reason;
+        $this->status = $status;
+        $this->extra = $extra;
+    }
+
+    /** @return array{error:array<string,mixed>} */
+    public function body(): array
+    {
+        return ['error' => ['code' => $this->reason, 'message' => $this->getMessage()] + $this->extra];
+    }
+}
+
+final class ContentReader
+{
+    public const SCHEMA_VERSION = 'tracy-content/v1';
+    /**
+     * The byte budget (`maxBytes`, Content API v2): the UTF-8 length of the JSON this reader
+     * returns, headers not counted. A caller may ask for MIN_BYTES..MAX_BYTES. Without it a listing
+     * is paged to DEFAULT_BYTES and an `{id}` read keeps its v1 budget, MAX_BYTES. Only a caller
+     * that SENDS maxBytes ever gets a content cut (`truncated`); for any other caller an
+     * oversized content is the v1 413, so a reader that predates the budget sees no difference.
+     */
+    public const MIN_BYTES = 8192;
+    public const MAX_BYTES = 262144;
+    public const DEFAULT_BYTES = 65536;
+    /** Headroom kept for the envelope around the payload when a page is cut to size. */
+    private const ENVELOPE_MARGIN = 4096;
+    /** A field value is never cut below this many encoded bytes: shorter ones are not what overflows. */
+    private const CUT_FLOOR = 256;
+    public const TTL = 300;
+    public const DEFAULT_LIMIT = 30;
+    public const MAX_LIMIT = 100;
+    public const BLOCK_PAGE = 100;
+    public const TYPES = ['page', 'article', 'service', 'project', 'shared', 'generic'];
+    /**
+     * Query names v1 defines. `itemsCursor` is defined but not served by this adapter.
+     * `protocolVersions` is what a newer caller sends to say which protocols it speaks; this
+     * adapter speaks one, so the value is accepted and ignored rather than refused.
+     */
+    private const KNOWN = ['id', 'type', 'locale', 'limit', 'cursor', 'blocksCursor', 'blockId', 'itemsCursor', 'protocolVersions', 'maxBytes'];
+    private const UNSERVED = ['itemsCursor'];
+
+    /** @var ContentSource */
+    private $source;
+    /** @var string */
+    private $secret;
+    /** @var string */
+    private $principal;
+    /** @var string */
+    private $scope;
+    /** @var int */
+    private $now;
+    /** @var int */
+    private $maxBytes;
+    /** @var int|null the budget the reader was built with, or null for the defaults above */
+    private $configured;
+    /** @var bool the request named `maxBytes`: only then may a content be cut */
+    private $sent = false;
+    /** @var bool the answer states `pagination.budget` (a listing, or a request that sent one) */
+    private $showBudget = true;
+
+    /**
+     * @param string $secret    key the cursor is signed with; changing it (a new token) voids every cursor
+     * @param string $principal who is reading (`site-token` for the site's own token)
+     * @param string $scope     what that principal may read (`published`, `editorial`)
+     * @param int|null $maxBytes the budget of a request that names no `maxBytes`; null for the defaults
+     */
+    public function __construct(ContentSource $source, string $secret, string $principal, string $scope, int $now, ?int $maxBytes = null)
+    {
+        if (strlen($secret) < 16) {
+            throw new InvalidArgumentException('A cursor secret needs at least 16 bytes');
+        }
+        $this->source = $source;
+        $this->secret = $secret;
+        $this->principal = $principal;
+        $this->scope = $scope;
+        $this->now = $now;
+        $this->configured = $maxBytes;
+        $this->maxBytes = $maxBytes ?? self::DEFAULT_BYTES;
+    }
+
+    public static function encode($value): string
+    {
+        return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * A raw query string as name → value, refusing what v1 refuses: a name twice, an array name,
+     * an empty value. Parsed by hand because `$_GET` folds duplicates and arrays silently.
+     *
+     * @return array<string,string>
+     */
+    public static function parseQuery(string $raw): array
+    {
+        $out = [];
+        foreach ($raw === '' ? [] : explode('&', $raw) as $pair) {
+            if ($pair === '') {
+                throw self::bad();
+            }
+            [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+            $key = rawurldecode(str_replace('+', ' ', $key));
+            $value = rawurldecode(str_replace('+', ' ', $value));
+            if (isset($out[$key]) || strpbrk($key, '[]') !== false) {
+                throw self::bad();
+            }
+            $out[$key] = $value;
+        }
+        return $out;
+    }
+
+    public static function bad(): ContentReadError
+    {
+        return new ContentReadError('CONTENT_BAD_QUERY', 400, 'Invalid content query.');
+    }
+
+    /**
+     * Answer one request. Throws `ContentReadError` for every refusal, so a caller can never
+     * mistake a refusal for an empty listing.
+     *
+     * @param array<string,mixed> $query
+     * @return array<string,mixed> a `tracy-content/v1` envelope
+     */
+    public function read(array $query): array
+    {
+        try {
+            return $this->answer($query);
+        } finally {
+            $this->source->release();
+        }
+    }
+
+    private function answer(array $query): array
+    {
+        if (array_key_exists('ids', $query)) {
+            return $this->batch($query);
+        }
+        foreach ($query as $key => $value) {
+            if (!is_string($key) || !in_array($key, self::KNOWN, true)) {
+                throw self::bad();
+            }
+            if (is_int($value)) {
+                $value = (string) $value;
+                $query[$key] = $value;
+            }
+            if (!is_string($value) || $value === '') {
+                throw self::bad();
+            }
+        }
+        foreach (self::UNSERVED as $key) {
+            if (isset($query[$key])) {
+                throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'This site does not serve ' . $key . ' yet.');
+            }
+        }
+        if (isset($query['maxBytes'])) {
+            // Not bound into any cursor: a cursor is a position in the content order, and the
+            // budget only decides how many whole contents one answer carries from there. A caller
+            // may raise it on the next page (to take a content the last page had to cut) or lower it.
+            if (!preg_match('/^[1-9][0-9]{0,5}$/D', $query['maxBytes'])
+                || (int) $query['maxBytes'] < self::MIN_BYTES || (int) $query['maxBytes'] > self::MAX_BYTES) {
+                throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'maxBytes must be an integer from ' . self::MIN_BYTES . ' to ' . self::MAX_BYTES . '.');
+            }
+            $this->maxBytes = (int) $query['maxBytes'];
+            $this->sent = true;
+        } else {
+            $this->sent = false;
+            $this->maxBytes = $this->configured ?? (isset($query['id']) ? self::MAX_BYTES : self::DEFAULT_BYTES);
+        }
+        $this->showBudget = $this->sent || !isset($query['id']);
+        if (isset($query['id'])) {
+            foreach (['cursor', 'type', 'locale', 'limit'] as $key) {
+                if (isset($query[$key])) {
+                    throw self::bad();
+                }
+            }
+            if (isset($query['blockId'])) {
+                return $this->block($query['id'], $query['blockId'], $query['blocksCursor'] ?? null);
+            }
+            return $this->detail($query['id'], $query['blocksCursor'] ?? null);
+        }
+        if (isset($query['blocksCursor']) || isset($query['blockId'])) {
+            throw self::bad();
+        }
+        return $this->listing($query);
+    }
+
+    // ---- listing ----------------------------------------------------------------------------
+
+    private function listing(array $query): array
+    {
+        $filters = ['type' => $query['type'] ?? null, 'locale' => $query['locale'] ?? null, 'limit' => $query['limit'] ?? null];
+        $offset = 0;
+        if (isset($query['cursor'])) {
+            $state = $this->decode($query['cursor'], 'list');
+            // A cursor carries its filters. A filter repeated beside it must say the same thing;
+            // one that differs is a different listing, not a next page.
+            foreach ($filters as $key => $value) {
+                if ($value !== null && $value !== $state['filters'][$key]) {
+                    throw self::bad();
+                }
+            }
+            $filters = $state['filters'];
+            $offset = (int) $state['offset'];
+        } else {
+            $filters['limit'] = $filters['limit'] ?? (string) self::DEFAULT_LIMIT;
+            if (!preg_match('/^[1-9][0-9]{0,2}$/D', $filters['limit']) || (int) $filters['limit'] > self::MAX_LIMIT) {
+                throw self::bad();
+            }
+            if ($filters['type'] !== null && !in_array($filters['type'], self::TYPES, true)) {
+                throw self::bad();
+            }
+            if ($filters['locale'] !== null && !in_array($filters['locale'], $this->source->site()['locales'], true)) {
+                throw self::bad();
+            }
+        }
+        $limit = (int) $filters['limit'];
+        $rows = [];
+        foreach ($this->source->summaries() as $summary) {
+            if (($filters['type'] === null || $summary['type'] === $filters['type'])
+                && ($filters['locale'] === null || $summary['locale'] === $filters['locale'])) {
+                $rows[] = $summary;
+            }
+        }
+        $total = count($rows);
+        if ($offset > $total) {
+            throw self::bad();
+        }
+        // Whole contents while the answer stays within the budget. The size of a page of k
+        // contents is exact without encoding it k times: the envelope with no contents (and the
+        // cursor that page would carry) plus each content's own JSON and the commas between them.
+        $candidates = array_slice($rows, $offset, $limit);
+        $out = [];
+        $sum = 0;
+        foreach ($candidates as $summary) {
+            $size = strlen(self::encode($summary));
+            $count = count($out) + 1;
+            if ($this->pageBase($filters, $offset + $count, $total, $limit) + $sum + $size + ($count - 1) > $this->maxBytes) {
+                break;
+            }
+            $out[] = $summary;
+            $sum += $size;
+        }
+        if ($out === [] && $candidates !== []) {
+            // The first content alone does not fit: send it, cut, rather than an empty page.
+            $first = $candidates[0];
+            $fits = function (array $content) use ($filters, $offset, $total, $limit): bool {
+                return $this->pageBase($filters, $offset + 1, $total, $limit) + strlen(self::encode($content)) <= $this->maxBytes;
+            };
+            // Cut only for a caller that asked for a budget; any other gets the v1 413.
+            $cut = $this->sent ? $this->truncated($first, $fits) : null;
+            if ($cut === null) {
+                throw $this->tooLarge((string) $first['id'], null, 'summary');
+            }
+            $out = [$cut];
+        }
+        return $this->envelope($out, $limit, $this->listCursor($filters, $offset + count($out), $total), $total);
+    }
+
+    /** The cursor of a listing continuing at `$at`, or null when nothing is left. */
+    private function listCursor(array $filters, int $at, int $total): ?string
+    {
+        return $at < $total ? $this->cursor(['kind' => 'list', 'filters' => $filters, 'offset' => $at]) : null;
+    }
+
+    /** Bytes of a listing page with no contents, carrying the cursor it would carry when it ends before `$at`. */
+    private function pageBase(array $filters, int $at, int $total, int $limit): int
+    {
+        return strlen(self::encode($this->envelope([], $limit, $this->listCursor($filters, $at, $total), $total)));
+    }
+
+    /**
+     * One content cut until `$fits` accepts it, or null when no cut can make it fit. The longest
+     * text or html value (a field of the content, of one of its blocks or block items, or
+     * `bodyHtml`) is cut first, to at most maxBytes/2 characters — and as many encoded bytes, so a
+     * multibyte text still fits — and marked `truncated: true` (bodyHtml, a string, is not
+     * markable: the content's own `truncated: true` covers it). If that is not enough, the next
+     * longest is cut, and a value already cut may be halved again. The content's `revision` is
+     * left as it is: it names the stored state, and a cut changes only what this answer shows.
+     */
+    private function truncated(array $content, callable $fits): ?array
+    {
+        if ($fits($content)) {
+            return $content;
+        }
+        $target = intdiv($this->maxBytes, 2);
+        $cut = [];
+        while (true) {
+            $longest = null;
+            $size = self::CUT_FLOOR;
+            foreach (self::textPaths($content) as $path) {
+                $bytes = strlen(self::encode(self::valueAt($content, $path)));
+                if ($bytes > $size) {
+                    $longest = $path;
+                    $size = $bytes;
+                }
+            }
+            if ($longest === null) {
+                return null;
+            }
+            $key = implode('.', $longest);
+            $limit = isset($cut[$key]) ? intdiv($size, 2) : $target;
+            $cut[$key] = true;
+            $content = self::setValueAt($content, $longest, self::utf8Prefix((string) self::valueAt($content, $longest), $limit));
+            $content['truncated'] = true;
+            if (end($longest) === 'value') {
+                $field = array_slice($longest, 0, -1);
+                $content = self::setValueAt($content, array_merge($field, ['truncated']), true);
+            }
+            if ($fits($content)) {
+                return $content;
+            }
+        }
+    }
+
+    /** @return array<int,array<int,string|int>> where the cuttable string values of a content sit */
+    private static function textPaths(array $content): array
+    {
+        $paths = [];
+        if (is_string($content['bodyHtml'] ?? null)) {
+            $paths[] = ['bodyHtml'];
+        }
+        $fields = static function (array $list, array $prefix) use (&$paths): void {
+            foreach ($list as $i => $field) {
+                if (is_array($field) && in_array($field['type'] ?? null, ['text', 'html'], true) && is_string($field['value'] ?? null)) {
+                    $paths[] = array_merge($prefix, [$i, 'value']);
+                }
+            }
+        };
+        $fields((array) ($content['fields'] ?? []), ['fields']);
+        foreach ((array) ($content['blocks'] ?? []) as $b => $block) {
+            $fields((array) ($block['fields'] ?? []), ['blocks', $b, 'fields']);
+            foreach ((array) ($block['items'] ?? []) as $n => $item) {
+                $fields((array) ($item['fields'] ?? []), ['blocks', $b, 'items', $n, 'fields']);
+            }
+        }
+        return $paths;
+    }
+
+    private static function valueAt(array $data, array $path)
+    {
+        foreach ($path as $step) {
+            $data = $data[$step];
+        }
+        return $data;
+    }
+
+    private static function setValueAt(array $data, array $path, $value): array
+    {
+        $step = array_shift($path);
+        $data[$step] = $path === [] ? $value : self::setValueAt($data[$step], $path, $value);
+        return $data;
+    }
+
+    /**
+     * The start of a UTF-8 string: at most `$max` characters and at most `$max` bytes once
+     * JSON-encoded, never ending inside a character.
+     */
+    private static function utf8Prefix(string $value, int $max): string
+    {
+        $out = self::utf8Chars($value, $max);
+        // `- 2`: the quotes around a JSON string are not part of the value.
+        while ($out !== '' && strlen(self::encode($out)) - 2 > $max) {
+            $over = strlen(self::encode($out)) - 2 - $max;
+            $out = self::utf8Bytes($out, max(0, strlen($out) - max($over, 1)));
+        }
+        return $out;
+    }
+
+    /** At most `$chars` characters of a UTF-8 string. */
+    private static function utf8Chars(string $value, int $chars): string
+    {
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $chars, 'UTF-8');
+        }
+        $length = strlen($value);
+        $seen = 0;
+        for ($i = 0; $i < $length; $i++) {
+            if ((ord($value[$i]) & 0xC0) !== 0x80) {
+                if ($seen === $chars) {
+                    return substr($value, 0, $i);
+                }
+                $seen++;
+            }
+        }
+        return $value;
+    }
+
+    /** At most `$bytes` bytes of a UTF-8 string, backed off to a character boundary. */
+    private static function utf8Bytes(string $value, int $bytes): string
+    {
+        if ($bytes >= strlen($value)) {
+            return $value;
+        }
+        while ($bytes > 0 && (ord($value[$bytes]) & 0xC0) === 0x80) {
+            $bytes--;
+        }
+        return substr($value, 0, $bytes);
+    }
+
+    // ---- many details -----------------------------------------------------------------------
+
+    /**
+     * `ids`: up to MAX_LIMIT details from ONE projection. A read's cost on WordPress is building
+     * the projection (every row in scope, its permalinks and revisions: ~100 ms on a 950-row site,
+     * 27/09/2026), and a detail on top of it is 1-5 ms, so one call per content spent nearly all of
+     * its time rebuilding the same state. Each content listed is answered exactly as an `{id}` read
+     * without `maxBytes` answers it when it fits whole: same shape, same revision, `complete`. The
+     * budget (`maxBytes`, else MAX_BYTES) fills in the order asked; a content that does not fit,
+     * has more blocks than one detail page holds, or has a value over budget is named in
+     * `pagination.pending` and never cut (read it alone with `{id}`, which pages or cuts it). An id
+     * with no readable content now is named in `pagination.missing`. No cursor: nothing here pages.
+     *
+     * @param array<string,mixed> $query `ids` as a list (the POST door), or one comma-separated value (GET)
+     */
+    private function batch(array $query): array
+    {
+        $ids = $query['ids'];
+        unset($query['ids'], $query['protocolVersions']);
+        if (array_diff(array_keys($query), ['maxBytes']) !== []) {
+            throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids is read with maxBytes only.');
+        }
+        if (is_string($ids)) {
+            $ids = explode(',', $ids);
+        }
+        $shape = new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids must list 1 to ' . self::MAX_LIMIT . ' content ids.');
+        if (!is_array($ids) || $ids === [] || array_keys($ids) !== range(0, count($ids) - 1) || count($ids) > self::MAX_LIMIT) {
+            throw $shape;
+        }
+        foreach ($ids as $id) {
+            if (!is_string($id) || $id === '' || strlen($id) > 128 || strpos($id, ',') !== false) {
+                throw $shape;
+            }
+        }
+        if (count(array_unique($ids)) !== count($ids)) {
+            throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids must not repeat an id.');
+        }
+        if (isset($query['maxBytes'])) {
+            $raw = is_int($query['maxBytes']) ? (string) $query['maxBytes'] : $query['maxBytes'];
+            if (!is_string($raw) || !preg_match('/^[1-9][0-9]{0,5}$/D', $raw) || (int) $raw < self::MIN_BYTES || (int) $raw > self::MAX_BYTES) {
+                throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'maxBytes must be an integer from ' . self::MIN_BYTES . ' to ' . self::MAX_BYTES . '.');
+            }
+            $this->maxBytes = (int) $raw;
+        } else {
+            $this->maxBytes = $this->configured ?? self::MAX_BYTES;
+        }
+        $this->sent = false; // a batch never cuts: what does not fit whole is pending
+        // Each content is sized as the `{id}` read with the same query would size its answer.
+        $this->showBudget = isset($query['maxBytes']);
+
+        // Every content is built once, from this one snapshot; an id the scope cannot read is missing.
+        $whole = [];
+        $missing = [];
+        foreach ($ids as $id) {
+            $content = $this->source->detail($id);
+            if ($content === null) {
+                $missing[] = $id;
+                continue;
+            }
+            $whole[$id] = $this->wholePage($id, $content);
+        }
+        $this->showBudget = true;
+        $page = function (array $contents, array $pending) use ($ids, $missing): array {
+            $envelope = $this->envelope($contents, count($ids), null, count($ids));
+            $envelope['pagination'] += ['pending' => $pending, 'missing' => $missing];
+            return $envelope;
+        };
+        $out = [];
+        $pending = [];
+        $sum = 0;
+        $decided = 0;
+        foreach ($ids as $id) {
+            $decided++;
+            if (!array_key_exists($id, $whole)) {
+                continue;
+            }
+            $content = $whole[$id];
+            if ($content === null) {
+                $pending[] = $id;
+                continue;
+            }
+            $bytes = strlen(self::encode($content));
+            // Sized against the longest `pending` this answer could still end with (every id not yet
+            // decided), so the final envelope can only be smaller. A list of k encoded items is `[`,
+            // the items joined by `,`, and `]`: exact arithmetic, as for a listing page.
+            $undecided = array_values(array_filter(array_slice($ids, $decided), static fn($later) => array_key_exists($later, $whole)));
+            $base = strlen(self::encode($page([], array_merge($pending, $undecided))));
+            if ($base + $sum + $bytes + count($out) > $this->maxBytes) {
+                $pending[] = $id;
+                continue;
+            }
+            $out[] = $content;
+            $sum += $bytes;
+        }
+        return $page($out, $pending);
+    }
+
+    /**
+     * A content exactly as an `{id}` read at this budget answers it, when that read answers it whole
+     * in one page; null when it would page its blocks or refuse a value over the budget (413). The
+     * single read itself decides, so the two can never disagree.
+     */
+    private function wholePage(string $id, array $content): ?array
+    {
+        try {
+            $page = $this->detail($id, null, $content)['contents'][0];
+        } catch (ContentReadError $e) {
+            if ($e->status === 413) {
+                return null;
+            }
+            throw $e;
+        }
+        return $page['detailState'] === 'complete' ? $page : null;
+    }
+
+    // ---- detail -----------------------------------------------------------------------------
+
+    /** @param array<string,mixed>|null $content the source's detail, when the caller already built it */
+    private function detail(string $id, ?string $blocksCursor, ?array $content = null): array
+    {
+        $offset = 0;
+        if ($blocksCursor !== null) {
+            $state = $this->decode($blocksCursor, 'blocks');
+            if (($state['id'] ?? null) !== $id) {
+                throw self::bad();
+            }
+            $offset = (int) $state['offset'];
+        }
+        $content = $content ?? $this->source->detail($id);
+        if ($content === null) {
+            throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
+        }
+        // Cut before paging, if the content's own parts beside its largest block would not fit:
+        // blocks are paged below, but a single value over the budget cannot be.
+        $margin = min(self::ENVELOPE_MARGIN, intdiv($this->maxBytes, 8));
+        $content = !$this->sent ? $content : $this->truncated($content, function (array $content) use ($margin): bool {
+            $largest = 0;
+            foreach ((array) ($content['blocks'] ?? []) as $block) {
+                $largest = max($largest, strlen(self::encode($block)));
+            }
+            $bare = $content;
+            $bare['blocks'] = [];
+            $bare['images'] = [];
+            return strlen(self::encode($this->envelope([$bare], 1, null, 1))) + $largest <= $this->maxBytes - $margin;
+        }) ?? $content;
+        $budget = $this->maxBytes - 2 * $margin;
+        foreach (['title', 'summary', 'bodyHtml'] as $key) {
+            if (strlen(self::encode($content[$key] ?? null)) > $budget) {
+                throw $this->contentTooLarge($content, $key);
+            }
+        }
+        foreach ((array) ($content['fields'] ?? []) as $field) {
+            if (strlen(self::encode($field['value'])) > $budget) {
+                throw $this->contentTooLarge($content, (string) $field['key']);
+            }
+        }
+        $all = (array) ($content['blocks'] ?? []);
+        foreach ($all as $block) {
+            foreach ($block['fields'] as $field) {
+                if (strlen(self::encode($field['value'])) > $budget) {
+                    throw $this->tooLarge($id, (string) $block['id'], (string) $field['key']);
+                }
+            }
+            foreach ($block['items'] as $item) {
+                foreach ($item['fields'] as $field) {
+                    if (strlen(self::encode($field['value'])) > $budget) {
+                        throw new ContentReadError('CONTENT_FIELD_TOO_LARGE', 413, 'A content field exceeds the response budget.',
+                            ['field' => ['contentId' => $id, 'blockId' => (string) $block['id'], 'itemId' => (string) $item['id'], 'key' => (string) $field['key']]]);
+                    }
+                }
+            }
+        }
+        if ($offset > count($all)) {
+            throw self::bad();
+        }
+        $images = (array) ($content['images'] ?? []);
+        $take = min(self::BLOCK_PAGE, count($all) - $offset);
+        while (true) {
+            $slice = array_slice($all, $offset, $take);
+            $more = $offset + count($slice) < count($all);
+            $page = $content;
+            $page['blocks'] = $slice;
+            $page['images'] = self::imagesFor($images, $slice, $offset === 0);
+            unset($page['links']['next'], $page['blocksPagination']);
+            if ($more) {
+                $next = $this->cursor(['kind' => 'blocks', 'id' => $id, 'offset' => $offset + count($slice)]);
+                $page['detailState'] = 'partial';
+                $page['links']['next'] = $page['links']['self'] . '&blocksCursor=' . rawurlencode($next);
+                $page['blocksPagination'] = ['limit' => max(1, count($slice)), 'nextCursor' => $next, 'total' => count($all)];
+            } else {
+                $page['detailState'] = 'complete';
+                if ($offset > 0) {
+                    $page['blocksPagination'] = ['limit' => max(1, count($slice)), 'nextCursor' => null, 'total' => count($all)];
+                }
+            }
+            $envelope = $this->envelope([$page], 1, null, 1);
+            if (strlen(self::encode($envelope)) <= $this->maxBytes) {
+                return $envelope;
+            }
+            if ($take <= 1) {
+                // One block alone does not fit beside the content's own fields: name the block.
+                throw $this->tooLarge($id, isset($all[$offset]['id']) ? (string) $all[$offset]['id'] : null, 'block');
+            }
+            $take = intdiv($take, 2);
+        }
+    }
+
+    /**
+     * One block occurrence of a content, with the content's own metadata and the images that
+     * block uses — and nothing else: no bodyHtml, fields, tags or relations. It is `partial` by
+     * definition. A block scan (from `error.links.firstBlock`, or any block read) is signed: the
+     * cursor names the content, the block and its position in ONE snapshot, and each answer's
+     * `links.next` carries the cursor of the next block. The last block ends the scan with
+     * `blocksPagination.nextCursor: null` and `links.next` back at the content.
+     */
+    private function block(string $id, string $blockId, ?string $cursor): array
+    {
+        $at = null;
+        if ($cursor !== null) {
+            $state = $this->decode($cursor, 'block');
+            if (($state['id'] ?? null) !== $id || ($state['blockId'] ?? null) !== $blockId) {
+                throw self::bad();
+            }
+            $at = (int) $state['offset'];
+        }
+        $content = $this->source->detail($id, false);
+        if ($content === null) {
+            throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
+        }
+        $all = array_values((array) ($content['blocks'] ?? []));
+        $index = null;
+        foreach ($all as $i => $block) {
+            if ($block['id'] === $blockId) {
+                $index = $i;
+                break;
+            }
+        }
+        if ($index === null) {
+            throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
+        }
+        if ($at !== null && $at !== $index) {
+            throw self::bad(); // the snapshot is the same (checked above), so the cursor lied about the position
+        }
+        $page = $content;
+        foreach (['bodyHtml', 'tags', 'fields', 'relations', 'blocksPagination'] as $key) {
+            unset($page[$key]);
+        }
+        $page['blocks'] = [$all[$index]];
+        $page['images'] = self::imagesFor((array) ($content['images'] ?? []), $page['blocks'], false);
+        $page['detailState'] = 'partial';
+        $next = $index + 1 < count($all) ? $this->blockLink($id, $all, $index + 1) : null;
+        $page['blocksPagination'] = ['limit' => 1, 'nextCursor' => $next === null ? null : $next['cursor'], 'total' => count($all)];
+        $page['links']['next'] = $next === null ? $page['links']['self'] : $next['path'];
+        $page['links']['self'] .= '&blockId=' . rawurlencode($blockId);
+        $envelope = $this->envelope([$page], 1, null, 1);
+        if (strlen(self::encode($envelope)) > $this->maxBytes) {
+            throw $this->tooLarge($id, $blockId, 'block');
+        }
+        return $envelope;
+    }
+
+    /** @return array{cursor:string,path:string} the signed read of block `$index` of one content */
+    private function blockLink(string $id, array $blocks, int $index): array
+    {
+        $blockId = (string) $blocks[$index]['id'];
+        $cursor = $this->cursor(['kind' => 'block', 'id' => $id, 'blockId' => $blockId, 'offset' => $index]);
+        $path = $this->contentPath() . '?id=' . rawurlencode($id) . '&blockId=' . rawurlencode($blockId) . '&blocksCursor=' . rawurlencode($cursor);
+        return ['cursor' => $cursor, 'path' => $path];
+    }
+
+    /** The path of `/content.json` on this site, taken from the links the source writes. */
+    private function contentPath(): string
+    {
+        $path = (string) parse_url($this->source->site()['url'], PHP_URL_PATH);
+        return rtrim($path, '/') . '/content.json';
+    }
+
+    /**
+     * A content-level scalar over budget: 413 naming it, with the snapshot of this read and —
+     * when it is `bodyHtml` and the content has blocks — `links.firstBlock`, the signed start of
+     * a block scan that never builds the page body.
+     */
+    private function contentTooLarge(array $content, string $key): ContentReadError
+    {
+        $error = $this->tooLarge((string) $content['id'], null, $key);
+        $error->extra['snapshot'] = ['revision' => $this->source->revision(), 'readAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now)];
+        $blocks = array_values((array) ($content['blocks'] ?? []));
+        // Only an oversized BODY is discoverable block by block (protocol b0a40e0): the blocks are
+        // the body's own parts. Another oversized scalar stays a plain 413.
+        if ($key === 'bodyHtml' && $blocks !== []) {
+            $url = parse_url($this->source->site()['url']);
+            $origin = $url['scheme'] . '://' . $url['host'] . (isset($url['port']) ? ':' . $url['port'] : '');
+            $error->extra['links'] = ['firstBlock' => $origin . $this->blockLink((string) $content['id'], $blocks, 0)['path']];
+        }
+        return $error;
+    }
+
+    /**
+     * The images a page of blocks uses: usages pointing at blocks on this page, plus usages of the
+     * content itself (no block) on the first page. An image with no usage left is left out.
+     */
+    private static function imagesFor(array $images, array $blocks, bool $first): array
+    {
+        $ids = [];
+        foreach ($blocks as $block) {
+            $ids[(string) $block['id']] = true;
+        }
+        $out = [];
+        foreach ($images as $image) {
+            $usages = [];
+            foreach ($image['usages'] as $usage) {
+                if ($usage['blockId'] === null ? $first : isset($ids[$usage['blockId']])) {
+                    $usages[] = $usage;
+                }
+            }
+            if ($usages !== []) {
+                $image['usages'] = $usages;
+                $out[] = $image;
+            }
+        }
+        return $out;
+    }
+
+    // ---- envelope and cursor ----------------------------------------------------------------
+
+    private function envelope(array $contents, int $limit, ?string $next, ?int $total): array
+    {
+        $unresolved = $this->source->unresolved();
+        return [
+            'schemaVersion' => self::SCHEMA_VERSION,
+            'view' => 'authenticated',
+            'site' => $this->source->site(),
+            'provenance' => $this->source->provenance(),
+            'snapshot' => ['revision' => $this->source->revision(), 'readAt' => gmdate('Y-m-d\TH:i:s\Z', $this->now)],
+            'pagination' => ['limit' => $limit, 'nextCursor' => $next, 'total' => $total] + ($this->showBudget ? ['budget' => $this->maxBytes] : []),
+            'completeness' => ['scope' => 'supported-content', 'status' => $unresolved === [] ? 'complete' : 'partial', 'unresolved' => $unresolved],
+            'contents' => $contents,
+        ];
+    }
+
+    private function tooLarge(string $id, ?string $block, string $key): ContentReadError
+    {
+        return new ContentReadError('CONTENT_FIELD_TOO_LARGE', 413, 'A content field exceeds the response budget.',
+            ['field' => ['contentId' => $id, 'blockId' => $block, 'itemId' => null, 'key' => $key]]);
+    }
+
+    private function cursor(array $state): string
+    {
+        $state += [
+            'v' => 1,
+            'site' => $this->source->site()['id'],
+            'principal' => $this->principal,
+            'scope' => $this->scope,
+            'revision' => $this->source->revision(),
+            'expires' => $this->now + self::TTL,
+        ];
+        $data = rtrim(strtr(base64_encode(self::encode($state)), '+/', '-_'), '=');
+        return $data . '.' . hash_hmac('sha256', $data, $this->secret);
+    }
+
+    /** @return array<string,mixed> the verified state of a cursor of the given kind */
+    private function decode(string $cursor, string $kind): array
+    {
+        if (strlen($cursor) > 4096 || !preg_match('/^([A-Za-z0-9_-]+)\.([a-f0-9]{64})$/D', $cursor, $m)
+            || !hash_equals(hash_hmac('sha256', $m[1], $this->secret), $m[2])) {
+            throw self::bad();
+        }
+        $state = json_decode((string) base64_decode(strtr($m[1], '-_', '+/'), true), true);
+        if (!is_array($state) || ($state['v'] ?? null) !== 1 || ($state['kind'] ?? null) !== $kind
+            || ($state['site'] ?? null) !== $this->source->site()['id']
+            || ($state['principal'] ?? null) !== $this->principal || ($state['scope'] ?? null) !== $this->scope
+            || !is_int($state['offset'] ?? null) || $state['offset'] < 0) {
+            throw self::bad();
+        }
+        if (!is_int($state['expires'] ?? null) || $state['expires'] <= $this->now
+            || !hash_equals((string) ($state['revision'] ?? ''), $this->source->revision())) {
+            throw new ContentReadError('CONTENT_SNAPSHOT_EXPIRED', 409, 'Restart the content listing.');
+        }
+        return $state;
+    }
+}

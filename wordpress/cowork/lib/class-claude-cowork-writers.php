@@ -70,8 +70,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		'user_roles',
 		'claude_cowork_token',
 		'claude_cowork_db_version',
-		// The content-only seal and which profile it names. Writable through `content.update`,
-		// either could unseal a customer's site with one option write, so both are refused here
+		// The contract's record and which profile it names. Writable through `content.update`,
+		// either could unbind a customer's site with one option write, so both are refused here
 		// and reached only through the contract door.
 		'_tracy_content_contract',
 		'claude_cowork_contract',
@@ -418,6 +418,28 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			return;
 		}
 		throw new RuntimeException( "unknown kind: {$kind}" );
+	}
+
+	/**
+	 * The editor lock by core's rule (see EditLock): the meta and the user through WordPress's own
+	 * API, so a heartbeat that just refreshed `_edit_lock` is what this sees.
+	 */
+	public function editLock( int $postId ): ?array {
+		if ( $postId <= 0 ) {
+			return null;
+		}
+		$holder = EditLock::holder(
+			get_post_meta( $postId, EditLock::META, true ),
+			get_post_meta( $postId, EditLock::LAST_EDITOR_META, true ),
+			time(),
+			EditLock::window()
+		);
+		if ( null === $holder ) {
+			return null;
+		}
+		// Core: a lock whose user is gone is no lock.
+		$user = get_userdata( $holder['user'] );
+		return $user ? EditLock::lockedBy( $holder, (string) $user->display_name ) : null;
 	}
 
 	/**
@@ -885,6 +907,47 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * A template part as the ACTIVE theme ships it, when the site never stored one: the raw bytes of
+	 * `<theme>/parts/<slug>.html` (or the older `block-template-parts/`), child theme first, then its
+	 * parent. Raw, not get_block_file_template()'s content, which injects theme attributes and hooked
+	 * blocks — its length would not be the file's. Null when no theme carries that part. read() stays
+	 * null for such a part on purpose: a write's undo is then a delete that puts the theme file back.
+	 *
+	 * @return array{id:int,title:string,content:string,area:string,source:string,file:string}|null
+	 */
+	public function themeTemplatePart( string $slug ): ?array {
+		if ( ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/i', $slug ) ) {
+			return null;
+		}
+		$dirs = array_unique( array( get_stylesheet_directory(), get_template_directory() ) );
+		foreach ( $dirs as $dir ) {
+			foreach ( array( 'parts', 'block-template-parts' ) as $folder ) {
+				$file = $dir . '/' . $folder . '/' . $slug . '.html';
+				if ( ! is_readable( $file ) ) {
+					continue;
+				}
+				$area = 'uncategorized';
+				if ( function_exists( 'get_block_file_template' ) ) {
+					$template = get_block_file_template( get_stylesheet() . '//' . $slug, 'wp_template_part' );
+					if ( $template && ! empty( $template->area ) ) {
+						$area = (string) $template->area;
+					}
+				}
+				$relative = defined( 'ABSPATH' ) && strpos( $file, ABSPATH ) === 0 ? substr( $file, strlen( ABSPATH ) ) : $file;
+				return array(
+					'id'      => 0,
+					'title'   => $slug,
+					'content' => (string) file_get_contents( $file ),
+					'area'    => $area,
+					'source'  => 'theme',
+					'file'    => $relative,
+				);
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * The override row for one template part of the ACTIVE theme, or null when the theme's own
 	 * file is still in charge.
 	 *
@@ -1272,6 +1335,51 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
  * string exactly. base64 keeps the result safe for a text column. On the way back the blob is
  * unserialized with classes forbidden, so a corrupted row can never instantiate anything.
  */
+/**
+ * The media library an image slot reads: `_wp_attached_file` names the attachment, the uploads
+ * folder holds the file, `getimagesize` gives its shape.
+ *
+ * The path is confined the same two ways the media writer confines one (string, then realpath),
+ * so a symlink inside uploads cannot hand a slot a file from elsewhere.
+ */
+final class Claude_Cowork_Image_Library implements ImageLibrary {
+
+	private const PREFIX = 'wp-content/uploads/';
+
+	public function find( string $path ): ?array {
+		global $wpdb;
+
+		if ( 0 !== strpos( $path, self::PREFIX ) || ! isset( $wpdb ) || ! function_exists( 'wp_upload_dir' ) ) {
+			return null;
+		}
+		$relative = substr( $path, strlen( self::PREFIX ) );
+		if ( in_array( '..', explode( '/', $relative ), true ) ) {
+			return null;
+		}
+		$uploads = wp_upload_dir( null, false );
+		$basedir = realpath( (string) ( $uploads['basedir'] ?? '' ) );
+		$file    = realpath( (string) ( $uploads['basedir'] ?? '' ) . '/' . $relative );
+		if ( false === $basedir || false === $file || 0 !== strncmp( $file, $basedir . '/', strlen( $basedir ) + 1 ) ) {
+			return null;
+		}
+		$id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND meta_value = %s LIMIT 1",
+				$relative
+			)
+		);
+		$size = @getimagesize( $file );
+		if ( null === $id || false === $size || $size[0] < 1 || $size[1] < 1 ) {
+			return null;
+		}
+		return array(
+			'id'     => (int) $id,
+			'width'  => (int) $size[0],
+			'height' => (int) $size[1],
+		);
+	}
+}
+
 final class Claude_Cowork_Apply_Log implements ApplyLog {
 
 	/** Raised whenever the table's shape changes, so an upgraded site rebuilds it. */

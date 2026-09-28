@@ -29,6 +29,8 @@ final class WP_Fake
     /** @var array<int,int> */
     public static array $cleaned = [];
     public static int $nextId = 500;
+    /** The active theme's folder, for a template part the site never stored (themeTemplatePart). */
+    public static string $themeDir = '/nonexistent-theme';
     /** @var array<string,string[]> "postId:taxonomy" => term names */
     public static array $terms = [];
     /** Stands in for KSES: a callable applied to post_content on the way in, or null for verbatim. */
@@ -56,9 +58,16 @@ final class WP_Fake
     public static int $flushed = 0;
     /** @var array<string,array<string,string>> Polylang slug => [original string => its translation], what each language's `polylang_mo` post holds */
     public static array $strings = [];
+    /** @var array<int,array{display_name:string}> user id => the columns an editor lock's holder is named by */
+    public static array $users = [];
+    /** @var array<string,callable> hook => the one callback `apply_filters` runs for it */
+    public static array $filters = [];
 
     public static function reset(): void
     {
+        self::$themeDir = '/nonexistent-theme';
+        self::$users = [];
+        self::$filters = [];
         self::$polylang = false;
         self::$languages = [];
         self::$strings = [];
@@ -181,6 +190,18 @@ function delete_post_meta(int $id, string $key): bool
     return true;
 }
 
+/** False for a user that does not exist, as WordPress answers: a lock held by one is no lock. */
+function get_userdata(int $id)
+{
+    return isset(WP_Fake::$users[$id]) ? (object) (['ID' => $id] + WP_Fake::$users[$id]) : false;
+}
+
+/** One callback per hook, enough for the core filters this plugin honours. */
+function apply_filters(string $tag, $value, ...$args)
+{
+    return isset(WP_Fake::$filters[$tag]) ? (WP_Fake::$filters[$tag])($value, ...$args) : $value;
+}
+
 function get_option(string $key, $default = false)
 {
     return array_key_exists($key, WP_Fake::$options) ? WP_Fake::$options[$key] : $default;
@@ -227,6 +248,16 @@ class WP_Post
 function get_stylesheet(): string
 {
     return WP_Fake::$stylesheet;
+}
+
+function get_stylesheet_directory(): string
+{
+    return WP_Fake::$themeDir;
+}
+
+function get_template_directory(): string
+{
+    return WP_Fake::$themeDir;
 }
 
 function wp_set_object_terms(int $id, $terms, string $taxonomy, bool $append = false): array

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "tracy-quickstart-editions/wordpress/v1",
   "contract": "tracy-business/wp7/1.1.0",
-  "baseHash": "115c3fbd719a5d2c92e1117f617564b87fb846c1f7ddb235f27a68def619f520",
+  "baseHash": "f3063781924bd9279ffba834b3dcd6a740ad1d6c255d97f2c64930890714787d",
   "source": {
     "language": "en",
     "locale": "en_US",
@@ -491,14 +491,17 @@
         "page-home:projects.cta.1",
         "page-home:projects.heading",
         "page-home:projects.item.1.href",
+        "page-home:projects.item.1.img",
         "page-home:projects.item.1.meta",
         "page-home:projects.item.1.text",
         "page-home:projects.item.1.title",
         "page-home:projects.item.2.href",
+        "page-home:projects.item.2.img",
         "page-home:projects.item.2.meta",
         "page-home:projects.item.2.text",
         "page-home:projects.item.2.title",
         "page-home:projects.item.3.href",
+        "page-home:projects.item.3.img",
         "page-home:projects.item.3.meta",
         "page-home:projects.item.3.text",
         "page-home:projects.item.3.title"
