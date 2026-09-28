@@ -1,0 +1,76 @@
+<!-- wp:template-part {"slug":"header","tagName":"header","className":"tracy-header","area":"header"} /-->
+<!-- wp:group {"tagName":"main","className":"hx-article-page","layout":{"type":"default"}} -->
+<main class="wp-block-group hx-article-page">
+<!-- wp:group {"tagName":"article","className":"com-content-article item-page hx-article","layout":{"type":"default"}} -->
+<article class="wp-block-group com-content-article item-page hx-article">
+<!-- wp:group {"tagName":"header","className":"hx-article__head hx-grid-bg","layout":{"type":"default"}} -->
+<header class="wp-block-group hx-article__head hx-grid-bg">
+<!-- wp:group {"className":"hx-container hx-pad hx-article__head-inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-pad hx-article__head-inner">
+<!-- the ten standalone Pages the source renders as ARTICLE views (page-map.json
+     `source.view: "article"` — features/integrations/changelog/faq/pricing/about/team/kineticql/
+     privacy/terms) get the EXACT same frame as a single post: same breadcrumb/eyebrow/title/sub/
+     byline/body/tags/related/CTA markup as templates/single.html, byte-identical class chain, so
+     the source's `templates/ja_kinetic/css/single-article.css` rules apply unchanged (see that
+     file's own header comment in the article CSS sheet). Kept as its own file rather than folded
+     into single.html because a WordPress Page and a WordPress Post are different post types with
+     different template-hierarchy slots (`page-<template>.html` vs `single.html`); the content and
+     structure below is deliberately the same file read twice. The article and body wrappers
+     also carry the source's own `com-content-article item-page` / `com-content-article__body`
+     classes, which Joomla core rules key on (see wp-ja-kinetic-article.css `.item-page`). -->
+<!-- wp:group {"tagName":"nav","className":"hx-article__breadcrumb"} -->
+<nav class="wp-block-group hx-article__breadcrumb" aria-label="Breadcrumb">
+<!-- wp:paragraph {"metadata":{"name":"article-breadcrumb.home"}} -->
+<p><a class="hx-bc-home" href="/">Home</a><span class="hx-bc-sep">/</span></p>
+<!-- /wp:paragraph -->
+<!-- wp:post-terms {"term":"category","className":"hx-bc-cat"} /-->
+<!-- wp:paragraph {"metadata":{"name":"article-breadcrumb.sep"}} -->
+<p><span class="hx-bc-sep">/</span></p>
+<!-- /wp:paragraph -->
+<!-- wp:post-title {"level":0,"className":"hx-bc-current"} /-->
+</nav>
+<!-- /wp:group -->
+<!-- wp:post-terms {"term":"category","className":"hx-eyebrow hx-article__cat"} /-->
+<!-- wp:post-title {"level":1,"className":"hx-h1 hx-article__title"} /-->
+<!-- wp:post-excerpt {"className":"hx-article__sub","excerptLength":30} /-->
+</div>
+<!-- /wp:group -->
+</header>
+<!-- /wp:group -->
+<!-- wp:group {"className":"hx-section hx-article__bodywrap","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-section hx-article__bodywrap">
+<!-- wp:group {"className":"hx-container hx-pad","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-container hx-pad">
+<!-- wp:group {"className":"hx-prose","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-prose">
+<!-- wp:group {"className":"hx-author","layout":{"type":"flex","flexWrap":"nowrap"}} -->
+<div class="wp-block-group hx-author">
+<!-- wp:wp-ja-kinetic/author-initials /-->
+<!-- wp:group {"className":"hx-author__c","layout":{"type":"default"}} -->
+<div class="wp-block-group hx-author__c">
+<!-- wp:post-author-name {"className":"hx-author__name"} /-->
+<!-- wp:wp-ja-kinetic/article-byline-meta /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- wp:post-featured-image {"isLink":false,"className":"item-image"} /-->
+<!-- wp:post-content {"className":"com-content-article__body article-body","layout":{"type":"default"}} /-->
+<!-- wp:post-terms {"term":"post_tag","className":"tags"} /-->
+<!-- wp:wp-ja-kinetic/article-foot /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- wp:wp-ja-kinetic/related-posts /-->
+<!-- the source's `article-cta` module position: ACM `cta` module 235 "[Kinetic] Article - CTA", edited in the
+     source's admin — here the synced pattern of that name (slug `wp-ja-kinetic-cta-article`), written by
+     tasks/ja-kinetic-wp7/post-seed.mjs and edited under Patterns; inc/owner-text.php fills the reference (D-40). -->
+<!-- wp:block {"metadata":{"name":"cta.article"}} /-->
+</article>
+<!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer","tagName":"footer","className":"tracy-footer","area":"footer"} /-->
