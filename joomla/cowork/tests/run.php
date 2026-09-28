@@ -20,10 +20,9 @@ require_once __DIR__ . '/../lib/Door.php';
 require_once __DIR__ . '/../lib/ContentIdentity.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
-// PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
-if (!function_exists('str_contains')) {
-    function str_contains(string $haystack, string $needle): bool { return $needle === '' || strpos($haystack, $needle) !== false; }
-}
+// The floor is PHP 8.1 (declared below, checked against update.json): the engine calls
+// array_is_list() and str_contains(), so the 7.4 polyfill this file once carried would only let
+// the harness pass on a version the code itself cannot run on.
 
 $passed = 0;
 $failed = 0;
@@ -1422,6 +1421,12 @@ check('update.json names the package version', $json['version'] ?? null, $pkgVer
 checkTrue(
     'and points at that version\'s release asset',
     ($json['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+// The PHP floor, once, in both feeds. The engine calls array_is_list() (8.1); a feed still saying
+// 7.4 lets Joomla's updater install a release onto a host that then dies on the first request.
+// Joomla reads `php_minimum` off the update entry, so the newest entry must carry it too.
+$newest = $upd->update;
+check('update.json declares the PHP floor the engine needs', $json['requires_php'] ?? null, '8.1');
+check('and the newest update.xml entry declares the same floor', $newest === null ? null : trim((string) $newest->php_minimum), $json['requires_php'] ?? null);
 
 // --- core.upgrade: the one write that moves a Joomla version --------------------------------
 // The engine validates the target and delegates the site-touching work to a CoreUpgrader, so
@@ -1835,6 +1840,7 @@ require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";
 require __DIR__ . "/content-extras.php";
 require __DIR__ . "/contract-ops-locks.php";
+require __DIR__ . "/retire-site-default.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
