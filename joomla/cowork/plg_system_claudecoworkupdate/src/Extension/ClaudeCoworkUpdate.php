@@ -80,8 +80,18 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
      */
     private const ASSET_PREFIX = 'https://github.com/TracyHQ/claude-cowork/releases/download/';
 
-    /** How often the manifests are read at all. Short enough that a release lands the same day. */
-    private const EVERY = 21600;
+    /**
+     * How often the manifests are read at all.
+     *
+     * A quarter of an hour, so a release reaches a site the next time somebody opens it in Tracy
+     * rather than up to six hours later. It was six hours first, which meant a site checked just
+     * before a release kept the old version for the rest of that working session, while the fix
+     * written for it sat announced.
+     * A check is one GET for a small file, and a package is downloaded only when a newer version
+     * is announced. Not lower: raw.githubusercontent caches for about five minutes, so asking
+     * more often than that cannot see a release any sooner.
+     */
+    private const EVERY = 900;
 
     public static function getSubscribedEvents(): array
     {

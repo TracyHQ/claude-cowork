@@ -5,7 +5,7 @@
     <creationDate>2026-09</creationDate>
     <copyright>(C) 2026 Tracy</copyright>
     <license>GPL-2.0-or-later</license>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <description><![CDATA[
         Takes the updates Tracy announces for this site, without waiting for somebody to press a
         button in the backend. Joomla shows an extension update and then waits; WordPress installs

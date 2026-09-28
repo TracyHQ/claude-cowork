@@ -36,11 +36,21 @@ defined('ABSPATH') || exit;
 const CLAUDE_COWORK_UPDATE_MANIFEST = 'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/wordpress/update.json';
 
 /**
- * How long an answer is kept. WordPress asks about updates roughly twice a day; a cache is not
- * about saving our own request but about the site's page loads never waiting on somebody else's
- * host. Short enough that a release is visible the same day it is cut.
+ * How often this site looks for a newer copy of itself, and so how long a manifest answer is kept.
+ *
+ * A quarter of an hour, the same as the Joomla package's self-updater: a release reaches a site
+ * the next time somebody opens it in Tracy, not half a day later. A look is one GET for a small
+ * file; a package is downloaded only when a newer version is announced. Not lower:
+ * raw.githubusercontent caches for about five minutes, so asking more often sees nothing sooner.
  */
-const CLAUDE_COWORK_UPDATE_TTL = 6 * HOUR_IN_SECONDS;
+const CLAUDE_COWORK_UPDATE_EVERY = 15 * MINUTE_IN_SECONDS;
+
+/**
+ * How long an answer is kept. A cache is not about saving our own request but about the site's
+ * page loads never waiting on somebody else's host. As long as the interval above and no longer,
+ * or the quarter-hour look would keep reading an answer from before the release.
+ */
+const CLAUDE_COWORK_UPDATE_TTL = CLAUDE_COWORK_UPDATE_EVERY;
 
 /** The manifest, or null when it cannot be read. Never throws: an update check is not worth a site. */
 function claude_cowork_update_manifest(): ?array
@@ -150,3 +160,81 @@ function claude_cowork_auto_update($update, $item)
 }
 
 add_filter('auto_update_plugin', 'claude_cowork_auto_update', 10, 2);
+
+/**
+ * Look for a newer copy every quarter hour, on WordPress's own cron, and take it.
+ *
+ * The filter above only says yes when WordPress asks, and WordPress asks on its own clock: about
+ * twice a day. On a site somebody opened right after a release that is half a day of the old
+ * version, the fix written for it announced and not installed. This brings the same work forward.
+ *
+ * ## Why wp-cron and not a hook on the page
+ *
+ * wp-cron runs when a visit arrives, in a separate background request, so a visitor never waits
+ * behind a download. It is also the one place a site that switched it off (`DISABLE_WP_CRON` plus
+ * a system cron) still reaches.
+ *
+ * ## Why the manifest is read first
+ *
+ * `self_update()` asks api.wordpress.org about every plugin on the site. Doing that every quarter
+ * hour on every site Tracy runs would be abusing somebody else's service to learn nothing new
+ * almost every time. Our own small file answers "is there anything?" first; the full path runs
+ * only when the answer is yes.
+ */
+function claude_cowork_take_update(): void
+{
+    $manifest = claude_cowork_update_manifest();
+    $installed = claude_cowork_version();
+    if ($manifest === null || $installed === null || version_compare((string) $manifest['version'], $installed, '<=')) {
+        return;
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+    // The site-wide switches an owner or host uses to say "nothing updates itself here"
+    // (DISALLOW_FILE_MODS, AUTOMATIC_UPDATER_DISABLED, the automatic_updater_disabled filter).
+    if ((new WP_Automatic_Updater())->is_disabled()) {
+        return;
+    }
+
+    // The lock WordPress's own automatic updater holds, so the two never install over each other.
+    if (!WP_Upgrader::create_lock('auto_updater')) {
+        return;
+    }
+
+    try {
+        require_once __DIR__ . '/lib/class-claude-cowork-packages.php';
+        $result = (new Claude_Cowork_Packages())->self_update();
+
+        // A failure here is otherwise invisible: nobody is waiting for this request's answer.
+        if (($result['ok'] ?? false) !== true) {
+            error_log('claude-cowork: update to ' . $manifest['version'] . ' failed: ' . ($result['error'] ?? 'unknown'));
+        }
+    } finally {
+        WP_Upgrader::release_lock('auto_updater');
+    }
+}
+
+add_filter('cron_schedules', static function ($schedules) {
+    $schedules['claude_cowork_update'] = [
+        'interval' => CLAUDE_COWORK_UPDATE_EVERY,
+        'display'  => 'Every 15 minutes (Tracy Claude Cowork updates)',
+    ];
+    return $schedules;
+});
+
+add_action('claude_cowork_update_check', 'claude_cowork_take_update');
+
+// Scheduled on the first request after install or upgrade, not in the activation hook: a copy that
+// arrives by an update is not activated again, so the hook would never schedule it there.
+add_action('init', static function (): void {
+    if (!wp_next_scheduled('claude_cowork_update_check')) {
+        wp_schedule_event(time() + CLAUDE_COWORK_UPDATE_EVERY, 'claude_cowork_update', 'claude_cowork_update_check');
+    }
+});
+
+// An upgrade deactivates silently and fires no hook, so this runs only when somebody switches the
+// plugin off, and then a switched-off plugin leaves no quarter-hour event behind.
+register_deactivation_hook(__DIR__ . '/claude-cowork.php', static function (): void {
+    wp_clear_scheduled_hook('claude_cowork_update_check');
+});

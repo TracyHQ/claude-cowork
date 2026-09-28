@@ -65,7 +65,12 @@ asks, gets an older number than it already has, and reports "up to date" forever
 **Joomla and WordPress both record the update address when the extension is INSTALLED.** A site
 running a version cut before this existed has no address to ask, and stays silent until somebody
 updates it once by hand. That first update is the price of adding this late; every one after it
-is a click.
+is taken without one.
+
+**The site takes a release by itself, within a quarter hour of the next visit.**
+`plg_system_claudecoworkupdate` reads `joomla/update.xml` after a response has gone to the browser,
+at most once every 15 minutes, and installs the package (and `tpl_tracy`) when a newer version is
+announced. Its `autoupdate` switch turns that off.
 
 ## Why the door is ALSO a system plugin
 
