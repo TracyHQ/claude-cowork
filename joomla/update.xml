@@ -30,6 +30,7 @@
         <maintainer>Tracy</maintainer>
         <maintainerurl>https://tracy.ai</maintainerurl>
         <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>8.1</php_minimum>
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
