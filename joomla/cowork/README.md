@@ -97,8 +97,8 @@ renders. So `plg_system_claudecoworkapi` marks the page — for one kind of requ
 | `<template data-tracy-owner="article:<id>:<alias>">` | inside every article render: the article page and each blog/featured item |
 | `<template data-tracy-owner="category:<id>:<alias>">` | inside a category's description (context `com_content.categories`) |
 | `data-tracy-src="article:<id>:<alias> block:<module type>"` | each item of an article-list module: `mod_articles`, `mod_articles_news`, `mod_articles_latest`, `mod_articles_category`, `mod_articles_popular`, `mod_related_items`, and `mod_ja_acm` when it links to two articles or more |
-| `data-tracy-src="category:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a category page, in module output (not menu modules) and in the component output (unreleased) |
-| `data-tracy-src="tag:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a tag page, same places (unreleased) |
+| `data-tracy-src="category:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a category page, in module output (not menu modules) and in the component output (0.18.3) |
+| `data-tracy-src="tag:<id>:<alias>[ block:<module type>]"` | each `<a>` linking to a tag page, same places (0.18.3) |
 
 Menu items need nothing: Joomla and T4 already print the id on each `<li>`. The format is shared
 with the picker runtime and the resolver in Tracy; change it there first. The rules are plain PHP in
@@ -195,7 +195,7 @@ Release activation is separate from source availability: 0.14.0 has been tested 
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.
 
-**Category and tag links (unreleased).** A category or tag name printed as a link — a breadcrumb, a
+**Category and tag links (0.18.3).** A category or tag name printed as a link — a breadcrumb, a
 blog's filter chips, the category line of a news card, a sidebar category list — is stamped on the
 `<a>` itself, since the item around it usually belongs to something else (the article a card shows).
 The link is tied to a record the same way article links are (`TaxonomyLinks`: candidates by id or
@@ -203,19 +203,24 @@ alias, confirmed by building the route Joomla's category/tag view builds). A cat
 published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
 not the category's. Menu modules get no such stamps for the same reason.
 
-## Unreleased Joomla 6 Content API pilot
+## Content API (`content.read`, `/content.json`)
+
+Released in **0.18.0**. Each content names its own Joomla records (`native`) since **0.18.2**;
+batch reads (`ids`) and the records and fields beside the contract slots since **0.18.3**.
 
 The opt-in `content.read` action and authenticated `GET /content.json` share
-`JoomlaContentReader`. GET requires the existing site token in `Authorization: Bearer …`;
+`JoomlaContentReader`. The reader takes a flat query: `id`, `type`, `locale`, `limit`, `cursor`,
+`blocksCursor`, `blockId` and `maxBytes` (8192 to 262144 bytes of JSON), or `ids` with `maxBytes`
+only (below). `protocolVersions` is accepted and ignored. `describe` is not a reader parameter: it
+is answered by Tracy's relay, from what this reader returns. GET requires the existing site token in `Authorization: Bearer …`;
 never put it in a URL. The existing token is a service credential, not a Tracy seat.
 The Tracy relay checks the current seat/policy on each request and supplies a server-owned
 `contentPrincipal` for cursor isolation. No new write permission is granted.
 
-The common machine contract is TCH `packages/cms/tracy-content-api` (foundation commit
-`1e724aad20c3be7df82aebf9e5e59db87e0a6aa2`, local/unpushed). Cross-repository protocol ownership:
-TracyHQ/tracy-docs `systems/content-api-v1.md`. This patch is not a receiver release.
+The common machine contract is TCH `packages/cms/tracy-content-api`. Cross-repository protocol
+ownership: TracyHQ/tracy-docs `systems/content-api-v1.md`.
 
-On a **private Joomla 6 test fixture**, install the locally built receiver, then explicitly run:
+To enable the reader on a site, install the receiver, then explicitly run:
 
 ```sh
 php tools/enable-content-reader.php --root=/path/to/joomla --new-site
@@ -237,7 +242,7 @@ and no inferred semantic key. Repeaters, exclusion assignments and media outside
 slots remain unresolved. `readMapping()` is separate from mutating native inspect. A damaged
 binding fails closed; native inspect/apply/revert keep their existing write semantics.
 
-### Many details in one read, and reads that overlap (unreleased)
+### Many details in one read, and reads that overlap (0.18.3)
 
 Every read builds the site's whole projection (all mapped tables, the contract, the router), so
 its cost barely depends on how much it answers. `ids` asks for up to 100 details in one call — a
@@ -250,7 +255,7 @@ A read writes nothing while it holds its database snapshot, so any number of rea
 Page identities (no trigger, see `ContentIdentity`) are levelled before the snapshot, and only
 when a menu item appeared or went since the last read.
 
-### Records and fields beside the contract slots (unreleased)
+### Records and fields beside the contract slots (0.18.3)
 
 A page prints words that no contract slot holds. `content.read` carries them too, each group as one
 block keyed by the Joomla row's **native id** — the id a render stamp names (`article:548` resolves
@@ -288,7 +293,7 @@ No transaction spans requests and no snapshot cache needs cleanup. Cursor expiry
 and binds site, principal (including scope), filter, revision and owner. Source cost remains
 linear across the mapped site and image directory: timing isolation and constant-cost paging
 are not claimed. Remote images, CSS backgrounds and srcset bytes remain unresolved.
-The pilot caps serialized responses at 262144 bytes, continuing blocks by signed cursor. A scalar
+The reader caps serialized responses at 262144 bytes (or the caller's `maxBytes`), continuing blocks by signed cursor. A scalar
 or unsegmentable metadata group that cannot fit returns 413, never truncated content. Item paging
 is not advertised until stable repeater mapping exists. Images changed after the final scan are
 seen on the next request; this does not claim a filesystem transaction with MariaDB.
@@ -304,8 +309,8 @@ deferred to the final segment (with no blocks remaining); its absence in an earl
 not loaded, never an invented null/empty value. The shared P1 schema already permits this.
 
 
-Content API relay protocol note (unreleased): `contentScope` is server-owned at the Tracy hop;
-this pilot supports `published` only and returns501 for another scope. `contentPrincipal` binds
+Content API relay protocol note: `contentScope` is server-owned at the Tracy hop;
+this reader supports `published` only and returns501 for another scope. `contentPrincipal` binds
 the signed cursor to a verified seat context; a service credential is not a seat. List continuation
 can send only `cursor`; explicit filter/limit repetitions must match its signed query. No identity
 migration, permission widening or contract repair runs from a read request. WordPress and EmDash
