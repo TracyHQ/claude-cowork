@@ -157,6 +157,12 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
 
 ## Content API (`/content.json`)
 
+Released in **0.14.0**. Each content names its own WordPress records (`native`) since **0.14.2**;
+batch reads (`ids`) since **0.14.3**. The reader takes a flat query: `id`, `type`, `locale`,
+`limit`, `cursor`, `blocksCursor`, `blockId`, `itemsCursor` and `maxBytes`, or `ids` with
+`maxBytes` only (below). `protocolVersions` is accepted and ignored. `describe` is not a reader
+parameter: it is answered by Tracy's relay, from what this reader returns.
+
 `GET <home>/content.json` with `Authorization: Bearer <token>` answers the site's live content in
 the `tracy-content/v1` shape (schema and validator live in TCH `packages/cms/tracy-content-api`):
 summaries by default, one content in full by `id`, `type`/`locale`/`limit` filters, and signed
