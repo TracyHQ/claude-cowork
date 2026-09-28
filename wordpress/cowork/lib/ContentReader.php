@@ -191,6 +191,9 @@ final class ContentReader
 
     private function answer(array $query): array
     {
+        if (array_key_exists('ids', $query)) {
+            return $this->batch($query);
+        }
         foreach ($query as $key => $value) {
             if (!is_string($key) || !in_array($key, self::KNOWN, true)) {
                 throw self::bad();
@@ -453,9 +456,125 @@ final class ContentReader
         return substr($value, 0, $bytes);
     }
 
+    // ---- many details -----------------------------------------------------------------------
+
+    /**
+     * `ids`: up to MAX_LIMIT details from ONE projection. A read's cost on WordPress is building
+     * the projection (every row in scope, its permalinks and revisions: ~100 ms on a 950-row site,
+     * 27/09/2026), and a detail on top of it is 1-5 ms, so one call per content spent nearly all of
+     * its time rebuilding the same state. Each content listed is answered exactly as an `{id}` read
+     * without `maxBytes` answers it when it fits whole: same shape, same revision, `complete`. The
+     * budget (`maxBytes`, else MAX_BYTES) fills in the order asked; a content that does not fit,
+     * has more blocks than one detail page holds, or has a value over budget is named in
+     * `pagination.pending` and never cut (read it alone with `{id}`, which pages or cuts it). An id
+     * with no readable content now is named in `pagination.missing`. No cursor: nothing here pages.
+     *
+     * @param array<string,mixed> $query `ids` as a list (the POST door), or one comma-separated value (GET)
+     */
+    private function batch(array $query): array
+    {
+        $ids = $query['ids'];
+        unset($query['ids'], $query['protocolVersions']);
+        if (array_diff(array_keys($query), ['maxBytes']) !== []) {
+            throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids is read with maxBytes only.');
+        }
+        if (is_string($ids)) {
+            $ids = explode(',', $ids);
+        }
+        $shape = new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids must list 1 to ' . self::MAX_LIMIT . ' content ids.');
+        if (!is_array($ids) || $ids === [] || array_keys($ids) !== range(0, count($ids) - 1) || count($ids) > self::MAX_LIMIT) {
+            throw $shape;
+        }
+        foreach ($ids as $id) {
+            if (!is_string($id) || $id === '' || strlen($id) > 128 || strpos($id, ',') !== false) {
+                throw $shape;
+            }
+        }
+        if (count(array_unique($ids)) !== count($ids)) {
+            throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'ids must not repeat an id.');
+        }
+        if (isset($query['maxBytes'])) {
+            $raw = is_int($query['maxBytes']) ? (string) $query['maxBytes'] : $query['maxBytes'];
+            if (!is_string($raw) || !preg_match('/^[1-9][0-9]{0,5}$/D', $raw) || (int) $raw < self::MIN_BYTES || (int) $raw > self::MAX_BYTES) {
+                throw new ContentReadError('CONTENT_BAD_QUERY', 400, 'maxBytes must be an integer from ' . self::MIN_BYTES . ' to ' . self::MAX_BYTES . '.');
+            }
+            $this->maxBytes = (int) $raw;
+        } else {
+            $this->maxBytes = $this->configured ?? self::MAX_BYTES;
+        }
+        $this->sent = false; // a batch never cuts: what does not fit whole is pending
+        // Each content is sized as the `{id}` read with the same query would size its answer.
+        $this->showBudget = isset($query['maxBytes']);
+
+        // Every content is built once, from this one snapshot; an id the scope cannot read is missing.
+        $whole = [];
+        $missing = [];
+        foreach ($ids as $id) {
+            $content = $this->source->detail($id);
+            if ($content === null) {
+                $missing[] = $id;
+                continue;
+            }
+            $whole[$id] = $this->wholePage($id, $content);
+        }
+        $this->showBudget = true;
+        $page = function (array $contents, array $pending) use ($ids, $missing): array {
+            $envelope = $this->envelope($contents, count($ids), null, count($ids));
+            $envelope['pagination'] += ['pending' => $pending, 'missing' => $missing];
+            return $envelope;
+        };
+        $out = [];
+        $pending = [];
+        $sum = 0;
+        $decided = 0;
+        foreach ($ids as $id) {
+            $decided++;
+            if (!array_key_exists($id, $whole)) {
+                continue;
+            }
+            $content = $whole[$id];
+            if ($content === null) {
+                $pending[] = $id;
+                continue;
+            }
+            $bytes = strlen(self::encode($content));
+            // Sized against the longest `pending` this answer could still end with (every id not yet
+            // decided), so the final envelope can only be smaller. A list of k encoded items is `[`,
+            // the items joined by `,`, and `]`: exact arithmetic, as for a listing page.
+            $undecided = array_values(array_filter(array_slice($ids, $decided), static fn($later) => array_key_exists($later, $whole)));
+            $base = strlen(self::encode($page([], array_merge($pending, $undecided))));
+            if ($base + $sum + $bytes + count($out) > $this->maxBytes) {
+                $pending[] = $id;
+                continue;
+            }
+            $out[] = $content;
+            $sum += $bytes;
+        }
+        return $page($out, $pending);
+    }
+
+    /**
+     * A content exactly as an `{id}` read at this budget answers it, when that read answers it whole
+     * in one page; null when it would page its blocks or refuse a value over the budget (413). The
+     * single read itself decides, so the two can never disagree.
+     */
+    private function wholePage(string $id, array $content): ?array
+    {
+        try {
+            $page = $this->detail($id, null, $content)['contents'][0];
+        } catch (ContentReadError $e) {
+            if ($e->status === 413) {
+                return null;
+            }
+            throw $e;
+        }
+        return $page['detailState'] === 'complete' ? $page : null;
+    }
+
     // ---- detail -----------------------------------------------------------------------------
 
-    private function detail(string $id, ?string $blocksCursor): array
+    /** @param array<string,mixed>|null $content the source's detail, when the caller already built it */
+    private function detail(string $id, ?string $blocksCursor, ?array $content = null): array
     {
         $offset = 0;
         if ($blocksCursor !== null) {
@@ -465,7 +584,7 @@ final class ContentReader
             }
             $offset = (int) $state['offset'];
         }
-        $content = $this->source->detail($id);
+        $content = $content ?? $this->source->detail($id);
         if ($content === null) {
             throw new ContentReadError('CONTENT_NOT_FOUND', 404, 'Content not found.');
         }
