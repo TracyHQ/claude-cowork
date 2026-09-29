@@ -6,12 +6,19 @@ check('loopback: an https site is asked over plain http first, then https resolv
     LoopbackRoute::routes('https://northwind.example/'),
     [['url' => 'http://127.0.0.1/', 'host' => 'northwind.example', 'resolve' => null],
      ['url' => 'https://northwind.example/', 'host' => 'northwind.example', 'resolve' => 'northwind.example:443:127.0.0.1']]);
-check('loopback: an http site has one route, its port and path kept',
-    LoopbackRoute::routes('http://northwind.example:8080/shop/'),
-    [['url' => 'http://127.0.0.1:8080/shop/', 'host' => 'northwind.example:8080', 'resolve' => null]]);
-check('loopback: an https port names the resolved address, plain http stays on 80',
+// A fleet copy's address names the OUTSIDE proxy port (`…tracy.test:51710`); Apache in the container
+// listens on 80 and answers that Host there. So port 80 first, the named port only after it.
+check('loopback: an http site with a port is asked on port 80 first, then on its port, with its Host both times',
+    LoopbackRoute::routes('http://travelfiji-com-au-68d54982.tracy.test:51710/shop/'),
+    [['url' => 'http://127.0.0.1/shop/', 'host' => 'travelfiji-com-au-68d54982.tracy.test:51710', 'resolve' => null],
+     ['url' => 'http://127.0.0.1:51710/shop/', 'host' => 'travelfiji-com-au-68d54982.tracy.test:51710', 'resolve' => null]]);
+check('loopback: an http site on port 80 or none has one route',
+    [LoopbackRoute::routes('http://northwind.example/'), LoopbackRoute::routes('http://northwind.example:80/')],
+    [[['url' => 'http://127.0.0.1/', 'host' => 'northwind.example', 'resolve' => null]],
+     [['url' => 'http://127.0.0.1/', 'host' => 'northwind.example:80', 'resolve' => null]]]);
+check('loopback: an https port names the resolved address; plain http stays on 80, with the Host as named',
     LoopbackRoute::routes('https://northwind.example:8443/shop'),
-    [['url' => 'http://127.0.0.1/shop/', 'host' => 'northwind.example', 'resolve' => null],
+    [['url' => 'http://127.0.0.1/shop/', 'host' => 'northwind.example:8443', 'resolve' => null],
      ['url' => 'https://northwind.example:8443/shop/', 'host' => 'northwind.example:8443', 'resolve' => 'northwind.example:8443:127.0.0.1']]);
 check('loopback: 200 is a page, a redirect or no answer tries the next route, anything else is no page',
     array_map([LoopbackRoute::class, 'outcome'], [200, 301, 302, 308, 0, 404, 500]), ['page', 'next', 'next', 'next', 'next', 'none', 'none']);

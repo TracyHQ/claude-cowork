@@ -2,7 +2,7 @@
 /**
  * LoopbackRoute — how this site asks itself for one of its own pages, in the order to try.
  *
- * Plain http to 127.0.0.1 with the site's Host first: a Tracy fleet copy serves plain http inside its
+ * Plain http to 127.0.0.1, port 80, with the site's Host (port included) first: a Tracy fleet copy serves plain http inside its
  * container even when its public address (the site root / home URL) is https, and a copy behind a TLS proxy has no
  * certificate of its own. Only when that fails or redirects (a site that forces https) is the https
  * route tried, with curl resolving the site's own name to 127.0.0.1 so the TLS name and the virtual
@@ -31,14 +31,20 @@ final class LoopbackRoute
         $https = strtolower((string) ($parts['scheme'] ?? 'http')) === 'https';
         $name = (string) ($parts['host'] ?? 'localhost');
         $path = rtrim((string) ($parts['path'] ?? ''), '/') . '/';
+        // The Host is the address as named, port included; the connection is port 80 first. A named
+        // port is often not this server's (a fleet copy's `…tracy.test:51710` is the proxy outside the
+        // container, where nothing inside listens), and the site's server answers its Host on 80.
+        $host = $name . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+        $plain = ['url' => 'http://127.0.0.1' . $path, 'host' => $host, 'resolve' => null];
         if (!$https) {
-            $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
-            return [['url' => 'http://127.0.0.1' . $port . $path, 'host' => $name . $port, 'resolve' => null]];
+            $routes = [$plain];
+            // Then the named port itself, for a site that really listens there. Not for https: plain
+            // http to a TLS port answers 400, which would end the page before the https route is tried.
+            if (isset($parts['port']) && (int) $parts['port'] !== 80) $routes[] = ['url' => 'http://127.0.0.1:' . (int) $parts['port'] . $path, 'host' => $host, 'resolve' => null];
+            return $routes;
         }
-        $plain = ['url' => 'http://127.0.0.1' . $path, 'host' => $name, 'resolve' => null];
         if (!$tls) return [$plain];
         $port = (int) ($parts['port'] ?? 443);
-        $host = $name . (isset($parts['port']) ? ':' . $port : '');
         return [$plain, ['url' => 'https://' . $host . $path, 'host' => $host, 'resolve' => $name . ':' . $port . ':127.0.0.1']];
     }
 
