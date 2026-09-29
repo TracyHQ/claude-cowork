@@ -32,8 +32,13 @@ case "$listing" in
 esac
 styles=$(printf '%s\n' "$listing" | grep -c "$slug/styles/.*\\.json" || true)
 # The Tracy theme carries every design inspiration; a template's theme carries its own look only.
+# How many is not typed here: the catalogue grows (152 until 16/09/2026, 154 since), and the
+# number the zip must carry is the one the mirrored `inspirations.json` lists — generated in TCH
+# from the same vendored library as the style files, so the two can only disagree if a file is lost.
 if [ "$slug" = tracy ]; then
-  [ "$styles" -eq 152 ] || { echo "expected 152 design inspirations in the zip, found $styles" >&2; exit 1; }
+  expected=$(grep -o '"name"' "$slug/inspirations.json" | wc -l | tr -d ' ')
+  [ "$expected" -gt 0 ] || { echo "could not count the design inspirations in $slug/inspirations.json" >&2; exit 1; }
+  [ "$styles" -eq "$expected" ] || { echo "expected $expected design inspirations in the zip (inspirations.json), found $styles" >&2; exit 1; }
 else
   [ "$styles" -ge 1 ] || { echo "expected the theme's own style variation in the zip, found none" >&2; exit 1; }
 fi

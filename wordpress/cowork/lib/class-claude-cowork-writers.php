@@ -1550,6 +1550,38 @@ final class Claude_Cowork_Apply_Log implements ApplyLog {
 		$this->db->delete( $this->table, array( 'apply_id' => $applyId ), array( '%s' ) );
 	}
 
+	public function later( string $applyId ): array {
+		// The row id is the order steps were recorded in, across every Apply: `seq` only orders
+		// the steps of one.
+		$first = $this->db->get_var(
+			$this->db->prepare( "SELECT MIN(id) FROM {$this->table} WHERE apply_id = %s", $applyId )
+		);
+		if ( null === $first ) {
+			return array();
+		}
+		$rows = $this->db->get_results(
+			$this->db->prepare(
+				"SELECT apply_id, entry FROM {$this->table} WHERE id > %d AND apply_id <> %s ORDER BY id ASC",
+				(int) $first,
+				$applyId
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$decoded = base64_decode( (string) ( $row['entry'] ?? '' ), true );
+			$entry   = false === $decoded ? null : unserialize( $decoded, array( 'allowed_classes' => false ) );
+			if ( is_array( $entry ) ) {
+				$out[] = array(
+					'apply_id' => (string) $row['apply_id'],
+					'entry'    => $entry,
+				);
+			}
+		}
+		return $out;
+	}
+
 	/** The next sequence number for an Apply, so steps replay in the order they happened. */
 	private function next_seq( string $applyId ): int {
 		$max = $this->db->get_var(

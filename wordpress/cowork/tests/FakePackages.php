@@ -138,10 +138,19 @@ final class FakePackages
         return ['ok' => true, 'changed' => $changed, 'was' => $was, 'post' => 7];
     }
 
-    public function wear_style(string $style): array
+    /** What the last theme.style handed in beside the style, so a test can see it arrived whole. */
+    public static ?array $wornVariation = null;
+    public static array $wornMeta = [];
+
+    public function wear_style(string $style, ?array $variation = null, array $meta = []): array
     {
         if (!preg_match('/^[a-z0-9-]+$/', $style)) {
             return ['ok' => false, 'error' => 'style must be a-z, 0-9 and dashes'];
+        }
+        self::$wornVariation = $variation;
+        self::$wornMeta = $meta;
+        if ($variation !== null) {
+            self::$styles[] = $style;
         }
         if (!in_array($style, self::$styles, true)) {
             return ['ok' => false, 'error' => "the theme has no styles/{$style}.json"];

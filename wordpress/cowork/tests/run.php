@@ -1631,6 +1631,8 @@ require_once __DIR__ . '/superseded-profile.php';
 require_once __DIR__ . '/multilingual.php';
 // The site's default language on a sealed multilingual site.
 require_once __DIR__ . '/site-language.php';
+require_once __DIR__ . '/theme-style-variation.php';
+require_once __DIR__ . '/global-styles-kses.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
@@ -1665,6 +1667,8 @@ require __DIR__ . '/loopback-route.php';
 require __DIR__ . '/derived-contract.php';
 // String overrides: gettext words replaced per locale, through content.contract string and apply.revert.
 require __DIR__ . '/string-overrides.php';
+// apply.revert takes back one receipt: the span its write changed, never the whole row.
+require __DIR__ . '/revert-span.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

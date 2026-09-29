@@ -613,7 +613,7 @@ final class Claude_Cowork_Packages {
 			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		$written = wp_update_post(
 			array(
@@ -626,7 +626,7 @@ final class Claude_Cowork_Packages {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		if ( is_wp_error( $written ) ) {
 			return array( 'ok' => false, 'error' => $written->get_error_message() );
@@ -654,12 +654,127 @@ final class Claude_Cowork_Packages {
 	 * @param string $style Variation id, `a-z0-9-`.
 	 * @return array
 	 */
-	public function wear_style( $style ) {
+	/**
+	 * Why a variation handed in on `theme.style` is not one the site may wear, or null when it is.
+	 *
+	 * A variation is a theme.json v3 document: `version: 3`, a `settings` object, a `title`. Nothing
+	 * else is required and nothing else is inspected — the theme reads what it understands — but a
+	 * document of another shape (a bare palette, a string) is refused here rather than written under
+	 * uploads and worn as an empty look.
+	 *
+	 * @param mixed $variation
+	 * @return string|null
+	 */
+	public static function variation_problem( $variation ) {
+		if ( ! is_array( $variation ) ) {
+			return 'variation must be a theme.json object';
+		}
+		if ( ( $variation['version'] ?? null ) !== 3 ) {
+			return 'variation.version must be 3';
+		}
+		if ( ! isset( $variation['settings'] ) || ! is_array( $variation['settings'] ) ) {
+			return 'variation.settings must be an object';
+		}
+		if ( isset( $variation['title'] ) && ! is_string( $variation['title'] ) ) {
+			return 'variation.title must be a string';
+		}
+		return null;
+	}
+
+	/**
+	 * Where Tracy's runtime-made variations live: `<uploads>/tracy/`. The theme reads the same place
+	 * (`inc/variations.php` of theme `tracy`, 1.1.3+): its own `styles/` first, then here.
+	 *
+	 * @return string
+	 */
+	public static function tracy_uploads_dir() {
+		$uploads = wp_upload_dir();
+		return rtrim( (string) ( $uploads['basedir'] ?? '' ), '/' ) . '/tracy';
+	}
+
+	/**
+	 * Write a variation Tracy made at build time — the customer's brand from `Brand/<host>/tokens.css`
+	 * — under uploads, and register it in `<uploads>/tracy/inspirations.json` so the theme lists it.
+	 *
+	 * Uploads and not the theme directory: a theme update replaces that directory wholesale, and the
+	 * brand's look would die with it (ADR 0023 in TracyHQ/tch).
+	 *
+	 * @param string $style `^[a-z0-9-]+$` — the caller checked.
+	 * @param array  $variation a theme.json v3 document (`variation_problem` said it is one).
+	 * @param array  $meta {name, category, nav, hero, dark}, the catalogue row the theme lists.
+	 * @return array{ok: bool, file?: string, error?: string}
+	 */
+	public static function stage_variation( $style, array $variation, array $meta ) {
+		$dir = self::tracy_uploads_dir();
+		if ( ! is_dir( $dir . '/styles' ) && ! wp_mkdir_p( $dir . '/styles' ) ) {
+			return array( 'ok' => false, 'error' => "cannot create {$dir}/styles" );
+		}
+		$file = $dir . "/styles/{$style}.json";
+		$variation['title'] = isset( $variation['title'] ) ? (string) $variation['title'] : $style;
+		if ( false === file_put_contents( $file, wp_json_encode( $variation, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" ) ) {
+			return array( 'ok' => false, 'error' => "cannot write {$file}" );
+		}
+		$index = $dir . '/inspirations.json';
+		$rows  = array();
+		if ( is_file( $index ) ) {
+			$decoded = json_decode( (string) file_get_contents( $index ), true );
+			$rows    = is_array( $decoded ) && isset( $decoded['systems'] ) && is_array( $decoded['systems'] ) ? $decoded['systems'] : array();
+		}
+		$rows[ $style ] = array(
+			'name'     => isset( $meta['name'] ) && is_string( $meta['name'] ) && '' !== $meta['name'] ? $meta['name'] : $variation['title'],
+			'category' => isset( $meta['category'] ) && is_string( $meta['category'] ) ? $meta['category'] : 'Your brand',
+			'nav'      => isset( $meta['nav'] ) && is_string( $meta['nav'] ) ? $meta['nav'] : 'top-left',
+			'hero'     => isset( $meta['hero'] ) && is_string( $meta['hero'] ) ? $meta['hero'] : 'split',
+			'dark'     => ! empty( $meta['dark'] ),
+		);
+		if ( false === file_put_contents( $index, wp_json_encode( array( 'systems' => $rows ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" ) ) {
+			return array( 'ok' => false, 'error' => "cannot write {$index}" );
+		}
+		return array( 'ok' => true, 'file' => $file );
+	}
+
+	/**
+	 * The variation file for a style: the theme's own `styles/<style>.json` first, then the one
+	 * Tracy wrote under uploads. Null when neither exists.
+	 *
+	 * @param string $style
+	 * @return string|null
+	 */
+	public static function variation_file( $style ) {
+		$shipped = get_theme_file_path( "styles/{$style}.json" );
+		if ( file_exists( $shipped ) ) {
+			return $shipped;
+		}
+		$written = self::tracy_uploads_dir() . "/styles/{$style}.json";
+		return file_exists( $written ) ? $written : null;
+	}
+
+	/**
+	 * Make the site wear one style variation. With `$variation` (a theme.json v3 document Tracy made
+	 * at build time — the customer's brand) the document is first written under uploads and
+	 * registered; without it, the style must already exist in the theme or under uploads.
+	 *
+	 * @param string     $style
+	 * @param array|null $variation
+	 * @param array      $meta
+	 * @return array
+	 */
+	public function wear_style( $style, $variation = null, array $meta = array() ) {
 		if ( ! preg_match( '/^[a-z0-9-]+$/', $style ) ) {
 			return array( 'ok' => false, 'error' => 'style must be a-z, 0-9 and dashes' );
 		}
-		$file = get_theme_file_path( "styles/{$style}.json" );
-		if ( ! file_exists( $file ) ) {
+		if ( null !== $variation ) {
+			$problem = self::variation_problem( $variation );
+			if ( null !== $problem ) {
+				return array( 'ok' => false, 'error' => $problem );
+			}
+			$staged = self::stage_variation( $style, $variation, $meta );
+			if ( ! $staged['ok'] ) {
+				return $staged;
+			}
+		}
+		$file = self::variation_file( $style );
+		if ( null === $file ) {
 			return array( 'ok' => false, 'error' => "the theme has no styles/{$style}.json" );
 		}
 		$variation = wp_json_file_decode( $file, array( 'associative' => true ) );
@@ -686,7 +801,7 @@ final class Claude_Cowork_Packages {
 			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		$written = wp_update_post(
 			array(
@@ -699,7 +814,7 @@ final class Claude_Cowork_Packages {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		if ( is_wp_error( $written ) ) {
 			return array( 'ok' => false, 'error' => $written->get_error_message() );
