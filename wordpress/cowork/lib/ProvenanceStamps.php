@@ -18,6 +18,12 @@
  *     term:<taxonomy>:<id>:<slug>      the term an archive is about (archive title, term description)
  *     template:<slug>                  the block template, when the page is about no record
  *                                      (search, date archive, 404)
+ *     menuItem:<id>                    a classic menu entry (its link; `nav_menu_link_attributes`)
+ *     widget:<widget_id>               a sidebar widget (its wrapper, and the blocks of a block widget)
+ *
+ * Records that name no block are stamped too, so an imported classic site is not blind: a post's
+ * content as `the_content` prints it (`post:<id>:<slug> block:the_content`, on its first element
+ * unless a block already stamped it), a classic menu's links, and a sidebar's widgets.
  *
  * A block with no owner still says what it is: `data-tracy-src="block:core/paragraph"`. The page
  * also carries one `<template data-tracy-owner="<owner>">` in the footer: the owner of anything the
@@ -89,6 +95,12 @@ interface ProvenanceSite
 
     /** False for renders that are not the page itself: REST, feeds, embeds. */
     public function isPageRender(): bool;
+
+    /**
+     * Whether `the_content` now prints the post of the loop (`in_the_loop()`, or the singular page's
+     * own post): not a theme mod, a widget or a builder running its text through the same filter.
+     */
+    public function inTheLoop(): bool;
 }
 
 final class ProvenanceStamps
@@ -129,6 +141,18 @@ final class ProvenanceStamps
 
     /** @var array<int, string> slug lookups, one query per post per request */
     private $slugs = [];
+
+    /**
+     * One entry per sidebar being rendered, innermost last: the widget it is rendering now
+     * (`widget:<id>`, owner of the blocks of a block widget), null before its first widget. A stack,
+     * so a sidebar rendered inside a widget gives the outer widget back when it ends.
+     *
+     * @var array<int, ?string>
+     */
+    private $sidebars = [];
+
+    /** How many `the_content` calls are running: one inside another is not the loop's post. */
+    private $contentDepth = 0;
 
     public function __construct(ProvenanceSite $site)
     {
@@ -188,6 +212,16 @@ final class ProvenanceStamps
         // Late, so filters that rewrite a block's markup (NavigationLinks at 10) see it unstamped.
         add_filter('render_block', [$stamps, 'leave'], 999, 3);
         add_action('wp_footer', [$stamps, 'printPageOwner'], 999);
+        // First and last on the_content: the first counts the call, so one running inside another
+        // (a related post, a shortcode) is known; the last stamps, after do_blocks (9), wpautop and
+        // shortcodes, on the markup the visitor gets.
+        add_filter('the_content', [$stamps, 'enterContent'], -999999, 1);
+        add_filter('the_content', [$stamps, 'theContent'], 999, 1);
+        add_filter('nav_menu_link_attributes', [$stamps, 'menuLinkAttributes'], 999, 2);
+        add_filter('dynamic_sidebar_params', [$stamps, 'sidebarParams'], 999, 1);
+        add_action('dynamic_sidebar_before', [$stamps, 'enterSidebar'], 10, 0);
+        add_action('dynamic_sidebar', [$stamps, 'enterWidget'], 10, 1);
+        add_action('dynamic_sidebar_after', [$stamps, 'leaveSidebar'], 10, 0);
     }
 
     /** Page-cache opt-outs, defined as early as possible: some caches read them at shutdown. */
@@ -263,6 +297,100 @@ final class ProvenanceStamps
         $owner = $this->resolve($name, $own, $context);
 
         return self::stamp($html, trim(($owner ?? '') . ' block:' . $name));
+    }
+
+    /**
+     * `the_content`: a post's content, of any post type, names its post on its first element. A block
+     * post's first block is stamped already (render_block ran inside do_blocks) and is left as it is.
+     *
+     * @param mixed $html
+     * @return mixed
+     */
+    public function theContent($html)
+    {
+        $nested = $this->contentDepth > 1;
+        $this->contentDepth = max(0, $this->contentDepth - 1);
+        if ($nested || !is_string($html) || trim($html) === '' || !$this->site->isPageRender() || !$this->site->inTheLoop()) {
+            return $html;
+        }
+        $owner = $this->post($this->site->currentPostId());
+        return $owner === null ? $html : self::stamp($html, $owner . ' block:the_content');
+    }
+
+    /**
+     * `the_content`, first of all: one more call running. theContent() counts it back down.
+     *
+     * @param mixed $html
+     * @return mixed the content, unchanged
+     */
+    public function enterContent($html)
+    {
+        $this->contentDepth++;
+        return $html;
+    }
+
+    /**
+     * `nav_menu_link_attributes`: a classic menu entry's link names the entry. The walker escapes
+     * attribute values itself.
+     *
+     * @param mixed $atts
+     * @param mixed $item the menu entry (a `nav_menu_item` post)
+     * @return mixed
+     */
+    public function menuLinkAttributes($atts, $item = null)
+    {
+        if (!is_array($atts) || !is_object($item) || !isset($item->ID) || (int) $item->ID <= 0 || isset($atts['data-tracy-src'])
+            || !$this->site->isPageRender()) {
+            return $atts;
+        }
+        $atts['data-tracy-src'] = 'menuItem:' . (int) $item->ID;
+        return $atts;
+    }
+
+    /**
+     * `dynamic_sidebar_params`: a widget's wrapper (`before_widget`, already formatted by core for
+     * classic and block widgets alike) names the widget. A theme with no wrapper leaves nothing to stamp.
+     *
+     * @param mixed $params
+     * @return mixed
+     */
+    public function sidebarParams($params)
+    {
+        if (!is_array($params) || !isset($params[0]) || !is_array($params[0]) || !$this->site->isPageRender()) {
+            return $params;
+        }
+        $id = trim((string) ($params[0]['widget_id'] ?? ''));
+        if ($id !== '' && is_string($params[0]['before_widget'] ?? null)) {
+            $params[0]['before_widget'] = self::stamp($params[0]['before_widget'], 'widget:' . $id);
+        }
+        return $params;
+    }
+
+    /**
+     * `dynamic_sidebar`: fired before each widget renders. Until the next widget or the sidebar's
+     * end, what renders (the blocks of a block widget) is that widget's.
+     *
+     * @param mixed $widget the registered widget (`id` is its widget_id)
+     */
+    public function enterWidget($widget): void
+    {
+        $id = is_array($widget) ? trim((string) ($widget['id'] ?? '')) : '';
+        if ($this->sidebars === []) {
+            $this->sidebars[] = null; // a widget rendered with no sidebar start seen: its own entry
+        }
+        $this->sidebars[count($this->sidebars) - 1] = $id === '' ? null : 'widget:' . $id;
+    }
+
+    /** `dynamic_sidebar_before`: a sidebar starts, inside whatever is rendering now. */
+    public function enterSidebar(): void
+    {
+        $this->sidebars[] = null;
+    }
+
+    /** `dynamic_sidebar_after`: the innermost sidebar is done; the widget around it (if any) owns again. */
+    public function leaveSidebar(): void
+    {
+        array_pop($this->sidebars);
     }
 
     /** `wp_footer`: the owner of anything the theme printed outside every block. */
@@ -367,6 +495,11 @@ final class ProvenanceStamps
                 return $owner;
             }
         }
+        for ($i = count($this->sidebars) - 1; $i >= 0; $i--) {
+            if ($this->sidebars[$i] !== null) {
+                return $this->sidebars[$i];
+            }
+        }
         return $this->pageFallback();
     }
 
@@ -453,6 +586,16 @@ final class WordPressProvenanceSite implements ProvenanceSite
         }
         $at = strpos($id, '//');
         return $at === false ? $id : substr($id, $at + 2);
+    }
+
+    public function inTheLoop(): bool
+    {
+        if (function_exists('in_the_loop') && in_the_loop()) {
+            return true;
+        }
+        // A singular page whose theme prints its content without starting the loop.
+        return function_exists('is_singular') && is_singular() && function_exists('get_queried_object_id')
+            && (int) get_queried_object_id() > 0 && (int) get_queried_object_id() === $this->currentPostId();
     }
 
     public function isPageRender(): bool

@@ -15,6 +15,8 @@ require_once __DIR__ . '/EditLock.php';
 class ContractProblem extends RuntimeException
 {
     public const SLOT_UNKNOWN = 'SLOT_UNKNOWN';
+    /** A derived slot's leaf could not be rewritten in place (its column would not read back). */
+    public const SLOT_UNWRITABLE = 'SLOT_UNWRITABLE';
     public const SLOT_TOO_LONG = 'SLOT_TOO_LONG';
     public const SLOT_EVIDENCE_REQUIRED = 'SLOT_EVIDENCE_REQUIRED';
     public const SLOT_NOT_CONTENT = 'SLOT_NOT_CONTENT';

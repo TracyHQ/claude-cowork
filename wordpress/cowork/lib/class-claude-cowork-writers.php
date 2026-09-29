@@ -527,6 +527,77 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * Drop every page cache an imported site may be served from, after a DERIVED contract apply.
+	 *
+	 * An imported site brings its own caches: Elementor's generated CSS, a page cache plugin, an
+	 * object cache. purgeCache() above clears what WordPress itself holds; the words just written
+	 * can still be served stale from any of these, and the render check that follows would then
+	 * warn about a write that is fine. Each is called only when it exists, each on its own: a cache
+	 * that cannot be cleared must not stop the next one, nor turn a completed write into a failure.
+	 * A quickstart site never gets here (its apply is unchanged).
+	 *
+	 * The object cache is not flushed whole (it may be a Redis shared with other sites): only the
+	 * entries of what this apply wrote are dropped.
+	 *
+	 * @param array<int,array{kind:string,id:int,key:?string}> $written the apply's `written` receipt
+	 */
+	public static function purgePageCaches( array $written = array() ): void {
+		$calls = array(
+			static function () {
+				if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
+					\Elementor\Plugin::$instance->files_manager->clear_cache();
+				}
+			},
+			static function () {
+				if ( function_exists( 'rocket_clean_domain' ) ) {
+					rocket_clean_domain();
+				}
+			},
+			static function () {
+				if ( function_exists( 'do_action' ) ) {
+					// LiteSpeed Cache's documented API; a no-op on a site without it.
+					do_action( 'litespeed_purge_all' );
+				}
+			},
+			static function () {
+				if ( function_exists( 'w3tc_flush_all' ) ) {
+					w3tc_flush_all();
+				}
+			},
+			static function () {
+				if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+					sg_cachepress_purge_cache();
+				}
+			},
+			static function () use ( $written ) {
+				foreach ( $written as $one ) {
+					$kind = (string) ( $one['kind'] ?? '' );
+					$id   = (int) ( $one['id'] ?? 0 );
+					$key  = (string) ( $one['key'] ?? '' );
+					if ( in_array( $kind, array( 'post', 'postmeta', 'menuItem' ), true ) && $id > 0 && function_exists( 'clean_post_cache' ) ) {
+						clean_post_cache( $id );
+					} elseif ( 'option' === $kind && '' !== $key && function_exists( 'wp_cache_delete' ) ) {
+						wp_cache_delete( $key, 'options' );
+					} elseif ( 'term' === $kind && $id > 0 && '' !== $key && function_exists( 'clean_term_cache' ) ) {
+						clean_term_cache( $id, $key );
+					}
+				}
+				if ( function_exists( 'wp_cache_delete' ) ) {
+					wp_cache_delete( 'alloptions', 'options' );
+					wp_cache_delete( 'notoptions', 'options' );
+				}
+			},
+		);
+		foreach ( $calls as $call ) {
+			try {
+				$call();
+			} catch ( \Throwable $ignored ) {
+				// Best-effort by contract, like purgeCache().
+			}
+		}
+	}
+
+	/**
 	 * @param array<string,mixed> $fields
 	 */
 	/**

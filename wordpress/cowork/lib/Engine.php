@@ -22,6 +22,8 @@ require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/QuickstartContract.php';
+require_once __DIR__ . '/VisibleText.php';
+require_once __DIR__ . '/StringOverrides.php';
 
 final class Engine
 {
@@ -47,6 +49,19 @@ final class Engine
     private ?QuickstartContract $contract;
     /** Set while a request runs under the writer lock, so the re-entrant call does not take it twice. */
     private bool $writing = false;
+
+    /** Where `content.contract derive` reads: `fn(): array{rows:list, pages:list<string>, unresolved:list<string>}`. */
+    private $deriveSource = null;
+    /** After a derived apply: `fn(list<string> $urls): array<string,string>` the pages that loaded, by address. */
+    private $deriveFetch = null;
+    /** After a derived apply: drop the page caches only a derived site needs dropped. */
+    private $derivePurge = null;
+    /** `fn(string $kind, int $id, array $identity): ?string` the page a derived row's words show on, or null. */
+    private $deriveOwnerUrl = null;
+    /** Pages the render check after a derived apply may fetch: it runs under the write lock. */
+    private const RENDER_CHECK_PAGES = 3;
+    /** Options a content.update or content.delete may never touch: the contract's own records. */
+    private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
@@ -110,6 +125,20 @@ final class Engine
     }
 
     /**
+     * Let `content.contract derive` bind an imported site to the map its own rows make, and check a
+     * derived apply on the page that shows it. Wired by the plugin, which alone reads the tables and
+     * fetches the rendered pages (WordPressDerivedRows).
+     */
+    public function derivedSource(callable $source, ?callable $fetch = null, ?callable $purge = null, ?callable $ownerUrl = null): self
+    {
+        $this->deriveSource = $source;
+        $this->deriveFetch = $fetch;
+        $this->derivePurge = $purge;
+        $this->deriveOwnerUrl = $ownerUrl;
+        return $this;
+    }
+
+    /**
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
      */
@@ -158,7 +187,7 @@ final class Engine
         // The contract's own record is not an option like the others: written through content.update,
         // one write could unbind the site or name another profile. It moves only through its door.
         if (in_array($action, ['content.update', 'content.delete'], true) && ($params['kind'] ?? '') === 'option'
-            && in_array((string) ($params['key'] ?? ''), [QuickstartContract::STORE_OPTION, 'claude_cowork_contract'], true)) {
+            && in_array((string) ($params['key'] ?? ''), self::CONTRACT_OPTIONS, true)) {
             return $this->err('bad_params', "This option is the contract's own record; it changes only through content.contract");
         }
         // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
@@ -298,9 +327,23 @@ final class Engine
         }
         $operation = isset($p['operation']) && is_string($p['operation']) && $p['operation'] !== '' ? $p['operation'] : 'inspect';
         $requested = isset($p['contract']) && is_string($p['contract']) && trim($p['contract']) !== '' ? trim($p['contract']) : null;
+        if ($operation === 'derive') {
+            return $this->derive($p);
+        }
+        if ($operation === 'string') {
+            return $this->stringOverride($p);
+        }
         try {
             if ($operation === 'inspect') {
                 return $this->inspectAnswer($this->contract->inspect($requested));
+            }
+            $derivedBinding = ($this->contract->binding()['mode'] ?? null) === 'derived';
+            if ($operation === 'bind' && $derivedBinding) {
+                // The reverse of derive's refusal: a site an import derive bound is not a quickstart's to take.
+                return $this->err('conflict', 'This site is bound to a derived contract; a quickstart bind refuses to replace it');
+            }
+            if ($derivedBinding && in_array(strtok($operation, '.'), ['sourceLanguage', 'siteLanguage', 'multilingual'], true)) {
+                return $this->err('unsupported', 'A derived contract has no editions: ' . $operation . ' is for a quickstart site');
             }
             if ($operation === 'bind') {
                 $state = $this->contract->inspect($requested);
@@ -508,6 +551,185 @@ final class Engine
         }
         $this->log->record($apply, ['op' => 'contract', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $state['revision']]);
         $this->stamped('content');
+        if ($this->contract->isDerived()) {
+            $result = $this->afterDerivedApply($result, is_array($p['changes'] ?? null) ? $p['changes'] : []);
+        }
+        return $result;
+    }
+
+    /**
+     * One gettext string replaced (or, with an empty value, no longer replaced) in one locale: the
+     * words a theme or plugin prints that no content row holds (StringOverrides). Any site, bound to a
+     * quickstart, derived or unbound; the binding is not read and not moved. Written as an ordinary
+     * content write of the one option, recorded under the caller's apply_id, so `apply.revert` puts
+     * the option back exactly as it was (or removes it, when this write created it).
+     */
+    private function stringOverride(array $p): array
+    {
+        $apply = $this->applyId($p);
+        if ($apply === null || strpos($apply, 'contract-') === 0) {
+            return $this->err('bad_params', 'apply_id required, and not a contract- one (those receipt content.contract apply)');
+        }
+        $why = StringOverrides::refusal($p);
+        if ($why !== null) {
+            return $this->err('bad_params', $why);
+        }
+        try {
+            $before = $this->writer->read('option', 0, StringOverrides::OPTION);
+            $map = StringOverrides::decode($before['value'] ?? '');
+            $key = StringOverrides::key($p['msgid'], isset($p['context']) ? (string) $p['context'] : null);
+            $next = StringOverrides::with($map, $p['locale'], $p['domain'], $key, $p['value']);
+            $override = ['locale' => $p['locale'], 'domain' => $p['domain'], 'msgid' => $p['msgid'], 'context' => $p['context'] ?? null,
+                'value' => $p['value'] === '' ? null : $p['value']];
+            if ($next === $map) {
+                return $this->ok(['unchanged' => true, 'override' => $override]);
+            }
+            $this->writer->write('option', 0, ['value' => StringOverrides::encode($next)], StringOverrides::OPTION);
+            try {
+                $this->log->record($apply, ['op' => 'content', 'kind' => 'option', 'id' => 0, 'key' => StringOverrides::OPTION, 'before' => $before]);
+            } catch (Throwable $e) {
+                // No undo on record: the write does not stand.
+                $this->rollbackContent('option', 0, StringOverrides::OPTION, $before);
+                throw $e;
+            }
+            $this->stamped('content');
+            return $this->ok(['apply_id' => $apply, 'written' => [['kind' => 'option', 'id' => 0, 'key' => StringOverrides::OPTION]], 'override' => $override]);
+        } catch (Throwable $e) {
+            return $this->err('contract_failed', 'The string override was not written: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bind an imported site to a DERIVED contract: its own rows, read through five codecs, calibrated
+     * by its rendered pages (a nested leaf is kept only when a page shows it). Refuses a site bound to
+     * a quickstart, and a site configured for a quickstart that is not bound yet (its provision binds
+     * next and must find the site unbound). The same requestId again answers what it bound; a new one
+     * re-derives.
+     */
+    private function derive(array $p): array
+    {
+        if ($this->deriveSource === null) {
+            return $this->err('unavailable', 'Derived contracts are not wired on this receiver');
+        }
+        $label = $p['label'] ?? null;
+        $requestId = $p['requestId'] ?? null;
+        if (!is_string($label) || !preg_match('/^[a-z0-9-]{3,80}$/D', $label)) {
+            return $this->err('bad_params', 'label required: 3-80 characters of a-z, 0-9 and -');
+        }
+        if (!is_string($requestId) || !preg_match(self::REQUEST_ID_SHAPE, $requestId)) {
+            return $this->err('bad_params', 'requestId required: 1-100 characters of a-z, A-Z, 0-9 and ._:-, the same on a retry');
+        }
+        try {
+            $binding = $this->contract->binding();
+            if ($binding !== null && ($binding['mode'] ?? null) !== 'derived') {
+                return $this->err('conflict', 'This site is bound to a quickstart contract; derive refuses to replace it');
+            }
+            if ($binding === null && $this->contract->quickstartConfigured()) {
+                return $this->err('conflict', 'This site is being built from a quickstart; derive refuses');
+            }
+            if ($binding !== null && ($binding['requestId'] ?? null) === $requestId) {
+                return $this->ok(['replayed' => true] + (is_array($binding['derive'] ?? null) ? $binding['derive'] : []));
+            }
+            $source = ($this->deriveSource)();
+            $pages = array_values(array_filter(is_array($source['pages'] ?? null) ? $source['pages'] : [], 'is_string'));
+            $unresolved = array_values(array_map('strval', is_array($source['unresolved'] ?? null) ? $source['unresolved'] : []));
+            $rows = QuickstartContract::prepareDerivedRows($this->writer, is_array($source['rows'] ?? null) ? $source['rows'] : [], $pages !== [], $unresolved);
+            $built = DerivedMap::build($rows, $pages !== [] ? VisibleText::fromPages($pages) : null, $label);
+            // What a visitor reads that no candidate leaf holds: words in theme files, language strings,
+            // text a plugin makes at run time. Counted, not located (the agent greps for those).
+            $texts = [];
+            foreach ($rows as $row) {
+                foreach ($row['core'] as $value) {
+                    $texts[] = (string) $value;
+                }
+                foreach ([$row['html'], $row['nested']] as $columns) {
+                    foreach ($columns as $value) {
+                        foreach (LeafCodec::leaves((string) $value) as $leaf) {
+                            $texts[] = $leaf['text'];
+                        }
+                    }
+                }
+            }
+            $nested = count(array_filter($built['map']['slots'], static fn($slot) => $slot['nested']));
+            $answer = ['contract' => $built['manifest']['id'], 'entities' => count($built['map']['entities']), 'slots' => count($built['map']['slots']),
+                'calibrated' => $built['manifest']['calibrated'],
+                'byClass' => ['db' => count($built['map']['slots']) - $nested, 'nested' => $nested, 'unmatched' => $pages !== [] ? VisibleText::unmatched($pages, $texts) : 0],
+                'unresolved' => $unresolved];
+            $this->contract->bindDerived($built, ['requestId' => $requestId, 'derivedAt' => gmdate('c'), 'keep' => DerivedMap::keepOf($built), 'derive' => $answer]);
+            return $this->ok($answer + ['replayed' => false]);
+        } catch (ContractUnavailable $e) {
+            return $this->err('contract_unavailable', $e->getMessage());
+        } catch (Throwable $e) {
+            return $this->err('contract_failed', $e->getMessage());
+        }
+    }
+
+    /**
+     * After a derived apply: drop the page caches a derived site may be served from (the writer's
+     * own purge already ran), then fetch the pages that own the written words (at most three, one
+     * fetch) and warn `WRITTEN_NOT_VISIBLE` for words a page does not show.
+     *
+     * A warning, never a refusal: the write stands, and its apply_id takes it back. A page that could
+     * not be fetched says nothing. An imported site prints words through paths no row describes (a
+     * template file, a language string, a builder's cache), and this is how the agent learns its
+     * write missed.
+     */
+    private function afterDerivedApply(array $result, array $changes): array
+    {
+        if ($this->derivePurge !== null) {
+            try {
+                // What this apply wrote, so the purge drops those entries only, never a shared object cache whole.
+                ($this->derivePurge)(is_array($result['written'] ?? null) ? $result['written'] : []);
+            } catch (Throwable $ignored) {
+            }
+        }
+        if ($this->deriveFetch === null || $this->deriveOwnerUrl === null) {
+            return $result;
+        }
+        // Uncalibrated, the map kept every nested leaf whether a page shows it or not (a meta
+        // description, a setting): only a row's own text is worth checking then.
+        $calibrated = ($this->contract->binding()['calibrated'] ?? true) !== false;
+        $checks = [];
+        foreach ($this->contract->derivedOwners(array_keys($changes)) as $key => $owner) {
+            $value = $changes[$key] ?? null;
+            if ($owner['type'] !== 'text' || !is_string($value) || trim($value) === '' || (!$calibrated && $owner['nested'])) {
+                continue;
+            }
+            try {
+                $url = ($this->deriveOwnerUrl)($owner['kind'], $owner['id'], $owner['identity']);
+            } catch (Throwable $ignored) {
+                $url = null;
+            }
+            if (is_string($url) && $url !== '') {
+                $checks[$url][] = [(string) $key, $value];
+            }
+        }
+        $checks = array_slice($checks, 0, self::RENDER_CHECK_PAGES, true);
+        if ($checks === []) {
+            return $result;
+        }
+        try {
+            $pages = ($this->deriveFetch)(array_map('strval', array_keys($checks)));
+        } catch (Throwable $ignored) {
+            return $result;
+        }
+        $warnings = [];
+        foreach ($checks as $url => $slots) {
+            $html = $pages[(string) $url] ?? null;
+            if (!is_string($html) || $html === '') {
+                continue;
+            }
+            $seen = VisibleText::fromPages([$html]);
+            foreach ($slots as [$key, $value]) {
+                if (!VisibleText::shows($seen, ['type' => 'text', 'text' => $value])) {
+                    $warnings[] = ['code' => 'WRITTEN_NOT_VISIBLE', 'message' => 'Written, but ' . $url . ' does not show it', 'severity' => 'warning',
+                        'slotKey' => $key, 'url' => (string) $url];
+                }
+            }
+        }
+        if ($warnings !== []) {
+            $result['warnings'] = array_merge($result['warnings'] ?? [], $warnings);
+        }
         return $result;
     }
 

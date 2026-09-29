@@ -24,6 +24,8 @@ require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/IdentityTokens.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
+require_once __DIR__ . '/LeafCodec.php';
+require_once __DIR__ . '/DerivedMap.php';
 
 /**
  * Where the binding lives. The plugin keeps it in an option; the tests keep it in memory.
@@ -69,6 +71,14 @@ final class QuickstartContract
     public const SCHEMA_VERSION = 1;
     /** `<design>/wp<major>/<version>` and nothing that could climb out of `lib/contracts/`. */
     public const ID_SHAPE = '~^[a-z][a-z0-9-]{1,40}/wp[0-9]{1,2}/[0-9]+\.[0-9]+\.[0-9]+$~D';
+    /**
+     * A DERIVED contract: an imported site bound to the map its own rows make (DerivedMap), named
+     * by the label its derive was given. Never a directory under `lib/contracts/`: only a binding
+     * made by `content.contract derive` names one.
+     */
+    public const DERIVED_SHAPE = '~^derived/[a-z0-9-]{3,80}$~D';
+    /** A derived link or picture address: sized as an address, not from the words it replaced. */
+    private const DERIVED_LINK_BYTES = 2048;
     public const EDITIONS_SCHEMA = 'tracy-quickstart-editions/wordpress/v1';
     public const SUPERSEDED_SCHEMA = 'tracy-quickstart-superseded/wordpress/v1';
     /** The published source edition: Polylang slug and WordPress locale. */
@@ -104,6 +114,15 @@ final class QuickstartContract
     /** @var array<string,int> attachment id of each picture an apply's checks resolved, by path */
     private array $imageIds = [];
 
+    /** @var callable|null `fn(): list<row>` the site's own rows, in DerivedMap's shape (WordPressDerivedRows) */
+    private $derivedRows = null;
+    /** Whether the resolved contract is a derived one. */
+    private bool $derived = false;
+    /** Whether a derived contract's map has been built (lazily: see ensureDerived()). */
+    private bool $derivedReady = false;
+    /** @var array{manifest:array,map:array}|null a map handed over already built (by bindDerived) */
+    private ?array $derivedBuilt = null;
+
     /**
      * An image slot's value: a picture already in this site's uploads. The same folder
      * `media.upload` writes to; `..` is refused separately because the pattern allows dots.
@@ -126,6 +145,34 @@ final class QuickstartContract
         $this->configured = trim($configured);
     }
 
+    /**
+     * Where a derived contract's rows come from. Called only the first time a derived map is needed
+     * (inspect, plan, the slots): an Engine answering `db.*`, `files.*` or `info` on a derived site
+     * resolves the binding and never scans the tables.
+     *
+     * @param callable $rows `fn(): list<array{kind,id,identity,core,html,nested}>`
+     */
+    public function withDerivedRows(callable $rows): self
+    {
+        $this->derivedRows = $rows;
+        return $this;
+    }
+
+    /** Whether this site is held to a derived contract (known once the binding was resolved). */
+    public function isDerived(): bool
+    {
+        return $this->derived;
+    }
+
+    /**
+     * Whether a quickstart profile is configured for this site (`claude_cowork_contract`) while it is
+     * not yet bound: the provision of a quickstart build sets it and binds next.
+     */
+    public function quickstartConfigured(): bool
+    {
+        return $this->configured !== '' && (bool) preg_match(self::ID_SHAPE, $this->configured);
+    }
+
     // ---- profile ----------------------------------------------------------------------------
 
     /**
@@ -144,6 +191,20 @@ final class QuickstartContract
         }
         if ($id === '') {
             throw new ContractUnavailable('No content contract is configured for this site; name one with the contract parameter');
+        }
+        if (preg_match(self::DERIVED_SHAPE, $id)) {
+            // Only the binding a derive made names a derived contract; nothing is loaded here, the
+            // map is built the first time something reads it.
+            if (($binding['mode'] ?? null) !== 'derived' || ($binding['contract'] ?? null) !== $id) {
+                throw new ContractUnavailable('A derived contract is made by content.contract derive, never named: ' . $id);
+            }
+            if ($requested !== null && $requested !== '' && $requested !== $id) {
+                throw new ContractUnavailable('This site is held to ' . $id . ', not ' . $requested);
+            }
+            if ($this->id !== $id || !$this->derived) {
+                $this->useDerived($id, (int) ($binding['algorithm'] ?? DerivedMap::ALGORITHM), null);
+            }
+            return;
         }
         if (!preg_match(self::ID_SHAPE, $id)) {
             throw new ContractUnavailable('Not a contract id: ' . substr($id, 0, 80));
@@ -178,6 +239,9 @@ final class QuickstartContract
         $this->manifest = $files['manifest'];
         $this->map = $files['content-map'];
         $this->lock = $files['presentation-lock'];
+        $this->derived = false;
+        $this->derivedReady = false;
+        $this->derivedBuilt = null;
         $this->contractHash = DemoTrimProfile::baseHash($directory);
         $this->demoTrim = null;
         $this->editions = null;
@@ -259,12 +323,14 @@ final class QuickstartContract
     /** @return array<int,array<string,mixed>> the content map's entities, in profile order */
     public function entities(): array
     {
+        $this->ensureDerived();
         return $this->map['entities'] ?? [];
     }
 
     /** @return array<int,array<string,mixed>> the content map's slots, in profile order */
     public function slots(): array
     {
+        $this->ensureDerived();
         return $this->map['slots'] ?? [];
     }
 
@@ -465,6 +531,9 @@ final class QuickstartContract
     public function inspect(?string $requested = null): array
     {
         $this->resolve($requested);
+        if ($this->derived) {
+            return $this->inspectDerived();
+        }
         $binding = $this->store->load();
         $problems = [];
         // 🔒 WHERE THE SITE DIFFERS FROM ITS QUICKSTART'S DESIGN IS A WARNING, NOT A PROBLEM (Tracy ADR
@@ -943,6 +1012,10 @@ final class QuickstartContract
                 continue;
             }
             $slot = $slots[$slotKey];
+            if (in_array((string) $slot['key'], $state['unreadable'] ?? [], true)) {
+                $errors[] = new ContractProblem(ContractProblem::SLOT_UNWRITABLE, 'This slot cannot be read on the site now; read the content again: ' . $key, $key);
+                continue;
+            }
             if (in_array((string) $slot['entity'], $state['missing'] ?? [], true)) {
                 $errors[] = new ContractProblem(ContractProblem::SLOT_UNKNOWN, 'The page or part that held this slot is not on the site any more: ' . $key, $key);
                 continue;
@@ -984,6 +1057,10 @@ final class QuickstartContract
         }
 
         $operations = [];
+        if ($this->derived) {
+            $operations = $this->derivedOperations($byTarget, $state, $errors);
+            $byTarget = [];
+        }
         foreach ($byTarget as $target) {
             if ($target['kind'] === 'optionTranslation') {
                 $new = null;
@@ -1052,6 +1129,9 @@ final class QuickstartContract
      */
     private function changeTarget(string $key, ?string $locale, array $slot, array $entity, array $state): array
     {
+        if ($this->derived) {
+            return $this->derivedTarget($key, $locale, $entity);
+        }
         $entityKey = (string) $slot['entity'];
         $kind = (string) $entity['kind'];
         if ($locale !== null && $kind === 'option') {
@@ -1110,7 +1190,7 @@ final class QuickstartContract
         $locked = [];
         foreach ($owners as $key => $owner) {
             $id = (int) $owner['id'];
-            if ($id <= 0 || !in_array($owner['kind'], ['post', 'templatePart'], true)) {
+            if ($id <= 0 || !in_array($owner['kind'], ['post', 'templatePart', 'postmeta'], true)) {
                 continue;
             }
             if (!array_key_exists($id, $locks)) {
@@ -1261,6 +1341,18 @@ final class QuickstartContract
     /** Scalar content rules, applied identically to a source slot and to an edition of it. */
     private function checkValue(array $slot, string $value, array $params, string $key): void
     {
+        if ($this->derived && in_array($slot['type'] ?? '', ['url', 'image'], true)) {
+            // First, as for every other value: a link or a picture a derived slot holds may sit in a
+            // shortcode or a block comment, which LeafCodec writes as it is, unescaped.
+            if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) {
+                throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Markup and control characters are not content: ' . $key, $key);
+            }
+            if (IdentityTokens::hasDirective($value)) {
+                throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Template directives are not content: ' . $key, $key);
+            }
+            $this->checkDerivedLink($slot, $value, $key);
+            return;
+        }
         if (($slot['type'] ?? '') === 'image') {
             $this->checkImage($slot, $value, $key);
             return;
@@ -1331,6 +1423,486 @@ final class QuickstartContract
             return $this->homeHost !== '' && $host === $this->homeHost;
         }
         return false;
+    }
+
+    // ---- derived contracts ------------------------------------------------------------------
+    //
+    // An imported site has no profile: its map is its own rows, read through five codecs
+    // (LeafCodec) and calibrated at derive time by its rendered pages (DerivedMap). A slot names a
+    // row (`entity`), a column of it and a leaf path inside that column (`leaf`, null = the whole
+    // column), so the same `inspect`, `plan` and Apply door serve it. Nothing about the design is
+    // held: there is no lock, no file, no skeleton, and so no drift.
+
+    /** Switch this object to the derived contract `$id`; the map is built when first needed. */
+    private function useDerived(string $id, int $algorithm, ?array $built): void
+    {
+        $this->id = $id;
+        $this->derived = true;
+        $this->derivedReady = false;
+        $this->derivedBuilt = $built;
+        $this->manifest = ['id' => $id, 'mode' => 'derived', 'algorithm' => $algorithm];
+        $this->map = [];
+        $this->lock = [];
+        $this->contractHash = self::derivedHash($algorithm);
+        $this->demoTrim = null;
+        $this->editions = null;
+        $this->acceptedBases = [];
+        $this->acceptedTrims = [];
+    }
+
+    /** What a derived binding is held to: the algorithm, never the rows, which every apply changes. */
+    public static function derivedHash(int $algorithm = DerivedMap::ALGORITHM): string
+    {
+        return hash('sha256', (string) json_encode(DerivedMap::hashBasis($algorithm)));
+    }
+
+    /**
+     * Build the derived map, once per object: the site's rows through DerivedMap, keeping only the
+     * nested leaves the derive found on a page (`keep` in the binding; null keeps them all).
+     */
+    private function ensureDerived(): void
+    {
+        if (!$this->derived || $this->derivedReady) {
+            return;
+        }
+        $built = $this->derivedBuilt;
+        if ($built === null) {
+            if ($this->derivedRows === null) {
+                throw new ContractUnavailable('This receiver cannot read a derived contract');
+            }
+            $binding = $this->store->load() ?? [];
+            $keep = isset($binding['keep']) && is_array($binding['keep']) ? array_values(array_map('strval', $binding['keep'])) : null;
+            $unresolved = [];
+            $rows = self::prepareDerivedRows($this->writer, ($this->derivedRows)(), ($binding['calibrated'] ?? true) !== false, $unresolved);
+            $built = DerivedMap::build($rows, null, substr((string) $this->id, strlen('derived/')),
+                (int) ($binding['algorithm'] ?? DerivedMap::ALGORITHM), $keep);
+        }
+        $this->manifest = $built['manifest'];
+        $this->map = $built['map'];
+        $this->derivedBuilt = null;
+        $this->derivedReady = true;
+    }
+
+    /**
+     * The rows a derived map may be made of, by the rules both the derive and every later read keep:
+     *
+     * - A row that does not read back through the writer exactly as the table holds it is left out
+     *   and named in `$unresolved`: an option a filter answers for (`option_*`, `pre_option_*`, as
+     *   Polylang and WPML strings do), a value a plugin wrote serialized by hand. Its leaf paths were
+     *   read from bytes a write would not start from; one such row must not lock every other slot.
+     * - Uncalibrated (no page could be fetched), the options are only the ones that are words by
+     *   nature: blogname, blogdescription, theme_mods_*, widget_*. Posts, meta, terms and menus stay.
+     *
+     * @param list<array> $rows in DerivedMap's shape
+     * @param list<string> $unresolved gains one line per row left out for not reading back
+     */
+    public static function prepareDerivedRows(SiteWriter $writer, array $rows, bool $calibrated, array &$unresolved): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $kind = (string) $row['kind'];
+            if (!$calibrated && $kind === 'option' && !self::wordOption((string) ($row['identity']['name'] ?? ''))) {
+                continue;
+            }
+            $entity = ['kind' => $kind, 'sourceId' => $row['id'], 'identity' => (array) $row['identity']];
+            $read = self::derivedRow($writer, $entity);
+            $differs = null;
+            foreach (['core', 'html', 'nested'] as $class) {
+                foreach ($row[$class] as $column => $value) {
+                    if ($differs === null && ($read === null || self::derivedRaw($writer, $entity, $read, (string) $column) !== (string) $value)) {
+                        $differs = (string) $column;
+                    }
+                }
+            }
+            if ($differs !== null) {
+                $unresolved[] = $kind . ' ' . $row['id'] . '.' . $differs . ' does not read back as stored (a filter or a plugin rewrites it), not offered';
+                continue;
+            }
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /** The options an uncalibrated derive keeps: the ones that hold a visitor's words by nature. */
+    private static function wordOption(string $name): bool
+    {
+        return in_array($name, ['blogname', 'blogdescription'], true) || strpos($name, 'theme_mods_') === 0 || strpos($name, 'widget_') === 0;
+    }
+
+    /**
+     * Bind the site to a derived map, replacing whatever derived binding stood (a re-derive moves it).
+     * The caller has refused a quickstart binding already. `$record` adds requestId, derivedAt, keep
+     * and the derive's answer (replayed as it was for the same requestId).
+     *
+     * @param array{manifest:array,map:array} $built
+     */
+    public function bindDerived(array $built, array $record): array
+    {
+        $this->useDerived((string) $built['manifest']['id'], (int) $built['manifest']['algorithm'], $built);
+        $state = $this->inspectDerived(false);
+        if ($state['problems'] !== []) {
+            throw new RuntimeException('The derived map does not read back: ' . implode('; ', $state['problems']));
+        }
+        $binding = [
+            'schemaVersion' => self::SCHEMA_VERSION,
+            'contract' => $this->id,
+            'contractHash' => $this->contractHash,
+            'ids' => $state['ids'],
+            'revision' => $state['revision'],
+            'mode' => 'derived',
+            'algorithm' => (int) $built['manifest']['algorithm'],
+            'calibrated' => (bool) $built['manifest']['calibrated'],
+            'demoTrim' => null,
+            'sourceLanguage' => null,
+            'siteLanguage' => null,
+            'boundAt' => gmdate('c'),
+        ] + $record;
+        $this->store->replace($binding);
+        return $binding;
+    }
+
+    /**
+     * The row, kind and type each of the given slot keys writes: what the render check after a
+     * derived apply needs to find the page that shows the words.
+     *
+     * @return array<string,array{type:string,kind:string,id:int,identity:array,nested:bool}>
+     */
+    public function derivedOwners(array $slotKeys): array
+    {
+        if (!$this->derived) {
+            return [];
+        }
+        $want = array_flip(array_map('strval', $slotKeys));
+        $entities = array_column($this->entities(), null, 'key');
+        $out = [];
+        foreach ($this->slots() as $slot) {
+            if (!isset($want[$slot['key']], $entities[$slot['entity']])) {
+                continue;
+            }
+            $entity = $entities[$slot['entity']];
+            $out[$slot['key']] = ['type' => (string) $slot['type'], 'kind' => (string) $entity['kind'], 'id' => (int) $entity['sourceId'],
+                'identity' => (array) $entity['identity'], 'nested' => !empty($slot['nested'])];
+        }
+        return $out;
+    }
+
+    /**
+     * inspect() for a derived contract, in the same shape, plus `slotDetails`: the map's slots with
+     * their current value, since no profile file describes them to the caller. A row gone from the
+     * site is drift (its slots cannot be written, every other slot can); a slot whose leaf cannot be
+     * read is a problem.
+     */
+    private function inspectDerived(bool $checkBinding = true): array
+    {
+        $binding = $this->store->load();
+        $problems = [];
+        $drift = [];
+        $missing = [];
+        if ($checkBinding && $binding !== null && !hash_equals($this->contractHash, (string) ($binding['contractHash'] ?? ''))) {
+            $problems[] = 'Installed content contract changed';
+        }
+        $ids = [];
+        $rows = [];
+        $entities = [];
+        $slotValues = [];
+        $details = [];
+        $parts = [];
+        $unreadable = [];
+        foreach ($this->entities() as $entity) {
+            $key = (string) $entity['key'];
+            $kind = (string) $entity['kind'];
+            $row = self::derivedRow($this->writer, $entity);
+            if ($row === null) {
+                $missing[] = $key;
+                $drift[] = 'Derived entity disappeared: ' . $key;
+                $parts[$key] = null;
+                continue;
+            }
+            $rows[$key] = $row;
+            $ids[$key] = (int) $entity['sourceId'];
+            $entities[] = ['key' => $key, 'kind' => $kind, 'id' => (int) $entity['sourceId'],
+                'language' => isset($entity['identity']['language']) ? (string) $entity['identity']['language'] : null,
+                'status' => $kind === 'post' ? (string) ($row['post_status'] ?? 'publish') : null];
+            $raws = [];
+            foreach ($this->slotsFor($key) as $slot) {
+                $column = (string) $slot['column'];
+                $raws[$column] ??= self::derivedRaw($this->writer, $entity, $row, $column);
+                try {
+                    $current = $slot['leaf'] === null ? $raws[$column] : LeafCodec::get($raws[$column], (string) $slot['leaf']);
+                } catch (LeafCodecError $e) {
+                    // This slot only: the row moved under it (another writer, a filter). Every other
+                    // slot stays writable; this one is refused by name until the next read drops it.
+                    $unreadable[] = (string) $slot['key'];
+                    $drift[] = 'Slot ' . $slot['key'] . ' cannot be read: ' . $e->getMessage();
+                    continue;
+                }
+                $slotValues[$slot['key']] = $current;
+                $details[] = ['key' => $slot['key'], 'entity' => $key, 'kind' => $kind, 'column' => $column, 'leaf' => $slot['leaf'],
+                    'type' => $slot['type'], 'maxCharacters' => $slot['maxCharacters'], 'current' => $current];
+            }
+            // The revision holds the words the slots show, not whole columns: a counter or a cache kept
+            // beside them in the same option must not make every read stale.
+            $mine = [];
+            foreach ($this->slotsFor($key) as $slot) {
+                $mine[$slot['key']] = $slotValues[$slot['key']] ?? null;
+            }
+            $parts[$key] = [$kind === 'post' ? (string) ($row['post_status'] ?? '') : null, $mine];
+        }
+        return [
+            'bound' => $binding !== null,
+            'contract' => (string) $this->id,
+            'revision' => hash('sha256', (string) json_encode($parts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)),
+            'ids' => $ids,
+            'entities' => $entities,
+            'slots' => $slotValues,
+            'slotDetails' => $details,
+            'imageSlots' => [],
+            'rows' => $rows,
+            'demoTrim' => null,
+            'sourceLanguage' => null,
+            'multilingual' => null,
+            'siteLanguage' => null,
+            'contractLineage' => null,
+            'mode' => 'derived',
+            'calibrated' => isset($binding['calibrated']) ? (bool) $binding['calibrated'] : null,
+            'problems' => $problems,
+            'drift' => $drift,
+            'missing' => $missing,
+            'unreadable' => $unreadable,
+        ];
+    }
+
+    /** The row a derived entity names, through the writer (so a write reads back as it will be served), or null. */
+    private static function derivedRow(SiteWriter $writer, array $entity): ?array
+    {
+        $id = (int) $entity['sourceId'];
+        $identity = (array) $entity['identity'];
+        switch ((string) $entity['kind']) {
+            case 'post':
+                return $writer->read('post', $id);
+            case 'postmeta':
+                return $writer->read('postmeta', (int) ($identity['postId'] ?? 0), (string) ($identity['key'] ?? ''));
+            case 'option':
+                return $writer->read('option', 0, (string) ($identity['name'] ?? ''));
+            case 'term':
+                return $writer->read('term', (int) ($identity['termId'] ?? $id), (string) ($identity['taxonomy'] ?? ''));
+            case 'menuItem':
+                return $writer->read('menuItem', $id);
+        }
+        return null;
+    }
+
+    /**
+     * One column of a derived row as the site stores it — the bytes LeafCodec paths address. A meta or
+     * an option is read unserialized by WordPress, so it is serialized back here: the slot's `ser:`
+     * path was read from the raw row (WordPressDerivedRows), and a write must never serialize twice.
+     */
+    private static function derivedRaw(SiteWriter $writer, array $entity, array $row, string $column): string
+    {
+        switch ((string) $entity['kind']) {
+            case 'postmeta':
+            case 'option':
+                return self::rawOf($row['value'] ?? '');
+            case 'menuItem':
+                if ($column === '_menu_item_url') {
+                    return (string) ($row['url'] ?? '');
+                }
+                $title = (string) ($row['title'] ?? '');
+                return $title !== '' ? $title : self::pointedTitle($writer, $row);
+            case 'term':
+                // Stored escaped (`A &amp; B`), shown decoded: the slot holds what a visitor reads.
+                return $column === 'name' ? html_entity_decode((string) ($row['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8') : (string) ($row[$column] ?? '');
+        }
+        return (string) ($row[$column] ?? '');
+    }
+
+    /** The title a menu entry without one shows: what it points at. */
+    private static function pointedTitle(SiteWriter $writer, array $item): string
+    {
+        $object = (int) ($item['object_id'] ?? 0);
+        if ($object <= 0) {
+            return '';
+        }
+        if (($item['type'] ?? '') === 'post_type') {
+            return (string) ($writer->read('post', $object)['post_title'] ?? '');
+        }
+        if (($item['type'] ?? '') === 'taxonomy') {
+            return html_entity_decode((string) ($writer->read('term', $object, (string) ($item['object'] ?? ''))['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        return '';
+    }
+
+    /** WordPress's `maybe_serialize`, without WordPress: what the database holds for a value read back. */
+    public static function rawOf($value): string
+    {
+        if (is_array($value) || is_object($value)) {
+            return serialize($value);
+        }
+        $value = (string) $value;
+        // A string that itself looks serialized is stored serialized again (WordPress does the same).
+        return LeafCodec::detect($value) === 'ser' ? serialize($value) : $value;
+    }
+
+    /** WordPress's `maybe_unserialize`, objects refused: what to hand the writer for raw bytes. */
+    public static function valueOf(string $raw)
+    {
+        if (LeafCodec::detect($raw) !== 'ser') {
+            return $raw;
+        }
+        return unserialize($raw, ['allowed_classes' => false]);
+    }
+
+    /** The row one change key of a derived contract lands on. A derived contract has no editions. */
+    private function derivedTarget(string $key, ?string $locale, array $entity): array
+    {
+        if ($locale !== null) {
+            throw new ContractProblem(ContractProblem::SLOT_EDITION_MISSING, 'A derived contract has no editions: ' . $key, $key);
+        }
+        $id = (int) $entity['sourceId'];
+        $identity = (array) $entity['identity'];
+        switch ((string) $entity['kind']) {
+            case 'postmeta':
+                $row = ['kind' => 'postmeta', 'id' => (int) $identity['postId'], 'key' => (string) $identity['key']];
+                break;
+            case 'option':
+                $row = ['kind' => 'option', 'id' => 0, 'key' => (string) $identity['name']];
+                break;
+            case 'term':
+                $row = ['kind' => 'term', 'id' => (int) ($identity['termId'] ?? $id), 'key' => (string) $identity['taxonomy']];
+                break;
+            case 'menuItem':
+                $row = ['kind' => 'menuItem', 'id' => $id, 'key' => (string) $identity['menu']];
+                break;
+            default:
+                $row = ['kind' => 'post', 'id' => $id, 'key' => ''];
+        }
+        return ['name' => $row['kind'] . ':' . $row['id'] . ':' . $row['key'], 'row' => $row + ['entity' => $entity]];
+    }
+
+    /**
+     * The writes of a derived apply: per row, every changed leaf set in its column (LeafCodec
+     * re-encodes each layer, and refuses a value that would not read back), then the columns handed
+     * to the writer in the fields it takes for that kind.
+     *
+     * @param ContractProblem[] $errors
+     */
+    private function derivedOperations(array $byTarget, array $state, array &$errors): array
+    {
+        $operations = [];
+        foreach ($byTarget as $target) {
+            $entity = $target['entity'];
+            $row = self::derivedRow($this->writer, $entity);
+            if ($row === null) {
+                $errors[] = new ContractProblem(ContractProblem::CONTRACT_FAILED, 'Target row is missing: ' . $entity['key']);
+                continue;
+            }
+            $before = [];
+            $after = [];
+            foreach ($target['changes'] as [$slot, $new, $key]) {
+                $column = (string) $slot['column'];
+                $before[$column] ??= self::derivedRaw($this->writer, $entity, $row, $column);
+                $after[$column] ??= $before[$column];
+                if ($slot['type'] === 'image' && $new !== '') {
+                    $new = $this->storedImage($new, (string) ($state['slots'][$key] ?? ''));
+                }
+                try {
+                    $after[$column] = $slot['leaf'] === null ? $new : LeafCodec::set($after[$column], (string) $slot['leaf'], $new);
+                } catch (LeafCodecError $e) {
+                    $errors[] = new ContractProblem(ContractProblem::SLOT_UNWRITABLE, 'Content slot cannot be rewritten in place: ' . $key . ' (' . $e->getMessage() . ')', $key);
+                }
+            }
+            $fields = [];
+            foreach ($after as $column => $raw) {
+                if ($raw === $before[$column]) {
+                    continue;
+                }
+                switch ($target['kind']) {
+                    case 'postmeta':
+                    case 'option':
+                        $fields['value'] = self::valueOf($raw);
+                        break;
+                    case 'menuItem':
+                        $fields[$column === '_menu_item_url' ? 'url' : 'title'] = $raw;
+                        break;
+                    case 'term':
+                        // Escaped as WordPress stores a name; wp_update_term's own escaping leaves an
+                        // entity alone (no double encoding), so the stored bytes are the same either way.
+                        $fields[$column] = $column === 'name' ? htmlspecialchars($raw, ENT_QUOTES, 'UTF-8', false) : $raw;
+                        break;
+                    default:
+                        $fields[$column] = $raw;
+                }
+            }
+            if ($fields !== []) {
+                $operations[] = ['kind' => $target['kind'], 'id' => $target['id'], 'key' => $target['key'], 'fields' => $fields];
+            }
+        }
+        return $operations;
+    }
+
+    /**
+     * A derived link: `https://…`, `http://…`, a path, a query, `mailto:`, `tel:` or an anchor, at most
+     * DERIVED_LINK_BYTES; never protocol-relative, a backslash, a space or a script. A derived picture:
+     * a png, jpg, webp, gif, avif or svg already in this site's uploads, named by its path, root-relative
+     * or with this site's own origin. An imported slot has no captured design, so no shape is held. SVG
+     * is allowed because the file must already be there: the site's own upload, never one this door
+     * writes (as on Joomla, where the file must already be under images/).
+     */
+    private function checkDerivedLink(array $slot, string $value, string $key): void
+    {
+        if (strlen($value) > self::DERIVED_LINK_BYTES) {
+            throw new ContractProblem(ContractProblem::SLOT_TOO_LONG, 'Content too long: ' . $key, $key, null,
+                ['limit' => self::DERIVED_LINK_BYTES, 'actual' => strlen($value)]);
+        }
+        if ($value === '') {
+            return;
+        }
+        if ($slot['type'] === 'url') {
+            if (strpos($value, '//') === 0 || strpos($value, '\\') !== false
+                || !preg_match('~^(https?://\S+|mailto:\S+|tel:[+0-9 ()-]+|/\S*|\?\S*|#[a-zA-Z0-9_-]+)$~D', $value)) {
+                throw new ContractProblem(ContractProblem::SLOT_LINK_UNSUPPORTED, 'Unsupported link: ' . $key, $key);
+            }
+            return;
+        }
+        $path = $this->uploadPath($value);
+        if ($path === null || !is_file($this->root . '/' . $path)) {
+            throw new ContractProblem(ContractProblem::SLOT_IMAGE_INVALID, 'Image must already be in this site\'s uploads (wp-content/uploads/…): ' . $key, $key);
+        }
+        $resolved = realpath($this->root . '/' . $path);
+        $uploads = realpath($this->root . '/wp-content/uploads');
+        if ($resolved === false || $uploads === false || strpos($resolved, $uploads . DIRECTORY_SEPARATOR) !== 0) {
+            throw new ContractProblem(ContractProblem::SLOT_IMAGE_INVALID, 'Image escapes the site uploads: ' . $key, $key);
+        }
+    }
+
+    /** A picture value reduced to its path under the webroot, or null when it is not one of this site's uploads. */
+    private function uploadPath(string $value): ?string
+    {
+        if (preg_match('~^https?://~i', $value)) {
+            if ($this->homeHost === null) {
+                $home = $this->writer->read('option', 0, 'home');
+                $this->homeHost = strtolower((string) parse_url((string) ($home['value'] ?? ''), PHP_URL_HOST));
+            }
+            if ($this->homeHost === '' || strtolower((string) parse_url($value, PHP_URL_HOST)) !== $this->homeHost) {
+                return null;
+            }
+            $value = (string) parse_url($value, PHP_URL_PATH);
+        }
+        $path = ltrim($value, '/');
+        if (strpos($path, '..') !== false || !preg_match('~^wp-content/uploads/[A-Za-z0-9/_.-]+\.(png|jpe?g|webp|gif|avif|svg)$~iD', $path)) {
+            return null;
+        }
+        return $path;
+    }
+
+    /** A derived picture written in the form its slot already holds: with the site's origin, root-relative, or bare. */
+    private function storedImage(string $value, string $old): string
+    {
+        $path = $this->uploadPath($value) ?? ltrim($value, '/');
+        if (preg_match('~^(https?://[^/]+)/~i', $old, $m)) {
+            return $m[1] . '/' . $path;
+        }
+        return (strpos($old, '/') === 0 ? '/' : '') . $path;
     }
 
     // ---- block slots ------------------------------------------------------------------------

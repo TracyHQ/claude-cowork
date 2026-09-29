@@ -38,6 +38,9 @@ require_once __DIR__ . '/ContentReader.php';
 require_once __DIR__ . '/BlockProjection.php';
 require_once __DIR__ . '/QuickstartContract.php';
 require_once __DIR__ . '/ContentIdentity.php';
+require_once __DIR__ . '/LeafCodec.php';
+require_once __DIR__ . '/DerivedMap.php';
+require_once __DIR__ . '/WordPressDerivedRows.php';
 
 final class Claude_Cowork_Content_Source implements ContentSource
 {
@@ -106,8 +109,20 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private $detailed = 0;
     /** @var array<string,string>|null theme template files, globbed once per request */
     private $templateFiles = null;
+    /** @var callable|null `fn(): list<row>` a derived site's rows (WordPressDerivedRows), read inside the snapshot */
+    private $derivedRows;
+    /** @var array<string,array> a derived site's rows by entity key, as read in this snapshot */
+    private $derivedRowsByKey = [];
+    /** @var array<string,list<array>> a derived site's slots by the content id that shows them */
+    private $derivedSlots = [];
+    /** @var array<string,string> `<kind>:<address>` of a derived row => the content id that shows it */
+    private $derivedContent = [];
 
-    public function __construct(string $scope, string $contractsDir, string $version)
+    /**
+     * @param callable|null $derivedRows where a site bound to a DERIVED contract reads its rows; the
+     *        site's own (WordPressDerivedRows::forSite) when null
+     */
+    public function __construct(string $scope, string $contractsDir, string $version, ?callable $derivedRows = null)
     {
         if (!isset(self::STATUSES[$scope])) {
             throw new InvalidArgumentException('Unknown read scope');
@@ -115,6 +130,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
         $this->scope = $scope;
         $this->contractsDir = rtrim($contractsDir, '/');
         $this->version = $version;
+        $this->derivedRows = $derivedRows;
     }
 
     // ---- ContentSource ----------------------------------------------------------------------
@@ -202,6 +218,14 @@ final class Claude_Cowork_Content_Source implements ContentSource
 
     private function contentIdOf(string $kind, int $native, string $key): ?string
     {
+        if ($this->derivedContent !== []) {
+            // A derived row is held by the content that shows it: a post's meta by its post, an
+            // option, a term or a menu entry by a shared content of its own.
+            $address = $kind === 'option' ? 'option:' . $key : ($kind === 'postmeta' ? 'post:' . $native : $kind . ':' . $native);
+            if (isset($this->derivedContent[$address])) {
+                return $this->derivedContent[$address];
+            }
+        }
         if ($kind === 'option' || $kind === 'optionTranslation') {
             return $this->siteContentId();
         }
@@ -239,13 +263,16 @@ final class Claude_Cowork_Content_Source implements ContentSource
             $this->fillFromMarkup($content, (string) file_get_contents($part['path']), null);
             return $content;
         }
+        if ($entry['kind'] === 'derived') {
+            return $this->withDerived($content);
+        }
         $native = (int) $entry['native'];
         $row = $this->posts[$native];
         $markup = $this->postContent($native);
         if ($row['post_type'] === 'wp_navigation') {
             $content['bodyHtml'] = BlockProjection::staticHtml(parse_blocks($markup)) ?: null;
             $content['blocks'] = [$this->navigationBlock($id, $markup)];
-            return $content;
+            return $this->withDerived($content);
         }
         $this->fillFromMarkup($content, $markup, $row);
         if (!$withBody) {
@@ -264,7 +291,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
             }
             $content['blocks'] = $this->withTemplate($content['blocks'], $row, $id);
         }
-        return $content;
+        return $this->withDerived($content);
     }
 
     // ---- loading ------------------------------------------------------------------------------
@@ -467,6 +494,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private function loadProfile(): ?array
     {
         $id = is_array($this->binding) ? (string) ($this->binding['contract'] ?? '') : '';
+        if ($id !== '' && preg_match(QuickstartContract::DERIVED_SHAPE, $id) && ($this->binding['mode'] ?? null) === 'derived') {
+            return $this->loadDerived($id);
+        }
         if ($id === '' || !preg_match(QuickstartContract::ID_SHAPE, $id)) {
             return null;
         }
@@ -479,6 +509,212 @@ final class Claude_Cowork_Content_Source implements ContentSource
             $out['hash'] .= $raw === null ? '-' : hash('sha256', $raw);
         }
         return is_array($out['manifest']) && is_array($out['content-map']) ? $out : null;
+    }
+
+    /**
+     * A derived contract's profile: the map its rows make now, read inside this snapshot and kept to
+     * the nested leaves its derive found on a page (`keep`), exactly as the contract builds it.
+     */
+    private function loadDerived(string $id): array
+    {
+        $rows = $this->derivedRows !== null ? ($this->derivedRows)() : WordPressDerivedRows::forSite()->rows();
+        // The same rows the contract's map is made of (QuickstartContract::prepareDerivedRows), so every
+        // slot key offered here is one an apply knows.
+        if (class_exists('Claude_Cowork_Site_Writer')) {
+            $ignored = [];
+            $rows = QuickstartContract::prepareDerivedRows(new Claude_Cowork_Site_Writer(), $rows, ($this->binding['calibrated'] ?? true) !== false, $ignored);
+        }
+        $keep = isset($this->binding['keep']) && is_array($this->binding['keep']) ? array_values(array_map('strval', $this->binding['keep'])) : null;
+        $built = DerivedMap::build($rows, null, substr($id, strlen('derived/')), (int) ($this->binding['algorithm'] ?? DerivedMap::ALGORITHM), $keep);
+        // Only the rows that carry a slot: a counter or a cache in an autoloaded option read here must
+        // not move the snapshot revision (it is in the fingerprint below).
+        $mapped = array_flip(array_column($built['map']['entities'], 'key'));
+        foreach ($rows as $row) {
+            if (isset($mapped[$row['kind'] . '-' . $row['id']])) {
+                $this->derivedRowsByKey[$row['kind'] . '-' . $row['id']] = $row;
+            }
+        }
+        return ['id' => $id, 'hash' => QuickstartContract::derivedHash((int) ($this->binding['algorithm'] ?? DerivedMap::ALGORITHM)),
+            'manifest' => $built['manifest'], 'content-map' => $built['map'], 'editions' => null, 'derived' => true];
+    }
+
+    /**
+     * Where a derived map's slots show: a post's (and its meta's) on the post's own content when this
+     * scope lists it; everything else — an option, a term, a menu entry, a post of a type this reader
+     * does not list — on a shared content of its own, named by the address the writer takes. Each
+     * content's revision covers the rows it shows, so a write to a page's builder meta moves the
+     * page's revision.
+     */
+    private function buildDerived(): void
+    {
+        $entities = [];
+        foreach ((array) ($this->profile['content-map']['entities'] ?? []) as $entity) {
+            $entities[(string) $entity['key']] = $entity;
+        }
+        $owned = [];
+        foreach ((array) ($this->profile['content-map']['slots'] ?? []) as $slot) {
+            $entity = $entities[(string) $slot['entity']] ?? null;
+            $row = $entity === null ? null : ($this->derivedRowsByKey[(string) $slot['entity']] ?? null);
+            if ($row === null) {
+                continue;
+            }
+            $kind = (string) $entity['kind'];
+            $post = $kind === 'post' ? (int) $entity['sourceId'] : ($kind === 'postmeta' ? (int) ($entity['identity']['postId'] ?? 0) : 0);
+            $owner = $post > 0 && isset($this->ids[$post], $this->summaries[$this->ids[$post]]) ? $this->ids[$post] : null;
+            // Addressed as the writer is (QuickstartContract::derivedTarget): a term by its term id.
+            $native = $kind === 'term' ? (int) ($entity['identity']['termId'] ?? $entity['sourceId']) : (int) $entity['sourceId'];
+            $address = $post > 0 ? 'post:' . $post : ($kind === 'option' ? 'option:' . (string) ($entity['identity']['name'] ?? '') : $kind . ':' . $native);
+            if ($owner === null) {
+                $owner = $this->opaque('c', 'derived:' . $address);
+                if (!isset($this->summaries[$owner])) {
+                    $this->index[$owner] = ['kind' => 'derived', 'native' => $address];
+                    $this->summaries[$owner] = $this->summary($owner, 'shared', $this->derivedTitle($entity, $row), null, null, null, null, '',
+                        ['status' => 'published', 'valueSource' => 'current', 'scheduledAt' => null], null);
+                    $this->summaries[$owner]['native'] = [$this->derivedNative($entity)];
+                }
+            }
+            $this->derivedContent[$address] = $owner;
+            try {
+                $value = self::derivedValue($row, $slot);
+            } catch (LeafCodecError $e) {
+                continue; // a leaf this snapshot cannot read is not offered; the contract refuses it too
+            }
+            $this->derivedSlots[$owner][] = ['slot' => $slot, 'value' => $value,
+                'block' => $kind === 'option' ? self::widgetBlock((string) ($entity['identity']['name'] ?? ''), $slot['leaf'] ?? null) : null];
+            $owned[$owner][(string) $slot['entity']] = $row;
+        }
+        foreach ($owned as $owner => $rows) {
+            ksort($rows);
+            $hash = hash('sha256', (string) json_encode($rows, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $this->summaries[$owner]['revision'] = substr(hash('sha256', $this->summaries[$owner]['revision'] . '|' . $hash), 0, 40);
+        }
+    }
+
+    /** A slot's value in the row this snapshot read: the whole column, or one leaf of it. */
+    private static function derivedValue(array $row, array $slot): string
+    {
+        $column = (string) $slot['column'];
+        $raw = (string) ($row['core'][$column] ?? $row['html'][$column] ?? $row['nested'][$column] ?? '');
+        return $slot['leaf'] === null ? $raw : LeafCodec::get($raw, (string) $slot['leaf']);
+    }
+
+    private function derivedTitle(array $entity, array $row): ?string
+    {
+        $kind = (string) $entity['kind'];
+        if ($kind === 'option') {
+            return (string) ($entity['identity']['name'] ?? '');
+        }
+        $title = (string) ($row['core']['post_title'] ?? $row['core']['name'] ?? '');
+        return $title === '' ? null : $title;
+    }
+
+    /** The record content.get / content.update take for a derived row, as the writer addresses it. */
+    private function derivedNative(array $entity): array
+    {
+        $identity = (array) $entity['identity'];
+        switch ((string) $entity['kind']) {
+            case 'option':
+                return ['kind' => 'option', 'key' => (string) ($identity['name'] ?? '')];
+            case 'term':
+                return ['kind' => 'term', 'id' => (int) ($identity['termId'] ?? $entity['sourceId']), 'key' => (string) ($identity['taxonomy'] ?? '')];
+            case 'menuItem':
+                return ['kind' => 'menuItem', 'id' => (int) $entity['sourceId'], 'key' => (string) ($identity['menu'] ?? '')];
+            case 'postmeta':
+                return ['kind' => 'post', 'id' => (int) ($identity['postId'] ?? 0)];
+        }
+        return ['kind' => 'post', 'id' => (int) $entity['sourceId']];
+    }
+
+    private function withDerived(array $content): array
+    {
+        return self::mergeDerived($content, $this->derivedSlots[$content['id']] ?? [],
+            fn(string $slotKey): string => $this->opaque('b', $content['id'] . '|derived:' . $slotKey));
+    }
+
+    /**
+     * A content's derived slots, merged into what its markup already projects. A leaf of the post's
+     * own markup (`post_content`) marks the first field of its blocks that holds the same words
+     * (`slotKey`), as a quickstart slot does, and is not listed twice; a slot no field shows — the
+     * title, a builder meta, an option, a term, a menu entry — is a block of its own after the
+     * content's blocks, its one field keyed by the slot, `semanticKey` naming the column.
+     *
+     * @param list<array{slot:array,value:string}> $slots
+     * @param callable(string):string $blockId
+     */
+    public static function mergeDerived(array $content, array $slots, callable $blockId): array
+    {
+        foreach ($slots as $one) {
+            $slot = $one['slot'];
+            if ((string) $slot['column'] === 'post_content' && self::markField($content['blocks'], $one['value'], (string) $slot['key'])) {
+                continue;
+            }
+            $field = ['key' => (string) $slot['key'], 'type' => (string) $slot['type'], 'value' => $one['value'], 'slotKey' => (string) $slot['key'],
+                'semanticKey' => (string) $slot['column']];
+            $name = $one['block'] ?? null;
+            if (is_string($name)) {
+                // One block per widget instance, named as the widget id the page stamps: every slot
+                // of that instance is a field of it.
+                $at = null;
+                foreach ($content['blocks'] as $index => $block) {
+                    if ($block['key'] === $name) {
+                        $at = $index;
+                        break;
+                    }
+                }
+                if ($at !== null) {
+                    $content['blocks'][$at]['fields'][] = $field;
+                    continue;
+                }
+                $content['blocks'][] = ['id' => $blockId($name), 'key' => $name, 'role' => null, 'position' => count($content['blocks']),
+                    'sharedContentId' => null, 'visibility' => 'unknown', 'fields' => [$field], 'items' => []];
+                continue;
+            }
+            $content['blocks'][] = ['id' => $blockId((string) $slot['key']), 'key' => (string) $slot['key'], 'role' => null,
+                'position' => count($content['blocks']), 'sharedContentId' => null, 'visibility' => 'unknown',
+                'fields' => [['key' => (string) $slot['key'], 'type' => (string) $slot['type'], 'value' => $one['value'], 'slotKey' => (string) $slot['key'],
+                    'semanticKey' => (string) $slot['column']]], 'items' => []];
+        }
+        return $content;
+    }
+
+    /**
+     * The block a widget option's slot belongs to: `widget-<base>-<n>` for option `widget_<base>` and
+     * a leaf under instance `<n>` (`ser:/<n>/…`), the widget id WordPress gives that instance and
+     * ProvenanceStamps prints (`widget:<base>-<n>`). Null for anything else.
+     */
+    public static function widgetBlock(string $option, ?string $leaf): ?string
+    {
+        if (strpos($option, 'widget_') !== 0 || $leaf === null || !preg_match('~^ser:/(\d+)(/|\|)~', $leaf, $m)) {
+            return null;
+        }
+        return 'widget-' . substr($option, strlen('widget_')) . '-' . $m[1];
+    }
+
+    /** Give the first unslotted field (of a block, or of an item in it) holding `$value` the slot key. */
+    private static function markField(array &$blocks, string $value, string $slotKey): bool
+    {
+        $want = trim($value);
+        foreach ($blocks as &$block) {
+            foreach ($block['fields'] as &$field) {
+                if ($field['slotKey'] === null && is_string($field['value']) && trim($field['value']) === $want) {
+                    $field['slotKey'] = $slotKey;
+                    return true;
+                }
+            }
+            unset($field);
+            foreach ($block['items'] as &$item) {
+                foreach ($item['fields'] as &$field) {
+                    if ($field['slotKey'] === null && is_string($field['value']) && trim($field['value']) === $want) {
+                        $field['slotKey'] = $slotKey;
+                        return true;
+                    }
+                }
+                unset($field);
+            }
+            unset($item);
+        }
+        unset($block);
+        return false;
     }
 
     /** @return array<string,array{theme:string,slug:string,path:string,hash:string}> */
@@ -641,6 +877,9 @@ final class Claude_Cowork_Content_Source implements ContentSource
                 ['status' => 'published', 'valueSource' => 'current', 'scheduledAt' => null], null);
             $this->summaries[$id]['native'] = [['kind' => 'templatePart', 'key' => (string) $slug]];
         }
+        if (!empty($this->profile['derived'])) {
+            $this->buildDerived();
+        }
     }
 
     private function postSummary(string $id, int $native, array $row): array
@@ -738,11 +977,16 @@ final class Claude_Cowork_Content_Source implements ContentSource
         foreach ($this->themeParts as $slug => $part) {
             $themeFiles['part:' . $slug] = $part['hash'];
         }
-        return hash('sha256', json_encode([
+        $read = [
             'v' => 1, 'plugin' => $this->version, 'scope' => $this->scope,
             'options' => $this->options, 'posts' => $this->posts, 'meta' => $this->meta, 'terms' => $this->terms,
             'languages' => $this->languages, 'theme' => $themeFiles, 'profile' => $this->profile['hash'] ?? null,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        ];
+        if (!empty($this->profile['derived'])) {
+            // A derived site's contents also show its options, terms, menu entries and builder meta.
+            $read['derived'] = $this->derivedRowsByKey;
+        }
+        return hash('sha256', json_encode($read, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     // ---- detail -----------------------------------------------------------------------------

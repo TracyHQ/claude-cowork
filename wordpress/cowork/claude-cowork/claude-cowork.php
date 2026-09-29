@@ -33,6 +33,10 @@ add_action('wp_insert_post', [ContentIdentity::class, 'mintOnInsert'], 10, 3);
 // so an ordinary visitor's page is byte-identical.
 require_once __DIR__ . '/lib/ProvenanceStamps.php';
 ProvenanceStamps::register();
+// Gettext words a theme or plugin prints, replaced per locale (`content.contract {operation:'string'}`).
+// Adds no filter at all unless the site holds an override (lib/StringOverrides.php).
+require_once __DIR__ . '/lib/StringOverrides.php';
+StringOverrides::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.
@@ -72,7 +76,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'LeafCodec', 'VisibleText', 'DerivedMap', 'LoopbackRoute', 'WordPressDerivedRows', 'StringOverrides', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -297,6 +301,9 @@ function claude_cowork_exec(): void
     // One writer for the engine and the contract: the contract reads the before-image of every
     // row through it and the engine purges what it touched, so the two must be the same object.
     $writer = new Claude_Cowork_Site_Writer();
+    // An imported site's own rows and rendered pages: what `content.contract derive` binds it to, and
+    // what a site bound that way reads its map from (only when a request needs the map).
+    $derived = WordPressDerivedRows::forSite();
     $engine = new Engine(
         $token === '' ? null : $token,
         [
@@ -315,7 +322,7 @@ function claude_cowork_exec(): void
         // Always wired. Whether the site is SEALED is a fact of its store (`_tracy_content_contract`),
         // not of this object: an unbound site with no `claude_cowork_contract` setting behaves as
         // before, and a bound one refuses every structural write even if the setting is gone.
-        new QuickstartContract(
+        (new QuickstartContract(
             $writer,
             new Claude_Cowork_Contract_Store(),
             rtrim(ABSPATH, '/\\'),
@@ -327,6 +334,21 @@ function claude_cowork_exec(): void
             // An image slot's picture must be an attachment in this site's uploads, in its slot's shape.
             new Claude_Cowork_Image_Library()
         )
+        )->withDerivedRows(static function () use ($derived): array {
+            return $derived->rows();
+        })
+    );
+    $engine->derivedSource(
+        static function () use ($derived): array {
+            $unresolved = [];
+            $rows = $derived->rows($unresolved);
+            return ['rows' => $rows, 'pages' => $derived->pages(), 'unresolved' => $unresolved];
+        },
+        static function (array $urls) use ($derived): array {
+            return $derived->fetch($urls, WordPressDerivedRows::CHECK_SECONDS);
+        },
+        [Claude_Cowork_Site_Writer::class, 'purgePageCaches'],
+        [$derived, 'ownerUrl']
     );
 
     $answer = $engine->handle($request);
