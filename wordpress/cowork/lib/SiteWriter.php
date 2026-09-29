@@ -187,4 +187,13 @@ interface ApplyLog
 
     /** Forget an apply_id — after it has been reverted, or before it is applied again. */
     public function clear(string $applyId): void;
+
+    /**
+     * Every step OTHER Applies recorded after this Apply's first step, oldest first, each as
+     * `{apply_id, entry}`. It is how a whole-row undo learns that a later change touched the same
+     * row, which writing the old row back would erase. Empty when the Apply has no steps.
+     *
+     * @return array<int,array{apply_id:string,entry:array<string,mixed>}>
+     */
+    public function later(string $applyId): array;
 }

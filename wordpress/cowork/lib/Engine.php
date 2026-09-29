@@ -21,6 +21,7 @@ require_once __DIR__ . '/FileWalker.php';
 require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/SiteWriter.php';
+require_once __DIR__ . '/ContentUndo.php';
 require_once __DIR__ . '/QuickstartContract.php';
 
 final class Engine
@@ -2297,14 +2298,21 @@ final class Engine
             return $this->err('write_failed', $e->getMessage());
         }
 
+        // The undo is the span this write changed, read back from the row as it landed, so a
+        // revert takes out this change and keeps every later one (ContentUndo). A write that cannot
+        // be described that way keeps the whole-row undo, which applyRevert guards on its own.
+        $entry = ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'key' => $key, 'before' => $before];
         try {
-            $this->log->record($applyId, [
-                'op' => 'content',
-                'kind' => $kind,
-                'id' => $newId,
-                'key' => $key,
-                'before' => $before,
-            ]);
+            $changes = ContentUndo::record($before, $this->writer->read($kind, $newId, $key), array_keys($p['fields']));
+        } catch (Throwable $e) {
+            $changes = null;
+        }
+        if ($changes !== null) {
+            $entry['undo'] = 'span';
+            $entry['changes'] = $changes;
+        }
+        try {
+            $this->log->record($applyId, $entry);
         } catch (Throwable $e) {
             $this->rollbackContent($kind, $newId, $key, $before);
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
@@ -2660,6 +2668,11 @@ final class Engine
                 return $locked;
             }
         }
+        // And every content step must still be undoable ALONE, checked before anything moves.
+        $conflict = $this->revertConflict($applyId, $entries);
+        if ($conflict !== null) {
+            return $conflict;
+        }
 
         $reverted = 0;
         $failed = [];
@@ -2717,6 +2730,8 @@ final class Engine
                 $step['kind'] = $entry['kind'] ?? null;
                 $step['id'] = $entry['id'] ?? null;
                 $step['key'] = ($entry['key'] ?? '') === '' ? null : $entry['key'];
+                // `span`: the revert takes out only this write; `row`: it writes the old row back.
+                $step['undo'] = ($entry['undo'] ?? '') === 'span' ? 'span' : 'row';
             } elseif ($op === 'media') {
                 $step['path'] = $entry['path'] ?? null;
             } elseif ($op === 'contract') {
@@ -2766,6 +2781,23 @@ final class Engine
             }
             return;
         }
+        if ($op === 'content' && ($entry['undo'] ?? '') === 'span') {
+            if ($this->writer === null) {
+                throw new RuntimeException('site writer not wired');
+            }
+            $kind = (string) ($entry['kind'] ?? '');
+            $id = (int) ($entry['id'] ?? 0);
+            $key = (string) ($entry['key'] ?? '');
+            $back = ContentUndo::restore($this->writer->read($kind, $id, $key), is_array($entry['changes'] ?? null) ? $entry['changes'] : []);
+            if (!isset($back['fields'])) {
+                // revertConflict checked this a moment ago; a write in between is the only way here.
+                throw new RuntimeException(self::conflictSentence($entry, $back['field'], $back['reason']));
+            }
+            if ($back['fields'] !== []) {
+                $this->writer->write($kind, $id, $back['fields'], $key);
+            }
+            return;
+        }
         if ($op === 'content') {
             if ($this->writer === null) {
                 throw new RuntimeException('site writer not wired');
@@ -2811,6 +2843,145 @@ final class Engine
             return;
         }
         throw new RuntimeException("unknown step: {$op}");
+    }
+
+    /**
+     * Why this Apply cannot be undone alone, as the refusal, or null when it can.
+     *
+     * Walked newest first against the rows as they are now, the way the revert will run:
+     *  - a span step (`undo: span`) must still find its own words where it put them
+     *    ({@see ContentUndo::restore()}); every other byte of the row is left as it is;
+     *  - a whole-row step (a create, a trash, a receipt recorded before spans existed, a write
+     *    whose row could not be read back) writes the old row back or deletes the new one, which
+     *    would erase whatever a LATER Apply did to that row. It goes ahead only when no later
+     *    Apply touched the row; otherwise it is refused like Joomla's out-of-order revert.
+     * Nothing is ever restored whole in place of a span that cannot be found.
+     *
+     * @param array<int,array<string,mixed>> $entries
+     */
+    private function revertConflict(string $applyId, array $entries): ?array
+    {
+        if ($this->writer === null) {
+            return null;
+        }
+        /** @var array<string,array<string,mixed>|null> $rows the row each target will hold, as the revert walks */
+        $rows = [];
+        $later = null;
+        foreach (array_reverse($entries) as $entry) {
+            if (($entry['op'] ?? '') !== 'content' || ($entry['kind'] ?? '') === 'optionTranslation') {
+                continue;
+            }
+            $kind = (string) ($entry['kind'] ?? '');
+            $id = (int) ($entry['id'] ?? 0);
+            $key = (string) ($entry['key'] ?? '');
+            $target = self::target($entry);
+            if (($entry['undo'] ?? '') === 'span') {
+                if (!array_key_exists($target, $rows)) {
+                    try {
+                        $rows[$target] = $this->writer->read($kind, $id, $key);
+                    } catch (Throwable $e) {
+                        return $this->err('revert_failed', $e->getMessage());
+                    }
+                }
+                $back = ContentUndo::restore($rows[$target], is_array($entry['changes'] ?? null) ? $entry['changes'] : []);
+                if (!isset($back['fields'])) {
+                    return $this->conflict(
+                        self::conflictSentence($entry, $back['field'], $back['reason']),
+                        'Tell the customer this change cannot be undone by itself because those words changed since. If they want the old words back, read the record again and change them with content.update.',
+                        $entry,
+                        ['field' => $back['field'], 'reason' => $back['reason']]
+                    );
+                }
+                $rows[$target] = array_merge($rows[$target] ?? [], $back['fields']);
+                continue;
+            }
+            if ($later === null) {
+                try {
+                    $later = $this->log === null ? [] : $this->log->later($applyId);
+                } catch (Throwable $e) {
+                    return $this->err('revert_failed', $e->getMessage());
+                }
+            }
+            $newer = [];
+            foreach ($later as $row) {
+                $step = $row['entry'];
+                if (in_array($step['op'] ?? '', ['content', 'visibility'], true) && self::target($step) === $target) {
+                    $newer[$row['apply_id']] = true;
+                }
+            }
+            if ($newer !== []) {
+                $ids = array_keys($newer);
+                $latest = (string) end($ids);
+                return $this->conflict(
+                    'Later content exists; revert the latest change first: apply ' . implode(', ', $ids) . ' changed ' . self::targetName($entry) . ' after this one',
+                    'apply.revert {apply_id:"' . $latest . '"} first, newest first, then this one; or tell the customer this change can no longer be undone by itself.',
+                    $entry,
+                    ['reason' => 'later', 'later' => $ids]
+                );
+            }
+            $rows[$target] = is_array($entry['before'] ?? null) ? $entry['before'] : null;
+        }
+        return null;
+    }
+
+    /**
+     * One refusal of `apply.revert`, in the shape the Joomla component answers an out-of-order
+     * revert: `error: conflict` and one `CONFLICT` in `errors[]`, plus what it is about and the way on.
+     *
+     * @param array<string,mixed> $entry
+     * @param array<string,mixed> $details
+     */
+    private function conflict(string $message, string $next, array $entry, array $details): array
+    {
+        return $this->err('conflict', $message) + [
+            'code' => 'CONFLICT',
+            'errors' => [ContractProblem::entry('CONFLICT', $message)],
+            'next' => $next,
+            'target' => [
+                'kind' => $entry['kind'] ?? null,
+                'id' => $entry['id'] ?? null,
+                'key' => ($entry['key'] ?? '') === '' ? null : $entry['key'],
+            ] + $details,
+        ];
+    }
+
+    /** @param array<string,mixed> $entry */
+    private static function conflictSentence(array $entry, ?string $field, string $reason): string
+    {
+        $where = self::targetName($entry) . ($field === null ? '' : " ({$field})");
+        if ($reason === 'ambiguous') {
+            return "The words this change wrote appear more than once in {$where}, and none of them is where it put them; nothing was reverted";
+        }
+        if ($reason === 'gone') {
+            return "{$where} is no longer there; nothing was reverted";
+        }
+        return "The words this change wrote in {$where} were changed since; nothing was reverted";
+    }
+
+    /** What one step lands on, the same string for every step that lands on the same row. @param array<string,mixed> $entry */
+    private static function target(array $entry): string
+    {
+        $kind = (string) ($entry['kind'] ?? '');
+        $id = (int) ($entry['id'] ?? 0);
+        $key = (string) ($entry['key'] ?? '');
+        if ($kind === 'templatePart') {
+            return "templatePart:{$key}";
+        }
+        if ($kind === 'option') {
+            return "option:{$key}";
+        }
+        return "{$kind}:{$id}:{$key}";
+    }
+
+    /** @param array<string,mixed> $entry */
+    private static function targetName(array $entry): string
+    {
+        $kind = (string) ($entry['kind'] ?? '');
+        $key = (string) ($entry['key'] ?? '');
+        if ($kind === 'option' || $kind === 'templatePart') {
+            return "{$kind} {$key}";
+        }
+        return "{$kind} " . (int) ($entry['id'] ?? 0) . ($key === '' ? '' : " {$key}");
     }
 
     /** @param array<string,mixed>|null $before */
