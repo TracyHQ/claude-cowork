@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.19.0 plus: carries the Tracy Base 1.0.1 (tracy-base/j6/1.0.1) and JA Voyara 1.0.3 (ja-voyara/j6/1.0.3) content contract profiles, the quickstarts whose templates honour ?theme=dark|light for one page load</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.19.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.19.1</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.19.1/pkg_claudecowork-0.19.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.18.5 plus: an imported site can be bound to a content contract derived from its own rows (content.contract operation derive), with leaf slots inside module params, articles, categories and custom fields, calibrated against the rendered pages; custom field values can be written through content.update (kind fieldValue) (TracyHQ/claude-cowork#74)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
