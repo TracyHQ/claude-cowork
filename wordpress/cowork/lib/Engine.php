@@ -1897,7 +1897,14 @@ final class Engine
         if ($style === '') {
             return $this->err('bad_params', 'style required, e.g. airbnb');
         }
-        $result = $this->packages->wear_style($style);
+        // A variation Tracy made at build time (the customer's brand) travels with the call and is
+        // written under uploads before it is worn; a style the theme ships needs none.
+        $variation = isset($p['variation']) && is_array($p['variation']) ? $p['variation'] : null;
+        if (isset($p['variation']) && $variation === null) {
+            return $this->err('bad_params', 'variation must be a theme.json object');
+        }
+        $meta = isset($p['meta']) && is_array($p['meta']) ? $p['meta'] : [];
+        $result = $this->packages->wear_style($style, $variation, $meta);
         return ($result['ok'] ?? false) === true
             ? $this->ok(['style' => $result['style'] ?? $style, 'post' => $result['post'] ?? null])
             : $this->err('style_failed', (string) ($result['error'] ?? 'the style did not go on'));
