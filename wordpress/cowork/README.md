@@ -46,7 +46,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
 | `apply.revert` | write | ok | ok; a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
-| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `apply`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`); the rest need a bound site | every operation |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
 | `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
 | `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
 
@@ -149,11 +149,68 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
+- `content.update` and `content.delete` refuse (`bad_params`) the contract's own options:
+  `_tracy_content_contract`, `claude_cowork_contract` and `claude_cowork_string_overrides`.
 - Warnings: `PRESENTATION_DRIFT` with `severity: warning` on `inspect`, `bind` and `apply` answers,
   one per difference from the released design. Error codes: `contract_unavailable`
   (store or profile unusable), `contract_failed` (the site or the request does not pass),
   `conflict` (already bound / a trim, relabel or retired set already on record), `writer_busy`
   (another writer holds the site's lock).
+
+### Derived contracts (imported sites)
+
+A site Tracy imported was never built from a quickstart, so no profile describes it. `derive` binds
+it to a **derived** contract: the map its own rows make (`lib/WordPressDerivedRows.php` →
+`lib/DerivedMap.php`), read through five codecs (`lib/LeafCodec.php`: text, HTML, shortcode, JSON,
+PHP serialize, nested in any order). In Tracy, only the import provision calls it.
+
+- `derive` — `{label: [a-z0-9-]{3,80}, requestId}`. Reads the published posts of every public type
+  (plus synced patterns, stored template parts and navigations), their non-bookkeeping meta, the
+  words options (`theme_mods_*`, `widget_*`, `sidebars_widgets`, autoloaded options up to 200 KB,
+  configuration options left out), public terms and classic menu entries (at most 5000 posts and
+  20 MB of values; the rest is named in `unresolved`). Then it **calibrates**: up to 40 rendered
+  pages fetched over loopback (curl to 127.0.0.1 with the site's Host, then https resolved to
+  127.0.0.1; no proxy, no redirect, one 60 s budget, `X-Tracy-Preview: pick`), and a nested leaf
+  (a builder setting, a theme option) is kept only when a page shows its words or its address.
+  No page loaded: `calibrated: false`, every nested leaf kept, options limited to `blogname`,
+  `blogdescription`, `theme_mods_*`, `widget_*`. A row that does not read back through WordPress as
+  the table holds it (an option a filter answers for) is left out and named. Answer:
+  `{contract: 'derived/<label>', entities, slots, calibrated, byClass: {db, nested, unmatched},
+  unresolved: [], replayed}` (`unmatched` counts visible text blocks no leaf holds). The same
+  `requestId` replays; a new one re-derives. `conflict` on a site bound to a quickstart, or
+  configured for one (`claude_cowork_contract`) and not bound yet.
+- The binding (`mode: 'derived'`) records `keep` (the nested slots calibration kept), the hash of the
+  algorithm (never of the rows, which every apply changes) and the derive's answer. Every later read
+  rebuilds the map from the rows, only when a request needs it (`db.*`, `files.*`, `info` never scan).
+- A slot is `{key: '<kind>-<id>.<column>.<sha1(leaf) 10>', entity, column, leaf}` (`leaf: null` is the
+  whole column). `inspect` adds `slotDetails` (every slot with its current value). `apply` works as
+  on a quickstart site, rewriting the leaf in its column and re-encoding every layer (a serialized
+  option is written back as the array WordPress reads). A link: `https?:`, a path, `?`, `mailto:`,
+  `tel:` or `#`, at most 2048 bytes; a picture: a png, jpg, webp, gif, avif or svg already under
+  `wp-content/uploads/`, written in the form the slot held. A leaf that would not read back is
+  `SLOT_UNWRITABLE`, before anything is written.
+- After a derived apply: the page caches a derived site may be served from are purged (Elementor's
+  CSS, WP Rocket, LiteSpeed, W3TC, SiteGround, and the object-cache entries of what was written), then
+  the owner pages of the written words (at most three: a post's permalink, else the home page) are
+  fetched and each word they do not show is a warning `WRITTEN_NOT_VISIBLE` `{slotKey, url}`. The
+  write stands (`apply.revert` takes it back); a page that could not be fetched says nothing.
+- `content.read` on a derived site: `quickstartTag: 'derived'`, `contractId: 'derived/<label>'`; a
+  post's markup field carries the slot key of its leaf, other slots are blocks of their own (options,
+  terms and menu entries are shared contents; a widget's slots sit in block `widget-<base>-<n>`).
+
+### Gettext string overrides
+
+Words a theme or plugin prints through gettext (`__('Read More', 'astra')`) live in no row. The
+`string` operation replaces one per locale: `{apply_id (not contract-), domain, msgid, context?,
+locale, value}`; an empty `value` removes it. It works on any site, bound or not, and moves no
+binding. The overrides are one option, `claude_cowork_string_overrides` (JSON
+`{"<locale>":{"<domain>":{"<context>\u0004<msgid>":"value"}}}`), written as a content write under the
+`apply_id`, so `apply.revert` puts it back (or removes it). The value must keep the msgid's printf
+placeholders (reordered positional ones are fine; a literal percent is `%%`), may carry only the tags
+and attributes the msgid itself uses, no entity in an attribute and no link but `https?:`, a path,
+`#`, `?`, `mailto:`, `tel:` or the msgid's own placeholder. `lib/StringOverrides.php` adds the
+`gettext`, `gettext_with_context`, `ngettext` and `ngettext_with_context` filters (priority 20) only
+when the option holds an override; a plural's forms are overridden as two msgids.
 
 ## Content API (`/content.json`)
 
@@ -320,6 +377,9 @@ When a page is requested with `X-Tracy-Preview: pick` **and** the site has a tok
 | `site:identity` | site title, tagline, logo |
 | `term:<taxonomy>:<id>:<slug>` | query title and term description on a category/tag/taxonomy archive, and that archive's top-level blocks |
 | `template:<slug>` | top-level blocks of a page about no record (search, date archive, 404) |
+| `post:<id>:<slug> block:the_content` | the first element of a post's content as `the_content` prints it (any post type, the loop's post only, not a nested call), unless a block stamped it already |
+| `menuItem:<id>` | the link of a classic menu entry (`nav_menu_link_attributes`) |
+| `widget:<widget_id>` | a sidebar widget's wrapper, and the blocks of a block widget (a sidebar inside a widget hands the owner back when it ends) |
 
 A stamping response is kept out of caches: `nocache_headers()`, `DONOTCACHEPAGE`, `LSCACHE_NO_CACHE`, LiteSpeed's no-cache call, `Cache-Control: private, no-store`, `Vary: Cookie`, `Referrer-Policy: no-referrer`. Without the header no hook is added at all, so an ordinary visitor's page is byte-identical. To check that on a site:
 

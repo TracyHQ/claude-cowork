@@ -18,7 +18,7 @@ an empty token refuses every request.
 | --- | --- |
 | `info`, `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list`, `core.manifest` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. `core.manifest` is the site's own record of which extensions are CMS core (ADR 0070 addendum). |
 | `content.list`, `content.get` | The read half of the content mirror (ADR 0071): paged summaries with checksums, then full rows — the same bytes an apply will compare against. |
-| `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): fifteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
+| `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
@@ -208,6 +208,55 @@ alias, confirmed by building the route Joomla's category/tag view builds). A cat
 published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
 not the category's. Menu modules get no such stamps for the same reason.
 
+## Derived contracts for imported sites (unreleased)
+
+A site imported into Tracy was never a quickstart: there is no profile to hold it to. `content.contract`
+`operation: derive` (`label` `[a-z0-9-]{3,80}`, `requestId`) binds it to a **derived** contract instead —
+a content map computed from the site's own rows, in the same `content-map` schema, so `inspect`,
+`apply`, `apply.revert` and `content.read` work on it unchanged. In Tracy only the provisioner calls
+`derive` (at import); the relay's Apply door refuses the operation.
+
+- **Refused** on a site bound to a quickstart, on a site under construction (`tracy_build_baseline`),
+  and on an unbound site whose params name a quickstart `contract` (its own bind is still to come). A
+  quickstart `bind` on a derived site is refused the same way. The same `requestId` again answers what
+  it bound (`replayed: true`); a new one derives again.
+- **What is read** (`JoomlaDerivedRows`, public rows only): articles (published, inside their publish
+  window: `title`; `introtext`/`fulltext` as HTML; `attribs`/`images`/`urls` nested), site menu items
+  (`title`, `params`), site modules (`title`; `content` of `mod_custom`; `params`), `com_content`
+  categories (`title`, `description`, `params`), single-row article custom field values of type
+  text/textarea/editor/media, and the site template styles that are a home or that a menu item names.
+  A value over 2 MB is listed in `unresolved`, not scanned. Extension tables are not read in v1.
+- **Leaf slots.** `LeafCodec` finds the words, pictures and links inside a value through five codecs
+  (text, HTML, shortcode, JSON, PHP serialize, nested in any order). A slot names its leaf by a path
+  (`leaf`); an apply rewrites only that leaf and re-encodes every layer in its own format. A value that
+  would not read back is refused as `SLOT_UNWRITABLE`, never stored. Slot keys are
+  `<kind>-<id>.<column>.<sha1(leaf) 10>`; the contract hash names the algorithm, not the rows, so an apply
+  never changes it.
+- **Calibration.** At derive the home page and up to 39 published menu pages are fetched over loopback
+  (plain http to 127.0.0.1 with the site's Host, then https resolved to 127.0.0.1; curl only, no proxy,
+  no redirect followed, 60 s in all). A nested leaf (a param, a setting) is kept only when a page shows
+  its words or its address; the kept keys are stored in the binding (`keep`) so later reads do not
+  fetch again. No page loaded: `calibrated: false`, every nested leaf kept. The answer counts
+  `byClass {db, nested, unmatched}` — `unmatched` is visible text blocks no leaf holds (theme files,
+  language strings), counted, not located.
+- **Pictures and links** on a derived slot take the forms an imported site stores: a file under
+  `images/` with or without a leading slash or Joomla's `#joomlaImage://` suffix (written back in the
+  slot's own form, with the new file's size), and links `https://…`, `/path`, `index.php?…`, `mailto:`,
+  `tel:`, `#anchor` (never `//…`, a backslash or a script). Quickstart profiles keep their own rules.
+- **After an apply** (committed, outside the transaction) T4's `media/t4/optimize` is emptied beside the
+  writer's usual cache purge, and up to three pages that own the written text (an article's own page, a
+  category's list, a menu item's page, a page a module is assigned to, else the home page) are fetched
+  again, 15 s in all. Words a fetched page does not show add a warning
+  `{code: WRITTEN_NOT_VISIBLE, message, severity: warning, slotKey, url}`; the apply stays `ok` and its
+  `apply_id` takes it back. A page that did not load says nothing. Uncalibrated, only a row's own text
+  is checked.
+
+**`fieldValue`**, the one new writer kind, is open on every site through `content.update` and
+`content.batch`, not only derived ones: one `#__fields_values` row named by `field_id × 10^9 + item_id`
+(`FieldValueKey`); only `value` is written; a pair stored in more than one row (a multiple-value
+field) reads as none and is refused; no create and no delete; recorded under the `apply_id` like every
+other write, so it reverts.
+
 ## Unreleased Joomla 6 Content API pilot
 
 The opt-in `content.read` action and authenticated `GET /content.json` share
@@ -265,7 +314,7 @@ to a block whose key starts `article-548`). None of these fields has a `slotKey`
 | Record | Block key | Field keys | Source | Written through |
 | --- | --- | --- | --- | --- |
 | article | `article-<id>.images` | `article-<id>.image_intro`, `.image_intro_caption`, `.image_fulltext`, `.image_fulltext_caption` | the `images` column; Joomla's `#joomlaImage://…` suffix removed; alt text on the picture in `images[]` | `content.update` article (`images`) |
-| article | `article-<id>.fields` | `article-<id>.field.<name>` | published, public custom field values of type text, textarea, editor (html) and media (image), in the article's language | read-only (values live outside the article row) |
+| article | `article-<id>.fields` | `article-<id>.field.<name>` | published, public custom field values of type text, textarea, editor (html) and media (image), in the article's language | `content.update` fieldValue (`value`), see "Derived contracts" |
 | article | `article-<id>.author` | `article-<id>.author` | `created_by_alias`, else the author's display name (`#__users.name` only) | read-only |
 | page | `menuItem-<id>.params` | `menuItem-<id>.params.<name>` | menu item params written as words (see below) | `content.update` menuItem (`params`) |
 | page | `menuItem-<id>.megamenu` | `menuItem-<id>.megamenu[<template>:<profile>].caption`, `….column.<row>.<col>` | T4 mega menu: item caption and mega column titles, from the template's navigation profile (`local/etc/navigation/<profile>.json`, else `etc/…`) | read-only (a template file) |
