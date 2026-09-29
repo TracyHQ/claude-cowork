@@ -778,7 +778,10 @@ final class Engine
         if ($found === null) {
             return $this->err('not_found', "no extension {$type}/{$element} is installed");
         }
-        if (!empty($found['core'])) {
+        // The one core extension an Apply may switch, and only ON: a redirect row does nothing while
+        // System - Redirect is off, and the agent cannot open the administrator to fix that itself.
+        $redirectOn = $enabled && $type === 'plugin' && $folder === 'system' && $element === 'redirect';
+        if (!empty($found['core']) && !$redirectOn) {
             return $this->err('refused', "extension {$element} is core");
         }
 
@@ -2462,7 +2465,39 @@ final class Engine
         if ($moveTo !== null) {
             $out['moved'] = true;
         }
+        if ($kind === 'redirect' && ($warning = $this->redirectPluginWarning()) !== null) {
+            $out['warnings'] = [$warning];
+        }
         return $this->ok($out);
+    }
+
+    /**
+     * A redirect row does nothing while the System - Redirect plugin is off: Joomla reads
+     * `#__redirect_links` only from that plugin's error handler. The row is saved either way, so
+     * the answer says so instead of leaving a caller to believe the old address now forwards.
+     * Read-only, and silent when the extension manager is not wired or cannot tell.
+     */
+    private function redirectPluginWarning(): ?array
+    {
+        if ($this->extensions === null) {
+            return null;
+        }
+        try {
+            $rows = (array) ($this->extensions->coreManifest()['extensions'] ?? []);
+        } catch (Throwable $e) {
+            return null;
+        }
+        foreach ($rows as $row) {
+            if (($row['type'] ?? '') === 'plugin' && ($row['folder'] ?? '') === 'system' && ($row['element'] ?? '') === 'redirect') {
+                if (!empty($row['enabled'])) {
+                    return null;
+                }
+                return ['code' => 'REDIRECT_PLUGIN_DISABLED', 'severity' => 'warning',
+                    'message' => 'The redirect is saved, but the System - Redirect plugin (plg_system_redirect) is disabled, so it does nothing yet. '
+                        . 'Next step: extension.enable {type: plugin, folder: system, element: redirect, enabled: true}.'];
+            }
+        }
+        return null;
     }
 
     /**

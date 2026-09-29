@@ -96,6 +96,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
             'table'   => '#__fields',
             'columns' => ['title', 'label', 'note', 'description', 'default_value', 'required',
                 'state', 'params', 'fieldparams', 'language', 'access'],
+            // What a field IS — its name, type, form and group — is chosen when it is made and
+            // never rewritten by an Apply: changing `type` under a field that holds values would
+            // strand them. So these columns are on the whitelist for a create only.
+            'createColumns' => ['name', 'type', 'context', 'group_id'],
             'create'  => true,
             'trash'   => 'state',
         ],
@@ -584,6 +588,11 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
         $tags = array_key_exists('tags', $fields) && is_array($fields['tags']) ? $fields['tags'] : null;
         unset($fields['tags']);
         [$table, $allowed] = [$this->tableFor($kind), self::MAP[$kind]['columns']];
+        if ($id <= 0) {
+            // Columns that may be named when a row is made and never after (a field's type).
+            $allowed = array_merge($allowed, self::MAP[$kind]['createColumns'] ?? []);
+            $fields = self::createFields($kind, $fields);
+        }
 
         // A new node in a tree is placed by Joomla's Table, not by this class's raw path — and
         // this branch comes before the raw whitelist because create-time fields (menutype, link,
@@ -653,9 +662,8 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
             // whitelist drops authorship fields on purpose, and these columns are NOT NULL with
             // no database default, so an insert that sets neither is refused by the database.
             $now = Factory::getDate()->toSql();
-            if ($kind === 'article') {
-                $object->created  = $now;
-                $object->modified = $now;
+            foreach (self::createStamps($kind, $now, $this->currentUserId()) as $column => $value) {
+                $object->{$column} = $value;
             }
             if ($kind === 'contact' || $kind === 'newsfeed') {
                 $object->created = $now;
@@ -683,6 +691,84 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
             $this->claimHome($id);
         }
         return $id;
+    }
+
+    /** Field types an Apply may create: the ones a plain contact or article form needs. */
+    public const FIELD_TYPES = ['text', 'email', 'tel', 'textarea', 'list'];
+
+    /** Where a created field may live: the forms of contacts and articles, nothing else. */
+    public const FIELD_CONTEXTS = ['com_contact.contact', 'com_contact.mail', 'com_content.article'];
+
+    /**
+     * What a create of this kind must say before it is written, checked and completed. Only `field`
+     * has anything to say: its `name` (the machine name, defaulting to a slug of the title), `type`
+     * and `context` are refused when they are not in the short lists above, and `group_id` defaults
+     * to 0 (no group). A field made with no context or type used to land as a row Joomla lists in no
+     * form at all (benchmark v6). Every other kind comes back untouched.
+     *
+     * @param array<string,mixed> $fields
+     * @return array<string,mixed>
+     */
+    public static function createFields(string $kind, array $fields): array
+    {
+        if ($kind !== 'field') {
+            return $fields;
+        }
+        $title = trim((string) ($fields['title'] ?? ''));
+        $name = trim((string) ($fields['name'] ?? ''));
+        if ($name === '') {
+            $name = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/D', $name)) {
+            throw new \RuntimeException('a field needs a name (lowercase letters, digits, - and _) or a title to make one from');
+        }
+        $type = (string) ($fields['type'] ?? 'text');
+        if (!in_array($type, self::FIELD_TYPES, true)) {
+            throw new \RuntimeException('field type must be one of: ' . implode(', ', self::FIELD_TYPES));
+        }
+        $context = (string) ($fields['context'] ?? '');
+        if (!in_array($context, self::FIELD_CONTEXTS, true)) {
+            throw new \RuntimeException('field context must be one of: ' . implode(', ', self::FIELD_CONTEXTS));
+        }
+        $fields['name'] = $name;
+        $fields['type'] = $type;
+        $fields['context'] = $context;
+        $fields['group_id'] = (int) ($fields['group_id'] ?? 0);
+        // NOT NULL columns with no database default, and a label the form prints.
+        $fields += ['params' => '{}', 'fieldparams' => '{}', 'description' => '', 'label' => $title,
+            'language' => '*', 'access' => 1];
+        return $fields;
+    }
+
+    /**
+     * The columns a brand-new row of this kind gets from the writer, not from the caller: NOT NULL
+     * with no database default, so an insert that leaves them out is refused by the database.
+     * The whitelist drops authorship and timestamps on purpose, so a caller cannot set these.
+     *
+     * @return array<string,mixed>
+     */
+    public static function createStamps(string $kind, string $now, int $userId): array
+    {
+        switch ($kind) {
+            case 'article':
+                return ['created' => $now, 'modified' => $now];
+            case 'redirect':
+                // `referer` is NOT NULL with no default: without it no redirect could ever be
+                // created (benchmark v6). `published` and `header` keep the table's own defaults.
+                return ['referer' => '', 'hits' => 0, 'created_date' => $now, 'modified_date' => $now];
+            case 'field':
+                return ['created_time' => $now, 'modified_time' => $now, 'created_user_id' => $userId];
+        }
+        return [];
+    }
+
+    private function currentUserId(): int
+    {
+        try {
+            return (int) Factory::getApplication()->getIdentity()->id;
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     /**
