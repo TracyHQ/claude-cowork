@@ -102,11 +102,14 @@ final class ContractTestWriter extends FakeSiteWriter {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
         parent::setVisibility($kind,$id,$column,$value);
     }
+    /** Whether a transaction is open right now: work that must follow the commit can say it did. */
+    public bool $open=false;
     public function transaction(callable $work):array {
         $before=[$this->store,$this->log->log,$this->binding->binding,$this->binding->job];
+        $this->open=true;
         try{return $work();}catch(Throwable $error){
             [$this->store,$this->log->log,$this->binding->binding,$this->binding->job]=$before;throw $error;
-        }
+        }finally{$this->open=false;}
     }
 }
 $contractDir=sys_get_temp_dir().'/cowork-contract-'.bin2hex(random_bytes(6));

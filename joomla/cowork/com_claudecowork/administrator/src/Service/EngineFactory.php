@@ -81,6 +81,20 @@ final class EngineFactory
 
     private static function buildContract(): ?\QuickstartContract
     {
+        // An imported site bound by `content.contract derive` is held to the map its own rows make,
+        // whatever profile the params name: the binding is what the site IS. Built lazily, and read
+        // without calibrating again: the nested leaves the derive's pages showed are the binding's `keep`.
+        $derived = self::derivedBinding();
+        if ($derived !== null) {
+            $writer = self::buildWriter();
+            if (!$writer) return null;
+            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $label = substr((string) $derived['contract'], strlen('derived/'));
+            $algorithm = (int) ($derived['algorithm'] ?? \DerivedMap::ALGORITHM);
+            $keep = $derived['keep'] ?? null;
+            return \QuickstartContract::derived($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT,
+                static fn(): array => \DerivedMap::build(JoomlaDerivedRows::rows($db), null, $label, $algorithm, is_array($keep) ? $keep : null));
+        }
         $configured = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         // A site under construction — provisioned from the Base archive with `tracy_build_baseline`
         // and no `contract`, because its template is still to be built — carries NO contract. It
@@ -107,6 +121,28 @@ final class EngineFactory
         return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory))
             ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
     }
+
+    /**
+     * The stored binding when it is a derived one, else null. The database only fetches a binding that
+     * holds `"mode":"derived"` (LOCATE: no JSON functions needed, and a quickstart's baseline of
+     * megabytes is neither sent nor decoded); PHP then decodes it and checks the field itself. The
+     * binding is written with json_encode, so the text is exactly that, and the same words inside a
+     * stored string would read `\"mode\"`. A site without the table yet is no derived site.
+     */
+    private static function derivedBinding(): ?array
+    {
+        try {
+            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $raw = $db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE(' . $db->quote(self::DERIVED_MARK) . ', binding) > 0')->loadResult();
+            $binding = $raw === null ? null : json_decode((string) $raw, true);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return is_array($binding) && ($binding['mode'] ?? null) === 'derived' && is_string($binding['contract'] ?? null) && strpos($binding['contract'], 'derived/') === 0 ? $binding : null;
+    }
+
+    /** What a derived binding's JSON holds, as json_encode writes it; also JoomlaContentReader's pre-filter. */
+    public const DERIVED_MARK = '"mode":"derived"';
 
     /**
      * The baseline profile of a site under construction, or null when the site is not one. Same
@@ -201,8 +237,22 @@ final class EngineFactory
             return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
         });
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
+        $quickstart = $contract !== '';
         $baseline = self::constructionBaseline();
         if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);
+        // `content.contract derive`: this site's public rows, and its rendered pages over loopback.
+        try {
+            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            // Params naming a quickstart contract (a provision whose bind is still to come) refuse derive while unbound.
+            $engine->derivedSource(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, static function () use ($db): array {
+                $unresolved = [];
+                $rows = JoomlaDerivedRows::rows($db, $unresolved);
+                return ['rows' => $rows, 'pages' => JoomlaDerivedRows::pages($db), 'unresolved' => $unresolved];
+            }, static fn(array $paths): array => JoomlaDerivedRows::fetch($paths, JoomlaDerivedRows::CHECK_SECONDS),
+                static fn() => JoomlaDerivedRows::clearOptimize(JPATH_ROOT), static fn(int $id): ?string => JoomlaDerivedRows::modulePage($db, $id), $quickstart);
+        } catch (\Throwable $e) {
+            // No database: derive answers 'unavailable', like every other write without one.
+        }
         return $engine;
     }
 

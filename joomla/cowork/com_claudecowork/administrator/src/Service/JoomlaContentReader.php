@@ -21,6 +21,21 @@ final class JoomlaContentReader
     }
     private function hash($value): string { return hash('sha256',\ContentReader::encode($value)); }
     /**
+     * Whether this site is bound to a DERIVED contract (an imported site's own rows). The database
+     * answers whether the binding holds `"mode":"derived"` (LOCATE, no JSON functions); only a binding
+     * that does is fetched and decoded, so a quickstart's baseline never is. Only then are site template
+     * styles projected, and only then are their identities levelled (ContentIdentity::DERIVED).
+     */
+    private ?bool $derived = null;
+    private function derivedSite(): bool {
+        if ($this->derived !== null) return $this->derived;
+        try {
+            $raw = $this->db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE('.$this->db->quote(EngineFactory::DERIVED_MARK).', binding) > 0')->loadResult();
+            $binding = $raw === null ? null : json_decode((string) $raw, true);
+            return $this->derived = is_array($binding) && ($binding['mode'] ?? null) === 'derived';
+        } catch (\Throwable $e) { return $this->derived = false; }
+    }
+    /**
      * Joomla's own site router, with the language prefix and alias rules the site applies when it
      * renders (`JoomlaAddress`). Relative, because this request may have reached the site by an
      * internal address.
@@ -185,6 +200,7 @@ final class JoomlaContentReader
         // Page identities have no trigger (nested-set locking, see ContentIdentity): level them now.
         // One try: this runs inside the apply's transaction, where a deadlock victim is rolled back whole.
         \ContentIdentity::level($this->db,'page',1);
+        if ($this->derivedSite()) \ContentIdentity::level($this->db,'templateStyle',1);
         $data=[];
         foreach (\ContentProjection::TABLES as $table=>$order) $data[$table]=$this->rows($table,$order);
         $contract=($this->contractFactory)();
@@ -217,8 +233,10 @@ final class JoomlaContentReader
         // item appeared or went; the snapshot then checks it holds an identity for every menu item
         // it read, and a menu item created in between costs a fresh snapshot, never a page with no id.
         $now=time();
+        $derived=$this->derivedSite();
         for ($attempt=1; ; $attempt++) {
             \ContentIdentity::level($this->db,'page');
+            if ($derived) \ContentIdentity::level($this->db,'templateStyle');
             $this->db->setQuery('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
             $this->db->transactionStart();
             try {

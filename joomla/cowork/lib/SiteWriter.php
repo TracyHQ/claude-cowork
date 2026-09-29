@@ -48,6 +48,47 @@ final class WriterBusy extends RuntimeException
     }
 }
 
+/**
+ * `#__fields_values` has no id column: a value is named by (field_id, item_id). A SiteWriter row is
+ * named by one int, so the pair is packed into one — field_id × SPAN + item_id — rather than widen
+ * every read, write and undo entry of the engine for the one kind that needs two.
+ */
+final class FieldValueKey
+{
+    public const SPAN = 1000000000;
+
+    public static function encode(int $fieldId, int $itemId): int
+    {
+        if ($fieldId < 1 || $itemId < 1 || $itemId >= self::SPAN) throw new RuntimeException('field value key out of range');
+        return $fieldId * self::SPAN + $itemId;
+    }
+
+    /**
+     * The one row of a pair, or null. The table has no key: a multiple-value field (checkbox, list
+     * multiple) keeps several rows for one pair, and none of them is "the" value.
+     *
+     * @param array<array-key,array> $rows every row of the pair
+     */
+    public static function only(array $rows): ?array
+    {
+        return count($rows) === 1 ? reset($rows) : null;
+    }
+
+    /** only(), for a write: a pair that is not exactly one row is refused, never guessed at. */
+    public static function single(array $rows): array
+    {
+        if (count($rows) === 0) throw new RuntimeException('target does not exist in this scope');
+        if (count($rows) > 1) throw new RuntimeException('this field value is stored in ' . count($rows) . ' rows (a multiple-value field); it cannot be written as one');
+        return reset($rows);
+    }
+
+    /** @return array{0:int,1:int} [field_id, item_id] */
+    public static function decode(int $id): array
+    {
+        return [intdiv($id, self::SPAN), $id % self::SPAN];
+    }
+}
+
 interface SiteWriter
 {
     /**
@@ -61,6 +102,9 @@ interface SiteWriter
     public const KINDS = [
         // content — the site's words and editorial structure
         'article', 'category', 'tag', 'field', 'menuItem', 'menutype', 'redirect',
+        // One stored custom field value (`#__fields_values`), named by FieldValueKey: what a derived
+        // contract writes when an imported site keeps words in a field. `field` is the DEFINITION.
+        'fieldValue',
         'banner', 'bannerClient', 'contact', 'newsfeed',
         // A content language of a multilingual site. It is content, not configuration: it decides
         // which words a visitor is shown, and it is the row without which every article tagged

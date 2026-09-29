@@ -192,6 +192,13 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
             'create'  => true,
             'trash'   => 'published',
         ],
+        // One stored custom field value, named by \FieldValueKey (field_id, item_id packed). Only its
+        // `value` is ever written, and never a new one: which item carries which field is the form's.
+        'fieldValue' => [
+            'table'   => '#__fields_values',
+            'columns' => ['value'],
+            'create'  => false,
+        ],
         'templateStyle' => [
             'table'   => '#__template_styles',
             'columns' => ['title', 'params', 'home', 'template'],
@@ -374,6 +381,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     public function read(string $kind, int $id): ?array
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->read($kind, $id);
+        if ($kind === 'fieldValue') return $this->readFieldValue($id);
         $table = $this->tableFor($kind);
         if ($id <= 0) {
             return null;
@@ -394,7 +402,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
      */
     public function readAll(string $kind, int $limit): array
     {
-        if (in_array($kind, self::RELATION_KINDS, true) || $kind === 'languageFilter') throw new \RuntimeException("{$kind} cannot be read whole");
+        if (in_array($kind, self::RELATION_KINDS, true) || $kind === 'languageFilter' || $kind === 'fieldValue') throw new \RuntimeException("{$kind} cannot be read whole");
         $pk = $this->pkFor($kind);
         $query = $this->db->getQuery(true)
             ->select('*')
@@ -411,6 +419,11 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
         if (in_array($kind, self::RELATION_KINDS, true)) return (new JoomlaRelations($this->db))->readMany($kind, $ids);
+        if ($kind === 'fieldValue') {
+            $out = [];
+            foreach ($ids as $id) if (($row = $this->readFieldValue($id)) !== null) $out[$id] = $row;
+            return $out;
+        }
         $table = $this->tableFor($kind);
         $pk = $this->pkFor($kind);
         $out = [];
@@ -426,6 +439,53 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     }
 
     private const RELATION_KINDS = ['articleAssociation', 'menuAssociation', 'moduleAssignment'];
+
+    /**
+     * One `#__fields_values` row by its packed key, or null — also when the pair is stored in several
+     * rows (a multiple-value field): the table has no key, and none of those rows is "the" value.
+     * `item_id` is a string column, so it is compared as one.
+     */
+    private function readFieldValue(int $id): ?array
+    {
+        return $id > 0 ? \FieldValueKey::only($this->fieldValueRows($id)) : null;
+    }
+
+    /** Up to two rows of a pair: enough to tell one from several. */
+    private function fieldValueRows(int $id): array
+    {
+        [$fieldId, $itemId] = \FieldValueKey::decode($id);
+        $item = (string) $itemId;
+        $query = $this->db->getQuery(true)
+            ->select('*')
+            ->from($this->db->quoteName('#__fields_values'))
+            ->where($this->db->quoteName('field_id') . ' = :field')
+            ->where($this->db->quoteName('item_id') . ' = :item')
+            ->bind(':field', $fieldId, ParameterType::INTEGER)
+            ->bind(':item', $item, ParameterType::STRING);
+        return $this->db->setQuery($query, 0, 2)->loadAssocList() ?: [];
+    }
+
+    /** Set one existing custom field value. A field and item that hold no value yet are refused, not created. */
+    private function writeFieldValue(int $id, array $fields): int
+    {
+        if ($id <= 0) throw new \RuntimeException('target does not exist in this scope');
+        \FieldValueKey::single($this->fieldValueRows($id));
+        if (!array_key_exists('value', $fields)) throw new \RuntimeException('no writable column for kind fieldValue');
+        [$fieldId, $itemId] = \FieldValueKey::decode($id);
+        $item = (string) $itemId;
+        $value = (string) $fields['value'];
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName('#__fields_values'))
+            ->set($this->db->quoteName('value') . ' = :value')
+            ->where($this->db->quoteName('field_id') . ' = :field')
+            ->where($this->db->quoteName('item_id') . ' = :item')
+            ->bind(':value', $value, ParameterType::STRING)
+            ->bind(':field', $fieldId, ParameterType::INTEGER)
+            ->bind(':item', $item, ParameterType::STRING);
+        $this->db->setQuery($query)->execute();
+        $this->lastKind = 'fieldValue';
+        return $id;
+    }
 
     /** The only column per kind setVisibility() may touch. */
     private const VISIBILITY = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
@@ -576,6 +636,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     public function write(string $kind, int $id, array $fields): int
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->write($kind, $id, $fields);
+        if ($kind === 'fieldValue') {
+            if ($id <= 0) throw new \RuntimeException('kind fieldValue cannot be created through Apply');
+            return $this->writeFieldValue($id, $fields);
+        }
         if ($id > 0 && !$this->read($kind, $id)) throw new \RuntimeException('target does not exist in this scope');
         if ($kind === 'templateStyle' && isset($fields['template'])) {
             $element = (string) $fields['template'];
@@ -935,7 +999,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
 
     public function list(string $kind, int $offset, int $limit): array
     {
-        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return [];
+        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment', 'fieldValue'], true)) return [];
         if ($kind === 'languageFilter') return $this->db->setQuery("SELECT extension_id AS id, enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssocList();
         $table = $this->tableFor($kind);
         $columns = self::LIST_COLUMNS[$kind];
@@ -1186,6 +1250,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
     public function delete(string $kind, int $id): void
     {
         $table = $this->tableFor($kind);
+        if ($kind === 'fieldValue') throw new \RuntimeException('kind fieldValue cannot be deleted through Apply');
         if ($id <= 0) {
             return;
         }
