@@ -1625,6 +1625,8 @@ check('content.language needs an apply_id',
 
 // The content-only seal: its own file, because it is its own boundary.
 require_once __DIR__ . '/contracts.php';
+// A site identity option the released archive does not carry: absent is empty, the first write creates it.
+require_once __DIR__ . '/identity-option.php';
 // A profile corrected in place keeps the sites sealed to its earlier bytes (superseded.json).
 require_once __DIR__ . '/superseded-profile.php';
 // Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.

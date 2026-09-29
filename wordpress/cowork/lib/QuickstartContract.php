@@ -607,6 +607,15 @@ final class QuickstartContract
             $kind = (string) ($entity['kind'] ?? '');
             $identity = is_array($entity['identity'] ?? null) ? $entity['identity'] : [];
             $found = $this->find($kind, $identity, $binding !== null && $kind !== 'option' ? (int) ($binding['ids'][$key] ?? 0) : 0);
+            if (isset($found['problem']) && $kind === 'option' && $this->isSiteIdentity($key)) {
+                // The released archive carries no identity row (Tracy Business wp7 1.2.0, 1.3.0):
+                // absent is the all-empty identity the theme renders, and the first apply creates it.
+                $entities[] = ['key' => $key, 'kind' => $kind, 'id' => null, 'language' => null, 'status' => null];
+                foreach ($this->slotsFor($key) as $slot) {
+                    $slotValues[$slot['key']] = '';
+                }
+                continue;
+            }
             if (isset($found['problem'])) {
                 // Gone from the site: its own slots cannot be written, every other slot still can.
                 if ($binding !== null) {
@@ -660,8 +669,9 @@ final class QuickstartContract
             $content = $kind === 'templatePart' ? (string) ($row['content'] ?? '') : (string) ($row['post_content'] ?? '');
             $slots = $this->slotsFor($key);
             if ($kind === 'option') {
+                $siteIdentity = $this->isSiteIdentity($key);
                 foreach ($slots as $slot) {
-                    $value = $this->optionSlotValue($row['value'], $slot);
+                    $value = $this->optionSlotValue($row['value'], $slot, $siteIdentity);
                     if ($value === null) {
                         $problems[] = 'Option slot is not text: ' . $slot['key'];
                         continue;
@@ -929,11 +939,34 @@ final class QuickstartContract
         return $out;
     }
 
-    /** What an option slot holds now: the whole value, or one key of an array value. Null when not text. */
-    private function optionSlotValue($value, array $slot): ?string
+    /**
+     * Is this option entity a site identity — every slot of it a `siteIdentity` field of one array
+     * option? Such an option may be absent (the released archive does not carry it; the first apply
+     * creates it) and may lack fields: both read empty, as the theme renders them (Tracy
+     * `tasks/spec-danh-tinh-site-wordpress.md`: a missing field is empty, never the demo value).
+     */
+    private function isSiteIdentity(string $key): bool
+    {
+        $slots = $this->slotsFor($key);
+        foreach ($slots as $slot) {
+            if (($slot['siteIdentity'] ?? false) !== true || !isset($slot['target']['field'])) {
+                return false;
+            }
+        }
+        return $slots !== [];
+    }
+
+    /**
+     * What an option slot holds now: the whole value, or one key of an array value. Null when not
+     * text. A field a site identity does not hold is empty.
+     */
+    private function optionSlotValue($value, array $slot, bool $siteIdentity = false): ?string
     {
         if (isset($slot['target']['field'])) {
             $field = (string) $slot['target']['field'];
+            if ($siteIdentity && is_array($value) && !array_key_exists($field, $value)) {
+                return '';
+            }
             $value = is_array($value) && array_key_exists($field, $value) ? $value[$field] : null;
         }
         return is_string($value) || is_numeric($value) ? (string) $value : null;
