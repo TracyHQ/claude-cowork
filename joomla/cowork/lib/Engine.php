@@ -778,7 +778,10 @@ final class Engine
         if ($found === null) {
             return $this->err('not_found', "no extension {$type}/{$element} is installed");
         }
-        if (!empty($found['core'])) {
+        // The one core extension an Apply may switch, and only ON: a redirect row does nothing while
+        // System - Redirect is off, and the agent cannot open the administrator to fix that itself.
+        $redirectOn = $enabled && $type === 'plugin' && $folder === 'system' && $element === 'redirect';
+        if (!empty($found['core']) && !$redirectOn) {
             return $this->err('refused', "extension {$element} is core");
         }
 

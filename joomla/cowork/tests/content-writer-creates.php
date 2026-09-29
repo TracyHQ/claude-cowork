@@ -120,4 +120,23 @@ namespace {
     check('and says the plugin is off', $cwOff['warnings'][0]['code'] ?? null, 'REDIRECT_PLUGIN_DISABLED');
     checkTrue('and names the next step', str_contains($cwOff['warnings'][0]['message'] ?? '', 'extension.enable'));
     check('with the plugin on there is no warning', isset($cwCall(true)['warnings']), false);
+
+    // ------------------------------------- extension.enable: the redirect plugin, and only on
+    $cwSwitch = function (string $element, string $folder, bool $enabled, bool $on) use ($cwLog, $WTOKEN, &$cwExt): array {
+        $cwExt = new FakeExtensions();
+        $cwExt->manifest = ['platform' => 'joomla', 'platformVersion' => '5.1.2', 'extensions' => [
+            ['type' => 'plugin', 'element' => 'redirect', 'folder' => 'system', 'core' => true, 'enabled' => $on, 'version' => '5'],
+            ['type' => 'plugin', 'element' => 'cache', 'folder' => 'system', 'core' => true, 'enabled' => $on, 'version' => '5'],
+        ]];
+        $engine = new Engine($WTOKEN, [], null, null, null, $cwExt, null, null, $cwLog);
+        return $engine->handle(['token' => $WTOKEN, 'action' => 'extension.enable', 'params' => [
+            'apply_id' => 'sw-' . mt_rand(), 'type' => 'plugin', 'folder' => $folder, 'element' => $element, 'enabled' => $enabled]]);
+    };
+    $cwOn = $cwSwitch('redirect', 'system', true, false);
+    check('the core redirect plugin may be enabled', $cwOn['ok'] ?? null, true);
+    check('the switch reached the manager', $cwExt->switched, [['type' => 'plugin', 'element' => 'redirect', 'folder' => 'system', 'enabled' => true]]);
+    check('and the undo log holds the before-state', $cwOn['before'] ?? null, false);
+    check('the core redirect plugin may not be disabled', $cwSwitch('redirect', 'system', false, true)['error'] ?? null, 'refused');
+    check('another core plugin may not be enabled', $cwSwitch('cache', 'system', true, false)['error'] ?? null, 'refused');
+    check('nor disabled', $cwSwitch('cache', 'system', false, true)['error'] ?? null, 'refused');
 }
