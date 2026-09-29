@@ -1,0 +1,1 @@
+a:2:{i:2;a:1:{s:7:"content";s:117:"<!-- wp:paragraph --><p>Follow the workshop on Instagram for behind-the-scenes glaze tests.</p><!-- /wp:paragraph -->";}s:12:"_multiwidget";i:1;}

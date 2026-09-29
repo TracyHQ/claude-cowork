@@ -1,0 +1,1 @@
+a:2:{i:0;a:3:{s:4:"name";s:11:"Elena Marsh";s:4:"role";s:12:"Head Roaster";s:3:"bio";s:87:"Elena has cupped coffee on three continents and still can't resist a Kenyan washed lot.";}i:1;a:3:{s:4:"name";s:10:"Tomas Berg";s:4:"role";s:14:"Wholesale Lead";s:3:"bio";s:72:"Tomas keeps every cafe account fed, one pallet of green beans at a time.";}}

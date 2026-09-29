@@ -1,0 +1,6 @@
+[vc_row css=".vc_custom_1600000000000{padding-top: 40px;}"][vc_column width="1/2"][vc_column_text]
+
+<h2>Small-Batch Ceramics, Made in Lisbon</h2>
+<p>Every mug is thrown by hand, so no two are &quot;perfect&quot; the same way twice.</p>
+
+[/vc_column_text][vc_btn title="See the Studio" style="flat" color="black" align="left" link="url:https%3A%2F%2Fceramics.example.com%2Fstudio|title:See%20the%20Studio|target:_blank"][/vc_btn][/vc_column][vc_column width="1/2"][vc_single_image image="317" img_size="large" alignment="center" onclick="link_image"][/vc_column][/vc_row]

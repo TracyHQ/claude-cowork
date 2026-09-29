@@ -1,0 +1,7 @@
+<!-- wp:paragraph -->
+<p>A midweight merino crew, knitted in Portugal from mulesing-free wool. Runs true to size.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item --><li>Machine washable on a wool cycle</li><!-- /wp:list-item --><!-- wp:list-item --><li>Ribbed cuffs and hem</li><!-- /wp:list-item --></ul>
+<!-- /wp:list -->

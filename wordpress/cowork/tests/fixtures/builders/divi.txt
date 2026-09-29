@@ -1,0 +1,6 @@
+[et_pb_section fb_built="1" admin_label="Hero" _builder_version="4.24.0"][et_pb_row _builder_version="4.24.0"][et_pb_column type="4_4" _builder_version="4.24.0"][et_pb_text admin_label="Hero Headline" _builder_version="4.24.0" header_font="||||||||" header_text_align="center"]
+
+<h1>Handcrafted Furniture, Built to Last</h1>
+<p>Every piece is joined, sanded and finished in our own workshop &mdash; no particle board, ever.</p>
+
+[/et_pb_text][et_pb_button button_text="View the Collection" button_url="https://furniture.example.com/collection" button_alignment="center" _builder_version="4.24.0" custom_button="on"][/et_pb_button][/et_pb_column][/et_pb_row][et_pb_row _builder_version="4.24.0"][et_pb_column type="4_4" _builder_version="4.24.0"][et_pb_image src="https://furniture.example.com/wp-content/uploads/2024/03/workshop.jpg" alt="Our workshop bench" title_text="Our workshop bench" _builder_version="4.24.0"][/et_pb_image][/et_pb_column][/et_pb_row][/et_pb_section]

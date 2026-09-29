@@ -1,0 +1,1 @@
+a:3:{i:2;a:4:{s:5:"title";s:8:"Visit Us";s:4:"text";s:67:"<p>14 Mill Lane, Riverton &#8211; open Wed to Sun, 10am to 5pm.</p>";s:6:"filter";b:1;s:6:"visual";b:1;}i:3;a:4:{s:5:"title";s:10:"Newsletter";s:4:"text";s:65:"<p>Sign up for restock alerts. No spam, roughly once a month.</p>";s:6:"filter";b:1;s:6:"visual";b:1;}s:12:"_multiwidget";i:1;}
