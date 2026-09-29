@@ -47,12 +47,16 @@ interface SiteWriter
      * as a starting point and lets a database row override them, so an edit lands without touching
      * a single file of somebody else's theme, and deleting the row restores the theme's own.
      *
+     * `template` is the same mechanism one level up: a full template (`page`, `front-page`) that a
+     * block theme ships as `templates/<slug>.html` and the Site Editor overrides with a `wp_template`
+     * row. A theme may print a page's own words there, and they are the site's words all the same.
+     *
      * `term` and `menuItem` close the other half of the same gap. Joomla edits a category or a
      * menu as a row; WordPress keeps both in taxonomies, and a plugin that only wrote posts and
      * options could rename neither. A WordPress menu is a `nav_menu` term with `nav_menu_item`
      * posts hanging off it — two shapes, so two kinds, rather than one kind pretending.
      */
-    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'term', 'menuItem'];
+    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'template', 'term', 'menuItem'];
 
     /**
      * The current state of one target, or null when nothing is there.
