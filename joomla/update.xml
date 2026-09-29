@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.18.4 plus: a redirect and a custom field can be created through content.update, a redirect says when its System - Redirect plugin is off and extension.enable may switch that one core plugin on (TracyHQ/claude-cowork#68)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.18.5</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.5</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.18.5/pkg_claudecowork-0.18.5.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.18.3 plus: tracyaccess logs a Tracy editor into the administrator only, so a site whose Privacy Consent plugin is on shows Tracy's Browser tab the site instead of the profile form (TracyHQ/tch#516)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
