@@ -143,6 +143,9 @@
 .gap-1 {
   gap: var(--wp--preset--spacing--1);
 }
+.gap-2 {
+  gap: var(--wp--preset--spacing--2);
+}
 .gap-4 {
   gap: var(--wp--preset--spacing--4);
 }
@@ -252,6 +255,9 @@
 }
 .p-8 {
   padding: var(--wp--preset--spacing--8);
+}
+.px-3 {
+  padding-inline: var(--wp--preset--spacing--3);
 }
 .px-8 {
   padding-inline: var(--wp--preset--spacing--8);
@@ -632,4 +638,19 @@
 
 .tracy-form__note--bad {
   color: var(--wp--preset--color--danger);
+}
+
+.tracy-pagination__item.is-current {
+  background: var(--wp--preset--color--surface);
+  color: var(--wp--preset--color--fg);
+  font-weight: 600;
+}
+
+.tracy-entry__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tracy-entry__title a:hover {
+  color: var(--wp--preset--color--accent);
 }
