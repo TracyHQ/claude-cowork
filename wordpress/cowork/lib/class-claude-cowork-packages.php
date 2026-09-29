@@ -613,7 +613,7 @@ final class Claude_Cowork_Packages {
 			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		$written = wp_update_post(
 			array(
@@ -626,7 +626,7 @@ final class Claude_Cowork_Packages {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		if ( is_wp_error( $written ) ) {
 			return array( 'ok' => false, 'error' => $written->get_error_message() );
@@ -801,7 +801,7 @@ final class Claude_Cowork_Packages {
 			remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			remove_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		$written = wp_update_post(
 			array(
@@ -814,7 +814,7 @@ final class Claude_Cowork_Packages {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		}
 		if ( $had_styles_kses ) {
-			add_filter( 'content_save_pre', 'wp_filter_global_styles_post' );
+			add_filter( 'content_save_pre', 'wp_filter_global_styles_post', 9 );
 		}
 		if ( is_wp_error( $written ) ) {
 			return array( 'ok' => false, 'error' => $written->get_error_message() );

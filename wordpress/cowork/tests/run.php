@@ -1632,6 +1632,7 @@ require_once __DIR__ . '/multilingual.php';
 // The site's default language on a sealed multilingual site.
 require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/theme-style-variation.php';
+require_once __DIR__ . '/global-styles-kses.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
 require __DIR__ . '/navigation-links.php';
