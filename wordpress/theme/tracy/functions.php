@@ -323,6 +323,17 @@ add_action(
 			}
 			if ( null !== $file && preg_match( '/^[a-z0-9-]+$/', $id ) && file_exists( get_theme_file_path( $file ) ) ) {
 				wp_enqueue_style( 'tracy-' . $kind, get_theme_file_uri( $file ), array(), $version );
+			} elseif ( 'artifact' === $kind && isset( $artifact ) && null !== $file ) {
+				// A look with no sheet of its own — a brand, made at build time under
+				// uploads/tracy/styles (ADR 0023) — wears the theme-driven sheet: the same rules, its
+				// varying properties read from the worn variation's variables. Those are printed here
+				// (variables only, no element rule) because `global-styles` is dequeued below. Measured
+				// 30/09 on `dfbrandwp1`: without it the home page rendered unstyled, `shot` 49/100.
+				$generic = "assets/css/artifacts/$artifact/_theme.css";
+				if ( file_exists( get_theme_file_path( $generic ) ) ) {
+					wp_enqueue_style( 'tracy-' . $kind, get_theme_file_uri( $generic ), array(), $version );
+					wp_add_inline_style( 'tracy-' . $kind, wp_get_global_stylesheet( array( 'variables' ) ) );
+				}
 			}
 			wp_enqueue_style( 'tracy-fixture-page', get_theme_file_uri( 'assets/css/fixture-page.css' ), array(), $version );
 			return;
