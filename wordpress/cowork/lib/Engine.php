@@ -2140,21 +2140,49 @@ final class Engine
             return $locked;
         }
 
+        // The group to link, validated BEFORE anything is written. `translations` is the OTHER
+        // pages; the page being filed is a member of the group too, in its own language, whether or
+        // not the caller listed it. Polylang links a group only from two or more languages, so a
+        // caller who named only the other page used to get ok:true and no hreflang at all (measured
+        // in benchmark v6). The page's own entry always wins: `$id` is the page this call files.
+        $wantsLink = isset($p['translations']) && is_array($p['translations']) && $p['translations'] !== [];
+        $translations = [];
+        if ($wantsLink) {
+            foreach ($p['translations'] as $code => $postId) {
+                $raw = trim((string) $code);
+                if (!preg_match('/^[a-z]{2}(-[a-z]{2})?$/i', $raw)) {
+                    return $this->err('bad_params', 'not a language code in translations: ' . $raw);
+                }
+                if ((int) $postId > 0) {
+                    $translations[strtolower(substr($raw, 0, 2))] = (int) $postId;
+                }
+            }
+            $translations[$slug] = $id;
+            if (count($translations) < 2) {
+                return $this->err('bad_params', 'translations must name at least one other language than ' . $slug . ' with its page id');
+            }
+        }
+
         $before = function_exists('pll_get_post_language') ? pll_get_post_language($id) : null;
 
         try {
             $this->ensureLanguage($slug);
-            pll_set_post_language($id, $slug);
-            $translations = [];
-            foreach ((array) ($p['translations'] ?? []) as $code => $postId) {
-                $code = strtolower(substr((string) $code, 0, 2));
-                $postId = (int) $postId;
-                if ($code !== '' && $postId > 0) {
-                    $this->ensureLanguage($code);
-                    $translations[$code] = $postId;
+            foreach (array_keys($translations) as $code) {
+                $this->ensureLanguage($code);
+            }
+            if ($wantsLink && function_exists('PLL') && PLL() && function_exists('pll_languages_list')) {
+                $known = (array) pll_languages_list();
+                foreach (array_keys($translations) as $code) {
+                    if (!in_array($code, $known, true)) {
+                        return $this->err('bad_params', 'unknown language: ' . $code);
+                    }
                 }
             }
-            if (count($translations) > 1 && function_exists('pll_save_post_translations')) {
+            pll_set_post_language($id, $slug);
+            if ($wantsLink) {
+                if (!function_exists('pll_save_post_translations')) {
+                    return $this->err('unavailable', 'this site cannot link translations');
+                }
                 pll_save_post_translations($translations);
             }
         } catch (Throwable $e) {
@@ -2174,7 +2202,11 @@ final class Engine
 
         $this->stamped('content');
 
-        return $this->ok(['id' => $id, 'lang' => $slug]);
+        $out = ['id' => $id, 'lang' => $slug];
+        if ($wantsLink) {
+            $out['linked'] = $translations;
+        }
+        return $this->ok($out);
     }
 
     /**

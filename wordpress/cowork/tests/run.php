@@ -1650,6 +1650,8 @@ require __DIR__ . '/content-batch.php';
 require __DIR__ . '/image-slots.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.
 require __DIR__ . '/provenance-stamps.php';
+// content.language: the page being filed joins its own translation group (defines Polylang writers, so last).
+require __DIR__ . '/content-language.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
