@@ -48,7 +48,10 @@ final class FakeSiteWriter implements SiteWriter
         if ('post' === $kind && 0 === $id) {
             $id = $this->nextId++;
         }
-        $this->store[$kind][$this->slot($id, $key)] = $fields;
+        // An update merges into the row, as every real writer does (`wp_update_post`, a template
+        // part's area, a menu item's destination): a field the call did not name stays.
+        $slot = $this->slot($id, $key);
+        $this->store[$kind][$slot] = array_merge($this->store[$kind][$slot] ?? [], $fields);
         return $id;
     }
 
@@ -141,9 +144,13 @@ final class FakeApplyLog implements ApplyLog
     /** @var array<string,array<int,array<string,mixed>>> */
     public array $log = [];
 
+    /** @var array<int,array{apply_id:string,entry:array<string,mixed>}> Every step, in the order recorded. */
+    private array $order = [];
+
     public function record(string $applyId, array $entry): void
     {
         $this->log[$applyId][] = $entry;
+        $this->order[] = ['apply_id' => $applyId, 'entry' => $entry];
     }
 
     public function entries(string $applyId): array
@@ -154,6 +161,21 @@ final class FakeApplyLog implements ApplyLog
     public function clear(string $applyId): void
     {
         unset($this->log[$applyId]);
+        $this->order = array_values(array_filter($this->order, static fn(array $row): bool => $row['apply_id'] !== $applyId));
+    }
+
+    public function later(string $applyId): array
+    {
+        $out = [];
+        $seen = false;
+        foreach ($this->order as $row) {
+            if ($row['apply_id'] === $applyId) {
+                $seen = true;
+            } elseif ($seen) {
+                $out[] = $row;
+            }
+        }
+        return $out;
     }
 }
 
@@ -172,5 +194,10 @@ final class FailingApplyLog implements ApplyLog
 
     public function clear(string $applyId): void
     {
+    }
+
+    public function later(string $applyId): array
+    {
+        return [];
     }
 }

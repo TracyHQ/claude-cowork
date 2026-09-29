@@ -1653,6 +1653,8 @@ require __DIR__ . '/image-slots.php';
 require __DIR__ . '/provenance-stamps.php';
 // content.language: the page being filed joins its own translation group (defines Polylang writers, so last).
 require __DIR__ . '/content-language.php';
+// apply.revert takes back one receipt: the span its write changed, never the whole row.
+require __DIR__ . '/revert-span.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
