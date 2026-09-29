@@ -842,7 +842,7 @@ class FakeSiteWriterBase implements SiteWriter
     /** Mirrors the real catalog's shape: identity/installer kinds refuse create, most kinds trash.
      * Tree kinds (menuItem/category/tag) create since 0.8.14 — the real writer routes them
      * through Joomla's Table API; here a plain insert stands in for it. */
-    private const NO_CREATE = ['user', 'extensionParams', 'templateStyle'];
+    private const NO_CREATE = ['user', 'extensionParams', 'templateStyle', 'fieldValue'];
     private const TRASH = [
         'article' => 'state', 'field' => 'state', 'banner' => 'state', 'bannerClient' => 'state',
         'category' => 'published', 'tag' => 'published', 'menuItem' => 'published',
@@ -860,8 +860,19 @@ class FakeSiteWriterBase implements SiteWriter
         return self::TRASH[$kind] ?? null;
     }
 
+    /**
+     * `#__fields_values` as the table holds it, when a test sets it: rows with no key of their own,
+     * so one (field_id, item_id) may have several. Null keeps fieldValue in $store like every kind.
+     */
+    public ?array $fieldValues = null;
+    private function fieldValueRows(int $id): array
+    {
+        [$field, $item] = FieldValueKey::decode($id);
+        return array_filter($this->fieldValues, fn($r) => (int) $r['field_id'] === $field && (string) $r['item_id'] === (string) $item);
+    }
     public function read(string $kind, int $id): ?array
     {
+        if ($kind === 'fieldValue' && $this->fieldValues !== null) return FieldValueKey::only($this->fieldValueRows($id));
         return $this->store[$kind][$id] ?? null;
     }
     public function readLanguageDefaults(): array
@@ -917,6 +928,12 @@ class FakeSiteWriterBase implements SiteWriter
     }
     public function write(string $kind, int $id, array $fields): int
     {
+        if ($kind === 'fieldValue' && $this->fieldValues !== null) {
+            $rows = $this->fieldValueRows($id);
+            FieldValueKey::single($rows);
+            $this->fieldValues[array_key_first($rows)]['value'] = (string) $fields['value'];
+            return $id;
+        }
         if ($id === 0) {
             // Like an auto-increment key: a new row never takes an id a row already holds.
             do $id = $this->nextId++; while (isset($this->store[$kind][$id]));
@@ -1841,6 +1858,17 @@ require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";
+// Derived contract core: leaf paths, rendered-page calibration, DB rows -> content map. Plain PHP, no CMS.
+require __DIR__ . "/leaf-codec.php";
+// Fixtures of RAW values in the storage format of popular Joomla builders (JA ACM, Cassiopeia,
+// YOOtheme, SP Page Builder): proves the codec above on real shapes, not only the hand-written
+// strings above.
+require __DIR__ . "/builder-fixtures.php";
+require __DIR__ . "/visible-text.php";
+require __DIR__ . "/derived-map.php";
+// Derived contract: an imported site bound to its own rows, through the contract door.
+require __DIR__ . "/derived-contract.php";
+require __DIR__ . "/loopback-route.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

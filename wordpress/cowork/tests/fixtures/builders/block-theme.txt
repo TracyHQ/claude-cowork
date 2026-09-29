@@ -1,0 +1,17 @@
+<!-- wp:heading {"level":1} -->
+<h1 class="wp-block-heading">Welcome to Northwind Traders</h1>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>We roast small-batch coffee &amp; ship it fresh, every Tuesday.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:cover {"url":"https://example.com/wp-content/uploads/2024/01/hero.jpg","id":12,"dimRatio":50} -->
+<div class="wp-block-cover"><span aria-hidden="true" class="wp-block-cover__background has-background-dim-50 has-background-dim"></span><img class="wp-block-cover__image-background" src="https://example.com/wp-content/uploads/2024/01/hero.jpg" alt="" data-object-fit="cover"/><div class="wp-block-cover__inner-container"><!-- wp:heading -->
+<h2 class="wp-block-heading">Fresh Roasted Weekly</h2>
+<!-- /wp:heading --></div></div>
+<!-- /wp:cover -->
+
+<!-- wp:buttons -->
+<div class="wp-block-buttons"><!-- wp:button {"text":"Shop the collection","url":"https://example.com/shop"} /--></div>
+<!-- /wp:buttons -->

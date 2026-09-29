@@ -9,6 +9,8 @@ require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/Timing.php';
+require_once __DIR__ . '/LeafCodec.php';
+require_once __DIR__ . '/DerivedMap.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -144,6 +146,56 @@ final class QuickstartContract
             $this->demoTrim = new DemoTrimProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw);
         }
     }
+    /**
+     * A DERIVED contract: an imported site's own rows are the map (DerivedMap), there is no design to
+     * compare and no file to prove. Built lazily — `$build()` runs the first time the map is needed,
+     * so an Engine answering `db.*` or `files.*` on such a site never scans its tables.
+     */
+    public static function derived(SiteWriter $writer, ContractStore $store, string $root, callable $build): self {
+        $contract = (new ReflectionClass(self::class))->newInstanceWithoutConstructor();
+        $contract->writer = $writer; $contract->store = $store; $contract->root = $root;
+        $contract->build = $build; $contract->derivedMode = true; $contract->lock = self::EMPTY_LOCK;
+        return $contract;
+    }
+    /** The shape of a Joomla presentation-lock.json with nothing locked (keys of tracy-airbnb/j6/1.1.0). */
+    private const EMPTY_LOCK = ['entities'=>[], 'assignments'=>[], 'inventoryCounts'=>[], 'access'=>[], 'visibility'=>[], 'fileRoots'=>[], 'files'=>[]];
+    private bool $derivedMode = false;
+    /** @var callable|null the derived map, until it is built */
+    private $build = null;
+    private function loaded(): void {
+        if ($this->build === null) return;
+        $built = ($this->build)(); $this->build = null;
+        $this->manifest = $built['manifest']; $this->map = $built['map'] + ['pages' => []];
+    }
+    public function isDerived(): bool { return $this->derivedMode; }
+    /** Derived entity key => the row it was read from: a derived map is rebuilt from the rows on every request. */
+    private function sourceIds(): array { return array_map('intval', array_column($this->baseEntities(), 'sourceId', 'key')); }
+    /** @return array<string,array{type:string,kind:string,id:int,nested:bool}> for the given keys of a derived contract's slots */
+    public function derivedOwners(array $slotKeys): array {
+        if (!$this->derivedMode) return [];
+        $want = array_flip(array_map('strval', $slotKeys)); $entities = $this->baseEntities(); $out = [];
+        foreach ($this->map['slots'] as $slot) if (isset($want[$slot['key']]))
+            $out[$slot['key']] = ['type'=>$slot['type'], 'kind'=>$entities[$slot['entity']]['kind'], 'id'=>(int)$entities[$slot['entity']]['sourceId'], 'nested'=>!empty($slot['nested'])];
+        return $out;
+    }
+    private function derivedSnapshot(array $record): array {
+        $this->loaded();
+        $counts = [];
+        foreach ($this->map['entities'] as $entity) $counts[$entity['kind']] = ($counts[$entity['kind']] ?? 0) + 1;
+        return ['contractHash'=>$this->contractHash(), 'ids'=>$this->sourceIds(), 'presentation'=>[], 'assignments'=>[], 'counts'=>$counts, 'access'=>[],
+            'mode'=>'derived', 'contract'=>$this->manifest['id'], 'algorithm'=>$this->manifest['algorithm'], 'calibrated'=>$this->manifest['calibrated']] + $record;
+    }
+    /**
+     * Bind a derived contract, replacing whatever derived binding stood (a re-derive moves it). The
+     * caller has refused a quickstart binding already. `$record` adds requestId, derivedAt, keep.
+     */
+    public function bindDerived(array $record): array {
+        $this->ready();
+        if (!$this->derivedMode) throw new RuntimeException('Only a derived contract binds this way');
+        $snapshot = $this->derivedSnapshot($record);
+        $this->store->replace($snapshot);
+        return $snapshot;
+    }
     private function ready(): void { if ($this->unavailable !== null) throw new RuntimeException($this->unavailable); }
     public function bound(): bool { $this->ready(); return $this->store->load() !== null; }
     /**
@@ -184,17 +236,23 @@ final class QuickstartContract
      * and re-encoding ~10 MB of profile JSON ran twice per inspect and twice per readMapping (#316).
      */
     private ?string $contractHash = null;
-    private function contractHash(): string {
+    public function contractHash(): string {
         if($this->contractHash!==null)return $this->contractHash;
+        // A derived map changes with every apply (it is the rows); what a binding is held to is the algorithm.
+        if($this->derivedMode){$this->loaded();return $this->contractHash=$this->digest(DerivedMap::hashBasis((int)$this->manifest['algorithm']));}
         $t=Timing::begin();$this->contractHash=$this->digest([$this->manifest,$this->map,$this->lock]);Timing::end('contractHash',$t);
         return $this->contractHash;
     }
     /** Derived once per instance from the immutable package map — it was rebuilt on every call, inside loops over every copy. */
     private ?array $baseEntities = null;
-    private function baseEntities(): array { return $this->baseEntities ??= array_column($this->map['entities'], null, 'key'); }
+    private function baseEntities(): array {
+        if ($this->baseEntities === null) { $this->loaded(); $this->baseEntities = array_column($this->map['entities'], null, 'key'); }
+        return $this->baseEntities;
+    }
     private ?array $slotsByEntity = null;
     private function slotsFor(string $key): array {
         if ($this->slotsByEntity === null) {
+            $this->loaded();
             $this->slotsByEntity = [];
             foreach ($this->map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $slot;
         }
@@ -314,7 +372,13 @@ final class QuickstartContract
         foreach ($slots as $slot) {
             if (!array_key_exists($slot['key'],$values)) continue;
             $value=$values[$slot['key']]; $col=$slot['column'];
-            if (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
+            // A derived slot names its leaf inside the column (LeafCodec): every layer is re-encoded
+            // in its own format, and a value that would not read back is refused, never stored.
+            if (($slot['leaf'] ?? null) !== null) {
+                try { $row[$col]=LeafCodec::set((string)$row[$col],$slot['leaf'],(string)$value); }
+                catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot cannot be rewritten in place: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
+            }
+            elseif (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
             elseif (isset($slot['jsonPath'])) {
                 $data=$json[$col]??json_decode($row[$col],true,512,JSON_THROW_ON_ERROR);
                 $inner=$slot['nestedJson']; $body=json_decode($data[$inner],true,512,JSON_THROW_ON_ERROR);
@@ -333,6 +397,10 @@ final class QuickstartContract
      */
     private function currentValue(array $row, array $slot, array &$parsed = []): string {
         $column=$slot['column'];$value=$row[$column];
+        if(($slot['leaf']??null)!==null) {
+            try { return LeafCodec::get((string)$value,$slot['leaf']); }
+            catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot is missing from its column: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
+        }
         if(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
@@ -525,7 +593,8 @@ final class QuickstartContract
         $languages = $this->effectiveLanguages($binding, null);
         $switcher = $binding['multilingual']['switcher'] ?? null;
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
-        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $binding, $languages, $switcher);
+        // A derived map is rebuilt from the rows it names, so its entities resolve by their own ids.
+        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $this->derivedMode ? ['ids'=>$this->sourceIds()] : $binding, $languages, $switcher);
         foreach ($resolved['missing'] as $gone) unset($keys[$gone]);
         unset($resolved['missing']);
         $slots = [];
@@ -537,6 +606,7 @@ final class QuickstartContract
 
     public function inspect(): array {
         $this->ready();
+        if ($this->derivedMode) return $this->inspectDerived();
         $inspect=Timing::begin();
         $this->drift = [];
         $this->files();
@@ -718,6 +788,35 @@ final class QuickstartContract
     }
 
     /**
+     * inspect() for a derived contract, in the same shape. Nothing to compare: no design was captured,
+     * no file is locked, the map is the rows. The baseline is the derive's own binding, which a
+     * content apply leaves as it is; the revision is every slot column of every mapped row.
+     */
+    private function inspectDerived(): array {
+        $inspect=Timing::begin();
+        $this->drift=[];
+        $binding=$this->store->load();
+        if($binding && ($binding['contractHash']??null)!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
+        $keys=$this->inventoryKeys([],null);
+        ['ids'=>$ids,'rows'=>$rows,'missing'=>$missing]=$this->resolveRows(new ContractRows($this->writer),$keys,['ids'=>$this->sourceIds()],[],null);
+        foreach($missing as $gone){unset($keys[$gone]);$this->drift('Derived entity disappeared: '.$gone);}
+        $this->settleDrift();
+        $slots=[];$slotValues=[];$revisionRows=[];
+        foreach($keys as $key=>$meta){
+            $parsed=[];
+            foreach($this->slotsFor($key) as $slot){
+                $slot['current']=$this->currentValue($rows[$key],$slot,$parsed);
+                $slots[]=$slot;$slotValues[$slot['key']]=$slot['current'];
+                $revisionRows[$key][$slot['column']]=$rows[$key][$slot['column']];
+            }
+        }
+        Timing::end('inspect',$inspect);
+        return ['contract'=>$this->manifest['id'],'snapshot'=>$binding??$this->derivedSnapshot([]),'revision'=>$this->digest($revisionRows),
+            'slots'=>$slots,'pages'=>[],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>[],'assignments'=>[],'slotValues'=>$slotValues,
+            'languages'=>[],'binding'=>$binding,'job'=>$this->store->job(),'switcher'=>null,'demoTrim'=>null];
+    }
+
+    /**
      * Scalar content rules, applied identically to an original and to a translation of it.
      *
      * Throws the slot's FIRST problem as a ContractProblem; the message is the one this rule has
@@ -739,6 +838,14 @@ final class QuickstartContract
         }
         if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
         if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        // An imported site stores links and pictures in whatever form it grew; a quickstart's rules below
+        // were written for the forms its own profile ships, and stay exactly as they are. A derived
+        // slot's length limit is sized from its old words, which says nothing about a link or a file
+        // name; an address has its own ceiling instead.
+        if($this->derivedMode && in_array($slot['type'],['url','image'],true)) {
+            if(strlen($value)>self::DERIVED_LINK_BYTES)throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>self::DERIVED_LINK_BYTES,'actual'=>strlen($value)]);
+            $this->checkDerivedLink($slot,$value,$refuse); return;
+        }
         if(mb_strlen($value)>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>mb_strlen($value)]);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
@@ -749,6 +856,42 @@ final class QuickstartContract
             $before=@getimagesize($this->root.'/'.$slot['sample']);$after=@getimagesize($this->root.'/'.$value);
             if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
+    }
+
+    /**
+     * A derived link: what LeafCodec reads as one (https://…, /path, index.php?…, mailto:, tel:, #anchor);
+     * never protocol-relative, a backslash or a script. A derived picture: a file inside `images/`,
+     * named with or without a leading slash and Joomla's `#joomlaImage://` suffix; any shape, since an
+     * imported slot has no captured design to keep. SVG is allowed because the file must already be
+     * under `images/`: the site's own upload, never one this door writes.
+     */
+    private function checkDerivedLink(array $slot, string $value, callable $refuse): void {
+        $key=$slot['key'];
+        if($value==='')return;
+        if($slot['type']==='url') {
+            if(strpos($value,'//')===0||strpos($value,'\\')!==false||!preg_match('~^(https?://\S+|mailto:\S+|tel:[+0-9 ()-]+|index\.php\?\S*|/\S*|#[a-zA-Z0-9_-]+)$~D',$value))
+                throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
+            return;
+        }
+        $path=self::imagePath($value);
+        if(!preg_match('~^images/[^\s?#\\\\]+\.(png|jpe?g|webp|gif|avif|svg)$~iD',$path)||!is_file($this->root.'/'.$path))throw $refuse('SLOT_IMAGE_INVALID','Image must already exist in the site media library: '.$key);
+        $resolved=realpath($this->root.'/'.$path);$imageRoot=realpath($this->root.'/images');
+        if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw $refuse('SLOT_IMAGE_INVALID','Image escapes the site media library: '.$key);
+    }
+    private const DERIVED_LINK_BYTES = 2048;
+    /** A stored picture value reduced to its file under the site root: no `#joomlaImage://` suffix, no leading slash. */
+    private static function imagePath(string $value): string { return ltrim(explode('#',$value,2)[0],'/'); }
+    /**
+     * A derived picture written in the form its slot already holds: a leading slash kept, and Joomla's
+     * media suffix (`#joomlaImage://local-<path>?width=&height=`) kept with the NEW file's size — or
+     * dropped when that size cannot be read, rather than state the old one.
+     */
+    private function storedImage(string $value, string $old): string {
+        $path=self::imagePath($value);
+        $out=(strpos($old,'/')===0?'/':'').$path;
+        if(strpos($old,'#joomlaImage://')===false)return $out;
+        $size=@getimagesize($this->root.'/'.$path);
+        return $size && $size[0]>0 && $size[1]>0 ? $out.'#joomlaImage://local-'.$path.'?width='.$size[0].'&height='.$size[1] : $out;
     }
 
     /**
@@ -814,7 +957,7 @@ final class QuickstartContract
             }
             try { $this->checkValue($slot,$value,$params); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
-            $values[$key]=$value;
+            $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
         }
         if($problems)throw ContractProblem::all($problems);
         // 🔒 A PICTURE IS THE SAME PICTURE IN EVERY LANGUAGE. Words are translated, so a new source

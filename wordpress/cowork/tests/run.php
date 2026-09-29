@@ -1654,6 +1654,19 @@ require __DIR__ . '/image-slots.php';
 require __DIR__ . '/provenance-stamps.php';
 // content.language: the page being filed joins its own translation group (defines Polylang writers, so last).
 require __DIR__ . '/content-language.php';
+// Derived contract core: leaf paths, rendered-page calibration, DB rows -> content map. Plain PHP, no CMS.
+require __DIR__ . '/leaf-codec.php';
+// Fixtures of RAW values in the storage format of popular builders (Elementor, Divi, WPBakery, block
+// theme, classic customizer/widgets, ACF, WooCommerce): proves the codec above on real shapes, not
+// only the hand-written strings above.
+require __DIR__ . '/builder-fixtures.php';
+require __DIR__ . '/visible-text.php';
+require __DIR__ . '/derived-map.php';
+require __DIR__ . '/loopback-route.php';
+// Derived contract on WordPress: rows, derive, leaf apply and revert, the reader, purge and render check.
+require __DIR__ . '/derived-contract.php';
+// String overrides: gettext words replaced per locale, through content.contract string and apply.revert.
+require __DIR__ . '/string-overrides.php';
 // apply.revert takes back one receipt: the span its write changed, never the whole row.
 require __DIR__ . '/revert-span.php';
 

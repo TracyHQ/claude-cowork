@@ -1,0 +1,1 @@
+{"logoFile":"","siteTitle":"Nordvik Ceramics","siteDescription":"Contemporary stoneware, thrown and fired in our Malmo studio.","transparent":0,"googleFont":1,"googleFontName":"Roboto","fluidContainer":0,"boxedFullWidth":0,"colorScheme":"blue","phone-body-font-size":90,"metaDescription":"A family run gallery specialising in contemporary Nordic ceramics."}

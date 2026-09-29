@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/ContentReader.php';
 require_once __DIR__ . '/JoomlaLocks.php';
+require_once __DIR__ . '/SiteWriter.php';
 /**
  * The mapped-content projection: CMS rows in, `content.read` contents out. No Joomla globals, no
  * database and no writes, so the contract door can compute the SAME revisions the reader served.
@@ -408,11 +409,17 @@ final class ContentProjection
         // "All languages" home is never the page anyone reads. Left in the map it sat beside the
         // real homes as a three-block "Home" and the agent opened it first (25/09, capijl1644).
         $languageHomes = count(array_filter($data['menu'], fn($m) => (int)($m['home'] ?? 0) === 1 && ($m['language'] ?? '*') !== '*' && (int)($m['published'] ?? 0) === 1 && (int)($m['client_id'] ?? 0) === 0));
+        // A derived contract (an imported site's own rows) also maps site template styles, which read
+        // as shared contents under an identity of their own: a style and a module may share a number.
+        $derived = ($mapping['manifest']['mode'] ?? '') === 'derived';
+        $kinds = ['article' => 'article', 'menuItem' => 'page', 'module' => 'shared'] + ($derived ? ['templateStyle' => 'shared'] : []);
         foreach ($mapping['keys'] as $key => $meta) {
-            $kind = ['article' => 'article', 'menuItem' => 'page', 'module' => 'shared'][$meta['kind']] ?? null;
+            $kind = $kinds[$meta['kind']] ?? null;
             if ($kind === null || !empty($meta['switcher'])) continue;
+            $identity = $meta['kind'] === 'templateStyle' ? 'templateStyle' : $kind;
             $row = $mapping['rows'][$key]; $nativeId = (int)$mapping['ids'][$key];
-            $allowed = self::visible($row, $levels, $now, $kind);
+            // A site template style has no audience of its own: it shows wherever the site does.
+            $allowed = $identity === 'templateStyle' || self::visible($row, $levels, $now, $kind);
             if ($kind === 'article') {
                 $cat = $categories[$row['catid']] ?? null;
                 $seen = [];
@@ -436,9 +443,9 @@ final class ContentProjection
             if (!$allowed) continue;
             if ($kind === 'article') $extras['articleCategory'][$nativeId] = (int)($row['catid'] ?? 0);
             if ($kind === 'page' && preg_match('~[?&]option=com_content&view=category(?:&[^&]*)*?&id=(\d+)~', (string)($row['link'] ?? ''), $m)) $extras['pageCategories'][(int)$m[1]] = true;
-            $uid = $identities[$kind][$nativeId] ?? null;
+            $uid = $identities[$identity][$nativeId] ?? null;
             if (!$uid) throw new ContentReadError('CONTENT_ADAPTER_UNSUPPORTED', 501, 'Content identity registry is incomplete');
-            $id = $opaque('content', $uid); $keys[$key] = $id; $native[$kind][$nativeId] = $id; $contractKey[$id] ??= $key;
+            $id = $opaque('content', $uid); $keys[$key] = $id; $native[$identity][$nativeId] = $id; $contractKey[$id] ??= $key;
             if (isset($contents[$id])) continue;
             $rowsOf[$id] = [[$meta['kind'], $nativeId]];
             $locale = ($row['language'] ?? '*') === '*' ? null : $row['language'];
@@ -457,11 +464,11 @@ final class ContentProjection
             // contract's jsonPath (`tb-hero[image-alt]`). Without it the agent could not tell the
             // picture's alt from any other text and ran the contract inspect only to read labels — on
             // the dev host 60–80 s a call (25/09/2026, local agent chat on r1j1734, 3 of 3 runs).
-            $semantic = function (array $slot): ?string {
+            $semantic = function (array $slot) use ($derived): ?string {
                 $path = $slot['jsonPath'] ?? null;
                 if (is_array($path) && isset($path[1]) && is_string($path[1]) && preg_match('/\[([^\]]+)\]$/', $path[1], $m))
                     return $m[1] . ((int)($path[2] ?? 0) > 0 ? '.' . (int)$path[2] : '');
-                return isset($slot['column']) && is_string($slot['column']) && $slot['column'] !== 'params' ? $slot['column'] : null;
+                return isset($slot['column']) && is_string($slot['column']) && ($slot['column'] !== 'params' || $derived) ? $slot['column'] : null;
             };
             $alts = [];
             foreach ($mapping['slots'][$key] as $slot) {
@@ -567,6 +574,23 @@ final class ContentProjection
         foreach ($native['article'] ?? [] as $articleId => $cid) {
             $category = $opaque('content', 'category:' . (int)($extras['articleCategory'][$articleId] ?? 0));
             if (isset($contents[$category], $contents[$cid])) $contents[$cid]['relations'][] = ['type' => 'parent', 'contentId' => $category];
+        }
+        // A derived map's category and custom-field-value slots belong to contents already made: a
+        // category's to its category record, a field value's to the article it is stored for. One
+        // block per slot, like every other slot; a content that is not read leaves its slots unread.
+        if ($derived) foreach ($mapping['keys'] as $key => $meta) {
+            if ($meta['kind'] === 'category') $owner = $opaque('content', 'category:' . (int)$mapping['ids'][$key]);
+            elseif ($meta['kind'] === 'fieldValue') $owner = $native['article'][FieldValueKey::decode((int)$mapping['ids'][$key])[1]] ?? null;
+            else continue;
+            if ($owner === null || !isset($contents[$owner])) continue;
+            $row = $mapping['rows'][$key];
+            foreach ($mapping['slots'][$key] as $slot) {
+                $field = ['key' => $slot['key'], 'type' => $slot['type'], 'value' => $slotValue($row, $slot), 'slotKey' => $slot['key'], 'semanticKey' => $slot['column']];
+                $contents[$owner]['blocks'][] = ['id' => $opaque('block', $owner . ':' . $slot['key']), 'key' => $slot['key'], 'role' => null, 'position' => count($contents[$owner]['blocks']),
+                    'sharedContentId' => null, 'visibility' => 'unknown', 'fields' => [$field], 'items' => []];
+            }
+            $keys[$key] = $owner;
+            if ($meta['kind'] === 'fieldValue') $rowsOf[$owner][] = ['fieldValue', (int)$mapping['ids'][$key]];
         }
         $groups = [];
         foreach ($data['associations'] as $association) {

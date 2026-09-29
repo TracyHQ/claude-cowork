@@ -20,12 +20,15 @@ final class FakeProvenanceSite implements ProvenanceSite
     public $template = null;
     /** @var bool */
     public $pageRender = true;
+    /** @var bool */
+    public $inLoop = true;
 
     public function slug(int $postId): string { return $this->slugs[$postId] ?? ''; }
     public function currentPostId(): int { return $this->current; }
     public function pageOwner(): ?string { return $this->page; }
     public function templateSlug(): ?string { return $this->template; }
     public function isPageRender(): bool { return $this->pageRender; }
+    public function inTheLoop(): bool { return $this->inLoop; }
 }
 
 /** The part of WP_Block the stamps read. */
@@ -246,7 +249,8 @@ function provRegister(string $header, string $token, string $extra = ''): string
 }
 
 check('ordinary request: register() adds no hook and touches no cache setting (the page is byte-identical)', provRegister('', $TOKEN16), '|cache|ls-cache');
-check('stamping request: hooks in and opts out of page caches', provRegister('pick', $TOKEN16), 'send_headers,render_block_data,render_block,wp_footer|nocache|ls-nocache');
+check('stamping request: hooks in and opts out of page caches', provRegister('pick', $TOKEN16),
+    'send_headers,render_block_data,render_block,wp_footer,the_content,the_content,nav_menu_link_attributes,dynamic_sidebar_params,dynamic_sidebar_before,dynamic_sidebar,dynamic_sidebar_after|nocache|ls-nocache');
 check('stamping header on a switched-off site: nothing', provRegister('pick', ''), '|cache|ls-cache');
 check('stamping header on an admin request: nothing', provRegister('pick', $TOKEN16, 'function is_admin() { return true; }'), '|cache|ls-cache');
 check('stamping header on admin-ajax: nothing', provRegister('pick', $TOKEN16, 'function wp_doing_ajax() { return true; }'), '|cache|ls-cache');
@@ -260,3 +264,53 @@ check('a stamping response is private, uncacheable and varies on the cookie', Pr
     ['X-LiteSpeed-Cache-Control: no-cache', true],
     ['Referrer-Policy: no-referrer', true],
 ]);
+
+// ---- Records no block names: a post's content, a classic menu entry, a widget ------------------
+
+$classic = new FakeProvenanceSite();
+$classic->slugs = [44 => 'oak-table'];
+$classic->current = 44;
+$s = new ProvenanceStamps($classic);
+check('the_content of any post type: its first element names the post',
+    $s->theContent("\n<p>Solid oak.</p><p>Made to order.</p>"), "\n<p data-tracy-src=\"post:44:oak-table block:the_content\">Solid oak.</p><p>Made to order.</p>");
+check('the_content never overwrites a block\'s own stamp',
+    $s->theContent('<p data-tracy-src="part:header block:core/paragraph">x</p>'), '<p data-tracy-src="part:header block:core/paragraph">x</p>');
+$classic->current = 0;
+check('the_content with no post in the loop is left', $s->theContent('<p>x</p>'), '<p>x</p>');
+$classic->current = 44;
+$classic->pageRender = false;
+check('the_content of a feed or REST render is left', $s->theContent('<p>x</p>'), '<p>x</p>');
+$classic->pageRender = true;
+$classic->inLoop = false;
+check('the_content outside the loop (a theme mod, a widget) is not the page\'s post', $s->theContent('<p>x</p>'), '<p>x</p>');
+$classic->inLoop = true;
+// A related post's content rendered inside the page's own (a shortcode, a block): the inner call is
+// not stamped with the loop's post; the outer one is.
+$s->enterContent('<p>outer</p>');
+$s->enterContent('<p>inner</p>');
+check('a nested the_content is not stamped', $s->theContent('<p>inner</p>'), '<p>inner</p>');
+check('the outer the_content still is', $s->theContent('<p>outer</p>'), '<p data-tracy-src="post:44:oak-table block:the_content">outer</p>');
+
+check('a classic menu entry\'s link names the entry', $s->menuLinkAttributes(['href' => '/about/'], (object) ['ID' => 31]),
+    ['href' => '/about/', 'data-tracy-src' => 'menuItem:31']);
+check('a link another filter already stamped is left', $s->menuLinkAttributes(['data-tracy-src' => 'x'], (object) ['ID' => 31]), ['data-tracy-src' => 'x']);
+
+$widgetParams = [['widget_id' => 'text-3', 'before_widget' => '<section id="text-3" class="widget widget_text">', 'after_widget' => '</section>'], ['number' => 3]];
+$stamped = $s->sidebarParams($widgetParams);
+check('a widget\'s first element names the widget', $stamped[0]['before_widget'], '<section data-tracy-src="widget:text-3" id="text-3" class="widget widget_text">');
+check('and nothing else of its params moves', [$stamped[0]['after_widget'], $stamped[1]], ['</section>', ['number' => 3]]);
+check('a theme with no widget wrapper is left', $s->sidebarParams([['widget_id' => 'text-4', 'before_widget' => '']])[0]['before_widget'], '');
+// A block widget: the blocks inside it are the widget's, until the sidebar ends.
+$s->enterSidebar();
+$s->enterWidget(['id' => 'block-2']);
+check('a block inside a block widget is owned by the widget', provStamps(provRender($s, ['core/paragraph', [], '<p>Open daily</p>', [], '', []])),
+    ['p widget:block-2 block:core/paragraph']);
+// A sidebar rendered inside that widget: its widget owns its blocks, and the outer owner comes back after.
+$s->enterSidebar();
+$s->enterWidget(['id' => 'text-9']);
+check('a widget of a nested sidebar owns its blocks', provStamps(provRender($s, ['core/paragraph', [], '<p>x</p>', [], '', []])), ['p widget:text-9 block:core/paragraph']);
+$s->leaveSidebar();
+check('the nested sidebar ending leaves the outer widget the owner', provStamps(provRender($s, ['core/paragraph', [], '<p>y</p>', [], '', []])), ['p widget:block-2 block:core/paragraph']);
+$s->leaveSidebar();
+$classic->page = 'post:44:oak-table';
+check('after the sidebar, blocks are the page\'s again', provStamps(provRender($s, ['core/paragraph', [], '<p>x</p>', [], '', []])), ['p post:44:oak-table block:core/paragraph']);

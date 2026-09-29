@@ -23,6 +23,12 @@ final class ContentIdentity
     public const TABLES = ['article'=>'content', 'page'=>'menu', 'shared'=>'modules'];
     /** The kinds a trigger keeps: every table Joomla writes without LOCK TABLES. */
     public const TRIGGERED = ['article'=>'content', 'shared'=>'modules'];
+    /**
+     * Kinds only a DERIVED contract projects (an imported site's site template styles, read as shared
+     * contents). Never triggered and never part of `install`: the reader levels them, like `page`,
+     * and only on a derived site, so a quickstart site's identity table stays as it was.
+     */
+    public const DERIVED = ['templateStyle'=>'template_styles'];
 
     /**
      * Every trigger name this component ever created, in creation order — the legacy page pair
@@ -50,7 +56,7 @@ final class ContentIdentity
      */
     public static function reconcile($db, string $kind): void
     {
-        $table=self::TABLES[$kind];
+        $table=self::TABLES[$kind] ?? self::DERIVED[$kind];
         $db->setQuery('INSERT IGNORE INTO #__claudecowork_content_identity(kind,native_id,uid) SELECT '.$db->quote($kind).",id,REPLACE(UUID(),'-','') FROM #__".$table)->execute();
         $db->setQuery('DELETE ci FROM #__claudecowork_content_identity ci LEFT JOIN #__'.$table.' t ON t.id=ci.native_id WHERE ci.kind='.$db->quote($kind).' AND t.id IS NULL')->execute();
     }
@@ -73,7 +79,7 @@ final class ContentIdentity
      */
     public static function level($db, string $kind, int $tries = 3): bool
     {
-        $table=self::TABLES[$kind]; $k=$db->quote($kind);
+        $table=self::TABLES[$kind] ?? self::DERIVED[$kind]; $k=$db->quote($kind);
         $drift=(int)$db->setQuery('SELECT (SELECT COUNT(*) FROM #__'.$table.' t LEFT JOIN #__claudecowork_content_identity ci ON ci.kind='.$k.' AND ci.native_id=t.id WHERE ci.native_id IS NULL)'
             .'+(SELECT COUNT(*) FROM #__claudecowork_content_identity ci LEFT JOIN #__'.$table.' t ON t.id=ci.native_id WHERE ci.kind='.$k.' AND t.id IS NULL)')->loadResult();
         if ($drift===0) return false;

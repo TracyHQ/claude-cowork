@@ -26,6 +26,7 @@ require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
 require_once __DIR__ . '/QuickstartContract.php';
+require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
 
@@ -205,6 +206,35 @@ final class Engine
                 null, $entity !== null ? ($owners[$entity] ?? null) : null, ['lockedBy' => $lockedBy, 'record' => ['kind' => $kind, 'id' => $id]] + $extra);
         }
         if ($problems) throw ContractProblem::all($problems);
+    }
+
+    /** Where `content.contract derive` binds, and what it reads: `fn(): array{rows:list, pages:list<string>, unresolved:list<string>}`. */
+    private ?ContractStore $deriveStore = null;
+    private $deriveSource = null;
+    /** After a derived apply: `fn(list<string> $paths): array<string,string>` pages that loaded, by path; and the caches only a derived site needs dropped. */
+    private $deriveFetch = null;
+    private $derivePurge = null;
+    /** `fn(int $moduleId): ?string` a page the module is assigned to ('' the home page), or null when none is known. */
+    private $deriveModulePage = null;
+    private bool $deriveQuickstart = false;
+    /** Pages the render check after a derived apply may fetch: it runs under the write lock. */
+    private const RENDER_CHECK_PAGES = 3;
+    private string $deriveRoot = '';
+    /** The request id a derive is replayed by: the shape content.batch takes for `request_id`. */
+    private const REQUEST_ID_SHAPE = '/^[a-zA-Z0-9._:-]{1,100}$/D';
+
+    /**
+     * Let `content.contract derive` bind an imported site to the map its own rows make. Wired by the
+     * host, which alone reads the CMS tables and fetches the rendered pages (JoomlaDerivedRows).
+     * `$quickstart`: the component's params name a quickstart contract — a provision whose bind is still
+     * to come, or failed; an unbound such site refuses derive (like WordPress' quickstartConfigured()).
+     */
+    public function derivedSource(ContractStore $store, string $root, callable $source, ?callable $fetch = null, ?callable $purge = null, ?callable $modulePage = null, bool $quickstart = false): self
+    {
+        $this->deriveQuickstart = $quickstart;
+        $this->deriveStore = $store; $this->deriveRoot = $root; $this->deriveSource = $source;
+        $this->deriveFetch = $fetch; $this->derivePurge = $purge; $this->deriveModulePage = $modulePage;
+        return $this;
     }
 
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
@@ -1370,6 +1400,9 @@ final class Engine
      */
     private function contractDoor(array $p): array
     {
+        // Before the early answers below: an imported site is exactly one with no contract of its own,
+        // and the factory may still have handed it the default profile (EngineFactory::buildContract).
+        if (($p['operation'] ?? '') === 'derive') return $this->derive($p);
         if (!$this->contract && $this->constructionBaseline !== null) {
             // Under construction there is nothing to verify and nothing to write through: the door
             // says so, names the baseline, and the builder goes on to capture and name a profile.
@@ -1380,6 +1413,11 @@ final class Engine
         if (!$this->contract || !$this->log) return $this->err('unavailable', 'Quickstart contract receiver is unavailable');
         try {
             if (($p['operation'] ?? '') === 'bind') {
+                // The reverse of derive's refusal: a site an import derive bound is not a quickstart's to take.
+                // Whatever contract this receiver holds: on such a site the factory hands the derived one,
+                // and only `derive` (re)binds it.
+                if((($this->contract->binding()['mode'] ?? null) === 'derived'))
+                    return $this->err('conflict', 'This site is bound to a derived contract; a quickstart bind refuses to replace it');
                 if(!$this->writer || !method_exists($this->writer,'transaction'))throw new RuntimeException('Transactional writer required');
                 return $this->writer->transaction(function(){
                     $state=$this->contract->inspect();
@@ -1437,7 +1475,7 @@ final class Engine
             $t=Timing::begin();$plan=$this->contract->plan($p,$before,$this->locks,$this->contentRevisions);Timing::end('plan',$t);
             if(count($plan['operations'])>300)throw new ContractProblem('CHANGES_INVALID','Split the revision into at most 300 entities');
             if(!$plan['operations'])return $this->ok(['unchanged'=>true]);
-            return $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
+            $applied = $this->contentBatch(['apply_id'=>$apply,'request_id'=>$request,'operations'=>$plan['operations']], function($result)use($plan,$apply,$request,$hash,$before){
                 $t=Timing::begin();$this->contract->bind($plan['snapshot']);Timing::end('bind',$t);
                 $t=Timing::begin();$state=$this->contract->inspect();Timing::end('verify',$t);
                 $t=Timing::begin();$revisions=$this->revisionsAfter($plan['touched'],$before);Timing::end('revisionsAfter',$t);
@@ -1451,10 +1489,120 @@ final class Engine
                 Timing::end('log',$t);
                 return $result;
             });
+            // Committed by now: what follows reads the site as a visitor would, outside any transaction.
+            if(($applied['ok'] ?? false) === true && $this->contract->isDerived()) $applied = $this->afterDerivedApply($applied, is_array($p['changes'] ?? null) ? $p['changes'] : []);
+            return $applied;
         } catch(Throwable $error) { return $this->contractFailed($error); }
         finally { $this->contract->endCall(); }
     }
 
+
+    /**
+     * Bind an imported site to a DERIVED contract: its own rows, read through five codecs, calibrated
+     * by its rendered pages (a nested leaf is kept only when a page shows it). Refuses a site bound to
+     * a quickstart and a site a quickstart Build is making — that Build's own bind comes next and must
+     * find the site unbound. The same requestId again answers what it bound; a new one re-derives.
+     */
+    private function derive(array $p): array
+    {
+        if (!$this->deriveStore || !$this->deriveSource || !$this->writer) return $this->err('unavailable', 'Derived contracts are not wired on this receiver');
+        $label = $p['label'] ?? null; $requestId = $p['requestId'] ?? null;
+        if (!is_string($label) || !preg_match('/^[a-z0-9-]{3,80}$/D', $label)) return $this->err('bad_params', 'label required: 3-80 characters of a-z, 0-9 and -');
+        if (!is_string($requestId) || !preg_match(self::REQUEST_ID_SHAPE, $requestId)) return $this->err('bad_params', 'requestId required: 1-100 characters of a-z, A-Z, 0-9 and ._:-, the same on a retry');
+        if ($this->constructionBaseline !== null) return $this->err('conflict', 'This site is being built from a quickstart; derive refuses');
+        try {
+            $binding = $this->deriveStore->load();
+            if ($binding !== null && ($binding['mode'] ?? null) !== 'derived')
+                return $this->err('conflict', 'This site is bound to a quickstart contract; derive refuses to replace it');
+            // Its quickstart bind is still to come: a derive now would take the site from it for good.
+            if ($binding === null && $this->deriveQuickstart)
+                return $this->err('conflict', 'This site is being built from a quickstart; derive refuses');
+            if ($binding !== null && ($binding['requestId'] ?? null) === $requestId)
+                return $this->ok(['replayed' => true] + ($binding['derive'] ?? []));
+            $source = ($this->deriveSource)();
+            $rows = $source['rows'] ?? []; $pages = $source['pages'] ?? [];
+            $built = DerivedMap::build($rows, $pages ? VisibleText::fromPages($pages) : null, $label);
+            // What a visitor reads that no candidate leaf holds: words in theme files, language strings,
+            // text a module makes at run time. Counted, not located (the agent greps for those).
+            $texts = [];
+            foreach ($rows as $row) {
+                foreach ($row['core'] as $value) $texts[] = (string) $value;
+                foreach ([$row['html'], $row['nested']] as $columns) foreach ($columns as $value) foreach (LeafCodec::leaves((string) $value) as $leaf) $texts[] = $leaf['text'];
+            }
+            $nested = count(array_filter($built['map']['slots'], static fn($slot) => $slot['nested']));
+            $answer = ['contract' => $built['manifest']['id'], 'entities' => count($built['map']['entities']), 'slots' => count($built['map']['slots']),
+                'calibrated' => $built['manifest']['calibrated'],
+                'byClass' => ['db' => count($built['map']['slots']) - $nested, 'nested' => $nested, 'unmatched' => $pages ? VisibleText::unmatched($pages, $texts) : 0],
+                'unresolved' => array_values($source['unresolved'] ?? [])];
+            $contract = QuickstartContract::derived($this->writer, $this->deriveStore, $this->deriveRoot, static fn() => $built);
+            $contract->bindDerived(['requestId' => $requestId, 'derivedAt' => gmdate('c'), 'keep' => DerivedMap::keepOf($built), 'derive' => $answer]);
+            // The rest of this request (and a test's next call) sees the site as it is now bound.
+            $this->contract = $contract;
+            return $this->ok($answer + ['replayed' => false]);
+        } catch (Throwable $error) { return $this->contractFailed($error); }
+    }
+
+    /**
+     * After a derived apply: drop what only a derived site caches (the writer's own purge already ran),
+     * then fetch the pages that own the written words ({@see ownerPage}, at most three) and warn
+     * `WRITTEN_NOT_VISIBLE` (shaped like a drift warning) for words the page does not show.
+     * A warning, never a refusal: the write stands, and its apply_id takes it back. A page that could
+     * not be fetched says nothing. Imported sites print words through paths no row describes (a
+     * template override, a language string), and this is how the agent learns its write missed.
+     */
+    private function afterDerivedApply(array $result, array $changes): array
+    {
+        if ($this->derivePurge) { try { ($this->derivePurge)(); } catch (Throwable $ignored) {} }
+        if (!$this->deriveFetch) return $result;
+        $checks = [];
+        // Uncalibrated, the map kept every nested leaf whether a page shows it or not (a meta description,
+        // a setting): only a row's own text (core and HTML columns) is worth checking then.
+        $calibrated = ($this->contract->binding()['calibrated'] ?? true) !== false;
+        foreach ($this->contract->derivedOwners(array_keys($changes)) as $key => $owner) {
+            $value = $changes[$key] ?? null;
+            if ($owner['type'] !== 'text' || !is_string($value) || trim($value) === '' || (!$calibrated && $owner['nested'])) continue;
+            $page = $this->ownerPage($owner['kind'], $owner['id']);
+            if ($page !== null) $checks[$page][] = [$key, $value];
+        }
+        $checks = array_slice($checks, 0, self::RENDER_CHECK_PAGES, true);
+        if (!$checks) return $result;
+        try { $pages = ($this->deriveFetch)(array_map('strval', array_keys($checks))); }
+        catch (Throwable $ignored) { return $result; }
+        $warnings = [];
+        foreach ($checks as $url => $slots) {
+            $html = $pages[(string) $url] ?? null;
+            if (!is_string($html) || $html === '') continue;
+            $seen = VisibleText::fromPages([$html]);
+            foreach ($slots as [$key, $value])
+                if (!VisibleText::shows($seen, ['type' => 'text', 'text' => $value]))
+                    $warnings[] = ['code' => 'WRITTEN_NOT_VISIBLE', 'message' => 'Written, but ' . $url . ' does not show it', 'severity' => 'warning', 'slotKey' => (string) $key, 'url' => (string) $url];
+        }
+        if ($warnings) $result['warnings'] = array_merge($this->driftWarnings(), $warnings);
+        return $result;
+    }
+
+    /**
+     * The page a derived entity's words show on, as a path from the site root ('' the home page), or
+     * null when no page is known: an unchecked write is better than a false warning from the wrong page.
+     * An article (and its custom field values) on its own page, a category on its list, a menu item on
+     * its own page, a module on a page it is assigned to (the host reads #__modules_menu), a template
+     * style on the home page.
+     */
+    private function ownerPage(string $kind, int $id): ?string
+    {
+        switch ($kind) {
+            case 'article': return 'index.php?option=com_content&view=article&id=' . $id;
+            case 'fieldValue': return 'index.php?option=com_content&view=article&id=' . FieldValueKey::decode($id)[1];
+            case 'category': return 'index.php?option=com_content&view=category&id=' . $id;
+            case 'module':
+                if (!$this->deriveModulePage) return null;
+                try { $page = ($this->deriveModulePage)($id); } catch (Throwable $ignored) { return null; }
+                return is_string($page) ? $page : null;
+            case 'menuItem': return 'index.php?Itemid=' . $id;
+            case 'templateStyle': return '';
+            default: return null;
+        }
+    }
 
     /**
      * The revision of every content this apply changed, read inside its transaction after the write:
