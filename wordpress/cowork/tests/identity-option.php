@@ -92,7 +92,7 @@ checkTrue('a site identity that is not an array is still a problem', in_array('O
 
 // ── the shipped profiles that need it ──────────────────────────────────────────────────────
 
-foreach (['1.2.0', '1.3.0'] as $version) {
+foreach (['1.2.0', '1.3.0', '1.3.1'] as $version) {
     $map = json_decode((string) file_get_contents(__DIR__ . '/../lib/contracts/tracy-business/wp7/' . $version . '/content-map.json'), true);
     $identitySlots = array_values(array_filter($map['slots'], static fn(array $slot): bool => $slot['entity'] === 'option-tracy_site_identity'));
     checkTrue("tracy-business/wp7/{$version}: every slot of tracy_site_identity is a site identity field",
