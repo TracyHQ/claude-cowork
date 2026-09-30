@@ -322,7 +322,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * the words are escaped with `esc_like`, so they match themselves instead of acting as wildcards.
 	 * A failed query throws: WordPress answers one with an empty list and a message nobody reads,
 	 * and an empty page here would read as "no such page" — the answer that sends a caller off to
-	 * create a duplicate.
+	 * create a duplicate. One failure is not a failure, and is answered as no rows: words with a
+	 * character above U+FFFF (an emoji) against a posts table that is still utf8, which MySQL refuses
+	 * to compare instead of finding nothing (see {@see four_byte_words_refused()}).
 	 *
 	 * Case and accents fold as the column's collation folds them; the collations WordPress installs
 	 * with are all case-insensitive. No language predicate: a post of any language is a row here, and
@@ -369,6 +371,13 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$ids = $wpdb->get_col(
 			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
 		);
+		// The one statement that can fail this way is this one: the count below asks the same thing.
+		if ( self::four_byte_words_refused( $wpdb, $needle ) ) {
+			return array(
+				'ids'     => array(),
+				'matched' => 0,
+			);
+		}
 		$this->assert_query_ran( $wpdb );
 		$ids = array_map( 'intval', is_array( $ids ) ? $ids : array() );
 
@@ -426,6 +435,33 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( '' !== $error ) {
 			throw new RuntimeException( 'the search query failed: ' . $error );
 		}
+	}
+
+	/**
+	 * Whether the statement that just ran was refused for the one reason that is an answer: words with
+	 * a character above U+FFFF (an emoji, a rare ideograph) against a posts table that is still `utf8`,
+	 * MySQL's three-byte character set.
+	 *
+	 * A column of that kind cannot hold such a character, so no post there holds these words. MySQL does
+	 * not say "no rows" to the comparison, it refuses it, because it cannot turn the words into the
+	 * column's character set without losing them: "Illegal mix of collations (utf8_general_ci,IMPLICIT)
+	 * and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'", or, from a server that words it
+	 * differently, "Incorrect string value". It is raised when the words cannot be turned into the
+	 * column's character set, and a utf8mb4 column, which is what WordPress installs, takes them; so the
+	 * message is enough to say the table cannot hold them, and the table itself is not looked at.
+	 * Both halves have to hold. The same message for words with no such character is a table this search
+	 * cannot compare with at all (a latin1 table and a Chinese word, say), and any other error with such
+	 * words (a crashed table, a lost connection) says nothing about what the table holds. Either is a
+	 * failure a caller has to be told about, not read as an empty result.
+	 *
+	 * @param object $wpdb The database handle whose last statement just ran.
+	 */
+	private static function four_byte_words_refused( $wpdb, string $needle ): bool {
+		$error = (string) ( $wpdb->last_error ?? '' );
+		if ( '' === $error || 1 !== preg_match( '/[\x{10000}-\x{10FFFF}]/u', $needle ) ) {
+			return false;
+		}
+		return 1 === preg_match( '/Illegal mix of collations|Incorrect string value/i', $error );
 	}
 
 	/**

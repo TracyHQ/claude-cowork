@@ -526,6 +526,66 @@ check('a statement WordPress refuses to build is an error, not an empty page', [
 $csDb->prepareRefuses = false;
 check('and the next search is fine', $csAsk(['search' => 'gizmo'])['ok'] ?? null, true);
 
+// ── a four-byte character on a posts table that is still utf8: no row can hold it ───────────────
+//
+// A site that was never moved to utf8mb4 keeps its posts in three-byte columns, and MySQL does not answer
+// "no rows" to a comparison with a character above U+FFFF (an emoji): it refuses the statement ("Illegal mix
+// of collations"). No post of that table holds the character, so the honest answer is none. A refusal that
+// is anything else stays a failure, and so does this one for words with no such character.
+$csSite(static function () use ($csPost): void {
+    $csPost(1, 'Summer sale today', ['post_name' => 'summer-sale']);
+    $csPost(2, 'Winter sale', ['post_name' => 'winter-sale']);
+    $csPost(3, '屋根の修理サービス');
+});
+$csDb->utf8mb3 = true;
+$csDb->queries = [];
+WP_Query::$lastArgs = [];
+$r = $csAsk(['search' => '🔥']);
+check('a four-byte character on a utf8 table: no rows, and it is an answer, not a failure', [$r['ok'] ?? null, $r['items'] ?? null], [true, []]);
+check('with the words echoed and a total of zero, the keys a search always has', [$r['search'] ?? null, $r['matched'] ?? null, $r['kind'] ?? null, $r['offset'] ?? null, array_keys($r)], ['🔥', 0, 'post', 0, ['ok', 'kind', 'offset', 'search', 'matched', 'items']]);
+check('as the door writes it: an empty list, not an object', json_encode($r, JSON_UNESCAPED_UNICODE), '{"ok":true,"kind":"post","offset":0,"search":"🔥","matched":0,"items":[]}');
+check('it took one statement, and no page was loaded for it', [count($csDb->queries), WP_Query::$lastArgs], [1, []]);
+check('and the statement really was refused (the stand-in refuses it as MySQL does)', $csDb->last_error !== '' && strpos($csDb->last_error, 'Illegal mix of collations') === 0, true);
+$r = $csAsk(['search' => 'summer 🔥 sale', 'offset' => 40, 'limit' => 5, 'include_body' => true, 'post_type' => 'page', 'name' => 'summer-sale']);
+check('the same with every other parameter: no rows, zero, the offset as asked', [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, $r['offset'] ?? null], [true, [], 0, 40]);
+check('a four-byte character among other words', $csAsk(['search' => "sale \u{10000}"])['matched'] ?? null, 0);
+// U+FFFF is the last three-byte character and U+10000 the first with four
+$csDb->failWith = "Illegal mix of collations (utf8_general_ci,IMPLICIT) and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'";
+foreach ([["\u{FFFF}", 'read_failed'], ["\u{10000}", null], ["\u{10FFFF}", null], ['sale', 'read_failed'], ['屋根', 'read_failed']] as [$csWords, $csWant]) {
+    $r = $csAsk(['search' => $csWords]);
+    check('the collation error with words of ' . json_encode($csWords) . ($csWant === null ? ': an answer' : ': still a failure'), [$r['ok'] ?? null, $r['error'] ?? null], $csWant === null ? [true, null] : [false, $csWant]);
+}
+$csDb->failWith = "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'";
+check('the message as MySQL 8 spells the character set', $csAsk(['search' => '🔥'])['matched'] ?? null, 0);
+$csDb->failWith = "Incorrect string value: '\\xF0\\x9F\\x94\\xA5' for column 'post_title' at row 1";
+$r = $csAsk(['search' => '🔥']);
+check('and the other message a server gives for it', [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null], [true, [], 0]);
+$r = $csAsk(['search' => 'sale']);
+check('that message for words with no four-byte character is a failure', [$r['ok'] ?? null, $r['error'] ?? null], [false, 'read_failed']);
+foreach (['Table wp_posts is marked as crashed', 'Lost connection to MySQL server during query', 'Deadlock found when trying to get lock; try restarting transaction'] as $csError) {
+    $csDb->failWith = $csError;
+    $r = $csAsk(['search' => '🔥']);
+    check("a four-byte character does not turn another error ({$csError}) into an answer", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), $csError) !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);
+}
+$csDb->failWith = '';
+// what the site's own words still find on that table, with the same handle
+$r = $csAsk(['search' => 'sale']);
+check('words without a four-byte character are searched as ever on that table', [$csIds($r), $r['matched'] ?? null], [[1, 2], 2]);
+check('CJK is three bytes: found, not refused', $csIds($csAsk(['search' => '屋根'])), [3]);
+$csDb->utf8mb3 = false;
+$csSite(static function () use ($csPost): void {
+    $csPost(1, "Summer sale \u{1F525} today");
+    $csPost(2, 'Winter sale');
+});
+$r = $csAsk(['search' => '🔥']);
+check('on a utf8mb4 table the same words are found: nothing is answered for them but what the table holds', [$csIds($r), $r['matched'] ?? null], [[1], 1]);
+check('and a fault there, with that character, is a failure', (function () use ($csAsk, $csDb) {
+    $csDb->failWith = 'Table wp_posts is marked as crashed';
+    $r = $csAsk(['search' => '🔥']);
+    $csDb->failWith = '';
+    return [$r['ok'] ?? null, $r['error'] ?? null];
+})(), [false, 'read_failed']);
+
 // ── a site with a language plugin: the search reaches every language ────────────────────────────
 //
 // Polylang narrows every WP_Query built during a request to the request's language, through

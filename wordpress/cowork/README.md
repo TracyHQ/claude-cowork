@@ -320,7 +320,18 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   than `post`. The engine refuses text that is not valid UTF-8 the same way, but over the door it
   never gets that far: a body that is not valid UTF-8 is not valid JSON, so the door reads no
   request from it and answers `unauthorized`, as it does for any body it cannot read. A statement
-  the database rejects is `read_failed`, not an empty page.
+  the database rejects is `read_failed`, not an empty page, with the one exception below.
+- **A four-byte character on a `utf8` table is an answer: no rows.** A site that was never moved to
+  `utf8mb4` keeps its posts in three-byte columns, and for words with a character above U+FFFF (an
+  emoji, a rare ideograph) MySQL does not find nothing: it refuses the statement (`Illegal mix of
+  collations`, or from another server `Incorrect string value`). No post of that table can hold such
+  a character, so the door answers `ok: true`, `matched: 0`, an empty `items` and the words echoed,
+  as for any search that finds nothing. It is decided by the words and the message together, not by
+  a look at the table: MySQL raises that message when the words cannot be turned into the column's
+  character set, and a `utf8mb4` column, which is what WordPress installs, takes them. Both halves
+  are required. The same message for words with no such character (a `latin1` table and a Chinese
+  word, say), and any other error for words that have one (a crashed table, a lost connection),
+  stay `read_failed`.
 
 The ids are found by one prepared statement that pages in SQL (`WP_Query`'s own `s` is not used: it
 splits words, treats a leading `-` as "exclude", searches the body, and drops password-protected posts

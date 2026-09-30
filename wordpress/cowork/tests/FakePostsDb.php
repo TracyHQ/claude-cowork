@@ -33,6 +33,13 @@ final class WP_Fake_PostsDb
     public string $failOnly = '';
     /** Set to have `prepare()` refuse, as WordPress does for a statement it cannot build: an empty string. */
     public bool $prepareRefuses = false;
+    /**
+     * Set when the posts table is still `utf8` (three bytes a character), as a site that was never moved to
+     * utf8mb4 has it. MySQL cannot turn a string with a character above U+FFFF into that column's character
+     * set, so it does not answer "no rows" to a comparison with one: it refuses the statement, with the
+     * message below, before it reads a row. A table like this holds no such character (the fixtures add none).
+     */
+    public bool $utf8mb3 = false;
     /** @var string[] every statement run, as MySQL would have received it */
     public array $queries = [];
 
@@ -83,6 +90,10 @@ final class WP_Fake_PostsDb
         }
         $this->queries[] = $query;
         $fails = $this->failWith !== '' && ($this->failOnly === '' || strpos($query, $this->failOnly) !== false);
+        if (!$fails && $this->utf8mb3 && preg_match('/[\x{10000}-\x{10FFFF}]/u', $query) === 1) {
+            $this->last_error = "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT) and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'";
+            return [];
+        }
         $this->last_error = $fails ? $this->failWith : '';
         return $fails ? [] : WP_Fake_PostsSql::run($query);
     }
