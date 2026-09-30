@@ -65,6 +65,8 @@ final class Engine
     private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
+    /** The longest `content.list` `search`, in characters: a fragment of a title, never a paragraph. */
+    private const SEARCH_MAX_CHARACTERS = 200;
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
     private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
@@ -2201,6 +2203,13 @@ final class Engine
      * Read-only: no apply_id, nothing recorded. A page that carries bodies is capped smaller,
      * because the alternative — one request per post — spends a caller's whole hourly allowance
      * at the relay on a single site's list.
+     *
+     * `search` (posts only) keeps the rows whose title or slug holds those words, in the plain
+     * list's order and states, and the answer then carries `search` (the words as they were
+     * matched) and `matched` (how many rows hold them in all, whatever `offset` and `limit` are).
+     * The `search` key in an answer is the caller's PROOF that this plugin read the parameter: a
+     * plugin from before it existed answers the whole list and `ok:true`, which reads exactly like
+     * "these are the ones that match". Without the key in the request the answer is unchanged.
      */
     private function contentList(array $p): array
     {
@@ -2228,6 +2237,16 @@ final class Engine
         $kind = isset($p['kind']) && is_string($p['kind']) && trim($p['kind']) !== ''
             ? trim($p['kind'])
             : 'post';
+        // Every kind filters by `search` or refuses it, never ignores it: the whole list under an
+        // `ok:true` would read as "these are the ones that match". A kind other than these two falls
+        // to the refusal below, which names it.
+        if (array_key_exists('search', $p) && ($kind === 'templatePart' || $kind === 'template')) {
+            return $this->err(
+                'bad_params',
+                "content.list cannot search kind \"{$kind}\": its rows come from the theme's files and the overrides stored over them, "
+                    . 'and that list is short enough to read whole. Drop "search", or search posts (kind "post") by title or slug.'
+            );
+        }
         // The template parts and templates the active theme renders, files and stored overrides
         // alike: a `wp_template_part` post list names only the overrides, so a part still served
         // from the theme file was invisible to a caller looking for a page's words.
@@ -2261,13 +2280,97 @@ final class Engine
             return $this->err('bad_params', 'post_type must be a post type name');
         }
 
+        // `search`: refused before anything is read when it cannot be used, so a caller never
+        // gets a list that quietly ignored it.
+        $search = null;
+        if (array_key_exists('search', $p)) {
+            [$search, $why] = self::searchNeedle($p['search']);
+            if ($search === null) {
+                return $this->err('bad_params', $why);
+            }
+        }
+        if ($search !== null && $search !== '') {
+            return $this->contentSearch($search, $offset, $limit, $withBody, $name, $type);
+        }
+
         try {
             $items = $this->writer->list_posts($offset, $limit, $withBody, $name, $type);
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
 
+        // Nothing to look for (the words were only spaces or control characters) is the plain
+        // list, and the empty `search` in the answer still says the parameter was read.
+        if ($search === '') {
+            return $this->ok(['kind' => 'post', 'offset' => $offset, 'search' => '', 'items' => $items]);
+        }
+
         return $this->ok(['kind' => 'post', 'offset' => $offset, 'items' => $items]);
+    }
+
+    /**
+     * `content.list` with words to look for: the writer finds the rows, and the answer carries the
+     * proof (`search`, the words as they were matched) and the exact count (`matched`) beside them.
+     */
+    private function contentSearch(string $search, int $offset, int $limit, bool $withBody, string $name, string $type): array
+    {
+        // Only a writer from before search lacks the method, and its list would ignore the words.
+        if (!method_exists($this->writer, 'search_posts')) {
+            return $this->err('unavailable', 'this plugin cannot search content');
+        }
+        try {
+            $found = $this->writer->search_posts($search, $offset, $limit, $withBody, $name, $type);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+
+        return $this->ok(['kind' => 'post', 'offset' => $offset, 'search' => $search, 'matched' => $found['matched'], 'items' => $found['items']]);
+    }
+
+    /**
+     * The words of a `search`, cleaned the way they are matched and echoed: valid UTF-8, in one
+     * canonical spelling, with control characters removed and no space at either end.
+     *
+     * @param mixed $raw What the caller sent under `search`.
+     * @return array{0:?string,1:string} [the words, ''] or [null, why they were refused]
+     */
+    private static function searchNeedle($raw): array
+    {
+        if (!is_string($raw)) {
+            return [null, 'search must be a string: the words to look for in a title or slug'];
+        }
+        $tooLong = 'search is at most ' . self::SEARCH_MAX_CHARACTERS . ' characters: send the distinctive words of the title, not the whole text';
+        // 200 characters are at most 800 bytes; this bound only keeps the passes below cheap on
+        // input that is mostly padding.
+        if (strlen($raw) > 4096) {
+            return [null, $tooLong];
+        }
+        // The answer travels as JSON, which carries nothing but valid UTF-8, and a pattern of
+        // broken bytes would match nothing while reading as "no such page".
+        if (preg_match('//u', $raw) !== 1) {
+            return [null, 'search must be valid UTF-8 text'];
+        }
+        // One canonical spelling whatever keyboard made it (the writer also tries the decomposed
+        // one, which is how some titles are stored). intl is optional on WordPress hosts: without
+        // it the words are used as sent.
+        if (class_exists('Normalizer')) {
+            $composed = Normalizer::normalize($raw, Normalizer::FORM_C);
+            if (is_string($composed)) {
+                $raw = $composed;
+            }
+        }
+        // A control character carries no words, and a space at either end (the ideographic space
+        // of CJK input included) is not part of a title's.
+        $clean = preg_replace('/\p{Cc}+/u', '', $raw);
+        $clean = $clean === null ? null : preg_replace('/^[\p{Z}\s]+|[\p{Z}\s]+$/u', '', $clean);
+        if ($clean === null) {
+            return [null, 'search must be valid UTF-8 text'];
+        }
+        if (mb_strlen($clean, 'UTF-8') > self::SEARCH_MAX_CHARACTERS) {
+            return [null, $tooLong];
+        }
+
+        return [$clean, ''];
     }
 
     /**

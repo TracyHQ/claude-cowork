@@ -1676,6 +1676,9 @@ require __DIR__ . '/derived-scale.php';
 require __DIR__ . '/string-overrides.php';
 // apply.revert takes back one receipt: the span its write changed, never the whole row.
 require __DIR__ . '/revert-span.php';
+// content.list search: the words of a title or slug, the real engine and writer over a $wpdb that reads its SQL.
+// Last, because it defines the stand-in Normalizer and get_post_types that the tests above rely on being absent.
+require __DIR__ . '/content-search.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

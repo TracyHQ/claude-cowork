@@ -98,6 +98,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		),
 	);
 
+	/**
+	 * What a post list shows: the post types a mirror carries unless the caller names one, and the
+	 * states an editor can still see (the trash is not one). Held once because the plain list and
+	 * the search must agree on them — a search over a wider set would find rows the list never shows.
+	 */
+	private const LISTED_TYPES    = array( 'post', 'page' );
+	private const LISTED_STATUSES = array( 'publish', 'draft', 'pending', 'private', 'future' );
+
 	/** @var array<int,int> Posts touched this request, so purgeCache cleans those and not the world. */
 	private $touched = array();
 
@@ -217,8 +225,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				// there?" — and paging through every post to answer it is how a seeder that runs
 				// twice creates everything twice (08/09).
 				'name'                => $name,
-				'post_type'           => '' === $type ? array( 'post', 'page' ) : $type,
-				'post_status'         => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+				'post_type'           => '' === $type ? self::LISTED_TYPES : $type,
+				'post_status'         => self::LISTED_STATUSES,
 				'orderby'             => 'ID',
 				'order'               => 'ASC',
 				'offset'              => $offset,
@@ -234,6 +242,195 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			$out[] = $this->describe_post( $post, $with_body );
 		}
 		return $out;
+	}
+
+	/**
+	 * One page of the posts whose title or slug holds `$needle`, and how many hold it in all.
+	 *
+	 * The same rows, in the same order (id ascending) and states, as {@see list_posts()} — narrowed
+	 * to the words asked for, so a caller looking for a page by its name reads one short answer
+	 * instead of paging through the whole site, where every page of the list costs it a round trip.
+	 *
+	 * ⚠ NOT `WP_Query`'s own `s`. It splits the words and matches each one in the title, the excerpt
+	 * AND the body; a word with a leading `-` excludes instead of finds; and for a caller who is not
+	 * logged in — this door is a token, not a login — it drops every password-protected post. Each
+	 * is a row silently missing from, or silently in, a list that reads as complete.
+	 *
+	 * The ids come from one prepared query that pages in SQL, so an offset deep into a long result
+	 * is as exact as the first page; `WP_Query` then loads those rows, so each one holds what the
+	 * plain list would have shown for it.
+	 *
+	 * @return array{items:array<int,array<string,mixed>>,matched:int}
+	 */
+	public function search_posts( string $needle, int $offset, int $limit, bool $with_body, string $name = '', string $type = '' ): array {
+		$found = $this->find_post_ids( $needle, $offset, $limit, $name, $type );
+		$items = array();
+		// Never `post__in` of nothing: WP_Query reads an empty list as "no restriction" and would
+		// answer with every post on the site.
+		if ( array() !== $found['ids'] ) {
+			$query = new \WP_Query(
+				array(
+					'post__in'            => $found['ids'],
+					'post_type'           => '' === $type ? self::LISTED_TYPES : $type,
+					'post_status'         => self::LISTED_STATUSES,
+					'orderby'             => 'ID',
+					'order'               => 'ASC',
+					'posts_per_page'      => count( $found['ids'] ),
+					'ignore_sticky_posts' => true,
+					'no_found_rows'       => true,
+					'suppress_filters'    => true,
+				)
+			);
+			foreach ( $query->posts as $post ) {
+				$items[] = $this->describe_post( $post, $with_body );
+			}
+		}
+		return array(
+			'items'   => $items,
+			'matched' => $found['matched'],
+		);
+	}
+
+	/**
+	 * The ids of one page of a search, and the exact number of rows that hold the words.
+	 *
+	 * Every value reaches MySQL as a bound parameter, and `%`, `_` and the escape character inside
+	 * the words are escaped with `esc_like`, so they match themselves instead of acting as wildcards.
+	 * A failed query throws: WordPress answers one with an empty list and a message nobody reads,
+	 * and an empty page here would read as "no such page" — the answer that sends a caller off to
+	 * create a duplicate.
+	 *
+	 * Case and accents fold as the column's collation folds them; the collations WordPress installs
+	 * with are all case-insensitive.
+	 *
+	 * @return array{ids:int[],matched:int}
+	 */
+	private function find_post_ids( string $needle, int $offset, int $limit, string $name, string $type ): array {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_col' ) || ! method_exists( $wpdb, 'esc_like' ) ) {
+			throw new RuntimeException( 'the database handle cannot search' );
+		}
+
+		$types = $this->listed_types( $type );
+		if ( array() === $types ) {
+			return array(
+				'ids'     => array(),
+				'matched' => 0,
+			);
+		}
+
+		// Type and states as the plain list reads them, then the slug when one is named (WP_Query
+		// cleans it the way a slug is stored, so this does too).
+		$where = 'post_type IN (' . implode( ',', array_fill( 0, count( $types ), '%s' ) ) . ')'
+			. ' AND post_status IN (' . implode( ',', array_fill( 0, count( self::LISTED_STATUSES ), '%s' ) ) . ')';
+		$args  = array_merge( $types, self::LISTED_STATUSES );
+		if ( '' !== $name ) {
+			$where .= ' AND post_name = %s';
+			$args[] = function_exists( 'sanitize_title_for_query' ) ? sanitize_title_for_query( $name ) : $name;
+		}
+
+		// Any spelling of the title will do; the slug holds neither entities nor decomposed
+		// letters, so it is tried with the words as they are.
+		$likes = array();
+		foreach ( self::search_forms( $needle ) as $form ) {
+			$likes[] = 'post_title LIKE %s';
+			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
+		}
+		$likes[] = 'post_name LIKE %s';
+		$args[]  = '%' . $wpdb->esc_like( $needle ) . '%';
+		$where  .= ' AND (' . implode( ' OR ', $likes ) . ')';
+
+		$ids = $wpdb->get_col(
+			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
+		);
+		$this->assert_query_ran( $wpdb );
+		$ids = array_map( 'intval', is_array( $ids ) ? $ids : array() );
+
+		// A page that is not full, and either starts at the top or holds something, ends the
+		// result where it ends: the total is known without asking. Anything else asks.
+		$n = count( $ids );
+		if ( $n < $limit && ( 0 === $offset || $n > 0 ) ) {
+			$matched = $offset + $n;
+		} else {
+			$count = $wpdb->get_var( $this->prepared( $wpdb, "SELECT COUNT(*) FROM {$wpdb->posts} WHERE {$where}", $args ) );
+			$this->assert_query_ran( $wpdb );
+			$matched = (int) $count;
+		}
+
+		return array(
+			'ids'     => $ids,
+			'matched' => $matched,
+		);
+	}
+
+	/**
+	 * The post types a list of `$type` reads, spelt out for SQL. `WP_Query` takes "any" to mean every
+	 * type not kept out of search, and so does a search here.
+	 *
+	 * @return string[]
+	 */
+	private function listed_types( string $type ): array {
+		if ( '' === $type ) {
+			return self::LISTED_TYPES;
+		}
+		if ( 'any' === $type && function_exists( 'get_post_types' ) ) {
+			return array_values( (array) get_post_types( array( 'exclude_from_search' => false ) ) );
+		}
+		return array( $type );
+	}
+
+	/**
+	 * A statement with its values bound. An empty answer from `prepare` is a statement WordPress
+	 * refused to build, and running it would come back as an empty page.
+	 *
+	 * @param object            $wpdb     The database handle.
+	 * @param array<int,mixed>  $values   What the placeholders stand for, in order.
+	 */
+	private function prepared( $wpdb, string $template, array $values ): string {
+		$sql = $wpdb->prepare( $template, ...$values );
+		if ( ! is_string( $sql ) || '' === $sql ) {
+			throw new RuntimeException( 'the search query could not be prepared' );
+		}
+		return $sql;
+	}
+
+	/** @param object $wpdb The database handle whose last statement just ran. */
+	private function assert_query_ran( $wpdb ): void {
+		$error = (string) ( $wpdb->last_error ?? '' );
+		if ( '' !== $error ) {
+			throw new RuntimeException( 'the search query failed: ' . $error );
+		}
+	}
+
+	/**
+	 * Every spelling of the words a stored title may hold, for a search to try in turn.
+	 *
+	 * Canonical composed and decomposed: a title copied from a macOS file name or a PDF is often
+	 * stored decomposed (a base letter plus combining marks), and only some collations treat the two
+	 * spellings as equal. And each with `&` and `>` written as entities, which is how core's KSES
+	 * filters store a title saved by anyone without the `unfiltered_html` capability
+	 * (`Tom &amp; Jerry`); a `<` is not here because KSES drops it, it never stores it as an entity.
+	 * Without intl (no `Normalizer`) only the spelling sent is tried.
+	 *
+	 * @return string[]
+	 */
+	public static function search_forms( string $needle ): array {
+		$spellings = array( $needle );
+		if ( class_exists( 'Normalizer' ) ) {
+			foreach ( array( Normalizer::FORM_C, Normalizer::FORM_D ) as $form ) {
+				$spelling = Normalizer::normalize( $needle, $form );
+				if ( is_string( $spelling ) ) {
+					$spellings[] = $spelling;
+				}
+			}
+		}
+		$forms = array();
+		foreach ( $spellings as $spelling ) {
+			$forms[] = $spelling;
+			$forms[] = str_replace( array( '&', '>' ), array( '&amp;', '&gt;' ), $spelling );
+		}
+		return array_values( array_unique( $forms ) );
 	}
 
 	/**
