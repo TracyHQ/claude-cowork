@@ -38,7 +38,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
 | `language.install` | write | ok | ok |
-| `content.list` | read | ok | ok |
+| `content.list` | read; `search` (unreleased) keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search-unreleased) | ok | ok |
 | `content.get` | read | ok | ok |
 | `content.update` | write | ok | ok |
 | `content.language` | write | ok | ok |
@@ -267,6 +267,52 @@ reader answers 501; after it, rows WordPress inserts get their uid at once. A fo
 same request id never rotates twice. A restore of the same site keeps its seed. A database copied by
 hand keeps the seed too, and so the ids, until whoever copied it declares the fork. Writes still go
 through `content.contract` `apply`.
+
+## Finding a post by its title: `content.list` `search` (unreleased)
+
+`content.list` lists posts and pages in id order, a page at a time, and a caller who knows a page by
+its name used to read the whole list to find it: on a Joomla site of 1,900 articles one such lookup
+took up to eighteen model calls, and a WordPress site of that size pages the same way. `search` does the
+finding here. It narrows the same list, so every other parameter (`post_type`, `name`,
+`include_body`, `offset`, `limit`) still applies to what is left.
+
+```
+{"action": "content.list", "params": {"search": "roof repair", "limit": 20}}
+→ {"ok": true, "kind": "post", "offset": 0, "search": "roof repair", "matched": 3, "items": [ … ]}
+```
+
+- **What matches.** A substring of the title **or** the slug (`post_name`), compared the way the
+  column's collation compares text: WordPress installs a case-insensitive one, and whether accents
+  fold depends on it. The words are one substring, not split: `roof repair` does not find the slug
+  `roof-repair`, and a leading `-` is a hyphen. The excerpt and the body are **not** searched.
+  A slug in a non-Latin script is stored percent-encoded by WordPress, so such a page is found by
+  its title.
+- **The words.** Trimmed (an ideographic or no-break space too), control characters removed, turned
+  into Unicode form C when PHP has `intl` (a host without it matches the spelling it was sent in), at
+  most 200 characters, valid UTF-8; one character is a needle. `%`, `_` and `\` match themselves,
+  and nothing is a wildcard or a pattern. Both the composed and the decomposed spelling of a letter
+  are tried, and `&` and `>` are also tried as `&amp;` and `&gt;`, which is how a title saved without
+  the `unfiltered_html` capability is stored.
+- **The answer.** `search` is present **exactly when the request carried the key**, holding the words as
+  they were matched: it is the caller's proof that this plugin read the parameter, because a plugin
+  from before `search` answers the whole list and `ok: true`. `matched` is the number of rows that
+  hold the words, whatever `offset` and `limit` are, and is exact at any offset. Words that are empty
+  once cleaned filter nothing: the plain list, `search: ""`, no `matched`. A request **without**
+  `search` is answered byte for byte as before.
+- **The rows** are the plain list's rows, in id order, with the plain list's states: published,
+  draft, pending, private and scheduled, password-protected posts included, the trash not. The
+  search adds no language filter of its own.
+- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
+  not valid UTF-8, or is longer than 200 characters; and any `search` on `kind` `templatePart`,
+  `template` or another kind than `post`. A statement the database rejects is `read_failed`, not an
+  empty page.
+
+The ids are found by one prepared statement that pages in SQL (`WP_Query`'s own `s` is not used: it
+splits words, treats a leading `-` as "exclude", searches the body, and drops password-protected posts
+for a caller who is not logged in), and `WP_Query` then loads exactly those rows.
+`tests/content-search.php` runs the real engine and writer over a `$wpdb` that reads the statements they
+send, and `tests/content-search-load.php` searches in a fresh process with only the classes
+`claude-cowork.php` loads.
 
 ## Layout
 
