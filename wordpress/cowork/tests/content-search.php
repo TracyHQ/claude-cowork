@@ -556,7 +556,7 @@ if (!function_exists('wp_encode_emoji')) {
     function wp_encode_emoji($content)
     {
         $map = [];
-        foreach ([0x1F525, 0x2122, 0x2764, 0x2714, 0x2600, 0x26A0, 0x2B50, 0xFE0F] as $codePoint) {
+        foreach ([0x1F525, 0x1F680, 0x2122, 0x2764, 0x2714, 0x2600, 0x26A0, 0x2B50, 0xFE0F] as $codePoint) {
             $entity = '&#x' . dechex($codePoint) . ';';
             $map[html_entity_decode($entity, ENT_QUOTES, 'UTF-8')] = $entity;
         }
@@ -758,6 +758,11 @@ foreach (['utf8mb3_general_ci', 'utf8_unicode_ci'] as $collation) {
     check("[{$collation}] the stored spelling, copied out of a list, finds its page", $csIds($csAsk(['search' => 'Summer sale &#x1f525; today'])), [1]);
     $r = $csAsk(['search' => 'summer 🔥 sale', 'offset' => 40, 'limit' => 5, 'include_body' => true, 'post_type' => 'page', 'name' => 'summer-sale']);
     check("[{$collation}] every other parameter beside it: answered, zero, the offset as asked", [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, $r['offset'] ?? null], [true, [], 0, 40]);
+    // An emoji that no page holds is a question that was asked and answered "none" (one statement, of its entity), unlike
+    // the words below that cannot exist there, which are answered without one.
+    $csForget();
+    $r = $csAsk(['search' => "\u{1F680}"]);
+    check("[{$collation}] an emoji that no page holds: asked as its entity, and none is an answer", [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, count($csDb->queries), $csFourByte($csDb->queries), $csDb->refused, strpos($csDb->queries[0] ?? '', "post_title LIKE '%&#x1f680;%'") !== false], [true, [], 0, 1, [], [], true]);
 }
 
 // A character that core cannot store on such a column at all (an ideograph above U+FFFF is no emoji, so it has no entity):
