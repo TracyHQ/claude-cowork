@@ -313,8 +313,9 @@ final class SearchNeedle
     /**
      * Clean one `search` value.
      *
-     * Line breaks and tabs are gaps between words; every other control character (NUL, escape, DEL,
-     * the C1 range) is dropped; the ends are trimmed, no-break and ideographic spaces included. The
+     * Tabs and line breaks (LF, CR, VT, FF and Unicode's NEL, line separator and paragraph separator)
+     * are gaps between words; every other control character (NUL, escape, DEL, the rest of the C1
+     * range) is dropped; the ends are trimmed, no-break and ideographic spaces included. The
      * result is NFC when this PHP can normalise (`Normalizer`, from intl or a polyfill), and matched
      * as its NFC and NFD forms, because a title may have been stored either way. Without a usable
      * normaliser (none, or one emptied by `disable_classes`) the needle is used as it came: it matches
@@ -335,7 +336,9 @@ final class SearchNeedle
         if (strlen($raw) > self::MAX_BYTES) {
             return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];
         }
-        $text = preg_replace(['/[\t\n\r\x0B\x0C]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
+        // Every line break is a gap, not only the ones a keyboard makes: NEL, the line separator and the
+        // paragraph separator arrive when text is pasted, and dropping NEL would glue two words together.
+        $text = preg_replace(['/[\t\n\r\x0B\x0C\x{85}\x{2028}\x{2029}]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
         // Trimmed by ONE pattern anchored at the start, with a possessive lead, so the text is read once.
         // The obvious `^\s+|\s+$` tries every space of a long run as a start and is quadratic when PCRE's
         // JIT is off, which is how some hosts run PHP: measured with pcre.jit=0, 20,000 spaces inside a

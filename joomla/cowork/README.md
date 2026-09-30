@@ -313,7 +313,8 @@ content.list {kind: "article", search: "roof repair"}
   space is a space, in the title and in the alias: "roof repair" does not match the alias
   `roof-repair`, so ask for the stem when the caller wants the language editions. An empty answer for
   a capitalised stem is the binary comparison, not proof that no row has it.
-- **The needle.** Trimmed; a tab or line break becomes a space and any other control character is
+- **The needle.** Trimmed; a tab or a line break (including NEL and the Unicode line and paragraph
+  separators, which arrive when text is pasted) becomes a space and any other control character is
   dropped. One character is enough (Chinese, Japanese). At most 200 characters once cleaned (and
   4,096 bytes before, which a real needle never comes near); that, a value that is not a string
   (`null` included) and one that is not UTF-8 are refused with `bad_params`. It is made NFC when PHP
