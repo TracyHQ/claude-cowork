@@ -1872,6 +1872,10 @@ require __DIR__ . "/derived-contract.php";
 // The same at the size of a real import, through JoomlaDerivedRows' own SQL over SQLite.
 require __DIR__ . "/derived-scale.php";
 require __DIR__ . "/loopback-route.php";
+// content.list `search`: the needle, its LIKE pattern through SQLite, the writer's SQL through a
+// recording driver, the engine's answers, and the loading production does. Last: it defines a
+// Normalizer stand-in when the PHP has none, and nothing after it should run beside that.
+require __DIR__ . "/content-search.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
