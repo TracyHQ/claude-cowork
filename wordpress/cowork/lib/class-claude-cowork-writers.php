@@ -326,8 +326,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * character above U+FFFF (an emoji) against a posts table that is still utf8, which MySQL refuses
 	 * to compare instead of finding nothing (see {@see four_byte_words_refused()}).
 	 *
-	 * Case and accents fold as the column's collation folds them; the collations WordPress installs
-	 * with are all case-insensitive. No language predicate: a post of any language is a row here, and
+	 * Case and accents fold as the column's collation folds them (the collations WordPress installs
+	 * with are all case-insensitive), except that a slug is also asked in lower case and so does not
+	 * depend on it (see {@see slug_forms()}). No language predicate: a post of any language is a row here, and
 	 * `search_posts()` loads the page in a way that keeps it one.
 	 *
 	 * @return array{ids:int[],matched:int}
@@ -373,7 +374,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$ids = $wpdb->get_col(
 			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
 		);
-		// The one statement that can fail this way is this one: the count below asks the same thing.
+		// The page of ids is the statement that fails this way, and it always runs first: the count
+		// below asks the same thing of the same rows, so it is never reached.
 		if ( self::four_byte_words_refused( $wpdb, $needle ) ) {
 			return array(
 				'ids'     => array(),
@@ -448,13 +450,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * not say "no rows" to the comparison, it refuses it, because it cannot turn the words into the
 	 * column's character set without losing them: "Illegal mix of collations (utf8_general_ci,IMPLICIT)
 	 * and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'", or, from a server that words it
-	 * differently, "Incorrect string value". It is raised when the words cannot be turned into the
-	 * column's character set, and a utf8mb4 column, which is what WordPress installs, takes them; so the
-	 * message is enough to say the table cannot hold them, and the table itself is not looked at.
-	 * Both halves have to hold. The same message for words with no such character is a table this search
-	 * cannot compare with at all (a latin1 table and a Chinese word, say), and any other error with such
-	 * words (a crashed table, a lost connection) says nothing about what the table holds. Either is a
-	 * failure a caller has to be told about, not read as an empty result.
+	 * differently, "Incorrect string value". A utf8mb4 column, which is what WordPress installs, takes
+	 * the words, so the message is enough to say the table cannot hold them, and the table itself is
+	 * not looked at. Both halves have to hold. The same message for words with no such character is a
+	 * table this search cannot compare with at all (a latin1 table and a Chinese word, say), and any
+	 * other error with such words (a crashed table, a lost connection) says nothing about what the
+	 * table holds. Either is a failure a caller has to be told about, not read as an empty result.
 	 *
 	 * @param object $wpdb The database handle whose last statement just ran.
 	 */

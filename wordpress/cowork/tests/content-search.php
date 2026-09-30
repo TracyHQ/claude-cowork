@@ -578,7 +578,7 @@ $csSite(static function () use ($csPost): void {
     $csPost(2, 'Winter sale');
 });
 $r = $csAsk(['search' => '🔥']);
-check('on a utf8mb4 table the same words are found: nothing is answered for them but what the table holds', [$csIds($r), $r['matched'] ?? null], [[1], 1]);
+check('on a utf8mb4 table the same words are searched like any others: the row that holds the emoji is found', [$csIds($r), $r['matched'] ?? null], [[1], 1]);
 check('and a fault there, with that character, is a failure', (function () use ($csAsk, $csDb) {
     $csDb->failWith = 'Table wp_posts is marked as crashed';
     $r = $csAsk(['search' => '🔥']);
