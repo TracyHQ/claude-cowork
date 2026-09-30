@@ -366,17 +366,31 @@ function sanitize_title_for_query(string $title): string
 
 /**
  * `WP_Query`, as far as the post list asks it: the arguments `list_posts` and `search_posts` send,
- * answered from `WP_Fake::$posts` in id order. Any other argument throws instead of being ignored,
- * so a test cannot pass because this fake did not understand what it was asked. Three behaviours of
- * the real class are kept on purpose, because the writer has to survive them (each read off
- * class-wp-query.php): an empty `post__in` is no restriction at all, an empty page size is the
- * site's "posts per page" setting (ten unless changed) and not zero rows, and no `post_type` means
- * `post`. Together they make an unguarded empty `post__in` answer with the site's first ten posts.
+ * answered from `WP_Fake::$posts` in id order. It refuses where a default would decide for the
+ * caller, so a test cannot pass because this fake happened to guess what core does:
+ *
+ *  - an argument it does not know throws, instead of being ignored;
+ *  - so does a query that does not ASK for `orderby` ID and `order` ASC (core, asked for nothing,
+ *    orders by post_date, newest first: a page in the wrong order on a real site);
+ *  - and one that does not ask for `suppress_filters` (core, not told to, runs every `posts_where`
+ *    and `posts_clauses` filter a plugin added, which a statement written by hand never sees).
+ *
+ * What the LAST query was asked is kept in `$lastArgs`, for a test to compare with what it means the
+ * writer to send: the arguments no answer shows (`ignore_sticky_posts`, `no_found_rows`) are only
+ * ever visible there.
+ *
+ * Three behaviours of the real class are kept on purpose, because the writer has to survive them
+ * (each read off class-wp-query.php): an empty `post__in` is no restriction at all, an empty page
+ * size is the site's "posts per page" setting (ten unless changed) and not zero rows, and no
+ * `post_type` means `post`. Together they make an unguarded empty `post__in` answer with the site's
+ * first ten posts.
  */
 class WP_Query
 {
     /** @var WP_Post[] */
     public array $posts = [];
+    /** @var array<string,mixed> the arguments of the query built last */
+    public static array $lastArgs = [];
 
     private const UNDERSTOOD = ['name', 'post_type', 'post_status', 'orderby', 'order', 'offset', 'posts_per_page',
         'ignore_sticky_posts', 'no_found_rows', 'suppress_filters', 'post__in'];
@@ -388,9 +402,13 @@ class WP_Query
                 throw new LogicException("the WP_Query fake does not understand `{$key}`");
             }
         }
-        if (($args['orderby'] ?? 'ID') !== 'ID' || ($args['order'] ?? 'ASC') !== 'ASC') {
-            throw new LogicException('the WP_Query fake orders by ID ascending only');
+        if (($args['orderby'] ?? null) !== 'ID' || ($args['order'] ?? null) !== 'ASC') {
+            throw new LogicException('the WP_Query fake orders by ID ascending only, and only when asked to: core would order by post_date, newest first');
         }
+        if (($args['suppress_filters'] ?? false) !== true) {
+            throw new LogicException('the WP_Query fake runs no query filters, so a caller has to suppress them: core would run every posts_where and posts_clauses filter');
+        }
+        self::$lastArgs = $args;
 
         $types = array_values(array_filter((array) ($args['post_type'] ?? 'post'), static fn ($t) => $t !== ''));
         $types = $types === [] ? ['post'] : $types;

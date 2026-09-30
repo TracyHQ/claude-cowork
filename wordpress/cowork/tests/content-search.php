@@ -6,7 +6,10 @@
  * reads a row is described by (FakeWordPress.php), and a `$wpdb` (FakePostsDb.php) that READS the
  * statements the writer builds and answers from the fake posts: a pattern that forgot to escape `%`,
  * an OR that lost its parentheses, a missing ORDER BY or a wrong page shows up as a wrong answer here,
- * not as a string that happens to look right.
+ * not as a string that happens to look right. That holds for the two SQL statements (the ids of a page,
+ * and the count). The `WP_Query` that loads the page is different: it refuses the arguments it does not
+ * know and the ones it would have to guess, and what it is asked is compared with what it should be
+ * (`WP_Query::$lastArgs`), because a fake cannot show a wrong order or a filter left on.
  *
  * Loaded by run.php, last (uses `check()`, `checkTrue()`, `$WTOKEN`, `WP_Fake`, `FakeApplyLog`).
  */
@@ -359,6 +362,47 @@ check('the statement: types and states as the plain list reads them, words group
     $csDb->queries[0],
     "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
     . "AND (post_title LIKE '%zebra%' OR post_name LIKE '%zebra%') ORDER BY ID ASC LIMIT 0, 100");
+
+// The query that then LOADS the page is pinned by what it is asked for. The statement above is read by a
+// reader that understands its SQL; this one is answered by a fake that can only refuse what it does not
+// know, and an argument it accepts but never uses (a sticky post kept in, a row count asked for) shows in
+// no answer at all. Left to core's defaults, a page would come back newest first, and any plugin's query
+// filter would narrow it after the count above had already been taken.
+/** The arguments of the last WP_Query, in key order, so a comparison does not depend on how they were written. */
+$csArgs = static function (): array {
+    $args = WP_Query::$lastArgs;
+    ksort($args);
+    return $args;
+};
+$csAsk(['search' => 'zebra', 'limit' => 2, 'offset' => 1]);
+check('the query that loads a page of a search: those ids, the plain list\'s types, states, order and flags', $csArgs(), [
+    'ignore_sticky_posts' => true,
+    'no_found_rows' => true,
+    'order' => 'ASC',
+    'orderby' => 'ID',
+    'post__in' => [53, 57],
+    'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+    'post_type' => ['post', 'page'],
+    'posts_per_page' => 2,
+    'suppress_filters' => true,
+]);
+$csAsk(['search' => 'zebra', 'post_type' => 'post']);
+check('and with a post type named, that type', $csArgs()['post_type'] ?? null, 'post');
+$csWriter->list_posts(1, 3, false);
+check('the plain list asks for the same order and flags, from its own offset', $csArgs(), [
+    'ignore_sticky_posts' => true,
+    'name' => '',
+    'no_found_rows' => true,
+    'offset' => 1,
+    'order' => 'ASC',
+    'orderby' => 'ID',
+    'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+    'post_type' => ['post', 'page'],
+    'posts_per_page' => 3,
+    'suppress_filters' => true,
+]);
+$csWriter->list_posts(0, 5, false, 'zebra-b', 'page');
+check('and with a slug and a type named, those', [$csArgs()['name'] ?? null, $csArgs()['post_type'] ?? null], ['zebra-b', 'page']);
 
 // ── states, protected posts, entities, types ────────────────────────────────────────────────────
 
