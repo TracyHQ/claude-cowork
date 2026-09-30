@@ -301,6 +301,8 @@ $csSite(static function () use ($csPost): void {
     $csPost(45, "Summer sale \u{1F525} today");
     $csPost(46, "Caf\u{E9} menu");
     $csPost(47, "Cafe\u{301} menu");
+    // WordPress stores the slug of a title in a non-Latin script percent-encoded, in lower case
+    $csPost(48, 'サービス点検', ['post_name' => '%e3%82%b5%e3%83%bc%e3%83%93%e3%82%b9%e7%82%b9%e6%a4%9c']);
 });
 check('a composed needle finds the title stored composed AND the one stored decomposed', $csIds($csAsk(['search' => "Vi\u{1EC7}t"])), [41, 42]);
 $r = $csAsk(['search' => "Vie\u{323}\u{302}t"]);
@@ -311,6 +313,9 @@ check('a control character between a letter and its accent is removed first, so 
 check('the writer tries the composed and the decomposed spelling', Claude_Cowork_Site_Writer::search_forms("Caf\u{E9}"), ["Caf\u{E9}", "Cafe\u{301}"]);
 check('CJK: two characters', $csIds($csAsk(['search' => '屋根'])), [43]);
 check('CJK: one character is enough', $csIds($csAsk(['search' => '修'])), [43]);
+check('a page whose slug was stored percent-encoded is found by its title', $csIds($csAsk(['search' => '点検'])), [48]);
+check('and by a slice of that slug, percent signs as themselves: the slug is matched as stored', [$csIds($csAsk(['search' => '%e3%82%b5'])), $csIds($csAsk(['search' => '%bc%e3%83'])), $csIds($csAsk(['search' => '%']))], [[48], [48], [48]]);
+check('a bare hex pair matches through that slug too, which is why words make the better needle', [$csIds($csAsk(['search' => 'e3'])), $csIds($csAsk(['search' => 'zz']))], [[48], []]);
 check('CJK with an ideographic space around it', $csIds($csAsk(['search' => "\u{3000}外壁\u{3000}"])), [44]);
 check('a four-byte character (the test source has four bytes for it)', strlen('🔥'), 4);
 $r = $csAsk(['search' => '🔥']);
