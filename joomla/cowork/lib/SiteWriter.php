@@ -400,8 +400,9 @@ final class SearchNeedle
 interface SearchableSiteWriter
 {
     /**
-     * The kinds whose rows carry a name to search. A kind not listed has none (a user, a redirect,
-     * a relation) and the engine refuses `search` on it instead of ignoring it.
+     * The kinds this writer searches: the ones whose rows are called by a title or a name. A kind not
+     * listed (a user, a redirect, an extension's parameters, a relation between two rows) is not
+     * searched, and the engine refuses `search` on it instead of ignoring it.
      *
      * @return string[]
      */

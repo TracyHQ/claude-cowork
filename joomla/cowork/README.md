@@ -332,8 +332,9 @@ content.list {kind: "article", search: "roof repair"}
   `module`, `templateStyle`, `language`, `menutype`. By name and alias: `banner`, `contact`,
   `newsfeed`. By name: `bannerClient` (that table has no alias). By title and name: `field`. Every
   other kind — `user`, `redirect`, `extensionParams`, `languageFilter`, the three association kinds,
-  `fieldValue` — has no title or name to match, and `search` on it is refused with `bad_params`
-  naming the kind and the ones that work. Never quietly ignored.
+  `fieldValue` — is not searched: it is a person, a URL pair, an extension's settings or a relation
+  between two rows, not a page a caller finds by its title. `search` on it is refused with
+  `bad_params` naming the kind and the ones that work. Never quietly ignored.
 - **Not in this change.** Searching bodies or notes, a state or language filter, an unfiltered
   `total`, and a case-insensitive alias (that would need `LOWER()` or a `COLLATE` on the alias
   columns). What the collation decides is decided by the site's tables, not by this code: the tests

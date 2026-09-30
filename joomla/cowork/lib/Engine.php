@@ -1334,7 +1334,7 @@ final class Engine
             }
             $searchable = $this->writer->searchableKinds();
             if (!in_array($kind, $searchable, true)) {
-                return $this->err('bad_params', 'search does not cover kind "' . $kind . '": its rows have no title or name to match. '
+                return $this->err('bad_params', 'search does not cover kind "' . $kind . '". '
                     . 'It covers: ' . implode(', ', $searchable) . '. Leave search out and page the list with offset and limit');
             }
         }

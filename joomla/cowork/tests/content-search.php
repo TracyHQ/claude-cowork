@@ -530,6 +530,14 @@ namespace {
         check("kind {$csKind}: and so does a writer that cannot search", array_keys($csAsk(['kind' => $csKind], new FakeSearchlessSite())), ['ok', 'kind', 'offset', 'items']);
     }
 
+    // The refusal says what search does cover and claims nothing about the refused kind: a user and an
+    // extension's parameters both HAVE a name, and text saying "no title or name to match" was false for them.
+    foreach (['user', 'extensionParams', 'redirect', 'fieldValue'] as $csKind) {
+        check("refusal: {$csKind} is named, with what search does cover and the road to take instead",
+            $csAsk(['kind' => $csKind, 'search' => 'x'], $csShop())['message'] ?? null,
+            'search does not cover kind "' . $csKind . '". It covers: ' . implode(', ', array_keys(CsSearchWriter::COLUMNS)) . '. Leave search out and page the list with offset and limit');
+    }
+
     // --- the production writer, joined to the engine
     // Every engine check above runs over an in-memory writer that declares SearchableSiteWriter itself,
     // and every check of the real writer above calls its methods directly, so none of them crosses the
