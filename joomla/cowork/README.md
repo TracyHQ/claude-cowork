@@ -48,8 +48,15 @@ edit the copy — that is how the two silently diverge.
 
 ```bash
 ./build.sh                                    # → dist/pkg_claudecowork.zip
-docker run --rm -v "$PWD":/w -w /w php:8.3-cli php tests/run.php
+docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
+docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
+
+Mount the repository root, not this folder: the release checks read `joomla/update.xml` and
+`joomla/update.json` one level up, so a mount of `joomla/cowork` alone stops at them. The second run
+is the same suite with the test writers reading through the list-and-read walk instead of in bulk;
+the two must agree test for test. The official `php` images carry no `intl`, so the tests stand in
+for `Normalizer` there (see `tests/content-search.php`).
 
 ## Updates from inside the site
 
