@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.19.1 plus: derived content contracts for imported sites fit in memory on large sites (rows read in batches, filtered in SQL) and the built map is kept between requests in its own table; reading a slot no longer re-encodes its column, and picture hashes are kept by file signature, so a content.read on an imported site takes about 0.3 s instead of several seconds (TracyHQ/claude-cowork#80)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.19.2</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.19.2</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.19.2/pkg_claudecowork-0.19.2.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.19.0 plus: carries the Tracy Base 1.0.1 (tracy-base/j6/1.0.1) and JA Voyara 1.0.3 (ja-voyara/j6/1.0.3) content contract profiles, the quickstarts whose templates honour ?theme=dark|light for one page load</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
