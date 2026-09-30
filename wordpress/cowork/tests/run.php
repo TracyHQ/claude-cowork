@@ -1666,9 +1666,12 @@ require __DIR__ . '/leaf-codec.php';
 require __DIR__ . '/builder-fixtures.php';
 require __DIR__ . '/visible-text.php';
 require __DIR__ . '/derived-map.php';
+require __DIR__ . '/derived-cache.php';
 require __DIR__ . '/loopback-route.php';
 // Derived contract on WordPress: rows, derive, leaf apply and revert, the reader, purge and render check.
 require __DIR__ . '/derived-contract.php';
+// The same at the size of a real import: memory, and the map kept between reads.
+require __DIR__ . '/derived-scale.php';
 // String overrides: gettext words replaced per locale, through content.contract string and apply.revert.
 require __DIR__ . '/string-overrides.php';
 // apply.revert takes back one receipt: the span its write changed, never the whole row.

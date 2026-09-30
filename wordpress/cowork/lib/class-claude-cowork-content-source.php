@@ -40,6 +40,7 @@ require_once __DIR__ . '/QuickstartContract.php';
 require_once __DIR__ . '/ContentIdentity.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
+require_once __DIR__ . '/DerivedCache.php';
 require_once __DIR__ . '/WordPressDerivedRows.php';
 
 final class Claude_Cowork_Content_Source implements ContentSource
@@ -109,8 +110,10 @@ final class Claude_Cowork_Content_Source implements ContentSource
     private $detailed = 0;
     /** @var array<string,string>|null theme template files, globbed once per request */
     private $templateFiles = null;
-    /** @var callable|null `fn(): list<row>` a derived site's rows (WordPressDerivedRows), read inside the snapshot */
+    /** @var callable|null `fn(): list<row>|Generator` a derived site's rows or their batches (WordPressDerivedRows), read inside the snapshot */
     private $derivedRows;
+    /** @var DerivedCache|null where a derived site's built map is kept between requests */
+    private $derivedCache;
     /** @var array<string,array> a derived site's rows by entity key, as read in this snapshot */
     private $derivedRowsByKey = [];
     /** @var array<string,list<array>> a derived site's slots by the content id that shows them */
@@ -121,8 +124,10 @@ final class Claude_Cowork_Content_Source implements ContentSource
     /**
      * @param callable|null $derivedRows where a site bound to a DERIVED contract reads its rows; the
      *        site's own (WordPressDerivedRows::forSite) when null
+     * @param DerivedCache|null $derivedCache keeps the built map between requests; with no `$derivedRows`, the
+     *        site's own (WordPressDerivedRows::cache) when null
      */
-    public function __construct(string $scope, string $contractsDir, string $version, ?callable $derivedRows = null)
+    public function __construct(string $scope, string $contractsDir, string $version, ?callable $derivedRows = null, ?DerivedCache $derivedCache = null)
     {
         if (!isset(self::STATUSES[$scope])) {
             throw new InvalidArgumentException('Unknown read scope');
@@ -131,6 +136,7 @@ final class Claude_Cowork_Content_Source implements ContentSource
         $this->contractsDir = rtrim($contractsDir, '/');
         $this->version = $version;
         $this->derivedRows = $derivedRows;
+        $this->derivedCache = $derivedCache;
     }
 
     // ---- ContentSource ----------------------------------------------------------------------
@@ -338,6 +344,10 @@ final class Claude_Cowork_Content_Source implements ContentSource
             global $wpdb;
             $wpdb->query('COMMIT');
             $this->open = false;
+            if ($this->derivedCache !== null) {
+                // The derived map built inside the snapshot, now that a write is allowed again.
+                $this->derivedCache->flush();
+            }
         }
     }
 
@@ -512,26 +522,51 @@ final class Claude_Cowork_Content_Source implements ContentSource
     }
 
     /**
-     * A derived contract's profile: the map its rows make now, read inside this snapshot and kept to
-     * the nested leaves its derive found on a page (`keep`), exactly as the contract builds it.
+     * A derived contract's profile: the map its rows make now, kept to the nested leaves its derive
+     * found on a page (`keep`), exactly as the contract builds it — and with it the rows that carry a
+     * slot. Both come from the map kept between requests while the tables' fingerprint stands
+     * (DerivedCache); otherwise they are read inside this snapshot, batch by batch, and kept.
      */
     private function loadDerived(string $id): array
     {
-        $rows = $this->derivedRows !== null ? ($this->derivedRows)() : WordPressDerivedRows::forSite()->rows();
-        // The same rows the contract's map is made of (QuickstartContract::prepareDerivedRows), so every
-        // slot key offered here is one an apply knows.
-        if (class_exists('Claude_Cowork_Site_Writer')) {
-            $ignored = [];
-            $rows = QuickstartContract::prepareDerivedRows(new Claude_Cowork_Site_Writer(), $rows, ($this->binding['calibrated'] ?? true) !== false, $ignored);
+        $binding = (array) $this->binding;
+        $rows = function () {
+            return $this->derivedRows !== null ? ($this->derivedRows)() : WordPressDerivedRows::forSite()->batches();
+        };
+        $make = static function () use ($rows, $binding, $id): array {
+            // The same rows the contract's map is made of (QuickstartContract::prepareDerivedRows), so every
+            // slot key offered here is one an apply knows.
+            if (class_exists('Claude_Cowork_Site_Writer')) {
+                return QuickstartContract::buildDerivedFor(new Claude_Cowork_Site_Writer(), $rows(), $binding, $id);
+            }
+            $basis = QuickstartContract::derivedBasis($binding, $id);
+            $keep = isset($binding['keep']) && is_array($binding['keep']) ? array_values(array_map('strval', $binding['keep'])) : null;
+            $source = $rows();
+            $mapped = [];
+            $built = DerivedMap::buildBatches(is_array($source) ? [$source] : $source, null, substr($id, strlen('derived/')), $basis['algorithm'], $keep, null, $mapped);
+            return ['built' => $built, 'rows' => $mapped];
+        };
+        $cache = $this->derivedCache = $this->derivedCache ?? ($this->derivedRows === null ? WordPressDerivedRows::siteCache($this->version) : null);
+        if ($cache !== null && $this->open) {
+            // This read is a READ ONLY transaction: a map built here is stored once release() commits it.
+            $cache->hold();
         }
-        $keep = isset($this->binding['keep']) && is_array($this->binding['keep']) ? array_values(array_map('strval', $this->binding['keep'])) : null;
-        $built = DerivedMap::build($rows, null, substr($id, strlen('derived/')), (int) ($this->binding['algorithm'] ?? DerivedMap::ALGORITHM), $keep);
+        $got = $cache !== null ? $cache->get(QuickstartContract::derivedBasis($binding, $id), $make) : $make();
+        $built = $got['built'];
         // Only the rows that carry a slot: a counter or a cache in an autoloaded option read here must
         // not move the snapshot revision (it is in the fingerprint below).
-        $mapped = array_flip(array_column($built['map']['entities'], 'key'));
-        foreach ($rows as $row) {
-            if (isset($mapped[$row['kind'] . '-' . $row['id']])) {
-                $this->derivedRowsByKey[$row['kind'] . '-' . $row['id']] = $row;
+        if ($got['rows'] !== null) {
+            $this->derivedRowsByKey = $got['rows'];
+        } else {
+            // Kept without its rows (too large for one stored entry): read them, keep the mapped ones.
+            $mapped = array_flip(array_column($built['map']['entities'], 'key'));
+            $source = $rows();
+            foreach (is_array($source) ? [$source] : $source as $batch) {
+                foreach ($batch as $row) {
+                    if (isset($mapped[$row['kind'] . '-' . $row['id']])) {
+                        $this->derivedRowsByKey[$row['kind'] . '-' . $row['id']] = $row;
+                    }
+                }
             }
         }
         return ['id' => $id, 'hash' => QuickstartContract::derivedHash((int) ($this->binding['algorithm'] ?? DerivedMap::ALGORITHM)),

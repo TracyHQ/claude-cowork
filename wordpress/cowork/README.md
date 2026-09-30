@@ -180,8 +180,27 @@ PHP serialize, nested in any order). In Tracy, only the import provision calls i
   `requestId` replays; a new one re-derives. `conflict` on a site bound to a quickstart, or
   configured for one (`claude_cowork_contract`) and not bound yet.
 - The binding (`mode: 'derived'`) records `keep` (the nested slots calibration kept), the hash of the
-  algorithm (never of the rows, which every apply changes) and the derive's answer. Every later read
-  rebuilds the map from the rows, only when a request needs it (`db.*`, `files.*`, `info` never scan).
+  algorithm (never of the rows, which every apply changes) and the derive's answer. The map is made
+  from the rows only when a request needs it (`db.*`, `files.*`, `info` never scan).
+- **Memory.** Rows are read in batches of 200 posts (`WordPressDerivedRows::batches()`) and built into
+  the map batch by batch (`DerivedMap::buildBatches`), so no request holds every row. What cannot be
+  words stays in the database: bookkeeping meta and configuration options are excluded in the `WHERE`
+  clause, and so are short values with no word in them (empty, digits and `.,:;+-`, a hex id, one
+  character, `yes`/`no`/`on`/`off`/`true`/`false`; under the usual `_ci` collations that comparison
+  ignores case, so `Yes` or `OFF` alone is skipped too). A derive and a map build first call
+  `wp_raise_memory_limit('admin')`. Measured on an imported shop (2,482 posts, 121,925 meta rows) a
+  derive needed over 128 MB before; the scale test (`tests/derived-scale.php`) holds the same shape
+  at about 35 MB for a derive and 4 MB for the rows.
+- **Kept between requests** (`lib/DerivedCache.php`): the built map and the rows that carry a slot,
+  gzip-compressed in the non-autoloaded option `claude_cowork_derived_map` (at most 3 MB; larger, the
+  rows are left out, then nothing is kept). Keyed by the receiver version, the binding's label,
+  algorithm, `keep` and calibration, and a fingerprint of the tables computed in one query (counts,
+  highest ids and a CRC32 checksum of every column read, over the same scope and filters). Any write
+  to those rows, through this plugin or not, changes it; a price or stock count does not. A derived
+  apply drops the kept map as well. `content.read` runs inside a READ ONLY snapshot, where MySQL
+  refuses writes: a map built there is stored after the snapshot commits. One object per request
+  serves the contract and every reader (`WordPressDerivedRows::siteCache`). A fingerprint that cannot
+  be read builds the map uncached; a map whose tables moved while it was built is not stored.
 - A slot is `{key: '<kind>-<id>.<column>.<sha1(leaf) 10>', entity, column, leaf}` (`leaf: null` is the
   whole column). `inspect` adds `slotDetails` (every slot with its current value). `apply` works as
   on a quickstart site, rewriting the leaf in its column and re-encoding every layer (a serialized

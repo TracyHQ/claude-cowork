@@ -76,7 +76,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'LeafCodec', 'VisibleText', 'DerivedMap', 'LoopbackRoute', 'WordPressDerivedRows', 'StringOverrides', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'LeafCodec', 'VisibleText', 'DerivedMap', 'DerivedCache', 'LoopbackRoute', 'WordPressDerivedRows', 'StringOverrides', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -334,15 +334,16 @@ function claude_cowork_exec(): void
             // An image slot's picture must be an attachment in this site's uploads, in its slot's shape.
             new Claude_Cowork_Image_Library()
         )
-        )->withDerivedRows(static function () use ($derived): array {
-            return $derived->rows();
-        })
+        // Batches, never every row at once; the built map is kept between requests (DerivedCache), in the
+        // one object the content readers of this request share.
+        )->withDerivedRows(static function () use ($derived): Generator {
+            return $derived->batches();
+        }, WordPressDerivedRows::siteCache((string) claude_cowork_version()))
     );
     $engine->derivedSource(
         static function () use ($derived): array {
-            $unresolved = [];
-            $rows = $derived->rows($unresolved);
-            return ['rows' => $rows, 'pages' => $derived->pages(), 'unresolved' => $unresolved];
+            // The rows as a generator of batches, read while the map is built; it returns its own unresolved lines.
+            return ['rows' => $derived->batches(), 'pages' => $derived->pages(), 'unresolved' => []];
         },
         static function (array $urls) use ($derived): array {
             return $derived->fetch($urls, WordPressDerivedRows::CHECK_SECONDS);

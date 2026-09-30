@@ -89,11 +89,10 @@ final class EngineFactory
             $writer = self::buildWriter();
             if (!$writer) return null;
             $db = Factory::getContainer()->get(DatabaseInterface::class);
-            $label = substr((string) $derived['contract'], strlen('derived/'));
-            $algorithm = (int) ($derived['algorithm'] ?? \DerivedMap::ALGORITHM);
-            $keep = $derived['keep'] ?? null;
+            // Built batch by batch, and kept between requests while the tables' fingerprint stands.
+            $cache = JoomlaDerivedRows::siteCache($db, (string) self::installedVersion());
             return \QuickstartContract::derived($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT,
-                static fn(): array => \DerivedMap::build(JoomlaDerivedRows::rows($db), null, $label, $algorithm, is_array($keep) ? $keep : null));
+                static fn(): array => JoomlaDerivedRows::built($db, $derived, $cache));
         }
         $configured = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         // A site under construction — provisioned from the Base archive with `tracy_build_baseline`
@@ -244,12 +243,13 @@ final class EngineFactory
         try {
             $db = Factory::getContainer()->get(DatabaseInterface::class);
             // Params naming a quickstart contract (a provision whose bind is still to come) refuse derive while unbound.
+            // The rows as a generator of batches, read while the map is built; it returns its own unresolved lines.
             $engine->derivedSource(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, static function () use ($db): array {
-                $unresolved = [];
-                $rows = JoomlaDerivedRows::rows($db, $unresolved);
-                return ['rows' => $rows, 'pages' => JoomlaDerivedRows::pages($db), 'unresolved' => $unresolved];
+                return ['rows' => JoomlaDerivedRows::batches($db), 'pages' => JoomlaDerivedRows::pages($db), 'unresolved' => []];
             }, static fn(array $paths): array => JoomlaDerivedRows::fetch($paths, JoomlaDerivedRows::CHECK_SECONDS),
-                static fn() => JoomlaDerivedRows::clearOptimize(JPATH_ROOT), static fn(int $id): ?string => JoomlaDerivedRows::modulePage($db, $id), $quickstart);
+                // After a derived apply: T4's optimize cache, and the map kept between requests (made of the rows just written).
+                static function () use ($db): void { JoomlaDerivedRows::clearOptimize(JPATH_ROOT); JoomlaDerivedRows::forget($db); },
+                static fn(int $id): ?string => JoomlaDerivedRows::modulePage($db, $id), $quickstart);
         } catch (\Throwable $e) {
             // No database: derive answers 'unavailable', like every other write without one.
         }

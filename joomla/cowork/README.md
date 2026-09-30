@@ -226,6 +226,20 @@ a content map computed from the site's own rows, in the same `content-map` schem
   categories (`title`, `description`, `params`), single-row article custom field values of type
   text/textarea/editor/media, and the site template styles that are a home or that a menu item names.
   A value over 2 MB is listed in `unresolved`, not scanned. Extension tables are not read in v1.
+- **Memory.** Articles are read 200 at a time (`JoomlaDerivedRows::batches()`) and built into the map
+  batch by batch (`DerivedMap::buildBatches`), so no request holds every row; a custom field value
+  with no word in it (a number, a hex id, one character) stays in the database. A derive and a map
+  build raise `memory_limit` to 256 MB when it is lower (never lowered, never from `-1`).
+- **Kept between requests** (`lib/DerivedCache.php`): the built map, gzip-compressed in its own table
+  `#__claudecowork_derived_cache` (created by `script.php` on install and update; never a row of the
+  contract table, which the content reader snapshots whole), at most 3 MB, else not kept. A map built
+  inside a read's snapshot transaction is stored after it commits, so a read never writes; one object
+  per request serves the contract and the reader. Keyed by the component version,
+  the binding's label, algorithm and `keep`, and a fingerprint of the tables computed in one query (a
+  count and a CRC32 checksum of every column read from articles in their publish window, site menu
+  items, modules, categories, custom field values and template styles). Any write to those rows
+  changes it; the purge after a derived apply also drops the kept map. A fingerprint that cannot be
+  read builds the map uncached; a map whose tables moved while it was built is not stored.
 - **Leaf slots.** `LeafCodec` finds the words, pictures and links inside a value through five codecs
   (text, HTML, shortcode, JSON, PHP serialize, nested in any order). A slot names its leaf by a path
   (`leaf`); an apply rewrites only that leaf and re-encodes every layer in its own format. A value that

@@ -26,6 +26,7 @@ require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
+require_once __DIR__ . '/DerivedCache.php';
 
 /**
  * Where the binding lives. The plugin keeps it in an option; the tests keep it in memory.
@@ -114,8 +115,10 @@ final class QuickstartContract
     /** @var array<string,int> attachment id of each picture an apply's checks resolved, by path */
     private array $imageIds = [];
 
-    /** @var callable|null `fn(): list<row>` the site's own rows, in DerivedMap's shape (WordPressDerivedRows) */
+    /** @var callable|null `fn(): list<row>|Generator` the site's own rows, in DerivedMap's shape, or their batches (WordPressDerivedRows) */
     private $derivedRows = null;
+    /** Where a built derived map is kept between requests; null builds it on every request. */
+    private ?DerivedCache $derivedCache = null;
     /** Whether the resolved contract is a derived one. */
     private bool $derived = false;
     /** Whether a derived contract's map has been built (lazily: see ensureDerived()). */
@@ -150,12 +153,26 @@ final class QuickstartContract
      * (inspect, plan, the slots): an Engine answering `db.*`, `files.*` or `info` on a derived site
      * resolves the binding and never scans the tables.
      *
-     * @param callable $rows `fn(): list<array{kind,id,identity,core,html,nested}>`
+     * @param callable $rows `fn(): list<array{kind,id,identity,core,html,nested}>`, or a generator of such lists
+     *        (WordPressDerivedRows::batches) so a large site is never held whole
+     * @param DerivedCache|null $cache keeps the built map between requests, keyed by the tables' fingerprint
      */
-    public function withDerivedRows(callable $rows): self
+    public function withDerivedRows(callable $rows, ?DerivedCache $cache = null): self
     {
         $this->derivedRows = $rows;
+        $this->derivedCache = $cache;
         return $this;
+    }
+
+    /**
+     * Drop the derived map kept between requests: after a write this receiver made, whatever the
+     * fingerprint would say, the next read builds from the rows as they are now.
+     */
+    public function forgetDerived(): void
+    {
+        if ($this->derivedCache !== null) {
+            $this->derivedCache->clear();
+        }
     }
 
     /** Whether this site is held to a derived contract (known once the binding was resolved). */
@@ -1504,11 +1521,12 @@ final class QuickstartContract
                 throw new ContractUnavailable('This receiver cannot read a derived contract');
             }
             $binding = $this->store->load() ?? [];
-            $keep = isset($binding['keep']) && is_array($binding['keep']) ? array_values(array_map('strval', $binding['keep'])) : null;
-            $unresolved = [];
-            $rows = self::prepareDerivedRows($this->writer, ($this->derivedRows)(), ($binding['calibrated'] ?? true) !== false, $unresolved);
-            $built = DerivedMap::build($rows, null, substr((string) $this->id, strlen('derived/')),
-                (int) ($binding['algorithm'] ?? DerivedMap::ALGORITHM), $keep);
+            $id = (string) $this->id;
+            // Built with the rows that carry a slot, so the content reader finds a whole entry in the cache.
+            $make = function () use ($binding, $id): array {
+                return self::buildDerivedFor($this->writer, ($this->derivedRows)(), $binding, $id);
+            };
+            $built = $this->derivedCache !== null ? $this->derivedCache->get(self::derivedBasis($binding, $id), $make)['built'] : $make()['built'];
         }
         $this->manifest = $built['manifest'];
         $this->map = $built['map'];
@@ -1554,6 +1572,73 @@ final class QuickstartContract
             $out[] = $row;
         }
         return $out;
+    }
+
+    /**
+     * A derived map built from the site's rows batch by batch (DerivedMap::buildBatches), each batch
+     * kept to what prepareDerivedRows() allows, so a large import is never held whole. `$rows` is a
+     * list of rows (one batch), or a generator of batches that returns its own `unresolved` lines
+     * (WordPressDerivedRows::batches).
+     *
+     * @param list<string> $unresolved gains the source's lines, then the rows left out for not reading back
+     * @param list<string>|null $texts when an array, gains every candidate leaf's words (what derive counts against the pages)
+     * @param array<string,array>|null $mapped when an array, gains the rows that carry a slot, by entity key
+     * @return array{manifest:array,map:array}
+     */
+    public static function buildDerived(SiteWriter $writer, iterable $rows, bool $calibrated, ?array $seen, string $label, int $algorithm, ?array $keep,
+        array &$unresolved, ?array &$texts = null, ?array &$mapped = null): array
+    {
+        $left = [];
+        $collect = $texts !== null;
+        $built = DerivedMap::buildBatches(is_array($rows) ? [$rows] : $rows, $seen, $label, $algorithm, $keep,
+            static function (array $batch) use ($writer, $calibrated, &$left, &$texts, $collect): array {
+                $batch = self::prepareDerivedRows($writer, $batch, $calibrated, $left);
+                if ($collect) {
+                    foreach ($batch as $row) {
+                        foreach ($row['core'] as $value) {
+                            $texts[] = (string) $value;
+                        }
+                        foreach ([$row['html'], $row['nested']] as $columns) {
+                            foreach ($columns as $value) {
+                                foreach (LeafCodec::leaves((string) $value) as $leaf) {
+                                    $texts[] = $leaf['text'];
+                                }
+                            }
+                        }
+                    }
+                }
+                return $batch;
+            }, $mapped);
+        if ($rows instanceof Generator) {
+            array_push($unresolved, ...array_map('strval', (array) $rows->getReturn()));
+        }
+        array_push($unresolved, ...$left);
+        return $built;
+    }
+
+    /**
+     * The map a read of a derived binding builds, without calibrating again (the derive's pages
+     * chose `keep`), with the rows that carry a slot.
+     *
+     * @return array{built:array{manifest:array,map:array},rows:array<string,array>}
+     */
+    public static function buildDerivedFor(SiteWriter $writer, iterable $rows, array $binding, string $id): array
+    {
+        $basis = self::derivedBasis($binding, $id);
+        $keep = isset($binding['keep']) && is_array($binding['keep']) ? array_values(array_map('strval', $binding['keep'])) : null;
+        $unresolved = [];
+        $texts = null;
+        $mapped = [];
+        $built = self::buildDerived($writer, $rows, $basis['calibrated'], null, substr($id, strlen('derived/')), $basis['algorithm'], $keep, $unresolved, $texts, $mapped);
+        return ['built' => $built, 'rows' => $mapped];
+    }
+
+    /** What a built derived map depends on besides the rows: DerivedCache keys it by this and the tables' fingerprint. */
+    public static function derivedBasis(array $binding, string $id): array
+    {
+        $keep = isset($binding['keep']) && is_array($binding['keep']) ? array_values(array_map('strval', $binding['keep'])) : null;
+        return ['contract' => $id, 'algorithm' => (int) ($binding['algorithm'] ?? DerivedMap::ALGORITHM), 'calibrated' => ($binding['calibrated'] ?? true) !== false,
+            'keep' => $keep === null ? null : hash('sha256', implode("\n", $keep))];
     }
 
     /** The options an uncalibrated derive keeps: the ones that hold a visitor's words by nature. */

@@ -47,6 +47,8 @@ final class DwDb
     public $dbh;
     public WP_Fake_ContentDb $inner;
     public int $rowQueries = 0;
+    /** Postmeta rows the fake handed to a row read. */
+    public int $metaRows = 0;
     /** @var array<string,true> options the fake keeps out of autoload */
     public array $notAutoloaded = [];
     /** @var array<string,string> option name => the raw bytes the table holds when a filter answers get_option otherwise */
@@ -89,6 +91,84 @@ final class DwDb
         return array_map(static fn($v) => isset($v[2]) && $v[2] !== '' ? $v[2] : stripslashes($v[1]), $values);
     }
 
+    /**
+     * Whether one row passes the filters the SQL itself names for `$keyColumn` and `$valueColumn`:
+     * `NOT IN (...)`, `NOT LIKE '...' ESCAPE '!'`, and the short-value test (LENGTH > n OR NOT
+     * (REGEXP ... OR one character)). Read from the query, so a filter the code stops sending is a
+     * row the tests see again.
+     */
+    private static function passes(string $sql, string $keyColumn, string $valueColumn, string $key, string $value): bool
+    {
+        $k = preg_quote($keyColumn, '/');
+        if (preg_match('/(?<![\w.])' . $k . ' NOT IN \(([^)]*)\)/', $sql, $m)) {
+            preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $m[1], $names);
+            if (in_array($key, array_map('stripslashes', $names[1]), true)) {
+                return false;
+            }
+        }
+        preg_match_all("/(?<![\w.])" . $k . " NOT LIKE '((?:[^']|'')*)' ESCAPE '!'/", $sql, $likes);
+        foreach ($likes[1] as $like) {
+            $pattern = '';
+            for ($i = 0; $i < strlen($like); $i++) {
+                $c = $like[$i];
+                $pattern .= $c === '!' ? preg_quote($like[++$i], '~') : ($c === '%' ? '.*' : ($c === '_' ? '.' : preg_quote($c, '~')));
+            }
+            if (preg_match('~^' . $pattern . '$~s', $key)) {
+                return false;
+            }
+        }
+        $v = preg_quote($valueColumn, '/');
+        if (preg_match('/(?<![\w.])LENGTH\(' . $v . '\) > (\d+)/', $sql, $m) && strlen($value) <= (int) $m[1]) {
+            preg_match_all("/(?<![\w.])" . $v . " REGEXP '([^']*)'/", $sql, $patterns);
+            foreach ($patterns[1] as $pattern) {
+                if (preg_match('~' . $pattern . '~', $value)) {
+                    return false;
+                }
+            }
+            if (strpos($sql, 'CHAR_LENGTH(' . $valueColumn . ') = 1') !== false && mb_strlen($value) === 1 && $value !== '/') {
+                return false;
+            }
+            // A case-insensitive collation, as the site's tables have.
+            if (preg_match('/(?<![\w.])' . $v . " IN \\(([^)]*)\\)/", $sql, $m) && preg_match_all("/'([^']*)'/", $m[1], $words)
+                && in_array(strtolower($value), $words[1], true)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** What WordPressDerivedRows::fingerprint() reads, over the fake's rows, by the filters its SQL names. */
+    private function fingerprint(string $sql): string
+    {
+        $types = array_flip(self::in($sql, 'p.post_type'));
+        $posts = [];
+        $metaRows = 0;
+        $words = [];
+        foreach (WP_Fake::$posts as $id => $row) {
+            if (($row['post_status'] ?? '') === 'publish' && isset($types[(string) ($row['post_type'] ?? '')])) {
+                $posts[$id] = $row;
+            }
+        }
+        foreach (WP_Fake::$meta as $at => $value) {
+            [$post, $key] = explode(':', $at, 2);
+            if (!isset($posts[(int) $post])) {
+                continue;
+            }
+            $metaRows++;
+            if (($posts[(int) $post]['post_type'] ?? '') === 'nav_menu_item' || self::passes($sql, 'm.meta_key', 'm.meta_value', $key, self::stored($value))) {
+                $words[$at] = self::stored($value);
+            }
+        }
+        $options = [];
+        foreach (WP_Fake::$options as $name => $value) {
+            $raw = $this->rawOptions[$name] ?? self::stored($value);
+            if (in_array($name, ['active_plugins', 'stylesheet', 'template'], true) || self::passes($sql, 'option_name', 'option_value', $name, $raw)) {
+                $options[$name] = $raw;
+            }
+        }
+        return md5(serialize([$posts, $metaRows, $words, $options, WP_Fake::$termRows, $this->sharedTerms, WP_Fake::$menuOf, WP_Fake::$postLanguage]));
+    }
+
     private static function stored($value): string
     {
         return is_array($value) ? serialize($value) : (string) $value;
@@ -109,10 +189,16 @@ final class DwDb
         if (strpos($sql, 'SELECT ID, post_type, post_name, post_title, post_excerpt, post_content FROM wp_posts') === 0) {
             $this->rowQueries++;
             $types = self::in($sql, 'post_type');
+            // Read in batches: `ID > <last>` ... `LIMIT <n>`.
+            $after = preg_match('/ ID > (\d+)/', $sql, $m) ? (int) $m[1] : -1;
+            $limit = preg_match('/ LIMIT (\d+)$/', $sql, $m) ? (int) $m[1] : PHP_INT_MAX;
             $out = [];
             ksort(WP_Fake::$posts);
             foreach (WP_Fake::$posts as $id => $row) {
-                if (($row['post_status'] ?? '') === 'publish' && in_array((string) ($row['post_type'] ?? ''), $types, true)) {
+                if (count($out) >= $limit) {
+                    break;
+                }
+                if ($id > $after && ($row['post_status'] ?? '') === 'publish' && in_array((string) ($row['post_type'] ?? ''), $types, true)) {
                     $out[] = ['ID' => (string) $id, 'post_type' => $row['post_type'], 'post_name' => (string) ($row['post_name'] ?? ''),
                         'post_title' => (string) ($row['post_title'] ?? ''), 'post_excerpt' => (string) ($row['post_excerpt'] ?? ''), 'post_content' => (string) ($row['post_content'] ?? '')];
                 }
@@ -149,15 +235,23 @@ final class DwDb
             return $out;
         }
         if (strpos($sql, 'SELECT meta_id, post_id, meta_key, meta_value FROM wp_postmeta WHERE post_id IN') === 0) {
-            $ids = self::in($sql, 'post_id');
+            $ids = array_flip(self::in($sql, 'post_id'));
             $out = [];
             foreach (WP_Fake::$meta as $at => $value) {
                 [$post, $key] = explode(':', $at, 2);
-                if (in_array($post, $ids, true)) {
+                if (isset($ids[$post]) && self::passes($sql, 'meta_key', 'meta_value', $key, self::stored($value))) {
                     $out[] = ['meta_id' => (string) self::metaId((int) $post, $key), 'post_id' => $post, 'meta_key' => $key, 'meta_value' => self::stored($value)];
                 }
             }
+            usort($out, static fn($a, $b) => [(int) $a['post_id'], (int) $a['meta_id']] <=> [(int) $b['post_id'], (int) $b['meta_id']]);
+            $this->metaRows += count($out);
             return $out;
+        }
+        if (strpos($sql, 'SELECT post_id, meta_key FROM wp_postmeta WHERE post_id IN') === 0) {
+            return []; // one value per post and key: the fake cannot store a key twice
+        }
+        if (strpos($sql, 'SELECT (SELECT CONCAT_WS(') === 0) {
+            return [['fingerprint' => $this->fingerprint($sql)]];
         }
         if (strpos($sql, 'SELECT tr.object_id, tt.taxonomy, t.slug FROM wp_term_relationships') === 0) {
             $ids = self::in($sql, 'tr.object_id');
@@ -177,7 +271,7 @@ final class DwDb
             $out = [];
             foreach (WP_Fake::$options as $name => $value) {
                 $themed = strpos($name, 'theme_mods_') === 0 || strpos($name, 'widget_') === 0 || $name === 'sidebars_widgets';
-                if ($themed || !isset($this->notAutoloaded[$name])) {
+                if (($themed || !isset($this->notAutoloaded[$name])) && self::passes($sql, 'option_name', 'option_value', $name, $this->rawOptions[$name] ?? self::stored($value))) {
                     $out[] = ['option_id' => (string) self::optionId($name), 'option_name' => $name, 'option_value' => $this->rawOptions[$name] ?? self::stored($value), 'autoload' => 'on'];
                 }
             }

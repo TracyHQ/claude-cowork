@@ -229,14 +229,27 @@ function get_option(string $key, $default = false)
     return array_key_exists($key, WP_Fake::$options) ? WP_Fake::$options[$key] : $default;
 }
 
+/** Whether the fake database is inside `START TRANSACTION ... READ ONLY`, where MySQL refuses every write (and $wpdb says false). */
+function wp_fake_read_only(): bool
+{
+    $db = $GLOBALS['wpdb'] ?? null;
+    return is_object($db) && (!empty($db->readOnly) || (isset($db->inner) && !empty($db->inner->readOnly)));
+}
+
 function update_option(string $key, $value, $autoload = null): bool
 {
+    if (wp_fake_read_only()) {
+        return false;
+    }
     WP_Fake::$options[$key] = $value;
     return true;
 }
 
 function delete_option(string $key): bool
 {
+    if (wp_fake_read_only()) {
+        return false;
+    }
     unset(WP_Fake::$options[$key]);
     return true;
 }

@@ -52,12 +52,43 @@ final class LeafCodec
 
     public static function get(string $raw, string $path): string
     {
-        $found = null;
-        self::rewrite($raw, self::steps($path), 0, static function (string $leaf) use (&$found): string {
-            $found = $leaf;
-            return $leaf;
-        });
-        return (string) $found;
+        return self::read($raw, self::steps($path), 0);
+    }
+
+    /**
+     * rewrite() without the write: the same steps, the same refusals, but no layer is re-encoded or
+     * spliced back, so reading one leaf costs the parse of each layer (kept by memo()), not a copy
+     * of the whole column per step.
+     *
+     * @param list<array{0:string,1:string}> $steps
+     */
+    private static function read(string $raw, array $steps, int $index): string
+    {
+        if ($index === count($steps)) return $raw;
+        [$codec, $address] = $steps[$index];
+        if ($codec === 'text') return $raw;
+        $have = self::detect($raw);
+        if ($have !== $codec) throw new LeafCodecError("Expected {$codec} at step {$index}, found {$have}");
+        if ($codec === 'ser') {
+            $node = unserialize($raw, ['allowed_classes' => false]);
+            foreach (self::pointerKeys($address) as $key) {
+                if (is_array($node) && array_key_exists($key, $node)) $node = $node[$key];
+                elseif (is_object($node) && property_exists($node, $key)) $node = $node->{$key};
+                else throw new LeafCodecError("No key {$key}");
+            }
+            if (!is_string($node)) throw new LeafCodecError('The leaf is not a string');
+            return self::read($node, $steps, $index + 1);
+        }
+        if ($codec === 'json') {
+            [$start, $length] = self::jsonLocate($raw, $address);
+            return self::read((string) json_decode(substr($raw, $start, $length)), $steps, $index + 1);
+        }
+        if ($codec === 'vcl') {
+            foreach (self::vclParts($raw) as $part) if ($part['key'] === $address) return self::read(rawurldecode($part['value']), $steps, $index + 1);
+            throw new LeafCodecError("No vcl part {$address}");
+        }
+        foreach (self::segments($raw, $codec) as $segment) if ($segment['address'] === $address) return self::read($segment['value'], $steps, $index + 1);
+        throw new LeafCodecError("No {$codec} segment {$address}");
     }
 
     public static function set(string $raw, string $path, string $value): string
@@ -68,6 +99,11 @@ final class LeafCodec
     }
 
     public static function detect(string $raw): string
+    {
+        return self::memo('detect', $raw, static fn(): string => self::detectOnce($raw));
+    }
+
+    private static function detectOnce(string $raw): string
     {
         if (strlen($raw) > self::MAX_BYTES) return 'opaque';
         $trim = ltrim($raw);
@@ -141,7 +177,7 @@ final class LeafCodec
         if ($index === count($steps)) return $leaf($raw);
         [$codec, $address] = $steps[$index];
         if ($codec === 'text') return $leaf($raw);
-        $have = self::detect($raw);
+        $have = self::detectOnce($raw);
         if ($have !== $codec) throw new LeafCodecError("Expected {$codec} at step {$index}, found {$have}");
         if ($codec === 'ser') {
             $tree = unserialize($raw, ['allowed_classes' => false]);
@@ -149,7 +185,7 @@ final class LeafCodec
             return serialize($tree);
         }
         if ($codec === 'json') {
-            [$start, $length] = self::jsonLocate($raw, $address);
+            [$start, $length] = self::jsonLocate($raw, $address, false);
             $token = substr($raw, $start, $length);
             $new = self::rewrite((string) json_decode($token), $steps, $index + 1, $leaf);
             // A Gutenberg block comment's attributes (`html:c<n>`) are written by serialize_block_attributes().
@@ -164,7 +200,7 @@ final class LeafCodec
             }
             throw new LeafCodecError("No vcl part {$address}");
         }
-        foreach (self::segments($raw, $codec) as $segment) {
+        foreach (self::segmentsOnce($raw, $codec) as $segment) {
             if ($segment['address'] !== $address) continue;
             $new = self::rewrite($segment['value'], $steps, $index + 1, $leaf);
             if ($segment['quote'] === 'raw') $encoded = $new;
@@ -184,6 +220,11 @@ final class LeafCodec
      * @return list<array{address:string,value:string,start:int,length:int,attr:?string,quote:string}>
      */
     private static function segments(string $raw, string $codec): array
+    {
+        return self::memo('segments:' . $codec, $raw, static fn(): array => self::segmentsOnce($raw, $codec));
+    }
+
+    private static function segmentsOnce(string $raw, string $codec): array
     {
         $pattern = $codec === 'html' ? self::TAG : self::SHORTCODE;
         preg_match_all($pattern, $raw, $tags, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
@@ -279,16 +320,19 @@ final class LeafCodec
      *
      * @return array{0:int,1:int}
      */
-    private static function jsonLocate(string $raw, string $pointer): array
+    private static function jsonLocate(string $raw, string $pointer, bool $kept = true): array
     {
         $at = self::jsonSpace($raw, 0);
         foreach (self::pointerKeys($pointer) as $key) {
-            $found = null;
-            foreach (self::jsonMembers($raw, $at) as [$name, $valueAt]) {
-                if ((string) $name === $key) $found = $valueAt;
-            }
-            if ($found === null) throw new LeafCodecError("No key {$key}");
-            $at = $found;
+            // The members by name, the last of a repeated name winning, as JSON decoders read it.
+            $names = static function () use ($raw, $at): array {
+                $names = [];
+                foreach (self::jsonMembers($raw, $at) as [$name, $valueAt]) $names[(string) $name] = $valueAt;
+                return $names;
+            };
+            $members = $kept ? self::memo('names:' . $at, $raw, $names) : $names();
+            if (!isset($members[$key])) throw new LeafCodecError("No key {$key}");
+            $at = $members[$key];
         }
         if (($raw[$at] ?? '') !== '"') throw new LeafCodecError('The leaf is not a string');
         return [$at, self::jsonSkip($raw, $at) - $at];
@@ -319,6 +363,36 @@ final class LeafCodec
             if (($raw[$at] ?? '') !== ',') return $out;
             $at = self::jsonSpace($raw, $at + 1);
         }
+    }
+
+    /** What memo() may hold: the memory its kept parses take, measured as they are made. */
+    private const MEMO_BYTES = 33554432;
+    /** @var array<string,array<string,mixed>> what memo() keeps: the value parsed => kind => its parse */
+    private static array $memo = [];
+    private static int $memoBytes = 0;
+
+    /**
+     * A pure parse of one value (its codec, its segments, the names of one JSON container's members),
+     * kept while the same value is asked again by a READ. Reading the leaves of one column one by one
+     * parsed the whole column once per leaf: a T4 template style with thousands of slots took 2 s of
+     * every content.read on an imported site (30/09/2026). Keyed by the value itself; short values
+     * are cheaper to parse than to keep. Counted by the memory each kept parse takes (a JSON of
+     * 40,000 small objects is under 1 MB of text and tens of MB of parses): past MEMO_BYTES it starts
+     * over. rewrite() never comes here, so a write depends on nothing kept.
+     */
+    private static function memo(string $kind, string $raw, callable $parse)
+    {
+        if (strlen($raw) < 512) return $parse();
+        if (isset(self::$memo[$raw]) && array_key_exists($kind, self::$memo[$raw])) return self::$memo[$raw][$kind];
+        if (self::$memoBytes > self::MEMO_BYTES) {
+            self::$memo = [];
+            self::$memoBytes = 0;
+        }
+        $before = memory_get_usage();
+        $parsed = $parse();
+        self::$memo[$raw][$kind] = $parsed;
+        self::$memoBytes += max(0, memory_get_usage() - $before) + 64;
+        return $parsed;
     }
 
     private static function jsonSpace(string $raw, int $at): int

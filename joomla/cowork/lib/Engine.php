@@ -1521,19 +1521,26 @@ final class Engine
                 return $this->ok(['replayed' => true] + ($binding['derive'] ?? []));
             $source = ($this->deriveSource)();
             $rows = $source['rows'] ?? []; $pages = $source['pages'] ?? [];
-            $built = DerivedMap::build($rows, $pages ? VisibleText::fromPages($pages) : null, $label);
-            // What a visitor reads that no candidate leaf holds: words in theme files, language strings,
-            // text a module makes at run time. Counted, not located (the agent greps for those).
+            // The rows arrive as a list or in batches (JoomlaDerivedRows::batches): built batch by batch, never
+            // held whole. `$texts` gathers what some candidate leaf holds; what a visitor reads beyond it — words
+            // in theme files, language strings, text a module makes at run time — is counted, not located (the
+            // agent greps for those).
             $texts = [];
-            foreach ($rows as $row) {
-                foreach ($row['core'] as $value) $texts[] = (string) $value;
-                foreach ([$row['html'], $row['nested']] as $columns) foreach ($columns as $value) foreach (LeafCodec::leaves((string) $value) as $leaf) $texts[] = $leaf['text'];
-            }
+            $built = DerivedMap::buildBatches(is_array($rows) ? [$rows] : $rows, $pages ? VisibleText::fromPages($pages) : null, $label, DerivedMap::ALGORITHM, null,
+                static function (array $batch) use (&$texts): array {
+                    foreach ($batch as $row) {
+                        foreach ($row['core'] as $value) $texts[] = (string) $value;
+                        foreach ([$row['html'], $row['nested']] as $columns) foreach ($columns as $value) foreach (LeafCodec::leaves((string) $value) as $leaf) $texts[] = $leaf['text'];
+                    }
+                    return $batch;
+                });
+            $unresolved = array_values(array_map('strval', $source['unresolved'] ?? []));
+            if ($rows instanceof Generator) array_push($unresolved, ...array_map('strval', (array) $rows->getReturn()));
             $nested = count(array_filter($built['map']['slots'], static fn($slot) => $slot['nested']));
             $answer = ['contract' => $built['manifest']['id'], 'entities' => count($built['map']['entities']), 'slots' => count($built['map']['slots']),
                 'calibrated' => $built['manifest']['calibrated'],
                 'byClass' => ['db' => count($built['map']['slots']) - $nested, 'nested' => $nested, 'unmatched' => $pages ? VisibleText::unmatched($pages, $texts) : 0],
-                'unresolved' => array_values($source['unresolved'] ?? [])];
+                'unresolved' => $unresolved];
             $contract = QuickstartContract::derived($this->writer, $this->deriveStore, $this->deriveRoot, static fn() => $built);
             $contract->bindDerived(['requestId' => $requestId, 'derivedAt' => gmdate('c'), 'keep' => DerivedMap::keepOf($built), 'derive' => $answer]);
             // The rest of this request (and a test's next call) sees the site as it is now bound.

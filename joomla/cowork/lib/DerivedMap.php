@@ -54,6 +54,33 @@ final class DerivedMap
     }
 
     /**
+     * build() over rows that arrive in batches (a generator of lists), so a large site is never held
+     * whole: each batch is built and let go before the next one is read. The same map as build()
+     * over all the rows at once, since a row's slots depend on that row alone.
+     *
+     * @param iterable<list<array>> $batches
+     * @param callable(list<array>):list<array>|null $each what a batch becomes before it is built (a filter, a tap)
+     * @param array<string,array>|null $mapped when an array, gains the rows that carry a slot, by entity key
+     * @return array{manifest:array,map:array}
+     */
+    public static function buildBatches(iterable $batches, ?array $seen, string $label, int $algorithm = self::ALGORITHM, ?array $keep = null,
+        ?callable $each = null, ?array &$mapped = null): array
+    {
+        $built = self::build([], $seen, $label, $algorithm, $keep);
+        foreach ($batches as $batch) {
+            if ($each !== null) $batch = $each($batch);
+            $part = self::build($batch, $seen, $label, $algorithm, $keep)['map'];
+            if ($mapped !== null && $part['entities'] !== []) {
+                $keys = array_flip(array_column($part['entities'], 'key'));
+                foreach ($batch as $row) if (isset($keys[$row['kind'] . '-' . $row['id']])) $mapped[$row['kind'] . '-' . $row['id']] = $row;
+            }
+            foreach ($part['entities'] as $entity) $built['map']['entities'][] = $entity;
+            foreach ($part['slots'] as $slot) $built['map']['slots'][] = $slot;
+        }
+        return $built;
+    }
+
+    /**
      * The nested slot keys of a derive-time map, stored in the binding as `keep` so later reads (which do not
      * fetch pages) keep the same nested leaves. Null when the map was not calibrated: keep them all.
      *
