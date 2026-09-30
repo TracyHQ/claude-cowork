@@ -179,6 +179,12 @@ namespace {
     check('needle: 200 four-byte characters are fine', SearchNeedle::clean(str_repeat("\u{1F525}", 200))['ok'], true);
     check('needle: 201 four-byte characters are refused', SearchNeedle::clean(str_repeat("\u{1F525}", 201))['ok'], false);
     check('needle: the limit is on the cleaned needle, so padding does not count', SearchNeedle::clean('  ' . str_repeat('a', 200) . "  \n")['ok'], true);
+    // The limit is read on the composed (NFC) form, the one the answer echoes: a decomposed letter is
+    // three code points and one character, and a needle must not be refused for how it happened to be typed.
+    $csDecomposedLetter = "e\u{302}\u{303}";
+    check('needle: the limit counts the composed form, so 200 decomposed letters (600 code points) are fine', SearchNeedle::clean(str_repeat($csDecomposedLetter, 200))['ok'], true);
+    check('needle: and they are echoed composed', SearchNeedle::clean(str_repeat($csDecomposedLetter, 200))['text'], str_repeat("\u{1EC5}", 200));
+    check('needle: 201 decomposed letters are refused, as 201 composed ones are', SearchNeedle::clean(str_repeat($csDecomposedLetter, 201))['ok'], false);
 
     // Trimming reads the text once, whatever shape the blanks take. (With PCRE's JIT off, a trim written
     // as `^\s+|\s+$` took 3.2 s on 20,000 spaces and 73 s on 100,000: see SearchNeedle::clean.) Refused
