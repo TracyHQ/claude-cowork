@@ -301,7 +301,13 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   `unfiltered_html` capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as
   `&gt;`, and a `<` that no `>` closes as `&lt;` (a quote or an ampersand after that sign is escaped
   too, one before it is not). Only a real tag such as `<script>` is dropped, and nobody searches
-  for that. The forms are asked of WordPress itself, not listed here.
+  for that. And each of those is tried the way a `utf8` column (three bytes a character) stores an
+  emoji or a symbol: core's `wp_insert_post()` turns `🔥` into `&#x1f525;`, `™` into `&#x2122;`, `❤`
+  into `&#x2764;` and so on, so on such a site that is the page's title whatever was typed, and a
+  table converted to `utf8mb4` afterwards keeps the text. `©`, `®` and `€` are stored as they are.
+  The character itself is tried too, because a `utf8mb4` site stores it as typed. The forms are
+  asked of WordPress itself (`wp_kses_normalize_entities()`, `wp_pre_kses_less_than()`,
+  `wp_encode_emoji()`), not listed here.
 - **The answer.** `search` is present **exactly when the request carried the key**, holding the words as
   they were matched: it is the caller's proof that this plugin read the parameter, because a plugin
   from before `search` answers the whole list and `ok: true`. `matched` is the number of rows that

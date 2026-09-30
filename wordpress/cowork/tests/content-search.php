@@ -509,8 +509,107 @@ foreach (['<script>alert(1)</script>', '<', '<<', '&', '>', '<>', '<b>'] as $csN
 }
 check('no needle has an empty spelling: that would be a pattern matching every row', $csEmpty, []);
 
+// ── an emoji or a symbol that WordPress stored as an entity ─────────────────────────────────────
+//
+// On a posts table that is `utf8` (three bytes a character) core cannot keep an emoji, so wp_insert_post()
+// runs wp_encode_emoji() over the title and stores `&#x1f525;` instead, and does the same for a number of
+// symbols that do fit in three bytes (`™` is `&#x2122;`, `❤` `&#x2764;`). A table converted to utf8mb4
+// afterwards keeps that text. A caller who types the character has to reach the page all the same, and the
+// statement asked only for the character: on such a site `matched` said 0 for a page that exists.
+check('without WordPress the entity spelling of a symbol is not tried', Claude_Cowork_Site_Writer::search_forms("Tracy\u{2122} plan"), ["Tracy\u{2122} plan"]);
+
+// Core's function replaces each code point of its emoji list with `&#x<hex in lower case>;` and leaves the
+// rest of the text as it is. Its list is long; this one holds the few code points these tests use, and gives
+// what core's own function gives for them (compared one by one against WordPress 7.1's).
+if (!function_exists('wp_encode_emoji')) {
+    function wp_encode_emoji($content)
+    {
+        $map = [];
+        foreach ([0x1F525, 0x2122, 0x2764, 0x2714, 0x2600, 0x26A0, 0x2B50, 0xFE0F] as $codePoint) {
+            $entity = '&#x' . dechex($codePoint) . ';';
+            $map[html_entity_decode($entity, ENT_QUOTES, 'UTF-8')] = $entity;
+        }
+        return strtr($content, $map);
+    }
+}
+check('(the stand-in for core\'s wp_encode_emoji leaves the signs that core leaves)', [
+    wp_encode_emoji("\u{A9} \u{AE} \u{20AC} \u{2192} caf\u{E9} 屋根"),
+    wp_encode_emoji("Sale \u{1F525}, \u{2122} \u{2764}\u{FE0F} \u{2714}"),
+], ["\u{A9} \u{AE} \u{20AC} \u{2192} caf\u{E9} 屋根", 'Sale &#x1f525;, &#x2122; &#x2764;&#xfe0f; &#x2714;']);
+
+check('an emoji and a symbol are tried as the character and as the entity core stores', [
+    Claude_Cowork_Site_Writer::search_forms("Sale \u{1F525}"),
+    Claude_Cowork_Site_Writer::search_forms("Tracy\u{2122}"),
+    Claude_Cowork_Site_Writer::search_forms("\u{2764}"),
+], [["Sale \u{1F525}", 'Sale &#x1f525;'], ["Tracy\u{2122}", 'Tracy&#x2122;'], ["\u{2764}", '&#x2764;']]);
+check('a sign core leaves alone has no entity spelling', Claude_Cowork_Site_Writer::search_forms("\u{A9} 2026 caf\u{E9}"), ["\u{A9} 2026 caf\u{E9}", "\u{A9} 2026 cafe\u{301}"]);
+check('KSES first and the emoji second, as wp_insert_post stores a title: an ampersand and an emoji make four spellings', Claude_Cowork_Site_Writer::search_forms("Tom & Jerry \u{1F525}"),
+    ["Tom & Jerry \u{1F525}", "Tom &amp; Jerry \u{1F525}", 'Tom & Jerry &#x1f525;', 'Tom &amp; Jerry &#x1f525;']);
+check('words with no character beyond ASCII have the spellings they always had', [
+    Claude_Cowork_Site_Writer::search_forms('roof'),
+    Claude_Cowork_Site_Writer::search_forms('Tom & Jerry'),
+], [['roof'], ['Tom & Jerry', 'Tom &amp; Jerry']]);
+
+$csSite(static function () use ($csPost): void {
+    // stored as a three-byte table stores them: by the function core stores them with
+    $csPost(101, wp_encode_emoji("Summer sale \u{1F525} today"));
+    $csPost(102, wp_encode_emoji("Tracy\u{2122} plan"));
+    $csPost(103, wp_encode_emoji("We \u{2764} roofing"));
+    $csPost(104, wp_encode_emoji("Done \u{2714}"));
+    // `Tom & Jerry 🔥` is stored four ways: KSES on (an author) or off (unfiltered_html) and, after it, a column that
+    // keeps three bytes (the emoji is an entity) or one that takes four (it stays the character)
+    $csPost(105, wp_encode_emoji('Tom &amp; Jerry ' . "\u{1F525}"));
+    $csPost(110, wp_encode_emoji('Tom & Jerry ' . "\u{1F525}"));
+    // what a table that takes four bytes keeps as the character itself
+    $csPost(106, "Winter sale \u{1F525}");
+    $csPost(111, 'Tom &amp; Jerry ' . "\u{1F525}");
+    $csPost(112, 'Tom & Jerry ' . "\u{1F525}");
+    $csPost(107, "Tracy\u{2122} raw plan");
+    $csPost(108, "\u{A9} 2026 roofing");
+    $csPost(109, 'Plain sale');
+});
+check('the fixtures are what core stores: entities, and the character where core leaves it', [
+    WP_Fake::$posts[101]['post_title'], WP_Fake::$posts[102]['post_title'], WP_Fake::$posts[105]['post_title'], WP_Fake::$posts[110]['post_title'], WP_Fake::$posts[108]['post_title'],
+], ['Summer sale &#x1f525; today', 'Tracy&#x2122; plan', 'Tom &amp; Jerry &#x1f525;', 'Tom & Jerry &#x1f525;', "\u{A9} 2026 roofing"]);
+$r = $csAsk(['search' => "\u{1F525}"]);
+check('an emoji finds the page that holds the entity AND the one that holds the character', [$csIds($r), $r['matched'] ?? null, $r['search'] ?? null], [[101, 105, 106, 110, 111, 112], 6, "\u{1F525}"]);
+check('the emoji with the words around it, either side or both', [
+    $csIds($csAsk(['search' => "Summer sale \u{1F525}"])),
+    $csIds($csAsk(['search' => "\u{1F525} today"])),
+    $csIds($csAsk(['search' => "Summer sale \u{1F525} today"])),
+    $csIds($csAsk(['search' => "sale \u{1F525}"])),
+], [[101], [101], [101], [101, 106]]);
+check('a symbol that fits in three bytes is found as the entity core stored, and as the character', [
+    $csIds($csAsk(['search' => "\u{2122}"])),
+    $csIds($csAsk(['search' => "Tracy\u{2122}"])),
+    $csIds($csAsk(['search' => "Tracy\u{2122} plan"])),
+    $csIds($csAsk(['search' => "We \u{2764} roofing"])),
+    $csIds($csAsk(['search' => "\u{2714}"])),
+], [[102, 107], [102, 107], [102], [103], [104]]);
+check('an ampersand and an emoji together: each of the four ways a title is stored is found (KSES first, then core encodes the emoji)', $csIds($csAsk(['search' => "Tom & Jerry \u{1F525}"])), [105, 110, 111, 112]);
+check('the stored spelling, copied out of a list, finds its page', $csIds($csAsk(['search' => 'Summer sale &#x1f525; today'])), [101]);
+check('a sign core does not encode is asked for as it is', $csIds($csAsk(['search' => "\u{A9} 2026"])), [108]);
+check('the plain words around the emoji still find the page, as ever', $csIds($csAsk(['search' => 'summer sale'])), [101]);
+check('the count behind `matched` asks the same spellings, so a page of one still totals them all', [$csIds($csAsk(['search' => "\u{1F525}", 'limit' => 1])), $csAsk(['search' => "\u{1F525}", 'limit' => 1])['matched'] ?? null], [[101], 6]);
+$csDb->queries = [];
+$csAsk(['search' => "\u{1F525}"]);
+check('the statement: the character and the entity for the title, the character for the slug (the same words, asked in lower case, are the same)', $csDb->queries[0],
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%\u{1F525}%' OR post_title LIKE '%&#x1f525;%' OR post_name LIKE '%\u{1F525}%') ORDER BY ID ASC LIMIT 0, 100");
+$csDb->queries = [];
+$csAsk(['search' => 'sale']);
+check('a search with no such character asks exactly what it asked before', $csDb->queries[0],
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%sale%' OR post_name LIKE '%sale%') ORDER BY ID ASC LIMIT 0, 100");
+
 // ── a failed statement is an error, never an empty page ─────────────────────────────────────────
 
+// Its own rows: a page of one is full, so the count behind `matched` is asked for, and only a title that is
+// there makes it so.
+$csSite(static function () use ($csPost): void {
+    $csPost(1, 'Gizmo post');
+    $csPost(2, 'Gizmo page', ['post_type' => 'page']);
+});
 $csDb->failWith = 'Table wp_posts is marked as crashed';
 $r = $csAsk(['search' => 'gizmo']);
 check('a failed statement is read_failed and says why', [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), 'marked as crashed') !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);

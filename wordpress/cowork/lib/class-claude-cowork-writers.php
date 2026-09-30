@@ -475,8 +475,18 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * spellings as equal. And each as core's KSES filters would store it, which is how a title saved by
 	 * anyone without the `unfiltered_html` capability is stored (see {@see as_kses_stores()}): `Tom &
 	 * Jerry` is `Tom &amp; Jerry`, and a `<` that no `>` closes is `&lt;`. Only a real tag such as
-	 * `<script>` is dropped, and no one searches for that. Without intl (no `Normalizer`) only the
-	 * spelling sent is tried.
+	 * `<script>` is dropped, and no one searches for that.
+	 *
+	 * And each of those as a column that keeps three bytes a character (`utf8`) stores it: core's
+	 * `wp_insert_post()` runs KSES first and `wp_encode_emoji()` second, and the second turns an emoji
+	 * and a number of symbols that fit in three bytes into entities: `🔥` is `&#x1f525;`, `™` is
+	 * `&#x2122;`, `❤` is `&#x2764;`. That is how such a page exists on a `utf8` site, whatever the
+	 * caller typed, and a table converted to `utf8mb4` afterwards keeps the text. `©`, `®` and `€` are
+	 * left as they are. Asked of WordPress, so the list is core's own. The spelling with the character
+	 * itself stays in the list: a `utf8mb4` site stores it as typed.
+	 *
+	 * Without intl (no `Normalizer`) only the spelling sent is tried, and where WordPress is absent
+	 * (a test) no entity is made.
 	 *
 	 * @return string[]
 	 */
@@ -492,10 +502,18 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 		$forms = array();
 		foreach ( $spellings as $spelling ) {
+			// Both spellings that KSES leaves, then each as a `utf8` column would keep it, in the order core
+			// stores a title: the filter first, the entities second (so `Tom & Jerry 🔥` has four).
+			$kses    = self::as_kses_stores( $spelling );
 			$forms[] = $spelling;
-			$forms[] = self::as_kses_stores( $spelling );
+			$forms[] = $kses;
+			if ( function_exists( 'wp_encode_emoji' ) ) {
+				$forms[] = wp_encode_emoji( $spelling );
+				$forms[] = wp_encode_emoji( $kses );
+			}
 		}
-		return array_values( array_unique( $forms ) );
+		// A regex that fails answers null, and a null is not a spelling.
+		return array_values( array_unique( array_filter( $forms, 'is_string' ) ) );
 	}
 
 	/**
