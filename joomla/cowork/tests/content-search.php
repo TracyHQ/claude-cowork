@@ -372,7 +372,10 @@ namespace {
         ];
         /** What the engine asked of it, in order. */
         public array $calls = [];
+        /** Every read() the engine made: what `include_body` asks a writer for, one full row per row found. */
+        public array $readIds = [];
 
+        public function read(string $kind, int $id): ?array { $this->readIds[] = [$kind, $id]; return parent::read($kind, $id); }
         public function searchableKinds(): array { return array_keys(self::COLUMNS); }
         public function searchRows(string $kind, array $variants, int $offset, int $limit): array
         {
@@ -508,10 +511,28 @@ namespace {
 
     // --- search with kind and include_body
     check('kind: a module is searched by title, not by its note', $csIds($csAsk(['kind' => 'module', 'search' => 'roof'], $csShop())), [1]);
-    $csAnswer = $csAsk(['kind' => 'article', 'search' => 'Roof repair', 'include_body' => true], $csShop());
+    $csWriter = $csShop();
+    $csAnswer = $csAsk(['kind' => 'article', 'search' => 'Roof repair', 'include_body' => true], $csWriter);
     check('include_body: each matching row carries its body', array_column($csAnswer['items'], 'introtext'), ['<p>one</p>', '<p>three</p>']);
+    // The in-memory list already holds a body, so the check above cannot tell a body that was read from one
+    // that was there; what it CAN see is whether the engine asked the writer for the full row.
+    check('include_body: the body is read for the rows found, one read each and no others', $csWriter->readIds, [['article', 1], ['article', 3]]);
     check('include_body: and the echo and count are still there', [$csAnswer['search'], $csAnswer['matched']], ['Roof repair', 2]);
-    check('include_body: the page ceiling of 25 still holds', $csAsk(['kind' => 'article', 'search' => 'a', 'include_body' => true, 'limit' => 500], $csShop())['ok'], true);
+    $csWriter = $csShop();
+    $csAsk(['kind' => 'article', 'search' => 'Roof repair'], $csWriter);
+    check('include_body: without it no full row is read', $csWriter->readIds, []);
+    // The page a search asks the writer for. The ceiling is what keeps one request from taking a shared
+    // host's whole content table, so it is read where it is applied: the limit handed to searchRows().
+    foreach ([
+        'by default' => [[], 100],
+        'by default, with bodies' => [['include_body' => true], 25],
+        'over the ceiling' => [['limit' => 500], 200],
+        'over the ceiling, with bodies' => [['include_body' => true, 'limit' => 500], 25],
+    ] as $csLabel => [$csParams, $csWantLimit]) {
+        $csWriter = $csShop();
+        $csAsk(['kind' => 'article', 'search' => 'a'] + $csParams, $csWriter);
+        check("include_body: the page a search asks for {$csLabel} is {$csWantLimit} rows", $csWriter->calls[0][4] ?? null, $csWantLimit);
+    }
 
     // --- every kind is filtered or refused, never ignored
     $csFiltered = ['article', 'category', 'tag', 'field', 'menuItem', 'menutype', 'banner', 'bannerClient', 'contact', 'newsfeed', 'language', 'module', 'templateStyle'];
