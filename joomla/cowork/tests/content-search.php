@@ -12,6 +12,8 @@
 //   3b. that same writer's statements run for real over SQLite in its case-sensitive LIKE mode, which
 //      stands in for the binary alias column: a capitalised needle reaches a lower-case alias whose
 //      title does not hold it, and an alias stored in upper case is found;
+//   3c. a needle no table can hold (a four-byte character on tables still in utf8mb3) answered as no
+//      rows, and every other database error left as read_failed;
 //   4. the engine's answers through an in-memory writer: the echo that proves the plugin read the
 //      request, `matched`, paging, every kind filtered or refused, and the answer without `search`
 //      unchanged byte for byte against what the code before this change answered;
@@ -95,8 +97,9 @@ namespace {
 
     /**
      * A driver that answers what it was told to and records every statement it was asked to run.
-     * With `pdo` set it runs each statement for real on that connection, with the values it was bound
-     * to, instead of answering `rows` and `scalar`.
+     * Two switches make it a different one: `failWith` refuses every statement with that exception, after
+     * recording it, as a database refuses one; `pdo` runs each statement for real on that connection, with
+     * the values it was bound to, instead of answering `rows` and `scalar`.
      */
     final class CsDb implements \Joomla\Database\DatabaseInterface
     {
@@ -104,6 +107,7 @@ namespace {
         public array $ran = [];
         public array $rows = [];
         public $scalar = 0;
+        public ?\Throwable $failWith = null;
         public ?\PDO $pdo = null;
         private array $fetched = [];
         private $pending = null;
@@ -137,6 +141,9 @@ namespace {
             }
             $sql = $query instanceof CsQuery ? $query->sql() : (string) $query;
             $this->ran[] = ['sql' => $sql, 'bound' => $bound, 'types' => $types, 'offset' => $offset, 'limit' => $limit];
+            if ($this->failWith !== null) {
+                throw $this->failWith;
+            }
             if ($this->pdo !== null) {
                 $statement = $this->pdo->prepare($limit > 0 ? $sql . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset : $sql);
                 foreach ($bound as $key => $value) {
@@ -263,6 +270,32 @@ namespace {
     check('lowerCased: % _ and the escape character have no case, so the pattern is the same one', SearchNeedle::like(SearchNeedle::lowerCased(['50%_OFF!'])[0]), '%50!%!_off!!%');
     check('lowerCased: the cleaned needle is untouched, and it is what the answer echoes', SearchNeedle::clean(' Roof ')['text'], 'Roof');
     check('lowerCased: and the variants clean() hands out are still the words as typed', SearchNeedle::clean('Roof')['variants'], ['Roof']);
+
+    // cannotBeStored(): when a database's refusal means "no row can hold this". Both halves are needed:
+    // every variant holds a character above U+FFFF, and the message is the collation mix or the incorrect value.
+    $csMix = "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT) and (utf8mb4_uca1400_ai_ci,COERCIBLE) for operation 'like'";
+    $csBadValue = "Incorrect string value: '\\xF0\\x9F\\x94\\xA5' for column `db`.`jos_content`.`title` at row 1";
+    $csEmoji = "\u{1F525}";
+    foreach ([
+        'the collation mix, for an emoji' => [[$csEmoji], $csMix, true],
+        'an incorrect string value, for an emoji' => [[$csEmoji], $csBadValue, true],
+        'the message in another case' => [[$csEmoji], strtoupper($csMix), true],
+        'the message inside a longer one, as PDO words it' => [[$csEmoji], 'SQLSTATE[HY000]: General error: 1267 ' . $csMix, true],
+        'an emoji among other characters' => [["roof {$csEmoji}"], $csMix, true],
+        'every variant holding one' => [[$csEmoji, $csEmoji . $csEmoji], $csMix, true],
+        'the first four-byte character' => [["\u{10000}"], $csMix, true],
+        'the last three-byte character is stored fine' => [["\u{FFFF}"], $csMix, false],
+        'a needle with no four-byte character, the same message' => [['roof'], $csMix, false],
+        'CJK is three bytes and is stored fine' => [["\u{5C4B}\u{6839}"], $csMix, false],
+        'one variant without one is not proof' => [[$csEmoji, 'roof'], $csMix, false],
+        'a variant that is not UTF-8 is not four-byte text' => [["\xF0\x9F\x94"], $csMix, false],
+        'another database error, for an emoji' => [[$csEmoji], "Unknown column 'a.titel' in 'where clause'", false],
+        'a lost connection, for an emoji' => [[$csEmoji], 'MySQL server has gone away', false],
+        'no message, for an emoji' => [[$csEmoji], '', false],
+        'no variants at all' => [[], $csMix, false],
+    ] as $csLabel => [$csVariants, $csMessage, $csWant]) {
+        check("cannotBeStored: {$csLabel}", SearchNeedle::cannotBeStored($csVariants, $csMessage), $csWant);
+    }
 
     // ============================================ 2. the pattern through a real SQL engine
     // SQLite's LIKE folds case for ASCII only, where MySQL's follows the collation, so this holds the
@@ -484,6 +517,67 @@ namespace {
         check('sql engine: the next page', [$csFound($csAnswer), $csAnswer['matched']], [[3, 5], 4]);
         [$csAnswer] = $csOver(['search' => 'Roofing', 'limit' => 2, 'offset' => 4]);
         check('sql engine: a page past the end is empty and still counted', [$csFound($csAnswer), $csAnswer['matched']], [[], 4]);
+    }
+
+    // ================================ 3c. a needle no row can hold: four bytes, on tables still in utf8mb3
+    // A table in `utf8` (utf8mb3) cannot hold a character above U+FFFF, and the server refuses to compare one of
+    // its columns with one: MariaDB says "Illegal mix of collations ...". Nothing there can hold the needle, so
+    // the honest answer is no rows, with the echo and a zero count, and not a read failure. The driver below
+    // refuses every statement with the server's own text, after recording it.
+    $csRefuse = function (string $message, string $needle, array $params = [], string $kind = 'category') use ($csAsk): array {
+        $db = new CsDb();
+        $db->failWith = new \RuntimeException($message);
+        return [$csAsk(['kind' => $kind, 'search' => $needle] + $params, new JoomlaSiteWriter($db)), $db];
+    };
+    $csEmpty = $csAsk(['kind' => 'category', 'search' => $csEmoji], new JoomlaSiteWriter(new CsDb()));
+    check('unstorable: what a search that finds nothing answers, for reference', $csEmpty, ['ok' => true, 'kind' => 'category', 'offset' => 0, 'search' => $csEmoji, 'matched' => 0, 'items' => []]);
+    foreach (['category', 'article', 'menuItem', 'field'] as $csKind) {
+        [$csAnswer, $csDb] = $csRefuse($csMix, $csEmoji, [], $csKind);
+        check("unstorable: {$csKind} - the collation mix, for an emoji, is no rows, answered as a search that found nothing",
+            $csAnswer, ['ok' => true, 'kind' => $csKind, 'offset' => 0, 'search' => $csEmoji, 'matched' => 0, 'items' => []]);
+        check("unstorable: {$csKind} - through one statement, the search itself, and no count for a first page that did not fill",
+            [count($csDb->ran), str_contains($csDb->ran[0]['sql'] ?? '', ' LIKE :s0 ')], [1, true]);
+    }
+    [$csAnswer] = $csRefuse($csBadValue, $csEmoji);
+    check('unstorable: an incorrect string value is the same', $csAnswer, ['ok' => true, 'kind' => 'category', 'offset' => 0, 'search' => $csEmoji, 'matched' => 0, 'items' => []]);
+    [$csAnswer] = $csRefuse($csMix, "  roof {$csEmoji} \n");
+    check('unstorable: the echo is the needle cleaned, as for any search', [$csAnswer['ok'], $csAnswer['search'], $csAnswer['matched'], $csAnswer['items']], [true, "roof {$csEmoji}", 0, []]);
+    [$csAnswer, $csDb] = $csRefuse($csMix, $csEmoji, ['offset' => 20]);
+    check('unstorable: a later page is zero too, the count refused the same way', [$csAnswer['ok'], $csAnswer['matched'], $csAnswer['items'], count($csDb->ran)], [true, 0, [], 2]);
+
+    // Any other refusal, or the same one for a needle with no such character, is a failure like any other.
+    foreach ([
+        'an unknown column' => [$csEmoji, "Unknown column 'a.titel' in 'where clause'"],
+        'a lost connection' => [$csEmoji, 'MySQL server has gone away'],
+        'the collation mix, for a needle of ASCII' => ['roof', $csMix],
+        'the collation mix, for a composed letter' => [$csNfc, $csMix],
+        'the collation mix, for CJK, which takes three bytes' => ["\u{5C4B}\u{6839}", $csMix],
+        'an incorrect string value, for ASCII' => ['roof', $csBadValue],
+    ] as $csLabel => [$csNeedle, $csMessage]) {
+        [$csAnswer] = $csRefuse($csMessage, $csNeedle);
+        check("unstorable: {$csLabel} stays read_failed, with the database's own words", [$csAnswer['ok'], $csAnswer['error'] ?? null, $csAnswer['message'] ?? null], [false, 'read_failed', $csMessage]);
+    }
+    // Only a search with words is read that way: a plain list, and a blank needle (which is a plain list), fail as they always did.
+    foreach (['no search at all' => [], 'a blank needle' => ['search' => '   ']] as $csLabel => $csParams) {
+        $csDb = new CsDb();
+        $csDb->failWith = new \RuntimeException($csMix);
+        $csAnswer = $csAsk(['kind' => 'category'] + $csParams, new JoomlaSiteWriter($csDb));
+        check("unstorable: {$csLabel} answers read_failed for the same message", [$csAnswer['ok'], $csAnswer['error'] ?? null, $csAnswer['message'] ?? null], [false, 'read_failed', $csMix]);
+    }
+    // The same rule at the writer's own two doors.
+    $csDb = new CsDb();
+    $csDb->failWith = new \RuntimeException($csMix);
+    $csWriter = new JoomlaSiteWriter($csDb);
+    check('unstorable: searchRows answers no rows for it', $csWriter->searchRows('category', [$csEmoji], 0, 10), []);
+    check('unstorable: countMatches answers zero for it', $csWriter->countMatches('category', [$csEmoji]), 0);
+    foreach (['searchRows' => fn () => $csWriter->searchRows('category', ['roof'], 0, 10), 'countMatches' => fn () => $csWriter->countMatches('category', ['roof']), 'list' => fn () => $csWriter->list('category', 0, 10)] as $csDoor => $csCall) {
+        $csThrown = null;
+        try {
+            $csCall();
+        } catch (\RuntimeException $csThrownBy) {
+            $csThrown = $csThrownBy->getMessage();
+        }
+        check("unstorable: {$csDoor} throws the refusal on, for a needle a table can hold", $csThrown, $csMix);
     }
 
     // =============================================== 4. the engine's answers, through a writer in memory

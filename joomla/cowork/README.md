@@ -327,6 +327,14 @@ content.list {kind: "article", search: "roof repair"}
   has `Normalizer` (intl, or Joomla's polyfill) and matched as both its NFC and its NFD form, since a
   title may have been stored either way; without `Normalizer` it is matched as typed. Blank after
   cleaning means no filter: the plain list, answered with `search: ""` and no `matched`.
+- **Four-byte characters.** A character above U+FFFF (an emoji, a rare Chinese character) cannot be
+  stored in a table still in `utf8` (utf8mb3), and such a site's database refuses to compare its
+  columns with one ("Illegal mix of collations", or "Incorrect string value"). A needle holding one
+  therefore **matches nothing** there: the answer is `matched: 0` and no rows, with the echo like
+  any other search, not an error. Only that is read this way: the two refusals above, for a needle
+  in which every form holds such a character. The same refusal for a needle without one, and any
+  other database error, is `read_failed`. (The refusal is matched by the server's English text; a
+  server set to another `lc_messages` language answers `read_failed`, the safe side.)
 - **The answer.** `search` is in the answer **if and only if** the request carried the key. It is the
   proof that this plugin read it: a plugin from before this change ignores the key and answers the
   whole list as `ok`, so a caller that sends `search` must look for the echo and read its absence as

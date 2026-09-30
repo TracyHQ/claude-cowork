@@ -396,6 +396,47 @@ final class SearchNeedle
     }
 
     /**
+     * Whether a database's refusal of a search means "no row can hold these words", so that the honest
+     * answer is no rows and not an error.
+     *
+     * A character above U+FFFF (an emoji, say) takes four bytes in UTF-8, and a table still in `utf8`
+     * (utf8mb3) cannot hold one, so no row of it can contain the needle. The server does not answer "none"
+     * to that comparison, it refuses it: MariaDB says "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT)
+     * and (utf8mb4_uca1400_ai_ci,COERCIBLE) for operation 'like'", and a write of such a character says
+     * "Incorrect string value". Reported as a failure it sends the caller off to hunt a fault it did not cause.
+     *
+     * BOTH halves must hold: every variant carries a character above U+FFFF AND the message is one of those
+     * two. The same message for a needle without such a character is some other fault (two tables in
+     * different collations, say), and any other message is a failure whatever the needle holds: both stay
+     * errors. The message is the server's English text; a server set to another `lc_messages` language does
+     * not match, and the caller gets the error, which is the safe side.
+     *
+     * @param string[] $variants the strings the refused statement was bound to
+     */
+    public static function cannotBeStored(array $variants, string $message): bool
+    {
+        if ($variants === []) {
+            return false;
+        }
+        $refused = false;
+        foreach (['Illegal mix of collations', 'Incorrect string value'] as $phrase) {
+            if (stripos($message, $phrase) !== false) {
+                $refused = true;
+                break;
+            }
+        }
+        if (!$refused) {
+            return false;
+        }
+        foreach ($variants as $variant) {
+            if (preg_match('/[\x{10000}-\x{10FFFF}]/u', $variant) !== 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had.
      *
      * A Normalizer counts only when it can normalise. `disable_classes=Normalizer`, which hardened hosts
@@ -447,13 +488,16 @@ interface SearchableSiteWriter
      * trashed row is listed like any other, because hiding it would make "this is the only match"
      * unsafe to say.
      *
+     * A needle that no row can hold answers no rows and does not throw: see SearchNeedle::cannotBeStored().
+     *
      * @param string[] $variants strings from SearchNeedle::clean(), at least one
      * @return array<int,array<string,?scalar>>
      */
     public function searchRows(string $kind, array $variants, int $offset, int $limit): array;
 
     /**
-     * How many rows searchRows() would answer over all pages, whatever the offset and limit.
+     * How many rows searchRows() would answer over all pages, whatever the offset and limit. Zero for a
+     * needle no row can hold, exactly as searchRows() answers no rows for it.
      *
      * @param string[] $variants
      */

@@ -1067,7 +1067,15 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             ->from($this->db->quoteName($this->tableFor($kind), 'a'));
         $this->applyScope($kind, $query, 'a');
         $this->whereWords($query, $kind, $variants);
-        return (int) $this->db->setQuery($query)->loadResult();
+        try {
+            return (int) $this->db->setQuery($query)->loadResult();
+        } catch (\Throwable $e) {
+            // A needle no row can hold is counted as none, as rows() answers it with none.
+            if (\SearchNeedle::cannotBeStored($variants, $e->getMessage())) {
+                return 0;
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -1168,7 +1176,18 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             );
         }
 
-        $rows = $this->db->setQuery($query, $offset, $limit)->loadAssocList() ?? [];
+        // A search whose needle no row can hold is answered with no rows, not with the database's refusal
+        // (SearchNeedle::cannotBeStored). Only THIS statement is read that way, the one that carries the
+        // needle: the lookups below never see it, and their failures are failures. A plain list has no
+        // needle, and its error is thrown on unchanged.
+        try {
+            $rows = $this->db->setQuery($query, $offset, $limit)->loadAssocList() ?? [];
+        } catch (\Throwable $e) {
+            if ($variants !== null && \SearchNeedle::cannotBeStored($variants, $e->getMessage())) {
+                return [];
+            }
+            throw $e;
+        }
 
         // Where each article actually lives on the web. Asked of Joomla's own router rather than
         // assembled from the alias: the answer depends on SEF settings, on which menu item claims
