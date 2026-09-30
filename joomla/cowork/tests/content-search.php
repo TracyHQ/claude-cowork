@@ -175,6 +175,30 @@ namespace {
     check('needle: 200 four-byte characters are fine', SearchNeedle::clean(str_repeat("\u{1F525}", 200))['ok'], true);
     check('needle: 201 four-byte characters are refused', SearchNeedle::clean(str_repeat("\u{1F525}", 201))['ok'], false);
     check('needle: the limit is on the cleaned needle, so padding does not count', SearchNeedle::clean('  ' . str_repeat('a', 200) . "  \n")['ok'], true);
+
+    // Trimming reads the text once, whatever shape the blanks take. (With PCRE's JIT off, a trim written
+    // as `^\s+|\s+$` took 3.2 s on 20,000 spaces and 73 s on 100,000: see SearchNeedle::clean.) Refused
+    // unread above MAX_BYTES, so what the patterns see stays short — exactly at the limit is still read.
+    $csPad = str_repeat(' ', 150);
+    foreach ([
+        'every kind of blank and nothing else' => ["\u{00A0}\u{3000} \t\r\n\u{2028}", ''],
+        'a run of blanks inside is kept as typed' => ['a' . $csPad . 'b', 'a' . $csPad . 'b'],
+        'and the ends around it are trimmed' => ['  a' . $csPad . "b \u{00A0}", 'a' . $csPad . 'b'],
+        'a long trailing run is trimmed' => ['a' . str_repeat(' ', 4000), 'a'],
+        'a long leading run is trimmed' => [str_repeat(' ', 4000) . 'a', 'a'],
+        'blanks up to the byte limit are nothing' => [str_repeat(' ', SearchNeedle::MAX_BYTES), ''],
+        'one character between blanks' => [' x ', 'x'],
+        'one blank character alone' => ["\u{3000}", ''],
+        'exactly the byte limit is still read' => [str_repeat(' ', SearchNeedle::MAX_BYTES - 1) . 'a', 'a'],
+    ] as $csLabel => [$csRaw, $csText]) {
+        $csGot = SearchNeedle::clean($csRaw);
+        check("needle: {$csLabel}", [$csGot['ok'], $csGot['text']], [true, $csText]);
+    }
+    check('needle: one byte over the limit is refused before it is read, whatever it would clean to',
+        SearchNeedle::clean(str_repeat(' ', SearchNeedle::MAX_BYTES) . 'a')['ok'], false);
+    check('needle: a long blank run inside makes the needle over 200 characters, and it is refused',
+        SearchNeedle::clean('a' . str_repeat(' ', 4000) . 'b')['ok'], false);
+    check('needle: the refusal for length names the limit', SearchNeedle::clean(str_repeat('a', 201))['message'], 'search is limited to 200 characters');
     foreach (['an array' => ['roof'], 'a number' => 123, 'a float' => 1.5, 'true' => true, 'null' => null, 'an object' => new stdClass()] as $csLabel => $csRaw) {
         check("needle: {$csLabel} is refused", SearchNeedle::clean($csRaw)['ok'], false);
     }

@@ -297,6 +297,12 @@ final class SearchNeedle
     public const MAX_LENGTH = 200;
 
     /**
+     * The most bytes a value may take BEFORE it is cleaned: 200 four-byte characters with room to spare
+     * for padding. Refused unread above this, so the patterns below only ever see a short string.
+     */
+    public const MAX_BYTES = 4096;
+
+    /**
      * The character that escapes `%` and `_` in the pattern like() builds — named in the SQL as an
      * explicit ESCAPE clause. Not a backslash: LIKE's default escape character is a backslash except
      * under sql_mode NO_BACKSLASH_ESCAPES, where it has none, so a needle's `%` would be a wildcard
@@ -313,6 +319,7 @@ final class SearchNeedle
      * as its NFC and NFD forms, because a title may have been stored either way. Without a
      * normaliser the needle is used as it came: it matches what was typed the same way, and nothing
      * is refused for lack of one. No minimum length: one character is a word in Chinese or Japanese.
+     * More than MAX_LENGTH characters once cleaned, or more than MAX_BYTES bytes before, is refused.
      *
      * @param mixed $raw the request's `search`, whatever it was
      * @return array{ok:true,text:string,variants:string[]}|array{ok:false,message:string}
@@ -324,13 +331,19 @@ final class SearchNeedle
         if (!is_string($raw)) {
             return ['ok' => false, 'message' => 'search must be a string of at most ' . self::MAX_LENGTH . ' characters'];
         }
-        $text = preg_replace(['/[\t\n\r\x0B\x0C]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
-        if ($text !== null) {
-            $text = preg_replace('/^[\s\p{Z}]+|[\s\p{Z}]+$/u', '', $text);
+        if (strlen($raw) > self::MAX_BYTES) {
+            return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];
         }
-        if ($text === null) {
+        $text = preg_replace(['/[\t\n\r\x0B\x0C]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
+        // Trimmed by ONE pattern anchored at the start, with a possessive lead, so the text is read once.
+        // The obvious `^\s+|\s+$` tries every space of a long run as a start and is quadratic when PCRE's
+        // JIT is off, which is how some hosts run PHP: measured with pcre.jit=0, 20,000 spaces inside a
+        // needle took 3.2 s and 100,000 took 73 s.
+        $kept = $text === null ? false : preg_match('/^[\s\p{Z}]*+(.*[^\s\p{Z}])/su', $text, $found);
+        if ($kept === false) {
             return ['ok' => false, 'message' => 'search must be valid UTF-8 text'];
         }
+        $text = $kept === 1 ? $found[1] : '';
         $nfc = self::form($text, false);
         if (mb_strlen($nfc, 'UTF-8') > self::MAX_LENGTH) {
             return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];

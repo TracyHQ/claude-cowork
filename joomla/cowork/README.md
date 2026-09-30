@@ -298,8 +298,9 @@ content.list {kind: "article", search: "roof repair"}
   "500 off sale". A space is a space: "roof repair" does not match the alias `roof-repair`; pass the
   alias stem for that. The words are bound parameters, never part of the SQL text.
 - **The needle.** Trimmed; a tab or line break becomes a space and any other control character is
-  dropped. One character is enough (Chinese, Japanese). At most 200 characters, and a value that is
-  not a string (`null` included) or not UTF-8, is refused with `bad_params`. It is made NFC when PHP
+  dropped. One character is enough (Chinese, Japanese). At most 200 characters once cleaned (and
+  4,096 bytes before, which a real needle never comes near); that, a value that is not a string
+  (`null` included) and one that is not UTF-8 are refused with `bad_params`. It is made NFC when PHP
   has `Normalizer` (intl, or Joomla's polyfill) and matched as both its NFC and its NFD form, since a
   title may have been stored either way; without `Normalizer` it is matched as typed. Blank after
   cleaning means no filter: the plain list, answered with `search: ""` and no `matched`.
