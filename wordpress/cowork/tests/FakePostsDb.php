@@ -17,6 +17,13 @@
  * found only by a statement that asks for that spelling (a real collation may find more, not less).
  * A column named in `$binaryColumns` compares byte for byte instead, as a `_bin` collation does.
  *
+ * It also answers what a real `$wpdb` answers about the columns: `get_col_charset()` names the character
+ * set of a column's collation, and a string with a character above U+FFFF (an emoji) compared with a column
+ * that keeps three bytes a character (`utf8`) is REFUSED, as it is on a real site, in the two ways it is
+ * there: by MySQL ("Illegal mix of collations"), or, for every collation but six, by `wpdb` itself before
+ * MySQL sees the statement (see `$collation`). A refusal is a failed statement with the message a site
+ * gets, so a statement that should never have been sent shows up as an error, not as a shorter answer.
+ *
  * Not a SQL engine: it stands in for one, for one query shape, and a test that needs more belongs
  * on a real install.
  */
@@ -24,6 +31,9 @@ declare(strict_types=1);
 
 final class WP_Fake_PostsDb
 {
+    /** The collations `wpdb::check_safe_collation()` trusts (WordPress 6.1 to 7.1): a table with only these is sent unchecked. */
+    private const SAFE_COLLATIONS = ['utf8_bin', 'utf8_general_ci', 'utf8mb3_bin', 'utf8mb3_general_ci', 'utf8mb4_bin', 'utf8mb4_general_ci'];
+
     public string $prefix = 'wp_';
     public string $posts = 'wp_posts';
     public string $dbname = 'wp';
@@ -35,12 +45,27 @@ final class WP_Fake_PostsDb
     /** Set to have `prepare()` refuse, as WordPress does for a statement it cannot build: an empty string. */
     public bool $prepareRefuses = false;
     /**
-     * Set when the posts table is still `utf8` (three bytes a character), as a site that was never moved to
-     * utf8mb4 has it. MySQL cannot turn a string with a character above U+FFFF into that column's character
-     * set, so it does not answer "no rows" to a comparison with one: it refuses the statement, with the
-     * message below, before it reads a row. A table like this holds no such character (the fixtures add none).
+     * The collation of the posts table's text columns, as `SHOW FULL COLUMNS` reports it. WordPress installs
+     * `utf8mb4_unicode_520_ci` (or a `utf8mb4` one): four bytes a character, so nothing is ever refused. A site that
+     * was never moved to utf8mb4 has a `utf8` one (three bytes a character), and a statement holding a character above
+     * U+FFFF is then refused by one of two: MySQL, which cannot turn the string into the column's character set
+     * ("Illegal mix of collations"), or `wpdb` itself. `wpdb::get_col()` skips its own check only when EVERY text column
+     * has one of six collations (see SAFE_COLLATIONS); for any other it removes such a character from the statement,
+     * finds it changed and never sends it, answering false with a translated message, and MySQL is never asked.
      */
-    public bool $utf8mb3 = false;
+    public string $collation = 'utf8mb4_unicode_520_ci';
+    /**
+     * Collations of single columns that differ from `$collation` (a table half converted): column name => collation.
+     *
+     * @var array<string,string>
+     */
+    public array $columnCollation = [];
+    /** Set for a handle that cannot say what a column keeps: `get_col_charset()` answers false, as it does off MySQL. */
+    public bool $charsetUnknown = false;
+    /** How many times `get_col_charset()` was asked (a real one reads the table's columns the first time). */
+    public int $charsetLookups = 0;
+    /** @var string[] statements `wpdb` refused itself: they never reached MySQL, so they are not in `$queries` */
+    public array $refused = [];
     /**
      * Columns that compare byte for byte, capitals and all, as a `_bin` collation compares them (a site can
      * set one with DB_COLLATE). Every other column ignores case, as the collations WordPress installs do.
@@ -54,6 +79,18 @@ final class WP_Fake_PostsDb
     public function esc_like(string $text): string
     {
         return addcslashes($text, '_%\\');
+    }
+
+    /** What `wpdb::get_col_charset()` answers: the character set in the column's collation name, or false. */
+    public function get_col_charset(string $table, string $column)
+    {
+        $this->charsetLookups++;
+        return $this->charsetUnknown ? false : explode('_', $this->collationOf($column))[0];
+    }
+
+    private function collationOf(string $column): string
+    {
+        return $this->columnCollation[$column] ?? $this->collation;
     }
 
     public function prepare(string $query, ...$args): string
@@ -96,15 +133,50 @@ final class WP_Fake_PostsDb
         if ($query === '') {
             return [];
         }
-        $this->queries[] = $query;
-        $fails = $this->failWith !== '' && ($this->failOnly === '' || strpos($query, $this->failOnly) !== false);
-        if (!$fails && $this->utf8mb3 && preg_match('/[\x{10000}-\x{10FFFF}]/u', $query) === 1) {
-            $this->last_error = "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT) and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'";
+        if ($this->wpdbRefuses($query)) {
+            $this->refused[] = $query;
+            $this->last_error = 'WordPress database error: Could not perform query because it contains invalid data.';
             return [];
         }
+        $this->queries[] = $query;
+        $fails = $this->failWith !== '' && ($this->failOnly === '' || strpos($query, $this->failOnly) !== false);
         $this->last_error = $fails ? $this->failWith : '';
-        return $fails ? [] : WP_Fake_PostsSql::run($query, $this->binaryColumns);
+        if ($fails) {
+            return [];
+        }
+        try {
+            return WP_Fake_PostsSql::run($query, $this->binaryColumns, [$this, 'collationOfColumn']);
+        } catch (WP_Fake_MysqlRefusal $e) {
+            $this->last_error = $e->getMessage();
+            return [];
+        }
     }
+
+    /** Public only so the reader can ask; it is what `collationOf()` answers. */
+    public function collationOfColumn(string $column): string
+    {
+        return $this->collationOf($column);
+    }
+
+    /**
+     * `wpdb::query()` never sends a statement that has a character above U+FFFF when the table keeps three bytes
+     * (some column is `utf8`, which is what `get_table_charset()` then answers even beside `utf8mb4` ones) and
+     * `check_safe_collation()` is false, i.e. some text column has a collation outside the six it trusts.
+     */
+    private function wpdbRefuses(string $query): bool
+    {
+        if (preg_match('/[\x{10000}-\x{10FFFF}]/u', $query) !== 1) {
+            return false;
+        }
+        $collations = array_merge([$this->collation], array_values($this->columnCollation));
+        $threeBytes = array_filter($collations, static fn (string $c): bool => in_array(explode('_', $c)[0], ['utf8', 'utf8mb3'], true));
+        return $threeBytes !== [] && array_diff($collations, self::SAFE_COLLATIONS) !== [];
+    }
+}
+
+/** MySQL's refusal of one statement, as `wpdb` records it in `last_error`. */
+final class WP_Fake_MysqlRefusal extends RuntimeException
+{
 }
 
 /** The reader behind {@see WP_Fake_PostsDb}: tokens, then a recursive descent over one statement shape. */
@@ -115,20 +187,42 @@ final class WP_Fake_PostsSql
     private int $at = 0;
     /** @var string[] columns compared byte for byte */
     private array $binary;
+    /** @var callable|null column name => its collation, so a string the column cannot hold is refused as MySQL refuses it */
+    private $collationOf;
 
-    private function __construct(array $tokens, array $binary)
+    private function __construct(array $tokens, array $binary, ?callable $collationOf)
     {
         $this->tokens = $tokens;
         $this->binary = $binary;
+        $this->collationOf = $collationOf;
     }
 
     /**
      * @param string[] $binary columns that compare byte for byte, as a `_bin` collation does
+     * @param callable|null $collationOf asked for the collation of each column a string is compared with
      * @return string[] ids in ascending order (as strings, like a driver answers), or one count
+     * @throws WP_Fake_MysqlRefusal for a string with a character above U+FFFF compared with a column that keeps three bytes
      */
-    public static function run(string $sql, array $binary = []): array
+    public static function run(string $sql, array $binary = [], ?callable $collationOf = null): array
     {
-        return (new self(self::tokenize($sql), $binary))->select();
+        return (new self(self::tokenize($sql), $binary, $collationOf))->select();
+    }
+
+    /**
+     * MySQL cannot turn a string with a character above U+FFFF into the character set of a `utf8` column, so it does
+     * not answer "no rows" to the comparison: it refuses the whole statement, before it reads a row, whichever
+     * branch of an OR held the string. A `utf8mb4` column takes it. Only the columns of one comparison are asked, so
+     * a table half converted refuses exactly the comparisons that name its three-byte column.
+     */
+    private function refuseWhatTheColumnCannotHold(string $column, string $literal, string $operation): void
+    {
+        if ($this->collationOf === null || preg_match('/[\x{10000}-\x{10FFFF}]/u', $literal) !== 1) {
+            return;
+        }
+        $collation = ($this->collationOf)($column);
+        if (in_array(explode('_', $collation)[0], ['utf8', 'utf8mb3'], true)) {
+            throw new WP_Fake_MysqlRefusal("Illegal mix of collations ({$collation},IMPLICIT) and (utf8mb4_unicode_520_ci,COERCIBLE) for operation '{$operation}'");
+        }
     }
 
     /** What the statement's string literal holds once MySQL has read it (`\%` and `\_` stay, for LIKE). */
@@ -304,22 +398,30 @@ final class WP_Fake_PostsSql
         $fold = static fn (string $text): string => $exact ? $text : mb_strtolower($text);
         if ($this->isWord('LIKE')) {
             $this->word('LIKE');
-            $regex = self::likeRegex($this->string(), $exact);
+            $pattern = $this->string();
+            $this->refuseWhatTheColumnCannotHold($column, $pattern, 'like');
+            $regex = self::likeRegex($pattern, $exact);
             return static fn (array $row): bool => preg_match($regex, $value($row)) === 1;
         }
         if ($this->isWord('IN')) {
             $this->word('IN');
             $this->sym('(');
-            $set = [$fold($this->string())];
+            $literal = $this->string();
+            $this->refuseWhatTheColumnCannotHold($column, $literal, 'in');
+            $set = [$fold($literal)];
             while ($this->isSym(',')) {
                 $this->sym(',');
-                $set[] = $fold($this->string());
+                $literal = $this->string();
+                $this->refuseWhatTheColumnCannotHold($column, $literal, 'in');
+                $set[] = $fold($literal);
             }
             $this->sym(')');
             return static fn (array $row): bool => in_array($fold($value($row)), $set, true);
         }
         $this->sym('=');
-        $want = $fold($this->string());
+        $literal = $this->string();
+        $this->refuseWhatTheColumnCannotHold($column, $literal, '=');
+        $want = $fold($literal);
         return static fn (array $row): bool => $fold($value($row)) === $want;
     }
 

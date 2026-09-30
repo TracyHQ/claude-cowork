@@ -331,18 +331,23 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   than `post`. The engine refuses text that is not valid UTF-8 the same way, but over the door it
   never gets that far: a body that is not valid UTF-8 is not valid JSON, so the door reads no
   request from it and answers `unauthorized`, as it does for any body it cannot read. A statement
-  the database rejects is `read_failed`, not an empty page, with the one exception below.
-- **A four-byte character on a `utf8` table is an answer: no rows.** A site that was never moved to
-  `utf8mb4` keeps its posts in three-byte columns, and for words with a character above U+FFFF (an
-  emoji, a rare ideograph) MySQL does not find nothing: it refuses the statement (`Illegal mix of
-  collations`, or from another server `Incorrect string value`). No post of that table can hold such
-  a character, so the door answers `ok: true`, `matched: 0`, an empty `items` and the words echoed,
-  as for any search that finds nothing. It is decided by the words and the message together, not by
-  a look at the table: MySQL raises that message when the words cannot be turned into the column's
-  character set, and a `utf8mb4` column, which is what WordPress installs, takes them. Both halves
-  are required. The same message for words with no such character (a `latin1` table and a Chinese
-  word, say), and any other error for words that have one (a crashed table, a lost connection),
-  stay `read_failed`.
+  the database rejects is `read_failed`, never an empty page.
+- **A four-byte character (an emoji) on a `utf8` table.** A site that was never moved to `utf8mb4`
+  keeps its posts in three-byte columns, and there core stores an emoji as an entity (`🔥` is
+  `&#x1f525;`, see above), so the page exists and is found: the words are asked for the way core
+  stores them. The character itself is not sent to such a column, because a string with a character
+  above U+FFFF compared with a `utf8` column is refused as a whole: MySQL says `Illegal mix of
+  collations` (or `Incorrect string value`), and for every collation but six (`utf8_general_ci`,
+  `utf8_bin` and their `utf8mb3` and `utf8mb4` names) `wpdb` refuses it first, in the site's language,
+  without asking MySQL. So no error message decides anything here. The plugin asks WordPress what
+  each column keeps (`$wpdb->get_col_charset()`, the test `wp_insert_post()` itself makes before it
+  writes an entity) and, for a column that keeps three bytes, leaves out the spellings that hold such
+  a character; a `utf8mb4` column, which is what WordPress installs, is asked for both. Words that no
+  such column can hold at all (an ideograph above U+FFFF is no emoji, so it has no entity) find
+  nothing, and the door says so without a query: `ok: true`, `matched: 0`, an empty `items`, the words
+  echoed. A statement that the database still refuses is `read_failed`, as any other: on a handle that
+  cannot say what a column keeps (a database that is not MySQL) the words are sent as they are, and
+  the refusal is reported, never turned into "no rows".
 
 The ids are found by one prepared statement that pages in SQL (`WP_Query`'s own `s` is not used: it
 splits words, treats a leading `-` as "exclude", searches the body, and drops password-protected posts

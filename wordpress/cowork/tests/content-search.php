@@ -7,7 +7,11 @@
  * statements the writer builds and answers from the fake posts: a pattern that forgot to escape `%`,
  * an OR that lost its parentheses, a missing ORDER BY or a wrong page shows up as a wrong answer here,
  * not as a string that happens to look right. That holds for the two SQL statements (the ids of a page,
- * and the count). The `WP_Query` that loads the page is different: it refuses the arguments it does not
+ * and the count). The same handle answers what a real one answers about its columns (`get_col_charset()`)
+ * and refuses what a real site refuses, in both ways it does: a character above U+FFFF compared with a
+ * column that keeps three bytes is refused by MySQL or, for most collations, by `wpdb` itself before MySQL
+ * is asked. A statement that should never have been sent is then a failure here, not a shorter answer.
+ * The `WP_Query` that loads the page is different: it refuses the arguments it does not
  * know and the ones it would have to guess, and what it is asked is compared with what it should be
  * (`WP_Query::$lastArgs`), because a fake cannot show a wrong order or a filter left on.
  *
@@ -625,59 +629,217 @@ check('a statement WordPress refuses to build is an error, not an empty page', [
 $csDb->prepareRefuses = false;
 check('and the next search is fine', $csAsk(['search' => 'gizmo'])['ok'] ?? null, true);
 
-// ── a four-byte character on a posts table that is still utf8: no row can hold it ───────────────
+// ── a four-byte character: what a column that keeps three bytes can be asked ────────────────────
 //
-// A site that was never moved to utf8mb4 keeps its posts in three-byte columns, and MySQL does not answer
-// "no rows" to a comparison with a character above U+FFFF (an emoji): it refuses the statement ("Illegal mix
-// of collations"). No post of that table holds the character, so the honest answer is none. A refusal that
-// is anything else stays a failure, and so does this one for words with no such character.
-$csSite(static function () use ($csPost): void {
-    $csPost(1, 'Summer sale today', ['post_name' => 'summer-sale']);
-    $csPost(2, 'Winter sale', ['post_name' => 'winter-sale']);
-    $csPost(3, '屋根の修理サービス');
-});
-$csDb->utf8mb3 = true;
-$csDb->queries = [];
-WP_Query::$lastArgs = [];
-$r = $csAsk(['search' => '🔥']);
-check('a four-byte character on a utf8 table: no rows, and it is an answer, not a failure', [$r['ok'] ?? null, $r['items'] ?? null], [true, []]);
-check('with the words echoed and a total of zero, the keys a search always has', [$r['search'] ?? null, $r['matched'] ?? null, $r['kind'] ?? null, $r['offset'] ?? null, array_keys($r)], ['🔥', 0, 'post', 0, ['ok', 'kind', 'offset', 'search', 'matched', 'items']]);
-check('as the door writes it: an empty list, not an object', json_encode($r, JSON_UNESCAPED_UNICODE), '{"ok":true,"kind":"post","offset":0,"search":"🔥","matched":0,"items":[]}');
-check('it took one statement, and no page was loaded for it', [count($csDb->queries), WP_Query::$lastArgs], [1, []]);
-check('and the statement really was refused (the stand-in refuses it as MySQL does)', $csDb->last_error !== '' && strpos($csDb->last_error, 'Illegal mix of collations') === 0, true);
-$r = $csAsk(['search' => 'summer 🔥 sale', 'offset' => 40, 'limit' => 5, 'include_body' => true, 'post_type' => 'page', 'name' => 'summer-sale']);
-check('the same with every other parameter: no rows, zero, the offset as asked', [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, $r['offset'] ?? null], [true, [], 0, 40]);
-check('a four-byte character among other words', $csAsk(['search' => "sale \u{10000}"])['matched'] ?? null, 0);
-// U+FFFF is the last three-byte character and U+10000 the first with four
+// A posts table that was never moved to utf8mb4 keeps its text in three-byte columns, and core stores an emoji there as
+// an entity (above): the page that holds one exists, and is found by the words asked for the way core stores them. What
+// cannot be sent is the character itself. A string with a character above U+FFFF compared with a column of that kind is
+// refused as a whole, whichever branch of an OR held it, and in two ways: MySQL says "Illegal mix of collations", and for
+// every collation but six `wpdb` refuses first, in the site's language, without asking MySQL. WordPress says what a column
+// keeps (`get_col_charset()`, the very test `wp_insert_post()` makes), so the spellings that hold such a character are left
+// out for a column that keeps three bytes, and no statement that would be refused is sent.
+/** The posts of a three-byte site: what core stored there (entities), not what was typed. */
+$csThreeByteSite = static function () use ($csSite, $csPost): void {
+    $csSite(static function () use ($csPost): void {
+        $csPost(1, wp_encode_emoji("Summer sale \u{1F525} today"), ['post_name' => 'summer-sale']);
+        $csPost(2, 'Winter sale', ['post_name' => 'winter-sale']);
+        $csPost(3, '屋根の修理サービス');
+        $csPost(4, wp_encode_emoji("Tracy\u{2122} plan"));
+        $csPost(5, wp_encode_emoji('Tom &amp; Jerry ' . "\u{1F525}"));
+    });
+};
+/** The statements of a list that hold a character above U+FFFF. */
+$csFourByte = static fn (array $statements): array => array_values(array_filter($statements, static fn (string $q): bool => preg_match('/[\x{10000}-\x{10FFFF}]/u', $q) === 1));
+/** A clean slate for what the handle records. */
+$csForget = static function () use ($csDb): void {
+    $csDb->queries = [];
+    $csDb->refused = [];
+    $csDb->last_error = '';
+    $csDb->charsetLookups = 0;
+    WP_Query::$lastArgs = [];
+};
+$csThreeBytes = [
+    'utf8_general_ci' => 'MySQL refuses it',
+    'utf8mb3_general_ci' => 'MySQL refuses it',
+    'utf8mb3_bin' => 'MySQL refuses it',
+    'utf8_unicode_ci' => 'wpdb refuses it itself',
+    'utf8_unicode_520_ci' => 'wpdb refuses it itself',
+    'utf8mb3_unicode_520_ci' => 'wpdb refuses it itself',
+];
+$csEmojiStatement = "SELECT ID FROM wp_posts WHERE post_type IN ('post') AND post_status IN ('publish') AND (post_title LIKE '%\u{1F525}%') ORDER BY ID ASC LIMIT 0, 100";
+
+// the stand-in is not vacuous: it refuses what a real site refuses, in the way that collation refuses it
+foreach ($csThreeBytes as $collation => $who) {
+    $csDb->collation = $collation;
+    $csForget();
+    $csDb->get_col($csEmojiStatement);
+    $viaMysql = $who === 'MySQL refuses it';
+    check("(the stand-in on {$collation}: {$who})", [
+        count($csDb->queries), count($csDb->refused),
+        strpos($csDb->last_error, $viaMysql ? 'Illegal mix of collations' : 'WordPress database error: Could not perform query because it contains invalid data.') === 0,
+    ], [$viaMysql ? 1 : 0, $viaMysql ? 0 : 1, true]);
+}
+foreach (['utf8mb4_unicode_520_ci', 'utf8mb4_general_ci', 'utf8mb4_bin'] as $collation) {
+    $csDb->collation = $collation;
+    $csForget();
+    $csDb->get_col($csEmojiStatement);
+    check("(and on {$collation}, which takes four bytes, it is not refused)", [count($csDb->queries), $csDb->last_error], [1, '']);
+}
+$csDb->collation = 'utf8mb3_general_ci';
+$csForget();
+$csDb->get_col("SELECT ID FROM wp_posts WHERE post_type IN ('post') AND post_status IN ('publish') AND (post_title LIKE '%\u{FFFF}%') ORDER BY ID ASC LIMIT 0, 100");
+check('(and U+FFFF, the last character of three bytes, is not refused: the boundary is U+10000)', [count($csDb->queries), $csDb->last_error], [1, '']);
+
+foreach ($csThreeBytes as $collation => $who) {
+    $csThreeByteSite();
+    $csDb->collation = $collation;
+    $csForget();
+    $r = $csAsk(['search' => "\u{1F525}"]);
+    check("[{$collation}] an emoji finds the pages core stored with the entity, as an answer and not a failure ({$who})",
+        [$r['ok'] ?? null, $csIds($r), $r['matched'] ?? null, $r['search'] ?? null, $r['error'] ?? null], [true, [1, 5], 2, "\u{1F525}", null]);
+    check("[{$collation}] and no statement that this column would refuse was sent: none holds the character, none was refused, no error",
+        [$csFourByte($csDb->queries), $csDb->refused, $csDb->last_error], [[], [], '']);
+    check("[{$collation}] the statement asks for the entity alone: the character is left out of the title, and the slug, which never holds it, is not asked",
+        $csDb->queries[0],
+        "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+        . "AND (post_title LIKE '%&#x1f525;%') ORDER BY ID ASC LIMIT 0, 100");
+    $csForget();
+    $r = $csAsk(['search' => "\u{1F525}", 'limit' => 1]);
+    check("[{$collation}] a page of one asks the count too, of the same spellings", [$csIds($r), $r['matched'] ?? null, count($csDb->queries), $csFourByte($csDb->queries), $csDb->refused], [[1], 2, 2, [], []]);
+    $r = $csAsk(['search' => "\u{1F525}", 'offset' => 1]);
+    check("[{$collation}] and a later page", [$csIds($r), $r['matched'] ?? null, $r['offset'] ?? null], [[5], 2, 1]);
+}
+
+foreach (['utf8mb3_general_ci', 'utf8_unicode_ci'] as $collation) {
+    $csThreeByteSite();
+    $csDb->collation = $collation;
+    $csForget();
+    check("[{$collation}] the emoji with the words around it, either side or both", [
+        $csIds($csAsk(['search' => "Summer sale \u{1F525}"])),
+        $csIds($csAsk(['search' => "\u{1F525} today"])),
+        $csIds($csAsk(['search' => "Summer sale \u{1F525} today"])),
+        $csIds($csAsk(['search' => "sale \u{1F525}"])),
+    ], [[1], [1], [1], [1]]);
+    check("[{$collation}] the words of the title with no emoji still find it, and a slug is asked as ever", [$csIds($csAsk(['search' => 'summer sale'])), $csIds($csAsk(['search' => 'winter-sale']))], [[1], [2]]);
+    check("[{$collation}] an ampersand and an emoji together: KSES stored the first, then core encoded the second", $csIds($csAsk(['search' => "Tom & Jerry \u{1F525}"])), [5]);
+    check("[{$collation}] a symbol of three bytes is found as the entity core stored, in one statement", (function () use ($csAsk, $csIds, $csDb, $csForget) {
+        $csForget();
+        $r = $csAsk(['search' => "\u{2122}"]);
+        return [$csIds($r), count($csDb->queries), $csDb->refused, $csDb->last_error];
+    })(), [[4], 1, [], '']);
+    check("[{$collation}] CJK is three bytes and needs no such care", $csIds($csAsk(['search' => '屋根'])), [3]);
+    check("[{$collation}] the stored spelling, copied out of a list, finds its page", $csIds($csAsk(['search' => 'Summer sale &#x1f525; today'])), [1]);
+    $r = $csAsk(['search' => 'summer 🔥 sale', 'offset' => 40, 'limit' => 5, 'include_body' => true, 'post_type' => 'page', 'name' => 'summer-sale']);
+    check("[{$collation}] every other parameter beside it: answered, zero, the offset as asked", [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, $r['offset'] ?? null], [true, [], 0, 40]);
+}
+
+// A character that core cannot store on such a column at all (an ideograph above U+FFFF is no emoji, so it has no entity):
+// nothing is left to ask, and the answer is none, with no statement.
+foreach (['utf8mb3_general_ci', 'utf8_unicode_ci'] as $collation) {
+    $csThreeByteSite();
+    $csDb->collation = $collation;
+    foreach (["\u{20BB7}", "sale \u{20BB7}", "\u{20BB7} \u{1F525}"] as $csWords) {
+        $csForget();
+        $r = $csAsk(['search' => $csWords, 'offset' => 40, 'limit' => 5]);
+        check("[{$collation}] words that cannot exist there (" . json_encode($csWords) . '): no rows, zero, the offset as asked, no statement, no page loaded',
+            [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null, $r['offset'] ?? null, $csDb->queries, $csDb->refused, WP_Query::$lastArgs], [true, [], 0, 40, [], [], []]);
+    }
+    $csForget();
+    $r = $csAsk(['search' => "\u{20BB7}"]);
+    check("[{$collation}] as the door writes it: the keys of any search, an empty list and not an object", json_encode($r, JSON_UNESCAPED_UNICODE), '{"ok":true,"kind":"post","offset":0,"search":"' . "\u{20BB7}" . '","matched":0,"items":[]}');
+    // U+FFFF is the last character of three bytes and U+10000 the first with four
+    foreach ([["\u{FFFF}", 1], ["\u{10000}", 0], ["\u{10FFFF}", 0]] as [$csWords, $csSent]) {
+        $csForget();
+        $r = $csAsk(['search' => $csWords]);
+        check("[{$collation}] the boundary: " . json_encode($csWords) . ($csSent === 1 ? ' is asked' : ' is not'), [$r['ok'] ?? null, $r['matched'] ?? null, count($csDb->queries), $csDb->refused], [true, 0, $csSent, []]);
+    }
+}
+
+// A search that has no such character in it never asks what the column keeps: that is a read of the table's columns.
+$csThreeByteSite();
+$csDb->collation = 'utf8mb3_general_ci';
+$csForget();
+$csAsk(['search' => 'sale']);
+$csAsk(['search' => "Caf\u{E9} \u{2122}"]);
+check('words with no character above U+FFFF never ask what the columns keep', $csDb->charsetLookups, 0);
+$csAsk(['search' => "\u{1F525}"]);
+check('and words that have one ask', $csDb->charsetLookups > 0, true);
+
+// The decision is the column's, not a message's. Nothing here reads an error to decide.
+$csThreeByteSite();
+$csDb->collation = 'utf8mb4_unicode_520_ci';
 $csDb->failWith = "Illegal mix of collations (utf8_general_ci,IMPLICIT) and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'";
-foreach ([["\u{FFFF}", 'read_failed'], ["\u{10000}", null], ["\u{10FFFF}", null], ['sale', 'read_failed'], ['屋根', 'read_failed']] as [$csWords, $csWant]) {
-    $r = $csAsk(['search' => $csWords]);
-    check('the collation error with words of ' . json_encode($csWords) . ($csWant === null ? ': an answer' : ': still a failure'), [$r['ok'] ?? null, $r['error'] ?? null], $csWant === null ? [true, null] : [false, $csWant]);
-}
-$csDb->failWith = "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'";
-check('the message as MySQL 8 spells the character set', $csAsk(['search' => '🔥'])['matched'] ?? null, 0);
+$r = $csAsk(['search' => "\u{1F525}"]);
+check('a column that takes four bytes and a server that still refuses the words: a failure to report, not "no rows"', [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), 'Illegal mix of collations') !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);
 $csDb->failWith = "Incorrect string value: '\\xF0\\x9F\\x94\\xA5' for column 'post_title' at row 1";
-$r = $csAsk(['search' => '🔥']);
-check('and the other message a server gives for it', [$r['ok'] ?? null, $r['items'] ?? null, $r['matched'] ?? null], [true, [], 0]);
-$r = $csAsk(['search' => 'sale']);
-check('that message for words with no four-byte character is a failure', [$r['ok'] ?? null, $r['error'] ?? null], [false, 'read_failed']);
-foreach (['Table wp_posts is marked as crashed', 'Lost connection to MySQL server during query', 'Deadlock found when trying to get lock; try restarting transaction'] as $csError) {
-    $csDb->failWith = $csError;
-    $r = $csAsk(['search' => '🔥']);
-    check("a four-byte character does not turn another error ({$csError}) into an answer", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), $csError) !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);
-}
+check('and so is the other message a server gives', $csAsk(['search' => "\u{1F525}"])['error'] ?? null, 'read_failed');
 $csDb->failWith = '';
-// what the site's own words still find on that table, with the same handle
+foreach (['utf8mb3_general_ci', 'utf8_unicode_ci'] as $collation) {
+    $csDb->collation = $collation;
+    foreach (['Table wp_posts is marked as crashed', 'Lost connection to MySQL server during query', 'Deadlock found when trying to get lock; try restarting transaction'] as $csError) {
+        $csDb->failWith = $csError;
+        $r = $csAsk(['search' => "\u{1F525}"]);
+        check("[{$collation}] a fault ({$csError}) with such words is a failure, not an answer", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), $csError) !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);
+    }
+    $csDb->failWith = 'Lost connection';
+    $csDb->failOnly = 'COUNT(';
+    check("[{$collation}] and a count that fails is one too, not a wrong total", [$csAsk(['search' => "\u{1F525}", 'limit' => 1])['error'] ?? null, $csAsk(['search' => "\u{1F525}"])['ok'] ?? null], ['read_failed', true]);
+    $csDb->failWith = '';
+    $csDb->failOnly = '';
+}
+$csDb->collation = 'utf8mb3_general_ci';
 $r = $csAsk(['search' => 'sale']);
 check('words without a four-byte character are searched as ever on that table', [$csIds($r), $r['matched'] ?? null], [[1, 2], 2]);
-check('CJK is three bytes: found, not refused', $csIds($csAsk(['search' => '屋根'])), [3]);
-$csDb->utf8mb3 = false;
+
+// A handle that cannot say what its columns keep (a database that is not MySQL answers false, as core does) has nothing
+// to decide from: the words are sent as they are, and a refusal is a failure to report.
+foreach (['utf8mb3_general_ci' => 'Illegal mix of collations', 'utf8_unicode_ci' => 'contains invalid data'] as $collation => $csText) {
+    $csThreeByteSite();
+    $csDb->collation = $collation;
+    $csDb->charsetUnknown = true;
+    $r = $csAsk(['search' => "\u{1F525}"]);
+    check("[{$collation}] a handle that cannot say: the refusal is read_failed, never an answer", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), $csText) !== false, array_key_exists('items', $r)], [false, 'read_failed', true, false]);
+    $csDb->charsetUnknown = false;
+}
+$csThreeByteSite();
+$csPost(6, "Autumn sale \u{1F525}"); // a table that takes four bytes may hold the character itself, and only the character asks for it
+$csDb->collation = 'utf8mb4_unicode_520_ci';
+$csDb->charsetUnknown = true;
+$r = $csAsk(['search' => "\u{1F525}"]);
+check('a handle that cannot say, over a table that takes four bytes: the words are sent as they are, so the character is found as well as its entity', [$csIds($r), $r['matched'] ?? null], [[1, 5, 6], 3]);
+$csDb->charsetUnknown = false;
+
+// A table half converted: each column is asked for what it can hold.
+$csDb->collation = 'utf8mb4_general_ci';
+$csDb->columnCollation = ['post_title' => 'utf8mb3_general_ci'];
+$csThreeByteSite();
+$csForget();
+$r = $csAsk(['search' => "\u{1F525}"]);
+check('(title keeps three bytes, slug takes four) the title is asked for the entity alone and the slug for the character', [$csIds($r), $csDb->last_error, $csDb->queries[0] ?? null], [[1, 5],  '',
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%&#x1f525;%' OR post_name LIKE '%\u{1F525}%') ORDER BY ID ASC LIMIT 0, 100"]);
+$csDb->columnCollation = ['post_name' => 'utf8mb3_general_ci'];
+$csThreeByteSite();
+$csForget();
+$r = $csAsk(['search' => "\u{1F525}"]);
+check('(title takes four bytes, slug keeps three) the title is asked both ways and the slug not at all', [$csIds($r), $csDb->last_error, $csDb->queries[0] ?? null], [[1, 5], '',
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%\u{1F525}%' OR post_title LIKE '%&#x1f525;%') ORDER BY ID ASC LIMIT 0, 100"]);
+$csDb->columnCollation = [];
+$csDb->collation = 'utf8mb4_unicode_520_ci';
+
+// On a table that takes four bytes nothing is left out, and the answer is what it was: the character AND the entity.
 $csSite(static function () use ($csPost): void {
     $csPost(1, "Summer sale \u{1F525} today");
     $csPost(2, 'Winter sale');
+    $csPost(3, wp_encode_emoji("Spring sale \u{1F525}"));
 });
+$csForget();
 $r = $csAsk(['search' => '🔥']);
-check('on a utf8mb4 table the same words are searched like any others: the row that holds the emoji is found', [$csIds($r), $r['matched'] ?? null], [[1], 1]);
+check('on a utf8mb4 table the same words are searched like any others: the row that holds the emoji is found, and the one that holds its entity', [$csIds($r), $r['matched'] ?? null, $csDb->last_error], [[1, 3], 2, '']);
+check('the statement asks for the character, its entity and the slug', $csDb->queries[0],
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%\u{1F525}%' OR post_title LIKE '%&#x1f525;%' OR post_name LIKE '%\u{1F525}%') ORDER BY ID ASC LIMIT 0, 100");
 check('and a fault there, with that character, is a failure', (function () use ($csAsk, $csDb) {
     $csDb->failWith = 'Table wp_posts is marked as crashed';
     $r = $csAsk(['search' => '🔥']);

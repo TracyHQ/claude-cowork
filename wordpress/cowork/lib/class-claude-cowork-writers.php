@@ -322,9 +322,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * the words are escaped with `esc_like`, so they match themselves instead of acting as wildcards.
 	 * A failed query throws: WordPress answers one with an empty list and a message nobody reads,
 	 * and an empty page here would read as "no such page" — the answer that sends a caller off to
-	 * create a duplicate. One failure is not a failure, and is answered as no rows: words with a
-	 * character above U+FFFF (an emoji) against a posts table that is still utf8, which MySQL refuses
-	 * to compare instead of finding nothing (see {@see four_byte_words_refused()}).
+	 * create a duplicate. The one answer of "none" that is not a query at all is words that no row
+	 * can hold (see {@see spellings_a_column_can_hold()}): a rare ideograph, on a posts table that keeps
+	 * three bytes a character.
 	 *
 	 * Case and accents fold as the column's collation folds them (the collations WordPress installs
 	 * with are all case-insensitive), except that a slug is also asked in lower case and so does not
@@ -359,13 +359,24 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 
 		// Any spelling of the title will do; the slug holds neither entities nor decomposed letters,
-		// and is tried as the words were typed and in lower case (see slug_forms()).
+		// and is tried as the words were typed and in lower case (see slug_forms()). Each column is asked
+		// the spellings it can hold.
+		$title_forms = self::spellings_a_column_can_hold( $wpdb, 'post_title', self::search_forms( $needle ) );
+		$slug_forms  = self::spellings_a_column_can_hold( $wpdb, 'post_name', self::slug_forms( $needle ) );
+		if ( array() === $title_forms && array() === $slug_forms ) {
+			// Nothing a column can hold is left, so no row holds these words. It is the only "none" that is
+			// true without asking, and an OR of nothing would not be a statement.
+			return array(
+				'ids'     => array(),
+				'matched' => 0,
+			);
+		}
 		$likes = array();
-		foreach ( self::search_forms( $needle ) as $form ) {
+		foreach ( $title_forms as $form ) {
 			$likes[] = 'post_title LIKE %s';
 			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
 		}
-		foreach ( self::slug_forms( $needle ) as $form ) {
+		foreach ( $slug_forms as $form ) {
 			$likes[] = 'post_name LIKE %s';
 			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
 		}
@@ -374,14 +385,6 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$ids = $wpdb->get_col(
 			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
 		);
-		// The page of ids is the statement that fails this way, and it always runs first: the count
-		// below asks the same thing of the same rows, so it is never reached.
-		if ( self::four_byte_words_refused( $wpdb, $needle ) ) {
-			return array(
-				'ids'     => array(),
-				'matched' => 0,
-			);
-		}
 		$this->assert_query_ran( $wpdb );
 		$ids = array_map( 'intval', is_array( $ids ) ? $ids : array() );
 
@@ -442,29 +445,60 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
-	 * Whether the statement that just ran was refused for the one reason that is an answer: words with
-	 * a character above U+FFFF (an emoji, a rare ideograph) against a posts table that is still `utf8`,
-	 * MySQL's three-byte character set.
+	 * The spellings of the words, out of `$forms`, that a text column of the posts table can hold: all of them,
+	 * unless the column keeps three bytes a character (`utf8`), where the ones with a character above U+FFFF
+	 * (an emoji, a rare ideograph) are left out.
 	 *
-	 * A column of that kind cannot hold such a character, so no post there holds these words. MySQL does
-	 * not say "no rows" to the comparison, it refuses it, because it cannot turn the words into the
-	 * column's character set without losing them: "Illegal mix of collations (utf8_general_ci,IMPLICIT)
-	 * and (utf8mb4_unicode_520_ci,COERCIBLE) for operation 'like'", or, from a server that words it
-	 * differently, "Incorrect string value". A utf8mb4 column, which is what WordPress installs, takes
-	 * the words, so the message is enough to say the table cannot hold them, and the table itself is
-	 * not looked at. Both halves have to hold. The same message for words with no such character is a
-	 * table this search cannot compare with at all (a latin1 table and a Chinese word, say), and any
-	 * other error with such words (a crashed table, a lost connection) says nothing about what the
-	 * table holds. Either is a failure a caller has to be told about, not read as an empty result.
+	 * Core stores an emoji in such a column as an entity (`&#x1f525;`, see {@see search_forms()}), so a page
+	 * that holds one exists and is found by that spelling. The character itself cannot be sent to the column: a
+	 * string that has one, compared with a column of that kind, is refused as a whole, whichever branch of an OR
+	 * held it. MySQL refuses it ("Illegal mix of collations", or "Incorrect string value"), and for every
+	 * collation but the six that `wpdb::check_safe_collation()` trusts (`utf8_general_ci`, `utf8_bin` and their
+	 * `utf8mb3` and `utf8mb4` names) `wpdb` refuses first, in the language of the site and without asking MySQL,
+	 * so no error message is a test for it. The column says what it keeps: the test is core's own, the one
+	 * `wp_insert_post()` makes before it writes an entity. A statement that would be refused is never sent, on
+	 * any collation.
 	 *
-	 * @param object $wpdb The database handle whose last statement just ran.
+	 * It is asked only when a spelling has such a character, because the answer is a read of the table's columns
+	 * the first time. What is left may be nothing: an ideograph above U+FFFF is no emoji, so it has no entity,
+	 * and core cannot store it in a column like that, so no row holds the words.
+	 *
+	 * A handle that cannot say what a column keeps (a database that is not MySQL, or a handle with no such
+	 * method) has nothing to decide from: the spellings are sent as they are, and a refusal is a failure to
+	 * report, never an answer.
+	 *
+	 * @param object   $wpdb   The database handle.
+	 * @param string   $column A text column of the posts table.
+	 * @param string[] $forms  The spellings to ask for.
+	 * @return string[]
 	 */
-	private static function four_byte_words_refused( $wpdb, string $needle ): bool {
-		$error = (string) ( $wpdb->last_error ?? '' );
-		if ( '' === $error || 1 !== preg_match( '/[\x{10000}-\x{10FFFF}]/u', $needle ) ) {
+	private static function spellings_a_column_can_hold( $wpdb, string $column, array $forms ): array {
+		$four_byte = array_filter(
+			$forms,
+			static function ( string $form ): bool {
+				return 1 === preg_match( '/[\x{10000}-\x{10FFFF}]/u', $form );
+			}
+		);
+		if ( array() === $four_byte || ! self::column_keeps_three_bytes( $wpdb, $column ) ) {
+			return $forms;
+		}
+		return array_values( array_diff_key( $forms, $four_byte ) );
+	}
+
+	/**
+	 * Whether `$column` of the posts table keeps three bytes a character: `utf8`, or `utf8mb3`, the name newer
+	 * servers give it. It is the test `wp_insert_post()` makes before it turns an emoji into an entity, so it
+	 * answers "is an emoji an entity in this column". False when the handle cannot say (an answer that is not
+	 * a string: not MySQL, or a table that could not be read).
+	 *
+	 * @param object $wpdb The database handle.
+	 */
+	private static function column_keeps_three_bytes( $wpdb, string $column ): bool {
+		if ( ! method_exists( $wpdb, 'get_col_charset' ) ) {
 			return false;
 		}
-		return 1 === preg_match( '/Illegal mix of collations|Incorrect string value/i', $error );
+		$charset = $wpdb->get_col_charset( $wpdb->posts, $column );
+		return 'utf8' === $charset || 'utf8mb3' === $charset;
 	}
 
 	/**
