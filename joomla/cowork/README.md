@@ -308,8 +308,8 @@ content.list {kind: "article", search: "roof repair"}
   two different ones. A title or name is declared with none, so it takes its table's,
   `utf8mb4_unicode_ci`, which ignores case and accents: `ROOF` finds "Roof repair", and `cafe` finds
   "Café". The `alias` of `article`, `category`, `tag`, `menuItem`, `banner`, `contact` and `newsfeed`
-  is declared `utf8mb4_bin`: binary, so a plain `LIKE` on it would compare case. Joomla always
-  writes an alias lower case (`OutputFilter::stringURLSafe` lower-cases what it returns), so the
+  is declared `utf8mb4_bin`: binary, so a plain `LIKE` on it would compare case. Joomla writes an
+  alias lower case (`OutputFilter::stringURLSafe` lower-cases what it returns), so the
   plugin compares the alias lower-cased — `LOWER(alias)` — with the needle lower-cased: `Roof-Repair`
   finds the alias `roof-repair`. That is what lets one call reach every language edition of a page
   whatever case the caller typed, and a row that stores an upper-case alias anyway (an import, a

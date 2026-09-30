@@ -482,7 +482,7 @@ interface SearchableSiteWriter
      * its table's collation (utf8mb4_unicode_ci on a stock Joomla, which ignores case and accents). An
      * alias column is utf8mb4_bin in Joomla's schema, which compares case, so an alias is compared
      * lower-cased (`LOWER(column)`) with the variants lower-cased (SearchNeedle::lowerCased()): Joomla
-     * writes every alias lower case, and a capitalised needle has to reach it all the same. An alias
+     * writes an alias lower case, and a capitalised needle has to reach it all the same. An alias
      * still tells accents apart where a title does not. The same rows, the same order, the same
      * summaries as list() gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a
      * trashed row is listed like any other, because hiding it would make "this is the only match"

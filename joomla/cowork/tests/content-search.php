@@ -564,7 +564,8 @@ namespace {
         $csAnswer = $csAsk(['kind' => 'category'] + $csParams, new JoomlaSiteWriter($csDb));
         check("unstorable: {$csLabel} answers read_failed for the same message", [$csAnswer['ok'], $csAnswer['error'] ?? null, $csAnswer['message'] ?? null], [false, 'read_failed', $csMix]);
     }
-    // The same rule at the writer's own two doors.
+    // The same rule at the writer's own doors: searchRows and countMatches answer none for a needle no table
+    // can hold, and throw the refusal on for any other, as list() does.
     $csDb = new CsDb();
     $csDb->failWith = new \RuntimeException($csMix);
     $csWriter = new JoomlaSiteWriter($csDb);
