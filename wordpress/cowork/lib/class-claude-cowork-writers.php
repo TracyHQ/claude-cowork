@@ -98,6 +98,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		),
 	);
 
+	/**
+	 * What a post list shows: the post types a mirror carries unless the caller names one, and the
+	 * states an editor can still see (the trash is not one). Held once because the plain list and
+	 * the search must agree on them — a search over a wider set would find rows the list never shows.
+	 */
+	private const LISTED_TYPES    = array( 'post', 'page' );
+	private const LISTED_STATUSES = array( 'publish', 'draft', 'pending', 'private', 'future' );
+
 	/** @var array<int,int> Posts touched this request, so purgeCache cleans those and not the world. */
 	private $touched = array();
 
@@ -217,8 +225,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				// there?" — and paging through every post to answer it is how a seeder that runs
 				// twice creates everything twice (08/09).
 				'name'                => $name,
-				'post_type'           => '' === $type ? array( 'post', 'page' ) : $type,
-				'post_status'         => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+				'post_type'           => '' === $type ? self::LISTED_TYPES : $type,
+				'post_status'         => self::LISTED_STATUSES,
 				'orderby'             => 'ID',
 				'order'               => 'ASC',
 				'offset'              => $offset,
@@ -234,6 +242,363 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			$out[] = $this->describe_post( $post, $with_body );
 		}
 		return $out;
+	}
+
+	/**
+	 * One page of the posts whose title or slug holds `$needle`, and how many hold it in all.
+	 *
+	 * The same rows, in the same order (id ascending) and states, as {@see list_posts()} — narrowed
+	 * to the words asked for, so a caller looking for a page by its name reads one short answer
+	 * instead of paging through the whole site, where every page of the list costs it a round trip.
+	 *
+	 * ⚠ NOT `WP_Query`'s own `s`. It splits the words and matches each one in the title, the excerpt
+	 * AND the body; a word with a leading `-` excludes instead of finds; and for a caller who is not
+	 * logged in — this door is a token, not a login — it drops every password-protected post. Each
+	 * is a row silently missing from, or silently in, a list that reads as complete.
+	 *
+	 * The ids come from one prepared query that pages in SQL, so an offset deep into a long result
+	 * is as exact as the first page; `WP_Query` then loads those rows, so each one holds what the
+	 * plain list would have shown for it.
+	 *
+	 * Every language: the ids are cut from the whole table, and the load asks for `lang => ''`, so a
+	 * page of a site that runs Polylang holds the rows of every language and is as long as the ids it
+	 * was cut for. The plain list is the one that follows the request's language there: it is one
+	 * query, and Polylang narrows that query before any page is cut. A load that still comes back
+	 * short of its ids (another plugin hides posts from every query, or a post changed while it was
+	 * read) is an error, not a shorter page: a caller reads a short page as the end of the result.
+	 *
+	 * @return array{items:array<int,array<string,mixed>>,matched:int}
+	 */
+	public function search_posts( string $needle, int $offset, int $limit, bool $with_body, string $name = '', string $type = '' ): array {
+		$found = $this->find_post_ids( $needle, $offset, $limit, $name, $type );
+		$items = array();
+		// Never `post__in` of nothing: WP_Query reads an empty list as "no restriction" and would
+		// answer with every post on the site.
+		if ( array() !== $found['ids'] ) {
+			$query = new \WP_Query(
+				array(
+					'post__in'            => $found['ids'],
+					'post_type'           => '' === $type ? self::LISTED_TYPES : $type,
+					'post_status'         => self::LISTED_STATUSES,
+					'orderby'             => 'ID',
+					'order'               => 'ASC',
+					'posts_per_page'      => count( $found['ids'] ),
+					'ignore_sticky_posts' => true,
+					'no_found_rows'       => true,
+					'suppress_filters'    => true,
+					// Every language, not the request's: Polylang narrows a query to the REQUEST's language, and
+					// rewrites a `post__in` to the copies of its posts in that language, through `parse_query`,
+					// which `suppress_filters` does not switch off. These ids were cut from every language by SQL,
+					// so a narrowed load drops rows after the page was cut (a short page, and a total nobody can
+					// reach) or answers a row's translation in place of the row that holds the words. The empty
+					// string is a value to Polylang, and where no plugin reads `lang` it is ignored, as it is in
+					// Engine and QuickstartContract.
+					'lang'                => '',
+				)
+			);
+			if ( count( $query->posts ) !== count( $found['ids'] ) ) {
+				throw new RuntimeException(
+					sprintf(
+						'the search found %d posts for this page and WordPress loaded %d of them: a plugin narrows the queries this door runs, or a post changed while it was read',
+						count( $found['ids'] ),
+						count( $query->posts )
+					)
+				);
+			}
+			foreach ( $query->posts as $post ) {
+				$items[] = $this->describe_post( $post, $with_body );
+			}
+		}
+		return array(
+			'items'   => $items,
+			'matched' => $found['matched'],
+		);
+	}
+
+	/**
+	 * The ids of one page of a search, and the exact number of rows that hold the words.
+	 *
+	 * Every value reaches MySQL as a bound parameter, and `%`, `_` and the escape character inside
+	 * the words are escaped with `esc_like`, so they match themselves instead of acting as wildcards.
+	 * A failed query throws: WordPress answers one with an empty list and a message nobody reads,
+	 * and an empty page here would read as "no such page" — the answer that sends a caller off to
+	 * create a duplicate. The one answer of "none" that is not a query at all is words that no row
+	 * can hold (see {@see spellings_a_column_can_hold()}): a rare ideograph, on a posts table that keeps
+	 * three bytes a character.
+	 *
+	 * Case and accents fold as the column's collation folds them (the collations WordPress installs
+	 * with are all case-insensitive), except that a slug is also asked in lower case and so does not
+	 * depend on it (see {@see slug_forms()}). No language predicate: a post of any language is a row here, and
+	 * `search_posts()` loads the page in a way that keeps it one.
+	 *
+	 * @return array{ids:int[],matched:int}
+	 */
+	private function find_post_ids( string $needle, int $offset, int $limit, string $name, string $type ): array {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_col' ) || ! method_exists( $wpdb, 'esc_like' ) ) {
+			throw new RuntimeException( 'the database handle cannot search' );
+		}
+
+		$types = $this->listed_types( $type );
+		if ( array() === $types ) {
+			return array(
+				'ids'     => array(),
+				'matched' => 0,
+			);
+		}
+
+		// Type and states as the plain list reads them, then the slug when one is named (WP_Query
+		// cleans it the way a slug is stored, so this does too).
+		$where = 'post_type IN (' . implode( ',', array_fill( 0, count( $types ), '%s' ) ) . ')'
+			. ' AND post_status IN (' . implode( ',', array_fill( 0, count( self::LISTED_STATUSES ), '%s' ) ) . ')';
+		$args  = array_merge( $types, self::LISTED_STATUSES );
+		if ( '' !== $name ) {
+			$where .= ' AND post_name = %s';
+			$args[] = function_exists( 'sanitize_title_for_query' ) ? sanitize_title_for_query( $name ) : $name;
+		}
+
+		// Any spelling of the title will do; the slug holds neither entities nor decomposed letters,
+		// and is tried as the words were typed and in lower case (see slug_forms()). Each column is asked
+		// the spellings it can hold.
+		$title_forms = self::spellings_a_column_can_hold( $wpdb, 'post_title', self::search_forms( $needle ) );
+		$slug_forms  = self::spellings_a_column_can_hold( $wpdb, 'post_name', self::slug_forms( $needle ) );
+		if ( array() === $title_forms && array() === $slug_forms ) {
+			// Nothing a column can hold is left, so no row holds these words. It is the only "none" that is
+			// true without asking, and an OR of nothing would not be a statement.
+			return array(
+				'ids'     => array(),
+				'matched' => 0,
+			);
+		}
+		$likes = array();
+		foreach ( $title_forms as $form ) {
+			$likes[] = 'post_title LIKE %s';
+			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
+		}
+		foreach ( $slug_forms as $form ) {
+			$likes[] = 'post_name LIKE %s';
+			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
+		}
+		$where .= ' AND (' . implode( ' OR ', $likes ) . ')';
+
+		$ids = $wpdb->get_col(
+			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
+		);
+		$this->assert_query_ran( $wpdb );
+		$ids = array_map( 'intval', is_array( $ids ) ? $ids : array() );
+
+		// A page that is not full, and either starts at the top or holds something, ends the
+		// result where it ends: the total is known without asking. Anything else asks.
+		$n = count( $ids );
+		if ( $n < $limit && ( 0 === $offset || $n > 0 ) ) {
+			$matched = $offset + $n;
+		} else {
+			$count = $wpdb->get_var( $this->prepared( $wpdb, "SELECT COUNT(*) FROM {$wpdb->posts} WHERE {$where}", $args ) );
+			$this->assert_query_ran( $wpdb );
+			$matched = (int) $count;
+		}
+
+		return array(
+			'ids'     => $ids,
+			'matched' => $matched,
+		);
+	}
+
+	/**
+	 * The post types a list of `$type` reads, spelt out for SQL. `WP_Query` takes "any" to mean every
+	 * type not kept out of search, and so does a search here.
+	 *
+	 * @return string[]
+	 */
+	private function listed_types( string $type ): array {
+		if ( '' === $type ) {
+			return self::LISTED_TYPES;
+		}
+		if ( 'any' === $type && function_exists( 'get_post_types' ) ) {
+			return array_values( (array) get_post_types( array( 'exclude_from_search' => false ) ) );
+		}
+		return array( $type );
+	}
+
+	/**
+	 * A statement with its values bound. An empty answer from `prepare` is a statement WordPress
+	 * refused to build, and running it would come back as an empty page.
+	 *
+	 * @param object            $wpdb     The database handle.
+	 * @param array<int,mixed>  $values   What the placeholders stand for, in order.
+	 */
+	private function prepared( $wpdb, string $template, array $values ): string {
+		$sql = $wpdb->prepare( $template, ...$values );
+		if ( ! is_string( $sql ) || '' === $sql ) {
+			throw new RuntimeException( 'the search query could not be prepared' );
+		}
+		return $sql;
+	}
+
+	/** @param object $wpdb The database handle whose last statement just ran. */
+	private function assert_query_ran( $wpdb ): void {
+		$error = (string) ( $wpdb->last_error ?? '' );
+		if ( '' !== $error ) {
+			throw new RuntimeException( 'the search query failed: ' . $error );
+		}
+	}
+
+	/**
+	 * The spellings of the words, out of `$forms`, that a text column of the posts table can hold: all of them,
+	 * unless the column keeps three bytes a character (`utf8`), where the ones with a character above U+FFFF
+	 * (an emoji, a rare ideograph) are left out.
+	 *
+	 * Core stores an emoji in such a column as an entity (`&#x1f525;`, see {@see search_forms()}), so a page
+	 * that holds one exists and is found by that spelling. The character itself cannot be sent to the column: a
+	 * string that has one, compared with a column of that kind, is refused as a whole, whichever branch of an OR
+	 * held it. MySQL refuses it ("Illegal mix of collations", or "Incorrect string value"), and for every
+	 * collation but the six that `wpdb::check_safe_collation()` trusts (`utf8_general_ci`, `utf8_bin` and their
+	 * `utf8mb3` and `utf8mb4` names) `wpdb` refuses first, in the language of the site and without asking MySQL,
+	 * so no error message is a test for it. The column says what it keeps: the test is core's own, the one
+	 * `wp_insert_post()` makes before it writes an entity. A statement that would be refused is never sent, on
+	 * any collation.
+	 *
+	 * It is asked only when a spelling has such a character, because the answer is a read of the table's columns
+	 * the first time. What is left may be nothing: an ideograph above U+FFFF is no emoji, so it has no entity,
+	 * and core cannot store it in a column like that, so no row holds the words.
+	 *
+	 * A handle that cannot say what a column keeps (a database that is not MySQL, or a handle with no such
+	 * method) has nothing to decide from: the spellings are sent as they are, and a refusal is a failure to
+	 * report, never an answer.
+	 *
+	 * @param object   $wpdb   The database handle.
+	 * @param string   $column A text column of the posts table.
+	 * @param string[] $forms  The spellings to ask for.
+	 * @return string[]
+	 */
+	private static function spellings_a_column_can_hold( $wpdb, string $column, array $forms ): array {
+		$four_byte = array_filter(
+			$forms,
+			static function ( string $form ): bool {
+				return 1 === preg_match( '/[\x{10000}-\x{10FFFF}]/u', $form );
+			}
+		);
+		if ( array() === $four_byte || ! self::column_keeps_three_bytes( $wpdb, $column ) ) {
+			return $forms;
+		}
+		return array_values( array_diff_key( $forms, $four_byte ) );
+	}
+
+	/**
+	 * Whether `$column` of the posts table keeps three bytes a character: `utf8`, or `utf8mb3`, the name newer
+	 * servers give it. It is the test `wp_insert_post()` makes before it turns an emoji into an entity, so it
+	 * answers "is an emoji an entity in this column". False when the handle cannot say (an answer that is not
+	 * a string: not MySQL, or a table that could not be read).
+	 *
+	 * @param object $wpdb The database handle.
+	 */
+	private static function column_keeps_three_bytes( $wpdb, string $column ): bool {
+		if ( ! method_exists( $wpdb, 'get_col_charset' ) ) {
+			return false;
+		}
+		$charset = $wpdb->get_col_charset( $wpdb->posts, $column );
+		return 'utf8' === $charset || 'utf8mb3' === $charset;
+	}
+
+	/**
+	 * Every spelling of the words a stored title may hold, for a search to try in turn.
+	 *
+	 * Canonical composed and decomposed: a title copied from a macOS file name or a PDF is often
+	 * stored decomposed (a base letter plus combining marks), and only some collations treat the two
+	 * spellings as equal. And each as core's KSES filters would store it, which is how a title saved by
+	 * anyone without the `unfiltered_html` capability is stored (see {@see as_kses_stores()}): `Tom &
+	 * Jerry` is `Tom &amp; Jerry`, and a `<` that no `>` closes is `&lt;`. Only a real tag such as
+	 * `<script>` is dropped, and no one searches for that.
+	 *
+	 * And each of those as a column that keeps three bytes a character (`utf8`) stores it: core's
+	 * `wp_insert_post()` runs KSES first and `wp_encode_emoji()` second, and the second turns an emoji
+	 * and a number of symbols that fit in three bytes into entities: `🔥` is `&#x1f525;`, `™` is
+	 * `&#x2122;`, `❤` is `&#x2764;`. That is how such a page exists on a `utf8` site, whatever the
+	 * caller typed, and a table converted to `utf8mb4` afterwards keeps the text. `©`, `®` and `€` are
+	 * left as they are. Asked of WordPress, so the list is core's own. The spelling with the character
+	 * itself stays in the list: a `utf8mb4` site stores it as typed.
+	 *
+	 * Without intl (no `Normalizer`) only the spelling sent is tried, and where WordPress is absent
+	 * (a test) no entity is made.
+	 *
+	 * @return string[]
+	 */
+	public static function search_forms( string $needle ): array {
+		$spellings = array( $needle );
+		if ( class_exists( 'Normalizer' ) ) {
+			foreach ( array( Normalizer::FORM_C, Normalizer::FORM_D ) as $form ) {
+				$spelling = Normalizer::normalize( $needle, $form );
+				if ( is_string( $spelling ) ) {
+					$spellings[] = $spelling;
+				}
+			}
+		}
+		$forms = array();
+		foreach ( $spellings as $spelling ) {
+			// Both spellings that KSES leaves, then each as a `utf8` column would keep it, in the order core
+			// stores a title: the filter first, the entities second (so `Tom & Jerry 🔥` has four).
+			$kses    = self::as_kses_stores( $spelling );
+			$forms[] = $spelling;
+			$forms[] = $kses;
+			if ( function_exists( 'wp_encode_emoji' ) ) {
+				$forms[] = wp_encode_emoji( $spelling );
+				$forms[] = wp_encode_emoji( $kses );
+			}
+		}
+		// A regex that fails answers null, and a null is not a spelling.
+		return array_values( array_unique( array_filter( $forms, 'is_string' ) ) );
+	}
+
+	/**
+	 * Every spelling of the words a stored slug may hold, for a search to try in turn: as typed, and in
+	 * lower case (one spelling when the words are lower case already).
+	 *
+	 * WordPress writes a slug in lower case, so a needle with a capital (`Roof`) is looking for lower
+	 * case. Whether `post_name LIKE '%Roof%'` finds `roof-repair` is the column's collation to say: the
+	 * ones WordPress installs ignore case, but a site can set a binary one (`DB_COLLATE`
+	 * `utf8mb4_bin`), which compares byte for byte and would never find it. Asking for both spellings
+	 * makes the answer the same on either, and the as-typed one keeps a slug that does have capitals (a
+	 * write straight to the table can leave one) found by the capitals it has. A title is stored as typed,
+	 * so it has no such rule and keeps to {@see search_forms()}.
+	 *
+	 * Only the letters A to Z are lowered, which is all a slug WordPress writes has to lose: it holds
+	 * ASCII letters, digits and hyphens, and anything else is percent-encoded, in lower-case hex (`%e5%b1…`).
+	 * That needs no mbstring, which a host may lack, and no locale, which `strtolower()` reads before
+	 * PHP 8.2.
+	 *
+	 * @return string[]
+	 */
+	public static function slug_forms( string $needle ): array {
+		return array_values( array_unique( array( $needle, strtr( $needle, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz' ) ) ) );
+	}
+
+	/**
+	 * `$text` as core's KSES filters store it in a title: what a search for that text has to look for
+	 * when the title was saved by someone without the `unfiltered_html` capability (an author, a wp-cli
+	 * seed with no user, an importer). Nothing here is dropped, only rewritten, so no spelling is ever
+	 * shorter than the words it stands for.
+	 *
+	 * Asked of WordPress, not listed here: `wp_kses()` first normalises entities (`&` becomes `&amp;`, a
+	 * numeric reference is padded to three digits: `&#37;` is `&#037;`), then `wp_pre_kses_less_than()`
+	 * turns a `<` that no `>` closes into `&lt;` and escapes everything after it up to the next `<`
+	 * (a quote there becomes `&quot;` or `&#039;`, one before the sign stays as typed), and a `>` that
+	 * closes nothing is written `&gt;`. A hand-written list of those drifts from core, and misses the
+	 * quote and the padded reference. Where WordPress is absent (a test) only `&`, `>` and `<` are
+	 * written, in that order so no entity is encoded twice.
+	 *
+	 * One case stays out of reach: words that START after a lone `<` and hold a quote (`18's guide` of
+	 * `Under <18's guide`) cannot know the sign before them escaped it, so the title is not found by
+	 * them; the same words with the sign, or without the quote, are.
+	 */
+	private static function as_kses_stores( string $text ): string {
+		if ( function_exists( 'wp_kses_normalize_entities' ) && function_exists( 'wp_pre_kses_less_than' ) ) {
+			$stored = wp_pre_kses_less_than( wp_kses_normalize_entities( $text ) );
+			if ( is_string( $stored ) ) {
+				return str_replace( '>', '&gt;', $stored );
+			}
+		}
+		return str_replace( array( '&', '>', '<' ), array( '&amp;', '&gt;', '&lt;' ), $text );
 	}
 
 	/**

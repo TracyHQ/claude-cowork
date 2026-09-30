@@ -54,6 +54,13 @@ final class WP_Fake
     public static array $postLanguage = [];
     /** @var array<int,array<string,int>> post id => [Polylang slug => id of its copy in that language] */
     public static array $translations = [];
+    /**
+     * The language a language plugin gives THIS request, as Polylang does for a door call that names none
+     * (the site's default): '' is a site with no plugin narrowing queries. It is what `WP_Query` narrows by.
+     */
+    public static string $requestLanguage = '';
+    /** @var int[] posts a plugin hides from every query through `pre_get_posts`, which no `WP_Query` argument switches off */
+    public static array $queryHides = [];
     /** How many times the rewrite rules were flushed. */
     public static int $flushed = 0;
     /** @var array<string,array<string,string>> Polylang slug => [original string => its translation], what each language's `polylang_mo` post holds */
@@ -76,6 +83,8 @@ final class WP_Fake
         self::$strings = [];
         self::$postLanguage = [];
         self::$translations = [];
+        self::$requestLanguage = '';
+        self::$queryHides = [];
         self::$flushed = 0;
         if (class_exists('WP_Fake_PLL_Languages')) {
             WP_Fake_PLL_Languages::$updates = [];
@@ -278,6 +287,15 @@ class WP_Post
     public string $post_name = '';
     public string $post_status = '';
     public string $post_type = '';
+    // What a post list describes each row by (`describe_post`); an unset column reads as WordPress
+    // reads it, empty or zero.
+    public string $post_excerpt = '';
+    public int $post_parent = 0;
+    public int $menu_order = 0;
+    public string $comment_status = 'closed';
+    public string $post_date_gmt = '0000-00-00 00:00:00';
+    public string $post_modified_gmt = '0000-00-00 00:00:00';
+    public int $post_author = 0;
 }
 
 function get_stylesheet(): string
@@ -345,6 +363,161 @@ function get_posts(array $args = []): array
         $out[] = $post;
     }
     return $out;
+}
+
+// ---- what a post list needs: WP_Query, and the reads that describe each row ------------------
+
+/** A slug as WordPress spells it when asked to look one up: lowercase, a dot becomes a hyphen. */
+function sanitize_title_for_query(string $title): string
+{
+    return strtolower(str_replace('.', '-', $title));
+}
+
+/**
+ * `WP_Query`, as far as the post list asks it: the arguments `list_posts` and `search_posts` send,
+ * answered from `WP_Fake::$posts` in id order. It refuses where a default would decide for the
+ * caller, so a test cannot pass because this fake happened to guess what core does:
+ *
+ *  - an argument it does not know throws, instead of being ignored;
+ *  - so does a query that does not ASK for `orderby` ID and `order` ASC (core, asked for nothing,
+ *    orders by post_date, newest first: a page in the wrong order on a real site);
+ *  - and one that does not ask for `suppress_filters` (core, not told to, runs every `posts_where`
+ *    and `posts_clauses` filter a plugin added, which a statement written by hand never sees).
+ *
+ * What the LAST query was asked is kept in `$lastArgs`, for a test to compare with what it means the
+ * writer to send: the arguments no answer shows (`ignore_sticky_posts`, `no_found_rows`) are only
+ * ever visible there.
+ *
+ * Three behaviours of the real class are kept on purpose, because the writer has to survive them
+ * (each read off class-wp-query.php): an empty `post__in` is no restriction at all, an empty page
+ * size is the site's "posts per page" setting (ten unless changed) and not zero rows, and no
+ * `post_type` means `post`. Together they make an unguarded empty `post__in` answer with the site's
+ * first ten posts.
+ *
+ * Two more are a language plugin's, and are switched on by `WP_Fake::$requestLanguage` (Polylang, read
+ * off its 3.7 source: PLL_Query::filter_query and PLL_Frontend_Auto_Translate). Both run in `parse_query`,
+ * which `suppress_filters` does not switch off, and both stand down for a query that carries a `lang`
+ * argument of any value, the empty string included:
+ *
+ *  - the query is narrowed to the request's language, so a row of another language (or of none) is
+ *    dropped from it, AFTER any page of ids somebody else cut;
+ *  - every id of a `post__in` is replaced by its copy in that language, when the post has one.
+ *
+ * Both apply only to a query that asks for a type the plugin translates (posts and pages here).
+ * `WP_Fake::$queryHides` is a plugin that hides posts from every query through `pre_get_posts`: nothing
+ * in a query's arguments switches that off.
+ */
+class WP_Query
+{
+    /** @var WP_Post[] */
+    public array $posts = [];
+    /** @var array<string,mixed> the arguments of the query built last */
+    public static array $lastArgs = [];
+
+    private const UNDERSTOOD = ['name', 'post_type', 'post_status', 'orderby', 'order', 'offset', 'posts_per_page',
+        'ignore_sticky_posts', 'no_found_rows', 'suppress_filters', 'post__in', 'lang'];
+    /** The post types a language plugin translates, and so narrows a query for. */
+    private const TRANSLATED_TYPES = ['post', 'page'];
+
+    public function __construct(array $args = [])
+    {
+        foreach (array_keys($args) as $key) {
+            if (!in_array($key, self::UNDERSTOOD, true)) {
+                throw new LogicException("the WP_Query fake does not understand `{$key}`");
+            }
+        }
+        if (($args['orderby'] ?? null) !== 'ID' || ($args['order'] ?? null) !== 'ASC') {
+            throw new LogicException('the WP_Query fake orders by ID ascending only, and only when asked to: core would order by post_date, newest first');
+        }
+        if (($args['suppress_filters'] ?? false) !== true) {
+            throw new LogicException('the WP_Query fake runs no query filters, so a caller has to suppress them: core would run every posts_where and posts_clauses filter');
+        }
+        self::$lastArgs = $args;
+
+        $types = array_values(array_filter((array) ($args['post_type'] ?? 'post'), static fn ($t) => $t !== ''));
+        $types = $types === [] ? ['post'] : $types;
+        if ($types === ['any']) {
+            $types = array_values(get_post_types(['exclude_from_search' => false]));
+        }
+        $statuses = (array) ($args['post_status'] ?? 'publish');
+        $name = (string) ($args['name'] ?? '') === '' ? '' : sanitize_title_for_query((string) $args['name']);
+        $only = array_map('intval', (array) ($args['post__in'] ?? []));
+        // The language plugin, unless the query says `lang` (`isset`: the empty string is a value, null is not).
+        $narrowed = '' !== WP_Fake::$requestLanguage && !isset($args['lang']) && [] !== array_intersect($types, self::TRANSLATED_TYPES);
+        if ($narrowed) {
+            $only = array_map(static fn (int $id): int => (int) (WP_Fake::$translations[$id][WP_Fake::$requestLanguage] ?? $id), $only);
+        }
+        // An empty size (absent, or zero) is the site's setting; only a setting of zero itself is one.
+        $perPage = $args['posts_per_page'] ?? null;
+        if (empty($perPage)) {
+            $perPage = get_option('posts_per_page', 10);
+        }
+        $perPage = (int) $perPage;
+        if ($perPage < -1) {
+            $perPage = abs($perPage);
+        } elseif ($perPage === 0) {
+            $perPage = 1;
+        }
+
+        $rows = WP_Fake::$posts;
+        ksort($rows);
+        $matching = [];
+        foreach ($rows as $id => $row) {
+            if (!in_array((string) ($row['post_type'] ?? ''), $types, true)
+                || !in_array((string) ($row['post_status'] ?? ''), $statuses, true)
+                || ('' !== $name && strtolower((string) ($row['post_name'] ?? '')) !== $name)
+                || ([] !== $only && !in_array((int) $id, $only, true))
+                || ($narrowed && (string) (WP_Fake::$postLanguage[(int) $id] ?? '') !== WP_Fake::$requestLanguage)
+                || in_array((int) $id, WP_Fake::$queryHides, true)) {
+                continue;
+            }
+            $post = new WP_Post();
+            $post->ID = (int) $id;
+            foreach (['post_title', 'post_content', 'post_name', 'post_status', 'post_type', 'post_excerpt', 'comment_status',
+                'post_date_gmt', 'post_modified_gmt'] as $column) {
+                if (isset($row[$column])) {
+                    $post->$column = (string) $row[$column];
+                }
+            }
+            foreach (['post_parent', 'menu_order', 'post_author'] as $column) {
+                $post->$column = (int) ($row[$column] ?? 0);
+            }
+            $matching[] = $post;
+        }
+        $this->posts = array_slice($matching, max(0, (int) ($args['offset'] ?? 0)), $perPage < 0 ? null : $perPage);
+    }
+}
+
+// What `describe_post` reads besides the row: a site with no terms, no featured image, no menus and
+// no page template, which is what a new site is.
+function get_the_terms($post, string $taxonomy)
+{
+    return false;
+}
+
+function get_post_thumbnail_id($post = null): int
+{
+    return 0;
+}
+
+function get_page_template_slug($post = null)
+{
+    return '';
+}
+
+function wp_get_nav_menus(array $args = []): array
+{
+    return [];
+}
+
+function wp_get_nav_menu_items($menu, array $args = [])
+{
+    return [];
+}
+
+function has_term($term = '', $taxonomy = '', $post = null): bool
+{
+    return false;
 }
 
 // ---- taxonomy terms and menu entries -------------------------------------------------------

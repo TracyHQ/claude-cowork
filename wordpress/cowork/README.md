@@ -38,7 +38,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
 | `language.install` | write | ok | ok |
-| `content.list` | read | ok | ok |
+| `content.list` | read; `search` (unreleased) keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search-unreleased) | ok | ok |
 | `content.get` | read | ok | ok |
 | `content.update` | write | ok | ok |
 | `content.language` | write | ok | ok |
@@ -267,6 +267,100 @@ reader answers 501; after it, rows WordPress inserts get their uid at once. A fo
 same request id never rotates twice. A restore of the same site keeps its seed. A database copied by
 hand keeps the seed too, and so the ids, until whoever copied it declares the fork. Writes still go
 through `content.contract` `apply`.
+
+## Finding a post by its title: `content.list` `search` (unreleased)
+
+`content.list` lists posts and pages in id order, a page at a time, and a caller who knows a page by
+its name used to read the whole list to find it: on a Joomla site of 1,900 articles one such lookup
+took up to eighteen model calls, and a WordPress site of that size pages the same way. `search` does the
+finding here. It narrows the same list, so every other parameter (`post_type`, `name`,
+`include_body`, `offset`, `limit`) still applies to what is left.
+
+```
+{"action": "content.list", "params": {"search": "roof repair", "limit": 20}}
+→ {"ok": true, "kind": "post", "offset": 0, "search": "roof repair", "matched": 3, "items": [ … ]}
+```
+
+- **What matches.** A substring of the title **or** the slug (`post_name`), compared the way the
+  column's collation compares text: WordPress installs a case-insensitive one, and whether accents
+  fold depends on it. The slug is also asked in lower case, because WordPress stores it that way:
+  `Roof` reaches `roof-repair` on a site that set a case-sensitive (binary) collation with
+  `DB_COLLATE` exactly as it does on the usual one, and a slug that does have capitals (a write
+  straight to the table can leave one) is still found by them. A title is stored as typed, so on
+  such a column it is found by the capitals it has. The words are one substring, not split:
+  `roof repair` does not find the slug `roof-repair`, and a leading `-` is a hyphen. The excerpt
+  and the body are **not** searched.
+  A slug in a non-Latin script is stored percent-encoded by WordPress (`%e5%b1%8b…`) and is matched
+  as stored: such a page is found by its title, and also by a needle that happens to be part of the
+  encoding, such as `%e5` or a bare hex pair like `b1`. Words make the better needle.
+- **The words.** Trimmed (an ideographic or no-break space too); a line break or a tab between words
+  is a space (words wrapped over two lines are still two words) and every other control character is
+  removed; turned into Unicode form C when PHP has `intl` (a host without it matches the spelling it
+  was sent in); at most 200 characters once cleaned, and text of more than 4,096 bytes is refused
+  before it is cleaned, with the same message (padding is not cleaned away); valid UTF-8; one
+  character is a needle. `%`, `_` and `\` match themselves (they are escaped with `esc_like()`, as
+  WordPress's own search escapes them) and nothing is a wildcard or a pattern. That escape is MySQL's
+  default one for a `LIKE`, so on a server that runs with the `NO_BACKSLASH_ESCAPES` SQL mode, which
+  leaves a `LIKE` with none, words with one of the three find nothing; core's `WP_Query` search has
+  the same limit. Both the composed and the decomposed spelling of a letter are tried, and each is
+  also tried the way core's KSES filters store it in a title saved without the `unfiltered_html`
+  capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as `&gt;`, and a `<` that no
+  `>` closes as `&lt;` (a quote or an ampersand after that sign is escaped too, one before it is not).
+  Only a real tag such as `<script>` is dropped, and nobody searches for that. And each of those is
+  tried the way a `utf8` column (three bytes a character) stores an emoji or a symbol: core's
+  `wp_insert_post()` turns `🔥` into `&#x1f525;`, `™` into `&#x2122;`, `❤` into `&#x2764;` and so on,
+  so on such a site that is the page's title whatever was typed, and a table converted to `utf8mb4`
+  afterwards keeps the text. `©`, `®` and `€` are stored as they are. The character itself is tried
+  too, because a `utf8mb4` site stores it as typed. The forms are asked of WordPress itself
+  (`wp_kses_normalize_entities()`, `wp_pre_kses_less_than()`, `wp_encode_emoji()`), not listed here.
+- **The answer.** `search` is present **exactly when the request carried the key**, holding the words as
+  they were matched: it is the caller's proof that this plugin read the parameter, because a plugin
+  from before `search` answers the whole list and `ok: true`. `matched` is the number of rows that
+  hold the words, whatever `offset` and `limit` are, and is exact at any offset. Words that are empty
+  once cleaned filter nothing: the plain list, `search: ""`, no `matched`. A request **without**
+  `search` is answered byte for byte as before.
+- **The rows** are the plain list's rows, in id order, with the plain list's states: published,
+  draft, pending, private and scheduled, password-protected posts included, the trash not.
+- **Every language.** The search reaches the posts of every language, whatever language the request
+  is answered in, and is where the plain list is not: on a site that runs Polylang the plain list is
+  narrowed by Polylang to the language it gives the request, so the other languages' posts are not
+  in it. A page that exists only in another language is found by its own words, a page is never
+  answered with its translation in place of the row that holds the words, and `matched` counts
+  rows this door returns. Pages stay full for the same reason: the ids of a page are cut from the
+  whole table, and the load asks for every language (`lang` set to the empty string). A load that
+  still comes back short of the ids it was cut for (a plugin that hides posts from every query, or
+  a post that changed while it was read) is `read_failed`, never a shorter list, because a caller
+  reads a short page as the end of the result.
+- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
+  longer than 200 characters once cleaned, or is more than 4,096 bytes before it is cleaned; and any
+  `search` on `kind` `templatePart`, `template` or another kind than `post`. The engine refuses text
+  that is not valid UTF-8 the same way, but over the door it never gets that far: a body that is not
+  valid UTF-8 is not valid JSON, so the door reads no request from it and answers `unauthorized`, as
+  it does for any body it cannot read. A statement the database rejects is `read_failed`, never an
+  empty page.
+- **A four-byte character (an emoji) on a `utf8` table.** A site that was never moved to `utf8mb4`
+  keeps its posts in three-byte columns, and there core stores an emoji as an entity (`🔥` is
+  `&#x1f525;`, see above), so the page exists and is found: the words are asked for the way core
+  stores them. The character itself is not sent to such a column, because a string with a character
+  above U+FFFF compared with a `utf8` column is refused as a whole: MySQL says `Illegal mix of
+  collations` (or `Incorrect string value`), and for every collation but six (`utf8_general_ci`,
+  `utf8_bin` and their `utf8mb3` and `utf8mb4` names) `wpdb` refuses it first, in the site's language,
+  without asking MySQL. So no error message decides anything here. The plugin asks WordPress what
+  each column keeps (`$wpdb->get_col_charset()`, the test `wp_insert_post()` itself makes before it
+  writes an entity) and, for a column that keeps three bytes, leaves out the spellings that hold such
+  a character; a `utf8mb4` column, which is what WordPress installs, is asked for both. Words that no
+  such column can hold at all (an ideograph above U+FFFF is no emoji, so it has no entity) find
+  nothing, and the door says so without a query: `ok: true`, `matched: 0`, an empty `items`, the words
+  echoed. A statement that the database still refuses is `read_failed`, as any other: on a handle that
+  cannot say what a column keeps (a database that is not MySQL) the words are sent as they are, and
+  the refusal is reported, never turned into "no rows".
+
+The ids are found by one prepared statement that pages in SQL (`WP_Query`'s own `s` is not used: it
+splits words, treats a leading `-` as "exclude", searches the body, and drops password-protected posts
+for a caller who is not logged in), and `WP_Query` then loads exactly those rows.
+`tests/content-search.php` runs the real engine and writer over a `$wpdb` that reads the statements they
+send, and `tests/content-search-load.php` searches in a fresh process with only the classes
+`claude-cowork.php` loads.
 
 ## Layout
 
