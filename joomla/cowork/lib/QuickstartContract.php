@@ -11,6 +11,7 @@ require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
+require_once __DIR__ . '/DerivedCache.php';
 
 interface ContractStore {
     public function load(): ?array;

@@ -68,14 +68,40 @@ final class JoomlaContentReader
         }
         ksort($out); return $out;
     }
-    /** The bytes of the readable files (path => sha256, null for a file that is not there). */
+    /**
+     * The bytes of the readable files (path => sha256, null for a file that is not there). A file whose
+     * signature (size, mtime, ctime, inode) is the one its hash was kept under is not read again: an
+     * imported site's map names hundreds of pictures, and hashing 237 of them took 2.2 s of every
+     * content.read (30/09/2026). Any write to a file moves its ctime, so a kept hash is never stale.
+     */
     private function hashes(array $readable): array {
-        foreach ($readable as $path=>$signature) if ($signature!==null) {
-            $hash=@hash_file('sha256',$this->root.'/'.$path);
-            if ($hash===false) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
-            $readable[$path]=$hash;
-        }
+        $known=JoomlaDerivedRows::keptHashes($this->db);
+        [$readable,$next]=self::hashesWith($this->root,$readable,$known);
+        if ($next!==$known) JoomlaDerivedRows::keepHashes($this->db,$next);
         return $readable;
+    }
+    /**
+     * @param array<string,?string> $readable path => signature, null when the file is not there
+     * @param array<string,array{0:string,1:string}> $known path => [signature, sha256] kept from earlier reads
+     * @return array{0:array<string,?string>,1:array<string,array{0:string,1:string}>} the hashes, and what to keep next
+     */
+    public static function hashesWith(string $root, array $readable, array $known, ?int $now=null): array {
+        $now??=time(); $next=[];
+        foreach ($readable as $path=>$signature) if ($signature!==null) {
+            $kept=$known[$path]??null;
+            if (is_array($kept) && ($kept[0]??null)===$signature && is_string($kept[1]??null)) $hash=$kept[1];
+            else {
+                $hash=@hash_file('sha256',$root.'/'.$path);
+                if ($hash===false) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Readable media changed during the read; restart');
+                // stat() times are whole seconds: a same-size write in the second of this hash would keep the
+                // whole signature. A file touched within 2 s is hashed again next read, never kept (as git does).
+                [, $mtime, $ctime] = array_map('intval', explode(':', $signature) + [0, 0, 0]);
+                if (max($mtime, $ctime) >= $now - 2) { $readable[$path]=$hash; continue; }
+            }
+            $readable[$path]=$hash; $next[$path]=[$signature,$hash];
+        }
+        ksort($next);
+        return [$readable,$next];
     }
     private function readableMedia(array $contents, array $scan): array {
         $paths=[];
@@ -225,7 +251,7 @@ final class JoomlaContentReader
         foreach ($tables as $table) if (($engines[$prefix.$table]??'')!=='InnoDB') throw new \ContentReadError('CONTENT_ADAPTER_UNSUPPORTED',501,'Content snapshot requires transactional tables');
         // File signatures (size, mtime, ctime, inode) bracket the DB snapshot; a readable file whose
         // signature moved forces a retry by the caller, and the revision hashes the readable files'
-        // bytes (`hashes`). Nothing is cached between requests and no transaction spans an HTTP
+        // bytes (`hashes`, each kept between requests under its file's signature; JoomlaDerivedRows::keptHashes). No transaction spans an HTTP
         // boundary.
         $mediaBefore=$this->media();
         // Nothing is written inside the snapshot, so reads that overlap never lock each other. Page
@@ -234,7 +260,9 @@ final class JoomlaContentReader
         // it read, and a menu item created in between costs a fresh snapshot, never a page with no id.
         $now=time();
         $derived=$this->derivedSite();
-        for ($attempt=1; ; $attempt++) {
+        // A derived map built inside the snapshot below is stored after it ends (JoomlaDerivedRows::holdSiteCaches).
+        if ($derived) JoomlaDerivedRows::holdSiteCaches();
+        try { for ($attempt=1; ; $attempt++) {
             \ContentIdentity::level($this->db,'page');
             if ($derived) \ContentIdentity::level($this->db,'templateStyle');
             $this->db->setQuery('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')->execute();
@@ -258,7 +286,7 @@ final class JoomlaContentReader
                 $this->db->transactionCommit();
                 break;
             } catch (\Throwable $e) { $this->db->transactionRollback(); throw $e; }
-        }
+        } } finally { if ($derived) JoomlaDerivedRows::flushSiteCaches(); }
         $mediaAfter=$this->media();
         $projection=\ContentProjection::build($data,$mapping,$config['site_id'],$this->base,$now,[$this->contract,'slotValue']);
         $contents=$projection['contents'];

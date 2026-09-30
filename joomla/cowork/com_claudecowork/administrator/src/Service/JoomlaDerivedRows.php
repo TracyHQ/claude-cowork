@@ -22,9 +22,9 @@ use Joomla\Database\DatabaseInterface;
  *
  * How a derived entity is resolved (read from QuickstartContract::resolveRows, 29/09/2026): a BOUND
  * row is found by the id its binding records, and only an unbound one by matching its `identity`
- * fields across the whole kind. A derived map is rebuilt from these rows on every request, so its
- * entities always resolve by their own id (`sourceId`); `identity` is recorded for the reader of the
- * map, never matched. `{id}` for every kind with an id column; `{fieldId, itemId}` for a custom
+ * fields across the whole kind. A derived map is made from these rows (and kept between requests
+ * only while they are unchanged: fingerprint(), DerivedCache), so its entities always resolve by
+ * their own id (`sourceId`); `identity` is recorded for the reader of the map, never matched. `{id}` for every kind with an id column; `{fieldId, itemId}` for a custom
  * field value, whose row id is the pair packed by \FieldValueKey.
  *
  * Only what the public sees: published rows, the site (client_id 0) menus and modules, com_content
@@ -44,41 +44,235 @@ final class JoomlaDerivedRows
     /** The render check after a derived apply: it runs under the same lock, and a write should not wait a minute on it. */
     public const CHECK_SECONDS = 15;
 
+    /** Articles read per query: each batch is rows before the next is fetched. */
+    private const BATCH = 200;
+    /** Values up to this many bytes are tested in SQL for holding no word at all (wordValue); longer ones are always read. */
+    private const SHORT = 64;
     /**
+     * The table that keeps the built map (row 1) and the reader's media hashes (row 2) between requests
+     * (script.php creates it). Its own table, never a row of #__claudecowork_content_contract: the
+     * content reader snapshots that one whole.
+     */
+    private const CACHE_TABLE = '#__claudecowork_derived_cache';
+    /** @var array<string,\DerivedCache> this request's kept maps (siteCache) */
+    private static array $siteCaches = [];
+
+    /**
+     * Every row at once: batches() gathered. For a test or a small site; a derive and a map build
+     * take the batches, so a large site is never held whole.
+     *
      * @param list<string> $unresolved gains one line per value too large to scan
      * @return list<array{kind:string,id:int,identity:array,core:array<string,string>,html:array<string,string>,nested:array<string,string>}>
      */
     public static function rows(DatabaseInterface $db, array &$unresolved = []): array
     {
         $out = [];
+        $batches = self::batches($db);
+        foreach ($batches as $batch) foreach ($batch as $row) $out[] = $row;
+        array_push($unresolved, ...$batches->getReturn());
+        return $out;
+    }
+
+    /**
+     * The rows in DerivedMap's shape, one batch at a time, in the order rows() lists them: articles
+     * BATCH at a time by id (the one table that grows with the site), then menu items, modules,
+     * categories, custom field values and template styles, each database result let go before the
+     * next query. A PHP row costs about 1.2 KB before its values: a site of thousands of articles
+     * held whole, then built into a map, went past a 128 MB limit on WordPress (30/09/2026).
+     *
+     * @return \Generator<int,list<array>,mixed,list<string>> returns the `unresolved` lines (values too large to scan)
+     */
+    public static function batches(DatabaseInterface $db): \Generator
+    {
+        self::raiseMemory();
+        $unresolved = [];
         $q = static fn(string $sql): array => $db->setQuery($sql)->loadAssocList() ?: [];
         $n = static fn(string $column): string => $db->quoteName($column);
-        // Published and inside its window now, as the site serves it (Joomla stores both dates in UTC).
-        $now = $db->quote(Factory::getDate()->toSql());
-        foreach ($q('SELECT id, title, introtext, ' . $n('fulltext') . ', attribs, images, urls FROM #__content WHERE state = 1'
-            . ' AND (publish_up IS NULL OR publish_up <= ' . $now . ') AND (publish_down IS NULL OR publish_down > ' . $now . ') ORDER BY id') as $r)
-            $out[] = self::row('article', (int) $r['id'], ['id' => (int) $r['id']], $r, ['title'], ['introtext', 'fulltext'], ['attribs', 'images', 'urls'], $unresolved);
+        for ($last = 0; ;) {
+            $batch = $q('SELECT id, title, introtext, ' . $n('fulltext') . ', attribs, images, urls FROM #__content WHERE ' . self::articleScope($db)
+                . ' AND id > ' . $last . ' ORDER BY id LIMIT ' . self::BATCH);
+            if (!$batch) break;
+            $out = [];
+            foreach ($batch as $r) {
+                $last = (int) $r['id'];
+                $out[] = self::row('article', (int) $r['id'], ['id' => (int) $r['id']], $r, ['title'], ['introtext', 'fulltext'], ['attribs', 'images', 'urls'], $unresolved);
+            }
+            unset($batch);
+            yield $out;
+        }
+        $out = [];
         // `level > 0` leaves out the tree's root; `main` is the administrator's own menu type.
-        foreach ($q('SELECT id, title, params FROM #__menu WHERE published = 1 AND client_id = 0 AND level > 0 AND menutype <> ' . $db->quote('main') . ' ORDER BY id') as $r)
+        foreach ($q('SELECT id, title, params FROM #__menu WHERE ' . self::menuScope($db) . ' ORDER BY id') as $r)
             $out[] = self::row('menuItem', (int) $r['id'], ['id' => (int) $r['id']], $r, ['title'], [], ['params'], $unresolved);
         foreach ($q('SELECT id, title, ' . $n('module') . ', content, params FROM #__modules WHERE published = 1 AND client_id = 0 ORDER BY id') as $r)
             $out[] = self::row('module', (int) $r['id'], ['id' => (int) $r['id']], $r, ['title'], $r['module'] === 'mod_custom' ? ['content'] : [], ['params'], $unresolved);
         foreach ($q('SELECT id, title, description, params FROM #__categories WHERE published = 1 AND extension = ' . $db->quote('com_content') . ' ORDER BY id') as $r)
             $out[] = self::row('category', (int) $r['id'], ['id' => (int) $r['id']], $r, ['title'], ['description'], ['params'], $unresolved);
+        yield $out;
         // item_id is a string column; only an article's (a positive integer) can be named by the packed key.
         // #__fields_values has no key: a pair stored in more than one row is a multiple-value field, left out.
-        foreach ($q('SELECT v.field_id, v.item_id, MIN(v.value) AS value FROM #__fields_values v JOIN #__fields f ON f.id = v.field_id WHERE f.context = '
-            . $db->quote('com_content.article') . ' AND f.state = 1 AND f.type IN (' . implode(',', array_map([$db, 'quote'], self::FIELD_TYPES)) . ')'
-            . ' GROUP BY v.field_id, v.item_id HAVING COUNT(*) = 1 ORDER BY v.field_id, v.item_id') as $r) {
+        // A value that cannot hold a word (a number, an id) stays in the database.
+        $out = [];
+        foreach ($q('SELECT v.field_id, v.item_id, MIN(v.value) AS value FROM #__fields_values v JOIN #__fields f ON f.id = v.field_id WHERE ' . self::fieldScope($db)
+            . ' GROUP BY v.field_id, v.item_id HAVING COUNT(*) = 1 AND ' . self::wordValue('MIN(v.value)') . ' ORDER BY v.field_id, v.item_id') as $r) {
             if (!ctype_digit((string) $r['item_id']) || (int) $r['item_id'] < 1 || (int) $r['item_id'] >= \FieldValueKey::SPAN) continue;
             $id = \FieldValueKey::encode((int) $r['field_id'], (int) $r['item_id']);
             $out[] = self::row('fieldValue', $id, ['fieldId' => (int) $r['field_id'], 'itemId' => (int) $r['item_id']], $r, [], [], ['value'], $unresolved);
         }
         // `home` is '0', '1' or a language tag (a home per language); either kind of home is in use.
-        foreach ($q('SELECT id, params FROM #__template_styles WHERE client_id = 0 AND (home <> ' . $db->quote('0')
-            . ' OR id IN (SELECT template_style_id FROM #__menu WHERE client_id = 0 AND published = 1 AND template_style_id > 0)) ORDER BY id') as $r)
+        foreach ($q('SELECT id, params FROM #__template_styles WHERE ' . self::styleScope($db) . ' ORDER BY id') as $r)
             $out[] = self::row('templateStyle', (int) $r['id'], ['id' => (int) $r['id']], $r, [], [], ['params'], $unresolved);
-        return $out;
+        yield $out;
+        return $unresolved;
+    }
+
+    /**
+     * What the rows are read from, in one query: per table a count and a checksum of every column
+     * rows() reads, over the same scope. Any write to them changes it; DerivedCache keys a built map
+     * by it. An article whose publish window opens or closes enters or leaves the scope, so it
+     * changes too. The cache row itself is outside every scope.
+     */
+    public static function fingerprint(DatabaseInterface $db): string
+    {
+        $n = static fn(string $column): string => $db->quoteName($column);
+        $sum = static fn(string $columns): string => "CONCAT_WS(':', COUNT(*), COALESCE(BIT_XOR(CRC32(CONCAT_WS('|', " . $columns . '))), 0))';
+        $row = $db->setQuery('SELECT'
+            . ' (SELECT ' . $sum('id, title, introtext, ' . $n('fulltext') . ', attribs, images, urls, modified') . ' FROM #__content WHERE ' . self::articleScope($db) . ') AS articles,'
+            . ' (SELECT ' . $sum('id, title, params') . ' FROM #__menu WHERE ' . self::menuScope($db) . ') AS menu,'
+            . ' (SELECT ' . $sum('id, title, ' . $n('module') . ', content, params') . ' FROM #__modules WHERE published = 1 AND client_id = 0) AS modules,'
+            . ' (SELECT ' . $sum('id, title, description, params') . ' FROM #__categories WHERE published = 1 AND extension = ' . $db->quote('com_content') . ') AS categories,'
+            . ' (SELECT ' . $sum('v.field_id, v.item_id, v.value') . ' FROM #__fields_values v JOIN #__fields f ON f.id = v.field_id WHERE ' . self::fieldScope($db) . ') AS fieldValues,'
+            . ' (SELECT ' . $sum('id, home, params') . ' FROM #__template_styles WHERE ' . self::styleScope($db) . ') AS styles')->loadAssoc();
+        return hash('sha256', (string) json_encode($row));
+    }
+
+    /** The derived map kept between requests in CACHE_TABLE, keyed by fingerprint(). */
+    public static function cache(DatabaseInterface $db, string $version): \DerivedCache
+    {
+        self::loadCache();
+        return new \DerivedCache(static fn(): string => self::fingerprint($db), static function () use ($db): ?string {
+            self::raiseMemory(); // unpacking a kept map of thousands of slots is tens of MB too
+            $stored = $db->setQuery('SELECT entry FROM ' . self::CACHE_TABLE . ' WHERE id = 1')->loadResult();
+            return is_string($stored) ? $stored : null;
+        }, static function (?string $value) use ($db): void {
+            // REPLACE: one statement, the same in MySQL and in the tests' SQLite.
+            $db->setQuery($value === null ? 'DELETE FROM ' . self::CACHE_TABLE . ' WHERE id = 1'
+                : 'REPLACE INTO ' . self::CACHE_TABLE . ' (id, entry) VALUES (1, ' . $db->quote($value) . ')')->execute();
+        }, $version);
+    }
+
+    /** The site's kept map, one object per request and connection: the contract and the content reader share it. */
+    public static function siteCache(DatabaseInterface $db, string $version): \DerivedCache
+    {
+        return self::$siteCaches[spl_object_id($db) . ':' . $version] ??= self::cache($db, $version);
+    }
+
+    /**
+     * Around a read's snapshot transaction: a map built inside it is stored only after it ends, so a
+     * read never writes (no lock inside a read that promises none, no deadlock between two misses).
+     */
+    public static function holdSiteCaches(): void
+    {
+        foreach (self::$siteCaches as $cache) $cache->hold();
+    }
+
+    public static function flushSiteCaches(): void
+    {
+        foreach (self::$siteCaches as $cache) $cache->flush();
+    }
+
+    /**
+     * The map a derived binding reads (no pages: the derive's `keep` chose the nested leaves), built
+     * batch by batch and kept between requests while fingerprint() stands. What EngineFactory hands
+     * QuickstartContract::derived() to build lazily.
+     *
+     * @return array{manifest:array,map:array}
+     */
+    public static function built(DatabaseInterface $db, array $binding, \DerivedCache $cache): array
+    {
+        $label = substr((string) $binding['contract'], strlen('derived/'));
+        $algorithm = (int) ($binding['algorithm'] ?? \DerivedMap::ALGORITHM);
+        $keep = is_array($binding['keep'] ?? null) ? array_values(array_map('strval', $binding['keep'])) : null;
+        $basis = ['contract' => (string) $binding['contract'], 'algorithm' => $algorithm, 'keep' => $keep === null ? null : hash('sha256', implode("\n", $keep))];
+        return $cache->get($basis, static fn(): array => ['built' => \DerivedMap::buildBatches(self::batches($db), null, $label, $algorithm, $keep)])['built'];
+    }
+
+    /**
+     * The media hashes the content reader keeps between reads (JoomlaContentReader::hashes), row 2 of
+     * CACHE_TABLE: path => [signature, sha256]. Empty when the table is not there yet.
+     *
+     * @return array<string,array{0:string,1:string}>
+     */
+    public static function keptHashes(DatabaseInterface $db): array
+    {
+        try {
+            $raw = $db->setQuery('SELECT entry FROM ' . self::CACHE_TABLE . ' WHERE id = 2')->loadResult();
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $kept = is_string($raw) ? json_decode($raw, true) : null;
+        return is_array($kept) ? $kept : [];
+    }
+
+    /** Keep the reader's media hashes (after its snapshot: never a write inside a read). A store that fails is only slower. */
+    public static function keepHashes(DatabaseInterface $db, array $hashes): void
+    {
+        try {
+            $db->setQuery('REPLACE INTO ' . self::CACHE_TABLE . ' (id, entry) VALUES (2, ' . $db->quote((string) json_encode($hashes, JSON_UNESCAPED_SLASHES)) . ')')->execute();
+        } catch (\Throwable $e) {
+        }
+    }
+
+    /** Drop the kept map: after a derived apply, the next read builds from the rows as they are now. */
+    public static function forget(DatabaseInterface $db): void
+    {
+        $db->setQuery('DELETE FROM ' . self::CACHE_TABLE . ' WHERE id = 1')->execute();
+    }
+
+    /** At least 256 MB for a derive or a map build, as wp-admin gives its heavy screens; never lowers a limit, never touches -1. */
+    public static function raiseMemory(): void
+    {
+        self::loadCache();
+        \DerivedCache::raiseMemory();
+    }
+
+    private static function loadCache(): void
+    {
+        if (!class_exists('DerivedCache', false)) require_once __DIR__ . '/../../lib/DerivedCache.php';
+    }
+
+    /** Published and inside its window now, as the site serves it (Joomla stores both dates in UTC). */
+    private static function articleScope(DatabaseInterface $db): string
+    {
+        $now = $db->quote(Factory::getDate()->toSql());
+        return 'state = 1 AND (publish_up IS NULL OR publish_up <= ' . $now . ') AND (publish_down IS NULL OR publish_down > ' . $now . ')';
+    }
+
+    private static function menuScope(DatabaseInterface $db): string
+    {
+        return 'published = 1 AND client_id = 0 AND level > 0 AND menutype <> ' . $db->quote('main');
+    }
+
+    private static function fieldScope(DatabaseInterface $db): string
+    {
+        return 'f.context = ' . $db->quote('com_content.article') . ' AND f.state = 1 AND f.type IN (' . implode(',', array_map([$db, 'quote'], self::FIELD_TYPES)) . ')';
+    }
+
+    private static function styleScope(DatabaseInterface $db): string
+    {
+        return 'client_id = 0 AND (home <> ' . $db->quote('0') . ' OR id IN (SELECT template_style_id FROM #__menu WHERE client_id = 0 AND published = 1 AND template_style_id > 0))';
+    }
+
+    /**
+     * SQL: a value that may hold a word or a link — the short values LeafCodec::typeOf finds nothing
+     * in are left out (empty, only digits, spaces and `.,:;+-`, a bare hex id of 8 or more, one
+     * character that is not `/`). A text field's `yes` is a word a visitor reads, so it stays.
+     * ASCII classes only, so MySQL 5.7's byte-wise REGEXP and 8.0's ICU one agree.
+     */
+    private static function wordValue(string $value): string
+    {
+        return '(LENGTH(' . $value . ') > ' . self::SHORT . ' OR NOT (' . $value . " REGEXP '^[-0-9[:space:].,:;+]*$' OR " . $value
+            . " REGEXP '^[0-9a-fA-F]{8,}$' OR (CHAR_LENGTH(" . $value . ') = 1 AND ' . $value . " <> '/')))";
     }
 
     /**

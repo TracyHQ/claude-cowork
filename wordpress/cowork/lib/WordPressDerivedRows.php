@@ -17,6 +17,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/LoopbackRoute.php';
+require_once __DIR__ . '/DerivedMap.php';
+require_once __DIR__ . '/DerivedCache.php';
 
 final class WordPressDerivedRows
 {
@@ -32,6 +34,12 @@ final class WordPressDerivedRows
     public const MAX_POSTS = 5000;
     /** Bytes of candidate values one derive scans; the rows past it are named in `unresolved`. */
     public const MAX_BYTES = 20971520;
+    /** Posts read per query, and posts whose meta is read per query: each batch is rows before the next is fetched. */
+    private const BATCH = 200;
+    /** Values up to this many bytes are tested in SQL for holding no word at all (wordValue); longer ones are always read. */
+    private const SHORT = 64;
+    /** Where the built map is kept between requests (DerivedCache): not autoloaded, and a technical option, so never a row. */
+    public const CACHE_OPTION = 'claude_cowork_derived_map';
 
     /**
      * Post types that are not public and still hold what a visitor reads: synced patterns, the block
@@ -117,53 +125,121 @@ final class WordPressDerivedRows
     // ---- rows -------------------------------------------------------------------------------
 
     /**
+     * Every row at once: batches() gathered. For a test or a small site; a derive and a map build
+     * take the batches, so a large import is never held whole.
+     *
      * @param list<string> $unresolved gains one line per value too large to scan
      * @return list<array{kind:string,id:int,identity:array,core:array<string,string>,html:array<string,string>,nested:array<string,string>}>
      */
     public function rows(?array &$unresolved = null): array
     {
         $unresolved = $unresolved ?? [];
-        $db = $this->db;
         $out = [];
-        $types = array_merge($this->postTypes, self::SHARED_TYPES);
-        $posts = $this->query('SELECT ID, post_type, post_name, post_title, post_excerpt, post_content FROM ' . $db->posts
-            . " WHERE post_status = 'publish' AND post_type IN (" . $this->inList($types) . ') ORDER BY ID LIMIT ' . (self::MAX_POSTS + 1));
-        if (count($posts) > self::MAX_POSTS) {
-            // A site this large is read in part; the count past the ceiling is unknown without another scan.
-            $posts = array_slice($posts, 0, self::MAX_POSTS);
-            $unresolved[] = 'more than ' . self::MAX_POSTS . ' published posts: only the first ' . self::MAX_POSTS . ' (by id) are scanned';
-        }
-        $menuItems = $this->query('SELECT ID, post_title FROM ' . $db->posts . " WHERE post_type = 'nav_menu_item' AND post_status = 'publish' ORDER BY ID");
-        $ids = array_map(static fn($r) => (int) $r['ID'], $posts);
-        $itemIds = array_map(static fn($r) => (int) $r['ID'], $menuItems);
-        $meta = $this->meta(array_merge($ids, $itemIds));
-        $terms = $this->postTerms(array_merge($ids, $itemIds), ['language', 'nav_menu']);
-
-        $byId = [];
-        foreach ($posts as $r) {
-            $id = (int) $r['ID'];
-            $byId[$id] = $r;
-            $identity = ['postType' => (string) $r['post_type'], 'slug' => (string) $r['post_name']];
-            if (isset($terms[$id]['language'])) {
-                $identity['language'] = $terms[$id]['language'];
+        $batches = $this->batches();
+        foreach ($batches as $batch) {
+            foreach ($batch as $row) {
+                $out[] = $row;
             }
-            $out[] = $this->row('post', $id, $identity, ['post_title' => $r['post_title'], 'post_excerpt' => $r['post_excerpt']],
-                ['post_content' => $r['post_content']], [], $unresolved);
         }
-        foreach ($ids as $id) {
-            foreach ($meta[$id] ?? [] as $key => $one) {
-                if (count($one) !== 1 || self::technicalMeta((string) $key)) {
-                    continue; // a key stored twice on one post has no single value a slot could stand for
+        array_push($unresolved, ...$batches->getReturn());
+        return $out;
+    }
+
+    /**
+     * The rows in DerivedMap's shape, one batch at a time, in the order rows() lists them: the
+     * published posts BATCH at a time by id, their meta BATCH posts at a time, the options, the
+     * terms, the menu entries. Each database result is gone before the next query; what cannot be
+     * words stays in the database (metaKeys, optionScope, wordValue). An imported shop measured
+     * 30/09/2026 held 121,925 meta rows for 2,482 posts, nearly all prices, stock counts, ids and
+     * switches: read whole into PHP they exhausted 128 MB, and each row costs about 1.2 KB there.
+     *
+     * @return Generator<int,list<array>,mixed,list<string>> returns the `unresolved` lines: values too large to
+     *         scan, posts past MAX_POSTS, rows past MAX_BYTES
+     */
+    public function batches(): Generator
+    {
+        self::raiseMemory();
+        $unresolved = [];
+        $db = $this->db;
+        // The rows whose candidate values fit in MAX_BYTES, in order; once one does not, none after it.
+        $bytes = 0;
+        $dropped = 0;
+        $budget = static function (array $rows) use (&$bytes, &$dropped): array {
+            $kept = [];
+            foreach ($rows as $row) {
+                $size = 0;
+                foreach (['core', 'html', 'nested'] as $class) {
+                    foreach ($row[$class] as $value) {
+                        $size += strlen((string) $value);
+                    }
                 }
-                $out[] = $this->row('postmeta', (int) $one[0]['meta_id'], ['postId' => $id, 'key' => (string) $key], [], [],
-                    ['meta_value' => $one[0]['meta_value']], $unresolved);
+                if ($dropped > 0 || $bytes + $size > self::MAX_BYTES) {
+                    $dropped++;
+                    continue;
+                }
+                $bytes += $size;
+                $kept[] = $row;
             }
+            return $kept;
+        };
+
+        $types = $this->inList(array_merge($this->postTypes, self::SHARED_TYPES));
+        $ids = [];
+        $titles = [];
+        for ($last = 0, $full = false; !$full;) {
+            $batch = $this->query('SELECT ID, post_type, post_name, post_title, post_excerpt, post_content FROM ' . $db->posts
+                . " WHERE post_status = 'publish' AND post_type IN (" . $types . ') AND ID > ' . $last . ' ORDER BY ID LIMIT ' . self::BATCH);
+            if ($batch === []) {
+                break;
+            }
+            $languages = $this->postTerms(array_map(static fn($r) => (int) $r['ID'], $batch), ['language']);
+            $out = [];
+            foreach ($batch as $r) {
+                $id = $last = (int) $r['ID'];
+                if (count($ids) === self::MAX_POSTS) {
+                    // A site this large is read in part; the count past the ceiling is unknown without another scan.
+                    $unresolved[] = 'more than ' . self::MAX_POSTS . ' published posts: only the first ' . self::MAX_POSTS . ' (by id) are scanned';
+                    $full = true;
+                    break;
+                }
+                $ids[] = $id;
+                $titles[$id] = (string) $r['post_title'];
+                $identity = ['postType' => (string) $r['post_type'], 'slug' => (string) $r['post_name']];
+                if (isset($languages[$id]['language'])) {
+                    $identity['language'] = $languages[$id]['language'];
+                }
+                $out[] = $this->row('post', $id, $identity, ['post_title' => $r['post_title'], 'post_excerpt' => $r['post_excerpt']],
+                    ['post_content' => $r['post_content']], [], $unresolved);
+            }
+            unset($batch);
+            yield $budget($out);
+        }
+        foreach (array_chunk($ids, self::BATCH) as $chunk) {
+            $in = implode(',', $chunk);
+            // A key stored twice on one post has no single value a slot could stand for, whatever the
+            // other copy holds: counted over every row, before the values are filtered.
+            $twice = [];
+            foreach ($this->query('SELECT post_id, meta_key FROM ' . $db->postmeta . ' WHERE post_id IN (' . $in . ') AND ' . $this->metaKeys('meta_key')
+                . ' GROUP BY post_id, meta_key HAVING COUNT(*) > 1') as $r) {
+                $twice[$r['post_id'] . ':' . $r['meta_key']] = true;
+            }
+            $batch = $this->query('SELECT meta_id, post_id, meta_key, meta_value FROM ' . $db->postmeta . ' WHERE post_id IN (' . $in . ') AND '
+                . $this->metaKeys('meta_key') . ' AND ' . self::wordValue('meta_value') . ' ORDER BY post_id, meta_id');
+            $out = [];
+            foreach ($batch as $r) {
+                $key = (string) $r['meta_key'];
+                if (isset($twice[$r['post_id'] . ':' . $key]) || self::technicalMeta($key)) {
+                    continue;
+                }
+                $out[] = $this->row('postmeta', (int) $r['meta_id'], ['postId' => (int) $r['post_id'], 'key' => $key], [], [],
+                    ['meta_value' => $r['meta_value']], $unresolved);
+            }
+            unset($batch);
+            yield $budget($out);
         }
 
-        $options = $this->query('SELECT option_id, option_name, option_value, autoload FROM ' . $db->options
-            . " WHERE option_name LIKE 'theme\\_mods\\_%' OR option_name LIKE 'widget\\_%' OR option_name = 'sidebars_widgets'"
-            . " OR (autoload IN ('yes','on','auto-on','auto') AND LENGTH(option_value) <= " . self::AUTOLOAD_BYTES . ') ORDER BY option_id');
-        foreach ($options as $r) {
+        $out = [];
+        foreach ($this->query('SELECT option_id, option_name, option_value, autoload FROM ' . $db->options . ' WHERE ' . $this->optionScope() . ' ORDER BY option_id') as $r) {
             $name = (string) $r['option_name'];
             if (self::technicalOption($name)) {
                 continue;
@@ -186,9 +262,14 @@ final class WordPressDerivedRows
             }
         }
 
+        // Menu entries: few, and their meta is read whole (the `_menu_item_*` keys are the entry).
+        $menuItems = $this->query('SELECT ID, post_title FROM ' . $db->posts . " WHERE post_type = 'nav_menu_item' AND post_status = 'publish' ORDER BY ID");
+        $itemIds = array_map(static fn($r) => (int) $r['ID'], $menuItems);
+        $meta = $this->meta($itemIds);
+        $menus = $this->postTerms($itemIds, ['nav_menu']);
         foreach ($menuItems as $r) {
             $id = (int) $r['ID'];
-            $menu = $terms[$id]['nav_menu'] ?? null;
+            $menu = $menus[$id]['nav_menu'] ?? null;
             if ($menu === null) {
                 continue; // an entry outside a menu renders nowhere, and the writer cannot address it
             }
@@ -196,41 +277,132 @@ final class WordPressDerivedRows
             // the slot's words; a write still lands on the entry's own title (QuickstartContract).
             $title = (string) $r['post_title'];
             if ($title === '') {
-                $title = $this->pointedTitle($meta[$id] ?? [], $byId);
+                $title = $this->pointedTitle($meta[$id] ?? [], $titles);
             }
             $out[] = $this->row('menuItem', $id, ['id' => $id, 'menu' => $menu], ['post_title' => $title], [],
                 ['_menu_item_url' => (string) ($meta[$id]['_menu_item_url'][0]['meta_value'] ?? '')], $unresolved);
         }
-        return $this->withinBudget($out, $unresolved);
-    }
-
-    /** The rows whose candidate values fit in MAX_BYTES, in order; the rest are counted in `unresolved`. */
-    private function withinBudget(array $rows, array &$unresolved): array
-    {
-        $bytes = 0;
-        $kept = [];
-        $dropped = 0;
-        foreach ($rows as $row) {
-            $size = 0;
-            foreach (['core', 'html', 'nested'] as $class) {
-                foreach ($row[$class] as $value) {
-                    $size += strlen((string) $value);
-                }
-            }
-            if ($dropped > 0 || $bytes + $size > self::MAX_BYTES) {
-                $dropped++;
-                continue;
-            }
-            $bytes += $size;
-            $kept[] = $row;
-        }
+        yield $budget($out);
         if ($dropped > 0) {
             $unresolved[] = $dropped . ' rows past the ' . self::MAX_BYTES . '-byte scan budget, not scanned';
         }
-        return $kept;
+        return $unresolved;
     }
 
-    /** @return array<int,array<string,list<array{meta_id:string,meta_value:string}>>> post id => key => rows */
+    /**
+     * What the rows are read from, cheaply, in one query: counts, the highest ids and a checksum of
+     * every column rows() reads, over the same scope and the same filters. Any write to those rows
+     * changes it (a price or a stock count, which no slot holds, does not); DerivedCache keys a
+     * built map by it. The receiver's own options are outside the scope, so storing the map does
+     * not change what it is keyed by.
+     */
+    public function fingerprint(): string
+    {
+        $db = $this->db;
+        $crc = static fn(string $columns): string => 'COALESCE(BIT_XOR(CRC32(CONCAT_WS(\'|\', ' . $columns . '))), 0)';
+        $scope = "p.post_status = 'publish' AND p.post_type IN (" . $this->inList(array_merge($this->postTypes, self::SHARED_TYPES, ['nav_menu_item'])) . ')';
+        $taxonomies = $this->inList(array_merge($this->taxonomies, ['nav_menu', 'language']));
+        $row = $this->query('SELECT'
+            . " (SELECT CONCAT_WS(':', COUNT(*), COALESCE(MAX(p.ID), 0), " . $crc('p.ID, p.post_type, p.post_name, p.post_title, p.post_excerpt, p.post_content, p.post_modified_gmt')
+            . ') FROM ' . $db->posts . ' p WHERE ' . $scope . ') AS posts,'
+            . " (SELECT CONCAT_WS(':', COUNT(*), COALESCE(MAX(m.meta_id), 0)) FROM " . $db->postmeta . ' m JOIN ' . $db->posts . ' p ON p.ID = m.post_id WHERE ' . $scope . ') AS meta,'
+            . ' (SELECT ' . $crc('m.meta_id, m.post_id, m.meta_key, m.meta_value') . ' FROM ' . $db->postmeta . ' m JOIN ' . $db->posts . ' p ON p.ID = m.post_id WHERE ' . $scope
+            . " AND ((" . $this->metaKeys('m.meta_key') . ' AND ' . self::wordValue('m.meta_value') . ") OR p.post_type = 'nav_menu_item')) AS words,"
+            . " (SELECT CONCAT_WS(':', COUNT(*), " . $crc('option_id, option_name, option_value') . ') FROM ' . $db->options . ' WHERE (' . $this->optionScope()
+            . ") OR option_name IN ('active_plugins', 'stylesheet', 'template')) AS options,"
+            // One checksum per table: an imported site often has wp_terms and wp_term_taxonomy in different
+            // collations, and one CONCAT_WS across both fails with "Illegal mix of collations".
+            . " (SELECT CONCAT_WS(':', COUNT(*), " . $crc('t.term_id, t.name, t.slug') . ', ' . $crc('tt.term_taxonomy_id, tt.term_id, tt.taxonomy, tt.description') . ') FROM ' . $db->terms . ' t JOIN '
+            . $db->term_taxonomy . ' tt ON tt.term_id = t.term_id WHERE tt.taxonomy IN (' . $taxonomies . ')) AS terms,'
+            . " (SELECT CONCAT_WS(':', COUNT(*), " . $crc('tr.object_id, tr.term_taxonomy_id') . ') FROM ' . $db->term_relationships . ' tr JOIN ' . $db->term_taxonomy
+            . " tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tt.taxonomy IN ('language', 'nav_menu')) AS links");
+        return hash('sha256', (string) json_encode([$row[0] ?? null, $this->postTypes, $this->taxonomies, $this->home]));
+    }
+
+    /** @var array<string,DerivedCache> this request's one kept map per receiver version (siteCache) */
+    private static array $siteCaches = [];
+
+    /**
+     * The site's own kept map, one object per request: the contract and every content reader built in
+     * the request share it, so the tables are fingerprinted and the map read once.
+     */
+    public static function siteCache(string $version): DerivedCache
+    {
+        return self::$siteCaches[$version] ??= self::forSite()->cache($version);
+    }
+
+    /** The derived map kept between requests in a non-autoloaded option, keyed by fingerprint(). */
+    public function cache(string $version): DerivedCache
+    {
+        return new DerivedCache([$this, 'fingerprint'], static function (): ?string {
+            // Unpacking a kept map of thousands of slots is tens of MB too; measured 30/09/2026 on an
+            // imported shop whose WordPress alone took 94 MB, a read outside wp-admin died at 128 MB.
+            self::raiseMemory();
+            $stored = function_exists('get_option') ? get_option(self::CACHE_OPTION, null) : null;
+            return is_string($stored) ? $stored : null;
+        }, static function (?string $value): void {
+            if ($value === null) {
+                delete_option(self::CACHE_OPTION);
+            } else {
+                update_option(self::CACHE_OPTION, $value, false);
+            }
+        }, $version);
+    }
+
+    /** As wp-admin does before its heavy screens: at least WP_MAX_MEMORY_LIMIT (256 MB by default), never less than the site has. */
+    public static function raiseMemory(): void
+    {
+        if (function_exists('wp_raise_memory_limit')) {
+            wp_raise_memory_limit('admin');
+            return;
+        }
+        DerivedCache::raiseMemory();
+    }
+
+    /** SQL: the meta keys that may hold words; the technical ones stay in the database. */
+    private function metaKeys(string $column): string
+    {
+        $out = $column . ' NOT IN (' . $this->inList(self::TECHNICAL_META) . ')';
+        foreach (self::TECHNICAL_META_PREFIXES as $prefix) {
+            $out .= ' AND ' . $column . ' NOT LIKE ' . self::likePrefix($prefix) . " ESCAPE '!'";
+        }
+        return $out;
+    }
+
+    /** SQL: the options rows() reads, the technical ones left in the database. */
+    private function optionScope(): string
+    {
+        $out = "(option_name LIKE 'theme!_mods!_%' ESCAPE '!' OR option_name LIKE 'widget!_%' ESCAPE '!' OR option_name = 'sidebars_widgets'"
+            . " OR (autoload IN ('yes', 'on', 'auto-on', 'auto') AND LENGTH(option_value) <= " . self::AUTOLOAD_BYTES . '))'
+            . ' AND option_name NOT IN (' . $this->inList(self::TECHNICAL_OPTIONS) . ") AND option_name NOT LIKE '%user!_roles' ESCAPE '!'";
+        foreach (self::TECHNICAL_OPTION_PREFIXES as $prefix) {
+            $out .= ' AND option_name NOT LIKE ' . self::likePrefix($prefix) . " ESCAPE '!'";
+        }
+        return $out . ' AND ' . self::wordValue('option_value');
+    }
+
+    /**
+     * SQL: a value that may hold a word or a link. Left out are the short values LeafCodec::typeOf
+     * finds nothing in (empty, only digits, spaces and `.,:;+-` as a price, a count or a date is, a
+     * bare hex id of 8 or more, one character that is not `/`), and a switch stored as a word
+     * (`yes`, `no`, `on`, `off`, `true`, `false`), which a plugin reads and a visitor never does.
+     * Anything longer than SHORT is read. ASCII classes only, so MySQL 5.7's byte-wise REGEXP and
+     * 8.0's ICU one agree.
+     */
+    private static function wordValue(string $column): string
+    {
+        return '(LENGTH(' . $column . ') > ' . self::SHORT . ' OR NOT (' . $column . " REGEXP '^[-0-9[:space:].,:;+]*\$' OR " . $column
+            . " REGEXP '^[0-9a-fA-F]{8,}\$' OR (CHAR_LENGTH(" . $column . ') = 1 AND ' . $column . " <> '/') OR " . $column
+            . " IN ('yes', 'no', 'on', 'off', 'true', 'false')))";
+    }
+
+    /** A LIKE pattern for names starting with `$prefix`, escaped with `!` (a backslash means two things across MySQL modes). */
+    private static function likePrefix(string $prefix): string
+    {
+        return "'" . strtr($prefix, ['!' => '!!', '_' => '!_', '%' => '!%', "'" => "''"]) . "%'";
+    }
+
+    /** Every meta row of the given posts (menu entries: a few, read whole). @return array<int,array<string,list<array{meta_id:string,meta_value:string}>>> post id => key => rows */
     private function meta(array $ids): array
     {
         $out = [];
@@ -261,9 +433,9 @@ final class WordPressDerivedRows
      * The title a menu entry without one shows: its post's, or its term's.
      *
      * @param array<string,list<array{meta_id:string,meta_value:string}>> $meta the entry's meta
-     * @param array<int,array<string,mixed>> $posts the published posts already read, by id
+     * @param array<int,string> $titles the titles of the published posts already read, by id
      */
-    private function pointedTitle(array $meta, array $posts): string
+    private function pointedTitle(array $meta, array $titles): string
     {
         $type = (string) ($meta['_menu_item_type'][0]['meta_value'] ?? '');
         $object = (int) ($meta['_menu_item_object_id'][0]['meta_value'] ?? 0);
@@ -271,8 +443,8 @@ final class WordPressDerivedRows
             return '';
         }
         if ($type === 'post_type') {
-            if (isset($posts[$object])) {
-                return (string) $posts[$object]['post_title'];
+            if (isset($titles[$object])) {
+                return $titles[$object];
             }
             $found = $this->query('SELECT ID, post_title FROM ' . $this->db->posts . ' WHERE ID = ' . $object);
             return (string) ($found[0]['post_title'] ?? '');

@@ -126,3 +126,34 @@ check('codec: unescaped unicode keeps line terminators raw', LeafCodec::set('{"t
 $lcBlockArrow = LeafCodec::set('<!-- wp:button {"text":"Buy"} /-->', 'html:c0|json:/text|text:', 'a --> b <c>');
 check('codec: block comment escapes -- < >', $lcBlockArrow, '<!-- wp:button {"text":"a \u002d\u002d\u003e b \u003cc\u003e"} /-->');
 check('codec: block comment escaped value reads back', LeafCodec::get($lcBlockArrow, 'html:c0|json:/text|text:'), 'a --> b <c>');
+// One column with thousands of leaves (a T4 template style's params on an imported site, measured
+// 30/09/2026: 2 s per content.read): reading every leaf must not parse the whole column once per leaf.
+$lcBig = [];
+for ($lcI = 0; $lcI < 3000; $lcI++) $lcBig['block' . $lcI] = ['title' => 'Heading number ' . $lcI, 'body' => '<p>Paragraph ' . $lcI . ' <a href="/page-' . $lcI . '">more</a></p>', 'color' => '#fff'];
+$lcBigRaw = json_encode(['sections' => $lcBig]);
+$lcBigLeaves = LeafCodec::leaves($lcBigRaw);
+$lcStarted = microtime(true);
+$lcBigRead = [];
+foreach ($lcBigLeaves as $lcLeaf) $lcBigRead[] = LeafCodec::get($lcBigRaw, $lcLeaf['path']);
+$lcBigMs = (microtime(true) - $lcStarted) * 1000;
+check('leaf: every leaf of a 3000-block column reads back', [count($lcBigLeaves), $lcBigRead[0], $lcBigRead[count($lcBigRead) - 1]], [12000, 'Heading number 0', 'more']);
+checkTrue('leaf: and reading them all takes well under a second (' . round($lcBigMs) . ' ms)', $lcBigMs < 500);
+$lcBigSet = LeafCodec::set($lcBigRaw, $lcBigLeaves[4]['path'], 'Heading one');
+check('leaf: a write after those reads still splices the one leaf', [LeafCodec::get($lcBigSet, $lcBigLeaves[4]['path']), LeafCodec::get($lcBigSet, $lcBigLeaves[0]['path']), strlen($lcBigSet) - strlen($lcBigRaw)],
+    ['Heading one', 'Heading number 0', strlen('Heading one') - strlen('Heading number 1')]);
+// What the kept parses hold is bounded, not only the bytes of the values parsed: a 40,000-object JSON
+// is under 1 MB but one entry per container grew the process by 50 MB (review, 30/09/2026).
+$lcMany = [];
+for ($lcI = 0; $lcI < 40000; $lcI++) $lcMany[] = ['t' => 'Word number ' . $lcI];
+$lcManyRaw = json_encode(['items' => $lcMany]);
+unset($lcMany);
+$lcManyLeaves = LeafCodec::leaves($lcManyRaw);
+gc_collect_cycles();
+memory_reset_peak_usage();
+$lcManyBase = memory_get_usage();
+$lcManyOk = 0;
+foreach ($lcManyLeaves as $lcLeaf) if (LeafCodec::get($lcManyRaw, $lcLeaf['path']) === $lcLeaf['text']) $lcManyOk++;
+$lcManyPeak = memory_get_peak_usage() - $lcManyBase;
+check('leaf: every leaf of a 40,000-object column reads back', $lcManyOk, 40000);
+checkTrue('leaf: and the parses kept for it stay within their budget (' . round($lcManyPeak / 1048576, 1) . ' MB)', $lcManyPeak < 40 * 1048576);
+unset($lcManyRaw, $lcManyLeaves);

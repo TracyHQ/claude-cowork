@@ -535,6 +535,13 @@ final class Engine
             $this->writer->purgeCache();
         } catch (Throwable $ignored) {
         }
+        if ($this->contract->isDerived()) {
+            // The map kept between requests was made of the rows just written: the next read builds it again.
+            try {
+                $this->contract->forgetDerived();
+            } catch (Throwable $ignored) {
+            }
+        }
         // `afterRevision`, as the Joomla receiver answers (#316): the contract revision this apply left,
         // read under the lock — the next apply can send it as expected_revision without inspecting again.
         $result = $this->ok(['apply_id' => $apply, 'request_id' => $request, 'written' => $written, 'revision' => $state['revision'], 'afterRevision' => $state['revision']] + $warn);
@@ -634,23 +641,14 @@ final class Engine
             $source = ($this->deriveSource)();
             $pages = array_values(array_filter(is_array($source['pages'] ?? null) ? $source['pages'] : [], 'is_string'));
             $unresolved = array_values(array_map('strval', is_array($source['unresolved'] ?? null) ? $source['unresolved'] : []));
-            $rows = QuickstartContract::prepareDerivedRows($this->writer, is_array($source['rows'] ?? null) ? $source['rows'] : [], $pages !== [], $unresolved);
-            $built = DerivedMap::build($rows, $pages !== [] ? VisibleText::fromPages($pages) : null, $label);
-            // What a visitor reads that no candidate leaf holds: words in theme files, language strings,
-            // text a plugin makes at run time. Counted, not located (the agent greps for those).
+            // The rows arrive as a list or in batches (WordPressDerivedRows::batches): built batch by batch,
+            // never held whole. `$texts` gathers what a visitor reads that some candidate leaf holds; what
+            // the pages show beyond it — words in theme files, language strings, text a plugin makes at
+            // run time — is counted, not located (the agent greps for those).
+            $rows = $source['rows'] ?? [];
             $texts = [];
-            foreach ($rows as $row) {
-                foreach ($row['core'] as $value) {
-                    $texts[] = (string) $value;
-                }
-                foreach ([$row['html'], $row['nested']] as $columns) {
-                    foreach ($columns as $value) {
-                        foreach (LeafCodec::leaves((string) $value) as $leaf) {
-                            $texts[] = $leaf['text'];
-                        }
-                    }
-                }
-            }
+            $built = QuickstartContract::buildDerived($this->writer, is_iterable($rows) ? $rows : [], $pages !== [], $pages !== [] ? VisibleText::fromPages($pages) : null,
+                $label, DerivedMap::ALGORITHM, null, $unresolved, $texts);
             $nested = count(array_filter($built['map']['slots'], static fn($slot) => $slot['nested']));
             $answer = ['contract' => $built['manifest']['id'], 'entities' => count($built['map']['entities']), 'slots' => count($built['map']['slots']),
                 'calibrated' => $built['manifest']['calibrated'],

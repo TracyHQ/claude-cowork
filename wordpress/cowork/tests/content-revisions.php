@@ -41,6 +41,7 @@ final class WP_Fake_ContentDb
     public string $last_error = '';
     public $dbh;
     public int $lockAnswer = 1;
+    public bool $readOnly = false;
     /** @var string[] */
     public array $queries = [];
 
@@ -60,6 +61,12 @@ final class WP_Fake_ContentDb
     public function query(string $sql)
     {
         $this->queries[] = $sql;
+        // As MySQL: a READ ONLY transaction refuses writes until it ends.
+        if (strpos($sql, 'START TRANSACTION') === 0) {
+            $this->readOnly = strpos($sql, 'READ ONLY') !== false;
+        } elseif ($sql === 'COMMIT' || $sql === 'ROLLBACK') {
+            $this->readOnly = false;
+        }
         return true;
     }
 
