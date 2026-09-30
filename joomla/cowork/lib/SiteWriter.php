@@ -316,9 +316,10 @@ final class SearchNeedle
      * Line breaks and tabs are gaps between words; every other control character (NUL, escape, DEL,
      * the C1 range) is dropped; the ends are trimmed, no-break and ideographic spaces included. The
      * result is NFC when this PHP can normalise (`Normalizer`, from intl or a polyfill), and matched
-     * as its NFC and NFD forms, because a title may have been stored either way. Without a
-     * normaliser the needle is used as it came: it matches what was typed the same way, and nothing
-     * is refused for lack of one. No minimum length: one character is a word in Chinese or Japanese.
+     * as its NFC and NFD forms, because a title may have been stored either way. Without a usable
+     * normaliser (none, or one emptied by `disable_classes`) the needle is used as it came: it matches
+     * what was typed the same way, and nothing is refused for lack of one. No minimum length: one
+     * character is a word in Chinese or Japanese.
      * More than MAX_LENGTH characters once cleaned, or more than MAX_BYTES bytes before, is refused.
      *
      * @param mixed $raw the request's `search`, whatever it was
@@ -364,10 +365,17 @@ final class SearchNeedle
         return '%' . strtr($variant, [$e => $e . $e, '%' => $e . '%', '_' => $e . '_']) . '%';
     }
 
-    /** One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had. */
+    /**
+     * One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had.
+     *
+     * A Normalizer counts only when it can normalise. `disable_classes=Normalizer`, which hardened hosts
+     * set, does not remove the class: with intl loaded it stays declared with its methods emptied out, so
+     * `class_exists()` alone says yes and the call is then a fatal Error, thrown from outside the
+     * engine's try/catch. The method is asked for as well.
+     */
     private static function form(string $text, bool $decomposed): string
     {
-        if (!class_exists('Normalizer')) {
+        if (!class_exists('Normalizer') || !method_exists('Normalizer', 'normalize')) {
             return $text;
         }
         $out = \Normalizer::normalize($text, $decomposed ? \Normalizer::FORM_D : \Normalizer::FORM_C);

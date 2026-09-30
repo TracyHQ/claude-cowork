@@ -55,8 +55,15 @@ docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowor
 Mount the repository root, not this folder: the release checks read `joomla/update.xml` and
 `joomla/update.json` one level up, so a mount of `joomla/cowork` alone stops at them. The second run
 is the same suite with the test writers reading through the list-and-read walk instead of in bulk;
-the two must agree test for test. The official `php` images carry no `intl`, so the tests stand in
-for `Normalizer` there (see `tests/content-search.php`).
+the two must agree test for test.
+
+The suite must pass on a PHP with `intl` and on one without it. The official `php` images carry no
+`intl`, so there the tests stand in for `Normalizer`; a PHP that has it (Homebrew, distro packages,
+and the PHP the CI job installs: `setup-php` loads `intl` by default) runs the real one. To run the
+suite that way in docker, add it to the image first: `apt-get install libicu-dev` and
+`docker-php-ext-install intl`. The tests that need no `Normalizer` start a fresh PHP with
+`disable_classes=Normalizer`, which on a PHP with `intl` leaves the class declared and empties its
+methods rather than removing it; the code treats that as no `Normalizer` (see `tests/content-search.php`).
 
 ## Updates from inside the site
 

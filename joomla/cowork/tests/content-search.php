@@ -123,10 +123,11 @@ namespace {
 
     use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaSiteWriter;
 
-    // A PHP without intl has no `Normalizer`, and the image these tests run in is one. Stand in for it
-    // with the two letters the fixtures use, so the code that calls the real class is what runs; on a
-    // PHP that has intl (or Joomla's polyfill) this is skipped and the real one does the same work.
-    // The absence itself is checked in a process of its own, below.
+    // A PHP without intl has no `Normalizer` (the official `php` docker images are such a PHP). Stand in
+    // for it with the two letters the fixtures use, so the code that calls the real class is what runs;
+    // on a PHP that has intl (Homebrew, distro packages, and the PHP CI installs) or Joomla's polyfill
+    // this is skipped and the real ICU one does the same work: the suite is green both ways.
+    // The absence of a usable Normalizer is checked in processes of their own, below.
     if (!class_exists('Normalizer')) {
         final class Normalizer
         {
@@ -537,8 +538,8 @@ namespace {
     // The tests above require the files by hand, so they would pass with the new classes in a file
     // production never loads. Production requires the list named in EngineFactory::loadEngine (and the
     // Joomla 3 door its own list), and Engine.php requires what it needs itself. This reads those
-    // lists from the source and runs a fresh PHP that requires exactly them — once on a PHP with no
-    // Normalizer, which must still answer, unnormalised.
+    // lists from the source and runs a fresh PHP that requires exactly them — also where there is no
+    // usable Normalizer, which must still answer, unnormalised.
     $csListOf = function (string $file, string $after) {
         $source = file_get_contents($file);
         $from = strpos($source, $after);
@@ -553,9 +554,19 @@ namespace {
     checkTrue('loading: the lists were read from the source', in_array('SiteWriter', $csFactoryList, true) && in_array('Engine', $csFactoryList, true)
         && in_array('SiteWriter', $csLegacyList, true) && in_array('Engine', $csLegacyList, true));
 
-    $csProbe = function (array $names, bool $writer, bool $withoutIntl) {
+    // $normalizer says what the fresh PHP is made to hold:
+    //   'as-is'    — nothing changed: the PHP's own Normalizer, or none where there is no intl;
+    //   'disabled' — `disable_classes=Normalizer`, the setting a hardened host uses. It does NOT remove
+    //                the class: with intl the class stays declared and only its methods are emptied out;
+    //                with no intl there is nothing to disable and the class is simply absent;
+    //   'emptied'  — as 'disabled', and where the class is absent the script declares an empty one, so
+    //                "a Normalizer class without normalize()" is what runs on every PHP, intl or not.
+    // The script reports whether a Normalizer is USABLE (class and method), the one thing all three
+    // agree on being able to say about a PHP whatever its build.
+    $csProbe = function (array $names, bool $writer, string $normalizer) {
         $code = <<<'PHP'
 <?php
+if (__EMPTIED__ && !class_exists('Normalizer', false)) { final class Normalizer {} }
 foreach (__NAMES__ as $c) { require_once __LIB__ . '/' . $c . '.php'; }
 $w = __WRITER__ ? new class implements SiteWriter, SearchableSiteWriter {
     public function canCreate(string $kind): bool { return false; }
@@ -578,25 +589,27 @@ $w = __WRITER__ ? new class implements SiteWriter, SearchableSiteWriter {
 } : null;
 $e = new Engine('probe-token-at-least-16', [], null, null, null, null, $w, null, null);
 $a = $e->handle(['token' => 'probe-token-at-least-16', 'action' => 'content.list', 'params' => ['kind' => 'article', 'search' => "Nguy\u{1EC5}n"]]);
-echo json_encode(['normalizer' => class_exists('Normalizer'), 'answer' => $a]);
+echo json_encode(['usable' => class_exists('Normalizer') && method_exists('Normalizer', 'normalize'), 'answer' => $a]);
 PHP;
-        $code = str_replace(['__NAMES__', '__LIB__', '__WRITER__'], [var_export($names, true), var_export(realpath(__DIR__ . '/../lib'), true), $writer ? 'true' : 'false'], $code);
+        $code = str_replace(['__EMPTIED__', '__NAMES__', '__LIB__', '__WRITER__'], [$normalizer === 'emptied' ? 'true' : 'false', var_export($names, true), var_export(realpath(__DIR__ . '/../lib'), true), $writer ? 'true' : 'false'], $code);
         $file = tempnam(sys_get_temp_dir(), 'cs-probe');
         file_put_contents($file, $code);
         $out = [];
-        exec(escapeshellarg(PHP_BINARY) . ' -d display_errors=1 -d error_reporting=-1' . ($withoutIntl ? ' -d disable_classes=Normalizer' : '') . ' ' . escapeshellarg($file) . ' 2>&1', $out, $status);
+        exec(escapeshellarg(PHP_BINARY) . ' -d display_errors=1 -d error_reporting=-1' . ($normalizer !== 'as-is' ? ' -d disable_classes=Normalizer' : '') . ' ' . escapeshellarg($file) . ' 2>&1', $out, $status);
         unlink($file);
         $text = implode("\n", $out);
-        $start = strpos($text, '{"normalizer"');
+        $start = strpos($text, '{"usable"');
         $decoded = $start === false ? null : json_decode(substr($text, $start), true);
         return $decoded === null ? ['failed' => $status, 'output' => $text] : $decoded;
     };
     $csWantEcho = ['ok' => true, 'kind' => 'article', 'offset' => 0, 'search' => $csNfc, 'matched' => 1];
-    $csLoaded = $csProbe($csFactoryList, true, false);
+    $csLoaded = $csProbe($csFactoryList, true, 'as-is');
     check('loading: the factory list is enough to search', array_diff_key($csLoaded['answer'] ?? ['probe' => $csLoaded], ['items' => 1]), $csWantEcho);
-    $csBare = $csProbe($csFactoryList, true, true);
-    check('loading: on a PHP with no Normalizer the class is gone', $csBare['normalizer'] ?? $csBare, false);
-    check('loading: and search still answers, the needle as it came and matched as it came', $csBare['answer'] ?? ['probe' => $csBare], $csWantEcho + ['items' => [['id' => 1, 'title' => $csNfc]]]);
-    $csOld = $csProbe($csLegacyList, false, false);
+    foreach (['disabled' => 'with disable_classes=Normalizer', 'emptied' => 'with a Normalizer class that has no normalize()'] as $csMode => $csWhat) {
+        $csBare = $csProbe($csFactoryList, true, $csMode);
+        check("loading: {$csWhat} there is no usable Normalizer", $csBare['usable'] ?? $csBare, false);
+        check("loading: {$csWhat} search still answers, the needle as it came and matched as it came", $csBare['answer'] ?? ['probe' => $csBare], $csWantEcho + ['items' => [['id' => 1, 'title' => $csNfc]]]);
+    }
+    $csOld = $csProbe($csLegacyList, false, 'as-is');
     check('loading: the Joomla 3 door loads the same files and refuses a search with no writer', [$csOld['answer']['ok'] ?? $csOld, $csOld['answer']['error'] ?? null], [false, 'unavailable']);
 }
