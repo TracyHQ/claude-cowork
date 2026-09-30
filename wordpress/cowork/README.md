@@ -296,19 +296,23 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
 - **The words.** Trimmed (an ideographic or no-break space too); a line break or a tab between words
   is a space (words wrapped over two lines are still two words) and every other control character is
   removed; turned into Unicode form C when PHP has `intl` (a host without it matches the spelling it
-  was sent in), at most 200 characters, valid UTF-8; one character is a needle. `%`, `_` and `\` match themselves,
-  and nothing is a wildcard or a pattern. Both the composed and the decomposed spelling of a letter
-  are tried, and each is also tried the way core's KSES filters store it in a title saved without the
-  `unfiltered_html` capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as
-  `&gt;`, and a `<` that no `>` closes as `&lt;` (a quote or an ampersand after that sign is escaped
-  too, one before it is not). Only a real tag such as `<script>` is dropped, and nobody searches
-  for that. And each of those is tried the way a `utf8` column (three bytes a character) stores an
-  emoji or a symbol: core's `wp_insert_post()` turns `🔥` into `&#x1f525;`, `™` into `&#x2122;`, `❤`
-  into `&#x2764;` and so on, so on such a site that is the page's title whatever was typed, and a
-  table converted to `utf8mb4` afterwards keeps the text. `©`, `®` and `€` are stored as they are.
-  The character itself is tried too, because a `utf8mb4` site stores it as typed. The forms are
-  asked of WordPress itself (`wp_kses_normalize_entities()`, `wp_pre_kses_less_than()`,
-  `wp_encode_emoji()`), not listed here.
+  was sent in); at most 200 characters once cleaned, and text of more than 4,096 bytes is refused
+  before it is cleaned, with the same message (padding is not cleaned away); valid UTF-8; one
+  character is a needle. `%`, `_` and `\` match themselves (they are escaped with `esc_like()`, as
+  WordPress's own search escapes them) and nothing is a wildcard or a pattern. That escape is MySQL's
+  default one for a `LIKE`, so on a server that runs with the `NO_BACKSLASH_ESCAPES` SQL mode, which
+  leaves a `LIKE` with none, words with one of the three find nothing; core's `WP_Query` search has
+  the same limit. Both the composed and the decomposed spelling of a letter are tried, and each is
+  also tried the way core's KSES filters store it in a title saved without the `unfiltered_html`
+  capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as `&gt;`, and a `<` that no
+  `>` closes as `&lt;` (a quote or an ampersand after that sign is escaped too, one before it is not).
+  Only a real tag such as `<script>` is dropped, and nobody searches for that. And each of those is
+  tried the way a `utf8` column (three bytes a character) stores an emoji or a symbol: core's
+  `wp_insert_post()` turns `🔥` into `&#x1f525;`, `™` into `&#x2122;`, `❤` into `&#x2764;` and so on,
+  so on such a site that is the page's title whatever was typed, and a table converted to `utf8mb4`
+  afterwards keeps the text. `©`, `®` and `€` are stored as they are. The character itself is tried
+  too, because a `utf8mb4` site stores it as typed. The forms are asked of WordPress itself
+  (`wp_kses_normalize_entities()`, `wp_pre_kses_less_than()`, `wp_encode_emoji()`), not listed here.
 - **The answer.** `search` is present **exactly when the request carried the key**, holding the words as
   they were matched: it is the caller's proof that this plugin read the parameter, because a plugin
   from before `search` answers the whole list and `ok: true`. `matched` is the number of rows that
@@ -327,12 +331,13 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   still comes back short of the ids it was cut for (a plugin that hides posts from every query, or
   a post that changed while it was read) is `read_failed`, never a shorter list, because a caller
   reads a short page as the end of the result.
-- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string or is
-  longer than 200 characters; and any `search` on `kind` `templatePart`, `template` or another kind
-  than `post`. The engine refuses text that is not valid UTF-8 the same way, but over the door it
-  never gets that far: a body that is not valid UTF-8 is not valid JSON, so the door reads no
-  request from it and answers `unauthorized`, as it does for any body it cannot read. A statement
-  the database rejects is `read_failed`, never an empty page.
+- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
+  longer than 200 characters once cleaned, or is more than 4,096 bytes before it is cleaned; and any
+  `search` on `kind` `templatePart`, `template` or another kind than `post`. The engine refuses text
+  that is not valid UTF-8 the same way, but over the door it never gets that far: a body that is not
+  valid UTF-8 is not valid JSON, so the door reads no request from it and answers `unauthorized`, as
+  it does for any body it cannot read. A statement the database rejects is `read_failed`, never an
+  empty page.
 - **A four-byte character (an emoji) on a `utf8` table.** A site that was never moved to `utf8mb4`
   keeps its posts in three-byte columns, and there core stores an emoji as an entity (`🔥` is
   `&#x1f525;`, see above), so the page exists and is found: the words are asked for the way core
