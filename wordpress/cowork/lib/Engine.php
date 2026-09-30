@@ -2351,21 +2351,23 @@ final class Engine
         if (preg_match('//u', $raw) !== 1) {
             return [null, 'search must be valid UTF-8 text'];
         }
-        // One canonical spelling whatever keyboard made it (the writer also tries the decomposed
-        // one, which is how some titles are stored). intl is optional on WordPress hosts: without
-        // it the words are used as sent.
-        if (class_exists('Normalizer')) {
-            $composed = Normalizer::normalize($raw, Normalizer::FORM_C);
-            if (is_string($composed)) {
-                $raw = $composed;
-            }
-        }
         // A control character carries no words, and a space at either end (the ideographic space
-        // of CJK input included) is not part of a title's.
+        // of CJK input included) is not part of a title's. Cleaned BEFORE the spelling is made
+        // canonical: a control character between a letter and its accent would otherwise keep the
+        // two apart, and the echoed words would come back decomposed.
         $clean = preg_replace('/\p{Cc}+/u', '', $raw);
         $clean = $clean === null ? null : preg_replace('/^[\p{Z}\s]+|[\p{Z}\s]+$/u', '', $clean);
         if ($clean === null) {
             return [null, 'search must be valid UTF-8 text'];
+        }
+        // One canonical spelling whatever keyboard made it (the writer also tries the decomposed
+        // one, which is how some titles are stored). intl is optional on WordPress hosts: without
+        // it the words are used as sent.
+        if (class_exists('Normalizer')) {
+            $composed = Normalizer::normalize($clean, Normalizer::FORM_C);
+            if (is_string($composed)) {
+                $clean = $composed;
+            }
         }
         if (mb_strlen($clean, 'UTF-8') > self::SEARCH_MAX_CHARACTERS) {
             return [null, $tooLong];

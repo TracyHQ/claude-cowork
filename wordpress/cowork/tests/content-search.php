@@ -307,6 +307,7 @@ $r = $csAsk(['search' => "Vie\u{323}\u{302}t"]);
 check('a decomposed needle finds both too, and is echoed composed', [$csIds($r), $r['search'] ?? null, $r['matched'] ?? null], [[41, 42], "Vi\u{1EC7}t", 2]);
 check('a needle spanning composed letters in the middle of the words', $csIds($csAsk(['search' => "h\u{E0}ng Vi"])), [41, 42]);
 check('an accent on a Latin letter, both ways', [$csIds($csAsk(['search' => "Caf\u{E9}"])), $csIds($csAsk(['search' => "Cafe\u{301}"]))], [[46, 47], [46, 47]]);
+check('a control character between a letter and its accent is removed first, so the echo is composed all the same', [$csAsk(['search' => "Cafe\x01\u{301}"])['search'] ?? null, $csAsk(['search' => "Cafe\u{301}\x01"])['search'] ?? null, $csIds($csAsk(['search' => "Cafe\x01\u{301}"]))], ["Caf\u{E9}", "Caf\u{E9}", [46, 47]]);
 check('the writer tries the composed and the decomposed spelling', Claude_Cowork_Site_Writer::search_forms("Caf\u{E9}"), ["Caf\u{E9}", "Cafe\u{301}"]);
 check('CJK: two characters', $csIds($csAsk(['search' => '屋根'])), [43]);
 check('CJK: one character is enough', $csIds($csAsk(['search' => '修'])), [43]);
