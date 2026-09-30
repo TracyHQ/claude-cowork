@@ -589,13 +589,16 @@ check('and once nothing hides a post, the same search is whole', [$csAsk(['searc
 // ── the plugin loads the way a site loads it ────────────────────────────────────────────────────
 
 if (function_exists('proc_open')) {
-    $proc = proc_open([PHP_BINARY, __DIR__ . '/content-search-load.php'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    // Errors on stderr whatever the machine's php.ini says: with none (a bare CLI image) PHP prints them on
+    // STDOUT, and a check that only quotes stderr reports a fatal "Class not found" as an empty message.
+    $proc = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', __DIR__ . '/content-search-load.php'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
     $out = stream_get_contents($pipes[1]);
     $err = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
     $code = proc_close($proc);
-    check('a search runs with only the classes claude-cowork.php loads' . ($code === 0 ? '' : " ({$err})"), $code, 0);
+    $why = substr(trim((string) preg_replace('/\s+/', ' ', $err . ' ' . $out)), 0, 300);
+    check('a search runs with only the classes claude-cowork.php loads' . ($code === 0 ? '' : " ({$why})"), $code, 0);
     checkTrue('and says so', strpos($out, 'search loads and answers') !== false);
 } else {
     echo "  (proc_open is disabled: the production-load check was skipped)\n";
