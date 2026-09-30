@@ -1009,15 +1009,18 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
      * Not searched, on purpose: notes, bodies, `label`, `menutype` (the key), emails — the words a
      * caller types are the words a row is called by.
      *
-     * The columns do not compare alike, and this code cannot change that (a LIKE follows the column's
-     * collation). In Joomla 5.4 and 6.1's install SQL (installation/sql/mysql: base, extensions and
-     * supports.sql) every title and name is declared without a collation, so it takes its table's,
-     * utf8mb4_unicode_ci: case and accents are ignored. Every `alias` in the map below — article,
-     * category, tag, menuItem, banner, contact, newsfeed — is declared
-     * `varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`: binary, so an alias matches EXACTLY,
-     * case, accents and NFC against NFD included. A caller passes an alias stem the way it is stored
-     * (Joomla writes it lower case, hyphenated). SQLite, which the tests run patterns through, folds
-     * ASCII case whatever the column says, so no test here can show it.
+     * The columns do not compare alike (a LIKE follows the column's collation), and whereWords() deals
+     * with the difference. In Joomla 5.4 and 6.1's install SQL (installation/sql/mysql: base, extensions
+     * and supports.sql) every title and name is declared without a collation, so it takes its table's,
+     * utf8mb4_unicode_ci: case and accents are ignored, and it is compared with the needle as typed.
+     * Every `alias` in the map below — article, category, tag, menuItem, banner, contact, newsfeed — is
+     * declared `varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`: binary, so a LIKE on it compares
+     * case. Joomla writes an alias lower case (OutputFilter::stringURLSafe), so an alias is compared as
+     * `LOWER(alias)` with the needle lower-cased, and a caller may capitalise a stem and still reach every
+     * language edition. It still tells accents apart, and NFC from NFD (both forms of the needle are tried).
+     * The tests run this SQL through SQLite set to a case-sensitive LIKE, which stands in for the binary
+     * column; SQLite's LOWER() folds ASCII only, so what a database's LOWER() does to a non-ASCII capital
+     * is left to a live site.
      *
      * @var array<string,string[]>
      */
@@ -1088,7 +1091,13 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
 
     /**
      * Narrow a query on the table aliased `a` to the rows where any searched column holds any
-     * variant: `(a.title LIKE :s0 ESCAPE '!' OR a.title LIKE :s1 ESCAPE '!' OR a.alias LIKE …)`.
+     * variant: `(a.title LIKE :s0 ESCAPE '!' OR a.title LIKE :s1 ESCAPE '!' OR LOWER(a.alias) LIKE …)`.
+     *
+     * A title or a name is compared as it is and follows its column's collation, which ignores case.
+     * An `alias` column is binary, so it is compared lower-cased, `LOWER(a.alias)`, with the variants
+     * lower-cased (SearchNeedle::lowerCased()): Joomla stores an alias lower case, and without this a
+     * capitalised needle misses every alias it names. The wrapper costs nothing an index could have
+     * saved, because a pattern that starts with `%` never used one.
      *
      * Bound parameters only — the caller's words never reach the SQL text. One placeholder per
      * column and variant, never one reused: a named parameter used twice is refused by PDO's native
@@ -1102,11 +1111,15 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     {
         $patterns = [];
         $terms = [];
+        $lowered = \SearchNeedle::lowerCased($variants);
         foreach ($this->searchColumnsOf($kind, $variants) as $column) {
-            foreach ($variants as $variant) {
+            $isAlias = $column === 'alias';
+            $words = $isAlias ? $lowered : $variants;
+            $name = 'a.' . $this->db->quoteName($column);
+            foreach ($words as $variant) {
                 $key = ':s' . count($patterns);
                 $patterns[$key] = \SearchNeedle::like($variant);
-                $terms[] = 'a.' . $this->db->quoteName($column) . ' LIKE ' . $key . " ESCAPE '" . \SearchNeedle::LIKE_ESCAPE . "'";
+                $terms[] = ($isAlias ? 'LOWER(' . $name . ')' : $name) . ' LIKE ' . $key . " ESCAPE '" . \SearchNeedle::LIKE_ESCAPE . "'";
             }
         }
         $query->where('(' . implode(' OR ', $terms) . ')');

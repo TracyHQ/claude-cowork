@@ -369,6 +369,33 @@ final class SearchNeedle
     }
 
     /**
+     * The variants to compare an ALIAS column with: each one lower-cased, the duplicates dropped.
+     *
+     * An alias has a list of its own because it is the one searched column that does not ignore case by
+     * itself. Joomla writes an alias lower case (`OutputFilter::stringURLSafe` and `stringURLUnicodeSlug`
+     * both return lower-cased text), but the column is `utf8mb4_bin` in every kind that has one, and a
+     * binary collation compares case: `LIKE '%Roof%'` misses the alias `roof-repair`, and a caller
+     * types a word the way a person does, capitalised. So the writer lower-cases the column
+     * (`LOWER(alias)`) and compares it with THESE, which finds the alias whatever case the needle came
+     * in, and the upper-case value that an import once left behind as well. A title or a name needs none
+     * of it: it follows its table's collation, which ignores case, and is compared with the variants as
+     * they are.
+     *
+     * The composed and the decomposed form stay two variants, as clean() made them, because an alias may
+     * hold either and lower-casing does not join them. Case is the only thing folded here: an alias still
+     * tells `e` from `é`, which its binary collation does not fold and this does not try to.
+     *
+     * @param string[] $variants from clean()
+     * @return string[]
+     */
+    public static function lowerCased(array $variants): array
+    {
+        return array_values(array_unique(array_map(function (string $variant): string {
+            return mb_strtolower($variant, 'UTF-8');
+        }, $variants)));
+    }
+
+    /**
      * One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had.
      *
      * A Normalizer counts only when it can normalise. `disable_classes=Normalizer`, which hardened hosts
@@ -410,12 +437,15 @@ interface SearchableSiteWriter
 
     /**
      * list(), narrowed to the rows where ANY searched column of the kind holds ANY of the variants
-     * as a substring. "Holds" is the database's own comparison of that column, and it is not one rule:
-     * a title or a name follows its table's collation (utf8mb4_unicode_ci on a stock Joomla, so case
-     * and accents are ignored), while an alias column is utf8mb4_bin in Joomla's schema and matches
-     * exactly, case and accents included. The same rows, the same order, the same summaries as list()
-     * gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a trashed row is
-     * listed like any other, because hiding it would make "this is the only match" unsafe to say.
+     * as a substring, ignoring case. The columns do not ignore it the same way. A title or a name follows
+     * its table's collation (utf8mb4_unicode_ci on a stock Joomla, which ignores case and accents). An
+     * alias column is utf8mb4_bin in Joomla's schema, which compares case, so an alias is compared
+     * lower-cased (`LOWER(column)`) with the variants lower-cased (SearchNeedle::lowerCased()): Joomla
+     * writes every alias lower case, and a capitalised needle has to reach it all the same. An alias
+     * still tells accents apart where a title does not. The same rows, the same order, the same
+     * summaries as list() gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a
+     * trashed row is listed like any other, because hiding it would make "this is the only match"
+     * unsafe to say.
      *
      * @param string[] $variants strings from SearchNeedle::clean(), at least one
      * @return array<int,array<string,?scalar>>

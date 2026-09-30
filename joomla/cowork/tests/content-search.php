@@ -7,7 +7,11 @@
 //      literal — the one thing no fake can vouch for;
 //   3. the real JoomlaSiteWriter, through a driver that records the SQL it is handed: one bound
 //      placeholder per column and variant, none overwritten, no state filter, no words in the text,
-//      and the plain list() still the query it was before search existed;
+//      an alias compared lower-cased on both sides, and the plain list() still the query it was
+//      before search existed;
+//   3b. that same writer's statements run for real over SQLite in its case-sensitive LIKE mode, which
+//      stands in for the binary alias column: a capitalised needle reaches a lower-case alias whose
+//      title does not hold it, and an alias stored in upper case is found;
 //   4. the engine's answers through an in-memory writer: the echo that proves the plugin read the
 //      request, `matched`, paging, every kind filtered or refused, and the answer without `search`
 //      unchanged byte for byte against what the code before this change answered;
@@ -15,10 +19,12 @@
 //      answers.
 //
 // Fixtures are neutral. What a LIKE counts as equal (case, accents, NFC against NFD) is the column's
-// collation, and no test here can show it: SQLite folds ASCII case whatever a column says. Joomla's
-// own schema gives a title its table's utf8mb4_unicode_ci and an alias utf8mb4_bin, so an alias
-// matches exactly (README, "Case and accents differ between title and alias"); the rest is left to
-// a live smoke on a real site, and nothing here claims it.
+// collation, and only a live site shows a collation. Joomla's own schema gives a title its table's
+// utf8mb4_unicode_ci (case and accents ignored) and an alias utf8mb4_bin (case compared); the writer
+// makes an alias ignore case by itself, comparing LOWER(alias) with the lower-cased needle (README,
+// "Case is ignored in the title and in the alias"). Section 3 holds that statement's text and 3b
+// runs it. What SQLite cannot stand in for, a title's collation, accents, and a database's own
+// LOWER() on a non-ASCII capital, is left to a live smoke on a real site, and nothing here claims it.
 
 // The Joomla pieces the search path touches, each declared only if no other test file has declared it
 // first. `Joomla\CMS\Factory` is left out ON PURPOSE: the search paths never call it, and
@@ -87,13 +93,19 @@ namespace {
         }
     }
 
-    /** A driver that answers what it was told to and records every statement it was asked to run. */
+    /**
+     * A driver that answers what it was told to and records every statement it was asked to run.
+     * With `pdo` set it runs each statement for real on that connection, with the values it was bound
+     * to, instead of answering `rows` and `scalar`.
+     */
     final class CsDb implements \Joomla\Database\DatabaseInterface
     {
         /** @var array<int,array{sql:string,bound:array<string,mixed>,types:array<string,string>,offset:int,limit:int}> */
         public array $ran = [];
         public array $rows = [];
         public $scalar = 0;
+        public ?\PDO $pdo = null;
+        private array $fetched = [];
         private $pending = null;
 
         public function getQuery($new = false): CsQuery { return new CsQuery(); }
@@ -104,8 +116,12 @@ namespace {
         }
         public function quote($text): string { return "'" . addslashes((string) $text) . "'"; }
         public function setQuery($query, $offset = 0, $limit = 0): self { $this->pending = [$query, $offset, $limit]; return $this; }
-        public function loadAssocList(): array { $this->run(); return $this->rows; }
-        public function loadResult() { $this->run(); return $this->scalar; }
+        public function loadAssocList(): array { $this->run(); return $this->pdo !== null ? $this->fetched : $this->rows; }
+        public function loadResult()
+        {
+            $this->run();
+            return $this->pdo !== null ? ($this->fetched === [] ? null : array_values($this->fetched[0])[0]) : $this->scalar;
+        }
         public function execute(): bool { $this->run(); return true; }
 
         private function run(): void
@@ -119,7 +135,16 @@ namespace {
                     $types[$key] = $item->type;
                 }
             }
-            $this->ran[] = ['sql' => $query instanceof CsQuery ? $query->sql() : (string) $query, 'bound' => $bound, 'types' => $types, 'offset' => $offset, 'limit' => $limit];
+            $sql = $query instanceof CsQuery ? $query->sql() : (string) $query;
+            $this->ran[] = ['sql' => $sql, 'bound' => $bound, 'types' => $types, 'offset' => $offset, 'limit' => $limit];
+            if ($this->pdo !== null) {
+                $statement = $this->pdo->prepare($limit > 0 ? $sql . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset : $sql);
+                foreach ($bound as $key => $value) {
+                    $statement->bindValue($key, $value);
+                }
+                $statement->execute();
+                $this->fetched = $statement->fetchAll(PDO::FETCH_ASSOC);
+            }
         }
     }
 
@@ -227,6 +252,18 @@ namespace {
     check('like: quotes and a backslash are left alone', SearchNeedle::like("C:\\path O'Brien \"x\""), "%C:\\path O'Brien \"x\"%");
     check('like: an escape is never escaped twice', SearchNeedle::like('!%'), '%!!!%%');
 
+    // lowerCased(): the variants an ALIAS is compared with. Joomla writes an alias lower case, the column
+    // is binary, so the needle is lower-cased to meet it (and the column is, in SQL: section 3).
+    check('lowerCased: a capitalised word is lower-cased', SearchNeedle::lowerCased(['Roof Repair']), ['roof repair']);
+    check('lowerCased: a lower-case stem is left as it is', SearchNeedle::lowerCased(['roof-repair']), ['roof-repair']);
+    check('lowerCased: non-ASCII capitals are lower-cased too', SearchNeedle::lowerCased(["\u{0410}\u{0411}", "\u{00C9}cole"]), ["\u{0430}\u{0431}", "\u{00E9}cole"]);
+    check('lowerCased: the composed and the decomposed form stay two variants', SearchNeedle::lowerCased([$csNfc, $csNfd]), ["nguy\u{1EC5}n", "nguye\u{302}\u{303}n"]);
+    check('lowerCased: variants that agree once lower-cased are one', SearchNeedle::lowerCased(['Roof', 'ROOF', 'roof']), ['roof']);
+    check('lowerCased: nothing in, nothing out', SearchNeedle::lowerCased([]), []);
+    check('lowerCased: % _ and the escape character have no case, so the pattern is the same one', SearchNeedle::like(SearchNeedle::lowerCased(['50%_OFF!'])[0]), '%50!%!_off!!%');
+    check('lowerCased: the cleaned needle is untouched, and it is what the answer echoes', SearchNeedle::clean(' Roof ')['text'], 'Roof');
+    check('lowerCased: and the variants clean() hands out are still the words as typed', SearchNeedle::clean('Roof')['variants'], ['Roof']);
+
     // ============================================ 2. the pattern through a real SQL engine
     // SQLite's LIKE folds case for ASCII only, where MySQL's follows the collation, so this holds the
     // ESCAPE behaviour and nothing else: that the pattern means what it says.
@@ -287,25 +324,37 @@ namespace {
         check("sql: list({$csKind}) is the query it was before search existed", [$csDb->ran[0]['sql'], $csDb->ran[0]['bound'], $csDb->ran[0]['offset'], $csDb->ran[0]['limit']], [$csWantSql, [], 20, 50]);
     }
 
-    $csTitleAlias = "(a.`title` LIKE :s0 ESCAPE '!' OR a.`title` LIKE :s1 ESCAPE '!' OR a.`alias` LIKE :s2 ESCAPE '!' OR a.`alias` LIKE :s3 ESCAPE '!')";
+    // The alias is the one column compared lower-cased, `LOWER(a.alias)`, with lower-cased words: the column is
+    // binary, Joomla stores an alias lower case, and a capitalised needle has to reach it. The title is not.
+    $csTitleAlias = "(a.`title` LIKE :s0 ESCAPE '!' OR a.`title` LIKE :s1 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s2 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s3 ESCAPE '!')";
     $csDb = $csSql(fn ($writer) => $writer->searchRows('category', [$csNfc, $csNfd], 20, 50));
     $csRan = $csDb->ran[0];
-    check('sql: a search adds one LIKE per column and variant, each with a placeholder of its own', $csRan['sql'],
+    check('sql: a search adds one LIKE per column and variant, each with a placeholder of its own, the alias lower-cased', $csRan['sql'],
         'SELECT a.`id`, a.`title`, a.`alias`, a.`path`, a.`parent_id`, a.`level`, a.`extension`, a.`published`, a.`language` FROM `#__categories` AS `a` WHERE ' . $csTitleAlias . ' ORDER BY a.`id` ASC');
-    check('sql: every placeholder holds its own pattern, none overwritten by a later one', $csRan['bound'],
-        [':s0' => '%' . $csNfc . '%', ':s1' => '%' . $csNfd . '%', ':s2' => '%' . $csNfc . '%', ':s3' => '%' . $csNfd . '%']);
+    check('sql: every placeholder holds its own pattern, none overwritten by a later one; the title as typed, the alias lower-cased', $csRan['bound'],
+        [':s0' => '%' . $csNfc . '%', ':s1' => '%' . $csNfd . '%', ':s2' => "%nguy\u{1EC5}n%", ':s3' => "%nguye\u{302}\u{303}n%"]);
     check('sql: the patterns are bound as strings', array_values(array_unique($csRan['types'])), ['string']);
     check('sql: offset and limit apply to the narrowed set', [$csRan['offset'], $csRan['limit']], [20, 50]);
 
     $csDb = $csSql(fn ($writer) => $writer->searchRows('menuItem', ['news'], 0, 100));
     check('sql: a menu item search keeps the site-menu scope beside the words',
         substr($csDb->ran[0]['sql'], strpos($csDb->ran[0]['sql'], ' WHERE ')),
-        " WHERE a.`client_id` = 0 AND (a.`title` LIKE :s0 ESCAPE '!' OR a.`alias` LIKE :s1 ESCAPE '!') ORDER BY a.`id` ASC");
+        " WHERE a.`client_id` = 0 AND (a.`title` LIKE :s0 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s1 ESCAPE '!') ORDER BY a.`id` ASC");
 
     $csDb = $csSql(fn ($writer) => $writer->searchRows('article', ['roof'], 0, 100));
     $csArticleSql = $csDb->ran[0]['sql'];
     checkTrue('sql: an article search keeps the category join', str_contains($csArticleSql, 'LEFT JOIN `#__categories` AS `c` ON c.id = a.catid'));
-    checkTrue('sql: and searches the article, not the joined category', str_contains($csArticleSql, " WHERE (a.`title` LIKE :s0 ESCAPE '!' OR a.`alias` LIKE :s1 ESCAPE '!') ORDER BY a.`id` ASC"));
+    checkTrue('sql: and searches the article, not the joined category', str_contains($csArticleSql, " WHERE (a.`title` LIKE :s0 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s1 ESCAPE '!') ORDER BY a.`id` ASC"));
+
+    // A capitalised needle: the title's pattern keeps the case the caller typed (the title's collation
+    // ignores it), the alias's is lower-cased (its column is binary and Joomla stores it lower case).
+    $csDb = $csSql(fn ($writer) => $writer->searchRows('article', ['Roof Repair'], 0, 100));
+    check('sql: a capitalised needle is bound as typed for the title and lower-cased for the alias', $csDb->ran[0]['bound'], [':s0' => '%Roof Repair%', ':s1' => '%roof repair%']);
+    $csDb = $csSql(fn ($writer) => $writer->searchRows('article', ['roof'], 0, 100));
+    check('sql: a lower-case needle is bound the same for both', $csDb->ran[0]['bound'], [':s0' => '%roof%', ':s1' => '%roof%']);
+    $csDb = $csSql(fn ($writer) => $writer->searchRows('field', ['Colour'], 0, 100));
+    check('sql: a column that is not an alias is never lower-cased: field is searched by title and name as typed',
+        [$csDb->ran[0]['bound'], str_contains($csDb->ran[0]['sql'], 'LOWER(')], [[':s0' => '%Colour%', ':s1' => '%Colour%'], false]);
 
     $csDb = $csSql(fn ($writer) => $writer->searchRows('bannerClient', ['acme'], 0, 10));
     checkTrue('sql: a banner client is searched by name alone — the table has no alias', str_contains($csDb->ran[0]['sql'], " WHERE (a.`name` LIKE :s0 ESCAPE '!') ORDER BY"));
@@ -316,7 +365,9 @@ namespace {
         $csWhere = explode(' ORDER BY ', $csWhere, 2)[0];
         checkTrue("sql: {$csKind} has no state or published filter, so a trashed row is listed", !str_contains($csWhere, 'state') && !str_contains($csWhere, 'published'));
         check("columns: every column searched on {$csKind} is one its list returns", array_values(array_diff($csColumns, $csConsts['LIST_COLUMNS'][$csKind] ?? [])), []);
-        checkTrue("sql: {$csKind} reads only its searched columns", (bool) preg_match_all('/a\.`(\w+)` LIKE/', $csWhere, $csFound) && array_values(array_unique($csFound[1])) === $csColumns);
+        checkTrue("sql: {$csKind} reads only its searched columns", (bool) preg_match_all('/a\.`(\w+)`\)? LIKE/', $csWhere, $csFound) && array_values(array_unique($csFound[1])) === $csColumns);
+        check("sql: {$csKind} lower-cases its alias column, if it has one, and no other",
+            preg_match_all('/LOWER\(a\.`(\w+)`\)/', $csWhere, $csLowered) ? array_values(array_unique($csLowered[1])) : [], in_array('alias', $csColumns, true) ? ['alias'] : []);
     }
     check('columns: the searchable kinds are these thirteen', (new JoomlaSiteWriter(new CsDb()))->searchableKinds(),
         ['article', 'category', 'tag', 'menuItem', 'module', 'templateStyle', 'language', 'menutype', 'banner', 'contact', 'newsfeed', 'bannerClient', 'field']);
@@ -327,18 +378,22 @@ namespace {
         $csDb = $csSql(fn ($writer) => $writer->searchRows('article', [$csNeedle], 0, 10));
         checkTrue("sql: {$csNeedle} is not in the statement's text", !str_contains($csDb->ran[0]['sql'], $csFragment));
         check("sql: {$csNeedle} is bound as a pattern", $csDb->ran[0]['bound'][':s0'], SearchNeedle::like($csNeedle));
+        check("sql: {$csNeedle} is bound for the alias as a lower-cased, still literal, pattern", $csDb->ran[0]['bound'][':s1'], SearchNeedle::like(mb_strtolower($csNeedle, 'UTF-8')));
     }
 
     $csDb = new CsDb();
     $csDb->scalar = '7';
     $csCounted = (new JoomlaSiteWriter($csDb))->countMatches('article', ['roof']);
     check('count: one COUNT(*) under the same predicate, with no join and no order', $csDb->ran[0]['sql'],
-        "SELECT COUNT(*) FROM `#__content` AS `a` WHERE (a.`title` LIKE :s0 ESCAPE '!' OR a.`alias` LIKE :s1 ESCAPE '!')");
+        "SELECT COUNT(*) FROM `#__content` AS `a` WHERE (a.`title` LIKE :s0 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s1 ESCAPE '!')");
     check('count: and answers an integer', $csCounted, 7);
+    $csDb = new CsDb();
+    (new JoomlaSiteWriter($csDb))->countMatches('article', ['Roof']);
+    check('count: the same words are bound as in the rows query, the alias lower-cased', $csDb->ran[0]['bound'], [':s0' => '%Roof%', ':s1' => '%roof%']);
     $csDb = new CsDb();
     (new JoomlaSiteWriter($csDb))->countMatches('menuItem', ['news']);
     check('count: a menu item count keeps the site-menu scope', $csDb->ran[0]['sql'],
-        "SELECT COUNT(*) FROM `#__menu` AS `a` WHERE a.`client_id` = 0 AND (a.`title` LIKE :s0 ESCAPE '!' OR a.`alias` LIKE :s1 ESCAPE '!')");
+        "SELECT COUNT(*) FROM `#__menu` AS `a` WHERE a.`client_id` = 0 AND (a.`title` LIKE :s0 ESCAPE '!' OR LOWER(a.`alias`) LIKE :s1 ESCAPE '!')");
 
     $csDb = new CsDb();
     $csDb->rows = [['id' => 5, 'title' => 'News', 'alias' => 'news']];
@@ -354,12 +409,90 @@ namespace {
         checkTrue("search: the writer refuses {$csKind} with " . count($csVariants) . ' words, and runs nothing', $csThrown !== '' && $csDb->ran === []);
     }
 
+    // The engine, asked for a `content.list` over any writer: defined here, ahead of the two sections that put
+    // the real writer behind it, and used by every section after.
+    $csToken = 'search-token-at-least-16chars';
+    $csAsk = function (array $params, SiteWriter $writer) use ($csToken): array {
+        return (new Engine($csToken, [], null, null, null, null, $writer, null, null))
+            ->handle(['token' => $csToken, 'action' => 'content.list', 'params' => $params]);
+    };
+
+    // ======================================= 3b. the alias, through a SQL engine that compares case
+    // A binary column (utf8mb4_bin) compares case, and SQLite's LIKE does too once `PRAGMA case_sensitive_like`
+    // is on. That is the nearest stand-in a test can have for the alias column, and it shows the one thing the SQL
+    // text cannot: that a capitalised needle REACHES a lower-case alias. The writer's own statements run here for
+    // real, over a table with the columns its list reads. Only what the stand-in gets right is asserted: a title
+    // is asked in the case it was stored, because a real title's collation folds case and this mode does not;
+    // and SQLite's LOWER() folds ASCII only, so a non-ASCII capital is lower-cased by the needle alone here, and
+    // what a database's own LOWER() does to one is left to a live site.
+    checkTrue("sql engine: pdo_sqlite is here to run the writer's statements", extension_loaded('pdo_sqlite'));
+    if (extension_loaded('pdo_sqlite')) {
+        $csBinary = new PDO('sqlite::memory:');
+        $csBinary->exec('PRAGMA case_sensitive_like = ON');
+        $csBinary->exec('CREATE TABLE `#__categories` (id INTEGER PRIMARY KEY, title TEXT, alias TEXT, path TEXT, parent_id INTEGER, level INTEGER, extension TEXT, published INTEGER, language TEXT)');
+        $csPut = $csBinary->prepare('INSERT INTO `#__categories` (id, title, alias, path, parent_id, level, extension, published, language) VALUES (?, ?, ?, ?, 1, 1, ?, 1, ?)');
+        foreach ([
+            [1, 'Roofing basics', 'roofing-basics', 'en-GB'],
+            // Translated editions of one page: the title does not hold the word, the alias stem does.
+            [2, 'Dacharbeiten', 'roofing-basics-de', 'de-DE'],
+            [3, 'Toiture', 'roofing-basics-fr', 'fr-FR'],
+            [4, 'Gutters', 'gutters', 'en-GB'],
+            // An alias stored in upper case, as an import or a hand edit can leave one.
+            [5, 'Legacy import', 'ROOFING-LEGACY', '*'],
+            [6, 'Primary school', "\u{00E9}cole-primaire", 'fr-FR'],
+            [7, 'Uebersicht', "\u{0448}\u{043A}\u{043E}\u{043B}\u{0430}-1", 'de-DE'],
+        ] as [$csId, $csTitle, $csAlias, $csLanguage]) {
+            $csPut->execute([$csId, $csTitle, $csAlias, 'p' . $csId, 'com_content', $csLanguage]);
+        }
+        $csOver = function (array $params) use ($csAsk, $csBinary): array {
+            $db = new CsDb();
+            $db->pdo = $csBinary;
+            return [$csAsk(['kind' => 'category'] + $params, new JoomlaSiteWriter($db)), $db];
+        };
+        $csFound = fn (array $answer): array => array_map('intval', array_column($answer['items'] ?? [], 'id'));
+
+        // The control, on the same connection and rows: the comparison this replaces. It misses every edition,
+        // so the checks below could fail.
+        $csPlain = $csBinary->prepare("SELECT id FROM `#__categories` WHERE title LIKE ? ESCAPE '!' OR alias LIKE ? ESCAPE '!' ORDER BY id");
+        $csPlain->execute(['%Roofing%', '%Roofing%']);
+        check('sql engine: control - a plain alias comparison misses every edition and the upper-case alias', array_map('intval', $csPlain->fetchAll(PDO::FETCH_COLUMN)), [1]);
+
+        foreach ([
+            'a capitalised needle finds the editions whose alias holds it and whose title does not, and an upper-case alias' => ['Roofing', [1, 2, 3, 5]],
+            'an all-capitals needle' => ['ROOFING', [1, 2, 3, 5]],
+            'a lower-case needle' => ['roofing', [1, 2, 3, 5]],
+            'a capitalised stem, hyphen and all' => ['Roofing-Basics', [1, 2, 3]],
+            'a stem in capitals' => ['ROOFING-BASICS', [1, 2, 3]],
+            'a stem as it is stored' => ['roofing-basics', [1, 2, 3]],
+            'an alias stored in upper case, by a lower-case needle' => ['legacy', [5]],
+            'and by a needle in capitals' => ['LEGACY', [5]],
+            'and by a capitalised one, which its title holds as well' => ['Legacy', [5]],
+            'a word only a title holds, as typed' => ['Dacharbeiten', [2]],
+            'a non-ASCII capital finds a lower-case alias' => ["\u{00C9}cole", [6]],
+            'a Cyrillic capital finds a lower-case alias' => ["\u{0428}\u{043A}\u{043E}\u{043B}\u{0430}", [7]],
+            'a word in no title and no alias' => ['Nothing', []],
+        ] as $csLabel => [$csNeedle, $csWant]) {
+            [$csAnswer] = $csOver(['search' => $csNeedle]);
+            check("sql engine: {$csLabel} ({$csNeedle})", [$csFound($csAnswer), $csAnswer['search'] ?? null, $csAnswer['matched'] ?? null], [$csWant, $csNeedle, count($csWant)]);
+        }
+
+        // Paged, so that a page which fills is counted by COUNT(*), which runs the same predicate.
+        [$csAnswer, $csDb] = $csOver(['search' => 'Roofing', 'limit' => 2]);
+        check('sql engine: a page that fills is counted by its own COUNT(*)',
+            [$csFound($csAnswer), $csAnswer['matched'], count($csDb->ran), str_starts_with($csDb->ran[1]['sql'] ?? '', 'SELECT COUNT(*)')], [[1, 2], 4, 2, true]);
+        [$csAnswer] = $csOver(['search' => 'Roofing', 'limit' => 2, 'offset' => 2]);
+        check('sql engine: the next page', [$csFound($csAnswer), $csAnswer['matched']], [[3, 5], 4]);
+        [$csAnswer] = $csOver(['search' => 'Roofing', 'limit' => 2, 'offset' => 4]);
+        check('sql engine: a page past the end is empty and still counted', [$csFound($csAnswer), $csAnswer['matched']], [[], 4]);
+    }
+
     // =============================================== 4. the engine's answers, through a writer in memory
     /**
      * The real writer's searched columns, in memory. A check below holds the two maps equal.
-     * It folds case on every column, the alias too, which is looser than the database: the real alias
-     * columns are utf8mb4_bin and match exactly. What is held here is what the engine does with a
-     * writer's answer, not how a database compares.
+     * It compares the way the real writer's SQL does, minus the collation: a title or a name ignores case (a
+     * real collation ignores accents as well, which this does not), and an alias is lower-cased on both sides.
+     * What is held here is what the engine does with a writer's answer, not how a database compares: sections
+     * 3 and 3b hold that.
      */
     final class CsSearchWriter extends FakeSiteWriter implements SearchableSiteWriter
     {
@@ -390,11 +523,14 @@ namespace {
         {
             $rows = $this->store[$kind] ?? [];
             ksort($rows);
+            $lowered = SearchNeedle::lowerCased($variants);
             $out = [];
             foreach ($rows as $id => $fields) {
                 foreach (self::COLUMNS[$kind] as $column) {
-                    foreach ($variants as $variant) {
-                        if (mb_stripos((string) ($fields[$column] ?? ''), $variant) !== false) {
+                    $isAlias = $column === 'alias';
+                    $held = (string) ($fields[$column] ?? '');
+                    foreach ($isAlias ? $lowered : $variants as $variant) {
+                        if ($isAlias ? mb_strpos(mb_strtolower($held, 'UTF-8'), $variant) !== false : mb_stripos($held, $variant) !== false) {
                             $out[] = ['id' => $id] + $fields;
                             continue 3;
                         }
@@ -408,11 +544,6 @@ namespace {
     /** A writer that predates search, whatever mode the suite runs in: the plain base, never the bulk one. */
     final class FakeSearchlessSite extends FakeSiteWriterBase {}
 
-    $csToken = 'search-token-at-least-16chars';
-    $csAsk = function (array $params, SiteWriter $writer) use ($csToken): array {
-        return (new Engine($csToken, [], null, null, null, null, $writer, null, null))
-            ->handle(['token' => $csToken, 'action' => 'content.list', 'params' => $params]);
-    };
     $csShop = function (): CsSearchWriter {
         $w = new CsSearchWriter();
         $w->store['article'] = [
@@ -450,6 +581,25 @@ namespace {
     check('answer: a row is the summary list() gives', $csAnswer['items'][0], ['id' => 1, 'title' => 'Roof repair', 'alias' => 'roof-repair', 'introtext' => '<p>one</p>']);
     check('answer: an alias-only hit is found — language editions share an alias stem', $csIds($csAsk(['kind' => 'article', 'search' => 'roof-repair'], $csShop())), [1, 2]);
     check('answer: a match is not case-sensitive', $csIds($csAsk(['kind' => 'article', 'search' => 'GUTTER'], $csShop())), [4]);
+    // The alias ignores case as the title does. Joomla writes an alias lower case, in a binary column, and the
+    // writer makes a capitalised needle reach it (3b runs that SQL); this is what the engine answers with it.
+    check('answer: a capitalised alias stem finds the editions too', $csIds($csAsk(['kind' => 'article', 'search' => 'Roof-Repair'], $csShop())), [1, 2]);
+    check('answer: and one in capitals', $csIds($csAsk(['kind' => 'article', 'search' => 'ROOF-REPAIR'], $csShop())), [1, 2]);
+    $csEditions = new CsSearchWriter();
+    foreach ([1 => ['Roofing basics', 'roofing-basics'], 2 => ['Dacharbeiten', 'roofing-basics-de'], 3 => ['Toiture', 'roofing-basics-fr'], 4 => ['Gutters', 'gutters'], 5 => ['Legacy import', 'ROOFING-LEGACY']] as $csId => [$csTitle, $csAlias]) {
+        $csEditions->store['article'][$csId] = ['title' => $csTitle, 'alias' => $csAlias];
+    }
+    foreach ([
+        'a capitalised needle finds the rows whose alias holds it and whose title does not' => ['Roofing', [1, 2, 3, 5]],
+        'an alias stored in upper case is still found, by a lower-case needle' => ['legacy', [5]],
+        'and by a capitalised one' => ['Legacy', [5]],
+        'a title is matched as before: a word only a title holds' => ['toiture', [3]],
+        'and in another case' => ['DACHARBEITEN', [2]],
+        'a word neither holds' => ['Nothing', []],
+    ] as $csLabel => [$csNeedle, $csWant]) {
+        $csAnswer = $csAsk(['kind' => 'article', 'search' => $csNeedle], $csEditions);
+        check("answer: {$csLabel} ({$csNeedle})", [$csIds($csAnswer), $csAnswer['search'], $csAnswer['matched']], [$csWant, $csNeedle, count($csWant)]);
+    }
     check('answer: no match is an empty page that says so', (function () use ($csAsk, $csShop) {
         $a = $csAsk(['kind' => 'article', 'search' => 'zzz'], $csShop());
         return [$a['ok'], $a['search'], $a['matched'], $a['items']];

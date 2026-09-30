@@ -18,7 +18,7 @@ an empty token refuses every request.
 | --- | --- |
 | `info`, `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list`, `core.manifest` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. `core.manifest` is the site's own record of which extensions are CMS core (ADR 0070 addendum). |
 | `content.list`, `content.get` | The read half of the content mirror (ADR 0071): paged summaries with checksums, then full rows — the same bytes an apply will compare against. |
-| `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds. A title ignores case; an alias is matched exactly as stored. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
+| `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
@@ -303,16 +303,22 @@ content.list {kind: "article", search: "roof repair"}
   searched. There are no wildcards and no patterns: `%` and `_` are ordinary characters (the query
   names its own `ESCAPE` character, so it means the same under any `sql_mode`), and `50%_off` finds
   "50%_off sale", not "500 off sale". The words are bound parameters, never part of the SQL text.
-- **Case and accents differ between title and alias.** A `LIKE` follows the column's collation, and
-  Joomla's own schema (5.4 and 6.1, `installation/sql/mysql`) gives the two different ones. A title or
-  name is declared with none, so it takes its table's, `utf8mb4_unicode_ci`, which ignores case and
-  accents: `ROOF` finds "Roof repair". The `alias` of `article`, `category`, `tag`, `menuItem`,
-  `banner`, `contact` and `newsfeed` is declared `utf8mb4_bin`: binary, so an alias matches
-  **exactly** — case, accents, and NFC against NFD. Pass an alias stem the way it is stored, lower
-  case and hyphenated: `roof-repair` finds the alias `roof-repair`; `Roof-Repair` does not. And a
-  space is a space, in the title and in the alias: "roof repair" does not match the alias
-  `roof-repair`, so ask for the stem when the caller wants the language editions. An empty answer for
-  a capitalised stem is the binary comparison, not proof that no row has it.
+- **Case is ignored in the title and in the alias; accents are not treated alike.** A `LIKE` follows
+  the column's collation, and Joomla's own schema (5.4 and 6.1, `installation/sql/mysql`) gives the
+  two different ones. A title or name is declared with none, so it takes its table's,
+  `utf8mb4_unicode_ci`, which ignores case and accents: `ROOF` finds "Roof repair", and `cafe` finds
+  "Café". The `alias` of `article`, `category`, `tag`, `menuItem`, `banner`, `contact` and `newsfeed`
+  is declared `utf8mb4_bin`: binary, so a plain `LIKE` on it would compare case. Joomla always
+  writes an alias lower case (`OutputFilter::stringURLSafe` lower-cases what it returns), so the
+  plugin compares the alias lower-cased — `LOWER(alias)` — with the needle lower-cased: `Roof-Repair`
+  finds the alias `roof-repair`. That is what lets one call reach every language edition of a page
+  whatever case the caller typed, and a row that stores an upper-case alias anyway (an import, a
+  hand edit) is found too. What stays exact in an alias is the rest of the binary comparison:
+  accents (`e` is not `é`), and the composed form against the decomposed one, both of which are
+  tried. A space is a space, in the title and in the alias: "roof repair" does not match the alias
+  `roof-repair`, so ask for the stem when the caller wants the language editions. A row can come
+  back through its alias alone: `roof-repair` finds an article titled "Fix your roof" whose alias is
+  `roof-repair-guide`, which is what an alias search is for and not a wrong hit.
 - **The needle.** Trimmed; a tab or a line break (including NEL and the Unicode line and paragraph
   separators, which arrive when text is pasted) becomes a space and any other control character is
   dropped. One character is enough (Chinese, Japanese). At most 200 characters once cleaned (and
@@ -338,12 +344,13 @@ content.list {kind: "article", search: "roof repair"}
   `fieldValue` — is not searched: it is a person, a URL pair, an extension's settings or a relation
   between two rows, not a page a caller finds by its title. `search` on it is refused with
   `bad_params` naming the kind and the ones that work. Never quietly ignored.
-- **Not in this change.** Searching bodies or notes, a state or language filter, an unfiltered
-  `total`, and a case-insensitive alias (that would need `LOWER()` or a `COLLATE` on the alias
-  columns). What the collation decides is decided by the site's tables, not by this code: the tests
-  hold the pattern and the SQL, on SQLite and on a recording driver, neither of which follows a MySQL
-  collation. A live site holds the rest: a mixed-case title, an accented one, a decomposed one, and a
-  capitalised alias stem. A site whose tables were altered from Joomla's install SQL may differ.
+- **Not in this change.** Searching bodies or notes, a state or language filter, and an unfiltered
+  `total`. What the collation decides is decided by the site's tables, not by this code: the tests
+  hold the pattern, the SQL text and the alias comparison (SQLite in its case-sensitive `LIKE` mode
+  stands in for the binary column), and none of them follows a MySQL collation. A live site holds the
+  rest: a mixed-case title, an accented one, a decomposed one, and what a database's `LOWER()` does to
+  a non-ASCII capital in a binary alias. A site whose tables were altered from Joomla's install SQL
+  may differ.
 
 ## Unreleased Joomla 6 Content API pilot
 

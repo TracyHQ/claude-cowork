@@ -1295,7 +1295,8 @@ final class Engine
      * caller cannot ask a shared host for its whole content table in one request; paging to the
      * end is the caller's loop. An empty page is the answer "you are past the end", not an error.
      *
-     * `search` narrows the list to the rows whose title (or name, and alias) holds the words, so a
+     * `search` narrows the list to the rows whose title (or name, and alias) holds the words, ignoring
+     * case in the alias as in the title (the writer sees to it, whatever the column's collation), so a
      * caller that knows a page by its title asks once instead of paging to it. The answer CARRIES
      * THE WORDS BACK (`search`, the request's once cleaned) and, for a non-empty needle, how many
      * rows match in all (`matched`). The key is the proof that this plugin read the request: a
