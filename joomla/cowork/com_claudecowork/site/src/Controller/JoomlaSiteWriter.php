@@ -1012,11 +1012,12 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
      * The columns do not compare alike, and this code cannot change that (a LIKE follows the column's
      * collation). In Joomla 5.4 and 6.1's install SQL (installation/sql/mysql: base, extensions and
      * supports.sql) every title and name is declared without a collation, so it takes its table's,
-     * utf8mb4_unicode_ci: case and accents are ignored. Every `alias` above — article, category, tag,
-     * menuItem, banner, contact, newsfeed — is `varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`:
-     * binary, so an alias matches EXACTLY, case, accents and NFC against NFD included. A caller passes
-     * an alias stem the way it is stored (Joomla writes it lower case, hyphenated). SQLite, which the
-     * tests run patterns through, folds ASCII case whatever the column says, so no test here can show it.
+     * utf8mb4_unicode_ci: case and accents are ignored. Every `alias` in the map below — article,
+     * category, tag, menuItem, banner, contact, newsfeed — is declared
+     * `varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`: binary, so an alias matches EXACTLY,
+     * case, accents and NFC against NFD included. A caller passes an alias stem the way it is stored
+     * (Joomla writes it lower case, hyphenated). SQLite, which the tests run patterns through, folds
+     * ASCII case whatever the column says, so no test here can show it.
      *
      * @var array<string,string[]>
      */
