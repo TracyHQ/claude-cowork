@@ -315,10 +315,12 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   still comes back short of the ids it was cut for (a plugin that hides posts from every query, or
   a post that changed while it was read) is `read_failed`, never a shorter list, because a caller
   reads a short page as the end of the result.
-- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
-  not valid UTF-8, or is longer than 200 characters; and any `search` on `kind` `templatePart`,
-  `template` or another kind than `post`. A statement the database rejects is `read_failed`, not an
-  empty page.
+- **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string or is
+  longer than 200 characters; and any `search` on `kind` `templatePart`, `template` or another kind
+  than `post`. The engine refuses text that is not valid UTF-8 the same way, but over the door it
+  never gets that far: a body that is not valid UTF-8 is not valid JSON, so the door reads no
+  request from it and answers `unauthorized`, as it does for any body it cannot read. A statement
+  the database rejects is `read_failed`, not an empty page.
 
 The ids are found by one prepared statement that pages in SQL (`WP_Query`'s own `s` is not used: it
 splits words, treats a leading `-` as "exclude", searches the body, and drops password-protected posts
