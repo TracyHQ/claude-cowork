@@ -281,6 +281,127 @@ interface BulkSiteReader
     public function readMany(string $kind, array $ids): array;
 }
 
+/**
+ * The words of a `content.list` `search`, cleaned and made ready to match. Plain PHP with no Joomla
+ * and no database, so the test runner can put every awkward needle through it.
+ *
+ * It lives in THIS file, beside the interface that uses it, on purpose: this is the one file every
+ * loader of the engine already requires (`EngineFactory::loadEngine`, the Joomla 3 controller,
+ * `Engine.php` itself), and `JoomlaSiteWriter` cannot be loaded without it. A helper in a NEW lib
+ * file would pass every test, which require files by hand, and fatal in production, which requires
+ * an explicit list.
+ */
+final class SearchNeedle
+{
+    /** The longest needle, in characters. A title is one line; more than this is a pasted paragraph. */
+    public const MAX_LENGTH = 200;
+
+    /**
+     * The character that escapes `%` and `_` in the pattern like() builds — named in the SQL as an
+     * explicit ESCAPE clause. Not a backslash: LIKE's default escape character is a backslash except
+     * under sql_mode NO_BACKSLASH_ESCAPES, where it has none, so a needle's `%` would be a wildcard
+     * on such a site. With the clause spelled out the pattern means the same in every mode.
+     */
+    public const LIKE_ESCAPE = '!';
+
+    /**
+     * Clean one `search` value.
+     *
+     * Line breaks and tabs are gaps between words; every other control character (NUL, escape, DEL,
+     * the C1 range) is dropped; the ends are trimmed, no-break and ideographic spaces included. The
+     * result is NFC when this PHP can normalise (`Normalizer`, from intl or a polyfill), and matched
+     * as its NFC and NFD forms, because a title may have been stored either way. Without a
+     * normaliser the needle is used as it came: it matches what was typed the same way, and nothing
+     * is refused for lack of one. No minimum length: one character is a word in Chinese or Japanese.
+     *
+     * @param mixed $raw the request's `search`, whatever it was
+     * @return array{ok:true,text:string,variants:string[]}|array{ok:false,message:string}
+     *         `text` is what the answer echoes; `variants` are the strings to match, none when `text`
+     *         is empty (an empty needle filters nothing).
+     */
+    public static function clean($raw): array
+    {
+        if (!is_string($raw)) {
+            return ['ok' => false, 'message' => 'search must be a string of at most ' . self::MAX_LENGTH . ' characters'];
+        }
+        $text = preg_replace(['/[\t\n\r\x0B\x0C]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
+        if ($text !== null) {
+            $text = preg_replace('/^[\s\p{Z}]+|[\s\p{Z}]+$/u', '', $text);
+        }
+        if ($text === null) {
+            return ['ok' => false, 'message' => 'search must be valid UTF-8 text'];
+        }
+        $nfc = self::form($text, false);
+        if (mb_strlen($nfc, 'UTF-8') > self::MAX_LENGTH) {
+            return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];
+        }
+        if ($nfc === '') {
+            return ['ok' => true, 'text' => '', 'variants' => []];
+        }
+        return ['ok' => true, 'text' => $nfc, 'variants' => array_values(array_unique([$nfc, self::form($nfc, true)]))];
+    }
+
+    /**
+     * The LIKE pattern for one variant: the word between two `%`, with `%`, `_` and the escape
+     * character itself made literal. Pair it with `ESCAPE '<LIKE_ESCAPE>'` in the SQL.
+     */
+    public static function like(string $variant): string
+    {
+        $e = self::LIKE_ESCAPE;
+        return '%' . strtr($variant, [$e => $e . $e, '%' => $e . '%', '_' => $e . '_']) . '%';
+    }
+
+    /** One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had. */
+    private static function form(string $text, bool $decomposed): string
+    {
+        if (!class_exists('Normalizer')) {
+            return $text;
+        }
+        $out = \Normalizer::normalize($text, $decomposed ? \Normalizer::FORM_D : \Normalizer::FORM_C);
+        return is_string($out) ? $out : $text;
+    }
+}
+
+/**
+ * Optional: a writer that can list only the rows whose NAME holds some words.
+ *
+ * Why it exists: a caller that knows a page by its title had to page through list() until it met
+ * it. On a site of ~1,900 articles that was two to eight extra model calls, and up to 18 calls and
+ * 256 s in one measured run (Tracy bench v7, 30/09/2026).
+ *
+ * It is its own interface, not a fourth argument of list(), so that a writer without it is REFUSED
+ * when a caller sends `search`. A widened list() would let such a writer take the key and ignore it,
+ * which is the answer this exists to end: ok, and the whole list, as if it had been filtered.
+ */
+interface SearchableSiteWriter
+{
+    /**
+     * The kinds whose rows carry a name to search. A kind not listed has none (a user, a redirect,
+     * a relation) and the engine refuses `search` on it instead of ignoring it.
+     *
+     * @return string[]
+     */
+    public function searchableKinds(): array;
+
+    /**
+     * list(), narrowed to the rows where ANY searched column of the kind holds ANY of the variants
+     * as a case-insensitive substring. The same rows, the same order, the same summaries as list()
+     * gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a trashed row is
+     * listed like any other, because hiding it would make "this is the only match" unsafe to say.
+     *
+     * @param string[] $variants strings from SearchNeedle::clean(), at least one
+     * @return array<int,array<string,?scalar>>
+     */
+    public function searchRows(string $kind, array $variants, int $offset, int $limit): array;
+
+    /**
+     * How many rows searchRows() would answer over all pages, whatever the offset and limit.
+     *
+     * @param string[] $variants
+     */
+    public function countMatches(string $kind, array $variants): int;
+}
+
 interface MediaWriter
 {
     /** The bytes currently at a media path, or null when nothing is there (so the undo is a delete). */

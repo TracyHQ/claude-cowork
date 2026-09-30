@@ -37,7 +37,7 @@ use Joomla\Database\ParameterType;
  * from-scratch article would have no ACL. Reskin edits existing rows, which is the path this is
  * built and tested for first; a create path grows an assets row here when a Proposal needs it.
  */
-final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
+final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \SearchableSiteWriter
 {
     /**
      * The catalog (ADR 0080 §2): each kind declares its table, the only columns an Apply may set,
@@ -997,10 +997,124 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
         'extensionParams' => ['extension_id', 'name', 'type', 'element', 'folder', 'client_id', 'enabled'],
     ];
 
+    /**
+     * The columns `content.list` `search` looks in, per kind: the ones that NAME a row. A kind with no
+     * row here is not searchable and the engine refuses `search` on it instead of ignoring it.
+     *
+     * Every column below is one LIST_COLUMNS already returns for the kind (LIST_COLUMNS was copied
+     * from a real install's SHOW COLUMNS), so none is a guess. `alias` is searched wherever the table
+     * has one, because the language editions of one article share an alias stem while their titles
+     * are translated: a title-only search finds one edition, a title-or-alias search finds them all.
+     * `#__banner_clients` has no alias, and a search naming one would fail on every bannerClient.
+     * Not searched, on purpose: notes, bodies, `label`, `menutype` (the key), emails — the words a
+     * caller types are the words a row is called by.
+     *
+     * @var array<string,string[]>
+     */
+    private const SEARCH_COLUMNS = [
+        'article'       => ['title', 'alias'],
+        'category'      => ['title', 'alias'],
+        'tag'           => ['title', 'alias'],
+        'menuItem'      => ['title', 'alias'],
+        'module'        => ['title'],
+        'templateStyle' => ['title'],
+        'language'      => ['title'],
+        'menutype'      => ['title'],
+        'banner'        => ['name', 'alias'],
+        'contact'       => ['name', 'alias'],
+        'newsfeed'      => ['name', 'alias'],
+        'bannerClient'  => ['name'],
+        'field'         => ['title', 'name'],
+    ];
+
     public function list(string $kind, int $offset, int $limit): array
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment', 'fieldValue'], true)) return [];
         if ($kind === 'languageFilter') return $this->db->setQuery("SELECT extension_id AS id, enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssocList();
+        return $this->rows($kind, $offset, $limit, null);
+    }
+
+    public function searchableKinds(): array
+    {
+        return array_keys(self::SEARCH_COLUMNS);
+    }
+
+    public function searchRows(string $kind, array $variants, int $offset, int $limit): array
+    {
+        $this->searchColumnsOf($kind, $variants);
+        return $this->rows($kind, $offset, $limit, $variants);
+    }
+
+    /** One SELECT COUNT(*) under the same scope and the same predicate as searchRows(), and no join. */
+    public function countMatches(string $kind, array $variants): int
+    {
+        $this->searchColumnsOf($kind, $variants);
+        $query = $this->db->getQuery(true)
+            ->select('COUNT(*)')
+            ->from($this->db->quoteName($this->tableFor($kind), 'a'));
+        $this->applyScope($kind, $query, 'a');
+        $this->whereWords($query, $kind, $variants);
+        return (int) $this->db->setQuery($query)->loadResult();
+    }
+
+    /**
+     * The columns a search of this kind reads. Throws for a kind that cannot be searched and for no
+     * words at all: the engine checks both first, so reaching here is a caller bypassing it, and an
+     * empty predicate would be a syntax error at best and an unfiltered list at worst.
+     *
+     * @param string[] $variants
+     * @return string[]
+     */
+    private function searchColumnsOf(string $kind, array $variants): array
+    {
+        if (!isset(self::SEARCH_COLUMNS[$kind])) {
+            throw new \RuntimeException("kind {$kind} cannot be searched");
+        }
+        if ($variants === []) {
+            throw new \RuntimeException('a search needs at least one word');
+        }
+        return self::SEARCH_COLUMNS[$kind];
+    }
+
+    /**
+     * Narrow a query on the table aliased `a` to the rows where any searched column holds any
+     * variant: `(a.title LIKE :s0 ESCAPE '!' OR a.title LIKE :s1 ESCAPE '!' OR a.alias LIKE …)`.
+     *
+     * Bound parameters only — the caller's words never reach the SQL text. One placeholder per
+     * column and variant, never one reused: a named parameter used twice is refused by PDO's native
+     * prepares. Each is bound to its OWN array slot, by reference as Joomla's bind() takes it: a loop
+     * variable bound the same way would be overwritten by the next turn, and every placeholder would
+     * be sent the last variant.
+     *
+     * @param string[] $variants
+     */
+    private function whereWords(\Joomla\Database\QueryInterface $query, string $kind, array $variants): void
+    {
+        $patterns = [];
+        $terms = [];
+        foreach ($this->searchColumnsOf($kind, $variants) as $column) {
+            foreach ($variants as $variant) {
+                $key = ':s' . count($patterns);
+                $patterns[$key] = \SearchNeedle::like($variant);
+                $terms[] = 'a.' . $this->db->quoteName($column) . ' LIKE ' . $key . " ESCAPE '" . \SearchNeedle::LIKE_ESCAPE . "'";
+            }
+        }
+        $query->where('(' . implode(' OR ', $terms) . ')');
+        foreach ($patterns as $key => &$pattern) {
+            $query->bind($key, $pattern, ParameterType::STRING);
+        }
+        unset($pattern);
+    }
+
+    /**
+     * The rows of list(), and of searchRows() when `$variants` names words: one query, ordered by
+     * the key, scoped like every read, plus the words predicate only when there are words — so a
+     * plain list is exactly the query it always was.
+     *
+     * @param string[]|null $variants
+     */
+    private function rows(string $kind, int $offset, int $limit, ?array $variants): array
+    {
         $table = $this->tableFor($kind);
         $columns = self::LIST_COLUMNS[$kind];
 
@@ -1009,6 +1123,9 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader
             ->from($this->db->quoteName($table, 'a'))
             ->order('a.' . $this->db->quoteName($this->pkFor($kind)) . ' ASC');
         $this->applyScope($kind, $query, 'a');
+        if ($variants !== null) {
+            $this->whereWords($query, $kind, $variants);
+        }
 
         if ($kind === 'article') {
             $query->select([
