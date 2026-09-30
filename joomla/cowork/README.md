@@ -324,10 +324,13 @@ content.list {kind: "article", search: "roof repair"}
 - **The answer.** `search` is in the answer **if and only if** the request carried the key. It is the
   proof that this plugin read it: a plugin from before this change ignores the key and answers the
   whole list as `ok`, so a caller that sends `search` must look for the echo and read its absence as
-  "not filtered". `matched` (non-empty needle only) is the exact count over all pages, and costs no
-  second query when the first page does not fill. The order stays by id and `offset` and `limit`
-  apply to the narrowed set. A trashed row is listed like any other: hiding it would make "this is the
-  only match" unsafe to say. A request without `search` is answered exactly as it always was.
+  "not filtered". Its value is the needle **as cleaned** — trimmed, control characters dropped, a
+  line break made a space, composed (NFC) where PHP can — not the bytes that were sent, and `""` for a
+  blank one; so a caller tests that the key is there, not that its value equals what it sent.
+  `matched` (non-empty needle only) is the exact count over all pages, and costs no second query
+  when the first page does not fill. The order stays by id and `offset` and `limit` apply to the
+  narrowed set. A trashed row is listed like any other: hiding it would make "this is the only match"
+  unsafe to say. A request without `search` is answered exactly as it always was.
 - **Kinds.** Filtered by title and alias: `article`, `category`, `tag`, `menuItem`. By title:
   `module`, `templateStyle`, `language`, `menutype`. By name and alias: `banner`, `contact`,
   `newsfeed`. By name: `bannerClient` (that table has no alias). By title and name: `field`. Every
