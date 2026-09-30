@@ -416,6 +416,14 @@ $csSite(static function () use ($csPost): void {
     $csPost(72, 'Tom & Jerry diner');
     $csPost(73, 'Size &gt; 10 inches');
     $csPost(74, 'Size > 10 inches');
+    // What core's KSES stores for a title that has a lone `<`, saved by someone without `unfiltered_html`
+    // (the sign and everything after it, up to the next `<`, is escaped), beside what a write that skips
+    // KSES stores (this plugin's own writes do): the raw sign.
+    $csPost(91, 'Angle a &lt; b compare');
+    $csPost(92, 'Raw a < b compare');
+    $csPost(93, 'Kids &lt;12 only');
+    $csPost(94, 'Price &lt;$10');
+    $csPost(95, 'A&amp;B &lt; C');
     $csPost(81, 'Gizmo event night', ['post_type' => 'event']);
     $csPost(82, 'Gizmo menu link', ['post_type' => 'nav_menu_item']);
     $csPost(83, 'Gizmo post');
@@ -429,10 +437,71 @@ check('and the stored spelling, copied out of a list, still finds the row that h
 check('the same for the angle bracket', $csIds($csAsk(['search' => 'Size > 10'])), [73, 74]);
 check('the entity spellings the writer tries', Claude_Cowork_Site_Writer::search_forms('Tom & Jerry'), ['Tom & Jerry', 'Tom &amp; Jerry']);
 check('a plain ASCII word has one spelling', Claude_Cowork_Site_Writer::search_forms('roof'), ['roof']);
-check('a less-than sign is left as it is: KSES drops it, it never stores it as an entity', Claude_Cowork_Site_Writer::search_forms('a < b'), ['a < b']);
+// A `<` that no `>` closes is text, and KSES stores it as `&lt;` (only a real tag such as `<script>` is
+// dropped): a caller who types the title it sees on the page has to find it.
+check('a less-than sign is tried as core stores it too', Claude_Cowork_Site_Writer::search_forms('a < b'), ['a < b', 'a &lt; b']);
+check('every sign at once: the ampersand is encoded once, not twice', Claude_Cowork_Site_Writer::search_forms('A&B > C < D'), ['A&B > C < D', 'A&amp;B &gt; C &lt; D']);
+check('a less-than sign finds the title KSES stored with the entity AND the one a raw write stored', $csIds($csAsk(['search' => 'a < b'])), [91, 92]);
+check('and the stored spelling, copied out of a list, finds only the row that holds it', $csIds($csAsk(['search' => 'a &lt; b'])), [91]);
+check('with no space after the sign', $csIds($csAsk(['search' => 'Kids <12'])), [93]);
+check('a sign before a dollar amount', $csIds($csAsk(['search' => 'Price <$10'])), [94]);
+check('an ampersand and a sign in one title', $csIds($csAsk(['search' => 'A&B < C'])), [95]);
 check('the default types are posts and pages', $csIds($csAsk(['search' => 'gizmo'])), [83, 84]);
 check('a custom type is searched when it is named', $csIds($csAsk(['search' => 'gizmo', 'post_type' => 'event'])), [81]);
 check('"any" is every type not kept out of search, as WP_Query reads it', $csIds($csAsk(['search' => 'gizmo', 'post_type' => 'any'])), [81, 83, 84]);
+
+// The spellings above come from a fallback: the plugin asks WordPress itself how KSES stores a title
+// (`wp_kses_normalize_entities()`, then `wp_pre_kses_less_than()`, the two steps `wp_kses()` runs first),
+// and only where WordPress is absent does it use a short list. Both functions are defined here, after the
+// fallback was checked, as the WordPress a site runs has them: the same two steps, with a short list of
+// named entities (core's is long). Over the inputs these tests type, and a few more, they answer what
+// WordPress 7.1.2's own functions answer (compared one by one, on a real site).
+if (!function_exists('wp_kses_normalize_entities')) {
+    function wp_kses_normalize_entities($content)
+    {
+        $content = str_replace('&', '&amp;', $content);
+        $content = preg_replace_callback('/&amp;([A-Za-z]{2,8}[0-9]{0,2});/', static function (array $m): string {
+            return in_array($m[1], ['amp', 'lt', 'gt', 'quot', 'nbsp', 'copy', 'eacute'], true) ? "&{$m[1]};" : $m[0];
+        }, $content);
+        $content = preg_replace_callback('/&amp;#(0*[0-9]{1,7});/', static function (array $m): string {
+            return '&#' . str_pad(ltrim($m[1], '0'), 3, '0', STR_PAD_LEFT) . ';';
+        }, $content);
+        return preg_replace_callback('/&amp;#[Xx](0*[0-9A-Fa-f]{1,6});/', static function (array $m): string {
+            return '&#x' . ltrim($m[1], '0') . ';';
+        }, $content);
+    }
+}
+if (!function_exists('wp_pre_kses_less_than')) {
+    function wp_pre_kses_less_than($content)
+    {
+        return preg_replace_callback('%<[^>]*?((?=<)|>|$)%', static function (array $m): string {
+            return strpos($m[0], '>') === false ? htmlspecialchars($m[0], ENT_QUOTES, 'UTF-8', false) : $m[0];
+        }, $content);
+    }
+}
+$csPost(96, 'Under &lt;18&#039;s guide');
+$csPost(97, 'Say "a &lt; b&quot;');
+$csPost(98, '100&#037; sure');
+check('with WordPress present the spellings are the ones KSES writes', [
+    Claude_Cowork_Site_Writer::search_forms('a < b'),
+    Claude_Cowork_Site_Writer::search_forms('Tom & Jerry'),
+    Claude_Cowork_Site_Writer::search_forms('A&B > C < D'),
+], [['a < b', 'a &lt; b'], ['Tom & Jerry', 'Tom &amp; Jerry'], ['A&B > C < D', 'A&amp;B &gt; C &lt; D']]);
+check('a sign that a later `>` closes is a tag to KSES, not text: it is not written as an entity', array_filter(Claude_Cowork_Site_Writer::search_forms('a <b> c'), static fn (string $form): bool => strpos($form, '&lt;') !== false), []);
+check('what follows a lone sign is escaped too: a quote becomes an entity', Claude_Cowork_Site_Writer::search_forms("Under <18's guide"), ["Under <18's guide", 'Under &lt;18&#039;s guide']);
+check('and a title stored that way is found by what a caller types', $csIds($csAsk(['search' => "Under <18's"])), [96]);
+check('what comes BEFORE the sign is not escaped', $csIds($csAsk(['search' => 'Say "a < b"'])), [97]);
+check('a numeric reference is stored padded to three digits, and found by the one a caller typed', [Claude_Cowork_Site_Writer::search_forms('100&#37; sure'), $csIds($csAsk(['search' => '100&#37; sure']))], [['100&#37; sure', '100&#037; sure'], [98]]);
+check('the rows found by the plain spellings are the same, and the sign now also finds the quoted title that holds it', [$csIds($csAsk(['search' => 'Tom & Jerry'])), $csIds($csAsk(['search' => 'a < b']))], [[71, 72], [91, 92, 97]]);
+$csEmpty = [];
+foreach (['<script>alert(1)</script>', '<', '<<', '&', '>', '<>', '<b>'] as $csNeedle) {
+    foreach (Claude_Cowork_Site_Writer::search_forms($csNeedle) as $csForm) {
+        if ($csForm === '') {
+            $csEmpty[] = $csNeedle;
+        }
+    }
+}
+check('no needle has an empty spelling: that would be a pattern matching every row', $csEmpty, []);
 
 // ── a failed statement is an error, never an empty page ─────────────────────────────────────────
 

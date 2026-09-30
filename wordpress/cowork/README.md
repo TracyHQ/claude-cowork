@@ -291,8 +291,11 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   into Unicode form C when PHP has `intl` (a host without it matches the spelling it was sent in), at
   most 200 characters, valid UTF-8; one character is a needle. `%`, `_` and `\` match themselves,
   and nothing is a wildcard or a pattern. Both the composed and the decomposed spelling of a letter
-  are tried, and `&` and `>` are also tried as `&amp;` and `&gt;`, which is how a title saved without
-  the `unfiltered_html` capability is stored.
+  are tried, and each is also tried the way core's KSES filters store it in a title saved without the
+  `unfiltered_html` capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as
+  `&gt;`, and a `<` that no `>` closes as `&lt;` (a quote or an ampersand after that sign is escaped
+  too, one before it is not). Only a real tag such as `<script>` is dropped, and nobody searches
+  for that. The forms are asked of WordPress itself, not listed here.
 - **The answer.** `search` is present **exactly when the request carried the key**, holding the words as
   they were matched: it is the caller's proof that this plugin read the parameter, because a plugin
   from before `search` answers the whole list and `ok: true`. `matched` is the number of rows that

@@ -433,10 +433,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 *
 	 * Canonical composed and decomposed: a title copied from a macOS file name or a PDF is often
 	 * stored decomposed (a base letter plus combining marks), and only some collations treat the two
-	 * spellings as equal. And each with `&` and `>` written as entities, which is how core's KSES
-	 * filters store a title saved by anyone without the `unfiltered_html` capability
-	 * (`Tom &amp; Jerry`); a `<` is not here because KSES drops it, it never stores it as an entity.
-	 * Without intl (no `Normalizer`) only the spelling sent is tried.
+	 * spellings as equal. And each as core's KSES filters would store it, which is how a title saved by
+	 * anyone without the `unfiltered_html` capability is stored (see {@see as_kses_stores()}): `Tom &
+	 * Jerry` is `Tom &amp; Jerry`, and a `<` that no `>` closes is `&lt;`. Only a real tag such as
+	 * `<script>` is dropped, and no one searches for that. Without intl (no `Normalizer`) only the
+	 * spelling sent is tried.
 	 *
 	 * @return string[]
 	 */
@@ -453,9 +454,37 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$forms = array();
 		foreach ( $spellings as $spelling ) {
 			$forms[] = $spelling;
-			$forms[] = str_replace( array( '&', '>' ), array( '&amp;', '&gt;' ), $spelling );
+			$forms[] = self::as_kses_stores( $spelling );
 		}
 		return array_values( array_unique( $forms ) );
+	}
+
+	/**
+	 * `$text` as core's KSES filters store it in a title: what a search for that text has to look for
+	 * when the title was saved by someone without the `unfiltered_html` capability (an author, a wp-cli
+	 * seed with no user, an importer). Nothing here is dropped, only rewritten, so no spelling is ever
+	 * shorter than the words it stands for.
+	 *
+	 * Asked of WordPress, not listed here: `wp_kses()` first normalises entities (`&` becomes `&amp;`, a
+	 * numeric reference is padded to three digits: `&#37;` is `&#037;`), then `wp_pre_kses_less_than()`
+	 * turns a `<` that no `>` closes into `&lt;` and escapes everything after it up to the next `<`
+	 * (a quote there becomes `&quot;` or `&#039;`, one before the sign stays as typed), and a `>` that
+	 * closes nothing is written `&gt;`. A hand-written list of those drifts from core, and misses the
+	 * quote and the padded reference. Where WordPress is absent (a test) only `&`, `>` and `<` are
+	 * written, in that order so no entity is encoded twice.
+	 *
+	 * One case stays out of reach: words that START after a lone `<` and hold a quote (`18's guide` of
+	 * `Under <18's guide`) cannot know the sign before them escaped it, so the title is not found by
+	 * them; the same words with the sign, or without the quote, are.
+	 */
+	private static function as_kses_stores( string $text ): string {
+		if ( function_exists( 'wp_kses_normalize_entities' ) && function_exists( 'wp_pre_kses_less_than' ) ) {
+			$stored = wp_pre_kses_less_than( wp_kses_normalize_entities( $text ) );
+			if ( is_string( $stored ) ) {
+				return str_replace( '>', '&gt;', $stored );
+			}
+		}
+		return str_replace( array( '&', '>', '<' ), array( '&amp;', '&gt;', '&lt;' ), $text );
 	}
 
 	/**
