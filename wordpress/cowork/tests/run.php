@@ -1677,7 +1677,9 @@ require __DIR__ . '/string-overrides.php';
 // apply.revert takes back one receipt: the span its write changed, never the whole row.
 require __DIR__ . '/revert-span.php';
 // content.list search: the words of a title or slug, the real engine and writer over a $wpdb that reads its SQL.
-// Last, because it defines the stand-in Normalizer and get_post_types that the tests above rely on being absent.
+// Last, because it defines file-scope stand-ins that the tests above rely on being absent: the class Normalizer
+// (only where intl is not loaded), get_post_types, get_permalink (when no test above defined it), and part-way
+// through wp_kses_normalize_entities and wp_pre_kses_less_than. Its fresh-process check has none of them.
 require __DIR__ . '/content-search.php';
 
 echo "\n{$passed} passed, {$failed} failed\n";
