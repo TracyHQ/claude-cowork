@@ -281,6 +281,229 @@ interface BulkSiteReader
     public function readMany(string $kind, array $ids): array;
 }
 
+/**
+ * The words of a `content.list` `search`, cleaned and made ready to match. Plain PHP with no Joomla
+ * and no database, so the test runner can put every awkward needle through it.
+ *
+ * It lives in THIS file, beside the interface that uses it, on purpose: this is the one file every
+ * loader of the engine already requires (`EngineFactory::loadEngine`, the Joomla 3 controller,
+ * `Engine.php` itself), and `JoomlaSiteWriter` cannot be loaded without it. A helper in a NEW lib
+ * file would pass every test, which require files by hand, and fatal in production, which requires
+ * an explicit list.
+ */
+final class SearchNeedle
+{
+    /** The longest needle, in characters. A title is one line; more than this is a pasted paragraph. */
+    public const MAX_LENGTH = 200;
+
+    /**
+     * The most bytes a value may take BEFORE it is cleaned: 200 four-byte characters with room to spare
+     * for padding. Refused unread above this, so the patterns below only ever see a short string.
+     */
+    public const MAX_BYTES = 4096;
+
+    /**
+     * The character that escapes `%` and `_` in the pattern like() builds — named in the SQL as an
+     * explicit ESCAPE clause. Not a backslash: LIKE's default escape character is a backslash except
+     * under sql_mode NO_BACKSLASH_ESCAPES, where it has none, so a needle's `%` would be a wildcard
+     * on such a site. With the clause spelled out the pattern means the same in every mode.
+     */
+    public const LIKE_ESCAPE = '!';
+
+    /**
+     * Clean one `search` value.
+     *
+     * Tabs and line breaks (LF, CR, VT, FF and Unicode's NEL, line separator and paragraph separator)
+     * are gaps between words; every other control character (NUL, escape, DEL, the rest of the C1
+     * range) is dropped; the ends are trimmed, no-break and ideographic spaces included. The
+     * result is NFC when this PHP can normalise (`Normalizer`, from intl or a polyfill), and matched
+     * as its NFC and NFD forms, because a title may have been stored either way. Without a usable
+     * normaliser (none, or one emptied by `disable_classes`) the needle is used as it came: it matches
+     * what was typed the same way, and nothing is refused for lack of one. No minimum length: one
+     * character is a word in Chinese or Japanese.
+     * More than MAX_LENGTH characters once cleaned, or more than MAX_BYTES bytes before, is refused.
+     *
+     * @param mixed $raw the request's `search`, whatever it was
+     * @return array{ok:true,text:string,variants:string[]}|array{ok:false,message:string}
+     *         `text` is what the answer echoes; `variants` are the strings to match, none when `text`
+     *         is empty (an empty needle filters nothing).
+     */
+    public static function clean($raw): array
+    {
+        if (!is_string($raw)) {
+            return ['ok' => false, 'message' => 'search must be a string of at most ' . self::MAX_LENGTH . ' characters'];
+        }
+        if (strlen($raw) > self::MAX_BYTES) {
+            return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];
+        }
+        // Every line break is a gap, not only the ones a keyboard makes: NEL, the line separator and the
+        // paragraph separator arrive when text is pasted, and dropping NEL would glue two words together.
+        $text = preg_replace(['/[\t\n\r\x0B\x0C\x{85}\x{2028}\x{2029}]+/u', '/\p{Cc}/u'], [' ', ''], $raw);
+        // Trimmed by ONE pattern anchored at the start, with a possessive lead, so the text is read once.
+        // The obvious `^\s+|\s+$` tries every space of a long run as a start and is quadratic when PCRE's
+        // JIT is off, which is how some hosts run PHP: measured with pcre.jit=0, 20,000 spaces inside a
+        // needle took 3.2 s and 100,000 took 73 s.
+        $kept = $text === null ? false : preg_match('/^[\s\p{Z}]*+(.*[^\s\p{Z}])/su', $text, $found);
+        if ($kept === false) {
+            return ['ok' => false, 'message' => 'search must be valid UTF-8 text'];
+        }
+        $text = $kept === 1 ? $found[1] : '';
+        $nfc = self::form($text, false);
+        if (mb_strlen($nfc, 'UTF-8') > self::MAX_LENGTH) {
+            return ['ok' => false, 'message' => 'search is limited to ' . self::MAX_LENGTH . ' characters'];
+        }
+        if ($nfc === '') {
+            return ['ok' => true, 'text' => '', 'variants' => []];
+        }
+        return ['ok' => true, 'text' => $nfc, 'variants' => array_values(array_unique([$nfc, self::form($nfc, true)]))];
+    }
+
+    /**
+     * The LIKE pattern for one variant: the word between two `%`, with `%`, `_` and the escape
+     * character itself made literal. Pair it with `ESCAPE '<LIKE_ESCAPE>'` in the SQL.
+     */
+    public static function like(string $variant): string
+    {
+        $e = self::LIKE_ESCAPE;
+        return '%' . strtr($variant, [$e => $e . $e, '%' => $e . '%', '_' => $e . '_']) . '%';
+    }
+
+    /**
+     * The variants to compare an ALIAS column with: each one lower-cased, the duplicates dropped.
+     *
+     * An alias has a list of its own because it is the one searched column that does not ignore case by
+     * itself. Joomla writes an alias lower case (`OutputFilter::stringURLSafe` and `stringURLUnicodeSlug`
+     * both return lower-cased text), but the column is `utf8mb4_bin` in every kind that has one, and a
+     * binary collation compares case: `LIKE '%Roof%'` misses the alias `roof-repair`, and a caller
+     * types a word the way a person does, capitalised. So the writer lower-cases the column
+     * (`LOWER(alias)`) and compares it with THESE, which finds the alias whatever case the needle came
+     * in, and the upper-case value that an import once left behind as well. A title or a name needs none
+     * of it: it follows its table's collation, which ignores case, and is compared with the variants as
+     * they are.
+     *
+     * The composed and the decomposed form stay two variants, as clean() made them, because an alias may
+     * hold either and lower-casing does not join them. Case is the only thing folded here: an alias still
+     * tells `e` from `é`, which its binary collation does not fold and this does not try to.
+     *
+     * @param string[] $variants from clean()
+     * @return string[]
+     */
+    public static function lowerCased(array $variants): array
+    {
+        return array_values(array_unique(array_map(function (string $variant): string {
+            return mb_strtolower($variant, 'UTF-8');
+        }, $variants)));
+    }
+
+    /**
+     * Whether a database's refusal of a search means "no row can hold these words", so that the honest
+     * answer is no rows and not an error.
+     *
+     * A character above U+FFFF (an emoji, say) takes four bytes in UTF-8, and a table still in `utf8`
+     * (utf8mb3) cannot hold one, so no row of it can contain the needle. The server does not answer "none"
+     * to that comparison, it refuses it: MariaDB says "Illegal mix of collations (utf8mb3_general_ci,IMPLICIT)
+     * and (utf8mb4_uca1400_ai_ci,COERCIBLE) for operation 'like'", and a write of such a character says
+     * "Incorrect string value". Reported as a failure it sends the caller off to hunt a fault it did not cause.
+     *
+     * BOTH halves must hold: every variant carries a character above U+FFFF AND the message is one of those
+     * two. The same message for a needle without such a character is some other fault (two tables in
+     * different collations, say), and any other message is a failure whatever the needle holds: both stay
+     * errors. The message is the server's English text; a server set to another `lc_messages` language does
+     * not match, and the caller gets the error, which is the safe side.
+     *
+     * @param string[] $variants the strings the refused statement was bound to
+     */
+    public static function cannotBeStored(array $variants, string $message): bool
+    {
+        if ($variants === []) {
+            return false;
+        }
+        $refused = false;
+        foreach (['Illegal mix of collations', 'Incorrect string value'] as $phrase) {
+            if (stripos($message, $phrase) !== false) {
+                $refused = true;
+                break;
+            }
+        }
+        if (!$refused) {
+            return false;
+        }
+        foreach ($variants as $variant) {
+            if (preg_match('/[\x{10000}-\x{10FFFF}]/u', $variant) !== 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * One Unicode form of a text — composed (NFC) or decomposed (NFD) — or the text itself when it cannot be had.
+     *
+     * A Normalizer counts only when it can normalise. `disable_classes=Normalizer`, which hardened hosts
+     * set, does not remove the class: with intl loaded it stays declared with its methods emptied out, so
+     * `class_exists()` alone says yes and the call is then a fatal Error, thrown from outside the
+     * engine's try/catch. The method is asked for as well.
+     */
+    private static function form(string $text, bool $decomposed): string
+    {
+        if (!class_exists('Normalizer') || !method_exists('Normalizer', 'normalize')) {
+            return $text;
+        }
+        $out = \Normalizer::normalize($text, $decomposed ? \Normalizer::FORM_D : \Normalizer::FORM_C);
+        return is_string($out) ? $out : $text;
+    }
+}
+
+/**
+ * Optional: a writer that can list only the rows whose NAME holds some words.
+ *
+ * Why it exists: a caller that knows a page by its title had to page through list() until it met
+ * it. On a site of ~1,900 articles that was two to eight extra model calls, and up to 18 calls and
+ * 256 s in one measured run (Tracy bench v7, 30/09/2026).
+ *
+ * It is its own interface, not a fourth argument of list(), so that a writer without it is REFUSED
+ * when a caller sends `search`. A widened list() would let such a writer take the key and ignore it,
+ * which is the answer this exists to end: ok, and the whole list, as if it had been filtered.
+ */
+interface SearchableSiteWriter
+{
+    /**
+     * The kinds this writer searches: the ones whose rows are called by a title or a name. A kind not
+     * listed (a user, a redirect, an extension's parameters, a relation between two rows) is not
+     * searched, and the engine refuses `search` on it instead of ignoring it.
+     *
+     * @return string[]
+     */
+    public function searchableKinds(): array;
+
+    /**
+     * list(), narrowed to the rows where ANY searched column of the kind holds ANY of the variants
+     * as a substring, ignoring case. The columns do not ignore it the same way. A title or a name follows
+     * its table's collation (utf8mb4_unicode_ci on a stock Joomla, which ignores case and accents). An
+     * alias column is utf8mb4_bin in Joomla's schema, which compares case, so an alias is compared
+     * lower-cased (`LOWER(column)`) with the variants lower-cased (SearchNeedle::lowerCased()): Joomla
+     * writes an alias lower case, and a capitalised needle has to reach it all the same. An alias
+     * still tells accents apart where a title does not. The same rows, the same order, the same
+     * summaries as list() gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a
+     * trashed row is listed like any other, because hiding it would make "this is the only match"
+     * unsafe to say.
+     *
+     * A needle that no row can hold answers no rows and does not throw: see SearchNeedle::cannotBeStored().
+     *
+     * @param string[] $variants strings from SearchNeedle::clean(), at least one
+     * @return array<int,array<string,?scalar>>
+     */
+    public function searchRows(string $kind, array $variants, int $offset, int $limit): array;
+
+    /**
+     * How many rows searchRows() would answer over all pages, whatever the offset and limit. Zero for a
+     * needle no row can hold, exactly as searchRows() answers no rows for it.
+     *
+     * @param string[] $variants
+     */
+    public function countMatches(string $kind, array $variants): int;
+}
+
 interface MediaWriter
 {
     /** The bytes currently at a media path, or null when nothing is there (so the undo is a delete). */

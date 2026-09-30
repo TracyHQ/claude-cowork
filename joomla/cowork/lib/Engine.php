@@ -1294,6 +1294,16 @@ final class Engine
      * Read-only: no apply_id, nothing recorded, nothing stamped. The page size is capped so a
      * caller cannot ask a shared host for its whole content table in one request; paging to the
      * end is the caller's loop. An empty page is the answer "you are past the end", not an error.
+     *
+     * `search` narrows the list to the rows whose title (or name, and alias) holds the words, ignoring
+     * case in the alias as in the title (the writer sees to it, whatever the column's collation), so a
+     * caller that knows a page by its title asks once instead of paging to it. The answer CARRIES
+     * THE WORDS BACK (`search`, the request's once cleaned) and, for a non-empty needle, how many
+     * rows match in all (`matched`). The key is the proof that this plugin read the request: a
+     * plugin that predates `search` ignored it and answered the whole list as ok, and an echo is the
+     * only way a caller can tell the two apart. Hence one rule for every kind: it is filtered or it
+     * is refused, never quietly left unfiltered. A request without `search` gets the answer it
+     * always got, key for key.
      */
     private function contentList(array $p): array
     {
@@ -1312,8 +1322,30 @@ final class Engine
         $ceiling = $withBody ? 25 : 200;
         $limit = min($ceiling, max(1, (int) ($p['limit'] ?? ($withBody ? 25 : 100))));
 
+        // Present means present: `array_key_exists`, not isset, so a `null` is refused as the
+        // non-string it is instead of being read as "no search" and answered unfiltered.
+        $needle = null;
+        if (array_key_exists('search', $p)) {
+            $needle = SearchNeedle::clean($p['search']);
+            if (!$needle['ok']) {
+                return $this->err('bad_params', $needle['message']);
+            }
+            if (!$this->writer instanceof SearchableSiteWriter) {
+                return $this->err('bad_params', 'this site cannot filter a list by search; leave search out and page the list with offset and limit');
+            }
+            $searchable = $this->writer->searchableKinds();
+            if (!in_array($kind, $searchable, true)) {
+                return $this->err('bad_params', 'search does not cover kind "' . $kind . '". '
+                    . 'It covers: ' . implode(', ', $searchable) . '. Leave search out and page the list with offset and limit');
+            }
+        }
+        // An empty needle filters nothing: the plain list, still answered with the echo.
+        $words = $needle !== null && $needle['variants'] !== [] ? $needle['variants'] : null;
+
         try {
-            $items = $this->writer->list($kind, $offset, $limit);
+            $items = $words === null
+                ? $this->writer->list($kind, $offset, $limit)
+                : $this->writer->searchRows($kind, $words, $offset, $limit);
             if ($withBody) {
                 foreach ($items as $index => $row) {
                     $full = $this->writer->read($kind, (int) $row['id']);
@@ -1322,11 +1354,20 @@ final class Engine
                     }
                 }
             }
+            // The count is a second query, so it is not asked when the first page already says it:
+            // a first page that did not fill is the whole set.
+            $matched = $words === null ? null
+                : ($offset === 0 && count($items) < $limit ? count($items) : $this->writer->countMatches($kind, $words));
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
 
-        return $this->ok(['kind' => $kind, 'offset' => $offset, 'items' => $items]);
+        if ($needle === null) {
+            return $this->ok(['kind' => $kind, 'offset' => $offset, 'items' => $items]);
+        }
+        return $this->ok(['kind' => $kind, 'offset' => $offset, 'search' => $needle['text']]
+            + ($matched === null ? [] : ['matched' => $matched])
+            + ['items' => $items]);
     }
 
     /**

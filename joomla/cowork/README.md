@@ -18,6 +18,7 @@ an empty token refuses every request.
 | --- | --- |
 | `info`, `site.stats`, `db.*`, `files.*`, `file.read`, `extension.list`, `core.manifest` | Reading, in pieces small enough to finish on a host that stops PHP after thirty seconds. `core.manifest` is the site's own record of which extensions are CMS core (ADR 0070 addendum). |
 | `content.list`, `content.get` | The read half of the content mirror (ADR 0071): paged summaries with checksums, then full rows — the same bytes an apply will compare against. |
+| `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
@@ -47,8 +48,22 @@ edit the copy — that is how the two silently diverge.
 
 ```bash
 ./build.sh                                    # → dist/pkg_claudecowork.zip
-docker run --rm -v "$PWD":/w -w /w php:8.3-cli php tests/run.php
+docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
+docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
+
+Mount the repository root, not this folder: the release checks read `joomla/update.xml` and
+`joomla/update.json` one level up, so a mount of `joomla/cowork` alone stops at them. The second run
+is the same suite with the test writers reading through the list-and-read walk instead of in bulk;
+the two must agree test for test (CI runs the first; run the second when you change how rows are read).
+
+The suite must pass on a PHP with `intl` and on one without it. The official `php` images carry no
+`intl`, so there the tests stand in for `Normalizer`; a PHP that has it (Homebrew, distro packages,
+and the PHP the CI job installs: `setup-php` loads `intl` by default) runs the real one. To run the
+suite that way in docker, add it to the image first: `apt-get update && apt-get install -y libicu-dev`
+and `docker-php-ext-install intl`. The tests that need no `Normalizer` start a fresh PHP with
+`disable_classes=Normalizer`, which on a PHP with `intl` leaves the class declared and empties its
+methods rather than removing it; the code treats that as no `Normalizer` (see `tests/content-search.php`).
 
 ## Updates from inside the site
 
@@ -270,6 +285,83 @@ a content map computed from the site's own rows, in the same `content-map` schem
 (`FieldValueKey`); only `value` is written; a pair stored in more than one row (a multiple-value
 field) reads as none and is refused; no create and no delete; recorded under the `apply_id` like every
 other write, so it reverts.
+
+## Finding a row by its title: `content.list` `search` (unreleased)
+
+A caller that knows a page by its title used to page through `content.list` until it met it — on a
+site of ~1,900 articles, two to eight extra calls, and up to eighteen in one measured run. `search`
+asks for the row instead:
+
+```
+content.list {kind: "article", search: "roof repair"}
+→ {ok, kind, offset: 0, search: "roof repair", matched: 3, items: [...]}
+```
+
+- **Match.** A substring of the title (the name, for the kinds that have one) and of the alias where
+  the kind has one: the language editions of one article share an alias stem while their titles are
+  translated, so a title-or-alias search reaches the editions that share the searched stem
+  (Tracy's quickstarts name them that way; a site that names its editions differently may not). Notes, bodies and intro text are not
+  searched. There are no wildcards and no patterns: `%` and `_` are ordinary characters (the query
+  names its own `ESCAPE` character, so it means the same under any `sql_mode`), and `50%_off` finds
+  "50%_off sale", not "500 off sale". The words are bound parameters, never part of the SQL text.
+- **Case is ignored in the title and in the alias; accents are not treated alike.** A `LIKE` follows
+  the column's collation, and Joomla's own schema (5.4 and 6.1, `installation/sql/mysql`) gives the
+  two different ones. A title or name is declared with none, so it takes its table's,
+  `utf8mb4_unicode_ci`, which ignores case and accents: `ROOF` finds "Roof repair", and `cafe` finds
+  "Café". The `alias` of `article`, `category`, `tag`, `menuItem`, `banner`, `contact` and `newsfeed`
+  is declared `utf8mb4_bin`: binary, so a plain `LIKE` on it would compare case. Joomla writes an
+  alias lower case (`OutputFilter::stringURLSafe` lower-cases what it returns), so the
+  plugin compares the alias lower-cased — `LOWER(alias)` — with the needle lower-cased: `Roof-Repair`
+  finds the alias `roof-repair`. That is what lets one call reach the language editions of a page that
+  share an alias stem, whatever case the caller typed, and a row that stores an upper-case alias anyway (an import, a
+  hand edit) is found too. What stays exact in an alias is the rest of the binary comparison:
+  accents (`e` is not `é`), and the composed form against the decomposed one, both of which are
+  tried. A space is a space, in the title and in the alias: "roof repair" does not match the alias
+  `roof-repair`, so ask for the stem when the caller wants the language editions. A row can come
+  back through its alias alone: `roof-repair` finds an article titled "Fix your roof" whose alias is
+  `roof-repair-guide`, which is what an alias search is for and not a wrong hit.
+- **The needle.** Trimmed; a tab or a line break (including NEL and the Unicode line and paragraph
+  separators, which arrive when text is pasted) becomes a space and any other control character is
+  dropped. One character is enough (Chinese, Japanese). At most 200 characters once cleaned (and
+  4,096 bytes before, which a real needle never comes near); that, a value that is not a string
+  (`null` included) and one that is not UTF-8 are refused with `bad_params`. It is made NFC when PHP
+  has `Normalizer` (intl, or Joomla's polyfill) and matched as both its NFC and its NFD form, since a
+  title may have been stored either way; without `Normalizer` it is matched as typed. Blank after
+  cleaning means no filter on a kind that takes `search`: the plain list, answered with `search: ""`
+  and no `matched`; a kind that refuses `search` refuses it whatever the value.
+- **Four-byte characters.** A character above U+FFFF (an emoji, a rare Chinese character) cannot be
+  stored in a table still in `utf8` (utf8mb3), and such a site's database refuses to compare its
+  columns with one ("Illegal mix of collations", or "Incorrect string value"). A needle holding one
+  therefore **matches nothing** there: the answer is `matched: 0` and no rows, with the echo like
+  any other search, not an error. Only that is read this way: the two refusals above, for a needle
+  in which every form holds such a character. The same refusal for a needle without one, and any
+  other database error, is `read_failed`. (The refusal is matched by the server's English text; a
+  server set to another `lc_messages` language answers `read_failed`, the safe side.)
+- **The answer.** `search` is in a successful answer **if and only if** the request carried the key (a
+  refusal, like any error, carries none). It is the
+  proof that this plugin read it: a plugin from before this change ignores the key and answers the
+  whole list as `ok`, so a caller that sends `search` must look for the echo and read its absence as
+  "not filtered". Its value is the needle **as cleaned** — trimmed, control characters dropped, a
+  line break made a space, composed (NFC) where PHP can — not the bytes that were sent, and `""` for a
+  blank one; so a caller tests that the key is there, not that its value equals what it sent.
+  `matched` (non-empty needle only) is the exact count over all pages, and costs no second query
+  when the first page does not fill. The order stays by id and `offset` and `limit` apply to the
+  narrowed set. A trashed row is listed like any other: hiding it would make "this is the only match"
+  unsafe to say. A request without `search` is answered exactly as it always was.
+- **Kinds.** Filtered by title and alias: `article`, `category`, `tag`, `menuItem`. By title:
+  `module`, `templateStyle`, `language`, `menutype`. By name and alias: `banner`, `contact`,
+  `newsfeed`. By name: `bannerClient` (that table has no alias). By title and name: `field`. Every
+  other kind — `user`, `redirect`, `extensionParams`, `languageFilter`, the three association kinds,
+  `fieldValue` — is not searched: it is a person, a URL pair, an extension's settings or a relation
+  between two rows, not a page a caller finds by its title. `search` on it is refused with
+  `bad_params` naming the kind and the ones that work. Never quietly ignored.
+- **Not in this change.** Searching bodies or notes, a state or language filter, and an unfiltered
+  `total`. What the collation decides is decided by the site's tables, not by this code: the tests
+  hold the pattern, the SQL text and the alias comparison (SQLite in its case-sensitive `LIKE` mode
+  stands in for the binary column), and none of them follows a MySQL collation. A live site holds the
+  rest: a mixed-case title, an accented one, a decomposed one, and what a database's `LOWER()` does to
+  a non-ASCII capital in a binary alias. A site whose tables were altered from Joomla's install SQL
+  may differ.
 
 ## Unreleased Joomla 6 Content API pilot
 
