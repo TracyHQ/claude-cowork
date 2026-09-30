@@ -278,6 +278,15 @@ class WP_Post
     public string $post_name = '';
     public string $post_status = '';
     public string $post_type = '';
+    // What a post list describes each row by (`describe_post`); an unset column reads as WordPress
+    // reads it, empty or zero.
+    public string $post_excerpt = '';
+    public int $post_parent = 0;
+    public int $menu_order = 0;
+    public string $comment_status = 'closed';
+    public string $post_date_gmt = '0000-00-00 00:00:00';
+    public string $post_modified_gmt = '0000-00-00 00:00:00';
+    public int $post_author = 0;
 }
 
 function get_stylesheet(): string
@@ -345,6 +354,121 @@ function get_posts(array $args = []): array
         $out[] = $post;
     }
     return $out;
+}
+
+// ---- what a post list needs: WP_Query, and the reads that describe each row ------------------
+
+/** A slug as WordPress spells it when asked to look one up: lowercase, a dot becomes a hyphen. */
+function sanitize_title_for_query(string $title): string
+{
+    return strtolower(str_replace('.', '-', $title));
+}
+
+/**
+ * `WP_Query`, as far as the post list asks it: the arguments `list_posts` and `search_posts` send,
+ * answered from `WP_Fake::$posts` in id order. Any other argument throws instead of being ignored,
+ * so a test cannot pass because this fake did not understand what it was asked. Three behaviours of
+ * the real class are kept on purpose, because the writer has to survive them (each read off
+ * class-wp-query.php): an empty `post__in` is no restriction at all, an empty page size is the
+ * site's "posts per page" setting (ten unless changed) and not zero rows, and no `post_type` means
+ * `post`. Together they make an unguarded empty `post__in` answer with the site's first ten posts.
+ */
+class WP_Query
+{
+    /** @var WP_Post[] */
+    public array $posts = [];
+
+    private const UNDERSTOOD = ['name', 'post_type', 'post_status', 'orderby', 'order', 'offset', 'posts_per_page',
+        'ignore_sticky_posts', 'no_found_rows', 'suppress_filters', 'post__in'];
+
+    public function __construct(array $args = [])
+    {
+        foreach (array_keys($args) as $key) {
+            if (!in_array($key, self::UNDERSTOOD, true)) {
+                throw new LogicException("the WP_Query fake does not understand `{$key}`");
+            }
+        }
+        if (($args['orderby'] ?? 'ID') !== 'ID' || ($args['order'] ?? 'ASC') !== 'ASC') {
+            throw new LogicException('the WP_Query fake orders by ID ascending only');
+        }
+
+        $types = array_values(array_filter((array) ($args['post_type'] ?? 'post'), static fn ($t) => $t !== ''));
+        $types = $types === [] ? ['post'] : $types;
+        if ($types === ['any']) {
+            $types = array_values(get_post_types(['exclude_from_search' => false]));
+        }
+        $statuses = (array) ($args['post_status'] ?? 'publish');
+        $name = (string) ($args['name'] ?? '') === '' ? '' : sanitize_title_for_query((string) $args['name']);
+        $only = array_map('intval', (array) ($args['post__in'] ?? []));
+        // An empty size (absent, or zero) is the site's setting; only a setting of zero itself is one.
+        $perPage = $args['posts_per_page'] ?? null;
+        if (empty($perPage)) {
+            $perPage = get_option('posts_per_page', 10);
+        }
+        $perPage = (int) $perPage;
+        if ($perPage < -1) {
+            $perPage = abs($perPage);
+        } elseif ($perPage === 0) {
+            $perPage = 1;
+        }
+
+        $rows = WP_Fake::$posts;
+        ksort($rows);
+        $matching = [];
+        foreach ($rows as $id => $row) {
+            if (!in_array((string) ($row['post_type'] ?? ''), $types, true)
+                || !in_array((string) ($row['post_status'] ?? ''), $statuses, true)
+                || ('' !== $name && strtolower((string) ($row['post_name'] ?? '')) !== $name)
+                || ([] !== $only && !in_array((int) $id, $only, true))) {
+                continue;
+            }
+            $post = new WP_Post();
+            $post->ID = (int) $id;
+            foreach (['post_title', 'post_content', 'post_name', 'post_status', 'post_type', 'post_excerpt', 'comment_status',
+                'post_date_gmt', 'post_modified_gmt'] as $column) {
+                if (isset($row[$column])) {
+                    $post->$column = (string) $row[$column];
+                }
+            }
+            foreach (['post_parent', 'menu_order', 'post_author'] as $column) {
+                $post->$column = (int) ($row[$column] ?? 0);
+            }
+            $matching[] = $post;
+        }
+        $this->posts = array_slice($matching, max(0, (int) ($args['offset'] ?? 0)), $perPage < 0 ? null : $perPage);
+    }
+}
+
+// What `describe_post` reads besides the row: a site with no terms, no featured image, no menus and
+// no page template, which is what a new site is.
+function get_the_terms($post, string $taxonomy)
+{
+    return false;
+}
+
+function get_post_thumbnail_id($post = null): int
+{
+    return 0;
+}
+
+function get_page_template_slug($post = null)
+{
+    return '';
+}
+
+function wp_get_nav_menus(array $args = []): array
+{
+    return [];
+}
+
+function wp_get_nav_menu_items($menu, array $args = [])
+{
+    return [];
+}
+
+function has_term($term = '', $taxonomy = '', $post = null): bool
+{
+    return false;
 }
 
 // ---- taxonomy terms and menu entries -------------------------------------------------------
