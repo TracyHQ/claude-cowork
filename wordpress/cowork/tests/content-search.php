@@ -594,17 +594,68 @@ check('and once nothing hides a post, the same search is whole', [$csAsk(['searc
 // ── the plugin loads the way a site loads it ────────────────────────────────────────────────────
 
 if (function_exists('proc_open')) {
-    // Errors on stderr whatever the machine's php.ini says: with none (a bare CLI image) PHP prints them on
-    // STDOUT, and a check that only quotes stderr reports a fatal "Class not found" as an empty message.
-    $proc = proc_open([PHP_BINARY, '-d', 'display_errors=stderr', __DIR__ . '/content-search-load.php'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-    $out = stream_get_contents($pipes[1]);
-    $err = stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $code = proc_close($proc);
-    $why = substr(trim((string) preg_replace('/\s+/', ' ', $err . ' ' . $out)), 0, 300);
+    /**
+     * Runs content-search-load.php in a fresh PHP. Errors go to stderr whatever the machine's php.ini says:
+     * with none (a bare CLI image) PHP prints them on STDOUT, and a check that only quotes stderr reports a
+     * fatal "Class not found" as an empty message. `$iniDir`, when given, is the only directory PHP scans
+     * for extra ini files in that process.
+     *
+     * @return array{0:int,1:string,2:string} exit code, stdout, and what went wrong in one line
+     */
+    $csChild = static function (array $args = [], ?string $iniDir = null): array {
+        $env = getenv();
+        if ($iniDir !== null) {
+            $env['PHP_INI_SCAN_DIR'] = $iniDir;
+        }
+        $proc = proc_open(array_merge([PHP_BINARY, '-d', 'display_errors=stderr', __DIR__ . '/content-search-load.php'], $args), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
+        $out = stream_get_contents($pipes[1]);
+        $err = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return [proc_close($proc), $out, substr(trim((string) preg_replace('/\s+/', ' ', $err . ' ' . $out)), 0, 300)];
+    };
+    [$code, $out, $why] = $csChild();
     check('a search runs with only the classes claude-cowork.php loads' . ($code === 0 ? '' : " ({$why})"), $code, 0);
     checkTrue('and says so', strpos($out, 'search loads and answers') !== false);
+
+    // The check for a PHP with no intl ran above, in this process, only where intl is absent. Where it is
+    // loaded (CI, most hosts) the same three checks run in a fresh PHP that is started without the ini file
+    // that loads the extension: a copy of the directory this PHP scanned, minus that file.
+    if ($csIntl) {
+        $csDir = null;
+        $csScanned = php_ini_scanned_files();
+        if (is_string($csScanned) && trim($csScanned) !== '') {
+            $csDir = sys_get_temp_dir() . '/cc-no-intl-' . getmypid();
+            if (!is_dir($csDir) && !@mkdir($csDir, 0700, true)) {
+                $csDir = null;
+            }
+        }
+        $csLeftOut = 0;
+        foreach ($csDir === null ? [] : array_filter(array_map('trim', explode(',', (string) $csScanned))) as $csIni) {
+            if (stripos(basename($csIni), 'intl') !== false) {
+                $csLeftOut++;
+            } else {
+                @copy($csIni, $csDir . '/' . basename($csIni));
+            }
+        }
+        if ($csDir !== null && $csLeftOut > 0) {
+            [$code, $out, $why] = $csChild(['nointl'], $csDir);
+        } else {
+            $code = 3;
+            $out = '';
+            $why = '';
+        }
+        if ($csDir !== null) {
+            array_map('unlink', glob($csDir . '/*') ?: []);
+            @rmdir($csDir);
+        }
+        if ($code === 3) {
+            echo "  (intl cannot be left out of this PHP, so the no-intl path was checked only on runners that lack it)\n";
+        } else {
+            check('without intl (a fresh PHP started without the extension) the words are matched as they were sent' . ($code === 0 ? '' : " ({$why})"), $code, 0);
+            checkTrue('and says so', strpos($out, 'without intl matches the spelling it was sent in') !== false);
+        }
+    }
 } else {
     echo "  (proc_open is disabled: the production-load check was skipped)\n";
 }

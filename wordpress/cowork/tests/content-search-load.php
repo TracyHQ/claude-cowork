@@ -10,6 +10,10 @@
  * here — exit 1 — and so a red test in content-search.php.
  *
  * Run by tests/content-search.php; also runnable on its own: `php tests/content-search-load.php`.
+ *
+ * With the argument `nointl` it also checks how the words are read by a PHP that has no intl (no class
+ * `Normalizer`, which a WordPress host may well lack). The parent starts it without the ini file that
+ * loads the extension; where intl is built into PHP there is no way to leave it out, and this exits 3.
  */
 declare(strict_types=1);
 
@@ -66,3 +70,26 @@ if (($answer['ok'] ?? null) !== true || $ids !== [3, 5] || ($answer['search'] ??
 }
 
 echo "search loads and answers with the plugin's own class list\n";
+
+if (($argv[1] ?? '') === 'nointl') {
+    if (class_exists('Normalizer')) {
+        echo "intl cannot be left out of this PHP\n";
+        exit(3);
+    }
+    // A title stored composed and one stored decomposed: with no Normalizer the words are matched in the
+    // spelling they were sent in, and echoed as sent.
+    $composed = "Vi\u{1EC7}t";
+    $decomposed = "Vie\u{323}\u{302}t";
+    WP_Fake::$posts = [
+        41 => ['ID' => 41, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => "Nh\u{E0} h\u{E0}ng Vi\u{1EC7}t", 'post_name' => 'item-41', 'post_content' => ''],
+        42 => ['ID' => 42, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => "Nha\u{300} ha\u{300}ng Vie\u{323}\u{302}t", 'post_name' => 'item-42', 'post_content' => ''],
+    ];
+    $ask = static fn (string $words): array => $engine->handle(['token' => $token, 'action' => 'content.list', 'params' => ['search' => $words]]);
+    $got = [$ask($composed), $ask($decomposed)];
+    $seen = [array_column($got[0]['items'] ?? [], 'id'), $got[0]['search'] ?? null, array_column($got[1]['items'] ?? [], 'id'), $got[1]['search'] ?? null, Claude_Cowork_Site_Writer::search_forms($composed)];
+    if ($seen !== [[41], $composed, [42], $decomposed, [$composed]]) {
+        fwrite(STDERR, 'without intl the search answered ' . json_encode($seen) . "\n");
+        exit(1);
+    }
+    echo "search without intl matches the spelling it was sent in\n";
+}
