@@ -139,6 +139,17 @@ check('a slug is cleaned as the plain list cleans it', $csIds($csAsk(['search' =
 check('a bad slug is still refused', $csAsk(['search' => 'about', 'name' => 'a b'])['error'] ?? null, 'bad_params');
 check('a bad post type is still refused', $csAsk(['search' => 'about', 'post_type' => 'a b'])['error'] ?? null, 'bad_params');
 
+// `matched` comes from a second statement, and the searches above never reach it: at the top of the list
+// a page that is not full already tells the total. A page of one is always full, so each of these forces
+// the count, over rows of another type, another state and another slug, which is what its WHERE has to
+// keep apart (the trash row 7 and the attachment 8 above are in the table and in no answer).
+$r = $csAsk(['search' => 'roof', 'limit' => 1]);
+check('a page of one still counts every row that holds the words, in the states the list reads', [$csIds($r), $r['matched'] ?? null], [[1], 7]);
+check('the count keeps to the post type asked for', $csAsk(['search' => 'roof', 'post_type' => 'page', 'limit' => 1])['matched'] ?? null, 2);
+check('and to the exact slug named', $csAsk(['search' => 'roof', 'name' => 'roof-warranty', 'limit' => 1])['matched'] ?? null, 1);
+check('a page past the end asks for the count too, and it keeps to the type', $csAsk(['search' => 'roof', 'post_type' => 'page', 'offset' => 5])['matched'] ?? null, 2);
+check('and to the slug', $csAsk(['search' => 'roof', 'name' => 'roof-warranty', 'offset' => 5])['matched'] ?? null, 1);
+
 $r = $csAsk(['search' => 'roof repair', 'include_body' => true]);
 check('with bodies, each row carries its content and excerpt', [$r['items'][0]['content'] ?? null, array_key_exists('excerpt', $r['items'][0] ?? [])], ['<p>Body 1</p>', true]);
 $csBare = $csAsk(['search' => 'roof repair'])['items'][0] ?? null;
