@@ -2205,7 +2205,8 @@ final class Engine
      * at the relay on a single site's list.
      *
      * `search` (posts only) keeps the rows whose title or slug holds those words, in the plain
-     * list's order and states, and the answer then carries `search` (the words as they were
+     * list's order and states and in every language (where the plain list of a site that runs
+     * Polylang follows the request's), and the answer then carries `search` (the words as they were
      * matched) and `matched` (how many rows hold them in all, whatever `offset` and `limit` are).
      * The `search` key in an answer is the caller's PROOF that this plugin read the parameter: a
      * plugin from before it existed answers the whole list and `ok:true`, which reads exactly like

@@ -300,8 +300,17 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   once cleaned filter nothing: the plain list, `search: ""`, no `matched`. A request **without**
   `search` is answered byte for byte as before.
 - **The rows** are the plain list's rows, in id order, with the plain list's states: published,
-  draft, pending, private and scheduled, password-protected posts included, the trash not. The
-  search adds no language filter of its own.
+  draft, pending, private and scheduled, password-protected posts included, the trash not.
+- **Every language.** The search reaches the posts of every language, whatever language the request
+  is answered in, and is where the plain list is not: on a site that runs Polylang the plain list is
+  narrowed by Polylang to the language it gives the request, so the other languages' posts are not
+  in it. A page that exists only in another language is found by its own words, a page is never
+  answered with its translation in place of the row that holds the words, and `matched` counts
+  rows this door returns. Pages stay full for the same reason: the ids of a page are cut from the
+  whole table, and the load asks for every language (`lang` set to the empty string). A load that
+  still comes back short of the ids it was cut for (a plugin that hides posts from every query, or
+  a post that changed while it was read) is `read_failed`, never a shorter list, because a caller
+  reads a short page as the end of the result.
 - **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
   not valid UTF-8, or is longer than 200 characters; and any `search` on `kind` `templatePart`,
   `template` or another kind than `post`. A statement the database rejects is `read_failed`, not an

@@ -260,6 +260,13 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * is as exact as the first page; `WP_Query` then loads those rows, so each one holds what the
 	 * plain list would have shown for it.
 	 *
+	 * Every language: the ids are cut from the whole table, and the load asks for `lang => ''`, so a
+	 * page of a site that runs Polylang holds the rows of every language and is as long as the ids it
+	 * was cut for. The plain list is the one that follows the request's language there: it is one
+	 * query, and Polylang narrows that query before any page is cut. A load that still comes back
+	 * short of its ids (another plugin hides posts from every query, or a post changed while it was
+	 * read) is an error, not a shorter page: a caller reads a short page as the end of the result.
+	 *
 	 * @return array{items:array<int,array<string,mixed>>,matched:int}
 	 */
 	public function search_posts( string $needle, int $offset, int $limit, bool $with_body, string $name = '', string $type = '' ): array {
@@ -279,8 +286,25 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 					'ignore_sticky_posts' => true,
 					'no_found_rows'       => true,
 					'suppress_filters'    => true,
+					// Every language, not the request's: Polylang narrows a query to the REQUEST's language, and
+					// rewrites a `post__in` to the copies of its posts in that language, through `parse_query`,
+					// which `suppress_filters` does not switch off. These ids were cut from every language by SQL,
+					// so a narrowed load drops rows after the page was cut (a short page, and a total nobody can
+					// reach) or answers a row's translation in place of the row that holds the words. The empty
+					// string is a value to Polylang, and where no plugin reads `lang` it is ignored, as it is in
+					// Engine and QuickstartContract.
+					'lang'                => '',
 				)
 			);
+			if ( count( $query->posts ) !== count( $found['ids'] ) ) {
+				throw new RuntimeException(
+					sprintf(
+						'the search found %d posts for this page and WordPress loaded %d of them: a plugin narrows the queries this door runs, or a post changed while it was read',
+						count( $found['ids'] ),
+						count( $query->posts )
+					)
+				);
+			}
 			foreach ( $query->posts as $post ) {
 				$items[] = $this->describe_post( $post, $with_body );
 			}
@@ -301,7 +325,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * create a duplicate.
 	 *
 	 * Case and accents fold as the column's collation folds them; the collations WordPress installs
-	 * with are all case-insensitive.
+	 * with are all case-insensitive. No language predicate: a post of any language is a row here, and
+	 * `search_posts()` loads the page in a way that keeps it one.
 	 *
 	 * @return array{ids:int[],matched:int}
 	 */

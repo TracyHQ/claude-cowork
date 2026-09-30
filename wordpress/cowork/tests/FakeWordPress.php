@@ -54,6 +54,13 @@ final class WP_Fake
     public static array $postLanguage = [];
     /** @var array<int,array<string,int>> post id => [Polylang slug => id of its copy in that language] */
     public static array $translations = [];
+    /**
+     * The language a language plugin gives THIS request, as Polylang does for a door call that names none
+     * (the site's default): '' is a site with no plugin narrowing queries. It is what `WP_Query` narrows by.
+     */
+    public static string $requestLanguage = '';
+    /** @var int[] posts a plugin hides from every query through `pre_get_posts`, which no `WP_Query` argument switches off */
+    public static array $queryHides = [];
     /** How many times the rewrite rules were flushed. */
     public static int $flushed = 0;
     /** @var array<string,array<string,string>> Polylang slug => [original string => its translation], what each language's `polylang_mo` post holds */
@@ -76,6 +83,8 @@ final class WP_Fake
         self::$strings = [];
         self::$postLanguage = [];
         self::$translations = [];
+        self::$requestLanguage = '';
+        self::$queryHides = [];
         self::$flushed = 0;
         if (class_exists('WP_Fake_PLL_Languages')) {
             WP_Fake_PLL_Languages::$updates = [];
@@ -384,6 +393,19 @@ function sanitize_title_for_query(string $title): string
  * size is the site's "posts per page" setting (ten unless changed) and not zero rows, and no
  * `post_type` means `post`. Together they make an unguarded empty `post__in` answer with the site's
  * first ten posts.
+ *
+ * Two more are a language plugin's, and are switched on by `WP_Fake::$requestLanguage` (Polylang, read
+ * off its 3.7 source: PLL_Query::filter_query and PLL_Frontend_Auto_Translate). Both run in `parse_query`,
+ * which `suppress_filters` does not switch off, and both stand down for a query that carries a `lang`
+ * argument of any value, the empty string included:
+ *
+ *  - the query is narrowed to the request's language, so a row of another language (or of none) is
+ *    dropped from it, AFTER any page of ids somebody else cut;
+ *  - every id of a `post__in` is replaced by its copy in that language, when the post has one.
+ *
+ * Both apply only to a query that asks for a type the plugin translates (posts and pages here).
+ * `WP_Fake::$queryHides` is a plugin that hides posts from every query through `pre_get_posts`: nothing
+ * in a query's arguments switches that off.
  */
 class WP_Query
 {
@@ -393,7 +415,9 @@ class WP_Query
     public static array $lastArgs = [];
 
     private const UNDERSTOOD = ['name', 'post_type', 'post_status', 'orderby', 'order', 'offset', 'posts_per_page',
-        'ignore_sticky_posts', 'no_found_rows', 'suppress_filters', 'post__in'];
+        'ignore_sticky_posts', 'no_found_rows', 'suppress_filters', 'post__in', 'lang'];
+    /** The post types a language plugin translates, and so narrows a query for. */
+    private const TRANSLATED_TYPES = ['post', 'page'];
 
     public function __construct(array $args = [])
     {
@@ -418,6 +442,11 @@ class WP_Query
         $statuses = (array) ($args['post_status'] ?? 'publish');
         $name = (string) ($args['name'] ?? '') === '' ? '' : sanitize_title_for_query((string) $args['name']);
         $only = array_map('intval', (array) ($args['post__in'] ?? []));
+        // The language plugin, unless the query says `lang` (`isset`: the empty string is a value, null is not).
+        $narrowed = '' !== WP_Fake::$requestLanguage && !isset($args['lang']) && [] !== array_intersect($types, self::TRANSLATED_TYPES);
+        if ($narrowed) {
+            $only = array_map(static fn (int $id): int => (int) (WP_Fake::$translations[$id][WP_Fake::$requestLanguage] ?? $id), $only);
+        }
         // An empty size (absent, or zero) is the site's setting; only a setting of zero itself is one.
         $perPage = $args['posts_per_page'] ?? null;
         if (empty($perPage)) {
@@ -437,7 +466,9 @@ class WP_Query
             if (!in_array((string) ($row['post_type'] ?? ''), $types, true)
                 || !in_array((string) ($row['post_status'] ?? ''), $statuses, true)
                 || ('' !== $name && strtolower((string) ($row['post_name'] ?? '')) !== $name)
-                || ([] !== $only && !in_array((int) $id, $only, true))) {
+                || ([] !== $only && !in_array((int) $id, $only, true))
+                || ($narrowed && (string) (WP_Fake::$postLanguage[(int) $id] ?? '') !== WP_Fake::$requestLanguage)
+                || in_array((int) $id, WP_Fake::$queryHides, true)) {
                 continue;
             }
             $post = new WP_Post();

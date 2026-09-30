@@ -375,8 +375,9 @@ $csArgs = static function (): array {
     return $args;
 };
 $csAsk(['search' => 'zebra', 'limit' => 2, 'offset' => 1]);
-check('the query that loads a page of a search: those ids, the plain list\'s types, states, order and flags', $csArgs(), [
+check('the query that loads a page of a search: those ids, the plain list\'s types, states, order and flags, and every language', $csArgs(), [
     'ignore_sticky_posts' => true,
+    'lang' => '',
     'no_found_rows' => true,
     'order' => 'ASC',
     'orderby' => 'ID',
@@ -449,6 +450,71 @@ $r = $csAsk(['search' => 'gizmo']);
 check('a statement WordPress refuses to build is an error, not an empty page', [$r['ok'] ?? null, $r['error'] ?? null, array_key_exists('items', $r)], [false, 'read_failed', false]);
 $csDb->prepareRefuses = false;
 check('and the next search is fine', $csAsk(['search' => 'gizmo'])['ok'] ?? null, true);
+
+// ── a site with a language plugin: the search reaches every language ────────────────────────────
+//
+// Polylang narrows every WP_Query built during a request to the request's language, through
+// `parse_query`, which `suppress_filters` does not switch off, and rewrites the ids of a `post__in` to
+// their copies in that language; a query that carries `lang` is left alone. The ids of a page are cut
+// from the whole table by SQL, so a loader that leaves either to Polylang loses rows AFTER the page was
+// cut (a short page, which the caller reads as the end, and a `matched` that counts rows this door can
+// never return) or hands back a row's translation in place of the row that holds the words.
+$csLanguages = static function (string $requestLanguage) use ($csSite, $csPost): void {
+    $csSite(static function () use ($csPost, $requestLanguage): void {
+        WP_Fake::$polylang = true;
+        WP_Fake::$requestLanguage = $requestLanguage;
+        foreach ([1 => 'en', 2 => 'vi', 3 => 'en', 4 => 'vi', 5 => 'en', 6 => 'vi'] as $id => $language) {
+            $csPost($id, "Roof repair {$id}", ['post_name' => "roof-repair-{$id}"]);
+            WP_Fake::$postLanguage[$id] = $language;
+        }
+        // one page in two languages, whose titles share no word
+        $csPost(10, 'Gutter cleaning', ['post_type' => 'page', 'post_name' => 'gutter-cleaning']);
+        $csPost(11, 'Ve sinh mang xoi', ['post_type' => 'page', 'post_name' => 've-sinh-mang-xoi']);
+        WP_Fake::$postLanguage[10] = 'en';
+        WP_Fake::$postLanguage[11] = 'vi';
+        WP_Fake::$translations[10] = ['en' => 10, 'vi' => 11];
+        WP_Fake::$translations[11] = ['en' => 10, 'vi' => 11];
+        // a type the plugin does not translate, so it has no language
+        $csPost(20, 'Roof repair event', ['post_type' => 'event', 'post_name' => 'roof-repair-event']);
+    });
+};
+foreach (['en' => [[1, 3, 5, 10], 'the English', 'repair 2', [2], 'sinh mang', [11]], 'vi' => [[2, 4, 6, 11], 'the Vietnamese', 'repair 1', [1], 'gutter', [10]]] as $language => [$plainIds, $which, $otherOnly, $otherOnlyIds, $twin, $twinIds]) {
+    $csLanguages($language);
+    check("[{$language}] the plain list is {$which} rows only, as Polylang narrows it", $csIds($csAsk(['limit' => 100])), $plainIds);
+
+    $ids = [];
+    $matched = [];
+    $sizes = [];
+    foreach ([0, 2, 4, 6] as $offset) {
+        $r = $csAsk(['search' => 'roof', 'limit' => 2, 'offset' => $offset]);
+        $ids[] = $csIds($r);
+        $matched[] = $r['matched'] ?? null;
+        $sizes[] = count($r['items'] ?? []);
+    }
+    check("[{$language}] pages of two, from the top: each is full, in both languages, none a translation", $ids, [[1, 2], [3, 4], [5, 6], []]);
+    check("[{$language}] and `matched` is the six rows the walk returns, at every offset", [$matched, array_sum($sizes)], [[6, 6, 6, 6], 6]);
+    $r = $csAsk(['search' => 'roof', 'limit' => 100]);
+    check("[{$language}] one page of everything: all six, in both languages", [$csIds($r), $r['matched'] ?? null], [[1, 2, 3, 4, 5, 6], 6]);
+
+    $r = $csAsk(['search' => $otherOnly]);
+    check("[{$language}] a page that exists only in the other language is found: not an empty answer that sends a caller off to create it", [$csIds($r), $r['matched'] ?? null], [$otherOnlyIds, 1]);
+    check("[{$language}] a row is never swapped for its translation: the words find the page that holds them", $csIds($csAsk(['search' => $twin])), $twinIds);
+    check("[{$language}] and the other edition of that page is found by its own words", $csIds($csAsk(['search' => $language === 'en' ? 'gutter' : 'sinh mang'])), [$language === 'en' ? 10 : 11]);
+
+    check("[{$language}] a type the plugin does not translate is found, as it is with no plugin", $csIds($csAsk(['search' => 'roof', 'post_type' => 'event'])), [20]);
+    check("[{$language}] \"any\" includes it, beside every language of the translated types", $csIds($csAsk(['search' => 'roof', 'post_type' => 'any'])), [1, 2, 3, 4, 5, 6, 20]);
+}
+
+// A plugin that hides posts from EVERY query (`pre_get_posts` is not something `lang` or
+// `suppress_filters` switches off) leaves the page short of the ids it was cut for. The search says so:
+// a short page is what a caller reads as the end, and a `matched` that counts a row never listed is a
+// total nobody can reach.
+$csLanguages('en');
+WP_Fake::$queryHides = [3];
+$r = $csAsk(['search' => 'roof', 'limit' => 100]);
+check('a page that loads short of its ids is read_failed, not a shorter list', [$r['ok'] ?? null, $r['error'] ?? null, preg_match('/found 6 posts.*loaded 5 of them/', (string) ($r['message'] ?? '')), array_key_exists('items', $r)], [false, 'read_failed', 1, false]);
+WP_Fake::$queryHides = [];
+check('and once nothing hides a post, the same search is whole', [$csAsk(['search' => 'roof', 'limit' => 100])['ok'] ?? null, count($csAsk(['search' => 'roof', 'limit' => 100])['items'] ?? [])], [true, 6]);
 
 // ── the plugin loads the way a site loads it ────────────────────────────────────────────────────
 
