@@ -55,13 +55,13 @@ docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowor
 Mount the repository root, not this folder: the release checks read `joomla/update.xml` and
 `joomla/update.json` one level up, so a mount of `joomla/cowork` alone stops at them. The second run
 is the same suite with the test writers reading through the list-and-read walk instead of in bulk;
-the two must agree test for test.
+the two must agree test for test (CI runs the first; run the second when you change how rows are read).
 
 The suite must pass on a PHP with `intl` and on one without it. The official `php` images carry no
 `intl`, so there the tests stand in for `Normalizer`; a PHP that has it (Homebrew, distro packages,
 and the PHP the CI job installs: `setup-php` loads `intl` by default) runs the real one. To run the
-suite that way in docker, add it to the image first: `apt-get install libicu-dev` and
-`docker-php-ext-install intl`. The tests that need no `Normalizer` start a fresh PHP with
+suite that way in docker, add it to the image first: `apt-get update && apt-get install -y libicu-dev`
+and `docker-php-ext-install intl`. The tests that need no `Normalizer` start a fresh PHP with
 `disable_classes=Normalizer`, which on a PHP with `intl` leaves the class declared and empties its
 methods rather than removing it; the code treats that as no `Normalizer` (see `tests/content-search.php`).
 
@@ -299,7 +299,8 @@ content.list {kind: "article", search: "roof repair"}
 
 - **Match.** A substring of the title (the name, for the kinds that have one) and of the alias where
   the kind has one: the language editions of one article share an alias stem while their titles are
-  translated, so a title-or-alias search finds every edition. Notes, bodies and intro text are not
+  translated, so a title-or-alias search reaches the editions that share the searched stem
+  (Tracy's quickstarts name them that way; a site that names its editions differently may not). Notes, bodies and intro text are not
   searched. There are no wildcards and no patterns: `%` and `_` are ordinary characters (the query
   names its own `ESCAPE` character, so it means the same under any `sql_mode`), and `50%_off` finds
   "50%_off sale", not "500 off sale". The words are bound parameters, never part of the SQL text.
@@ -311,8 +312,8 @@ content.list {kind: "article", search: "roof repair"}
   is declared `utf8mb4_bin`: binary, so a plain `LIKE` on it would compare case. Joomla writes an
   alias lower case (`OutputFilter::stringURLSafe` lower-cases what it returns), so the
   plugin compares the alias lower-cased — `LOWER(alias)` — with the needle lower-cased: `Roof-Repair`
-  finds the alias `roof-repair`. That is what lets one call reach every language edition of a page
-  whatever case the caller typed, and a row that stores an upper-case alias anyway (an import, a
+  finds the alias `roof-repair`. That is what lets one call reach the language editions of a page that
+  share an alias stem, whatever case the caller typed, and a row that stores an upper-case alias anyway (an import, a
   hand edit) is found too. What stays exact in an alias is the rest of the binary comparison:
   accents (`e` is not `é`), and the composed form against the decomposed one, both of which are
   tried. A space is a space, in the title and in the alias: "roof repair" does not match the alias
@@ -326,7 +327,8 @@ content.list {kind: "article", search: "roof repair"}
   (`null` included) and one that is not UTF-8 are refused with `bad_params`. It is made NFC when PHP
   has `Normalizer` (intl, or Joomla's polyfill) and matched as both its NFC and its NFD form, since a
   title may have been stored either way; without `Normalizer` it is matched as typed. Blank after
-  cleaning means no filter: the plain list, answered with `search: ""` and no `matched`.
+  cleaning means no filter on a kind that takes `search`: the plain list, answered with `search: ""`
+  and no `matched`; a kind that refuses `search` refuses it whatever the value.
 - **Four-byte characters.** A character above U+FFFF (an emoji, a rare Chinese character) cannot be
   stored in a table still in `utf8` (utf8mb3), and such a site's database refuses to compare its
   columns with one ("Illegal mix of collations", or "Incorrect string value"). A needle holding one
@@ -335,7 +337,8 @@ content.list {kind: "article", search: "roof repair"}
   in which every form holds such a character. The same refusal for a needle without one, and any
   other database error, is `read_failed`. (The refusal is matched by the server's English text; a
   server set to another `lc_messages` language answers `read_failed`, the safe side.)
-- **The answer.** `search` is in the answer **if and only if** the request carried the key. It is the
+- **The answer.** `search` is in a successful answer **if and only if** the request carried the key (a
+  refusal, like any error, carries none). It is the
   proof that this plugin read it: a plugin from before this change ignores the key and answers the
   whole list as `ok`, so a caller that sends `search` must look for the echo and read its absence as
   "not filtered". Its value is the needle **as cleaned** — trimmed, control characters dropped, a
