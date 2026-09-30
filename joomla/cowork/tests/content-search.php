@@ -509,6 +509,37 @@ namespace {
         check("kind {$csKind}: and so does a writer that cannot search", array_keys($csAsk(['kind' => $csKind], new FakeSearchlessSite())), ['ok', 'kind', 'offset', 'items']);
     }
 
+    // --- the production writer, joined to the engine
+    // Every engine check above runs over an in-memory writer that declares SearchableSiteWriter itself,
+    // and every check of the real writer above calls its methods directly, so none of them crosses the
+    // gate the engine holds (`$this->writer instanceof SearchableSiteWriter`). The interface list of
+    // JoomlaSiteWriter is the one line that switches search on in production: without it the engine
+    // refuses every search on every site, and the rest of this file stays green. So the real writer is
+    // asked here, and the engine is run over it, through the same recording driver as section 3.
+    checkTrue('real writer: JoomlaSiteWriter declares SearchableSiteWriter', (new JoomlaSiteWriter(new CsDb())) instanceof SearchableSiteWriter);
+    $csRealDb = new CsDb();
+    $csRealDb->rows = [['id' => 5, 'title' => 'News', 'alias' => 'news']];
+    check('real writer: the engine answers a search with the echo, the count and the rows',
+        $csAsk(['kind' => 'category', 'search' => 'news'], new JoomlaSiteWriter($csRealDb)),
+        ['ok' => true, 'kind' => 'category', 'offset' => 0, 'search' => 'news', 'matched' => 1, 'items' => [['id' => 5, 'title' => 'News', 'alias' => 'news']]]);
+    check('real writer: through one narrowed query, and no count since the first page did not fill',
+        array_map(fn (array $ran): bool => str_contains($ran['sql'], " WHERE (a.`title` LIKE :s0 ESCAPE '!'"), $csRealDb->ran), [true]);
+    $csRealDb = new CsDb();
+    $csRealDb->rows = [['id' => 5, 'title' => 'News', 'alias' => 'news']];
+    $csRealDb->scalar = '7';
+    $csAnswer = $csAsk(['kind' => 'category', 'search' => 'news', 'limit' => 1], new JoomlaSiteWriter($csRealDb));
+    check('real writer: a page that fills is counted by its own COUNT, and the count is an integer',
+        [$csAnswer['matched'] ?? null, array_map(fn (array $ran): bool => str_starts_with($ran['sql'], 'SELECT COUNT(*)'), $csRealDb->ran)], [7, [false, true]]);
+    foreach (SiteWriter::KINDS as $csKind) {
+        $csRealDb = new CsDb();
+        $csAnswer = $csAsk(['kind' => $csKind, 'search' => 'x'], new JoomlaSiteWriter($csRealDb));
+        $csEchoed = ($csAnswer['ok'] ?? false) === true && array_key_exists('search', $csAnswer);
+        $csRefused = ($csAnswer['ok'] ?? null) === false && ($csAnswer['error'] ?? null) === 'bad_params';
+        checkTrue("real writer, kind {$csKind}: search is answered with its echo or refused, never answered without it", $csEchoed || $csRefused);
+        check("real writer, kind {$csKind}: it is filtered exactly where the table above says", $csEchoed, in_array($csKind, $csFiltered, true));
+        checkTrue("real writer, kind {$csKind}: a refused search runs no statement", $csEchoed || $csRealDb->ran === []);
+    }
+
     // --- the answer without `search`, byte for byte against the code before this change
     $csPin = function (SiteWriter $w): SiteWriter {
         $w->store['article'][3] = ['title' => 'First', 'alias' => 'first', 'introtext' => '<p>long body</p>'];
