@@ -14,8 +14,11 @@
 //   5. loading: the classes arrive with the files production requires, and a PHP without intl still
 //      answers.
 //
-// Fixtures are neutral. Collation behaviour (case, accents, NFC against NFD) is the server's and is
-// left to a live smoke on a real site; nothing here claims it.
+// Fixtures are neutral. What a LIKE counts as equal (case, accents, NFC against NFD) is the column's
+// collation, and no test here can show it: SQLite folds ASCII case whatever a column says. Joomla's
+// own schema gives a title its table's utf8mb4_unicode_ci and an alias utf8mb4_bin, so an alias
+// matches exactly (README, "Case and accents differ between title and alias"); the rest is left to
+// a live smoke on a real site, and nothing here claims it.
 
 namespace Joomla\CMS {
     if (!class_exists(Factory::class)) {
@@ -340,7 +343,12 @@ namespace {
     }
 
     // =============================================== 4. the engine's answers, through a writer in memory
-    /** The real writer's searched columns, in memory. A check below holds the two maps equal. */
+    /**
+     * The real writer's searched columns, in memory. A check below holds the two maps equal.
+     * It folds case on every column, the alias too, which is looser than the database: the real alias
+     * columns are utf8mb4_bin and match exactly. What is held here is what the engine does with a
+     * writer's answer, not how a database compares.
+     */
     final class CsSearchWriter extends FakeSiteWriter implements SearchableSiteWriter
     {
         public const COLUMNS = [

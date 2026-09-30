@@ -406,7 +406,10 @@ interface SearchableSiteWriter
 
     /**
      * list(), narrowed to the rows where ANY searched column of the kind holds ANY of the variants
-     * as a case-insensitive substring. The same rows, the same order, the same summaries as list()
+     * as a substring. "Holds" is the database's own comparison of that column, and it is not one rule:
+     * a title or a name follows its table's collation (utf8mb4_unicode_ci on a stock Joomla, so case
+     * and accents are ignored), while an alias column is utf8mb4_bin in Joomla's schema and matches
+     * exactly, case and accents included. The same rows, the same order, the same summaries as list()
      * gives; `$offset` and `$limit` apply to the narrowed set. No state filter: a trashed row is
      * listed like any other, because hiding it would make "this is the only match" unsafe to say.
      *
