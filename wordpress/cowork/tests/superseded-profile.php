@@ -120,7 +120,7 @@ $other = $door($engineFor($t, $sameContract($tree, $t)), 'inspect');
 check('a binding hash the declaration does not name still refuses', [$other['ok'], in_array('Installed content contract changed', $other['problems'] ?? [], true)], [false, true]);
 
 // 6. The shipped profiles carry their real declarations, and they load.
-foreach (['tracy-business/wp7/1.1.0', 'tracy-business/wp7/1.2.0', 'tracy-business/wp7/1.3.0'] as $shipped) {
+foreach (['tracy-business/wp7/1.1.0', 'tracy-business/wp7/1.2.0', 'tracy-business/wp7/1.3.0', 'tracy-business/wp7/1.3.1'] as $shipped) {
     $real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
     try {
         $real->preview($shipped);
