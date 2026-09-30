@@ -20,12 +20,11 @@
 // matches exactly (README, "Case and accents differ between title and alias"); the rest is left to
 // a live smoke on a real site, and nothing here claims it.
 
-namespace Joomla\CMS {
-    if (!class_exists(Factory::class)) {
-        final class Factory {}
-    }
-}
-
+// The Joomla pieces the search path touches, each declared only if no other test file has declared it
+// first. `Joomla\CMS\Factory` is left out ON PURPOSE: the search paths never call it, and
+// content-writer-creates.php declares the two calls it does make. An empty one here won whenever this
+// file loaded first, and that file then died on `Factory::getDate()`: the order the files load in
+// must not decide whether either runs. A file that needs one of the names below guards it the same way.
 namespace Joomla\Database {
     if (!interface_exists(DatabaseInterface::class)) {
         interface DatabaseInterface {}
