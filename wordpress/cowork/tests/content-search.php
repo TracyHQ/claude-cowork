@@ -129,6 +129,20 @@ $csSite($csRoofSite);
 $r = $csAsk(['search' => ' Roof repair ']);
 check('the words are trimmed, and found in a title in any case', $csIds($r), [1, 2, 9]);
 check('control characters are removed and what is left is trimmed', $csAsk(['search' => "\n roof \t\x00"])['search'] ?? null, 'roof');
+// A line break or a tab between words is where the words were wrapped or copied from a table: it separates them,
+// so deleting it would join them (`roof\nrepair` searched as `roofrepair`, which finds nothing).
+check('a line break or a tab between words is a space, not nothing', [
+    $csAsk(['search' => "roof\nrepair"])['search'] ?? null,
+    $csAsk(['search' => "roof\r\n\trepair"])['search'] ?? null,
+    $csAsk(['search' => "roof\x0Brepair\x0C"])['search'] ?? null,
+    $csAsk(['search' => "roof\u{85}repair"])['search'] ?? null,
+], ['roof repair', 'roof repair', 'roof repair', 'roof repair']);
+check('and it finds the title the words came from', [$csIds($csAsk(['search' => "Emergency roof\nrepair"])), $csIds($csAsk(['search' => "roof\n\nrepair"]))], [[2], [1, 2, 9]]);
+check('the other control characters are still removed, and plain spaces stay as they were typed', [
+    $csAsk(['search' => "roof\x00\nre\x01pair"])['search'] ?? null,
+    $csAsk(['search' => 'roof  repair'])['search'] ?? null,
+    $csAsk(['search' => "\nroof repair\n"])['search'] ?? null,
+], ['roof repair', 'roof  repair', 'roof repair']);
 check('the answer says what was matched, and how many rows hold it', [$r['search'] ?? null, $r['matched'] ?? null], ['Roof repair', 3]);
 check('the answer has the plain list\'s keys, then the proof and the count, in that order', array_keys($r), ['ok', 'kind', 'offset', 'search', 'matched', 'items']);
 check('it is a list of posts, from the top', [$r['ok'] ?? null, $r['kind'] ?? null, $r['offset'] ?? null], [true, 'post', 0]);
@@ -175,7 +189,7 @@ check('and the rows a search can reach are the plain list\'s: the trash and the 
 // ── nothing to look for: the plain list, and the key still proves the parameter was read ────────
 
 $plain = $csAsk([]);
-foreach (['an empty string' => '', 'spaces' => '   ', 'a no-break space' => "\u{A0}", 'an ideographic space' => "\u{3000}\u{3000}", 'control characters' => "\x00\x1f\x7f"] as $what => $words) {
+foreach (['an empty string' => '', 'spaces' => '   ', 'a no-break space' => "\u{A0}", 'an ideographic space' => "\u{3000}\u{3000}", 'control characters' => "\x00\x1f\x7f", 'line breaks and tabs' => "\n\t \r\n"] as $what => $words) {
     $r = $csAsk(['search' => $words]);
     check("{$what}: the plain list, with the key echoed empty", [$r['search'] ?? 'absent', array_key_exists('matched', $r), $csIds($r)], ['', false, $csIds($plain)]);
 }

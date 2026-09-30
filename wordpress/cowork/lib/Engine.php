@@ -2330,7 +2330,8 @@ final class Engine
 
     /**
      * The words of a `search`, cleaned the way they are matched and echoed: valid UTF-8, in one
-     * canonical spelling, with control characters removed and no space at either end.
+     * canonical spelling, a line break or a tab between words made a space, the other control
+     * characters removed and no space at either end.
      *
      * @param mixed $raw What the caller sent under `search`.
      * @return array{0:?string,1:string} [the words, ''] or [null, why they were refused]
@@ -2351,11 +2352,14 @@ final class Engine
         if (preg_match('//u', $raw) !== 1) {
             return [null, 'search must be valid UTF-8 text'];
         }
-        // A control character carries no words, and a space at either end (the ideographic space
-        // of CJK input included) is not part of a title's. Cleaned BEFORE the spelling is made
-        // canonical: a control character between a letter and its accent would otherwise keep the
-        // two apart, and the echoed words would come back decomposed.
-        $clean = preg_replace('/\p{Cc}+/u', '', $raw);
+        // A line break or a tab between words is what separates them where the text was wrapped or
+        // copied from a table, so a run of them is one space: deleted, `roof\nrepair` would be searched
+        // as `roofrepair` and find nothing. Every other control character carries no words, and a
+        // space at either end (the ideographic space of CJK input included) is not part of a title's.
+        // Cleaned BEFORE the spelling is made canonical: a control character between a letter and its
+        // accent would otherwise keep the two apart, and the echoed words would come back decomposed.
+        $clean = preg_replace('/[\t\n\x0B\f\r\x{85}]+/u', ' ', $raw);
+        $clean = $clean === null ? null : preg_replace('/\p{Cc}+/u', '', $clean);
         $clean = $clean === null ? null : preg_replace('/^[\p{Z}\s]+|[\p{Z}\s]+$/u', '', $clean);
         if ($clean === null) {
             return [null, 'search must be valid UTF-8 text'];

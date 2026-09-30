@@ -293,9 +293,10 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   A slug in a non-Latin script is stored percent-encoded by WordPress (`%e5%b1%8b…`) and is matched
   as stored: such a page is found by its title, and also by a needle that happens to be part of the
   encoding, such as `%e5` or a bare hex pair like `b1`. Words make the better needle.
-- **The words.** Trimmed (an ideographic or no-break space too), control characters removed, turned
-  into Unicode form C when PHP has `intl` (a host without it matches the spelling it was sent in), at
-  most 200 characters, valid UTF-8; one character is a needle. `%`, `_` and `\` match themselves,
+- **The words.** Trimmed (an ideographic or no-break space too); a line break or a tab between words
+  is a space (words wrapped over two lines are still two words) and every other control character is
+  removed; turned into Unicode form C when PHP has `intl` (a host without it matches the spelling it
+  was sent in), at most 200 characters, valid UTF-8; one character is a needle. `%`, `_` and `\` match themselves,
   and nothing is a wildcard or a pattern. Both the composed and the decomposed spelling of a letter
   are tried, and each is also tried the way core's KSES filters store it in a title saved without the
   `unfiltered_html` capability (an author, a wp-cli seed, an importer): `&` as `&amp;`, `>` as
