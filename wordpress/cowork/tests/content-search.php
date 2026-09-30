@@ -586,6 +586,57 @@ check('and a fault there, with that character, is a failure', (function () use (
     return [$r['ok'] ?? null, $r['error'] ?? null];
 })(), [false, 'read_failed']);
 
+// ── the slug is lower case: a capitalised needle reaches it whatever the column's collation ─────
+//
+// WordPress stores a slug in lower case, and whether `post_name LIKE '%Roof%'` finds `roof-repair` is for the
+// column's collation to say. The ones WordPress installs ignore case, but a site can set a binary one
+// (DB_COLLATE `utf8mb4_bin`), which compares byte for byte. So the words are tried against the slug as typed
+// AND in lower case. The title is stored as typed, so it has no such rule and keeps to its own spellings.
+$csSite(static function () use ($csPost): void {
+    $csPost(1, 'Get a quote', ['post_name' => 'roof-repair-old']);
+    $csPost(2, 'Emergency call-out', ['post_type' => 'page', 'post_name' => 'emergency-call-out']);
+    $csPost(3, 'ROOF REPAIR COST', ['post_name' => 'roof-repair-cost']);
+    $csPost(4, 'Solar panels', ['post_name' => '%e3%82%b5%e3%83%bc']);
+    // what a write straight to the table can leave and WordPress itself never writes: capitals in a slug
+    $csPost(5, 'Legacy import', ['post_name' => 'Roof-Repair-Legacy']);
+});
+check('(default columns ignore case) a capitalised needle reaches a lower-case slug that the title does not hold', $csIds($csAsk(['search' => 'Roof-Repair-Old'])), [1]);
+check('(default columns) and so does a shouted one, and a slug with capitals', $csIds($csAsk(['search' => 'ROOF-REPAIR'])), [1, 3, 5]);
+check('the spellings a slug is tried in: as typed and in lower case, one when it is lower case already', [
+    Claude_Cowork_Site_Writer::slug_forms('Roof-Repair'),
+    Claude_Cowork_Site_Writer::slug_forms('roof-repair'),
+    Claude_Cowork_Site_Writer::slug_forms('%E3%82%B5'),
+    Claude_Cowork_Site_Writer::slug_forms('50%_OFF'),
+], [['Roof-Repair', 'roof-repair'], ['roof-repair'], ['%E3%82%B5', '%e3%82%b5'], ['50%_OFF', '50%_off']]);
+check('only the letters A to Z are lowered: other text is left as it is, multibyte characters whole', [
+    Claude_Cowork_Site_Writer::slug_forms("CAF\u{C9} \u{5C4B}\u{6839} \u{1F525}"),
+    Claude_Cowork_Site_Writer::slug_forms("\u{5C4B}\u{6839}"),
+], [["CAF\u{C9} \u{5C4B}\u{6839} \u{1F525}", "caf\u{C9} \u{5C4B}\u{6839} \u{1F525}"], ["\u{5C4B}\u{6839}"]]);
+$csDb->binaryColumns = ['post_name'];
+check('(the stand-in is not vacuous) a binary column does not match a needle with other capitals', [
+    WP_Fake_PostsSql::run("SELECT ID FROM wp_posts WHERE post_name LIKE '%Roof-Repair-Old%'", ['post_name']),
+    WP_Fake_PostsSql::run("SELECT ID FROM wp_posts WHERE post_name LIKE '%roof-repair-old%'", ['post_name']),
+    WP_Fake_PostsSql::run("SELECT ID FROM wp_posts WHERE post_name LIKE '%Roof-Repair-Old%'"),
+], [[], ['1'], ['1']]);
+$r = $csAsk(['search' => 'Roof-Repair-Old']);
+check('(binary slug column) a capitalised needle reaches the lower-case slug, and is echoed as typed', [$csIds($r), $r['search'] ?? null, $r['matched'] ?? null], [[1], 'Roof-Repair-Old', 1]);
+check('(binary slug column) a shouted one too', $csIds($csAsk(['search' => 'ROOF-REPAIR'])), [1, 3]);
+check('(binary slug column) capitals as typed still reach a slug that has them, beside the lower-case ones', $csIds($csAsk(['search' => 'Roof-Repair'])), [1, 3, 5]);
+check('(binary slug column) lower case does not reach a slug written with capitals: that one takes the capitals it has', $csIds($csAsk(['search' => 'roof-repair'])), [1, 3]);
+check('(binary slug column) a percent-escape copied in capitals out of an address bar reaches the slug WordPress stored in lower case', $csIds($csAsk(['search' => '%E3%82%B5'])), [4]);
+$r = $csAsk(['search' => 'ROOF-REPAIR', 'limit' => 1]);
+check('(binary slug column) the count behind `matched` asks the same, so a page of one still totals both', [$csIds($r), $r['matched'] ?? null], [[1], 2]);
+check('(binary slug column) an exact slug named beside the words is cleaned as the plain list cleans it', $csIds($csAsk(['search' => 'ROOF', 'name' => 'Roof-Repair-Old'])), [1]);
+$csDb->queries = [];
+$csAsk(['search' => 'Zebra']);
+check('the statement for a capitalised needle: the slug asked as typed and in lower case, the title once', $csDb->queries[0],
+    "SELECT ID FROM wp_posts WHERE post_type IN ('post','page') AND post_status IN ('publish','draft','pending','private','future') "
+    . "AND (post_title LIKE '%Zebra%' OR post_name LIKE '%Zebra%' OR post_name LIKE '%zebra%') ORDER BY ID ASC LIMIT 0, 100");
+// A title is compared as its column compares it: only the slug is also asked in lower case.
+$csDb->binaryColumns = ['post_title', 'post_name'];
+check('(binary title column) the title is found by the capitals it was stored with, not by lower case: the collation decides', [$csIds($csAsk(['search' => 'ROOF REPAIR'])), $csIds($csAsk(['search' => 'roof repair']))], [[3], []]);
+$csDb->binaryColumns = [];
+
 // ── a site with a language plugin: the search reaches every language ────────────────────────────
 //
 // Polylang narrows every WP_Query built during a request to the request's language, through

@@ -357,16 +357,18 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			$args[] = function_exists( 'sanitize_title_for_query' ) ? sanitize_title_for_query( $name ) : $name;
 		}
 
-		// Any spelling of the title will do; the slug holds neither entities nor decomposed
-		// letters, so it is tried with the words as they are.
+		// Any spelling of the title will do; the slug holds neither entities nor decomposed letters,
+		// and is tried as the words were typed and in lower case (see slug_forms()).
 		$likes = array();
 		foreach ( self::search_forms( $needle ) as $form ) {
 			$likes[] = 'post_title LIKE %s';
 			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
 		}
-		$likes[] = 'post_name LIKE %s';
-		$args[]  = '%' . $wpdb->esc_like( $needle ) . '%';
-		$where  .= ' AND (' . implode( ' OR ', $likes ) . ')';
+		foreach ( self::slug_forms( $needle ) as $form ) {
+			$likes[] = 'post_name LIKE %s';
+			$args[]  = '%' . $wpdb->esc_like( $form ) . '%';
+		}
+		$where .= ' AND (' . implode( ' OR ', $likes ) . ')';
 
 		$ids = $wpdb->get_col(
 			$this->prepared( $wpdb, "SELECT ID FROM {$wpdb->posts} WHERE {$where} ORDER BY ID ASC LIMIT %d, %d", array_merge( $args, array( $offset, $limit ) ) )
@@ -493,6 +495,29 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			$forms[] = self::as_kses_stores( $spelling );
 		}
 		return array_values( array_unique( $forms ) );
+	}
+
+	/**
+	 * Every spelling of the words a stored slug may hold, for a search to try in turn: as typed, and in
+	 * lower case (one spelling when the words are lower case already).
+	 *
+	 * WordPress writes a slug in lower case, so a needle with a capital (`Roof`) is looking for lower
+	 * case. Whether `post_name LIKE '%Roof%'` finds `roof-repair` is the column's collation to say: the
+	 * ones WordPress installs ignore case, but a site can set a binary one (`DB_COLLATE`
+	 * `utf8mb4_bin`), which compares byte for byte and would never find it. Asking for both spellings
+	 * makes the answer the same on either, and the as-typed one keeps a slug that does have capitals (a
+	 * write straight to the table can leave one) found by the capitals it has. A title is stored as typed,
+	 * so it has no such rule and keeps to {@see search_forms()}.
+	 *
+	 * Only the letters A to Z are lowered, which is all a slug WordPress writes has to lose: it holds
+	 * ASCII letters, digits and hyphens, and anything else is percent-encoded, in lower-case hex (`%e5%b1…`).
+	 * That needs no mbstring, which a host may lack, and no locale, which `strtolower()` reads before
+	 * PHP 8.2.
+	 *
+	 * @return string[]
+	 */
+	public static function slug_forms( string $needle ): array {
+		return array_values( array_unique( array( $needle, strtr( $needle, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz' ) ) ) );
 	}
 
 	/**

@@ -283,8 +283,13 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
 
 - **What matches.** A substring of the title **or** the slug (`post_name`), compared the way the
   column's collation compares text: WordPress installs a case-insensitive one, and whether accents
-  fold depends on it. The words are one substring, not split: `roof repair` does not find the slug
-  `roof-repair`, and a leading `-` is a hyphen. The excerpt and the body are **not** searched.
+  fold depends on it. The slug is also asked in lower case, because WordPress stores it that way:
+  `Roof` reaches `roof-repair` on a site that set a case-sensitive (binary) collation with
+  `DB_COLLATE` exactly as it does on the usual one, and a slug that does have capitals (a write
+  straight to the table can leave one) is still found by them. A title is stored as typed, so on
+  such a column it is found by the capitals it has. The words are one substring, not split:
+  `roof repair` does not find the slug `roof-repair`, and a leading `-` is a hyphen. The excerpt
+  and the body are **not** searched.
   A slug in a non-Latin script is stored percent-encoded by WordPress (`%e5%b1%8b…`) and is matched
   as stored: such a page is found by its title, and also by a needle that happens to be part of the
   encoding, such as `%e5` or a bare hex pair like `b1`. Words make the better needle.

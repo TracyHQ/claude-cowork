@@ -15,6 +15,7 @@
  * byte), and the collation is case-insensitive but folds no accents and normalises nothing —
  * stricter than any collation WordPress installs with, so a title stored in one Unicode spelling is
  * found only by a statement that asks for that spelling (a real collation may find more, not less).
+ * A column named in `$binaryColumns` compares byte for byte instead, as a `_bin` collation does.
  *
  * Not a SQL engine: it stands in for one, for one query shape, and a test that needs more belongs
  * on a real install.
@@ -40,6 +41,13 @@ final class WP_Fake_PostsDb
      * message below, before it reads a row. A table like this holds no such character (the fixtures add none).
      */
     public bool $utf8mb3 = false;
+    /**
+     * Columns that compare byte for byte, capitals and all, as a `_bin` collation compares them (a site can
+     * set one with DB_COLLATE). Every other column ignores case, as the collations WordPress installs do.
+     *
+     * @var string[]
+     */
+    public array $binaryColumns = [];
     /** @var string[] every statement run, as MySQL would have received it */
     public array $queries = [];
 
@@ -95,7 +103,7 @@ final class WP_Fake_PostsDb
             return [];
         }
         $this->last_error = $fails ? $this->failWith : '';
-        return $fails ? [] : WP_Fake_PostsSql::run($query);
+        return $fails ? [] : WP_Fake_PostsSql::run($query, $this->binaryColumns);
     }
 }
 
@@ -105,16 +113,22 @@ final class WP_Fake_PostsSql
     /** @var array<int,array{0:string,1:mixed}> */
     private array $tokens;
     private int $at = 0;
+    /** @var string[] columns compared byte for byte */
+    private array $binary;
 
-    private function __construct(array $tokens)
+    private function __construct(array $tokens, array $binary)
     {
         $this->tokens = $tokens;
+        $this->binary = $binary;
     }
 
-    /** @return string[] ids in ascending order (as strings, like a driver answers), or one count */
-    public static function run(string $sql): array
+    /**
+     * @param string[] $binary columns that compare byte for byte, as a `_bin` collation does
+     * @return string[] ids in ascending order (as strings, like a driver answers), or one count
+     */
+    public static function run(string $sql, array $binary = []): array
     {
-        return (new self(self::tokenize($sql)))->select();
+        return (new self(self::tokenize($sql), $binary))->select();
     }
 
     /** What the statement's string literal holds once MySQL has read it (`\%` and `\_` stay, for LIKE). */
@@ -285,29 +299,35 @@ final class WP_Fake_PostsSql
             throw new LogicException("SQL reader: unknown column {$column}");
         }
         $value = static fn (array $row): string => (string) ($row[$column] ?? '');
+        $exact = in_array($column, $this->binary, true);
+        // How this column compares text: exactly under a binary collation, ignoring case under the rest.
+        $fold = static fn (string $text): string => $exact ? $text : mb_strtolower($text);
         if ($this->isWord('LIKE')) {
             $this->word('LIKE');
-            $regex = self::likeRegex($this->string());
+            $regex = self::likeRegex($this->string(), $exact);
             return static fn (array $row): bool => preg_match($regex, $value($row)) === 1;
         }
         if ($this->isWord('IN')) {
             $this->word('IN');
             $this->sym('(');
-            $set = [mb_strtolower($this->string())];
+            $set = [$fold($this->string())];
             while ($this->isSym(',')) {
                 $this->sym(',');
-                $set[] = mb_strtolower($this->string());
+                $set[] = $fold($this->string());
             }
             $this->sym(')');
-            return static fn (array $row): bool => in_array(mb_strtolower($value($row)), $set, true);
+            return static fn (array $row): bool => in_array($fold($value($row)), $set, true);
         }
         $this->sym('=');
-        $want = mb_strtolower($this->string());
-        return static fn (array $row): bool => mb_strtolower($value($row)) === $want;
+        $want = $fold($this->string());
+        return static fn (array $row): bool => $fold($value($row)) === $want;
     }
 
-    /** A LIKE pattern as a regex: `\x` is x, `%` any run, `_` one character, the rest itself. */
-    private static function likeRegex(string $pattern): string
+    /**
+     * A LIKE pattern as a regex: `\x` is x, `%` any run, `_` one character, the rest itself. Case is
+     * ignored unless `$exact` (a binary collation).
+     */
+    private static function likeRegex(string $pattern, bool $exact = false): string
     {
         $regex = '';
         $n = strlen($pattern);
@@ -326,7 +346,7 @@ final class WP_Fake_PostsSql
                 $regex .= preg_quote($c, '~');
             }
         }
-        return '~^' . $regex . '\z~isu';
+        return '~^' . $regex . '\z~' . ($exact ? '' : 'i') . 'su';
     }
 
     private function next(): array
