@@ -222,7 +222,8 @@ $csDb->queries = [];
 $r = $csAsk(['search' => ['x']]);
 check('a refusal lists nothing, echoes nothing and asks the database nothing', [array_key_exists('items', $r), array_key_exists('search', $r), count($csDb->queries)], [false, false, 0]);
 
-// templates and every other kind: the parameter is refused, never ignored
+// templates: the parameter is refused, never ignored (and the two things that go with it: an empty search is refused
+// too, and the plain list still works)
 foreach (['templatePart', 'template'] as $kind) {
     $r = $csAsk(['kind' => $kind, 'search' => 'header']);
     check("{$kind} cannot be searched: refused, naming the kind", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), "\"{$kind}\"") !== false, array_key_exists('items', $r)], [false, 'bad_params', true, false]);
@@ -230,10 +231,22 @@ foreach (['templatePart', 'template'] as $kind) {
     check("{$kind}: a null search is the key too", $csAsk(['kind' => $kind, 'search' => null])['error'] ?? null, 'bad_params');
     check("{$kind} still lists without a search", $csAsk(['kind' => $kind])['ok'] ?? null, true);
 }
-foreach (['option', 'menuItem', 'user', 'page', 'menutype'] as $kind) {
+
+// EVERY kind: a search is filtered and echoed, or refused naming the kind. It is never answered `ok:true` with the whole
+// list and no `search` key, which reads as "these are the ones that match" and is the failure this door exists to
+// prevent. The kinds are READ from SiteWriter::KINDS (postmeta and term included, which nothing else here names), so a
+// kind added to the writer later is held to the same rule without anyone remembering to list it; the ones after
+// them are kinds the door never had, and names a caller might guess.
+$csKinds = array_values(array_unique(array_merge(SiteWriter::KINDS, ['pattern', 'user', 'page', 'menutype', 'nosuchkind'])));
+foreach ($csKinds as $kind) {
     $r = $csAsk(['kind' => $kind, 'search' => 'x']);
-    check("kind {$kind} with a search is refused, naming it", [$r['ok'] ?? null, $r['error'] ?? null, strpos((string) ($r['message'] ?? ''), "\"{$kind}\"") !== false], [false, 'bad_params', true]);
+    $refused = ($r['ok'] ?? null) === false && ($r['error'] ?? null) === 'bad_params'
+        && strpos((string) ($r['message'] ?? ''), "\"{$kind}\"") !== false && !array_key_exists('items', $r);
+    $filtered = ($r['ok'] ?? null) === true && ($r['search'] ?? null) === 'x' && array_key_exists('matched', $r);
+    check("kind {$kind} with a search: refused naming it, or filtered and echoed, never the whole list under ok:true",
+        $refused || $filtered ? 'refused or filtered' : $r, 'refused or filtered');
 }
+check('(the table reads the writer\'s own list) it holds the kinds no other test names', [in_array('postmeta', $csKinds, true), in_array('term', $csKinds, true)], [true, true]);
 
 // A writer that cannot search refuses the words; it never lists as if it had read them.
 $csOld = new FakeSiteWriter();
