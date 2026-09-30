@@ -2230,10 +2230,20 @@ final class Engine
         $kind = isset($p['kind']) && is_string($p['kind']) && trim($p['kind']) !== ''
             ? trim($p['kind'])
             : 'post';
+        // The template parts and templates the active theme renders, files and stored overrides
+        // alike: a `wp_template_part` post list names only the overrides, so a part still served
+        // from the theme file was invisible to a caller looking for a page's words.
+        if (($kind === 'templatePart' || $kind === 'template') && method_exists($this->writer, 'listThemeRows')) {
+            try {
+                return $this->ok(['kind' => $kind, 'items' => $this->writer->listThemeRows($kind)]);
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
         if ($kind !== 'post') {
             return $this->err(
                 'bad_params',
-                "content.list serves kind \"post\" only; \"{$kind}\" is not listed here. "
+                "content.list serves kinds \"post\", \"templatePart\" and \"template\"; \"{$kind}\" is not listed here. "
                     . 'Read one with content.get {kind, id or key}, and use post_type to narrow posts.'
             );
         }
@@ -2291,8 +2301,11 @@ final class Engine
         $kind = isset($p['kind']) && is_string($p['kind']) && trim($p['kind']) !== ''
             ? trim($p['kind'])
             : 'post';
+        if ($kind === 'pattern') {
+            return $this->patternGet($p);
+        }
         if (!in_array($kind, SiteWriter::KINDS, true)) {
-            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
+            return $this->err('bad_params', 'kind must be one of: ' . implode(', ', array_merge(SiteWriter::KINDS, ['pattern'])));
         }
         $id = max(0, (int) ($p['id'] ?? 0));
         $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
@@ -2308,11 +2321,13 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
-        if ($item === null && $kind === 'templatePart' && $key !== '' && method_exists($this->writer, 'themeTemplatePart')) {
-            // A part the site never stored is still what visitors see: the theme's own file. Served as
-            // read (stored:false), so a write to it is judged against those bytes; the writer's read()
-            // stays null there on purpose — its undo is a delete that puts the theme file back.
-            $theme = $this->writer->themeTemplatePart($key);
+        $themeRead = ['templatePart' => 'themeTemplatePart', 'template' => 'themeTemplate'][$kind] ?? null;
+        if ($item === null && $themeRead !== null && $key !== '' && method_exists($this->writer, $themeRead)) {
+            // A part (or template) the site never stored is still what visitors see: the theme's own
+            // file. Served as read (stored:false), so a write to it is judged against those bytes; the
+            // writer's read() stays null there on purpose — its undo is a delete that puts the theme
+            // file back.
+            $theme = $this->writer->{$themeRead}($key);
             if ($theme !== null) {
                 return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false]);
             }
@@ -2440,6 +2455,37 @@ final class Engine
     }
 
     /**
+     * One registered block pattern, by name, as a `<!-- wp:pattern {"slug"} /-->` block renders it.
+     *
+     * Read-only by design, and not a SiteWriter kind: a pattern lives in the theme's (or a plugin's)
+     * PHP, and the block editor changes one by expanding it into the post, part or template that
+     * inserts it — that record is what a caller writes. `stored:false`, like a theme-file part.
+     */
+    private function patternGet(array $p): array
+    {
+        $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+        if ($key === '') {
+            return $this->err('bad_params', 'key required: the pattern name, e.g. "twentytwentyfive/hero"');
+        }
+        if (!method_exists($this->writer, 'themePattern')) {
+            return $this->err('unavailable', 'this plugin cannot read block patterns');
+        }
+        try {
+            $item = $this->writer->themePattern($key);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($item === null) {
+            return $this->err('not_found', "no registered pattern named \"{$key}\"");
+        }
+        return $this->ok(['kind' => 'pattern', 'id' => 0, 'key' => $key, 'item' => $item, 'stored' => false]);
+    }
+
+    /** A pattern is changed where it is inserted; the sentence both write doors refuse it with. */
+    private const PATTERN_WRITE = 'a registered pattern is read-only: expand it into the post, templatePart or '
+        . 'template that inserts it (its <!-- wp:pattern --> comment), as the block editor does, and write that record';
+
+    /**
      * Make sure Polylang knows a language, using its own defaults for everything a form never asks
      * for. The locale is the one Polylang ships for that slug when it has one — its predefined list
      * is the only place that knows `vi` is `vi_VN` and `en` is `en_US` — and `<slug>_<SLUG>` only
@@ -2496,6 +2542,9 @@ final class Engine
             return $this->err('bad_params', 'apply_id required');
         }
         $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if ($kind === 'pattern') {
+            return $this->err('bad_params', self::PATTERN_WRITE);
+        }
         if (!in_array($kind, SiteWriter::KINDS, true)) {
             return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
         }
@@ -2583,6 +2632,9 @@ final class Engine
             return $this->err('bad_params', 'apply_id required');
         }
         $kind = isset($p['kind']) && is_string($p['kind']) ? $p['kind'] : '';
+        if ($kind === 'pattern') {
+            return $this->err('bad_params', self::PATTERN_WRITE);
+        }
         if (!in_array($kind, SiteWriter::KINDS, true)) {
             return $this->err('bad_params', 'kind must be one of: ' . implode(', ', SiteWriter::KINDS));
         }
@@ -2596,11 +2648,11 @@ final class Engine
         // before-state settles which row is meant before anything is touched.
         $before = $this->writer->read($kind, $id, $key);
         if ($before === null) {
-            return $this->err('not_found', 'templatePart' === $kind
-                ? "no templatePart with slug {$key}"
+            return $this->err('not_found', ('templatePart' === $kind || 'template' === $kind)
+                ? "no {$kind} with slug {$key}"
                 : "no {$kind} with id {$id}");
         }
-        if ('templatePart' === $kind) {
+        if ('templatePart' === $kind || 'template' === $kind) {
             $id = (int) ($before['id'] ?? 0);
         }
         $locked = $this->editLocked($kind, $id, $before);
@@ -2884,8 +2936,9 @@ final class Engine
                 continue;
             }
             $kind = (string) ($entry['kind'] ?? '');
-            // A template part's entry carries its row id (a create's too), so it is checked as that post.
-            $locked = $this->editLocked($kind === 'templatePart' ? 'post' : $kind, (int) ($entry['id'] ?? 0), null);
+            // A template part's (or template's) entry carries its row id (a create's too), so it is
+            // checked as that post.
+            $locked = $this->editLocked(($kind === 'templatePart' || $kind === 'template') ? 'post' : $kind, (int) ($entry['id'] ?? 0), null);
             if ($locked !== null) {
                 return $locked;
             }
@@ -3186,8 +3239,8 @@ final class Engine
         $kind = (string) ($entry['kind'] ?? '');
         $id = (int) ($entry['id'] ?? 0);
         $key = (string) ($entry['key'] ?? '');
-        if ($kind === 'templatePart') {
-            return "templatePart:{$key}";
+        if ($kind === 'templatePart' || $kind === 'template') {
+            return "{$kind}:{$key}";
         }
         if ($kind === 'option') {
             return "option:{$key}";
@@ -3200,7 +3253,7 @@ final class Engine
     {
         $kind = (string) ($entry['kind'] ?? '');
         $key = (string) ($entry['key'] ?? '');
-        if ($kind === 'option' || $kind === 'templatePart') {
+        if ($kind === 'option' || $kind === 'templatePart' || $kind === 'template') {
             return "{$kind} {$key}";
         }
         return "{$kind} " . (int) ($entry['id'] ?? 0) . ($key === '' ? '' : " {$key}");
@@ -3326,7 +3379,7 @@ final class Engine
         $post = 0;
         if (in_array($kind, ['post', 'postmeta', 'menuItem'], true)) {
             $post = $id;
-        } elseif ($kind === 'templatePart') {
+        } elseif ($kind === 'templatePart' || $kind === 'template') {
             $post = (int) ($before['id'] ?? 0);
         }
         if ($post <= 0) {

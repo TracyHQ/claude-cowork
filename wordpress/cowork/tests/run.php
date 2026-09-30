@@ -1648,6 +1648,8 @@ require __DIR__ . '/content-revisions.php';
 require __DIR__ . '/edit-lock.php';
 // Native ids: each content names its own WordPress record.
 require __DIR__ . '/content-natives.php';
+// Words a block theme holds: templates read and written as overrides, patterns read by name.
+require __DIR__ . '/theme-words.php';
 // Many details in one read: content.read ids.
 require __DIR__ . '/content-batch.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.

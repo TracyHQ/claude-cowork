@@ -62,10 +62,13 @@ final class WP_Fake
     public static array $users = [];
     /** @var array<string,callable> hook => the one callback `apply_filters` runs for it */
     public static array $filters = [];
+    /** @var array<string,array<string,mixed>> pattern name => what the block pattern registry holds for it */
+    public static array $patterns = [];
 
     public static function reset(): void
     {
         self::$themeDir = '/nonexistent-theme';
+        self::$patterns = [];
         self::$users = [];
         self::$filters = [];
         self::$polylang = false;
@@ -94,6 +97,25 @@ final class WP_Fake
         self::$nextId = 500;
         self::$contentFilter = null;
         self::$ksesParked = null;
+    }
+}
+
+/**
+ * The block pattern registry, as far as the writer asks it: one pattern by name, its content already
+ * run through PHP (the real `get_registered` includes a theme file pattern and returns its output).
+ */
+final class WP_Block_Patterns_Registry
+{
+    private static ?self $instance = null;
+
+    public static function get_instance(): self
+    {
+        return self::$instance ??= new self();
+    }
+
+    public function get_registered(string $name): ?array
+    {
+        return WP_Fake::$patterns[$name] ?? null;
     }
 }
 

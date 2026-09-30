@@ -80,6 +80,24 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	/** Told apart from a real stored value, which may legitimately be null, false or ''. */
 	private const ABSENT = "\0claude_cowork_absent";
 
+	/**
+	 * The two kinds a block theme ships as files and the Site Editor overrides with a row of the
+	 * active theme: the post type of that row, and the theme folders its file may sit in (current
+	 * name first, then the pre-5.9 one).
+	 */
+	private const THEME_ROWS = array(
+		'templatePart' => array(
+			'type'    => 'wp_template_part',
+			'folders' => array( 'parts', 'block-template-parts' ),
+			'example' => 'the part slug, e.g. "header"',
+		),
+		'template'     => array(
+			'type'    => 'wp_template',
+			'folders' => array( 'templates', 'block-templates' ),
+			'example' => 'the template slug, e.g. "page"',
+		),
+	);
+
 	/** @var array<int,int> Posts touched this request, so purgeCache cleans those and not the world. */
 	private $touched = array();
 
@@ -153,22 +171,25 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			);
 		}
 
-		if ( 'templatePart' === $kind ) {
+		if ( isset( self::THEME_ROWS[ $kind ] ) ) {
 			if ( '' === $key ) {
 				return null;
 			}
-			$existing = $this->find_template_part( $key );
+			$existing = $this->find_theme_row( $kind, $key );
 			// Null means the theme's own file is still in charge, which makes the undo of this
 			// write a delete — and a delete puts the theme's file back, exactly where it was.
 			if ( null === $existing ) {
 				return null;
 			}
-			return array(
+			$row = array(
 				'id'      => (int) $existing->ID,
 				'title'   => (string) $existing->post_title,
 				'content' => (string) $existing->post_content,
-				'area'    => $this->template_part_area( (int) $existing->ID ),
 			);
+			if ( 'templatePart' === $kind ) {
+				$row['area'] = $this->template_part_area( (int) $existing->ID );
+			}
+			return $row;
 		}
 
 		throw new RuntimeException( "unknown kind: {$kind}" );
@@ -359,8 +380,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'option' === $kind ) {
 			return $this->write_option( $fields, $key );
 		}
-		if ( 'templatePart' === $kind ) {
-			return $this->write_template_part( $key, $fields );
+		if ( isset( self::THEME_ROWS[ $kind ] ) ) {
+			return $this->write_theme_row( $kind, $key, $fields );
 		}
 		if ( 'term' === $kind ) {
 			return $this->write_term( $key, $id, $fields );
@@ -393,10 +414,10 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			}
 			return;
 		}
-		if ( 'templatePart' === $kind ) {
+		if ( isset( self::THEME_ROWS[ $kind ] ) ) {
 			// Deleting the override is what restores the theme's own file, so this is both the
-			// undo of a create AND the way to hand a part back to the theme on purpose.
-			$existing = '' === $key ? null : $this->find_template_part( $key );
+			// undo of a create AND the way to hand a part (or a template) back to the theme on purpose.
+			$existing = '' === $key ? null : $this->find_theme_row( $kind, $key );
 			if ( null !== $existing ) {
 				wp_delete_post( (int) $existing->ID, true );
 			}
@@ -453,11 +474,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		// A term is missing on purpose. Deleting one and creating it again mints a NEW term id,
 		// and every post filed under the old one quietly loses its category — an undo that
 		// restores the name but not the relationships is worse than refusing.
-		return in_array( $kind, array( 'post', 'templatePart', 'menuItem' ), true );
+		return in_array( $kind, array( 'post', 'templatePart', 'template', 'menuItem' ), true );
 	}
 
 	public function trash( string $kind, int $id ): void {
-		if ( 'templatePart' === $kind ) {
+		if ( isset( self::THEME_ROWS[ $kind ] ) ) {
 			// A template part has no trash of its own: removing the override IS the delete, and
 			// what comes back is the theme's own file. The revert re-writes the override.
 			if ( $id > 0 ) {
@@ -777,7 +798,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			}
 		}
 
-		// KSES comes off for this one write, exactly as it does for `write_template_part` and for
+		// KSES comes off for this one write, exactly as it does for `write_theme_row` and for
 		// the same reason (see {@see write_unfiltered}): a page built from a block theme carries the
 		// theme's own inline `<svg>` icons, and KSES deletes them without telling anyone — the row
 		// then holds less than was sent, `assert_content_survived` refuses, and a site built from a
@@ -978,58 +999,158 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
-	 * A template part as the ACTIVE theme ships it, when the site never stored one: the raw bytes of
-	 * `<theme>/parts/<slug>.html` (or the older `block-template-parts/`), child theme first, then its
-	 * parent. Raw, not get_block_file_template()'s content, which injects theme attributes and hooked
-	 * blocks — its length would not be the file's. Null when no theme carries that part. read() stays
-	 * null for such a part on purpose: a write's undo is then a delete that puts the theme file back.
+	 * A template part as the ACTIVE theme ships it, when the site never stored one. See themeFile().
 	 *
 	 * @return array{id:int,title:string,content:string,area:string,source:string,file:string}|null
 	 */
 	public function themeTemplatePart( string $slug ): ?array {
-		if ( ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/i', $slug ) ) {
+		return $this->themeFile( 'templatePart', $slug );
+	}
+
+	/**
+	 * A full template (`page`, `front-page`, `single`…) as the ACTIVE theme ships it, when the site
+	 * never stored one. See themeFile().
+	 *
+	 * @return array{id:int,title:string,content:string,source:string,file:string}|null
+	 */
+	public function themeTemplate( string $slug ): ?array {
+		return $this->themeFile( 'template', $slug );
+	}
+
+	/**
+	 * A theme row as the ACTIVE theme ships it, when the site never stored one: the raw bytes of
+	 * `<theme>/<folder>/<slug>.html` (`parts/` or the older `block-template-parts/` for a part,
+	 * `templates/` or `block-templates/` for a template), child theme first, then its parent. Raw,
+	 * not get_block_file_template()'s content, which injects theme attributes and hooked blocks — its
+	 * length would not be the file's. Null when no theme carries it. read() stays null for such a row
+	 * on purpose: a write's undo is then a delete that puts the theme file back.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	private function themeFile( string $kind, string $slug ): ?array {
+		if ( ! isset( self::THEME_ROWS[ $kind ] ) || ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/i', $slug ) ) {
 			return null;
 		}
-		$dirs = array_unique( array( get_stylesheet_directory(), get_template_directory() ) );
+		$shape = self::THEME_ROWS[ $kind ];
+		$dirs  = array_unique( array( get_stylesheet_directory(), get_template_directory() ) );
 		foreach ( $dirs as $dir ) {
-			foreach ( array( 'parts', 'block-template-parts' ) as $folder ) {
+			foreach ( $shape['folders'] as $folder ) {
 				$file = $dir . '/' . $folder . '/' . $slug . '.html';
 				if ( ! is_readable( $file ) ) {
 					continue;
 				}
-				$area = 'uncategorized';
-				if ( function_exists( 'get_block_file_template' ) ) {
-					$template = get_block_file_template( get_stylesheet() . '//' . $slug, 'wp_template_part' );
-					if ( $template && ! empty( $template->area ) ) {
-						$area = (string) $template->area;
-					}
-				}
 				$relative = defined( 'ABSPATH' ) && strpos( $file, ABSPATH ) === 0 ? substr( $file, strlen( ABSPATH ) ) : $file;
-				return array(
+				$row      = array(
 					'id'      => 0,
 					'title'   => $slug,
 					'content' => (string) file_get_contents( $file ),
-					'area'    => $area,
-					'source'  => 'theme',
-					'file'    => $relative,
 				);
+				if ( 'templatePart' === $kind ) {
+					$area = 'uncategorized';
+					if ( function_exists( 'get_block_file_template' ) ) {
+						$template = get_block_file_template( get_stylesheet() . '//' . $slug, 'wp_template_part' );
+						if ( $template && ! empty( $template->area ) ) {
+							$area = (string) $template->area;
+						}
+					}
+					$row['area'] = $area;
+				}
+				$row['source'] = 'theme';
+				$row['file']   = $relative;
+				return $row;
 			}
 		}
 		return null;
 	}
 
 	/**
-	 * The override row for one template part of the ACTIVE theme, or null when the theme's own
-	 * file is still in charge.
+	 * Every template part or template the ACTIVE theme renders, by slug, sorted: the theme's files
+	 * (child theme and parent) and the site's stored overrides of this theme, each slug once.
+	 * `stored` says whether an override row is in charge. No bodies — content.get reads one.
+	 *
+	 * @return array<int,array{key:string,title:string,stored:bool}>
+	 */
+	public function listThemeRows( string $kind ): array {
+		if ( ! isset( self::THEME_ROWS[ $kind ] ) ) {
+			throw new RuntimeException( "unknown kind: {$kind}" );
+		}
+		$shape = self::THEME_ROWS[ $kind ];
+		$found = array();
+		foreach ( array_unique( array( get_stylesheet_directory(), get_template_directory() ) ) as $dir ) {
+			foreach ( $shape['folders'] as $folder ) {
+				foreach ( glob( $dir . '/' . $folder . '/*.html' ) ?: array() as $file ) {
+					$slug = basename( $file, '.html' );
+					if ( preg_match( '/^[a-z0-9][a-z0-9_-]*$/i', $slug ) && ! isset( $found[ $slug ] ) ) {
+						$found[ $slug ] = array( 'key' => $slug, 'title' => $slug, 'stored' => false );
+					}
+				}
+			}
+		}
+		$rows = get_posts(
+			array(
+				'post_type'        => $shape['type'],
+				'post_status'      => array( 'publish', 'draft', 'auto-draft' ),
+				'numberposts'      => -1,
+				'no_found_rows'    => true,
+				'suppress_filters' => false,
+				'tax_query'        => array(
+					array(
+						'taxonomy' => 'wp_theme',
+						'field'    => 'name',
+						'terms'    => get_stylesheet(),
+					),
+				),
+			)
+		);
+		foreach ( $rows as $row ) {
+			if ( $row instanceof \WP_Post && '' !== $row->post_name ) {
+				$found[ $row->post_name ] = array(
+					'key'    => $row->post_name,
+					'title'  => '' !== $row->post_title ? $row->post_title : $row->post_name,
+					'stored' => true,
+				);
+			}
+		}
+		ksort( $found );
+		return array_values( $found );
+	}
+
+	/**
+	 * A registered block pattern by name, its content as a `<!-- wp:pattern {"slug"} /-->` block
+	 * renders it: the registry has already run a theme file pattern's PHP. Read-only — the block
+	 * editor changes a pattern by expanding it into the record that inserts it, and that record is
+	 * what a caller writes. Null when no pattern of that name is registered.
+	 *
+	 * @return array{id:int,title:string,content:string,source:string}|null
+	 */
+	public function themePattern( string $name ): ?array {
+		if ( ! preg_match( '#^[a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)?$#i', $name ) || ! class_exists( 'WP_Block_Patterns_Registry' ) ) {
+			return null;
+		}
+		$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( $name );
+		if ( ! is_array( $pattern ) || ! isset( $pattern['content'] ) ) {
+			return null;
+		}
+		return array(
+			'id'      => 0,
+			'title'   => (string) ( $pattern['title'] ?? $name ),
+			'content' => (string) $pattern['content'],
+			'source'  => 'registry',
+		);
+	}
+
+	/**
+	 * The override row for one template part (or template) of the ACTIVE theme, or null when the
+	 * theme's own file is still in charge.
 	 *
 	 * Scoped to the active theme on purpose. A site that has switched themes keeps the old
 	 * theme's overrides in the same table, and a lookup by slug alone would edit a header no
 	 * visitor has seen for months.
 	 */
-	private function find_template_part( string $slug ): ?\WP_Post {
+	private function find_theme_row( string $kind, string $slug ): ?\WP_Post {
 		$found = get_posts(
 			array(
-				'post_type'        => 'wp_template_part',
+				'post_type'        => self::THEME_ROWS[ $kind ]['type'],
 				'name'             => $slug,
 				'post_status'      => array( 'publish', 'draft', 'auto-draft' ),
 				'numberposts'      => 1,
@@ -1059,10 +1180,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * Three things have to be true together, and WordPress says nothing when one is missing — the
 	 * row simply never takes effect, which is the failure this method exists to make impossible:
 	 *
-	 * 1. `post_type` is `wp_template_part` and the slug is the part's name (`header`, `footer`)
+	 * 1. `post_type` is `wp_template_part` (`wp_template` for a template) and the slug is its name
+	 *    (`header`, `footer`; `page`, `front-page`)
 	 * 2. it carries a `wp_theme` term naming the ACTIVE theme, which is how WordPress decides an
 	 *    override belongs to the theme being rendered
-	 * 3. it carries a `wp_template_part_area` term, which is how the Site Editor groups it
+	 * 3. a part carries a `wp_template_part_area` term, which is how the Site Editor groups it
 	 *
 	 * Published, not drafted. The default for a new post here is `draft` — right for an article
 	 * nobody approved, wrong for this: a drafted override is not applied, so the caller would be
@@ -1070,16 +1192,17 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 *
 	 * @param array<string,mixed> $fields
 	 */
-	private function write_template_part( string $slug, array $fields ): int {
+	private function write_theme_row( string $kind, string $slug, array $fields ): int {
+		$shape = self::THEME_ROWS[ $kind ];
 		if ( '' === $slug ) {
-			throw new RuntimeException( 'templatePart needs a key: the part slug, e.g. "header"' );
+			throw new RuntimeException( "{$kind} needs a key: {$shape['example']}" );
 		}
 		if ( ! array_key_exists( 'content', $fields ) ) {
-			throw new RuntimeException( 'templatePart needs a content field: the block markup to render' );
+			throw new RuntimeException( "{$kind} needs a content field: the block markup to render" );
 		}
 
 		$theme    = get_stylesheet();
-		$existing = $this->find_template_part( $slug );
+		$existing = $this->find_theme_row( $kind, $slug );
 		$area     = isset( $fields['area'] ) && '' !== $fields['area']
 			? (string) $fields['area']
 			: ( null !== $existing ? $this->template_part_area( (int) $existing->ID ) : 'uncategorized' );
@@ -1087,7 +1210,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$data = array(
 			'post_content' => (string) $fields['content'],
 			'post_status'  => 'publish',
-			'post_type'    => 'wp_template_part',
+			'post_type'    => $shape['type'],
 			'post_name'    => $slug,
 			'post_title'   => isset( $fields['title'] ) && '' !== $fields['title'] ? (string) $fields['title'] : $slug,
 		);
@@ -1121,9 +1244,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		$this->assert_content_survived( $written, (string) $data['post_content'] );
 
 		// Set every time, not only on create: a row whose theme term went missing renders nothing
-		// and reports nothing, and re-asserting it costs one query.
+		// and reports nothing, and re-asserting it costs one query. Only a part has an area.
 		wp_set_object_terms( $written, $theme, 'wp_theme', false );
-		wp_set_object_terms( $written, $area, 'wp_template_part_area', false );
+		if ( 'templatePart' === $kind ) {
+			wp_set_object_terms( $written, $area, 'wp_template_part_area', false );
+		}
 
 		$this->touched[ $written ] = $written;
 		return $written;
