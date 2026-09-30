@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.19.2 plus: content.list takes a search. A substring of a title, name or alias (case ignored, so one call reaches the language editions that share an alias stem), answered with the key search as proof the plugin read it and the exact count matched; every kind either filters or refuses it, and a request without search answers exactly as before (TracyHQ/claude-cowork#83)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.20.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.20.0/pkg_claudecowork-0.20.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.19.1 plus: derived content contracts for imported sites fit in memory on large sites (rows read in batches, filtered in SQL) and the built map is kept between requests in its own table; reading a slot no longer re-encodes its column, and picture hashes are kept by file signature, so a content.read on an imported site takes about 0.3 s instead of several seconds (TracyHQ/claude-cowork#80)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
