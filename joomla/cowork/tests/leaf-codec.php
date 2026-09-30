@@ -137,7 +137,8 @@ $lcBigRead = [];
 foreach ($lcBigLeaves as $lcLeaf) $lcBigRead[] = LeafCodec::get($lcBigRaw, $lcLeaf['path']);
 $lcBigMs = (microtime(true) - $lcStarted) * 1000;
 check('leaf: every leaf of a 3000-block column reads back', [count($lcBigLeaves), $lcBigRead[0], $lcBigRead[count($lcBigRead) - 1]], [12000, 'Heading number 0', 'more']);
-checkTrue('leaf: and reading them all takes well under a second (' . round($lcBigMs) . ' ms)', $lcBigMs < 500);
+// Linear, not quadratic: the old read path took 7.3 s here; slow CI runners take under 1 s.
+checkTrue('leaf: and reading them all takes well under the old 7 s (' . round($lcBigMs) . ' ms)', $lcBigMs < 3000);
 $lcBigSet = LeafCodec::set($lcBigRaw, $lcBigLeaves[4]['path'], 'Heading one');
 check('leaf: a write after those reads still splices the one leaf', [LeafCodec::get($lcBigSet, $lcBigLeaves[4]['path']), LeafCodec::get($lcBigSet, $lcBigLeaves[0]['path']), strlen($lcBigSet) - strlen($lcBigRaw)],
     ['Heading one', 'Heading number 0', strlen('Heading one') - strlen('Heading number 1')]);
@@ -149,11 +150,13 @@ $lcManyRaw = json_encode(['items' => $lcMany]);
 unset($lcMany);
 $lcManyLeaves = LeafCodec::leaves($lcManyRaw);
 gc_collect_cycles();
-memory_reset_peak_usage();
+// memory_reset_peak_usage() is PHP 8.2+; CI runs 8.1, where the retained growth stands in for the peak.
+$lcManyReset = function_exists('memory_reset_peak_usage');
+if ($lcManyReset) memory_reset_peak_usage();
 $lcManyBase = memory_get_usage();
 $lcManyOk = 0;
 foreach ($lcManyLeaves as $lcLeaf) if (LeafCodec::get($lcManyRaw, $lcLeaf['path']) === $lcLeaf['text']) $lcManyOk++;
-$lcManyPeak = memory_get_peak_usage() - $lcManyBase;
+$lcManyPeak = ($lcManyReset ? memory_get_peak_usage() : memory_get_usage()) - $lcManyBase;
 check('leaf: every leaf of a 40,000-object column reads back', $lcManyOk, 40000);
 checkTrue('leaf: and the parses kept for it stay within their budget (' . round($lcManyPeak / 1048576, 1) . ' MB)', $lcManyPeak < 40 * 1048576);
 unset($lcManyRaw, $lcManyLeaves);

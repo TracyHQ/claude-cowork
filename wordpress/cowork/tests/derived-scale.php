@@ -17,10 +17,12 @@ echo "\nDerived contract at scale (WordPress)\n";
 /** Peak bytes `$run` allocates above what was in use before it. */
 $dsPeak = static function (callable $run, &$result = null): int {
     gc_collect_cycles();
-    memory_reset_peak_usage();
+    // memory_reset_peak_usage() is PHP 8.2+; CI runs 8.1, where the retained growth stands in for the peak.
+    $reset = function_exists('memory_reset_peak_usage');
+    if ($reset) memory_reset_peak_usage();
     $base = memory_get_usage();
     $result = $run();
-    return memory_get_peak_usage() - $base;
+    return ($reset ? memory_get_peak_usage() : memory_get_usage()) - $base;
 };
 $dsSeed = static function (): void {
     WP_Fake::reset();
