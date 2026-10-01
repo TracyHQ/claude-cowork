@@ -122,18 +122,29 @@ check('a stored template is held to its row, not to the theme file under it', [$
 check('and its own revision lands', $br('content.update', ['apply_id' => 'br-t3', 'kind' => 'template', 'key' => 'front-page', 'expected_body_revision' => BR_WELCOME,
     'fields' => ['content' => '<!-- wp:paragraph --><p>Home</p><!-- /wp:paragraph -->']])['body_revision'] ?? null, BR_HOME);
 
-// Nothing there: deleted since it was read, or never there. No revision matches it, and none is invented.
+// Nothing there to compare with (a create, or a record deleted since it was read): the key names the
+// revision of a record that exists, so it is refused as a parameter, and nothing is written.
 $WP_FAKE_POSTS_BEFORE = WP_Fake::$posts;
 $gone = $br('content.update', ['apply_id' => 'br-g1', 'kind' => 'post', 'id' => 4040, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => 'x']]);
-check('a post that is not there matches no revision: stale, body_revision null',
-    [$gone['error'] ?? null, array_key_exists('body_revision', $gone) ? $gone['body_revision'] : 'absent', str_contains((string) ($gone['message'] ?? ''), 'post 4040')],
-    ['revision_stale', null, true]);
+check('a post that is not there is refused: the key names the revision of an existing record',
+    [$gone['error'] ?? null, str_contains((string) ($gone['message'] ?? ''), 'existing'), str_contains((string) ($gone['message'] ?? ''), 'post 4040')],
+    ['bad_params', true, true]);
 $create = $br('content.update', ['apply_id' => 'br-g2', 'kind' => 'post', 'id' => 0, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_title' => 'New']]);
-check('nor does a create, and nothing is created', [$create['error'] ?? null, WP_Fake::$posts === $WP_FAKE_POSTS_BEFORE], ['revision_stale', true]);
+check('so is a create, and nothing is created', [$create['error'] ?? null, WP_Fake::$posts === $WP_FAKE_POSTS_BEFORE], ['bad_params', true]);
 $noPart = $br('content.update', ['apply_id' => 'br-g3', 'kind' => 'templatePart', 'key' => 'sidebar', 'expected_body_revision' => BR_HELLO, 'fields' => ['content' => 'x']]);
-check('nor a part neither stored nor in the theme', [$noPart['error'] ?? null, array_key_exists('body_revision', $noPart) ? $noPart['body_revision'] : 'absent', $brWriter->read('templatePart', 0, 'sidebar')],
-    ['revision_stale', null, null]);
+check('and a part neither stored nor in the theme', [$noPart['error'] ?? null, $brWriter->read('templatePart', 0, 'sidebar')], ['bad_params', null]);
 check('(none of them logged a step)', [$brLog->entries('br-g1'), $brLog->entries('br-g2'), $brLog->entries('br-g3')], [[], [], []]);
+
+// The checks that were there first come first: a post open in the editor is refused as locked, even
+// when the caller's revision is stale too (the lock is what the caller has to wait out).
+$lkWriter = new FakeSiteWriter();
+$lkWriter->store['post']['33'] = ['post_title' => 'Contact', 'post_content' => '<p>Hello again</p>'];
+$lkWriter->locks[33] = ['kind' => 'admin-user', 'name' => 'Ada Editor', 'since' => '2026-10-01T09:00:00Z', 'until' => '2026-10-01T09:02:30Z'];
+$lkEngine = new Engine($WTOKEN, [], null, null, null, null, $lkWriter, null, new FakeApplyLog());
+$lk = $lkEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'lk-1', 'kind' => 'post', 'id' => 33, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => 'x']]]);
+check('a post both open in the editor and stale answers the lock', [$lk['error'] ?? null, $lk['code'] ?? null, $lkWriter->store['post']['33']['post_content']],
+    ['locked', 'SLOT_LOCKED_BY_USER', '<p>Hello again</p>']);
 
 // ── the check runs under the writer's lock, between the read and the write ───────────────────────
 

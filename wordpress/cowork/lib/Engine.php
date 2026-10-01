@@ -2722,18 +2722,18 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('write_failed', $e->getMessage());
         }
-        // Compared with the record just read, which is what content.get would answer now. This action
-        // runs under the writer's lock (see handle()), so no other write through this door lands
-        // between this check and the write below.
+        $locked = $this->editLocked($kind, $id, $before);
+        if ($locked !== null) {
+            return $locked;
+        }
+        // After the checks that were there before it, and compared with the record just read, which is
+        // what content.get would answer now. This action runs under the writer's lock (see handle()),
+        // so no other write through this door lands between this check and the write below.
         if ($expected !== null) {
             $stale = $this->staleBody($kind, $id, $key, $before, $expected);
             if ($stale !== null) {
                 return $stale;
             }
-        }
-        $locked = $this->editLocked($kind, $id, $before);
-        if ($locked !== null) {
-            return $locked;
         }
         try {
             $newId = $this->writer->write($kind, $id, $p['fields'], $key);
@@ -2784,8 +2784,8 @@ final class Engine
     /**
      * The refusal of a write whose `expected_body_revision` is not the body the site holds now, or
      * null when it is. "Now" is what content.get would answer: the stored row, or for a template part
-     * or template the site never stored, the theme's own file. Nothing there at all (deleted since it
-     * was read, or never created) matches no revision, and the answer's `body_revision` is null.
+     * or template the site never stored, the theme's own file. With nothing there at all (a create, or
+     * a record deleted since it was read) there is no revision to name, so the key is a bad parameter.
      *
      * @param array<string,mixed>|null $before The record as read for this write.
      * @return array<string,mixed>|null
@@ -2800,17 +2800,17 @@ final class Engine
                 return $this->err('write_failed', $e->getMessage());
             }
         }
+        $where = self::targetName(['kind' => $kind, 'id' => $id, 'key' => $key]);
         $revision = self::bodyRevision($kind, $current)['body_revision'] ?? null;
-        if ($revision !== null && hash_equals($revision, $expected)) {
+        if ($revision === null) {
+            return $this->err('bad_params', "expected_body_revision names the revision of an existing record, and there is no {$where} to compare it with, "
+                . 'so nothing was written. Leave it out to create one, or read the record again with content.get if it was deleted.');
+        }
+        if (hash_equals($revision, $expected)) {
             return null;
         }
-        $where = self::targetName(['kind' => $kind, 'id' => $id, 'key' => $key]);
-        $message = $revision === null
-            ? "There is no {$where} for expected_body_revision to match, so nothing was written: it was deleted after it was read, or it never existed. "
-                . 'Read it again with content.get, or leave expected_body_revision out to create it.'
-            : "The body of {$where} changed after it was read and no longer matches expected_body_revision, so nothing was written. "
-                . 'Read it again with content.get, make the change on the body it holds now, and send the body_revision that read answers.';
-        return $this->err('revision_stale', $message) + ['body_revision' => $revision];
+        return $this->err('revision_stale', "The body of {$where} changed after it was read and no longer matches expected_body_revision, so nothing was written. "
+            . 'Read it again with content.get, make the change on the body it holds now, and send the body_revision that read answers.') + ['body_revision' => $revision];
     }
 
     /**
