@@ -10,6 +10,7 @@ namespace Tracy\Component\ClaudeCowork\Site\Controller;
 
 \defined('_JEXEC') or die;
 
+use Joomla\CMS\Cache\Cache;
 use Joomla\CMS\Cache\Exception\CacheExceptionInterface;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Router\Route;
@@ -1446,15 +1447,49 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     /**
      * Drop the caches that would otherwise keep serving the version just replaced. Best-effort by
      * the interface's contract: a cache that will not clear must not fail a write that landed.
+     *
+     * EVERY GROUP THE SITE'S CACHE HOLDS, as System › Clear Cache lists and deletes them (com_cache
+     * CacheModel: the site's own handler and path, each group named by the storage itself, so file,
+     * Redis, Memcached and APCu alike). A write changes what any module may print — an article's title
+     * in a `mod_articles_category` list, its picture in a megamenu card — and a module's output is
+     * cached under the module's own name, a group no fixed list of components names. Measured
+     * 02/10/2026 on an imported Joomla 6.1 copy with conservative caching on (15 minutes): a tour
+     * renamed and given a new picture went on showing the old title and picture on the home page,
+     * and the agent spent twenty shell calls finding and clearing the cache by hand.
      */
     public function purgeCache(): void
     {
-        // One group per component the catalog can touch. Cleaning a group that saw no write is
-        // cheap; serving a stale menu after a rename is not.
+        try {
+            $app = Factory::getApplication();
+            $cache = Cache::getInstance('', [
+                'defaultgroup' => '',
+                'storage'      => $app->get('cache_handler', ''),
+                'caching'      => true,
+                'cachebase'    => $app->get('cache_path', JPATH_CACHE),
+            ]);
+            foreach ((array) $cache->getAll() as $item) {
+                $group = is_object($item) && isset($item->group) ? (string) $item->group : '';
+                if ($group === '') {
+                    continue;
+                }
+                try {
+                    $cache->clean($group);
+                } catch (\Throwable $e) {
+                    // One group that will not clean leaves the others to clean.
+                }
+            }
+        } catch (\Throwable $e) {
+            // A storage that cannot list its groups: the named groups below still clean.
+        }
+        // One group per component the catalog can touch, and the article modules that list them,
+        // for a storage that answered no list. Cleaning a group that saw no write is cheap; serving
+        // a stale menu after a rename is not.
         foreach ([
             'com_content', 'com_modules', 'com_templates', 't4', 'mod_ja_acm', '_system', 'page',
             'com_menus', 'mod_menu', 'com_categories', 'com_tags', 'com_fields',
             'com_redirect', 'com_banners', 'com_contact', 'com_newsfeeds', 'com_users', 'com_plugins',
+            'mod_articles', 'mod_articles_category', 'mod_articles_categories', 'mod_articles_latest',
+            'mod_articles_news', 'mod_articles_popular', 'mod_articles_archive', 'mod_custom',
         ] as $group) {
             try {
                 Factory::getCache($group, '')->clean();
