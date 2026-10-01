@@ -65,6 +65,11 @@ final class Engine
     private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
+    /** `content.list {kind: "pattern"}`: rows a page holds when the caller names no `limit`, and the most it may name. */
+    private const PATTERN_LIST_DEFAULT = 50;
+    private const PATTERN_LIST_MAX = 200;
+    /** The most bytes a page of patterns' `items` holds once encoded: the Content API's default page (ContentReader::DEFAULT_BYTES). */
+    private const PATTERN_LIST_BYTES = 65536;
     /** The longest `content.list` `search`, in characters: a fragment of a title, never a paragraph. */
     private const SEARCH_MAX_CHARACTERS = 200;
     /**
@@ -2245,8 +2250,8 @@ final class Engine
             ? trim($p['kind'])
             : 'post';
         // Every kind filters by `search` or refuses it, never ignores it: the whole list under an
-        // `ok:true` would read as "these are the ones that match". A kind other than these two falls
-        // to the refusal below, which names it.
+        // `ok:true` would read as "these are the ones that match". Posts and patterns filter by it,
+        // these two refuse it, and any other kind falls to the refusal below, which names it.
         if (array_key_exists('search', $p) && ($kind === 'templatePart' || $kind === 'template')) {
             return $this->err(
                 'bad_params',
@@ -2263,6 +2268,9 @@ final class Engine
             } catch (Throwable $e) {
                 return $this->err('read_failed', $e->getMessage());
             }
+        }
+        if ($kind === 'pattern') {
+            return $this->patternList($p);
         }
         if ($kind !== 'post') {
             return $this->err(
@@ -2316,6 +2324,104 @@ final class Engine
     }
 
     /**
+     * `content.list {kind: "pattern"}`: the block patterns registered on the site, in name order, a
+     * page at a time. No bodies: content.get `{kind: "pattern", key: <name>}` reads one.
+     */
+    private function patternList(array $p): array
+    {
+        if (!method_exists($this->writer, 'listPatterns')) {
+            return $this->err('unavailable', 'this plugin cannot list block patterns');
+        }
+        // Clamped as a post list clamps them; only a value that is not a whole number is refused,
+        // because reading `"ten"` or `true` as a default would page somewhere the caller never asked.
+        foreach (['offset', 'limit'] as $name) {
+            if (array_key_exists($name, $p) && !is_int($p[$name]) && !(is_string($p[$name]) && preg_match('/^\d{1,9}$/D', $p[$name]))) {
+                return $this->err('bad_params', "{$name} must be a whole number");
+            }
+        }
+        $offset = max(0, (int) ($p['offset'] ?? 0));
+        $limit = min(self::PATTERN_LIST_MAX, max(1, (int) ($p['limit'] ?? self::PATTERN_LIST_DEFAULT)));
+        // `search` is read the way a post search reads it, so the echoed words mean the same thing.
+        $search = null;
+        if (array_key_exists('search', $p)) {
+            [$search, $why] = self::searchNeedle($p['search'], "a pattern's name, title, description or keywords");
+            if ($search === null) {
+                return $this->err('bad_params', $why);
+            }
+        }
+        // `category`: one category slug, matched exactly, as the inserter files patterns.
+        $category = null;
+        if (array_key_exists('category', $p)) {
+            $category = is_string($p['category']) ? trim($p['category']) : '';
+            if ($category === '') {
+                return $this->err('bad_params', 'category must be a category slug, e.g. "banner"');
+            }
+        }
+        try {
+            $rows = $this->writer->listPatterns();
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $needle = $search === null || $search === '' ? null : self::foldCase($search);
+        $rows = array_values(array_filter($rows, static function (array $row) use ($needle, $category): bool {
+            // Hidden from the inserter is hidden here: such a pattern is only placed by a template.
+            if (($row['inserter'] ?? true) === false) {
+                return false;
+            }
+            if ($category !== null && !in_array($category, (array) ($row['categories'] ?? []), true)) {
+                return false;
+            }
+            if ($needle === null) {
+                return true;
+            }
+            $haystacks = array_merge([$row['name'] ?? '', $row['title'] ?? '', $row['description'] ?? ''], (array) ($row['keywords'] ?? []));
+            foreach ($haystacks as $haystack) {
+                if (is_string($haystack) && strpos(self::foldCase($haystack), $needle) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        }));
+        usort($rows, static fn (array $a, array $b): int => strcmp((string) $a['name'], (string) $b['name']));
+        // Whole rows up to the byte ceiling, as they will be encoded on the way out; the first row always
+        // comes, so a caller paging by `offset + count(items)` always moves on.
+        $page = array_slice($rows, $offset, $limit);
+        $items = [];
+        $bytes = 2;
+        foreach ($page as $row) {
+            $item = [
+                'name' => (string) $row['name'],
+                'title' => (string) ($row['title'] ?? ''),
+                'categories' => array_values((array) ($row['categories'] ?? [])),
+                'description' => (string) ($row['description'] ?? ''),
+                'chars' => (int) ($row['chars'] ?? 0),
+            ];
+            $bytes += strlen((string) json_encode($item)) + ($items === [] ? 0 : 1);
+            if ($items !== [] && $bytes > self::PATTERN_LIST_BYTES) {
+                break;
+            }
+            $items[] = $item;
+        }
+        $answer = ['kind' => 'pattern', 'items' => $items, 'matched' => count($rows), 'offset' => $offset, 'limit' => $limit];
+        if (count($items) < count($page)) {
+            $answer['truncated'] = true;
+        }
+        if ($search !== null) {
+            $answer['search'] = $search;
+        }
+        if ($category !== null) {
+            $answer['category'] = $category;
+        }
+        return $this->ok($answer);
+    }
+
+    /** Lower case for a comparison that ignores it: every letter where PHP has mbstring, ASCII ones where it has not. */
+    private static function foldCase(string $text): string
+    {
+        return function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
+    }
+
+    /**
      * `content.list` with words to look for: the writer finds the rows, and the answer carries the
      * proof (`search`, the words as they were matched) and the exact count (`matched`) beside them.
      */
@@ -2339,13 +2445,14 @@ final class Engine
      * canonical spelling, a line break or a tab between words made a space, the other control
      * characters removed and no space at either end.
      *
-     * @param mixed $raw What the caller sent under `search`.
+     * @param mixed  $raw   What the caller sent under `search`.
+     * @param string $where What the words are looked for in, for the refusal's sentence.
      * @return array{0:?string,1:string} [the words, ''] or [null, why they were refused]
      */
-    private static function searchNeedle($raw): array
+    private static function searchNeedle($raw, string $where = 'a title or slug'): array
     {
         if (!is_string($raw)) {
-            return [null, 'search must be a string: the words to look for in a title or slug'];
+            return [null, 'search must be a string: the words to look for in ' . $where];
         }
         $tooLong = 'search is at most ' . self::SEARCH_MAX_CHARACTERS . ' characters: send the distinctive words of the title, not the whole text';
         // 200 characters are at most 800 bytes; this bound only keeps the passes below cheap on

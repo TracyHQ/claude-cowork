@@ -33,6 +33,14 @@ final class FakeSiteWriter implements SiteWriter
         return array_values($rows);
     }
 
+    /** @var array<int,array<string,mixed>> What listPatterns() answers: the registry's patterns as the writer maps them. */
+    public array $patterns = [];
+
+    public function listPatterns(): array
+    {
+        return $this->patterns;
+    }
+
     /** @var array<string,array<string,array<string,mixed>>> kind => target => fields */
     public array $store = [];
     private int $nextId = 100;
