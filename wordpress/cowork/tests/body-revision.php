@@ -34,8 +34,8 @@ $br = static fn (string $action, array $params) => $brEngine->handle(['token' =>
 // ── content.get: the revision of the body a body write would replace ───────────────────────────
 
 WP_Fake::$posts[70] = ['ID' => 70, 'post_type' => 'page', 'post_title' => 'About', 'post_status' => 'publish', 'post_content' => '<p>Hello</p>'];
-$got = $br('content.get', ['id' => 70]);
-check('content.get on a post answers the sha256 of its post_content', [$got['ok'] ?? null, $got['body_revision'] ?? null], [true, BR_HELLO]);
+$brGot = $br('content.get', ['id' => 70]);
+check('content.get on a post answers the sha256 of its post_content', [$brGot['ok'] ?? null, $brGot['body_revision'] ?? null], [true, BR_HELLO]);
 
 $brTheme = sys_get_temp_dir() . '/cowork-body-revision-' . bin2hex(random_bytes(4));
 mkdir($brTheme . '/templates', 0777, true);
@@ -44,25 +44,32 @@ file_put_contents($brTheme . '/parts/header.html', '<!-- wp:site-title /-->');
 file_put_contents($brTheme . '/templates/front-page.html', '<!-- wp:paragraph --><p>Home</p><!-- /wp:paragraph -->');
 WP_Fake::$themeDir = $brTheme;
 
-$part = $br('content.get', ['kind' => 'templatePart', 'key' => 'header']);
-check('a part served from the theme file answers the revision of the file\'s bytes', [$part['stored'] ?? null, $part['body_revision'] ?? null], [false, BR_SITE_TITLE]);
-$tpl = $br('content.get', ['kind' => 'template', 'key' => 'front-page']);
-check('a template served from the theme file too', [$tpl['stored'] ?? null, $tpl['body_revision'] ?? null], [false, BR_HOME]);
+$brPart = $br('content.get', ['kind' => 'templatePart', 'key' => 'header']);
+check('a part served from the theme file answers the revision of the file\'s bytes', [$brPart['stored'] ?? null, $brPart['body_revision'] ?? null], [false, BR_SITE_TITLE]);
+$brTpl = $br('content.get', ['kind' => 'template', 'key' => 'front-page']);
+check('a template served from the theme file too', [$brTpl['stored'] ?? null, $brTpl['body_revision'] ?? null], [false, BR_HOME]);
 
 WP_Fake::$options['blogname'] = 'Tracy';
 check('an option has no body, so no body_revision', array_key_exists('body_revision', $br('content.get', ['kind' => 'option', 'key' => 'blogname'])), false);
 WP_Fake::$patterns['tracy/hero'] = ['name' => 'tracy/hero', 'title' => 'Hero', 'content' => '<p>Hello</p>'];
 check('nor does a pattern, which is never written', array_key_exists('body_revision', $br('content.get', ['kind' => 'pattern', 'key' => 'tracy/hero'])), false);
+WP_Fake::$meta['70:tracy_heading'] = '<p>Hello</p>';
+WP_Fake::$termRows[9] = ['term_id' => 9, 'taxonomy' => 'category', 'name' => 'News', 'slug' => 'news', 'description' => '<p>Hello</p>', 'parent' => 0];
+WP_Fake::$posts[71] = ['ID' => 71, 'post_type' => 'nav_menu_item', 'post_title' => 'About', 'menu_order' => 1, 'post_content' => '<p>Hello</p>'];
+foreach (['postmeta' => ['id' => 70, 'key' => 'tracy_heading'], 'term' => ['id' => 9, 'key' => 'category'], 'menuItem' => ['id' => 71]] as $brKind => $brAddress) {
+    $brRead = $br('content.get', ['kind' => $brKind] + $brAddress);
+    check("nor does a {$brKind}", [$brRead['ok'] ?? null, array_key_exists('body_revision', $brRead)], [true, false]);
+}
 
 // ── content.update: a write answers the revision of the body it left ─────────────────────────────
 
-$up = $br('content.update', ['apply_id' => 'br-1', 'kind' => 'post', 'id' => 70, 'fields' => ['post_content' => '<p>Hello again</p>']]);
-check('a post write answers the revision of the body it left', [$up['ok'] ?? null, $up['body_revision'] ?? null], [true, BR_HELLO_AGAIN]);
+$brUp = $br('content.update', ['apply_id' => 'br-1', 'kind' => 'post', 'id' => 70, 'fields' => ['post_content' => '<p>Hello again</p>']]);
+check('a post write answers the revision of the body it left', [$brUp['ok'] ?? null, $brUp['body_revision'] ?? null], [true, BR_HELLO_AGAIN]);
 check('the one content.get answers next', $br('content.get', ['id' => 70])['body_revision'] ?? null, BR_HELLO_AGAIN);
-$titled = $br('content.update', ['apply_id' => 'br-2', 'kind' => 'post', 'id' => 70, 'fields' => ['post_title' => 'About us']]);
-check('a write that left the body alone answers the revision it already had', $titled['body_revision'] ?? null, BR_HELLO_AGAIN);
-$partUp = $br('content.update', ['apply_id' => 'br-3', 'kind' => 'templatePart', 'key' => 'header', 'fields' => ['content' => '<!-- wp:site-logo /-->']]);
-check('a part written over its theme file answers the revision of the override it created', [$partUp['created'] ?? null, $partUp['body_revision'] ?? null], [true, BR_SITE_LOGO]);
+$brTitled = $br('content.update', ['apply_id' => 'br-2', 'kind' => 'post', 'id' => 70, 'fields' => ['post_title' => 'About us']]);
+check('a write that left the body alone answers the revision it already had', $brTitled['body_revision'] ?? null, BR_HELLO_AGAIN);
+$brPartUp = $br('content.update', ['apply_id' => 'br-3', 'kind' => 'templatePart', 'key' => 'header', 'fields' => ['content' => '<!-- wp:site-logo /-->']]);
+check('a part written over its theme file answers the revision of the override it created', [$brPartUp['created'] ?? null, $brPartUp['body_revision'] ?? null], [true, BR_SITE_LOGO]);
 check('an option write answers no body_revision', array_key_exists('body_revision', $br('content.update', ['apply_id' => 'br-4', 'kind' => 'option', 'key' => 'blogname', 'fields' => ['value' => 'Tracy Cowork']])), false);
 $br('apply.revert', ['apply_id' => 'br-4']);
 $br('apply.revert', ['apply_id' => 'br-3']);
@@ -73,77 +80,85 @@ check('(the writes above are taken back before the next tests)', [WP_Fake::$post
 // ── expected_body_revision: the write lands only over the body the caller read ─────────────────────
 
 WP_Fake::$posts[70]['post_content'] = '<p>Hello again</p>'; // someone else changed the page after the caller read BR_HELLO
-WP_Fake::$cleaned = [];
-$stale = $br('content.update', ['apply_id' => 'br-stale', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO,
+$brStale = $br('content.update', ['apply_id' => 'br-stale', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO,
     'fields' => ['post_content' => '<p>Mine</p>']]);
 check('a write over a body that changed since it was read is refused as revision_stale',
-    [$stale['ok'] ?? null, $stale['error'] ?? null, $stale['body_revision'] ?? null], [false, 'revision_stale', BR_HELLO_AGAIN]);
-checkTrue('with a sentence that says what to do next', is_string($stale['message'] ?? null)
-    && str_contains($stale['message'], 'content.get') && str_ends_with($stale['message'], '.'));
+    [$brStale['ok'] ?? null, $brStale['error'] ?? null, $brStale['body_revision'] ?? null], [false, 'revision_stale', BR_HELLO_AGAIN]);
+checkTrue('with a sentence that says what to do next', is_string($brStale['message'] ?? null)
+    && str_contains($brStale['message'], 'content.get') && str_ends_with($brStale['message'], '.'));
 check('nothing is written', WP_Fake::$posts[70]['post_content'], '<p>Hello again</p>');
 check('nothing is logged', $brLog->entries('br-stale'), []);
 
-$fresh = $br('content.update', ['apply_id' => 'br-5', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO_AGAIN,
+$brFresh = $br('content.update', ['apply_id' => 'br-5', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO_AGAIN,
     'fields' => ['post_content' => '<p>Hello</p>']]);
 check('a write over the body the caller read lands, and answers the revision it left',
-    [$fresh['ok'] ?? null, WP_Fake::$posts[70]['post_content'], $fresh['body_revision'] ?? null], [true, '<p>Hello</p>', BR_HELLO]);
+    [$brFresh['ok'] ?? null, WP_Fake::$posts[70]['post_content'], $brFresh['body_revision'] ?? null], [true, '<p>Hello</p>', BR_HELLO]);
 check('the revision content.get answered is the one a write is held to: read, then write',
     $br('content.update', ['apply_id' => 'br-6', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => $br('content.get', ['id' => 70])['body_revision'],
         'fields' => ['post_content' => '<p>Hello again</p>']])['ok'] ?? null, true);
+$brTitleOnly = $br('content.update', ['apply_id' => 'br-title', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_title' => 'Renamed']]);
+check('a write that changes only the title is still held to the body it was read with',
+    [$brTitleOnly['error'] ?? null, WP_Fake::$posts[70]['post_title'], $brLog->entries('br-title')], ['revision_stale', 'About', []]);
+$brTitleOnly = $br('content.update', ['apply_id' => 'br-title2', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO_AGAIN, 'fields' => ['post_title' => 'About Tracy']]);
+check('and lands when the body is still the one read', [$brTitleOnly['ok'] ?? null, WP_Fake::$posts[70]['post_title'], $brTitleOnly['body_revision'] ?? null], [true, 'About Tracy', BR_HELLO_AGAIN]);
+$br('apply.revert', ['apply_id' => 'br-title2']);
 check('a revision in capitals is not the one content.get answers', $br('content.update', ['apply_id' => 'br-x', 'kind' => 'post', 'id' => 70,
     'expected_body_revision' => strtoupper(BR_HELLO_AGAIN), 'fields' => ['post_content' => 'x']])['error'] ?? null, 'revision_stale');
 
-foreach (['an empty string' => '', 'a number' => 7, 'null' => null, 'a list' => [BR_HELLO_AGAIN], 'false' => false] as $what => $value) {
-    $r = $br('content.update', ['apply_id' => 'br-bad', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => $value, 'fields' => ['post_content' => 'x']]);
-    check("expected_body_revision as {$what} is refused, never read as no condition", [$r['error'] ?? null, str_contains((string) ($r['message'] ?? ''), 'expected_body_revision')], ['bad_params', true]);
+foreach (['an empty string' => '', 'a number' => 7, 'null' => null, 'a list' => [BR_HELLO_AGAIN], 'false' => false] as $brWhat => $brValue) {
+    $brR = $br('content.update', ['apply_id' => 'br-bad', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => $brValue, 'fields' => ['post_content' => 'x']]);
+    check("expected_body_revision as {$brWhat} is refused, never read as no condition", [$brR['error'] ?? null, str_contains((string) ($brR['message'] ?? ''), 'expected_body_revision')], ['bad_params', true]);
 }
 check('(and none of them wrote)', [WP_Fake::$posts[70]['post_content'], $brLog->entries('br-bad'), $brLog->entries('br-x')], ['<p>Hello again</p>', [], []]);
 
 WP_Fake::$options['blogname'] = 'Tracy';
-$opt = $br('content.update', ['apply_id' => 'br-opt', 'kind' => 'option', 'key' => 'blogname', 'expected_body_revision' => BR_HELLO, 'fields' => ['value' => 'x']]);
+$brOpt = $br('content.update', ['apply_id' => 'br-opt', 'kind' => 'option', 'key' => 'blogname', 'expected_body_revision' => BR_HELLO, 'fields' => ['value' => 'x']]);
 check('a kind with no body refuses the condition rather than ignore it, naming the kinds that take it',
-    [$opt['error'] ?? null, str_contains((string) ($opt['message'] ?? ''), 'templatePart'), WP_Fake::$options['blogname']], ['bad_params', true, 'Tracy']);
+    [$brOpt['error'] ?? null, str_contains((string) ($brOpt['message'] ?? ''), 'templatePart'), WP_Fake::$options['blogname']], ['bad_params', true, 'Tracy']);
 
 // A part or template the site never stored is held to the theme file content.get serves for it.
-$partStale = $br('content.update', ['apply_id' => 'br-p1', 'kind' => 'templatePart', 'key' => 'header', 'expected_body_revision' => BR_SITE_LOGO,
+$brPartStale = $br('content.update', ['apply_id' => 'br-p1', 'kind' => 'templatePart', 'key' => 'header', 'expected_body_revision' => BR_SITE_LOGO,
     'fields' => ['content' => '<!-- wp:site-logo /-->']]);
 check('a part never stored is compared with its theme file: another revision is stale, answering the file\'s',
-    [$partStale['error'] ?? null, $partStale['body_revision'] ?? null, $brWriter->read('templatePart', 0, 'header'), $brLog->entries('br-p1')],
+    [$brPartStale['error'] ?? null, $brPartStale['body_revision'] ?? null, $brWriter->read('templatePart', 0, 'header'), $brLog->entries('br-p1')],
     ['revision_stale', BR_SITE_TITLE, null, []]);
-$partUp = $br('content.update', ['apply_id' => 'br-p2', 'kind' => 'templatePart', 'key' => 'header', 'expected_body_revision' => BR_SITE_TITLE,
+$brPartUp = $br('content.update', ['apply_id' => 'br-p2', 'kind' => 'templatePart', 'key' => 'header', 'expected_body_revision' => BR_SITE_TITLE,
     'fields' => ['content' => '<!-- wp:site-logo /-->']]);
-check('and the file\'s own revision lets the first override land', [$partUp['ok'] ?? null, $partUp['created'] ?? null, $partUp['body_revision'] ?? null], [true, true, BR_SITE_LOGO]);
+check('and the file\'s own revision lets the first override land', [$brPartUp['ok'] ?? null, $brPartUp['created'] ?? null, $brPartUp['body_revision'] ?? null], [true, true, BR_SITE_LOGO]);
+check('content.get on a stored part answers the revision of its row\'s content', [$br('content.get', ['kind' => 'templatePart', 'key' => 'header'])['stored'] ?? true,
+    $br('content.get', ['kind' => 'templatePart', 'key' => 'header'])['body_revision'] ?? null], [true, BR_SITE_LOGO]);
 check('from then on the stored row is what a write is held to', $br('content.update', ['apply_id' => 'br-p3', 'kind' => 'templatePart', 'key' => 'header',
     'expected_body_revision' => BR_SITE_TITLE, 'fields' => ['content' => 'x']])['body_revision'] ?? null, BR_SITE_LOGO);
 
 $br('content.update', ['apply_id' => 'br-t1', 'kind' => 'template', 'key' => 'front-page', 'fields' => ['content' => '<!-- wp:paragraph --><p>Welcome</p><!-- /wp:paragraph -->']]);
-$tplStale = $br('content.update', ['apply_id' => 'br-t2', 'kind' => 'template', 'key' => 'front-page', 'expected_body_revision' => BR_HOME, 'fields' => ['content' => 'x']]);
-check('a stored template is held to its row, not to the theme file under it', [$tplStale['error'] ?? null, $tplStale['body_revision'] ?? null], ['revision_stale', BR_WELCOME]);
+$brTplStale = $br('content.update', ['apply_id' => 'br-t2', 'kind' => 'template', 'key' => 'front-page', 'expected_body_revision' => BR_HOME, 'fields' => ['content' => 'x']]);
+check('content.get on a stored template answers its row\'s revision, not the theme file\'s', $br('content.get', ['kind' => 'template', 'key' => 'front-page'])['body_revision'] ?? null, BR_WELCOME);
+check('a stored template is held to its row, not to the theme file under it', [$brTplStale['error'] ?? null, $brTplStale['body_revision'] ?? null], ['revision_stale', BR_WELCOME]);
 check('and its own revision lands', $br('content.update', ['apply_id' => 'br-t3', 'kind' => 'template', 'key' => 'front-page', 'expected_body_revision' => BR_WELCOME,
     'fields' => ['content' => '<!-- wp:paragraph --><p>Home</p><!-- /wp:paragraph -->']])['body_revision'] ?? null, BR_HOME);
 
 // Nothing there to compare with (a create, or a record deleted since it was read): the key names the
 // revision of a record that exists, so it is refused as a parameter, and nothing is written.
-$WP_FAKE_POSTS_BEFORE = WP_Fake::$posts;
-$gone = $br('content.update', ['apply_id' => 'br-g1', 'kind' => 'post', 'id' => 4040, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => 'x']]);
+$brPostsBefore = WP_Fake::$posts;
+$brGone = $br('content.update', ['apply_id' => 'br-g1', 'kind' => 'post', 'id' => 4040, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => 'x']]);
 check('a post that is not there is refused: the key names the revision of an existing record',
-    [$gone['error'] ?? null, str_contains((string) ($gone['message'] ?? ''), 'existing'), str_contains((string) ($gone['message'] ?? ''), 'post 4040')],
+    [$brGone['error'] ?? null, str_contains((string) ($brGone['message'] ?? ''), 'existing'), str_contains((string) ($brGone['message'] ?? ''), 'post 4040')],
     ['bad_params', true, true]);
-$create = $br('content.update', ['apply_id' => 'br-g2', 'kind' => 'post', 'id' => 0, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_title' => 'New']]);
-check('so is a create, and nothing is created', [$create['error'] ?? null, WP_Fake::$posts === $WP_FAKE_POSTS_BEFORE], ['bad_params', true]);
-$noPart = $br('content.update', ['apply_id' => 'br-g3', 'kind' => 'templatePart', 'key' => 'sidebar', 'expected_body_revision' => BR_HELLO, 'fields' => ['content' => 'x']]);
-check('and a part neither stored nor in the theme', [$noPart['error'] ?? null, $brWriter->read('templatePart', 0, 'sidebar')], ['bad_params', null]);
+$brCreate = $br('content.update', ['apply_id' => 'br-g2', 'kind' => 'post', 'id' => 0, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_title' => 'New']]);
+check('so is a create, and nothing is created', [$brCreate['error'] ?? null, WP_Fake::$posts === $brPostsBefore], ['bad_params', true]);
+$brNoPart = $br('content.update', ['apply_id' => 'br-g3', 'kind' => 'templatePart', 'key' => 'sidebar', 'expected_body_revision' => BR_HELLO, 'fields' => ['content' => 'x']]);
+check('and a part neither stored nor in the theme', [$brNoPart['error'] ?? null, $brWriter->read('templatePart', 0, 'sidebar')], ['bad_params', null]);
 check('(none of them logged a step)', [$brLog->entries('br-g1'), $brLog->entries('br-g2'), $brLog->entries('br-g3')], [[], [], []]);
 
 // The checks that were there first come first: a post open in the editor is refused as locked, even
 // when the caller's revision is stale too (the lock is what the caller has to wait out).
-$lkWriter = new FakeSiteWriter();
-$lkWriter->store['post']['33'] = ['post_title' => 'Contact', 'post_content' => '<p>Hello again</p>'];
-$lkWriter->locks[33] = ['kind' => 'admin-user', 'name' => 'Ada Editor', 'since' => '2026-10-01T09:00:00Z', 'until' => '2026-10-01T09:02:30Z'];
-$lkEngine = new Engine($WTOKEN, [], null, null, null, null, $lkWriter, null, new FakeApplyLog());
-$lk = $lkEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+$brLkWriter = new FakeSiteWriter();
+$brLkWriter->store['post']['33'] = ['post_title' => 'Contact', 'post_content' => '<p>Hello again</p>'];
+$brLkWriter->locks[33] = ['kind' => 'admin-user', 'name' => 'Ada Editor', 'since' => '2026-10-01T09:00:00Z', 'until' => '2026-10-01T09:02:30Z'];
+$brLkEngine = new Engine($WTOKEN, [], null, null, null, null, $brLkWriter, null, new FakeApplyLog());
+$brLk = $brLkEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
     'params' => ['apply_id' => 'lk-1', 'kind' => 'post', 'id' => 33, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => 'x']]]);
-check('a post both open in the editor and stale answers the lock', [$lk['error'] ?? null, $lk['code'] ?? null, $lkWriter->store['post']['33']['post_content']],
+check('a post both open in the editor and stale answers the lock', [$brLk['error'] ?? null, $brLk['code'] ?? null, $brLkWriter->store['post']['33']['post_content']],
     ['locked', 'SLOT_LOCKED_BY_USER', '<p>Hello again</p>']);
 
 // ── the check runs under the writer's lock, between the read and the write ───────────────────────
@@ -214,44 +229,53 @@ final class BodyRevisionSpyWriter implements SiteWriter
     }
 }
 
-$spy = new BodyRevisionSpyWriter();
-$spy->inner->store['post']['12'] = ['post_title' => 'Pricing', 'post_content' => '<p>Hello</p>'];
-$spyLog = new FakeApplyLog();
-$spyEngine = new Engine($WTOKEN, [], null, null, null, null, $spy, null, $spyLog);
-$spyUpdate = static fn (array $params) => $spyEngine->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => $params]);
+$brSpy = new BodyRevisionSpyWriter();
+$brSpy->inner->store['post']['12'] = ['post_title' => 'Pricing', 'post_content' => '<p>Hello</p>'];
+$brSpyLog = new FakeApplyLog();
+$brStamp = new class {
+    /** @var string[] */
+    public array $touched = [];
 
-$r = $spyUpdate(['apply_id' => 'spy-1', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO_AGAIN, 'fields' => ['post_content' => 'x']]);
-check('a stale write reads under the lock and stops there: no write, no purge',
-    [$r['error'] ?? null, $spy->events], ['revision_stale', ['lock', 'read', 'unlock']]);
-$spy->events = [];
-$r = $spyUpdate(['apply_id' => 'spy-2', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => '<p>Hello again</p>']]);
+    public function touch(string $reason): void
+    {
+        $this->touched[] = $reason;
+    }
+};
+$brSpyEngine = new Engine($WTOKEN, [], null, null, null, null, $brSpy, null, $brSpyLog, $brStamp);
+$brSpyUpdate = static fn (array $params) => $brSpyEngine->handle(['token' => $WTOKEN, 'action' => 'content.update', 'params' => $params]);
+
+$brR = $brSpyUpdate(['apply_id' => 'spy-1', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO_AGAIN, 'fields' => ['post_content' => 'x']]);
+check('a stale write reads under the lock and stops there: no write, no purge, no change stamp, no log',
+    [$brR['error'] ?? null, $brSpy->events, $brStamp->touched, $brSpyLog->entries('spy-1')], ['revision_stale', ['lock', 'read', 'unlock'], [], []]);
+$brSpy->events = [];
+$brR = $brSpyUpdate(['apply_id' => 'spy-2', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => '<p>Hello again</p>']]);
 check('a fresh one reads, checks and writes in one hold of the lock, and its answer reuses the read the undo takes',
-    [$r['body_revision'] ?? null, $spy->events], [BR_HELLO_AGAIN, ['lock', 'read', 'write', 'read', 'purge', 'unlock']]);
+    [$brR['body_revision'] ?? null, $brSpy->events, $brStamp->touched], [BR_HELLO_AGAIN, ['lock', 'read', 'write', 'read', 'purge', 'unlock'], ['content']]);
 
 // ── without the key nothing changes; with it, the receipt is the same receipt ─────────────────────
 
-$spy->inner->store['post']['12']['post_content'] = '<p>Changed by someone else</p>';
-$plain = $spyUpdate(['apply_id' => 'spy-3', 'kind' => 'post', 'id' => 12, 'fields' => ['post_content' => '<p>Hello</p>']]);
+$brSpy->inner->store['post']['12']['post_content'] = '<p>Changed by someone else</p>';
+$brPlain = $brSpyUpdate(['apply_id' => 'spy-3', 'kind' => 'post', 'id' => 12, 'fields' => ['post_content' => '<p>Hello</p>']]);
 check('a write without expected_body_revision is not held to anything: it lands over whatever is there',
-    [$plain['ok'] ?? null, $spy->inner->store['post']['12']['post_content']], [true, '<p>Hello</p>']);
-check('and answers what 0.16.0 answered, plus body_revision', array_keys($plain), ['ok', 'kind', 'id', 'key', 'created', 'body_revision']);
-$held = $spyUpdate(['apply_id' => 'spy-4', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => '<p>Hello again</p>']]);
-check('a held write answers the same shape', array_keys($held), array_keys($plain));
-$plainEntry = $spyLog->entries('spy-3')[0] ?? [];
-$heldEntry = $spyLog->entries('spy-4')[0] ?? [];
+    [$brPlain['ok'] ?? null, $brSpy->inner->store['post']['12']['post_content']], [true, '<p>Hello</p>']);
+check('and answers what 0.16.0 answered, plus body_revision', array_keys($brPlain), ['ok', 'kind', 'id', 'key', 'created', 'body_revision']);
+$brHeld = $brSpyUpdate(['apply_id' => 'spy-4', 'kind' => 'post', 'id' => 12, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => '<p>Hello again</p>']]);
+check('a held write answers the same shape', array_keys($brHeld), array_keys($brPlain));
+$brPlainEntry = $brSpyLog->entries('spy-3')[0] ?? [];
+$brHeldEntry = $brSpyLog->entries('spy-4')[0] ?? [];
 check('and records the same kind of undo step: the condition is not part of the receipt',
-    [array_keys($heldEntry), $heldEntry['undo'] ?? null, array_key_exists('expected_body_revision', $heldEntry)], [array_keys($plainEntry), 'span', false]);
+    [array_keys($brHeldEntry), $brHeldEntry['undo'] ?? null, array_key_exists('expected_body_revision', $brHeldEntry)], [array_keys($brPlainEntry), 'span', false]);
 
 // apply.revert takes a held write back exactly as it takes back any other.
-$rv = $spyEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'spy-4']]);
-check('apply.revert takes back a held write', [$rv['ok'] ?? null, $rv['reverted'] ?? null, $spy->inner->store['post']['12']['post_content']], [true, 1, '<p>Hello</p>']);
-check('and the body is back at the revision the held write was compared with', $spyEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['id' => 12]])['body_revision'] ?? null, BR_HELLO);
+$brRv = $brSpyEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'spy-4']]);
+check('apply.revert takes back a held write', [$brRv['ok'] ?? null, $brRv['reverted'] ?? null, $brSpy->inner->store['post']['12']['post_content']], [true, 1, '<p>Hello</p>']);
+check('and the body is back at the revision the held write was compared with', $brSpyEngine->handle(['token' => $WTOKEN, 'action' => 'content.get', 'params' => ['id' => 12]])['body_revision'] ?? null, BR_HELLO);
 WP_Fake::$posts[70]['post_content'] = '<p>Hello</p>';
 $br('content.update', ['apply_id' => 'br-r1', 'kind' => 'post', 'id' => 70, 'expected_body_revision' => BR_HELLO, 'fields' => ['post_content' => '<p>Hello again</p>']]);
 $br('content.update', ['apply_id' => 'br-r2', 'kind' => 'post', 'id' => 70, 'fields' => ['post_title' => 'About Tracy']]);
-$rv = $br('apply.revert', ['apply_id' => 'br-r1']);
+$brRv = $br('apply.revert', ['apply_id' => 'br-r1']);
 check('on the real writer too, and a later receipt on the same post stays',
-    [$rv['ok'] ?? null, WP_Fake::$posts[70]['post_content'], WP_Fake::$posts[70]['post_title']], [true, '<p>Hello</p>', 'About Tracy']);
+    [$brRv['ok'] ?? null, WP_Fake::$posts[70]['post_content'], WP_Fake::$posts[70]['post_title']], [true, '<p>Hello</p>', 'About Tracy']);
 
 foreach (['templates/front-page.html', 'parts/header.html'] as $f) {
     unlink($brTheme . '/' . $f);
