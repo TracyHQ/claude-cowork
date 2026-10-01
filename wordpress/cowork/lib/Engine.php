@@ -67,6 +67,12 @@ final class Engine
     private const MAX_DB_LIMIT = 5000;
     /** The longest `content.list` `search`, in characters: a fragment of a title, never a paragraph. */
     private const SEARCH_MAX_CHARACTERS = 200;
+    /**
+     * The field a body write replaces, for the kinds `body_revision` covers: a post's `post_content`,
+     * a template part's or template's `content`. Every other kind answers no revision and takes no
+     * `expected_body_revision`.
+     */
+    private const BODY_FIELDS = ['post' => 'post_content', 'templatePart' => 'content', 'template' => 'content'];
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
     private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
@@ -2429,15 +2435,14 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
-        $themeRead = ['templatePart' => 'themeTemplatePart', 'template' => 'themeTemplate'][$kind] ?? null;
-        if ($item === null && $themeRead !== null && $key !== '' && method_exists($this->writer, $themeRead)) {
+        if ($item === null) {
             // A part (or template) the site never stored is still what visitors see: the theme's own
             // file. Served as read (stored:false), so a write to it is judged against those bytes; the
             // writer's read() stays null there on purpose — its undo is a delete that puts the theme
             // file back.
-            $theme = $this->writer->{$themeRead}($key);
+            $theme = $this->themeRow($kind, $key);
             if ($theme !== null) {
-                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false]);
+                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false] + self::bodyRevision($kind, $theme));
             }
         }
         if ($item === null) {
@@ -2447,7 +2452,44 @@ final class Engine
             return $this->err('not_found', sprintf('no %s at id %d, key "%s"', $kind, $id, $key));
         }
 
-        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item]);
+        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item] + self::bodyRevision($kind, $item));
+    }
+
+    /**
+     * A template part or template as the active theme's own file serves it, for a slug the site never
+     * stored; null for any other kind, an empty slug, a writer that cannot read theme files, or no
+     * such file.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function themeRow(string $kind, string $key): ?array
+    {
+        $read = ['templatePart' => 'themeTemplatePart', 'template' => 'themeTemplate'][$kind] ?? null;
+        if ($read === null || $key === '' || !method_exists($this->writer, $read)) {
+            return null;
+        }
+        return $this->writer->{$read}($key);
+    }
+
+    /**
+     * `body_revision` for the kinds whose body a write replaces whole: the full sha256 (64 hex) of
+     * that field as the site holds it. One formula for `content.get`, the `expected_body_revision`
+     * check and the answer of a write, so a revision one of them answers is the one the others compare.
+     *
+     * @param array<string,mixed>|null $row The record as read: a stored row or a theme file.
+     * @return array{body_revision?:?string} Empty for a kind with no body; null when nothing is there.
+     */
+    private static function bodyRevision(string $kind, ?array $row): array
+    {
+        $field = self::BODY_FIELDS[$kind] ?? null;
+        if ($field === null) {
+            return [];
+        }
+        if ($row === null) {
+            return ['body_revision' => null];
+        }
+        $body = $row[$field] ?? '';
+        return ['body_revision' => hash('sha256', is_scalar($body) ? (string) $body : '')];
     }
 
     /**
@@ -2661,11 +2703,33 @@ final class Engine
         }
         $id = max(0, (int) ($p['id'] ?? 0));
         $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+        // `expected_body_revision`: write only over the body the caller read (the `body_revision`
+        // content.get answered). Refused before anything is read when it cannot be compared.
+        $expected = null;
+        if (array_key_exists('expected_body_revision', $p)) {
+            $expected = $p['expected_body_revision'];
+            if (!is_string($expected) || $expected === '') {
+                return $this->err('bad_params', 'expected_body_revision must be a non-empty string: the body_revision content.get answered');
+            }
+            if (!isset(self::BODY_FIELDS[$kind])) {
+                return $this->err('bad_params', 'expected_body_revision applies to kinds "post", "templatePart" and "template", whose body a write replaces; '
+                    . "kind \"{$kind}\" has no body to compare, so send the write without it");
+            }
+        }
 
         try {
             $before = $this->writer->read($kind, $id, $key); // null => a create, so its undo is a delete
         } catch (Throwable $e) {
             return $this->err('write_failed', $e->getMessage());
+        }
+        // Compared with the record just read, which is what content.get would answer now. This action
+        // runs under the writer's lock (see handle()), so no other write through this door lands
+        // between this check and the write below.
+        if ($expected !== null) {
+            $stale = $this->staleBody($kind, $id, $key, $before, $expected);
+            if ($stale !== null) {
+                return $stale;
+            }
         }
         $locked = $this->editLocked($kind, $id, $before);
         if ($locked !== null) {
@@ -2680,9 +2744,13 @@ final class Engine
         // The undo is the span this write changed, read back from the row as it landed, so a
         // revert takes out this change and keeps every later one (ContentUndo). A write that cannot
         // be described that way keeps the whole-row undo, which applyRevert guards on its own.
+        // That read is also the record as the site now holds it, so the answer's `body_revision` is
+        // computed from it rather than from what was sent: a filter on the way in can change a body.
         $entry = ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'key' => $key, 'before' => $before];
+        $after = null;
         try {
-            $changes = ContentUndo::record($before, $this->writer->read($kind, $newId, $key), array_keys($p['fields']));
+            $after = $this->writer->read($kind, $newId, $key);
+            $changes = ContentUndo::record($before, $after, array_keys($p['fields']));
         } catch (Throwable $e) {
             $changes = null;
         }
@@ -2710,7 +2778,39 @@ final class Engine
             'id' => $newId,
             'key' => $key === '' ? null : $key,
             'created' => $before === null,
-        ]);
+        ] + self::bodyRevision($kind, $after));
+    }
+
+    /**
+     * The refusal of a write whose `expected_body_revision` is not the body the site holds now, or
+     * null when it is. "Now" is what content.get would answer: the stored row, or for a template part
+     * or template the site never stored, the theme's own file. Nothing there at all (deleted since it
+     * was read, or never created) matches no revision, and the answer's `body_revision` is null.
+     *
+     * @param array<string,mixed>|null $before The record as read for this write.
+     * @return array<string,mixed>|null
+     */
+    private function staleBody(string $kind, int $id, string $key, ?array $before, string $expected): ?array
+    {
+        $current = $before;
+        if ($current === null) {
+            try {
+                $current = $this->themeRow($kind, $key);
+            } catch (Throwable $e) {
+                return $this->err('write_failed', $e->getMessage());
+            }
+        }
+        $revision = self::bodyRevision($kind, $current)['body_revision'] ?? null;
+        if ($revision !== null && hash_equals($revision, $expected)) {
+            return null;
+        }
+        $where = self::targetName(['kind' => $kind, 'id' => $id, 'key' => $key]);
+        $message = $revision === null
+            ? "There is no {$where} for expected_body_revision to match, so nothing was written: it was deleted after it was read, or it never existed. "
+                . 'Read it again with content.get, or leave expected_body_revision out to create it.'
+            : "The body of {$where} changed after it was read and no longer matches expected_body_revision, so nothing was written. "
+                . 'Read it again with content.get, make the change on the body it holds now, and send the body_revision that read answers.';
+        return $this->err('revision_stale', $message) + ['body_revision' => $revision];
     }
 
     /**
