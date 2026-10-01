@@ -1650,6 +1650,10 @@ require __DIR__ . '/edit-lock.php';
 require __DIR__ . '/content-natives.php';
 // Words a block theme holds: templates read and written as overrides, patterns read by name.
 require __DIR__ . '/theme-words.php';
+// content.get answers a body_revision; content.update can be held to it (expected_body_revision).
+require __DIR__ . '/body-revision.php';
+// content.list kind pattern: the registered block patterns, a page at a time, by words or by category.
+require __DIR__ . '/pattern-list.php';
 // Many details in one read: content.read ids.
 require __DIR__ . '/content-batch.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.

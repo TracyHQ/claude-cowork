@@ -1505,6 +1505,48 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * Every registered block pattern, as `content.list {kind: "pattern"}` pages and filters them: the
+	 * fields a caller picks a pattern by, whether the inserter shows it (`inserter => false` hides one;
+	 * any other value shows it, as in the block editor), and the length of its content in characters.
+	 * The registry renders a theme file pattern's PHP to give its content, which is what content.get
+	 * then answers. No content here — content.get reads one by name.
+	 *
+	 * @return array<int,array{name:string,title:string,description:string,categories:string[],keywords:string[],inserter:bool,chars:int}>
+	 */
+	public function listPatterns(): array {
+		if ( ! class_exists( 'WP_Block_Patterns_Registry' ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( \WP_Block_Patterns_Registry::get_instance()->get_all_registered() as $pattern ) {
+			if ( ! is_array( $pattern ) || ! isset( $pattern['name'] ) || ! is_string( $pattern['name'] ) ) {
+				continue;
+			}
+			$content = isset( $pattern['content'] ) && is_string( $pattern['content'] ) ? $pattern['content'] : '';
+			$out[]   = array(
+				'name'        => $pattern['name'],
+				'title'       => isset( $pattern['title'] ) && is_string( $pattern['title'] ) ? $pattern['title'] : $pattern['name'],
+				'description' => isset( $pattern['description'] ) && is_string( $pattern['description'] ) ? $pattern['description'] : '',
+				'categories'  => self::strings_of( $pattern['categories'] ?? array() ),
+				'keywords'    => self::strings_of( $pattern['keywords'] ?? array() ),
+				'inserter'    => ! ( array_key_exists( 'inserter', $pattern ) && false === $pattern['inserter'] ),
+				'chars'       => mb_strlen( $content, 'UTF-8' ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * The strings of a list a plugin registered, in order; anything else in it is dropped.
+	 *
+	 * @param mixed $list
+	 * @return string[]
+	 */
+	private static function strings_of( $list ): array {
+		return is_array( $list ) ? array_values( array_filter( $list, 'is_string' ) ) : array();
+	}
+
+	/**
 	 * The override row for one template part (or template) of the ACTIVE theme, or null when the
 	 * theme's own file is still in charge.
 	 *

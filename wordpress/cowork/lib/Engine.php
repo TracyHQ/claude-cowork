@@ -65,8 +65,19 @@ final class Engine
     private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
+    /** `content.list {kind: "pattern"}`: rows a page holds when the caller names no `limit`, and the most it may name. */
+    private const PATTERN_LIST_DEFAULT = 50;
+    private const PATTERN_LIST_MAX = 200;
+    /** The most bytes a page of patterns' `items` holds once encoded: the Content API's default page (ContentReader::DEFAULT_BYTES). */
+    private const PATTERN_LIST_BYTES = 65536;
     /** The longest `content.list` `search`, in characters: a fragment of a title, never a paragraph. */
     private const SEARCH_MAX_CHARACTERS = 200;
+    /**
+     * The field a body write replaces, for the kinds `body_revision` covers: a post's `post_content`,
+     * a template part's or template's `content`. Every other kind answers no revision and takes no
+     * `expected_body_revision`.
+     */
+    private const BODY_FIELDS = ['post' => 'post_content', 'templatePart' => 'content', 'template' => 'content'];
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
     private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
@@ -2239,8 +2250,8 @@ final class Engine
             ? trim($p['kind'])
             : 'post';
         // Every kind filters by `search` or refuses it, never ignores it: the whole list under an
-        // `ok:true` would read as "these are the ones that match". A kind other than these two falls
-        // to the refusal below, which names it.
+        // `ok:true` would read as "these are the ones that match". Posts and patterns filter by it,
+        // these two refuse it, and any other kind falls to the refusal below, which names it.
         if (array_key_exists('search', $p) && ($kind === 'templatePart' || $kind === 'template')) {
             return $this->err(
                 'bad_params',
@@ -2257,6 +2268,9 @@ final class Engine
             } catch (Throwable $e) {
                 return $this->err('read_failed', $e->getMessage());
             }
+        }
+        if ($kind === 'pattern') {
+            return $this->patternList($p);
         }
         if ($kind !== 'post') {
             return $this->err(
@@ -2310,6 +2324,104 @@ final class Engine
     }
 
     /**
+     * `content.list {kind: "pattern"}`: the block patterns registered on the site, in name order, a
+     * page at a time. No bodies: content.get `{kind: "pattern", key: <name>}` reads one.
+     */
+    private function patternList(array $p): array
+    {
+        if (!method_exists($this->writer, 'listPatterns')) {
+            return $this->err('unavailable', 'this plugin cannot list block patterns');
+        }
+        // Clamped as a post list clamps them; only a value that is not a whole number is refused,
+        // because reading `"ten"` or `true` as a default would page somewhere the caller never asked.
+        foreach (['offset', 'limit'] as $name) {
+            if (array_key_exists($name, $p) && !is_int($p[$name]) && !(is_string($p[$name]) && preg_match('/^\d{1,9}$/D', $p[$name]))) {
+                return $this->err('bad_params', "{$name} must be a whole number");
+            }
+        }
+        $offset = max(0, (int) ($p['offset'] ?? 0));
+        $limit = min(self::PATTERN_LIST_MAX, max(1, (int) ($p['limit'] ?? self::PATTERN_LIST_DEFAULT)));
+        // `search` is read the way a post search reads it, so the echoed words mean the same thing.
+        $search = null;
+        if (array_key_exists('search', $p)) {
+            [$search, $why] = self::searchNeedle($p['search'], "a pattern's name, title, description or keywords");
+            if ($search === null) {
+                return $this->err('bad_params', $why);
+            }
+        }
+        // `category`: one category slug, matched exactly, as the inserter files patterns.
+        $category = null;
+        if (array_key_exists('category', $p)) {
+            $category = is_string($p['category']) ? trim($p['category']) : '';
+            if ($category === '') {
+                return $this->err('bad_params', 'category must be a category slug, e.g. "banner"');
+            }
+        }
+        try {
+            $rows = $this->writer->listPatterns();
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $needle = $search === null || $search === '' ? null : self::foldCase($search);
+        $rows = array_values(array_filter($rows, static function (array $row) use ($needle, $category): bool {
+            // Hidden from the inserter is hidden here: such a pattern is only placed by a template.
+            if (($row['inserter'] ?? true) === false) {
+                return false;
+            }
+            if ($category !== null && !in_array($category, (array) ($row['categories'] ?? []), true)) {
+                return false;
+            }
+            if ($needle === null) {
+                return true;
+            }
+            $haystacks = array_merge([$row['name'] ?? '', $row['title'] ?? '', $row['description'] ?? ''], (array) ($row['keywords'] ?? []));
+            foreach ($haystacks as $haystack) {
+                if (is_string($haystack) && strpos(self::foldCase($haystack), $needle) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        }));
+        usort($rows, static fn (array $a, array $b): int => strcmp((string) $a['name'], (string) $b['name']));
+        // Whole rows up to the byte ceiling, as they will be encoded on the way out; the first row always
+        // comes, so a caller paging by `offset + count(items)` always moves on.
+        $page = array_slice($rows, $offset, $limit);
+        $items = [];
+        $bytes = 2;
+        foreach ($page as $row) {
+            $item = [
+                'name' => (string) $row['name'],
+                'title' => (string) ($row['title'] ?? ''),
+                'categories' => array_values((array) ($row['categories'] ?? [])),
+                'description' => (string) ($row['description'] ?? ''),
+                'chars' => (int) ($row['chars'] ?? 0),
+            ];
+            $bytes += strlen((string) json_encode($item)) + ($items === [] ? 0 : 1);
+            if ($items !== [] && $bytes > self::PATTERN_LIST_BYTES) {
+                break;
+            }
+            $items[] = $item;
+        }
+        $answer = ['kind' => 'pattern', 'items' => $items, 'matched' => count($rows), 'offset' => $offset, 'limit' => $limit];
+        if (count($items) < count($page)) {
+            $answer['truncated'] = true;
+        }
+        if ($search !== null) {
+            $answer['search'] = $search;
+        }
+        if ($category !== null) {
+            $answer['category'] = $category;
+        }
+        return $this->ok($answer);
+    }
+
+    /** Lower case for a comparison that ignores it: every letter where PHP has mbstring, ASCII ones where it has not. */
+    private static function foldCase(string $text): string
+    {
+        return function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
+    }
+
+    /**
      * `content.list` with words to look for: the writer finds the rows, and the answer carries the
      * proof (`search`, the words as they were matched) and the exact count (`matched`) beside them.
      */
@@ -2333,13 +2445,14 @@ final class Engine
      * canonical spelling, a line break or a tab between words made a space, the other control
      * characters removed and no space at either end.
      *
-     * @param mixed $raw What the caller sent under `search`.
+     * @param mixed  $raw   What the caller sent under `search`.
+     * @param string $where What the words are looked for in, for the refusal's sentence.
      * @return array{0:?string,1:string} [the words, ''] or [null, why they were refused]
      */
-    private static function searchNeedle($raw): array
+    private static function searchNeedle($raw, string $where = 'a title or slug'): array
     {
         if (!is_string($raw)) {
-            return [null, 'search must be a string: the words to look for in a title or slug'];
+            return [null, 'search must be a string: the words to look for in ' . $where];
         }
         $tooLong = 'search is at most ' . self::SEARCH_MAX_CHARACTERS . ' characters: send the distinctive words of the title, not the whole text';
         // 200 characters are at most 800 bytes; this bound only keeps the passes below cheap on
@@ -2429,15 +2542,14 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
-        $themeRead = ['templatePart' => 'themeTemplatePart', 'template' => 'themeTemplate'][$kind] ?? null;
-        if ($item === null && $themeRead !== null && $key !== '' && method_exists($this->writer, $themeRead)) {
+        if ($item === null) {
             // A part (or template) the site never stored is still what visitors see: the theme's own
             // file. Served as read (stored:false), so a write to it is judged against those bytes; the
             // writer's read() stays null there on purpose — its undo is a delete that puts the theme
             // file back.
-            $theme = $this->writer->{$themeRead}($key);
+            $theme = $this->themeRow($kind, $key);
             if ($theme !== null) {
-                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false]);
+                return $this->ok(['kind' => $kind, 'id' => 0, 'key' => $key, 'item' => $theme, 'stored' => false] + self::bodyRevision($kind, $theme));
             }
         }
         if ($item === null) {
@@ -2447,7 +2559,44 @@ final class Engine
             return $this->err('not_found', sprintf('no %s at id %d, key "%s"', $kind, $id, $key));
         }
 
-        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item]);
+        return $this->ok(['kind' => $kind, 'id' => $id, 'key' => $key, 'item' => $item] + self::bodyRevision($kind, $item));
+    }
+
+    /**
+     * A template part or template as the active theme's own file serves it, for a slug the site never
+     * stored; null for any other kind, an empty slug, a writer that cannot read theme files, or no
+     * such file.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function themeRow(string $kind, string $key): ?array
+    {
+        $read = ['templatePart' => 'themeTemplatePart', 'template' => 'themeTemplate'][$kind] ?? null;
+        if ($read === null || $key === '' || !method_exists($this->writer, $read)) {
+            return null;
+        }
+        return $this->writer->{$read}($key);
+    }
+
+    /**
+     * `body_revision` for the kinds whose body a write replaces whole: the full sha256 (64 hex) of
+     * that field as the site holds it. One formula for `content.get`, the `expected_body_revision`
+     * check and the answer of a write, so a revision one of them answers is the one the others compare.
+     *
+     * @param array<string,mixed>|null $row The record as read: a stored row or a theme file.
+     * @return array{body_revision?:?string} Empty for a kind with no body; null when nothing is there.
+     */
+    private static function bodyRevision(string $kind, ?array $row): array
+    {
+        $field = self::BODY_FIELDS[$kind] ?? null;
+        if ($field === null) {
+            return [];
+        }
+        if ($row === null) {
+            return ['body_revision' => null];
+        }
+        $body = $row[$field] ?? '';
+        return ['body_revision' => hash('sha256', is_scalar($body) ? (string) $body : '')];
     }
 
     /**
@@ -2661,6 +2810,19 @@ final class Engine
         }
         $id = max(0, (int) ($p['id'] ?? 0));
         $key = isset($p['key']) && is_string($p['key']) ? trim($p['key']) : '';
+        // `expected_body_revision`: write only over the body the caller read (the `body_revision`
+        // content.get answered). Refused before anything is read when it cannot be compared.
+        $expected = null;
+        if (array_key_exists('expected_body_revision', $p)) {
+            $expected = $p['expected_body_revision'];
+            if (!is_string($expected) || $expected === '') {
+                return $this->err('bad_params', 'expected_body_revision must be a non-empty string: the body_revision content.get answered');
+            }
+            if (!isset(self::BODY_FIELDS[$kind])) {
+                return $this->err('bad_params', 'expected_body_revision applies to kinds "post", "templatePart" and "template", whose body a write replaces; '
+                    . "kind \"{$kind}\" has no body to compare, so send the write without it");
+            }
+        }
 
         try {
             $before = $this->writer->read($kind, $id, $key); // null => a create, so its undo is a delete
@@ -2671,6 +2833,15 @@ final class Engine
         if ($locked !== null) {
             return $locked;
         }
+        // After the checks that were there before it, and compared with the record just read, which is
+        // what content.get would answer now. This action runs under the writer's lock (see handle()),
+        // so no other write through this door lands between this check and the write below.
+        if ($expected !== null) {
+            $stale = $this->staleBody($kind, $id, $key, $before, $expected);
+            if ($stale !== null) {
+                return $stale;
+            }
+        }
         try {
             $newId = $this->writer->write($kind, $id, $p['fields'], $key);
         } catch (Throwable $e) {
@@ -2680,9 +2851,13 @@ final class Engine
         // The undo is the span this write changed, read back from the row as it landed, so a
         // revert takes out this change and keeps every later one (ContentUndo). A write that cannot
         // be described that way keeps the whole-row undo, which applyRevert guards on its own.
+        // That read is also the record as the site now holds it, so the answer's `body_revision` is
+        // computed from it rather than from what was sent: a filter on the way in can change a body.
         $entry = ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'key' => $key, 'before' => $before];
+        $after = null;
         try {
-            $changes = ContentUndo::record($before, $this->writer->read($kind, $newId, $key), array_keys($p['fields']));
+            $after = $this->writer->read($kind, $newId, $key);
+            $changes = ContentUndo::record($before, $after, array_keys($p['fields']));
         } catch (Throwable $e) {
             $changes = null;
         }
@@ -2710,7 +2885,39 @@ final class Engine
             'id' => $newId,
             'key' => $key === '' ? null : $key,
             'created' => $before === null,
-        ]);
+        ] + self::bodyRevision($kind, $after));
+    }
+
+    /**
+     * The refusal of a write whose `expected_body_revision` is not the body the site holds now, or
+     * null when it is. "Now" is what content.get would answer: the stored row, or for a template part
+     * or template the site never stored, the theme's own file. With nothing there at all (a create, or
+     * a record deleted since it was read) there is no revision to name, so the key is a bad parameter.
+     *
+     * @param array<string,mixed>|null $before The record as read for this write.
+     * @return array<string,mixed>|null
+     */
+    private function staleBody(string $kind, int $id, string $key, ?array $before, string $expected): ?array
+    {
+        $current = $before;
+        if ($current === null) {
+            try {
+                $current = $this->themeRow($kind, $key);
+            } catch (Throwable $e) {
+                return $this->err('write_failed', $e->getMessage());
+            }
+        }
+        $where = self::targetName(['kind' => $kind, 'id' => $id, 'key' => $key]);
+        $revision = self::bodyRevision($kind, $current)['body_revision'] ?? null;
+        if ($revision === null) {
+            return $this->err('bad_params', "expected_body_revision names the revision of an existing record, and there is no {$where} to compare it with, "
+                . 'so nothing was written. Leave it out to create one, or read the record again with content.get if it was deleted.');
+        }
+        if (hash_equals($revision, $expected)) {
+            return null;
+        }
+        return $this->err('revision_stale', "The body of {$where} changed after it was read and no longer matches expected_body_revision, so nothing was written. "
+            . 'Read it again with content.get, make the change on the body it holds now, and send the body_revision that read answers.') + ['body_revision' => $revision];
     }
 
     /**

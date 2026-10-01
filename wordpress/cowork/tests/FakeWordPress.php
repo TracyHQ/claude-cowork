@@ -110,8 +110,8 @@ final class WP_Fake
 }
 
 /**
- * The block pattern registry, as far as the writer asks it: one pattern by name, its content already
- * run through PHP (the real `get_registered` includes a theme file pattern and returns its output).
+ * The block pattern registry, as far as the writer asks it: one pattern by name, or all of them, the
+ * content already run through PHP (the real registry includes a theme file pattern and returns its output).
  */
 final class WP_Block_Patterns_Registry
 {
@@ -125,6 +125,12 @@ final class WP_Block_Patterns_Registry
     public function get_registered(string $name): ?array
     {
         return WP_Fake::$patterns[$name] ?? null;
+    }
+
+    /** Every pattern, in the order registered, each with its content (the real one runs a file pattern's PHP for it). */
+    public function get_all_registered(bool $outside_init_only = false): array
+    {
+        return array_values(WP_Fake::$patterns);
     }
 }
 

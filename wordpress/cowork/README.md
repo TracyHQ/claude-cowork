@@ -38,9 +38,9 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
 | `language.install` | write | ok | ok |
-| `content.list` | read; `search` (unreleased) keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search-unreleased) | ok | ok |
-| `content.get` | read | ok | ok |
-| `content.update` | write | ok | ok |
+| `content.list` | read; `search` (unreleased) keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search-unreleased); `kind: "pattern"` (unreleased) lists the registered block patterns, see [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern-unreleased) | ok | ok |
+| `content.get` | read; a post, template part or template answers its `body_revision` (unreleased), see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision-unreleased) | ok | ok |
+| `content.update` | write; `expected_body_revision` (unreleased) writes only over the body that was read, see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision-unreleased) | ok | ok |
 | `content.language` | write | ok | ok |
 | `content.delete` | write | ok | ok |
 | `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
@@ -333,7 +333,9 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
   reads a short page as the end of the result.
 - **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
   longer than 200 characters once cleaned, or is more than 4,096 bytes before it is cleaned; and any
-  `search` on `kind` `templatePart`, `template` or another kind than `post`. The engine refuses text
+  `search` on `kind` `templatePart`, `template` or another kind than `post` and `pattern` (patterns
+  are searched as [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern-unreleased)
+  says). The engine refuses text
   that is not valid UTF-8 the same way, but over the door it never gets that far: a body that is not
   valid UTF-8 is not valid JSON, so the door reads no request from it and answers `unauthorized`, as
   it does for any body it cannot read. A statement the database rejects is `read_failed`, never an
@@ -361,6 +363,81 @@ for a caller who is not logged in), and `WP_Query` then loads exactly those rows
 `tests/content-search.php` runs the real engine and writer over a `$wpdb` that reads the statements they
 send, and `tests/content-search-load.php` searches in a fresh process with only the classes
 `claude-cowork.php` loads.
+
+## A write held to the body it read: `body_revision` (unreleased)
+
+`content.update` replaces a body whole, so two callers that read the same page and each write their
+change back lose the first change without a word: the second write lands over a body its caller
+never saw. `body_revision` lets a caller name the body it read, and be refused when that body is no
+longer there.
+
+```
+{"action": "content.get", "params": {"kind": "post", "id": 70}}
+→ {"ok": true, "kind": "post", "id": 70, "key": "", "item": { … }, "body_revision": "d0a26d23…0f5900"}
+
+{"action": "content.update", "params": {"apply_id": "a1", "kind": "post", "id": 70,
+  "expected_body_revision": "d0a26d23…0f5900", "fields": {"post_content": "<p>Hello again</p>"}}}
+→ {"ok": true, "kind": "post", "id": 70, "key": null, "created": false, "body_revision": "7458f3c9…ab135cc"}
+→ {"ok": false, "error": "revision_stale", "message": "The body of post 70 changed after it was read …",
+   "body_revision": "7458f3c9…ab135cc"}                      (when the page changed since it was read)
+```
+
+- **What it is.** The sha256 (64 lowercase hex characters) of the body a body write replaces, as the
+  site holds it: `post_content` for kind `post`, `content` for kinds `templatePart` and `template`.
+  `content.get` answers it beside `item` for those three kinds, including a template part or template
+  served from the theme's file (`stored: false`), where it is the revision of the file's bytes. Every
+  other kind, `pattern` included, answers none.
+- **After a write.** A successful `content.update` of those kinds answers the `body_revision` of the
+  record as read back after the write (the read the undo log already takes), which is what the next
+  `content.get` answers: a filter on the way in can change a body. It is there whether or not the
+  request named a revision.
+- **`expected_body_revision`** (optional, a string) is compared with the body `content.get` would
+  answer at that moment: the stored row, or for a template part or template the site never stored,
+  the theme's file. The comparison runs under the writer's lock, after the record is read and before
+  anything is written, so no other write through this door lands in between; an edit saved in the
+  WordPress admin does not take that lock. It comes after the checks a write already had: a post open
+  in the editor still answers `locked` (`SLOT_LOCKED_BY_USER`) first.
+- **Stale.** A different revision is `revision_stale`, with a sentence and the `body_revision` the
+  site holds now. Nothing is written, nothing is logged, and no change is stamped. Read the record
+  again, make the change on what it holds now, and send the new revision. The comparison is exact: the
+  same hex in capitals is another revision.
+- **Refused** (`bad_params`), nothing written: a value that is not a string, or is empty; the key on
+  any other kind, which has no body to compare; and the key where there is no record to compare with
+  (a create, or a record deleted since it was read).
+- **Without the key** nothing is compared: the write, its undo entry and every refusal are what 0.16.0
+  did, and `apply.revert` takes back a write that named a revision as it takes back any other.
+
+## Listing block patterns: `content.list` `kind: "pattern"` (unreleased)
+
+A block theme builds its pages out of registered patterns, and a caller that wants to put one on a
+page has to know which ones the site has before `content.get {kind: "pattern", key}` reads one.
+
+```
+{"action": "content.list", "params": {"kind": "pattern", "search": "plans", "category": "tracy-pages"}}
+→ {"ok": true, "kind": "pattern", "items": [{"name": "tracy/pricing", "title": "Pricing",
+   "categories": ["tracy-pages"], "description": "Three plans side by side", "chars": 812}],
+   "matched": 1, "offset": 0, "limit": 50, "search": "plans", "category": "tracy-pages"}
+```
+
+- **The rows** are the patterns in WordPress's block pattern registry (`WP_Block_Patterns_Registry`)
+  in name order: core's, the theme's and the plugins'. `chars` is the length of a pattern's content
+  in characters, as the registry renders it (a theme file pattern's PHP has run). No content here:
+  `content.get` reads one. A pattern registered with `inserter => false` is not listed, as the block
+  inserter does not show it either. Patterns the editor fetches from the WordPress.org directory are
+  registered only when the editor asks for them, so they are not here; a synced pattern is a
+  `wp_block` post and is read as kind `post`.
+- **`search`** is cleaned as a post search's words are (above) and echoed the same way. It keeps the
+  patterns whose name, title, description or one of whose keywords holds the words as one substring,
+  ignoring case (every letter where PHP has `mbstring`, ASCII letters where it has not).
+- **`category`** keeps the patterns filed under exactly that category slug, and is echoed.
+- **`matched`** is the number of patterns past the filters, whatever `offset` and `limit` are.
+- **Pages.** 50 rows unless `limit` says otherwise, at most 200: a larger `limit` is 200 and one below
+  1 is 1, and the answer's `limit` says which was used. `offset` counts from 0. A page is also cut at a
+  whole row once its `items` pass 64 KB as encoded, and then carries `truncated: true`; it always holds
+  at least one row, so `offset` plus the number of `items` is the next page.
+- **Refused** (`bad_params`): a `search` a post search refuses, a `category` that is not a non-empty
+  string, and an `offset` or `limit` that is not a whole number (an integer, or a string of digits).
+  A plugin too old to list patterns answers `unavailable`.
 
 ## Layout
 
