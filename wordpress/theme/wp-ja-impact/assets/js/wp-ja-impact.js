@@ -81,6 +81,10 @@
     const panel = top ? partsOf(top).panel : null
     if (menu) menu.classList.toggle('jim-drill', Boolean(panel))
     if (panel && drawer) drawer.scrollTop = 0
+    // a panel opened inside a scrolled panel starts at the top of the one that covers it
+    if (panel)
+      for (let up = panel.parentElement; up && up !== menu; up = up.parentElement)
+        if (up.matches('.wp-block-navigation__submenu-container')) up.scrollTop = 0
     for (const node of menu
       ? menu.querySelectorAll(
           '.wp-block-navigation-item__content, .wp-block-navigation-submenu__toggle, .jim-drill-back__button'

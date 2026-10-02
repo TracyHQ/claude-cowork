@@ -272,6 +272,8 @@ html[data-theme='dark'] body.tracy .acm-related-items .jim-rel__title a { color:
     transform: none;
   }
   body.tracy .jim-header__menu .jim-nav .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle[aria-expanded='true'] ~ .wp-block-navigation__submenu-container { display: flex; }
+  /* a third-level panel covers its parent panel whole, back row included, so one back row shows at a time (the source's drawer does the same) */
+  body.tracy .jim-header__menu .jim-nav .wp-block-navigation__submenu-container .wp-block-navigation-submenu > .wp-block-navigation__submenu-container { inset: 0; }
   body.tracy .jim-header__menu.jim-drill { overflow: hidden; }
   /* the back row: the open item's name with a left chevron, first in its panel */
   body.tracy .jim-header__menu .jim-drill-back { margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--jim-line); }

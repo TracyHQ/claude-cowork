@@ -567,6 +567,10 @@ function wp_ja_impact_section_menu_link( string $content, array $block ): string
 	if ( '' === $content || str_contains( $content, 'current-menu-item' ) || 'post-type' !== ( $block['attrs']['kind'] ?? '' ) || 'page' !== ( $block['attrs']['type'] ?? '' ) ) {
 		return $content;
 	}
+	// A menu item that points at this very post is the highlight (the source marks that item and its parents only): the section is no longer marked beside it.
+	if ( wp_ja_impact_navigation_points_at_post( null ) ) {
+		return $content;
+	}
 	$section = wp_ja_impact_single_section();
 	if ( '' === $section ) {
 		return $content;
@@ -578,3 +582,66 @@ function wp_ja_impact_section_menu_link( string $content, array $block ): string
 	return (string) preg_replace( '/^(<li class="[^"]*)"/', '$1 current-menu-item"', $content, 1 );
 }
 add_filter( 'render_block_core/navigation-link', 'wp_ja_impact_section_menu_link', 20, 2 );
+
+/**
+ * Whether a block list holds a link to the given post, at any depth.
+ *
+ * @param array $blocks  Parsed blocks.
+ * @param int   $post_id The post ID.
+ * @return bool
+ */
+function wp_ja_impact_blocks_link_to_post( array $blocks, int $post_id ): bool {
+	foreach ( $blocks as $inner ) {
+		$attrs = (array) ( $inner['attrs'] ?? array() );
+		if ( 'post-type' === ( $attrs['kind'] ?? '' ) && 'post' === ( $attrs['type'] ?? '' ) && (int) ( $attrs['id'] ?? 0 ) === $post_id ) {
+			return true;
+		}
+		if ( ! empty( $inner['innerBlocks'] ) && wp_ja_impact_blocks_link_to_post( (array) $inner['innerBlocks'], $post_id ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Whether the navigation being rendered has an item that points at the post shown. The answer is taken from the
+ * navigation's own block tree before its items render, so it does not depend on which sibling renders first.
+ *
+ * @param array|null $navigation The parsed navigation block to inspect, or null to read the answer of the one rendering now.
+ * @return bool
+ */
+function wp_ja_impact_navigation_points_at_post( ?array $navigation ): bool {
+	static $answer = false;
+	if ( null === $navigation ) {
+		return $answer;
+	}
+	$answer = false;
+	if ( ! is_singular( 'post' ) ) {
+		return false;
+	}
+	$post_id = (int) get_queried_object_id();
+	$blocks  = (array) ( $navigation['innerBlocks'] ?? array() );
+	$ref     = (int) ( $navigation['attrs']['ref'] ?? 0 );
+	if ( $ref ) {
+		$menu = get_post( $ref );
+		if ( $menu instanceof WP_Post && 'wp_navigation' === $menu->post_type ) {
+			$blocks = parse_blocks( $menu->post_content );
+		}
+	}
+	$answer = $post_id > 0 && wp_ja_impact_blocks_link_to_post( $blocks, $post_id );
+	return $answer;
+}
+
+/**
+ * Reads each navigation's items before they render (see wp_ja_impact_navigation_points_at_post()).
+ *
+ * @param array $parsed_block The block about to render.
+ * @return array
+ */
+function wp_ja_impact_navigation_read_items( array $parsed_block ): array {
+	if ( 'core/navigation' === ( $parsed_block['blockName'] ?? '' ) ) {
+		wp_ja_impact_navigation_points_at_post( $parsed_block );
+	}
+	return $parsed_block;
+}
+add_filter( 'render_block_data', 'wp_ja_impact_navigation_read_items' );

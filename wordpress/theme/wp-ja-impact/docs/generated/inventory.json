@@ -12,7 +12,7 @@
       "Text Domain": "wp-ja-impact",
       "Theme Name": "JA Impact",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
-      "Version": "1.0.2"
+      "Version": "1.0.3"
     },
     "themeJson": {
       "version": 3,
@@ -1508,6 +1508,11 @@
       },
       {
         "kind": "filter",
+        "hook": "render_block_data",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
         "hook": "request",
         "file": "inc/extra.php"
       },
@@ -1686,7 +1691,7 @@
       "assets/css/groups/ga.css": "sha256:80737661aa41b11a75636d5059cba5284c015204864b52884f603a3e16b7f306",
       "assets/css/groups/gb.css": "sha256:fa22e903218139163c953e7c2600e32515c0a17ad5c1892801c73708fc781110",
       "assets/css/groups/gc.css": "sha256:aae4b2008e791579e765938ade9f102d00f9f19d64e1e2b8186dcf62900c9636",
-      "assets/css/groups/z-pilot.css": "sha256:48b285e53bc1cc645a2a09131b0145fcc3f6cc1da7a4df5fdffaf825f3466f7e",
+      "assets/css/groups/z-pilot.css": "sha256:76c8df9bdcb25b4b88ad0ac46a027502ae9df72e791a8b5d7e48474e7da46b9f",
       "assets/css/layout.css": "sha256:dca7d68d13067d81e306200f1ec08e2a5fa03b05bf3b46202ebe69ae86d9c06f",
       "assets/css/sections.css": "sha256:d287eb0b26beee53654bdab114c23195e72b212240d9e5703d9546252a130a3f",
       "assets/css/tracy-motion.css": "sha256:656642b63d46e2cb41fcd5af3437e25fed38175280bfcf14e9a1f6da5efb6bec",
@@ -1712,10 +1717,10 @@
       "assets/js/tracy-preview.js": "sha256:174189d9b2412fe0b7a3f69dde16d901d43d24528b89d3bbad3c78adacb54eed",
       "assets/js/tracy.js": "sha256:88c0d89600b0320a54eb34f943c4f29f631a920eca0866a78e2f054837ae1df4",
       "assets/js/wp-ja-impact-dark.js": "sha256:31878f739a3f915162f6a639d774cb4048bc369f47af499609daa465144b4168",
-      "assets/js/wp-ja-impact.js": "sha256:f9b8a7115bedfb873ebc34f895f6d01adca0726cd209637169e2569617800479",
+      "assets/js/wp-ja-impact.js": "sha256:eaa53f786e5c265eac7fe98d93231f51e21a495d3daebf3f7e46dde0cf13e87c",
       "functions.php": "sha256:60eff34ab071981697e31164004a9ef94ea5da3667d6679d09812d64fc3e0fc8",
       "inc/asset-version.php": "sha256:3a714c4a5c7cc86565cbafdb063a68340b09c58045962b8751ef3ed66c415b1d",
-      "inc/extra.php": "sha256:236d740b3a23cc4c49bfa8c02823a39745f3fc814d4045f0ad587b08614c8915",
+      "inc/extra.php": "sha256:92408ef115f2161f79c026b1ecb02420ff3a33be67d390a4cc661fe567bd73ab",
       "inc/groups/g1.php": "sha256:8a23bfccd380f19db6595e8c7020f52f1e2db3e08eaf915c116af609ee4426cf",
       "inc/groups/g3.php": "sha256:60838c00b792aec9a89eef2ac2a981aa4d802c2b47722b66730247c695216fc4",
       "inc/groups/ga.php": "sha256:8fbb6c260914cf052d228dd392a6b68f2c46438044b710bb6256bf7033f37bae",
@@ -1775,7 +1780,7 @@
       "patterns/section-team.php": "sha256:539399cdefc0989bfdc07cc6ef300e1a632db5d1c40e067cfcae545adff68092",
       "readme.txt": "sha256:a18197359db260c208bdee84ef927e122917f8bae400feb1935eeadb79144519",
       "screenshot.png": "sha256:f02d6016b09875cbad0ce2db9a763a41b4aa11896ecfe4aba1872727d5181e00",
-      "style.css": "sha256:f56b6ca4cb922a7f87a61bde6efdfde3efd3913cf4de572725e7661974d4910b",
+      "style.css": "sha256:c4fbcc0a886b2df42b4c16a4cd43c85f5a304ae580d9e679e32ac132c72abc61",
       "styles/wp-ja-impact.json": "sha256:35a4885fbd28663e5cabf13ede0172a73c4385d50c666c2504d0f9726387c1ed",
       "templates/404.html": "sha256:cc3e999c851baca8a41ffc99387cde33f6eefcccc37236d986cf3c690568315e",
       "templates/archive.html": "sha256:fc6d41404a1a7e4cd2849229344814af9ab393b3d67742a8b2a9efa26422d602",
