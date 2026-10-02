@@ -93,6 +93,13 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
      */
     private const EVERY = 900;
 
+    /**
+     * The global the package's installer script reads to tell this caller from the others. A
+     * literal, not a reference to that script's class: the script is the one inside the package
+     * being installed, and is not loaded until the install runs.
+     */
+    private const CONTEXT = 'claudecowork_install_context';
+
     public static function getSubscribedEvents(): array
     {
         return ['onAfterRespond' => 'onAfterRespond'];
@@ -270,7 +277,15 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
             }
 
             // `method="upgrade"` in every Tracy manifest, so installing over the top IS the update.
-            $ok = Installer::getInstance()->install($package['extractdir']);
+            // The context tells the package's own installer script who is installing it, so its
+            // receipt says `auto-updater` (joomla/cowork/script.php). Set for this call only.
+            $previous               = $GLOBALS[self::CONTEXT] ?? null;
+            $GLOBALS[self::CONTEXT] = ['trigger' => 'auto-updater', 'element' => $element, 'from' => $installed, 'to' => $release['version']];
+            try {
+                $ok = Installer::getInstance()->install($package['extractdir']);
+            } finally {
+                $GLOBALS[self::CONTEXT] = $previous;
+            }
 
             $this->log(
                 \sprintf(
@@ -287,8 +302,20 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
         }
     }
 
+    /**
+     * Written to `<log_path>/plg_system_claudecoworkupdate.php`. `Log::add` alone goes nowhere: Joomla
+     * keeps no logger for a category nobody registered, so until this every "installed" and every
+     * "REFUSED" this plugin wrote was dropped (measured on a stand, 02/10/2026: no such file).
+     */
     private function log(string $message, int $priority): void
     {
+        static $registered = false;
+
+        if (!$registered) {
+            $registered = true;
+            Log::addLogger(['text_file' => 'plg_system_claudecoworkupdate.php'], Log::ALL, ['plg_system_claudecoworkupdate']);
+        }
+
         Log::add($message, $priority, 'plg_system_claudecoworkupdate');
     }
 }
