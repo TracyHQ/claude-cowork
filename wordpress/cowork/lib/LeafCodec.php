@@ -23,9 +23,16 @@
  * loses `&nbsp;` for the raw character), so setting the old value back does not always restore the old
  * bytes. apply.revert restores the stored before-image of the whole column, not set(old).
  *
+ * A credential is no leaf (SecretLeaf, 02/10/2026): a JSON or serialized key whose NAME says it holds one
+ * (`smtp`, `api_key`, `password`...) takes its whole subtree with it, and a text whose SHAPE gives it away (a
+ * Google or Stripe key, a JWT, a webhook address...) is skipped wherever it sits. Listing only; get() and set()
+ * follow the address they are given.
+ *
  * Plain PHP, no CMS. Identical in the Joomla and WordPress engines.
  */
 declare(strict_types=1);
+
+require_once __DIR__ . '/SecretLeaf.php';
 
 final class LeafCodecError extends RuntimeException {}
 
@@ -154,7 +161,7 @@ final class LeafCodec
             default:
                 $text = trim($raw);
                 $type = self::typeOf($text);
-                if ($type === null) return;
+                if ($type === null || SecretLeaf::value($text)) return;
                 $out[] = ['path' => self::path(array_merge($prefix, [['text', '']])), 'type' => $type, 'text' => $text];
         }
     }
@@ -163,7 +170,7 @@ final class LeafCodec
     {
         if (is_array($value)) {
             foreach ($value as $key => $child) {
-                if (is_string($key) && self::technicalKey($key)) continue;
+                if (is_string($key) && (self::technicalKey($key) || SecretLeaf::name($key))) continue;
                 self::walkTree($child, $pointer . '/' . strtr((string) $key, ['~' => '~0', '/' => '~1', '|' => '~2']), $codec, $prefix, $depth, $out);
             }
             return;

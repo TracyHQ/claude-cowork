@@ -491,6 +491,11 @@ final class WordPressDerivedRows
         if (in_array($name, self::TECHNICAL_OPTIONS, true) || substr($name, -strlen('user_roles')) === 'user_roles') {
             return true;
         }
+        // An option a plugin named for a credential (`mailchimp_api_key`, `wpmailsmtp`): not words, and not for
+        // a slot to show whatever its value looks like (SecretLeaf). The core's own are in the list above.
+        if (SecretLeaf::name($name)) {
+            return true;
+        }
         foreach (self::TECHNICAL_OPTION_PREFIXES as $prefix) {
             if (strpos($name, $prefix) === 0) {
                 return true;
