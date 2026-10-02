@@ -13,6 +13,7 @@ namespace Tracy\Component\ClaudeCowork\Administrator\Service;
 use Joomla\CMS\Application\CMSApplicationInterface;
 use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
+use Joomla\CMS\Log\Log;
 use Joomla\Database\DatabaseInterface;
 use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaApplyLog;
 use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaCoreUpgrader;
@@ -135,6 +136,7 @@ final class EngineFactory
             $raw = $db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE(' . $db->quote(self::DERIVED_MARK) . ', binding) > 0')->loadResult();
             $binding = $raw === null ? null : json_decode((string) $raw, true);
         } catch (\Throwable $e) {
+            self::logFailure('derivedBinding', $e);
             return null;
         }
         return is_array($binding) && ($binding['mode'] ?? null) === 'derived' && is_string($binding['contract'] ?? null) && strpos($binding['contract'], 'derived/') === 0 ? $binding : null;
@@ -252,6 +254,7 @@ final class EngineFactory
                 static fn(int $id): ?string => JoomlaDerivedRows::modulePage($db, $id), $quickstart);
         } catch (\Throwable $e) {
             // No database: derive answers 'unavailable', like every other write without one.
+            self::logFailure('derivedSource', $e);
         }
         return $engine;
     }
@@ -295,7 +298,7 @@ final class EngineFactory
             $reader=new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class),static fn()=>self::buildContract(),JPATH_ROOT,\Joomla\CMS\Uri\Uri::root());
             $result=$reader->read($query,$principal);
         } catch (\ContentReadError $e) { $status=$e->status; $result=$e->body(); }
-        catch (\Throwable $e) { $status=503; $result=['error'=>['code'=>'CONTENT_SOURCE_UNAVAILABLE','message'=>'Content source or binding could not be read']]; }
+        catch (\Throwable $e) { self::logFailure('content.read',$e); $status=503; $result=['error'=>['code'=>'CONTENT_SOURCE_UNAVAILABLE','message'=>'Content source or binding could not be read']]; }
         http_response_code($status);
         $app->sendHeaders();
         echo \ContentReader::encode($result);
@@ -341,6 +344,7 @@ final class EngineFactory
         try {
             $driver = Factory::getContainer()->get(DatabaseInterface::class)->getConnection();
         } catch (\Throwable $e) {
+            self::logFailure('buildDumper', $e);
             return null;
         }
 
@@ -357,6 +361,7 @@ final class EngineFactory
         try {
             return new \FileWalker($configured !== '' ? $configured : JPATH_ROOT);
         } catch (\Throwable $e) {
+            self::logFailure('buildWalker', $e);
             return null;
         }
     }
@@ -371,6 +376,7 @@ final class EngineFactory
         try {
             return new JoomlaSiteWriter(Factory::getContainer()->get(DatabaseInterface::class));
         } catch (\Throwable $e) {
+            self::logFailure('buildWriter', $e);
             return null;
         }
     }
@@ -381,6 +387,7 @@ final class EngineFactory
         try {
             return new JoomlaMediaWriter(JPATH_ROOT);
         } catch (\Throwable $e) {
+            self::logFailure('buildMedia', $e);
             return null;
         }
     }
@@ -394,7 +401,55 @@ final class EngineFactory
         try {
             return new JoomlaApplyLog(Factory::getContainer()->get(DatabaseInterface::class));
         } catch (\Throwable $e) {
+            self::logFailure('buildLog', $e);
             return null;
         }
+    }
+
+    /** Whether this request registered the component's log file with Joomla yet. */
+    private static bool $loggerAdded = false;
+
+    /**
+     * Writes down a Throwable that a catch here answers with an honest fallback (content.read's 503,
+     * a builder's null), so the caller's generic answer has a cause someone can read — TCH #722 was
+     * a 503 nothing anywhere could explain. Joomla's log first, in `com_claudecowork.php` under the
+     * site's log path; PHP's `error_log` when Joomla's Log is missing or cannot write.
+     *
+     * Only the Throwable's class, message, location and stack — never the request, and the stack
+     * without its arguments: a frame's arguments can be the token. Never throws: a log that cannot be
+     * written must not turn the fallback into a fatal.
+     */
+    private static function logFailure(string $where, \Throwable $e): void
+    {
+        $entry = $where . ': ' . self::describe($e);
+        for ($previous = $e->getPrevious(), $depth = 0; $previous && $depth < 5; $previous = $previous->getPrevious(), $depth++) {
+            $entry .= "\nCaused by " . self::describe($previous);
+        }
+        try {
+            if (!class_exists(Log::class)) throw new \RuntimeException('Joomla Log is unavailable');
+            if (!self::$loggerAdded) {
+                Log::addLogger(['text_file' => 'com_claudecowork.php'], Log::ALL, ['com_claudecowork']);
+                self::$loggerAdded = true;
+            }
+            Log::add($entry, Log::ERROR, 'com_claudecowork');
+            return;
+        } catch (\Throwable $unlogged) {
+        }
+        try {
+            @error_log('com_claudecowork ' . $entry);
+        } catch (\Throwable $unlogged) {
+        }
+    }
+
+    /** One Throwable as `Class: message at file:line` and its stack, each frame without arguments. */
+    private static function describe(\Throwable $e): string
+    {
+        $message = $e->getMessage();
+        $text = get_class($e) . ': ' . ($message === '' ? '(no message)' : $message) . ' at ' . $e->getFile() . ':' . $e->getLine();
+        foreach ($e->getTrace() as $i => $frame) {
+            $text .= "\n#{$i} " . (isset($frame['file']) ? $frame['file'] . '(' . ($frame['line'] ?? 0) . '): ' : '[internal function]: ')
+                . ($frame['class'] ?? '') . ($frame['type'] ?? '') . ($frame['function'] ?? '') . '()';
+        }
+        return $text;
     }
 }

@@ -1877,6 +1877,9 @@ require __DIR__ . "/loopback-route.php";
 // recording driver, the engine's answers, and the loading production does. Last: it defines a
 // Normalizer stand-in when the PHP has none, and nothing after it should run beside that.
 require __DIR__ . "/content-search.php";
+// EngineFactory's catches log what they answer for. Each case runs in its own PHP process, so the
+// Joomla stand-ins it needs never meet the ones defined above.
+require __DIR__ . "/engine-factory-logging.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
