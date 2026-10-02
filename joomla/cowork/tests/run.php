@@ -1873,6 +1873,9 @@ require __DIR__ . "/derived-contract.php";
 // The same at the size of a real import, through JoomlaDerivedRows' own SQL over SQLite.
 require __DIR__ . "/derived-scale.php";
 require __DIR__ . "/loopback-route.php";
+// EngineFactory's contract selection: an unbound site is not held to a bundled profile, and its
+// content.read answers 501, not a masked 503 (TCH #722). Real factory and reader, in subprocesses.
+require __DIR__ . "/engine-factory-unbound.php";
 // content.list `search`: the needle, its LIKE pattern through SQLite, the writer's SQL through a
 // recording driver, the engine's answers, and the loading production does. Last: it defines a
 // Normalizer stand-in when the PHP has none, and nothing after it should run beside that.
