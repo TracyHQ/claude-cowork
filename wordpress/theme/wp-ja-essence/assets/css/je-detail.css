@@ -1,0 +1,221 @@
+/* je-detail — page-group stylesheet (loaded after wp-ja-essence.css). */
+
+/* Contact: one white card (heading, intro, form) with the gallery band below it at full container width. */
+.je-page--contact .je-narrow { max-width: none; }
+.je-contactcard { max-width: 905px; margin: 0 auto 56px; padding: 36px 36px 36px; background: var(--wp--preset--color--surface, #fff); border-radius: 8px; }
+.je-contactcard__title { font-family: var(--wp--preset--font-family--display, inherit); font-size: 40px; line-height: 1.2; font-weight: 400; margin: 0 0 12px; }
+.je-contactcard__intro { max-width: 780px; margin: 0 auto 36px; color: var(--wp--preset--color--fg-2); font-size: 16px; line-height: 1.45; }
+.je-contactcard .wpcf7-form p { margin: 0 0 24px; }
+.je-contactcard .wpcf7-form label { display: block; font-family: var(--wp--preset--font-family--display, inherit); font-size: 16px; color: var(--wp--preset--color--fg, #212529); }
+.je-contactcard .wpcf7-form-control-wrap { display: block; margin-top: 8px; }
+.je-contactcard input[type="text"], .je-contactcard input[type="email"], .je-contactcard textarea { display: block; width: 100%; box-sizing: border-box; min-height: 48px; padding: 8px 18px; border: 1px solid light-dark(#dfe3ee, #3a4459); border-radius: 6px; background: light-dark(#fff, #222a3b); font: inherit; font-size: 14px; color: light-dark(var(--wp--preset--color--fg, #212529), #c2c9d6); }
+.je-contactcard textarea { min-height: 230px; padding-top: 16px; resize: vertical; }
+.je-contactcard .wpcf7-list-item label { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-family: var(--wp--preset--font-family--body, inherit); color: var(--wp--preset--color--fg-2); }
+.je-contactcard input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+.je-contactcard .wpcf7-submit { min-height: 48px; padding: 0 20px; border: 0; border-radius: 6px; background: var(--wp--preset--color--accent, #4d6bff); color: var(--wp--preset--color--accent-on, #fff); font-family: var(--wp--preset--font-family--display, inherit); font-size: 16px; cursor: pointer; }
+.je-contactcard .wpcf7-response-output { margin: 0; }
+
+/* Login: a 500px white card, full-width controls, gallery band below at container width. */
+.je-page--login .je-narrow { max-width: none; }
+.je-page--login .je-prose form#loginform { max-width: 500px; box-sizing: border-box; margin: 0 auto 56px; padding: 36px; background: var(--wp--preset--color--surface, #fff); border-radius: 8px; }
+.je-page--login #loginform p { margin: 0 0 24px; }
+.je-page--login #loginform label { display: block; margin-bottom: 8px; font-family: var(--wp--preset--font-family--display, inherit); font-size: 16px; color: var(--wp--preset--color--fg, #212529); }
+.je-page--login #loginform input.input { display: block; width: 100%; box-sizing: border-box; min-height: 48px; padding: 8px 14px; border: 1px solid light-dark(#dfe3ee, #3a4459); border-radius: 6px; background: light-dark(#fff, #222a3b); font: inherit; color: light-dark(var(--wp--preset--color--fg, #212529), #eef1f6); }
+.je-page--login #loginform .login-remember label { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--wp--preset--font-family--body, inherit); color: var(--wp--preset--color--fg-2); }
+.je-page--login #loginform input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+.je-page--login #loginform .login-submit { margin: 0; }
+.je-page--login #wp-submit { width: 100%; min-height: 48px; border: 0; border-radius: 6px; background: var(--wp--preset--color--accent, #4d6bff); color: var(--wp--preset--color--accent-on, #fff); font-family: var(--wp--preset--font-family--display, inherit); font-size: 16px; cursor: pointer; }
+
+/* Form pages sit 72px under the header like the source. */
+.je-page--contact, .je-page--login, .je-page--register, .je-page--account { padding-top: 72px; }
+.je-contactcard .je-contactcard__title { font-family: var(--wp--preset--font-family--display); }
+
+/* 404: the source draws a bare centred card, no header or footer. */
+.je-404 { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 72px 24px; box-sizing: border-box; }
+.je-404__card { width: 100%; max-width: 900px; padding: 96px 24px; background: var(--wp--preset--color--surface, #fff); border-radius: 8px; text-align: center; }
+.je-404__code { font-family: var(--wp--preset--font-family--display); font-size: 240px; line-height: 240px; margin: 0 0 12px; color: var(--wp--preset--color--fg-2); }
+.je-404__card .je-page__title { margin: 0 0 16px; font-size: 40px; line-height: 48px; }
+.je-404__card p { color: var(--wp--preset--color--fg); line-height: 1.6; }
+.je-404__card p.je-404__code { color: var(--wp--preset--color--fg-2); line-height: 240px; }
+.je-404__card .wp-block-button__link { line-height: 18px; }
+
+/* Typography page: the Bootstrap components T4's style guide shows, drawn from the classes in the page body. */
+.t4-typo-example { margin: 0 0 48px; }
+.t4-typo-example > .row { display: grid; grid-template-columns: 1fr 3fr; gap: 24px; }
+.t4-typo-example h2 { font-size: 24px; margin: 0 0 12px; }
+.t4-typo-example .display-1, .t4-typo-example .display-2, .t4-typo-example .display-3, .t4-typo-example .display-4, .t4-typo-example .display-5, .t4-typo-example .display-6 { font-weight: 300; line-height: 1.2; margin: 0 0 8px; }
+.t4-typo-example .display-1 { font-size: 80px; } .t4-typo-example .display-2 { font-size: 72px; } .t4-typo-example .display-3 { font-size: 64px; }
+.t4-typo-example .display-4 { font-size: 56px; } .t4-typo-example .display-5 { font-size: 48px; } .t4-typo-example .display-6 { font-size: 40px; }
+.t4-typo-example .alert { position: relative; display: flex; align-items: center; justify-content: space-between; margin: 0 0 16px; padding: 14px 20px; border: 1px solid transparent; border-radius: 6px; }
+.t4-typo-example .alert p { margin: 0; color: inherit; }
+.t4-typo-example .alert .btn-close { background: none; border: 0; font-size: 0; width: 16px; height: 16px; opacity: .5; }
+.t4-typo-example .alert .btn-close::before { content: "\00d7"; font-size: 22px; line-height: 16px; }
+.t4-typo-example .alert-primary { color: light-dark(#052c65, #6ea8fe); background: light-dark(#cfe2ff, #031633); border-color: light-dark(#b6d4fe, #084298); }
+.t4-typo-example .alert-secondary { color: light-dark(#2b2f32, #a7acb1); background: light-dark(#e2e3e5, #161719); border-color: light-dark(#d3d6d8, #41464b); }
+.t4-typo-example .alert-success { color: light-dark(#0a3622, #75b798); background: light-dark(#d1e7dd, #051b11); border-color: light-dark(#badbcc, #0f5132); }
+.t4-typo-example .alert-danger { color: light-dark(#58151c, #ea868f); background: light-dark(#f8d7da, #2c0b0e); border-color: light-dark(#f5c2c7, #842029); }
+.t4-typo-example .alert-warning { color: light-dark(#664d03, #ffda6a); background: light-dark(#fff3cd, #332701); border-color: light-dark(#ffecb5, #997404); }
+.t4-typo-example .alert-info { color: light-dark(#055160, #6edff6); background: light-dark(#cff4fc, #032830); border-color: light-dark(#b6effb, #087990); }
+.t4-typo-example .alert-light { color: light-dark(#495057, #f8f9fa); background: light-dark(#fefefe, #343a40); border-color: light-dark(#fdfdfe, #495057); }
+.t4-typo-example .alert-dark { color: light-dark(#495057, #dee2e6); background: light-dark(#ced4da, #1a1d20); border-color: light-dark(#bcbebf, #343a40); }
+.t4-typo-example .badge { display: inline-block; padding: .35em .65em; border-radius: 6px; font: 700 .75em/1 var(--wp--preset--font-family--display); color: #fff; vertical-align: baseline; }
+.t4-typo-example .badge.rounded-pill { border-radius: 50rem; }
+.t4-typo-example .bg-primary { background: var(--wp--preset--color--accent, #4d6bff); } .t4-typo-example .bg-secondary { background: #6c757d; }
+.t4-typo-example .bg-success { background: #20c997; } .t4-typo-example .bg-danger { background: #dc3545; } .t4-typo-example .bg-warning { background: #ffc107; }
+.t4-typo-example .bg-info { background: #0dcaf0; } .t4-typo-example .bg-light { background: #f8f9fa; } .t4-typo-example .bg-dark { background: #212529; }
+.t4-typo-example .text-dark { color: #212529; }
+.t4-typo-example .btn { display: inline-block; margin: 0 6px 8px 0; padding: 6px 14px; border: 1px solid transparent; border-radius: 6px; font: 400 16px/1.5 var(--wp--preset--font-family--display); cursor: pointer; }
+.t4-typo-example .btn-sm { padding: 2px 8px; font-size: 12px; } .t4-typo-example .btn-lg { padding: 8px 18px; font-size: 18px; }
+.t4-typo-example .btn-primary { background: var(--wp--preset--color--accent, #4d6bff); color: #fff; } .t4-typo-example .btn-secondary { background: #fdf6f2; color: #6c757d; }
+.t4-typo-example .btn-success { background: #198754; color: #fff; } .t4-typo-example .btn-danger { background: #dc3545; color: #fff; } .t4-typo-example .btn-warning { background: #fd7e14; color: #fff; }
+.t4-typo-example .btn-info { background: #0dcaf0; color: #fff; } .t4-typo-example .btn-light { background: #f8f9fa; color: #212529; } .t4-typo-example .btn-dark { background: #212529; color: #fff; }
+.t4-typo-example [class*="btn-outline-"] { background: transparent; border-color: currentColor; }
+.t4-typo-example .btn-outline-primary { color: var(--wp--preset--color--accent, #4d6bff); } .t4-typo-example .btn-outline-secondary { color: #6c757d; }
+.t4-typo-example .btn-outline-success { color: #198754; } .t4-typo-example .btn-outline-danger { color: #dc3545; } .t4-typo-example .btn-outline-warning { color: #fd7e14; }
+.t4-typo-example .btn-outline-info { color: #0dcaf0; } .t4-typo-example .btn-outline-light { color: #f8f9fa; } .t4-typo-example .btn-outline-dark { color: #212529; }
+.t4-typo-example .card { border: 1px solid light-dark(#dfe3ee, #3a4459); border-radius: 6px; overflow: hidden; }
+.t4-typo-example .card:not([class*="bg-"]):not([class*="text-bg-"]) { background: light-dark(#fff, #1a2132); }
+.t4-typo-example .card-body, .t4-typo-example .card-header { padding: 12px 16px; }
+.t4-typo-example .card-header { border-bottom: 1px solid rgba(0,0,0,.125); background: rgba(0,0,0,.03); }
+.t4-typo-example .card.text-white, .t4-typo-example .card[class*="text-bg-"] { color: #fff; }
+.t4-typo-example .bg-primary.card, .t4-typo-example .card.bg-primary { background: #0d6efd; }
+.t4-typo-example .progress { height: 16px; margin: 0 0 8px; background: #e9ecef; border-radius: 6px; overflow: hidden; }
+.t4-typo-example .progress-bar { height: 100%; color: #fff; font-size: 12px; text-align: center; }
+.t4-typo-example .spinner-border { display: inline-block; width: 32px; height: 32px; margin-right: 8px; border: 4px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: je-spin .75s linear infinite; }
+@keyframes je-spin { to { transform: rotate(360deg); } }
+.t4-typo-example .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.t4-typo-example .pagination { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.t4-typo-example .page-link { display: block; min-width: 48px; height: 48px; box-sizing: border-box; padding: 0 12px; border-radius: 30px; background: light-dark(rgba(0, 0, 0, 0.1), rgb(26, 33, 48)); text-align: center; text-decoration: none; color: light-dark(#212529, rgb(194, 201, 214)); }
+.t4-typo-example .page-item.active .page-link { background: var(--wp--preset--color--accent, #4d6bff); color: #fff; }
+.t4-typo-example .page-item.disabled .page-link { opacity: .5; }
+@media (max-width: 767px) { .t4-typo-example > .row { grid-template-columns: 1fr; } .je-404__code { font-size: 160px; } .je-404__card p.je-404__code { line-height: 160px; } }
+.je-page:has(.t4-typo-example) .je-narrow { max-width: none; }
+.je-page:has(.t4-typo-example) .t4-typo-example { padding: 0; }
+.t4-typo-example .alert p > a, .t4-typo-example .alert-link { white-space: nowrap; }
+/* s9: detail article title and quote as measured on the source detail pages (h1 40/48, quote Jost 32/38.4 in the accent) */
+.je-articlecard .je-page__title { font-size: 40px; line-height: 1.2; }
+.je-articlecard .area-blockquote .blockquote { margin: 0; font-family: Jost, sans-serif; font-size: 32px; line-height: 1.2; color: var(--wp--preset--color--accent); }
+.je-articlecard .area-blockquote .blockquote p { margin: 0; }
+.je-articlecard .je-meta__author { font-weight: 400; font-size: 14px; line-height: 1.5; color: var(--wp--preset--color--fg); }
+.je-articlecard .area-blockquote figcaption { margin: 24px 0 0; font-family: Jost, sans-serif; font-size: 18px; line-height: 1.5; color: var(--wp--preset--color--fg-2); }
+@media (max-width: 767px) { .je-articlecard .je-page__title { font-size: 24px; line-height: 1.2; } .je-articlecard .area-blockquote .blockquote { font-size: 24px; } }
+/* s9: Bootstrap type specimen values read from the source typography page (computed, 1440) */
+.t4-typo-example p.h1 { font-family: Jost; font-size: 40px; line-height: 52px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h2 { font-family: Jost; font-size: 32px; line-height: 41.6px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h3 { font-family: Jost; font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h4 { font-family: Jost; font-size: 18px; line-height: 23.4px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h5 { font-family: Jost; font-size: 16px; line-height: 20.8px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h6 { font-family: Jost; font-size: 14px; line-height: 18.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.lead { font-family: "Noto Serif"; font-size: 20px; line-height: 30px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example .card-text { font-family: "Noto Serif"; font-size: 16px; line-height: 24px; font-weight: 400; color: inherit; }
+.t4-typo-example .card:not([class*="text-"]) { color: light-dark(rgb(33, 37, 41), rgb(194, 201, 214)); }
+.t4-typo-example p.display-1 { font-family: "Noto Serif"; font-size: 80px; line-height: 104px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example p.display-2 { font-family: "Noto Serif"; font-size: 72px; line-height: 93.6px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example p.display-3 { font-family: "Noto Serif"; font-size: 64px; line-height: 83.2px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example p.display-4 { font-family: "Noto Serif"; font-size: 56px; line-height: 72.8px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example p.display-5 { font-family: "Noto Serif"; font-size: 48px; line-height: 62.4px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example p.display-6 { font-family: "Noto Serif"; font-size: 40px; line-height: 52px; font-weight: 300; color: var(--wp--preset--color--fg); }
+.t4-typo-example a.btn.btn-primary { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-primary { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-secondary { font-size: 18px; line-height: 20.7px; color: rgb(108, 117, 125); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-success { font-size: 18px; line-height: 20.7px; color: rgb(0, 0, 0); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-danger { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-warning { font-size: 18px; line-height: 20.7px; color: rgb(0, 0, 0); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-info { font-size: 18px; line-height: 20.7px; color: rgb(0, 0, 0); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-light { font-size: 18px; line-height: 20.7px; color: rgb(0, 0, 0); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-dark { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-primary { font-size: 18px; line-height: 20.7px; color: rgb(77, 107, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-secondary { font-size: 18px; line-height: 20.7px; color: rgb(253, 246, 242); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-success { font-size: 18px; line-height: 20.7px; color: rgb(25, 135, 84); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-danger { font-size: 18px; line-height: 20.7px; color: rgb(220, 53, 69); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-warning { font-size: 18px; line-height: 20.7px; color: rgb(253, 126, 20); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-info { font-size: 18px; line-height: 20.7px; color: rgb(13, 202, 240); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-light { font-size: 18px; line-height: 20.7px; color: rgb(248, 249, 250); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-outline-dark { font-size: 18px; line-height: 20.7px; color: rgb(33, 37, 41); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example button.btn.btn-primary.btn-sm { font-size: 14px; line-height: 16.1px; color: rgb(255, 255, 255); padding-top: 4px; padding-left: 8px; }
+.t4-typo-example button.btn.btn-lg.btn-primary { font-size: 20px; line-height: 23px; color: rgb(255, 255, 255); padding-top: 8px; padding-left: 16px; }
+.t4-typo-example a.btn.btn-dark.w-100 { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
+.t4-typo-example a.page-link { font-size: 14px; line-height: 48px; color: light-dark(rgb(0, 0, 0), rgb(194, 201, 214)); padding-top: 0px; padding-left: 12px; }
+.t4-typo-example h3 { font-family: Jost; font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+
+/* s11: links inside alerts take the alert colour in bold (source .alert-link); search-page button as the source .btn (Jost 18/20.7, 48px) */
+.t4-typo-example .alert a { color: inherit; font-weight: 700; }
+.je-search-form .wp-block-search__button.wp-element-button:not(.has-icon) { padding: 14px 34px; box-sizing: border-box; font-family: Jost, sans-serif; font-size: 18px; line-height: 20.7px; font-weight: 400; min-height: 48px; }
+
+/* s11: the source steps headings and display sizes down with the viewport (Bootstrap bands: h1 28/32/38/40, h2 24/28/32, h3 22/24, display calc(rfs + vw)) */
+.je-page:has(.t4-typo-example) .je-page__title { font-size: 32px; line-height: 41.6px; }
+.t4-typo-example h1, .t4-typo-example p.h1 { font-size: 40px; line-height: 52px; }
+.t4-typo-example p.display-1 { font-size: min(80px, calc(1.625rem + 4.5vw)); line-height: 1.3; }
+.t4-typo-example p.display-2 { font-size: min(72px, calc(1.575rem + 3.9vw)); line-height: 1.3; }
+.t4-typo-example p.display-3 { font-size: min(64px, calc(1.525rem + 3.3vw)); line-height: 1.3; }
+.t4-typo-example p.display-4 { font-size: min(56px, calc(1.475rem + 2.7vw)); line-height: 1.3; }
+.t4-typo-example p.display-5 { font-size: min(48px, calc(1.425rem + 2.1vw)); line-height: 1.3; }
+.t4-typo-example p.display-6 { font-size: min(40px, calc(1.375rem + 1.5vw)); line-height: 1.3; }
+@media (max-width: 1199px) { .t4-typo-example h1, .t4-typo-example p.h1, .je-contactcard__title { font-size: 38px; line-height: 49.4px; } }
+@media (max-width: 767px) {
+	.t4-typo-example h1, .t4-typo-example p.h1, .je-contactcard__title { font-size: 32px; line-height: 41.6px; }
+	.je-page:has(.t4-typo-example) .je-page__title, .t4-typo-example h2, .t4-typo-example p.h2 { font-size: 28px; line-height: 36.4px; }
+	.t4-typo-example h3, .t4-typo-example p.h3 { font-size: 22px; line-height: 28.6px; }
+}
+@media (max-width: 575px) {
+	.t4-typo-example h1, .t4-typo-example p.h1, .je-contactcard__title { font-size: 28px; line-height: 36.4px; }
+	.je-page:has(.t4-typo-example) .je-page__title, .t4-typo-example h2, .t4-typo-example p.h2 { font-size: 24px; line-height: 31.2px; }
+}
+@media (max-width: 767px) { .je-404__card .je-page__title { font-size: 24px; line-height: 28.8px; }}
+@media (max-width: 575px) { .je-contactcard__title { font-size: 28px; line-height: 33.6px; } }
+@media (max-width: 767px) { .je-page .wp-block-post-content h2:not(.je-card__title):not(.je-sec__title):not(.tracy-card__title):not(.tracy-eyebrow), .je-page .wp-block-post-content .h2 { font-size: 28px; line-height: 36.4px; } }
+@media (max-width: 575px) { .je-page .wp-block-post-content h2:not(.je-card__title):not(.je-sec__title):not(.tracy-card__title):not(.tracy-eyebrow), .je-page .wp-block-post-content .h2 { font-size: 24px; line-height: 31.2px; } }
+
+/* s11: pagination sizes as the source (sm 14, default 16, lg 20) and the dark colours of the neutral buttons */
+.t4-typo-example .pagination:not(.pagination-sm):not(.pagination-lg) a.page-link { font-size: 16px; }
+.t4-typo-example .pagination-lg a.page-link, .t4-typo-example .pagination-lg .page-item { font-size: 20px; }
+.t4-typo-example button.btn.btn-secondary { background: light-dark(#fdf6f2, #222a3b); color: light-dark(rgb(108, 117, 125), #c2c9d6); }
+.t4-typo-example button.btn.btn-light { background: light-dark(#f8f9fa, #222a3b); color: light-dark(rgb(0, 0, 0), #eef1f6); }
+.t4-typo-example button.btn.btn-outline-secondary { color: light-dark(rgb(253, 246, 242), #c2c9d6); }
+.t4-typo-example button.btn.btn-outline-light { color: light-dark(rgb(248, 249, 250), #eef1f6); }
+.t4-typo-example button.btn.btn-outline-dark { color: light-dark(rgb(33, 37, 41), #c2c9d6); }
+.t4-typo-example .card:not(.text-white):not(.text-dark) p.card-text { color: light-dark(rgba(33, 37, 41, 0.75), #c2c9d6); line-height: 21px; }
+.je-search-form .wp-block-search__input { border-color: light-dark(#949494, #3a4459); background: light-dark(#fff, #222a3b); color: light-dark(var(--wp--preset--color--fg, #212529), #c2c9d6); }
+@media (max-width: 575.98px) { .je-search-form .wp-block-search__button.wp-element-button:not(.has-icon) { padding: 12px 16px; font-size: 14px; line-height: 16.1px; min-height: 45px; } }
+@media (max-width: 400px) { .je-404__code { font-size: min(160px, 36vw); } .je-404__card p.je-404__code { line-height: 1.5; } }
+
+/* s14: the generic .je-prose .row:has(> .col-lg-3) four-column rule (wp-ja-essence.css) out-ranks the specimen grid; restate it with higher specificity. */
+.je-prose .t4-typo-example > .row { grid-template-columns: 1fr 3fr; }
+.je-prose .t4-typo-example .row-cols-md-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.je-prose .t4-typo-example > .row > .col-lg-9.offset-lg-3 { grid-column: 2; }
+@media (max-width: 767px) { .je-prose .t4-typo-example > .row, .je-prose .t4-typo-example .row-cols-md-2 { grid-template-columns: 1fr; } .je-prose .t4-typo-example > .row > .col-lg-9.offset-lg-3 { grid-column: 1; } }
+
+/* related-items type 1 ("More Read"): three white cards, picture on top, badge, title, date (source module 132) */
+.je-more__items--cards { gap: 36px; }
+.je-more__items--cards > li { margin-block: 0 !important; }
+.je-sec--more:has(.je-more__items--cards) .je-more { margin-inline: -18px; }
+.je-relcard { background: var(--wp--preset--color--surface); border-radius: 8px; padding: 36px; height: 100%; box-sizing: border-box; }
+.je-relcard .je-relcard__img { width: calc(100% + 36px); max-width: none; margin: -18px -18px 24px; }
+.je-relcard .je-relcard__img img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 8px; display: block; }
+.je-relcard .je-badge { margin: 0; }
+.je-relcard .je-relcard__title { margin: 16px 0 8px; font-size: 24px; line-height: 1.3; }
+.je-relcard .je-meta__date { margin: 0; font-size: 14px; line-height: 1.5; }
+@media (max-width: 1023px) { .je-more__items--cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 767px) { .je-more__items--cards { grid-template-columns: minmax(0, 1fr) !important; } .je-relcard { padding: 18px 18px 24px; } .je-relcard .je-relcard__img { width: 100%; margin: 0 0 24px; } }
+/* an article with no sidebar (layout-2) takes the full container width */
+.je-narrow:has(.je-articlecard):not(:has(.je-side)) { max-width: 1164px; }
+
+/* article footer (D-67): Prev/Next, Share article, Tags in */
+.je-artfoot { margin-top: 48px; }
+.je-pagenav { display: flex; justify-content: space-between; margin: 24px 0 0; }
+.je-pagenav a { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; background: light-dark(#f8f8ff, #222a3b); color: inherit; font-family: Jost, sans-serif; font-size: 18px; line-height: 20.7px; text-decoration: none; }
+.je-pagenav__next { margin-left: auto; }
+.je-pagenav__prev::before { content: "\2039"; }
+.je-pagenav__next::after { content: "\203A"; }
+.je-artfoot__row { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-top: 48px; padding-top: 48px; }
+.je-artfoot h6 { margin: 0 0 24px; font-family: Jost, sans-serif; font-size: 18px; font-weight: 400; line-height: 1.3; color: var(--wp--preset--color--fg); }
+.je-share { display: flex; gap: 8px; }
+.je-share a { position: relative; display: block; width: 36px; height: 36px; border-radius: 50%; font-size: 0; line-height: 0; overflow: hidden; }
+.je-share a::after { content: ""; position: absolute; inset: 9px; background: #fff; -webkit-mask: var(--je-ico) center / contain no-repeat; mask: var(--je-ico) center / contain no-repeat; }
+.je-share__facebook { background: #3b5998; --je-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M12 2C6.5 2 2 6.5 2 12c0 5 3.7 9.1 8.4 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7C18.3 21.1 22 17 22 12c0-5.5-4.5-10-10-10z%22/%3E%3C/svg%3E"); }
+.je-share__x { background: #1da1f2; --je-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M13.982 10.622 20.54 3h-1.554l-5.693 6.618L8.745 3H3.5l6.876 10.007L3.5 21h1.554l6.012-6.989L15.868 21h5.245l-7.131-10.378Zm-2.128 2.474-.697-.997-5.543-7.93H8l4.474 6.4.697.996 5.815 8.318h-2.387l-4.745-6.787Z%22/%3E%3C/svg%3E"); }
+.je-share__linkedin { background: #0077b5; --je-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.5h4V21H3zM9.5 9.5h3.8v1.6h.1c.5-1 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5c0-1.2 0-2.7-1.7-2.7s-1.9 1.3-1.9 2.6V21h-4z%22/%3E%3C/svg%3E"); }
+.je-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.je-tag-chip { display: inline-block; padding: 11px 16px; border-radius: 8px; background: light-dark(#f8f8ff, #222a3b); color: inherit; font-size: 16px; line-height: 16px; text-decoration: none; }
+@media (max-width: 767px) { .je-artfoot__tags { width: 100%; } .je-tags { justify-content: flex-start; } }
+.je-relcard .je-relcard__title a { color: inherit; text-decoration: none; font-weight: 400; }

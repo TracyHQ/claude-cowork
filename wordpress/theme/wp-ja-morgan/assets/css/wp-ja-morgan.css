@@ -1,0 +1,2546 @@
+/* wp-ja-morgan — the JA Morgan look, written from the computed styles of the running source
+   (Joomla 6, T3, measured 29/09/2026 on :8281 at 1440 and 390 px, light and dark; probes kept
+   outside the repository). No rule is copied from the source template: its CSS is not
+   redistributable. Class names follow the source markup (t3-*, acm-*) where the patterns mirror
+   it, so the same element answers to the same name on both sides; jm-* is this theme's own.
+   Colours go through the presets theme.overlay.json declares with light-dark(), so dark mode
+   follows the root attribute without a second rule for most elements. */
+
+/* ---- Fonts: PT Root UI (SIL OFL 1.1), Ionicons 4.4.7 (MIT), Font Awesome 4.5 (SIL OFL 1.1) ---- */
+@font-face {
+	font-family: "PTRootUI";
+	src: url("../fonts/pt-root-ui-regular.woff") format("woff");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "PTRootUI";
+	src: url("../fonts/pt-root-ui-medium.woff") format("woff");
+	font-weight: 500 600;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "PTRootUI";
+	src: url("../fonts/pt-root-ui-bold.woff") format("woff");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Ionicons";
+	src: url("../fonts/ionicons.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: block;
+}
+@font-face {
+	font-family: "FontAwesome";
+	src: url("../fonts/fontawesome-webfont.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: block;
+}
+
+:root {
+	--jm-font: "PTRootUI", Helvetica, Arial, sans-serif;
+	--jm-navy: light-dark(#1b3060, #1b3060);
+	--jm-navy-fg: light-dark(#1b3060, #cdd4e0);
+	--jm-heading: var(--wp--preset--color--fg-2, #333333);
+	--jm-text: var(--wp--preset--color--fg, #777777);
+	--jm-bg: var(--wp--preset--color--bg, #ffffff);
+	--jm-gray: light-dark(#f2f3f7, #141927);
+	--jm-card: light-dark(#ffffff, #1a2032);
+	--jm-line: light-dark(#eaeaea, #2a3247);
+	--jm-soft: light-dark(#aaaaaa, #8b93a4);
+	--jm-footer: #111111;
+	/* The red of buttons and section kickers stays #d93030 in dark too (measured); links take --ja-accent. */
+	--jm-red: #d93030;
+	--jm-lead: light-dark(#777777, #f2f4f8);
+	--jm-gutter: 15px;
+}
+
+/* ---- Base ---- */
+body {
+	font-family: var(--jm-font);
+	font-size: 16px;
+	line-height: 25px;
+	color: var(--jm-text);
+	background: var(--jm-bg);
+	-webkit-font-smoothing: antialiased;
+}
+body :where(h1, h2, h3, h4, h5, h6) {
+	font-family: var(--jm-font);
+	color: var(--jm-heading);
+	font-weight: 500;
+	letter-spacing: -0.6px;
+	margin: 0;
+}
+body :where(h4, h5, h6) {
+	letter-spacing: normal;
+}
+body :where(p) {
+	margin: 0 0 25px;
+}
+body a {
+	color: var(--ja-accent);
+	text-decoration: none;
+}
+.screen-reader-text {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* WordPress flow layouts space every child by the block gap; the source stacks its blocks with
+   their own margins only. */
+.jm-header :where(.is-layout-flow, .is-layout-constrained) > *,
+.jm-main :where(.is-layout-flow, .is-layout-constrained) > *,
+.jm-footer :where(.is-layout-flow, .is-layout-constrained) > * {
+	margin-block-start: 0;
+}
+.jm-main,
+.jm-sections {
+	margin: 0;
+	padding: 0;
+}
+.tracy-header.jm-header,
+.tracy-footer.jm-footer {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	background: none;
+	position: relative;
+}
+
+/* ---- Container: Bootstrap 3 steps of the source (750 / 970 / 1260 at 768 / 992 / 1200) ---- */
+.container {
+	box-sizing: border-box;
+	width: auto;
+	max-width: 100%;
+	margin-inline: auto;
+	padding-inline: var(--jm-gutter);
+}
+@media (min-width: 768px) {
+	.container {
+		width: 750px;
+	}
+}
+@media (min-width: 992px) {
+	.container {
+		width: 970px;
+	}
+}
+@media (min-width: 1200px) {
+	.container {
+		width: 1260px;
+	}
+}
+.jm-fluid > .container {
+	width: auto;
+	padding-inline: 0;
+}
+
+/* ---- Buttons ---- */
+.wp-block-button.btn .wp-block-button__link,
+.jm-quick-contact .btn {
+	display: inline-block;
+	box-sizing: border-box;
+	font-family: var(--jm-font);
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 18.08px;
+	padding: 20px 30px;
+	border: 1px solid var(--jm-red);
+	border-radius: 4px;
+	background: var(--jm-red);
+	color: #ffffff;
+	text-decoration: none;
+	transition: background-color 0.2s, border-color 0.2s;
+}
+.wp-block-button.btn .wp-block-button__link:hover,
+.wp-block-button.btn .wp-block-button__link:focus-visible {
+	background: var(--wp--preset--color--accent-hover, #b22323);
+	border-color: var(--wp--preset--color--accent-hover, #b22323);
+}
+.jm-arrow .wp-block-button__link::after,
+.jm-quick-contact .jm-arrow::after {
+	content: "\f119";
+	font-family: "Ionicons";
+	font-weight: 400;
+	margin-left: 6.25px;
+}
+.wp-block-buttons {
+	gap: 0;
+}
+
+/* The arrow link a card draws: a 30 px accent square. */
+.action-link-icon {
+	margin: 30px 0 0;
+	line-height: 30px;
+}
+.action-link-icon a {
+	display: inline-block;
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	border-radius: 4px;
+	background: var(--jm-red);
+	color: #ffffff;
+	text-align: center;
+	font-size: 0;
+	text-decoration: none;
+}
+.action-link-icon a::before {
+	content: "\f119";
+	font-family: "Ionicons";
+	font-size: 16px;
+}
+
+/* ---- Topbar ---- */
+.t3-topbar {
+	background: #1b3060;
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 13px;
+	line-height: 40px;
+	height: 40px;
+}
+.t3-topbar > .container {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 40px;
+}
+.t3-topbar .list-info {
+	display: flex;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.t3-topbar .topbar-left li {
+	padding: 0 25px;
+	border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+.t3-topbar .topbar-left li:first-child {
+	border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+.t3-topbar .topbar-left li::before {
+	font-family: "Ionicons";
+	margin-right: 6.25px;
+}
+.t3-topbar .jm-icon-pin::before {
+	content: "\f1e5";
+}
+.t3-topbar .jm-icon-call::before {
+	content: "\f13e";
+}
+.t3-topbar .wp-block-social-links {
+	gap: 0;
+	margin: 0;
+}
+.t3-topbar .wp-block-social-links .wp-social-link {
+	width: 40px;
+	height: 40px;
+	border-left: 1px solid rgba(255, 255, 255, 0.1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(255, 255, 255, 0.5);
+	background: none;
+}
+.t3-topbar .wp-block-social-links .wp-social-link a {
+	padding: 0;
+	color: inherit;
+}
+.t3-topbar .wp-block-social-links .wp-social-link svg {
+	width: 14px;
+	height: 14px;
+	fill: currentColor;
+}
+.jm-route-front-page .t3-topbar,
+.jm-route-home-style-3 .t3-topbar,
+.jm-route-home-style-4 .t3-topbar {
+	display: none;
+}
+
+/* ---- Header ---- */
+.t3-header {
+	background: var(--jm-bg);
+	height: 90px;
+	position: relative;
+	z-index: 50;
+}
+.t3-header > .container {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 90px;
+}
+.t3-header .logo {
+	margin: 0;
+	font-size: 24px;
+	line-height: 24px;
+	font-weight: 700;
+	letter-spacing: -1px;
+}
+.t3-header .logo a {
+	color: var(--jm-navy-fg);
+}
+.t3-header .logo strong {
+	color: var(--ja-accent);
+	font-weight: 700;
+}
+.t3-header .header-inner {
+	display: flex;
+	align-items: center;
+	height: 90px;
+}
+.t3-mainnav.wp-block-navigation {
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 25px;
+	gap: 0;
+}
+.t3-mainnav .wp-block-navigation__container {
+	gap: 0;
+}
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+	display: block;
+	padding: 32.5px 15px 32.5px 0;
+	margin-left: 30px;
+	color: var(--jm-heading);
+}
+.t3-mainnav .current-menu-item > .wp-block-navigation-item__content,
+.t3-mainnav .current-menu-ancestor > .wp-block-navigation-item__content,
+.t3-mainnav .wp-block-navigation-item__content:hover {
+	color: var(--ja-accent);
+}
+/* Escape closed the dropdown (assets/js/wp-ja-morgan.js): it stays closed until the pointer leaves. */
+.t3-mainnav .wp-block-navigation-submenu.jm-submenu-closed > .wp-block-navigation__submenu-container {
+	visibility: hidden !important;
+	opacity: 0 !important;
+}
+/* The source draws its caret inside the link's right padding (8 px caret, 2 px gap, 15 px pad). */
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-item__content {
+	padding-right: 29px;
+}
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+	position: absolute;
+	right: 15px;
+	top: 50%;
+	width: 12px;
+	margin: -6px 0 0;
+}
+.t3-mainnav .wp-block-navigation__submenu-container {
+	font-size: 15px;
+	font-weight: 400;
+	line-height: 23.4375px;
+	border: 1px solid light-dark(rgba(0, 0, 0, 0.15), #2a3247) !important;
+	border-radius: 0 0 4px 4px;
+	padding: 15px;
+	width: 200px;
+	min-width: 200px !important;
+	box-sizing: border-box;
+	/* The border is translucent over the page, as the source's Bootstrap dropdown draws it. */
+	background-color: var(--jm-card) !important;
+	background-clip: padding-box !important;
+	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.176);
+}
+:root[data-theme="dark"] .t3-mainnav .wp-block-navigation__submenu-container {
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation__submenu-container {
+	left: 0;
+}
+.t3-mainnav .wp-block-navigation__submenu-container .wp-block-navigation-item {
+	width: 100%;
+}
+.t3-mainnav .wp-block-navigation__submenu-container .wp-block-navigation-item__content.wp-block-navigation-item__content {
+	padding: 5px !important;
+	width: 100%;
+	box-sizing: border-box;
+	color: light-dark(#333333, #cdd4e0);
+}
+.t3-mainnav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content {
+	color: light-dark(var(--ja-accent), #cdd4e0);
+}
+.headright {
+	display: flex;
+	align-items: center;
+}
+.head-search.wp-block-search {
+	margin: 0 0 0 15px;
+}
+.head-search .wp-block-search__button {
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	background: none;
+	color: var(--jm-navy-fg);
+}
+.head-search .wp-block-search__button svg {
+	width: 22px;
+	height: 22px;
+	fill: currentColor;
+}
+.head-search .wp-block-search__input {
+	width: 120px;
+	min-width: 0;
+	font-size: 14px;
+	height: 30px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	background: var(--jm-bg);
+	color: var(--jm-text);
+}
+.theme-toggle {
+	width: 36px;
+	height: 40px;
+	margin-left: 6px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--jm-navy-fg);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+.theme-toggle__sun {
+	display: none;
+}
+:root[data-theme="dark"] .theme-toggle__moon {
+	display: none;
+}
+:root[data-theme="dark"] .theme-toggle__sun {
+	display: inline;
+}
+.off-canvas-toggle {
+	position: relative;
+	width: 30px;
+	height: 30px;
+	margin-left: 14px;
+	padding: 9px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: var(--ja-accent);
+	cursor: pointer;
+	display: inline-flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+.off-canvas-toggle span {
+	display: block;
+	height: 2px;
+	background: #ffffff;
+	border-radius: 1px;
+}
+
+/* ---- Off-canvas sidebar (the source's "Sidebar" panel with the Joomla Pages menu) ---- */
+.t3-off-canvas {
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 250px;
+	z-index: 1001;
+	overflow-y: auto;
+	background: var(--jm-bg);
+	transform: translateX(100%);
+	visibility: hidden;
+	transition: transform 0.3s ease, visibility 0s 0.3s;
+}
+html.jm-off-canvas-open .t3-off-canvas {
+	transform: none;
+	visibility: visible;
+	transition: transform 0.3s ease;
+}
+html.jm-off-canvas-open body::after {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	background: rgba(0, 0, 0, 0.2);
+}
+.t3-off-canvas-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 40px;
+	padding: 0 0 0 30px;
+	background: #1b3060;
+}
+.t3-off-canvas-header-title {
+	flex: 1;
+	letter-spacing: -0.6px;
+	font-size: 15px;
+	line-height: 40px;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: #ffffff;
+}
+.t3-off-canvas-header .close {
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: 0;
+	background: #192c58;
+	color: #ffffff;
+	font-family: inherit;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 40px;
+	text-shadow: 0 1px 0 #ffffff;
+	cursor: pointer;
+}
+.t3-off-canvas-body {
+	padding: 30px;
+}
+.t3-off-canvas-body .module-title {
+	font-size: 16px;
+	line-height: 23.328px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.6px;
+	margin: 0 0 12.5px;
+}
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item .wp-block-navigation-item__content {
+	display: block;
+	padding: 5px 20px 5px 0;
+	color: var(--jm-heading);
+	font-size: 15px;
+	font-weight: 400;
+	line-height: 23.4375px;
+}
+/* A group heading of the menu (a menu item with no link). */
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+	padding: 0;
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 25px;
+}
+.jm-off-canvas-nav .wp-block-navigation__container > .wp-block-navigation-item + .wp-block-navigation-item {
+	margin-top: 12.5px;
+}
+.jm-off-canvas-nav .wp-block-navigation__submenu-container {
+	position: static !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	width: auto !important;
+	height: auto !important;
+	border: 0 !important;
+	padding: 0 0 0 15px !important;
+	margin: 2px 0 0;
+	background: none !important;
+}
+.jm-off-canvas-nav .wp-block-navigation-submenu__toggle {
+	display: none;
+}
+
+/* ---- Sections (T3Section chrome: t3-section, padding-*, border-*, mod-bg-*) ---- */
+.jm-acm {
+	position: relative;
+	margin: 0;
+}
+.jm-acm > .container,
+.jm-acm .acm-hero-inner {
+	position: relative;
+	z-index: 1;
+}
+.t3-section.padding-top {
+	padding-top: 150px;
+}
+.t3-section.padding-bottom {
+	padding-bottom: 150px;
+}
+.t3-section.border-top {
+	border-top: 1px solid var(--jm-line);
+}
+.t3-section.border-bottom {
+	border-bottom: 1px solid var(--jm-line);
+}
+.mod-bg-white {
+	background-color: var(--jm-bg);
+}
+.mod-bg-gray {
+	background-color: var(--jm-gray);
+}
+.mod-bg-secondary {
+	background-color: #1b3060;
+	color: #ffffff;
+}
+.mod-bg-secondary :where(h1, h2, h3, h4, .lead) {
+	color: #ffffff;
+}
+.mod-bg-secondary .section-title .sub-heading {
+	color: #ffffff;
+}
+/* The T3Section background picture (a faint world map) sits behind the section content. */
+.jm-section-bg {
+	position: absolute;
+	inset: 0;
+	margin: 0 !important;
+	z-index: 0;
+	pointer-events: none;
+}
+.jm-section-bg img {
+	width: 100%;
+	height: 100%;
+	object-fit: none;
+	object-position: center top;
+}
+.jm-bg-left-bottom .jm-section-bg img {
+	object-position: left bottom;
+}
+.jm-bg-center-center .jm-section-bg img {
+	object-position: center center;
+}
+.section-title .sub-heading {
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 25px;
+	color: var(--jm-red);
+	margin: 0 0 25px;
+}
+.section-title h3 {
+	font-size: 36px;
+	font-weight: 400;
+	line-height: 45px;
+}
+.align-center > .section-title,
+.acm-features.style-2 > .section-title,
+.acm-testimonial.style-1 > .section-title {
+	max-width: 520px;
+	margin: 0 auto 60px;
+	text-align: center;
+}
+.home .acm-teams > .section-title h3 {
+	font-size: 48px;
+	font-weight: 700;
+	line-height: 60px;
+}
+.lead {
+	font-size: 18px;
+	line-height: 30px;
+	color: var(--jm-lead);
+}
+.mod-bg-secondary .lead {
+	color: light-dark(#ffffff, #f2f4f8);
+}
+
+/* ---- hero style-1 ---- */
+.acm-hero {
+	position: relative;
+	overflow: hidden;
+	color: #ffffff;
+}
+.acm-hero .ft-bg,
+.acm-hero .ft-bg-xs {
+	position: absolute;
+	inset: 0;
+	margin: 0 !important;
+	z-index: 0;
+}
+.acm-hero .ft-bg img,
+.acm-hero .ft-bg-xs img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 0 0; /* the source's background-position: 0% 0% */
+}
+.acm-hero .ft-bg-xs {
+	display: none;
+}
+.acm-hero > .container {
+	position: relative;
+	z-index: 1;
+}
+.acm-hero.hero-large {
+	padding: 200px 0 180px;
+}
+.acm-hero.hero-extra-large {
+	padding: 250px 0 230px;
+}
+.acm-hero.hero-normal {
+	padding: 125px 0;
+}
+.acm-hero .wrap-content {
+	max-width: 560px;
+}
+.acm-hero.align-center .wrap-content {
+	max-width: 760px;
+	margin-inline: auto;
+	text-align: center;
+}
+.acm-hero .sub-heading {
+	color: #ffffff;
+	font-weight: 500;
+	margin-bottom: 25px;
+}
+.acm-hero :where(h1, h2) {
+	font-size: 60px;
+	font-weight: 700;
+	line-height: 75px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+	margin: 0 0 30px;
+}
+.acm-hero .lead {
+	color: #ffffff;
+	padding-right: 60px;
+	margin: 0 0 60px;
+}
+.acm-hero.align-center .lead {
+	padding-right: 0;
+}
+.acm-hero .btn-action {
+	margin: 0;
+}
+.acm-hero.align-center .btn-action {
+	justify-content: center;
+}
+.acm-hero.mod-bg-secondary .jm-section-bg img {
+	object-fit: cover;
+}
+
+/* ---- slideshow style-owl ---- */
+.acm-slideshow {
+	position: relative;
+	overflow: hidden;
+}
+.acm-slideshow.tracy-motion-carousel {
+	overflow: hidden;
+}
+.acm-slideshow .tracy-motion-track {
+	display: flex;
+	flex-wrap: nowrap;
+}
+.acm-slideshow .slider-content {
+	position: relative;
+	flex: 0 0 100%;
+	box-sizing: border-box;
+	padding: 180px 0;
+	min-height: 770px;
+	margin: 0;
+}
+.acm-slideshow .slider-bg {
+	position: absolute;
+	inset: 0;
+	margin: 0 !important;
+}
+.acm-slideshow .slider-bg img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 0 0; /* the source's background-position: 0% 0% */
+}
+.acm-slideshow .slider-content > .container {
+	position: relative;
+	z-index: 1;
+}
+.acm-slideshow .slider-content-inner {
+	max-width: 480px;
+}
+.acm-slideshow .title {
+	font-size: 60px;
+	font-weight: 700;
+	line-height: 75px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+}
+.acm-slideshow .description {
+	margin: 50px 0 0;
+	font-size: 18px;
+	line-height: 30px;
+	color: rgba(255, 255, 255, 0.75);
+}
+.acm-slideshow .wp-block-buttons {
+	margin: 60px 0 0;
+}
+.jm-slide-tabs {
+	border-bottom: 1px solid var(--jm-line);
+	background: var(--jm-bg);
+}
+.jm-slide-tabs > .container {
+	display: flex;
+	width: 100%;
+	max-width: none;
+	padding: 0;
+}
+.jm-slide-tab {
+	flex: 1 1 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 90px;
+	margin: 0 6px !important;
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 31.25px;
+	color: var(--jm-heading);
+	cursor: pointer;
+	position: relative;
+	text-align: center;
+}
+.jm-slide-tab.is-current {
+	color: light-dark(#333333, #ffffff);
+}
+:root[data-theme="dark"] .jm-slide-tab:not(.is-current) {
+	color: #dfe4ec;
+}
+.jm-slide-tab.is-current::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: -1px;
+	height: 3px;
+	background: var(--ja-accent);
+}
+/* The library's own dots stand behind the titled tabs above (they step the same carousel). */
+.acm-slideshow > .tracy-motion-dots,
+.acm-slideshow .tracy-motion-dots {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+}
+
+/* ---- features-intro style-1 ---- */
+.acm-features.style-1 {
+	display: grid;
+	grid-template-columns: 4fr 8fr;
+	gap: 30px;
+}
+.acm-features.style-1 .acm-features-intro {
+	margin: 30px 0 25px;
+}
+.acm-feature-slide.tracy-motion-carousel {
+	overflow: hidden;
+	margin: 0 -15px;
+}
+.acm-feature-slide .tracy-motion-track {
+	display: flex;
+	flex-wrap: nowrap;
+}
+.acm-feature-slide .features-item {
+	flex: 0 0 50%;
+	box-sizing: border-box;
+	padding: 0 15px;
+	margin: 0;
+}
+.acm-feature-slide .features-img img {
+	display: block;
+	width: 100%;
+	height: 260px;
+	object-fit: cover;
+	border-radius: 4px;
+}
+.acm-feature-slide .features-img {
+	margin: 0 !important;
+}
+.acm-features :where(.features-item) h4 {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 30px;
+}
+.acm-feature-slide h4 {
+	margin: 25px 0 12.5px !important;
+}
+.acm-feature-slide p:not(.action-link-icon) {
+	padding-right: 30px;
+}
+.acm-feature-slide .action-link-icon {
+	margin-top: 0;
+}
+
+/* ---- features-intro style-2 ---- */
+.acm-features.style-2 .jm-cards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0 30px;
+}
+.acm-features.style-2 .jm-cards.acm-features-intro--cols-4 {
+	grid-template-columns: repeat(4, 1fr);
+}
+.acm-features.style-2 .features-item {
+	background: var(--jm-card);
+	padding: 60px 30px 30px;
+	margin: 0 0 30px;
+	border-radius: 4px;
+	text-align: center;
+}
+.style-normal .acm-features.style-2 .features-item {
+	background: none;
+}
+.align-left .acm-features.style-2 .features-item {
+	text-align: left;
+}
+.acm-features.style-2 .font-icon {
+	font-size: 60px;
+	line-height: 93.75px;
+	color: var(--jm-navy-fg);
+	margin: 0 0 25px;
+}
+.acm-features.style-2 .font-icon::before {
+	font-family: "Ionicons";
+}
+.hx-ico-ion-ios-crop::before {
+	content: "\f41e";
+}
+.hx-ico-ion-ios-color-wand::before {
+	content: "\f416";
+}
+.hx-ico-ion-ios-create::before {
+	content: "\f165";
+}
+.hx-ico-ion-ios-timer::before {
+	content: "\f4c1";
+}
+.hx-ico-ion-ios-speedometer::before {
+	content: "\f4b0";
+}
+.hx-ico-ion-ios-checkmark-circle-outline::before {
+	content: "\f149";
+}
+.acm-features.style-2 .img-icon {
+	margin: 0 0 25px !important;
+}
+.acm-features.style-2 .img-icon img {
+	width: 75px;
+	height: 75px;
+	display: inline-block;
+}
+.acm-features.style-2 .features-item h4 {
+	margin: 0 0 30px;
+}
+.acm-features.style-2 .link-action {
+	justify-content: center;
+	margin-top: 30px;
+}
+
+/* ---- features-intro style-3 (picture half, text half) ---- */
+.acm-features.style-3 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	min-height: 600px;
+}
+.content-left .acm-features.style-3 .features-image {
+	order: 2;
+}
+.acm-features.style-3 .features-image {
+	position: relative;
+	margin: 0 !important;
+	overflow: hidden;
+}
+.acm-features.style-3 .features-image img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.acm-features.style-3 .features-content {
+	box-sizing: border-box;
+	max-width: 615px;
+	padding: 120px 0 120px 180px;
+}
+.content-left .acm-features.style-3 .features-content {
+	margin-left: auto;
+	padding: 120px 180px 120px 0;
+}
+.acm-features.style-3 .lead {
+	margin: 30px 0 25px;
+}
+.acm-features.style-3 .list-check {
+	list-style: none;
+	margin: 0 0 25px;
+	padding: 0;
+}
+.acm-features.style-3 .list-check li {
+	display: flex;
+	align-items: center;
+	margin-top: 20px;
+	font-weight: 500;
+	line-height: 26.67px;
+	color: light-dark(#333333, #cdd4e0);
+}
+.acm-features.style-3 .list-check li::before {
+	content: "\f00c";
+	font-family: "FontAwesome";
+	font-size: 11px;
+	width: 20px;
+	height: 20px;
+	line-height: 20px;
+	margin-right: 15px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--jm-red);
+	color: #ffffff;
+	text-align: center;
+}
+.acm-features.style-3 .features-action {
+	margin-top: 35px;
+}
+.acm-accordion .panel {
+	background: var(--jm-card);
+	border-radius: 4px;
+	margin: 15px 0 0;
+}
+.acm-accordion .panel:first-child {
+	margin-top: 0;
+}
+.acm-accordion .panel summary {
+	position: relative;
+	list-style: none;
+	display: block;
+	height: 60px;
+	line-height: 60px;
+	padding: 0 60px 0 25px;
+	border-radius: 4px;
+	background: var(--jm-gray);
+	color: var(--jm-heading);
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.acm-accordion .panel summary::-webkit-details-marker {
+	display: none;
+}
+.acm-accordion .panel summary::after {
+	content: "\f067";
+	font-family: "FontAwesome";
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 60px;
+	text-align: center;
+	color: #999999;
+}
+.acm-accordion .panel[open] summary {
+	background: #1b3060;
+	color: #ffffff;
+	border-radius: 4px 4px 0 0;
+}
+.acm-accordion .panel[open] summary::after {
+	content: "\f068";
+	color: #ffffff;
+}
+.acm-accordion .panel-body {
+	margin: 0;
+	padding: 25px;
+	border: 1px solid var(--jm-line);
+	border-top: 0;
+	border-radius: 0 0 4px 4px;
+}
+/* The quick contact form of the source (JA Quick Contact): underlined fields on the navy band. */
+.jm-quick-contact {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 15px;
+	margin-top: 10px;
+}
+.jm-quick-contact .jm-field {
+	flex: 1 1 100%;
+	margin: 0 0 30px;
+}
+.jm-quick-contact .jm-field--half {
+	flex: 1 1 calc(50% - 15px);
+}
+.jm-quick-contact label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+}
+.jm-quick-contact :where(input, textarea) {
+	width: 100%;
+	box-sizing: border-box;
+	font-family: var(--jm-font);
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 36px;
+	color: #ffffff;
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+	padding: 0 10px 15px 0;
+}
+.jm-quick-contact :where(input, textarea)::placeholder {
+	color: rgba(255, 255, 255, 0.75);
+}
+.jm-quick-contact textarea {
+	min-height: 60px;
+	line-height: 25px;
+	padding-top: 10px;
+}
+.jm-quick-contact .btn {
+	font-weight: 700;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+/* ---- teams style-1 ---- */
+.acm-teams .jm-cards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 30px;
+}
+.acm-teams .jm-cards.acm-teams--cols-4 {
+	grid-template-columns: repeat(4, 1fr);
+}
+.acm-teams .teams-item {
+	background: var(--jm-card);
+	border-radius: 4px;
+	overflow: hidden;
+	text-align: center;
+	box-shadow: 0 5px 30px rgba(0, 0, 0, 0.05);
+}
+.acm-teams .avatar {
+	margin: 0 !important;
+}
+.acm-teams .avatar img {
+	display: block;
+	width: 100%;
+	border-radius: 4px 4px 0 0;
+}
+.acm-teams--cols-3 .avatar img {
+	height: 482px;
+	object-fit: cover;
+	object-position: top;
+}
+.acm-teams .member-info {
+	padding: 25px;
+}
+.acm-teams .member-info h4 {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 30px;
+	margin: 0 0 12.5px;
+}
+.home .acm-teams .member-info h4 {
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 24px;
+	text-transform: uppercase;
+	margin: 0;
+}
+.acm-teams .position {
+	font-size: 13px;
+	line-height: 20.3px;
+	color: var(--jm-soft);
+	margin: 0;
+}
+.acm-teams .action-link-icon {
+	display: none;
+}
+.acm-teams .teams-action {
+	justify-content: center;
+	margin-top: 60px;
+}
+.acm-teams .teams-action .wp-block-button__link {
+	font-size: 18px;
+	line-height: 20.34px;
+	padding: 30px 75px;
+}
+.jm-link-warning .teams-action .wp-block-button__link {
+	background: #ffbb22;
+	border-color: #ffbb22;
+}
+
+/* ---- testimonials style-1 (case study cards) ---- */
+/* The module runs full width (container-fluid) and the tmpl draws its own container inside. */
+.acm-testimonial.style-1 {
+	box-sizing: border-box;
+	max-width: 100%;
+	margin-inline: auto;
+	padding-inline: var(--jm-gutter);
+	overflow: hidden;
+}
+@media (min-width: 768px) {
+	.acm-testimonial.style-1 {
+		width: 750px;
+	}
+}
+@media (min-width: 992px) {
+	.acm-testimonial.style-1 {
+		width: 970px;
+	}
+}
+@media (min-width: 1200px) {
+	.acm-testimonial.style-1 {
+		width: 1260px;
+	}
+}
+.acm-testimonial.style-1 .testimonial-content {
+	overflow: hidden;
+	margin: 0 -15px;
+}
+.acm-testimonial.style-1 .tracy-motion-track {
+	display: flex;
+	flex-wrap: nowrap;
+}
+.acm-testimonial.style-1 .testimonial-item {
+	flex: 0 0 33.3333%;
+	box-sizing: border-box;
+	padding: 0 15px;
+	text-align: center;
+	margin: 0;
+}
+.acm-testimonial.style-1 .testimonial-img {
+	position: relative;
+	margin-bottom: 30px;
+}
+.acm-testimonial.style-1 .testimonial-img figure {
+	margin: 0;
+}
+.acm-testimonial.style-1 .testimonial-img img {
+	display: block;
+	width: 100%;
+	height: 260px;
+	object-fit: cover;
+}
+.acm-testimonial.style-1 .label-highlight {
+	position: absolute;
+	left: 50%;
+	bottom: -15px;
+	transform: translateX(-50%);
+	max-width: 90%;
+	margin: 0;
+	padding: 0 15px;
+	border-radius: 4px;
+	background: #1b3060;
+	color: #ffffff;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 30px;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+.acm-testimonial.style-1 h4 {
+	font-size: 20px;
+	line-height: 30px;
+	margin: 0 45px 12.5px;
+}
+.acm-testimonial.style-1 p:not(.action-link-icon, .label-highlight) {
+	margin: 0 45px 25px;
+}
+.acm-testimonial.style-1 .link-action {
+	justify-content: center;
+	margin-top: 60px;
+}
+
+/* ---- carousel dots (motion library) ---- */
+.tracy-motion-dots {
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+	margin-top: 60px;
+}
+.tracy-motion-dots button {
+	width: 12px;
+	height: 12px;
+	padding: 0;
+	border: 2px solid var(--jm-line);
+	border-radius: 50%;
+	background: transparent;
+	cursor: pointer;
+}
+.tracy-motion-dots button[aria-current="true"] {
+	border-color: var(--ja-accent);
+}
+
+/* ---- testimonials style-2 (the quote over the footer) ---- */
+.t3-section-footer.jm-acm {
+	background: var(--jm-footer);
+	color: #888888;
+}
+.t3-section-footer > .container {
+	padding-top: 150px;
+	padding-bottom: 60px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.acm-testimonial.style-2 {
+	overflow: hidden;
+}
+.acm-testimonial.style-2 .tracy-motion-track {
+	display: flex;
+	flex-wrap: nowrap;
+}
+.acm-testimonial.style-2 .testimonial-item {
+	flex: 0 0 100%;
+	display: flex;
+	gap: 30px;
+	margin: 0;
+}
+.acm-testimonial.style-2 .testimonial-avatar {
+	margin: 0 !important;
+	flex: none;
+}
+.acm-testimonial.style-2 .testimonial-avatar img {
+	width: 180px;
+	height: 180px;
+	object-fit: cover;
+	border-radius: 50%;
+}
+.acm-testimonial.style-2 .testimonial-content-wrap {
+	max-width: 615px;
+	padding-top: 9px;
+}
+.acm-testimonial.style-2 .testimonial-content {
+	font-size: 24px;
+	line-height: 37.5px;
+	color: #ffffff;
+	margin: 0 0 30px;
+}
+.acm-testimonial.style-2 .testimonial-detail {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 31.25px;
+	color: #ffffff;
+	margin: 0;
+}
+.acm-testimonial.style-2 .testimonial-role {
+	display: block;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 20.3px;
+	color: #ffffff;
+	margin: 6.25px 0 0;
+}
+.acm-testimonial.style-2 .tracy-motion-dots {
+	justify-content: flex-start;
+	margin: 30px 0 0 210px;
+}
+
+/* ---- clients style-1 ---- */
+.acm-cliens.style-1 {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+}
+.acm-cliens .client-item {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 200px;
+	margin: 0;
+}
+.acm-cliens .client-img {
+	margin: 0 !important;
+}
+.acm-cliens .client-img img {
+	width: 152px;
+	height: 152px;
+	object-fit: contain;
+}
+.jm-opacity-30 .client-img img {
+	opacity: 0.3;
+	transition: opacity 0.3s;
+}
+.jm-opacity-30 .client-item:hover .client-img img {
+	opacity: 1;
+}
+
+/* ---- Footer ---- */
+.t3-footer {
+	background: var(--jm-footer);
+	color: #888888;
+}
+.t3-spotlight {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 30px;
+	padding-top: 150px; /* measured on the source: 150 px, plus 12.5 px above each module */
+}
+.t3-footnav .jm-foot-col {
+	margin-top: 12.5px;
+}
+.t3-footnav .module-title {
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 23.33px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+	margin: 0 0 12.5px;
+}
+.t3-footnav .wp-block-navigation {
+	gap: 0;
+}
+.t3-footnav .wp-block-navigation-item__content {
+	display: block;
+	font-size: 16px;
+	line-height: 30px;
+	color: #888888;
+}
+.t3-footnav .wp-block-navigation-item__content:hover {
+	color: #ffffff;
+}
+.social-follow.wp-block-social-links {
+	gap: 5px;
+	margin: 0;
+}
+.social-follow .wp-social-link {
+	width: 30px;
+	height: 30px;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.social-follow .wp-social-link a {
+	padding: 0;
+}
+.social-follow .wp-social-link svg {
+	width: 13px;
+	height: 13px;
+}
+.social-follow .wp-social-link-facebook {
+	background: #3b5999;
+}
+.social-follow .wp-social-link-x {
+	background: #55acee;
+}
+.social-follow .wp-social-link-instagram {
+	background: #e4405f;
+}
+.t3-copyright {
+	font-size: 13px;
+	line-height: 20.3px;
+	color: #777777;
+	padding: 50px 0 150px;
+}
+.t3-copyright small {
+	display: block;
+	font-size: 13px;
+	margin-bottom: 5px;
+}
+.t3-copyright .copyright {
+	margin: 0;
+}
+.t3-copyright a {
+	color: #888888;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ---- Masthead (mod_jamasthead): the page's picture behind its title, darkened 58 % ---- */
+.ja-masthead.wp-block-cover {
+	min-height: 0;
+	padding: 120px 0;
+	margin: 0;
+	align-items: stretch;
+}
+.ja-masthead.wp-block-cover .wp-block-cover__background {
+	opacity: 0.58;
+	background: #000000;
+}
+.ja-masthead .wp-block-cover__inner-container {
+	width: 100%;
+	color: #ffffff;
+}
+.ja-masthead-detail {
+	position: relative;
+	z-index: 2;
+	max-width: 500px;
+	margin-inline: auto;
+	color: #ffffff;
+}
+.ja-masthead-title.wp-block-post-title,
+.ja-masthead .ja-masthead-title {
+	font-size: 60px;
+	font-weight: 600;
+	line-height: 90px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+	margin: 0 0 12.5px;
+}
+.ja-masthead-description {
+	margin: 25px 0 0;
+	font-size: 20px;
+	line-height: 31.25px;
+	color: #ffffff;
+}
+.ja-masthead-description p {
+	margin: 0;
+}
+/* The article's masthead: its full-text picture (inc/extra.php) behind category, title and meta. */
+.jm-article-masthead {
+	position: relative;
+	padding: 120px 0;
+	background-size: cover;
+	background-position: 0 0;
+	background-color: #1b3060;
+}
+.jm-article-masthead::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.58);
+}
+.jm-article-masthead > .container {
+	position: relative;
+	z-index: 1;
+}
+.jm-article-masthead .ja-masthead-detail {
+	max-width: 800px;
+	margin: 0;
+}
+.jm-article-masthead .ja-masthead-title {
+	line-height: 75px;
+}
+.category-name a {
+	display: inline-block;
+	padding: 6.5px 15px;
+	border-radius: 4px;
+	background: #1b3060;
+	color: #ffffff;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 17.19px;
+	text-transform: uppercase;
+}
+.jm-article-masthead .category-name {
+	margin: 0 0 25px;
+}
+.article-info {
+	gap: 0 10px;
+	font-size: 12px;
+	line-height: 18.75px;
+	color: #999999;
+}
+.jm-article-masthead .article-info {
+	font-size: 14px;
+	line-height: 21.875px;
+	color: #f2f3f7;
+	margin: 50px 0 25px;
+}
+.article-info .createdby::before,
+.article-info .published::before {
+	font-family: "FontAwesome";
+	margin-right: 4px;
+}
+.article-info .createdby::before {
+	content: "\f007";
+}
+.article-info .published::before {
+	content: "\f073";
+}
+
+/* ---- Main body with the sidebar (col-md-9 / col-md-3 of the source) ---- */
+.t3-mainbody {
+	padding-top: 75px;
+	padding-bottom: 75px;
+}
+.jm-with-sidebar > .t3-content {
+	min-width: 0;
+}
+/* From 992 px the source lays the content (col-md-9) and the sidebar (col-md-3) in a row with 30 px
+   gutters: the row is the container plus one gutter, the columns 75% and 25% of it. */
+@media (min-width: 992px) {
+	.container.jm-with-sidebar {
+		display: grid;
+		grid-template-columns: 75% 25%;
+		align-items: stretch;
+		width: 1000px;
+		padding-inline: 0;
+	}
+	.jm-with-sidebar > .t3-content {
+		padding-inline: 30px;
+	}
+	.jm-with-sidebar > .jm-sidebar-part,
+	.jm-with-sidebar > .t3-sidebar {
+		margin: 0;
+		padding: 0 30px;
+		box-sizing: border-box;
+		border-left: 1px solid var(--jm-line);
+	}
+}
+@media (min-width: 1200px) {
+	.container.jm-with-sidebar {
+		width: 1290px;
+	}
+}
+.item-page p {
+	margin: 0 0 25px;
+}
+.item-page h3 {
+	font-size: 24px;
+	line-height: 35px;
+	margin: 25px 0 12.5px;
+}
+.item-page .wp-block-image,
+.item-page figure {
+	margin: 12.5px 0;
+}
+.item-page img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 4px;
+}
+/* Bootstrap rows in an article: one column below 992 px, equal columns from there. */
+.item-page .row {
+	display: flex;
+	flex-wrap: wrap;
+	margin-inline: -15px;
+}
+.item-page .row > [class*="col-"] {
+	box-sizing: border-box;
+	width: 100%;
+	padding-inline: 15px;
+}
+@media (min-width: 992px) {
+	.item-page .row > .col-md-4 {
+		width: 33.33333333%;
+	}
+	.item-page .row > .col-md-6 {
+		width: 50%;
+	}
+}
+.tags.wp-block-post-terms {
+	margin: 0 0 18.75px;
+}
+.tags a {
+	display: inline-block;
+	padding: 2.4px 7.2px 3.6px;
+	margin-right: 5px;
+	border-radius: 3px;
+	background: var(--jm-gray);
+	color: var(--jm-text);
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 12px;
+}
+.tags .wp-block-post-terms__separator {
+	display: none;
+}
+.pagenav {
+	gap: 3.9px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 13.56px;
+}
+.pagenav .wp-block-post-navigation-link a {
+	display: inline-block;
+	box-sizing: border-box;
+	padding: 5px 10px;
+	border: 1px solid light-dark(transparent, #2a3247);
+	border-radius: 4px;
+	background: light-dark(transparent, #20283c);
+	color: light-dark(var(--jm-red), #cdd4e0);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 13.56px;
+	text-decoration: none;
+}
+.pagenav .previous a::before,
+.pagenav .next a::after {
+	display: inline-block;
+	width: 12px;
+	font-family: "FontAwesome";
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1;
+	text-align: center;
+	vertical-align: top;
+}
+.pagenav .previous a::before {
+	content: "\f053";
+	margin-right: 4.8px;
+}
+.pagenav .next a::after {
+	content: "\f054";
+	margin-left: 4.8px;
+}
+
+/* ---- Sidebar modules ---- */
+.t3-sidebar .t3-module {
+	margin: 0 0 30px;
+}
+.t3-sidebar .module-title {
+	font-size: 18px;
+	font-weight: 500;
+	line-height: 26.24px;
+	letter-spacing: -0.6px;
+	color: light-dark(var(--jm-red), #f2f4f8);
+	margin: 0 0 15px;
+}
+.jm-login .login-username label,
+.jm-login .login-password label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+}
+.jm-login form p {
+	margin: 0 0 15px;
+}
+.jm-login input[type="text"],
+.jm-login input[type="password"] {
+	box-sizing: border-box;
+	width: 100%;
+	height: 60px;
+	padding: 20px 30px 20px 90px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	background: var(--jm-card) no-repeat;
+	font-family: var(--jm-font);
+	font-size: 16px;
+	color: #555555;
+}
+.jm-login .login-username,
+.jm-login .login-password {
+	position: relative;
+}
+.jm-login .login-username::before,
+.jm-login .login-password::before {
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: 1;
+	width: 60px;
+	height: 60px;
+	line-height: 60px;
+	text-align: center;
+	border-radius: 4px 0 0 4px;
+	background: #eeeeee;
+	color: #555555;
+	font-family: "FontAwesome";
+}
+.jm-login .login-username::before {
+	content: "\f007";
+}
+.jm-login .login-password::before {
+	content: "\f023";
+}
+.jm-login .login-remember {
+	margin-bottom: 25px;
+}
+.jm-login .login-submit input,
+.jm-login .button-primary {
+	font-family: var(--jm-font);
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 18.08px;
+	padding: 20px 30px;
+	border: 1px solid var(--jm-red);
+	border-radius: 4px;
+	background: var(--jm-red);
+	color: #ffffff;
+	cursor: pointer;
+}
+.jm-login .unstyled {
+	margin: 20px 0 0;
+	padding-left: 25px;
+	font-size: 15px;
+	line-height: 23.44px;
+}
+.jm-login .unstyled a {
+	color: var(--jm-text);
+}
+.mostread.wp-block-latest-posts {
+	padding: 0;
+	margin: 0;
+}
+.mostread.wp-block-latest-posts li {
+	margin: 0 0 25px;
+}
+.mostread .wp-block-latest-posts__featured-image {
+	margin: 0 0 15px;
+}
+.mostread .wp-block-latest-posts__featured-image img {
+	width: 100%;
+	height: auto;
+	aspect-ratio: 3 / 2;
+	object-fit: cover;
+	border-radius: 4px;
+}
+.mostread .wp-block-latest-posts__post-title {
+	font-size: 15px;
+	font-weight: 500;
+	line-height: 23.44px;
+	color: var(--jm-heading);
+}
+.categories-module.wp-block-categories {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.categories-module li {
+	padding: 10px 0;
+	line-height: 24px;
+	color: var(--jm-text);
+}
+.categories-module li::before {
+	content: "\f07b";
+	font-family: "FontAwesome";
+	margin-right: 8px;
+	color: #999999;
+}
+.categories-module li a {
+	color: var(--jm-text);
+}
+.tagspopular.wp-block-tag-cloud {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0;
+}
+.tagspopular.wp-block-tag-cloud a {
+	margin: 0;
+	padding: 5px 10px;
+	border-radius: 4px;
+	background: var(--jm-gray);
+	color: var(--jm-text);
+	font-size: 14px !important;
+	font-weight: 500;
+	line-height: 14px;
+}
+
+/* ---- Category blog cards (patterns/cards.php) ---- */
+.blog .tracy-grid.items-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 30px;
+	padding: 0;
+	margin: 0;
+}
+.blog .item.tracy-card {
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	height: 100%;
+	padding: 30px 30px 60px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	background: none;
+	box-shadow: none;
+}
+.blog .item-image {
+	margin: -30px -30px 30px !important;
+}
+.blog .item-image img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 4px 4px 0 0;
+}
+.blog .category-name {
+	margin: -45px 0 25px;
+	position: relative;
+}
+.blog .article-title {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 30px;
+	letter-spacing: -0.6px;
+	margin: 0 0 25px;
+}
+.blog .article-title a {
+	color: var(--jm-heading);
+}
+.blog .article-intro {
+	margin: 0;
+}
+.blog .article-intro p {
+	margin: 0 0 25px;
+}
+.blog .article-info {
+	margin: 0 0 25px;
+}
+.blog .readmore.wp-block-read-more {
+	display: inline-block;
+	align-self: flex-start;
+	width: 30px;
+	height: 30px;
+	overflow: hidden;
+	border-radius: 4px;
+	background: var(--jm-red);
+	color: #ffffff;
+	font-size: 0;
+	line-height: 30px;
+	text-align: center;
+}
+.blog .readmore.wp-block-read-more::before {
+	content: "\f119";
+	font-family: "Ionicons";
+	font-size: 16px;
+}
+.blog .pagination.wp-block-query-pagination {
+	margin-top: 30px;
+	gap: 6.25px;
+	align-items: center;
+}
+.blog .pagination .page-numbers,
+.blog .pagination a {
+	display: inline-block;
+	padding: 12.5px 25px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 25px;
+	color: var(--jm-heading);
+}
+.blog .pagination .page-numbers.current {
+	background: var(--jm-red);
+	border-color: var(--jm-red);
+	color: #ffffff;
+}
+
+/* ---- The not-found page (the source's error.php, in the site frame) ---- */
+.jm-404 .jm-error.wp-block-cover {
+	padding: 30px;
+	min-height: 100vh;
+	margin: 0;
+	text-align: center;
+}
+.jm-error .error-code {
+	font-size: 300px;
+	line-height: 1;
+	font-weight: 400;
+	color: #ffffff;
+	margin: 0 0 36px;
+}
+.jm-error .error-message {
+	font-size: 48px;
+	font-weight: 700;
+	line-height: 60px;
+	color: #ffffff;
+	margin: 0 0 25px;
+}
+.jm-error .error-text {
+	color: rgba(255, 255, 255, 0.5);
+	margin: 0 0 30px;
+}
+.jm-error .error-actions {
+	justify-content: center;
+}
+
+/* ---- Below the desktop width ---- */
+@media (max-width: 1199px) {
+	.acm-features.style-3 .features-content,
+	.content-left .acm-features.style-3 .features-content {
+		padding: 90px 60px;
+	}
+}
+@media (max-width: 991px) {
+	.t3-spotlight {
+		grid-template-columns: repeat(3, 1fr);
+	}
+	.acm-teams .jm-cards,
+	.acm-teams .jm-cards.acm-teams--cols-4,
+	.acm-features.style-2 .jm-cards,
+	.acm-features.style-2 .jm-cards.acm-features-intro--cols-4 {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	.acm-testimonial.style-1 .testimonial-item {
+		flex-basis: 50%;
+	}
+	.acm-features.style-1 {
+		grid-template-columns: 1fr;
+	}
+	.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+		margin-left: 0;
+	}
+}
+@media (max-width: 767px) {
+	.t3-topbar .topbar-left {
+		display: none;
+	}
+	.t3-topbar > .container {
+		justify-content: flex-end;
+	}
+	.t3-header,
+	.t3-header > .container,
+	.t3-header .header-inner {
+		height: 63px;
+	}
+	.hidden-xs {
+		display: none !important;
+	}
+	.t3-spotlight {
+		grid-template-columns: 1fr;
+	}
+	.t3-section.padding-top {
+		padding-top: 60px;
+	}
+	.t3-section.padding-bottom {
+		padding-bottom: 60px;
+	}
+	.acm-hero.hero-large,
+	.acm-hero.hero-extra-large {
+		padding: 120px 0;
+	}
+	.acm-hero.hero-normal {
+		padding: 60px 0;
+	}
+	/* The source swaps to the small picture only where one is set (home-style-2's hero sets none). */
+	.acm-hero:has(.ft-bg-xs img) .ft-bg {
+		display: none;
+	}
+	.acm-hero .ft-bg-xs:has(img) {
+		display: block;
+	}
+	.acm-hero :where(h1, h2),
+	.acm-slideshow .title {
+		font-size: 28px;
+		line-height: 35px;
+	}
+	.acm-slideshow .title {
+		font-size: 36px;
+		line-height: 45px;
+	}
+	.acm-hero .lead {
+		padding-right: 0;
+		margin-bottom: 30px;
+	}
+	.acm-slideshow .slider-content {
+		padding: 60px 0;
+		min-height: 440px;
+	}
+	.acm-slideshow .description {
+		margin-top: 30px;
+	}
+	.acm-slideshow .wp-block-buttons {
+		margin-top: 30px;
+	}
+	.jm-slide-tabs {
+		display: none;
+	}
+	.acm-slideshow .tracy-motion-dots {
+		position: absolute !important;
+		width: auto;
+		height: auto;
+		overflow: visible;
+		clip: auto;
+		left: 0;
+		right: 0;
+		bottom: 20px;
+		margin: 0;
+	}
+	.section-title h3 {
+		font-size: 28px;
+		line-height: 35px;
+	}
+	.home .acm-teams > .section-title h3 {
+		font-size: 24px;
+		line-height: 30px;
+	}
+	.acm-testimonial.style-2 .testimonial-content {
+		font-size: 20px;
+		line-height: 31.25px;
+	}
+	.align-center > .section-title,
+	.acm-features.style-2 > .section-title,
+	.acm-testimonial.style-1 > .section-title {
+		margin-bottom: 30px;
+	}
+	.acm-teams .jm-cards,
+	.acm-teams .jm-cards.acm-teams--cols-4,
+	.acm-features.style-2 .jm-cards,
+	.acm-features.style-2 .jm-cards.acm-features-intro--cols-4 {
+		grid-template-columns: 1fr;
+	}
+	.acm-feature-slide .features-item,
+	.acm-testimonial.style-1 .testimonial-item {
+		flex-basis: 100%;
+	}
+	.acm-features.style-3 {
+		grid-template-columns: 1fr;
+		min-height: 0;
+	}
+	.acm-features.style-3 .features-image {
+		order: 0 !important;
+		min-height: 300px;
+	}
+	.acm-features.style-3 .features-content,
+	.content-left .acm-features.style-3 .features-content {
+		max-width: none;
+		padding: 60px 15px;
+	}
+	.acm-teams--cols-3 .avatar img {
+		height: auto;
+	}
+	.acm-cliens.style-1 {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	.acm-testimonial.style-2 .testimonial-item {
+		flex-direction: column;
+	}
+	.acm-testimonial.style-2 .tracy-motion-dots {
+		margin-left: 0;
+	}
+	.ja-masthead.wp-block-cover,
+	.jm-article-masthead {
+		padding: 60px 0;
+	}
+	.ja-masthead-title.wp-block-post-title,
+	.ja-masthead .ja-masthead-title {
+		font-size: 36px;
+		line-height: 45px;
+	}
+	.ja-masthead-detail {
+		max-width: none;
+	}
+	.t3-mainbody {
+		padding-top: 45px;
+		padding-bottom: 45px;
+	}
+	.jm-with-sidebar {
+		grid-template-columns: 1fr;
+	}
+	.jm-with-sidebar > .t3-content {
+		padding-right: 0;
+	}
+	.jm-with-sidebar > .jm-sidebar-part,
+	.jm-with-sidebar > .t3-sidebar {
+		padding-left: 0;
+		border-left: 0;
+		margin-top: 45px;
+	}
+	.blog .tracy-grid.items-row {
+		grid-template-columns: 1fr;
+	}
+	.jm-error .error-code {
+		font-size: 150px;
+	}
+	.t3-section-footer > .container {
+		padding-top: 60px;
+	}
+	.t3-copyright {
+		padding-bottom: 60px;
+	}
+}
+
+/* ---- Dark mode: the surfaces the source repaints under html[data-theme="dark"] ---- */
+:root[data-theme="dark"] .t3-header {
+	background: #0f1320;
+}
+:root[data-theme="dark"] .acm-accordion .panel[open] summary {
+	background: #1b3060;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme]) .t3-header {
+		background: #0f1320;
+	}
+}
+
+/* Core grows a social icon on hover; the source's icons do not move. */
+.wp-block-social-links .wp-social-link:hover {
+	transform: none;
+}
+/* The off-canvas panel in dark: its own surface, quieter group headings than links (measured). */
+.t3-off-canvas {
+	background: light-dark(var(--jm-bg), #141927);
+}
+.t3-off-canvas-header {
+	background: light-dark(#1b3060, #0c1019);
+}
+.t3-off-canvas-header .close {
+	color: light-dark(#ffffff, #cdd4e0);
+}
+.t3-off-canvas-body .module-title,
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
+.t3-off-canvas .jm-off-canvas-nav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
+	color: light-dark(var(--jm-heading), #a7b0c2);
+}
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item .wp-block-navigation-item__content,
+.t3-off-canvas .jm-off-canvas-nav .wp-block-navigation-item__label {
+	color: light-dark(var(--jm-heading), #cdd4e0);
+}
+
+/* The listing's category chip uses the page font (the base theme sets its eyebrow in mono). */
+.blog .category-name.tracy-eyebrow,
+.blog .category-name.tracy-eyebrow a {
+	font-family: var(--jm-font);
+	letter-spacing: normal;
+}
+/* The card closes on its arrow button; the excerpt's own "Read more" link is not drawn. */
+.blog .article-intro .wp-block-post-excerpt__more-text {
+	display: none;
+}
+/* Pagination as the source's Joomla pager: page boxes, the current one filled; no first/prev arrows
+   when there is nothing before. */
+.blog .pagination .wp-block-query-pagination-numbers {
+	display: flex;
+	gap: 6.25px;
+}
+.blog .pagination .page-numbers.dots {
+	border: 0;
+}
+.blog .pagination .wp-block-query-pagination-previous:empty,
+.blog .pagination .tracy-pager-disabled,
+.blog .pagination [aria-disabled="true"] {
+	display: none;
+}
+/* Social icons: a centred white glyph in a coloured square. */
+.wp-block-social-links .wp-social-link a {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+}
+.social-follow .wp-social-link a {
+	color: #ffffff;
+	fill: #ffffff;
+}
+/* The seeder's Joomla pager (tracy-pager): boxes as the source's, the current page filled, the
+   disabled steps not drawn, the page counter boxed on the right. */
+.blog .tracy-joomla-pager {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-top: 30px;
+}
+.tracy-joomla-pager .tracy-pager__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6.25px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.tracy-joomla-pager .tracy-pager__item.is-disabled {
+	display: none;
+}
+.tracy-joomla-pager .tracy-pager__link {
+	display: block;
+	padding: 12.5px 25px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 25px;
+	color: var(--jm-heading);
+}
+.tracy-joomla-pager .is-current .tracy-pager__link {
+	background: var(--jm-red);
+	border-color: var(--jm-red);
+	color: #ffffff;
+}
+.tracy-joomla-pager .tracy-pager__counter {
+	margin: 0;
+	padding: 12.5px 25px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	line-height: 25px;
+}
+
+/* ---- Fast Gate round 1 (measured deltas against the source, light and dark) ---- */
+.blog .article-intro,
+.blog .article-intro p,
+.blog .tracy-card__text {
+	font-size: 16px;
+	line-height: 25px;
+	color: var(--jm-text);
+}
+.blog .item .category-name a,
+.jm-article-masthead .category-name a {
+	display: inline-block;
+	padding: 6.5px 15px;
+	border-radius: 4px;
+	background: #1b3060;
+	color: light-dark(#ffffff, #f2f4f8);
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 17.19px;
+	text-transform: uppercase;
+}
+.jm-login .unstyled li,
+.jm-login .unstyled a {
+	color: #777777;
+}
+.mostread .wp-block-post-template {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.mostread .wp-block-post-template > li {
+	margin: 0 0 25px;
+}
+.mostread .mostread-image {
+	margin: 0 0 15px;
+}
+.mostread .mostread-image img {
+	width: 100%;
+	height: auto;
+	aspect-ratio: 3 / 2;
+	object-fit: cover;
+	border-radius: 4px;
+}
+.mostread .mostread-title {
+	font-size: 15px;
+	font-weight: 500;
+	line-height: 23.44px;
+	letter-spacing: normal;
+	margin: 0;
+}
+.mostread .mostread-title a {
+	color: light-dark(#333333, #e6e9ef);
+}
+.categories-module li,
+.categories-module li a {
+	color: light-dark(#777777, #cdd4e0);
+}
+.tagspopular.wp-block-tag-cloud a,
+.tags a {
+	color: light-dark(#777777, #cdd4e0);
+	background: light-dark(#f2f3f7, #20283c);
+}
+.jm-error .error-message {
+	font-size: 50px;
+	letter-spacing: normal;
+	line-height: 83.5px;
+	margin: 0 0 10px;
+	color: light-dark(#ffffff, #f2f4f8);
+}
+.jm-error .error-text {
+	font-size: 18px;
+	line-height: 30.06px;
+	color: light-dark(#888888, #a7b0c2);
+}
+.jm-error .error-actions .wp-block-button__link::after {
+	margin-left: 7.05px;
+	line-height: 1;
+}
+.jm-error .error-actions .wp-block-button__link {
+	display: block;
+	border: 0;
+	padding: 20px 40px;
+	line-height: 18.4px;
+	color: light-dark(#ffffff, #e0463f);
+}
+@media (max-width: 767px) {
+	.ja-masthead-description {
+		font-size: 16px;
+		line-height: 25px;
+	}
+	.jm-error .error-code {
+		margin-bottom: 48px;
+	}
+	.jm-error .error-message {
+		font-size: 30px;
+		line-height: 50.1px;
+	}
+	.jm-error .error-actions .wp-block-button__link {
+		padding: 16px 32px;
+	}
+	.jm-error .error-actions {
+		margin-bottom: 28px;
+	}
+	.jm-error .error-text {
+		font-size: 16px;
+		line-height: 26.72px;
+	}
+}
+
+/* The popular tags as the source lists them (one list item a tag), and the masthead picture
+   anchored top-left as the source's background (background-position 0% 0%). */
+ul.tagspopular.wp-block-tag-cloud {
+	list-style: none;
+	padding: 0;
+}
+ul.tagspopular li {
+	margin: 0;
+}
+.ja-masthead .wp-block-cover__image-background {
+	object-position: 0 0;
+}
+
+/* ---- Navigation below 992 px (the source's collapse point) ---- */
+/* The off-canvas menu is a plain vertical list: WordPress's flex items would put a heading and its
+   children side by side. */
+.jm-off-canvas-nav.wp-block-navigation,
+.jm-off-canvas-nav .wp-block-navigation__container,
+.jm-off-canvas-nav .wp-block-navigation-item {
+	display: block;
+}
+.jm-off-canvas-nav .wp-block-navigation__container {
+	gap: 0;
+}
+@media (max-width: 991px) {
+	.t3-header,
+	.t3-header > .container,
+	.t3-header .header-inner {
+		height: 63px;
+	}
+	.t3-header .header-inner,
+	.t3-mainnav.wp-block-navigation {
+		position: static;
+	}
+	.head-search {
+		display: none;
+	}
+	/* The source orders the header controls theme toggle, sidebar, menu; the menu button is last. */
+	.t3-mainnav.wp-block-navigation {
+		order: 3;
+		gap: 0;
+	}
+	.headright {
+		order: 2;
+	}
+	.off-canvas-toggle {
+		margin-left: 29px;
+	}
+	/* WordPress collapses the menu below 600 px; the source collapses it below 992 px. */
+	.t3-mainnav .wp-block-navigation__responsive-container:not(.is-menu-open) {
+		display: none;
+	}
+	.t3-mainnav .wp-block-navigation__responsive-container-open,
+	.t3-mainnav .wp-block-navigation__responsive-container-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		margin: 0 0 0 15px;
+		padding: 0;
+		border: 0;
+		border-radius: 4px;
+		background: var(--ja-accent);
+		color: #ffffff;
+	}
+	.t3-mainnav .wp-block-navigation__responsive-container-open svg,
+	.t3-mainnav .wp-block-navigation__responsive-container-close svg {
+		width: 16px;
+		height: 16px;
+		fill: currentColor;
+	}
+	/* The source's button keeps its bars while the menu is open; the close button draws the same
+	   glyph, not a cross. */
+	.t3-mainnav .wp-block-navigation__responsive-container-close svg {
+		display: none;
+	}
+	.t3-mainnav .wp-block-navigation__responsive-container-close::before {
+		content: "";
+		width: 14px;
+		height: 12px;
+		background: linear-gradient(#ffffff 0 0) 0 0 / 100% 2px no-repeat, linear-gradient(#ffffff 0 0) 0 5px / 100% 2px no-repeat, linear-gradient(#ffffff 0 0) 0 10px / 100% 2px no-repeat;
+	}
+	/* The open panel is the source's collapse: a full-width list under the header, in the page
+	   surface. The close button takes the open button's place. */
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open {
+		position: absolute;
+		inset: 60px 0 auto 0;
+		z-index: 100;
+		width: auto;
+		height: auto;
+		padding: 0;
+		overflow: visible;
+		background: var(--jm-bg);
+		color: inherit;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-close,
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-dialog,
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-container-content {
+		width: 100%;
+		max-width: none;
+		padding: 0;
+		margin: 0;
+		display: block;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-container-close {
+		position: absolute;
+		top: -45px;
+		right: 15px;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container {
+		display: block;
+		padding: 1px 0 0;
+		border-top: 1px solid light-dark(#f2f3f7, #2a3247);
+		border-bottom: 1px solid light-dark(#f2f3f7, #2a3247);
+		font-size: 16px;
+		font-weight: 700;
+		line-height: 25px;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-item {
+		display: block;
+		position: relative;
+		width: 100%;
+		padding: 0 15px;
+		box-sizing: border-box;
+		border-top: 1px solid light-dark(#f2f3f7, #2a3247);
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item:first-child {
+		border-top: 0;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+		display: block;
+		margin: 0;
+		padding: 10px 0;
+		color: light-dark(#777777, #cdd4e0);
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
+		color: var(--jm-red);
+	}
+	/* The submenu stays folded until its caret is opened, as in the source. */
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__submenu-container {
+		display: none;
+		position: static;
+		width: auto;
+		min-width: 0 !important;
+		padding: 0 0 10px 15px !important;
+		border: 0 !important;
+		box-shadow: none;
+		background: none !important;
+		visibility: visible;
+		opacity: 1;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-submenu.jm-sub-open > .wp-block-navigation__submenu-container {
+		display: block;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+		position: absolute;
+		top: 0;
+		right: 15px;
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		width: 40px;
+		height: 40px;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--ja-accent);
+		font-size: 0;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-submenu__toggle svg {
+		display: none;
+	}
+	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-submenu__toggle::after {
+		content: "";
+		display: block;
+		border-top: 4px solid currentColor;
+		border-right: 4px solid transparent;
+		border-left: 4px solid transparent;
+	}
+}
+
+/* The current page in the off-canvas menu is in the accent; the group that holds it is too in light,
+   and keeps its quiet heading colour in dark (measured). */
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item.current-menu-item > .wp-block-navigation-item__content,
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item.current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
+	color: var(--ja-accent);
+}
+.t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item:has(.current-menu-item) > .wp-block-navigation-item__content,
+.t3-off-canvas .jm-off-canvas-nav .wp-block-navigation__container > .wp-block-navigation-item:has(.current-menu-item) > .wp-block-navigation-item__content .wp-block-navigation-item__label {
+	color: light-dark(var(--ja-accent), #a7b0c2);
+}
+
+@media (max-width: 767px) {
+	.t3-spotlight {
+		padding-top: 30.5px; /* measured on the source: heading 43 px below the footer top at 480-576 px */
+	}
+}

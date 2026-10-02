@@ -1,0 +1,852 @@
+/* Account and contact pages of wp-ja-morgan: Login, Registration, Password Reset, Username Reminder, Contact Us.
+   Written from computed styles measured on the source stand at 1440 px, light and dark (no source CSS copied).
+   Colours come from the shared light-dark() tokens of wp-ja-morgan.css. */
+
+/* ---- Cards: a bordered box centred in the main body ---- */
+.login-wrap.jm-form,
+.registration.jm-form,
+.reset.jm-form,
+.remind.jm-form {
+	box-sizing: border-box;
+	margin-inline: auto;
+	padding: 60px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+}
+.login-wrap.jm-form,
+.registration.jm-form {
+	width: 480px;
+	max-width: 100%;
+	margin-block: 90px;
+}
+.registration.jm-form {
+	width: 500px;
+}
+.reset.jm-form,
+.remind.jm-form {
+	width: 650px;
+	max-width: 100%;
+}
+
+/* ---- Labels, fields, buttons ---- */
+.jm-form fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+}
+.jm-form label {
+	display: inline-block;
+	max-width: 100%;
+	margin: 0 0 5px;
+	font-weight: 400;
+	color: var(--jm-text);
+}
+.reset.jm-form label,
+.remind.jm-form label {
+	font-weight: 300;
+}
+.jm-form .login label {
+	color: light-dark(#777777, #cdd4e0);
+}
+.jm-form .star {
+	color: #ffcc00;
+}
+.jm-form .form-group {
+	margin: 0 -15px 25px;
+}
+.jm-form .login .form-group {
+	margin-inline: 0;
+}
+.jm-form .control-group {
+	margin: 0 0 25px;
+}
+.jm-form .control-label {
+	padding-top: 5px;
+}
+.jm-form .login .control-label {
+	padding-top: 0;
+}
+.jm-form .form-control {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 60px;
+	padding: 20px 30px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+	background: light-dark(#ffffff, #1a2032);
+	color: light-dark(#555555, #e6e9ef);
+	font: inherit;
+	line-height: 25px;
+	box-shadow: none;
+}
+.jm-form .form-control:focus {
+	outline: 0;
+	border-color: light-dark(#999999, #6f8fd6);
+}
+.jm-form textarea.form-control {
+	height: 167px;
+	box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+}
+.reset.jm-form .controls,
+.remind.jm-form .controls {
+	width: 100%;
+}
+.reset.jm-form .form-control,
+.remind.jm-form .form-control {
+	width: 80%;
+}
+.jm-form .alert-warning {
+	margin: 0 0 25px;
+	padding: 15px;
+	border: 1px solid light-dark(#faebcc, #5a4d20);
+	border-radius: 4px;
+	background: light-dark(#fcf8e3, #2a2410);
+	color: light-dark(#c09853, #e6c46a);
+}
+.jm-form .btn {
+	display: inline-block;
+	box-sizing: border-box;
+	padding: 20px 30px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	font: 600 16px/18.08px var(--jm-font);
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+.jm-form .btn-primary {
+	border-color: var(--jm-red);
+	background: var(--jm-red);
+	color: #ffffff;
+}
+.jm-form .btn-primary:hover,
+.jm-form .btn-primary:focus-visible {
+	border-color: var(--wp--preset--color--accent-hover, #b22323);
+	background: var(--wp--preset--color--accent-hover, #b22323);
+}
+.jm-form .btn-block {
+	display: block;
+	width: 100%;
+}
+.jm-form .btn-default {
+	margin: 5px 12.5px 0 0;
+	border-color: var(--jm-line);
+	background: light-dark(#ffffff, #20283c);
+	color: light-dark(#333333, #cdd4e0);
+}
+
+/* Password and date fields: the input joined to a grey button */
+.jm-form .input-group {
+	display: flex;
+}
+.jm-form .input-group .form-control {
+	flex: 1 1 auto;
+	min-width: 0;
+	border-radius: 4px 0 0 4px;
+}
+.jm-form .input-group .btn {
+	margin: 0;
+	align-self: stretch;
+}
+.jm-form .input-group .btn-secondary {
+	flex: none;
+	border: 1px solid transparent;
+	border-radius: 0 4px 4px 0;
+	background: light-dark(#efefef, #20283c);
+	color: light-dark(#777777, #cdd4e0);
+}
+.jm-form .icon-eye,
+.jm-form .icon-calendar {
+	display: inline-block;
+	width: 20px;
+	height: 16px;
+	margin-left: 6.25px;
+	line-height: 16px;
+	text-align: center;
+	vertical-align: top;
+}
+.jm-form .icon-calendar {
+	width: 14px;
+}
+/* The date field is a joined input and a red button, as wide as its own content (source: 229 + 82.25 px) */
+.jm-form .input-group:has(.input-calendar-toggle) {
+	display: inline-flex;
+}
+.jm-form .input-group:has(.input-calendar-toggle) .form-control {
+	flex: 0 0 229px;
+	border-right-width: 0;
+}
+.jm-form .input-calendar-toggle.btn-primary {
+	flex: none;
+	border-radius: 0 4px 4px 0;
+	background: var(--jm-red);
+	color: #ffffff;
+}
+.jm-form .password-group meter {
+	display: block;
+	width: 80px;
+	height: 16px;
+	margin-top: 5px;
+}
+.jm-form .password-group output {
+	display: block;
+	height: 21px;
+	padding-top: 21px;
+	box-sizing: border-box;
+	color: light-dark(#555555, #cdd4e0);
+}
+.jm-form .icon-eye::before,
+.jm-form .icon-calendar::before {
+	font-family: "FontAwesome";
+	font-weight: 400;
+	line-height: 1;
+}
+.jm-form .icon-eye::before {
+	content: "\f06e";
+}
+.jm-form .icon-calendar::before {
+	content: "\f073";
+}
+
+/* ---- Login ---- */
+.jm-form .login .checkbox label {
+	display: inline;
+	position: relative;
+	margin: 0;
+	padding-left: 20px;
+	cursor: pointer;
+}
+.jm-form .login .checkbox input {
+	position: absolute;
+	top: 4px;
+	left: 0;
+	margin: 0;
+}
+.jm-form .login .other-links {
+	margin-bottom: 0;
+}
+.jm-form .other-links ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	text-align: center;
+}
+.jm-form .other-links li {
+	display: inline-block;
+	padding: 0 6.25px;
+	margin: 0;
+}
+.jm-form .other-links a {
+	font-size: 12px;
+	line-height: 18.75px;
+	color: light-dark(#555555, #a7b0c2);
+	text-decoration: none;
+}
+.jm-form .other-links a:hover {
+	color: var(--ja-accent, #d93030);
+}
+
+/* ---- Registration ---- */
+.registration.jm-form legend {
+	display: block;
+	width: 100%;
+	margin: 0 0 25px;
+	padding: 0;
+	border: 0;
+	font-size: 36px;
+	font-weight: 500;
+	line-height: 56.25px;
+	color: var(--jm-heading);
+}
+.registration.jm-form fieldset + fieldset {
+	margin-top: 30px;
+}
+.jm-form .field-spacer .red {
+	color: #d93030;
+}
+.jm-form .small {
+	font-size: 13.6px;
+	color: #999999;
+}
+.registration.jm-form .form-check {
+	display: block;
+	padding: 0;
+}
+.registration.jm-form .form-check input {
+	margin: 0 9px 0 0;
+}
+.registration.jm-form .form-check-label {
+	display: inline;
+	margin: 0 12.5px 0 0;
+}
+.registration.jm-form #jm-reg-tos {
+	padding-top: 8.33px;
+}
+.jm-form .form-text {
+	color: #777777;
+	font-size: 13.6px;
+}
+.jm-form .form-actions {
+	margin: 37.5px -15px 0;
+}
+.jm-form .form-actions .jm-control {
+	padding: 0 15px;
+}
+.jm-form .form-actions .btn {
+	margin: 5px 12.5px 0 0;
+}
+.jm-form .visually-hidden,
+.registration.jm-form legend.visually-hidden {
+	position: absolute;
+	left: 0;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* ---- Contact ---- */
+.jm-contact-page {
+	padding: 0;
+}
+.jm-contact-page .box-info {
+	padding: 150px 0;
+	background: var(--jm-gray);
+}
+.jm-contact-page .header-title {
+	margin-bottom: 60px;
+	text-align: center;
+}
+.jm-contact-page .header-title__kicker {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 25px;
+	color: var(--jm-red);
+}
+.jm-contact-page .header-title__name {
+	margin: 0;
+	font-size: 40px;
+	font-weight: 500;
+	line-height: 50px;
+	letter-spacing: -0.6px;
+	color: light-dark(#333333, #f2f4f8);
+}
+.jm-contact-page .contact-info {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 30px;
+	margin: 15px 15px 0;
+	padding: 0;
+}
+.jm-contact-page .address-detail {
+	box-sizing: border-box;
+	padding: 50px 30px;
+	border-radius: 4px;
+	background: var(--jm-card);
+	text-align: center;
+}
+.jm-contact-page .address-detail .fa {
+	display: block;
+	margin: 0 0 25px;
+	font-size: 36px;
+	line-height: 36px;
+	color: light-dark(#1b3060, #6f8fd6);
+}
+.jm-contact-page .address-detail .fa::before {
+	font-family: "FontAwesome";
+	font-style: normal;
+}
+.jm-contact-page .fa-map-marker::before {
+	content: "\f041";
+}
+.jm-contact-page .fa-envelope-o::before {
+	content: "\f003";
+}
+.jm-contact-page .fa-phone::before {
+	content: "\f095";
+}
+.jm-contact-page .fa-globe::before {
+	content: "\f0ac";
+}
+.jm-contact-page .address-detail .title {
+	margin: 0 0 10px;
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 31.25px;
+	color: light-dark(#333333, #f2f4f8);
+}
+.jm-contact-page .address-detail .content {
+	margin: 0;
+	color: light-dark(#777777, #e6e9ef);
+}
+.jm-contact-page .address-detail a {
+	color: inherit;
+	text-decoration: none;
+}
+.jm-contact-page .contact-inner {
+	display: flex;
+	min-height: 880px;
+}
+.jm-contact-page .contact-image {
+	flex: 0 0 50%;
+	margin: 0;
+	overflow: hidden;
+}
+.jm-contact-page .contact-image img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: left center;
+}
+.jm-contact-page .contact-form-wrap {
+	box-sizing: border-box;
+	display: flex;
+	flex: 0 0 50%;
+	align-items: center;
+	padding: 90px;
+	background: #1b3060;
+	color: #ffffff;
+}
+.jm-contact-page .contact-box {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 600px;
+	margin: 0 15px;
+}
+.jm-contact-page .contact-title {
+	margin: 0 0 12.5px;
+	font-size: 36px;
+	font-weight: 500;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+}
+.jm-contact-page .contact-legend {
+	margin: 0 0 12.5px;
+	opacity: 0.6;
+}
+/* The contact form inside the blue panel: underlined transparent fields, labels replaced by placeholders */
+.jm-contact-page .jm-contact-form fieldset {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+.jm-contact-page .jm-contact-form legend {
+	display: block;
+	width: 100%;
+	margin: 0 0 12.5px;
+	padding: 0;
+	border: 0;
+	font-size: 16px;
+	line-height: 25px;
+	color: #ffffff;
+	opacity: 0.6;
+}
+.jm-contact-page .jm-contact-form .form-group {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 25px -15px 0;
+}
+.jm-contact-page .jm-contact-form .form-group [class*="col-sm-"] {
+	box-sizing: border-box;
+	padding: 0 15px;
+}
+.jm-contact-page .jm-contact-form .col-sm-6 {
+	flex: 0 0 50%;
+}
+.jm-contact-page .jm-contact-form .col-sm-12 {
+	flex: 0 0 100%;
+}
+.jm-contact-page .jm-contact-form label.control-label {
+	display: none;
+}
+.jm-contact-page .jm-contact-form input:not([type="checkbox"]),
+.jm-contact-page .jm-contact-form textarea {
+	display: block;
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	height: 60px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-bottom: 1px solid rgba(225, 225, 225, 0.2);
+	border-radius: 0;
+	background: transparent;
+	color: #ffffff;
+	font: inherit;
+	line-height: 60px;
+	box-shadow: none;
+}
+.jm-contact-page .jm-contact-form textarea {
+	height: 150px;
+	resize: vertical;
+}
+.jm-contact-page .jm-contact-form input::placeholder,
+.jm-contact-page .jm-contact-form textarea::placeholder {
+	color: #ffffff;
+	opacity: 1;
+}
+.jm-contact-page .jm-contact-form input:focus,
+.jm-contact-page .jm-contact-form textarea:focus {
+	outline: 0;
+	border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+.jm-contact-page .jm-contact-form .checkbox {
+	position: relative;
+	margin-top: 10px;
+}
+.jm-contact-page .jm-contact-form .checkbox input {
+	position: absolute;
+	top: 6px;
+	left: 0;
+	margin: 0;
+}
+.jm-contact-page .jm-contact-form .checkbox label {
+	display: block;
+	padding: 0 0 6.25px 20px;
+	line-height: 25px;
+	color: #ffffff;
+}
+.jm-contact-page .jm-contact-form .control-btn {
+	margin-top: 30px;
+}
+.jm-contact-page .jm-contact-form .btn {
+	display: inline-block;
+	box-sizing: border-box;
+	padding: 20px 30px;
+	border: 1px solid var(--jm-red);
+	border-radius: 4px;
+	background: var(--jm-red);
+	color: #ffffff;
+	font: 600 16px/18.08px var(--jm-font);
+	cursor: pointer;
+}
+.jm-contact-page .jm-contact-form .btn:hover {
+	background: var(--wp--preset--color--accent-hover, #b22323);
+}
+.jm-contact-page .jm-contact-form .btn .icon {
+	margin-left: 6.25px;
+}
+.jm-contact-page .jm-contact-form .btn .ion-ios-arrow-round-forward::before {
+	content: "\2192";
+	font-family: var(--jm-font);
+	font-weight: 400;
+}
+.jm-contact-page .jm-contact-form .alert {
+	margin: 0 0 12.5px;
+	padding: 12px 15px;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.12);
+	color: #ffffff;
+}
+
+/* Status messages the account handlers print above a form */
+.jm-form .alert-success {
+	margin: 0 0 25px;
+	padding: 15px;
+	border: 1px solid light-dark(#d6e9c6, #2f5a2a);
+	border-radius: 4px;
+	background: light-dark(#dff0d8, #14261a);
+	color: light-dark(#3c763d, #9fd39a);
+}
+.jm-form .alert-danger {
+	margin: 0 0 25px;
+	padding: 15px;
+	border: 1px solid light-dark(#ebccd1, #6a2a2a);
+	border-radius: 4px;
+	background: light-dark(#f2dede, #2a1414);
+	color: light-dark(#a94442, #e69a9a);
+}
+
+@media (max-width: 991px) {
+	.jm-contact-page .contact-info {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	.jm-contact-page .box-info {
+		padding: 90px 0;
+	}
+	.jm-contact-page .contact-inner {
+		flex-direction: column;
+		min-height: 0;
+	}
+	.jm-contact-page .contact-image {
+		flex-basis: auto;
+		height: 420px;
+	}
+	.jm-contact-page .contact-form-wrap {
+		padding: 60px 30px;
+	}
+}
+@media (max-width: 767px) {
+	.jm-contact-page .contact-info {
+		grid-template-columns: 1fr;
+	}
+	.login-wrap.jm-form,
+	.registration.jm-form,
+	.reset.jm-form,
+	.remind.jm-form {
+		padding: 30px 20px;
+	}
+	.reset.jm-form .form-control,
+	.remind.jm-form .form-control {
+		width: 100%;
+	}
+	.registration.jm-form legend {
+		font-size: 28px;
+		line-height: 40px;
+	}
+}
+
+/* ---- Smart Search (templates/search.html): the source's com_finder form ---- */
+.jm-finder-form .form-inline {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.jm-finder-form fieldset {
+	border: 0;
+	margin: 0 0 16px;
+	padding: 0;
+}
+.jm-finder-form .input-group {
+	display: flex;
+	flex: 1;
+	gap: 8px;
+}
+.jm-finder-form .input-group .form-control {
+	flex: 1;
+}
+.jm-finder-form details > summary {
+	display: inline-block;
+	cursor: pointer;
+	list-style: none;
+}
+.jm-finder-form details > summary::-webkit-details-marker {
+	display: none;
+}
+.jm-finder-form .com-finder__tips {
+	margin-top: 16px;
+	padding: 16px;
+	border: 1px solid var(--jm-line);
+	border-radius: 4px;
+}
+
+/* ---- Header variants of the three other home styles (desktop only; the drawer below 992 px is shared) ----
+   The source gives each home style its own header (measured at 1440 px): style 2 is a white topbar, a
+   logo row with contact info and a navy menu bar that overlaps the hero; styles 3 and 4 lay the header
+   transparent over the hero with white text. The Home submenu opens at its trigger, so these
+   geometries decide where the panel lands. */
+/* The header info row is a desktop element (the source hides it on phones). */
+.jm-head-info {
+	display: none;
+}
+@media (min-width: 992px) {
+	body.jm-route-home-style-2 .jm-head-info {
+		display: block;
+	}
+	/* Style 2 */
+	body.jm-route-home-style-2 .t3-topbar {
+		box-sizing: border-box;
+		height: 42px;
+		background: var(--jm-bg);
+		color: #aaaaaa;
+		border: 1px solid #eaeaea;
+	}
+	body.jm-route-home-style-2 .t3-topbar > .container {
+		height: 40px;
+	}
+	body.jm-route-home-style-2 .t3-topbar .topbar-left li,
+	body.jm-route-home-style-2 .t3-topbar .wp-block-social-links .wp-social-link {
+		border-color: #eaeaea;
+		color: #aaaaaa;
+	}
+	body.jm-route-home-style-2 .t3-header {
+		height: auto;
+		margin-bottom: -30px;
+		background: transparent;
+	}
+	body.jm-route-home-style-2 .t3-header > .container {
+		flex-wrap: wrap;
+		height: auto;
+		padding-top: 30px;
+	}
+	body.jm-route-home-style-2 .t3-header .logo {
+		order: 1;
+		line-height: 33.3px;
+		margin-bottom: 30px;
+	}
+	body.jm-route-home-style-2 .t3-header .jm-head-info {
+		order: 2;
+		margin: 0 0 30px auto;
+	}
+	body.jm-route-home-style-2 .jm-head-info ul {
+		display: flex;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	body.jm-route-home-style-2 .jm-head-info li {
+		min-height: 45.4px;
+		padding: 0 10px;
+	}
+	body.jm-route-home-style-2 .jm-head-info li + li {
+		margin-left: 60px;
+	}
+	body.jm-route-home-style-2 .jm-head-info h5 {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 400;
+		margin-bottom: 6.1px;
+		line-height: 16.3px;
+		color: #aaaaaa;
+	}
+	body.jm-route-home-style-2 .jm-head-info span,
+	body.jm-route-home-style-2 .jm-head-info a {
+		display: block;
+		font-size: 16px;
+		font-weight: 500;
+		line-height: 21px;
+		color: var(--jm-text-strong, #333333);
+	}
+	body.jm-route-home-style-2 .t3-header .header-inner {
+		order: 3;
+		flex: 0 0 100%;
+		justify-content: space-between;
+		height: 60px;
+		border-radius: 4px;
+		background: var(--jm-secondary);
+	}
+	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+		padding: 17.5px 20px 17.5px 0;
+		margin-left: 20px;
+		color: #ffffff;
+	}
+	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-item__content {
+		padding-right: 34px;
+	}
+	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+		right: 20px;
+		color: #ffffff;
+	}
+	body.jm-route-home-style-2 .headright {
+		height: 60px;
+	}
+	body:is(.jm-route-home-style-2, .jm-route-home-style-3) .head-search .wp-block-search__inside-wrapper,
+	body:is(.jm-route-home-style-2, .jm-route-home-style-3) .head-search .wp-block-search__button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	body.jm-route-home-style-2 .head-search.wp-block-search {
+		margin: 0;
+	}
+	body.jm-route-home-style-2 .head-search .wp-block-search__button,
+	body.jm-route-home-style-2 .theme-toggle,
+	body.jm-route-home-style-2 .off-canvas-toggle {
+		width: 60px;
+		height: 60px;
+		margin: 0;
+		border-radius: 0;
+		background: transparent;
+		color: #ffffff;
+	}
+	body.jm-route-home-style-2 .off-canvas-toggle {
+		padding: 21px 22px;
+	}
+
+	/* Styles 3 and 4: transparent over the hero, white text */
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header {
+		box-sizing: border-box;
+		height: 91px;
+		margin-bottom: -91px;
+		background: transparent;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .logo a,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .head-search .wp-block-search__button,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .theme-toggle {
+		color: #ffffff;
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+		color: #ffffff;
+	}
+	/* The hero now starts under the header, so it gives the header's height back as padding. */
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero:first-child {
+		padding-top: 340px;
+	}
+	body.jm-route-home-style-3 .t3-header > .container {
+		max-width: none;
+		width: 100%;
+		padding: 0 0 0 15px;
+	}
+	body.jm-route-home-style-3 .t3-header .header-inner {
+		display: contents;
+	}
+	body.jm-route-home-style-3 .t3-header .logo {
+		padding-right: 15px;
+	}
+	body.jm-route-home-style-4 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+		padding-right: 18px;
+		margin-left: 18px;
+	}
+	body.jm-route-home-style-4 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-item__content {
+		padding-right: 32px;
+	}
+	body.jm-route-home-style-3 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
+		padding-right: 20px;
+		margin-left: 20px;
+	}
+	body.jm-route-home-style-3 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-item__content {
+		padding-right: 34px;
+	}
+	body.jm-route-home-style-3 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+		right: 20px;
+	}
+	body.jm-route-home-style-4 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
+		right: 18px;
+	}
+	body.jm-route-home-style-4 .off-canvas-toggle {
+		margin-left: 6px;
+	}
+	body.jm-route-home-style-3 .headright {
+		padding-left: 15px;
+	}
+	body.jm-route-home-style-3 .head-search.wp-block-search {
+		margin: 0;
+	}
+	body.jm-route-home-style-4 .head-search.wp-block-search {
+		margin-left: 6px;
+	}
+	body.jm-route-home-style-3 .head-search .wp-block-search__button,
+	body.jm-route-home-style-3 .off-canvas-toggle {
+		width: 90px;
+		height: 90px;
+	}
+	body.jm-route-home-style-3 .off-canvas-toggle {
+		margin-left: 6px;
+		padding: 39px 36px;
+		border-radius: 0;
+		background: transparent;
+	}
+	body.jm-route-home-style-4 .off-canvas-toggle {
+		background: transparent;
+	}
+}
+
+.jm-finder-form .btn,
+.jm-finder-form .form-control {
+	font-family: inherit;
+}
+/* Closed, the advanced tips take no space and are not drawn, as the source's collapsed panel. */
+.jm-finder-form details:not([open]) > .com-finder__tips {
+	display: none;
+}
