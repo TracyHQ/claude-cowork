@@ -49,6 +49,10 @@
                  these are PHP files; same placement Akeeba uses for its own engine. -->
             <folder>lib</folder>
             <filename>config.xml</filename>
+            <!-- Every file this release puts on the site, with its sha256 (scripts/release-manifest.mjs,
+                 written by build.sh, never committed). The same file is attached to the release
+                 as an asset, which is what makes the copy on disk checkable. -->
+            <filename>tracy-release.json</filename>
         </files>
         <languages folder="administrator/language">
             <language tag="en-GB">en-GB/com_claudecowork.ini</language>

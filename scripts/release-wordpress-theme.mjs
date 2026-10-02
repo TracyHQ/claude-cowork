@@ -107,6 +107,13 @@ run('bash', ['build.sh', slug], { cwd: themeDir, stdio: 'inherit' })
 renameSync(join(themeDir, 'dist', `${slug}.zip`), join(themeDir, 'dist', zipName))
 console.log(`· wordpress/theme/dist/${zipName}`)
 
+// The release manifest the build wrote beside the zip (scripts/release-manifest.mjs): attached as an
+// asset of its own, because the copy inside the zip is only checkable against one nobody on a site
+// can change. It must name the tag about to be created, or it describes some other build.
+const releaseManifest = join(themeDir, 'dist', 'tracy-release.json')
+if (JSON.parse(readFileSync(releaseManifest, 'utf8')).tag !== tagName(version)) die('dist/tracy-release.json names another tag than the one about to be created')
+console.log('· dist/tracy-release.json (release asset)')
+
 if (dryRun) {
   console.log('\n--dry-run: stopping here. update.json was edited — `git checkout` it if you do not want that.\n')
   process.exit(0)
@@ -131,6 +138,7 @@ run('gh', [
   'create',
   tagName(version),
   join(themeDir, 'dist', zipName),
+  releaseManifest,
   '--title',
   slug === 'tracy' ? `WordPress theme ${version}` : `WordPress theme ${slug} ${version}`,
   // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a

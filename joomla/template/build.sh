@@ -13,8 +13,26 @@ cd "$(dirname "$0")"
 
 [ -f tpl_tracy/templateDetails.xml ] || { echo "tpl_tracy/templateDetails.xml is missing" >&2; exit 1; }
 
-rm -rf dist && mkdir -p dist
-( cd tpl_tracy && zip -qrX ../dist/tpl_tracy.zip . -x '*.DS_Store' '*.tpl.xml' )
+rm -rf build dist && mkdir -p build dist
+# Staged, because the mirror is not written here: the release manifest goes into a copy.
+cp -R tpl_tracy build/tpl_tracy
+find build/tpl_tracy \( -name '.DS_Store' -o -name '*.tpl.xml' \) -delete
+# Joomla installs by the <files> list, so the manifest only reaches a site if templateDetails.xml
+# names it. The mirror's generator in TCH does not (yet): the line is added to the STAGED copy, once,
+# and the release manifest below hashes the copy that ships. When TCH emits it, this is a no-op.
+if ! grep -q '<filename>tracy-release.json</filename>' build/tpl_tracy/templateDetails.xml; then
+  sed -i.bak 's|<filename>templateDetails.xml</filename>|<filename>templateDetails.xml</filename>\
+    <filename>tracy-release.json</filename>|' build/tpl_tracy/templateDetails.xml
+  rm -f build/tpl_tracy/templateDetails.xml.bak
+  grep -q '<filename>tracy-release.json</filename>' build/tpl_tracy/templateDetails.xml || {
+    echo "could not name tracy-release.json in templateDetails.xml" >&2; exit 1
+  }
+fi
+# The release manifest: every file the template puts on a site (templates/tpl_tracy/, its media,
+# its language files), with its sha256. Ships in the zip, and in dist/ as its own release asset.
+node ../../scripts/release-manifest.mjs joomla-template build/tpl_tracy build/tpl_tracy/tracy-release.json
+cp build/tpl_tracy/tracy-release.json dist/tracy-release.json
+( cd build/tpl_tracy && zip -qrX ../../dist/tpl_tracy.zip . )
 
 # The listing is read ONCE into a variable: piping it into `grep -q` under `set -o pipefail`
 # fails the script even when the pattern matches, because grep leaves early and unzip dies of
