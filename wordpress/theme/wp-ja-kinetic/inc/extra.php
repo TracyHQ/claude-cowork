@@ -85,6 +85,64 @@ function wp_ja_kinetic_enqueue_assets(): void {
 add_action( 'wp_enqueue_scripts', 'wp_ja_kinetic_enqueue_assets', 11 );
 
 /**
+ * `?theme=dark|light` decides by its FIRST value (assets/js/wp-ja-kinetic-dark.js). WordPress's canonical
+ * redirect rebuilds the query from a parsed copy in which a repeated key keeps its LAST value, so
+ * `?theme=dark&theme=light` would be sent to `?theme=light` before any script runs. Cancelled only when normalising the repeated key changes the
+ * first value; any other redirect (host, scheme, port, path, fragment, other parameters) is left alone.
+ *
+ * @param string|false $redirect_url  The address WordPress wants to send the visitor to.
+ * @param string       $requested_url The address that was asked for.
+ * @return string|false
+ */
+function wp_ja_kinetic_keep_first_theme_value( $redirect_url, $requested_url ) {
+	if ( ! is_string( $redirect_url ) || ! is_string( $requested_url ) ) {
+		return $redirect_url;
+	}
+	$asked  = wp_parse_url( $requested_url );
+	$wanted = wp_parse_url( $redirect_url );
+	if ( ! is_array( $asked ) || ! is_array( $wanted ) ) {
+		return $redirect_url;
+	}
+	$asked_query  = isset( $asked['query'] ) ? (string) $asked['query'] : '';
+	$wanted_query = isset( $wanted['query'] ) ? (string) $wanted['query'] : '';
+	unset( $asked['query'], $wanted['query'] );
+	// Scheme, host, port, path or fragment differ: that redirect is not about `theme`.
+	if ( $asked !== $wanted ) {
+		return $redirect_url;
+	}
+	// Split like URLSearchParams: pairs in order, cut at the first "=", key and value decoded.
+	$split = static function ( $query ) {
+		$theme = array();
+		$other = array();
+		foreach ( explode( '&', $query ) as $pair ) {
+			if ( '' === $pair ) {
+				continue;
+			}
+			$parts = explode( '=', $pair, 2 );
+			if ( 'theme' === urldecode( $parts[0] ) ) {
+				$theme[] = urldecode( isset( $parts[1] ) ? $parts[1] : '' );
+			} else {
+				$other[] = $pair;
+			}
+		}
+		return array( $theme, $other );
+	};
+	list( $asked_theme, $asked_other )   = $split( $asked_query );
+	list( $wanted_theme, $wanted_other ) = $split( $wanted_query );
+	if ( count( $asked_theme ) < 2 || $asked_other !== $wanted_other ) {
+		return $redirect_url;
+	}
+	$override = static function ( $values ) {
+		return ( isset( $values[0] ) && in_array( $values[0], array( 'dark', 'light' ), true ) ) ? $values[0] : '';
+	};
+	if ( $override( $asked_theme ) === $override( $wanted_theme ) ) {
+		return $redirect_url;
+	}
+	return false;
+}
+add_filter( 'redirect_canonical', 'wp_ja_kinetic_keep_first_theme_value', 20, 2 );
+
+/**
  * The page's direction and default theme on <html> (D-14). The source's template style decides both
  * per menu item and prints them before the first paint (`index.php:53-65`: `data-style` always, the
  * theme from the cookie, else the style's `other_default_theme`): Terminal and Signal are dark by
@@ -186,14 +244,18 @@ function wp_ja_kinetic_meta_description(): void {
 add_action( 'wp_head', 'wp_ja_kinetic_meta_description', 1 );
 
 /**
- * The source's favicon (`templates/ja_kinetic/favicon.ico`, a 16 px PNG) until the owner sets a
- * Site Icon under Settings > General, which WordPress then prints instead.
+ * The site's icon is WordPress's own Site Icon (Settings > General, Customizer > Site Identity),
+ * printed by core's wp_site_icon(). Until the owner sets one, the theme prints a single fallback:
+ * the Kinetic mark of the header logo (parts/header.html, the same two strokes) in the accent
+ * green, lime on a dark tab bar. The Joomla quickstart's favicon.ico is the Joomla logo, so it is
+ * not carried. In the Customizer preview core prints its own placeholder icon even without a Site
+ * Icon, so the fallback stays out there too: one icon link in the head in every case.
  */
 function wp_ja_kinetic_favicon(): void {
-	if ( has_site_icon() ) {
+	if ( has_site_icon() || is_customize_preview() ) {
 		return;
 	}
-	printf( "<link rel=\"icon\" href=\"%s\" type=\"image/png\">\n", esc_url( get_theme_file_uri( 'assets/images/favicon.png' ) ) );
+	printf( "<link rel=\"icon\" href=\"%s\" type=\"image/svg+xml\">\n", esc_url( get_theme_file_uri( 'assets/images/favicon.svg' ) ) );
 }
 add_action( 'wp_head', 'wp_ja_kinetic_favicon', 2 );
 

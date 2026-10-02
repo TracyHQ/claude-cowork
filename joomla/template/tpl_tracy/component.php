@@ -25,6 +25,10 @@ $wa->useStyle('template.tracy')
         [],
         ['template.tracy']
     );
+
+// Last, once every sheet of this template is registered: each one's version follows its file, so a
+// look change that rewrites it reaches every browser at once (resolve.php).
+tpl_tracy_stamp_styles($wa, JPATH_ROOT);
 $this->setMetaData('viewport', 'width=device-width, initial-scale=1');
 ?>
 <!DOCTYPE html>

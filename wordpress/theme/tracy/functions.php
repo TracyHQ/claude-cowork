@@ -17,6 +17,9 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/inc/update.php';
 // Where a variation lives (theme, then uploads) and which systems the site may wear: inc/variations.php.
 require_once __DIR__ . '/inc/variations.php';
+// A theme stylesheet's `ver` carries its file's modification time, so a look change that rewrites the
+// file reaches every browser at once instead of after its cache gives up: inc/asset-version.php.
+require_once __DIR__ . '/inc/asset-version.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );
