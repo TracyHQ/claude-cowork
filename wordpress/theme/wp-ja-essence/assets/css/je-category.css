@@ -75,3 +75,43 @@
 .je-slug-category-blog .tracy-query .je-card__tags a { display: inline-block; margin-right: 12px; font-size: 12px; text-decoration: none; color: var(--wp--preset--color--fg-2); }
 .je-slug-category-blog .tracy-query a.je-card__more { font: 400 18px/20.7px Jost, sans-serif; text-decoration: none; color: light-dark(rgba(37, 36, 36, 0.7), rgb(194, 201, 214)); }
 .je-slug-category-blog .tracy-query .je-card__intro .wp-block-post-excerpt__more-link { display: none; }
+
+/* 1.0.1 — Author listing (the `wp-ja-essence/authors` block): photo, name, job title and bio on white cards, three to a row. */
+.je-authors__items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; margin: 0; padding: 0; list-style: none; }
+@media (max-width: 991px) { .je-authors__items { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 575px) { .je-authors__items { grid-template-columns: 1fr; } }
+.je-author { padding: 18px; text-align: center; background: var(--wp--preset--color--surface); border-radius: 16px; box-sizing: border-box; }
+.je-author__picture { display: block; margin-bottom: 18px; }
+.je-author__photo { display: block; width: 100%; height: auto; aspect-ratio: 1 / 0.83; object-fit: cover; border-radius: 8px; }
+.je-author__name { margin: 0 0 4px; font-size: 18px; line-height: 1.3; }
+.je-author__name a { color: var(--wp--preset--color--fg-2); text-decoration: none; }
+.je-author__job { margin: 0 0 12px; font-size: 13px; color: var(--wp--preset--color--muted); }
+.je-author__bio { margin: 0; font-size: 13px; line-height: 1.5; color: var(--wp--preset--color--fg); }
+
+/* 1.0.1 — Tagged items (the `wp-ja-essence/tagged-list` block): a filter field over a plain list of titles. */
+.je-taglist__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 18px; }
+.je-taglist__filter input[type="search"] { box-sizing: border-box; width: 260px; max-width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--wp--preset--color--border); border-radius: 8px; background: var(--wp--preset--color--surface); color: var(--wp--preset--color--fg); font: inherit; font-size: 14px; }
+.je-taglist__filter button { height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--wp--preset--color--accent); color: var(--wp--preset--color--accent-on); font: inherit; font-size: 14px; cursor: pointer; }
+.je-taglist__clear { font-size: 14px; }
+.je-taglist__items { margin: 0; padding: 0; list-style: none; }
+.je-taglist__items li { padding: 12px 0; border-bottom: 1px solid var(--wp--preset--color--border-soft); }
+.je-taglist__items a { color: var(--wp--preset--color--fg-2); text-decoration: none; }
+.je-taglist__items a:hover { color: var(--wp--preset--color--accent-hover); }
+.je-taglist__empty, .je-authors__empty { margin: 18px 0; color: var(--wp--preset--color--muted); }
+
+/* the pager the two blocks above share */
+.je-listpager { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 36px 0 0; }
+.je-listpager ul { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.je-listpager li a, .je-listpager li span { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 6px; border-radius: 50%; background: light-dark(rgba(33, 37, 41, .08), rgba(238, 241, 246, .12)); color: var(--wp--preset--color--fg-2); text-decoration: none; font-size: 13px; }
+.je-listpager__current { background: var(--wp--preset--color--accent) !important; color: var(--wp--preset--color--accent-on) !important; }
+.je-listpager__of { margin: 0; font-size: 13px; color: var(--wp--preset--color--muted); }
+.je-narrow:has(.je-authors), .je-narrow:has(.je-taglist) { max-width: 1164px; }
+.je-authors, .je-taglist { padding-top: 72px; }
+
+/* 1.0.1 — measured against the source's own author, title-list and counter rows (Visual QA cp1) */
+.je-author__name { font-size: 24px; line-height: 24px; }
+@media (max-width: 767px) { .je-author__name { font-size: 22px; line-height: 22px; } }
+.je-author__job { font-size: 16px; line-height: 20.8px; color: var(--wp--preset--color--fg); }
+.je-taglist__items li { font-family: Jost, sans-serif; font-size: 20px; font-weight: 500; line-height: 26px; color: light-dark(rgb(33, 37, 41), rgb(194, 201, 214)); }
+.je-taglist__items a { font: inherit; color: light-dark(var(--wp--preset--color--fg-2), rgb(194, 201, 214)); }
+.je-listpager .je-listpager__of { display: inline-block; padding: 4px 12px; border-radius: 8px; background: rgba(0, 0, 0, .1); font-family: Jost, sans-serif; font-size: 16px; line-height: 24px; color: light-dark(#000, rgb(140, 151, 168)); }

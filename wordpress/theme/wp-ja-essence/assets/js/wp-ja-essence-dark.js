@@ -4,7 +4,9 @@
  * are `data-theme` on the root element; auto is its absence, and the stylesheet then follows the
  * OS through prefers-color-scheme. This file is enqueued in the head, blocking, so the attribute
  * is on the root before the first paint; the toggle buttons ([data-tracy-theme-toggle]) are wired
- * once the document has parsed. Each click cycles light → dark → auto.
+ * once the document has parsed. Each click flips what the page shows, light ↔ dark, as the source's
+ * darkmode.js does: from `auto` the click goes to the opposite of the OS setting, so the first click always
+ * changes the page. `auto` stays a readable cookie value (a saved 1.0.0 choice) but a click never writes it.
  *
  * The source (JA Essence, js/darkmode.js) keeps the choice in a `ja_nova-theme` cookie but reads it back
  * only when the OS setting changes, so a visitor who picked dark sees light again after a reload on a
@@ -16,13 +18,19 @@
  * on the toggle writes the cookie. */
 ;(() => {
   const COOKIE = 'tracy_theme'
-  const STATES = ['light', 'dark', 'auto']
-  const LABELS = {
-    light: 'Theme: light. Switch to dark',
-    dark: 'Theme: dark. Switch to automatic',
-    auto: 'Theme: automatic. Switch to light'
-  }
   const root = document.documentElement
+
+  // What the page shows for a state: `auto` follows the OS (light when it cannot be read).
+  const shown = (state) => {
+    if (state !== 'auto') return state
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  }
+  const label = (state) =>
+    shown(state) === 'dark' ? 'Theme: dark. Switch to light' : 'Theme: light. Switch to dark'
 
   const read = () => {
     const match = document.cookie.match(/(?:^|;\s*)tracy_theme=(light|dark|auto)(?:;|$)/)
@@ -38,8 +46,8 @@
     if (state === 'auto') root.removeAttribute('data-theme')
     else root.setAttribute('data-theme', state)
     for (const button of document.querySelectorAll('[data-tracy-theme-toggle]')) {
-      button.setAttribute('aria-pressed', state === 'dark' ? 'true' : 'false')
-      button.setAttribute('aria-label', LABELS[state])
+      button.setAttribute('aria-pressed', shown(state) === 'dark' ? 'true' : 'false')
+      button.setAttribute('aria-label', label(state))
       button.setAttribute('data-theme-state', state)
     }
   }
@@ -62,12 +70,21 @@
     document.addEventListener('DOMContentLoaded', () => apply(state))
   }
 
+  // While the state is `auto` the label follows the OS setting.
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (state === 'auto') apply(state)
+    })
+  } catch {
+    // no matchMedia: the label stays as drawn
+  }
+
   document.addEventListener('click', (event) => {
     const target = event.target
     const button = target && target.closest ? target.closest('[data-tracy-theme-toggle]') : null
     if (!button) return
     event.preventDefault()
-    state = STATES[(STATES.indexOf(state) + 1) % STATES.length]
+    state = shown(state) === 'dark' ? 'light' : 'dark'
     apply(state)
     write(state)
   })

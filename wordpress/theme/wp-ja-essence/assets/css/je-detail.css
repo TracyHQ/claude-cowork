@@ -219,3 +219,25 @@
 .je-tag-chip { display: inline-block; padding: 11px 16px; border-radius: 8px; background: light-dark(#f8f8ff, #222a3b); color: inherit; font-size: 16px; line-height: 16px; text-decoration: none; }
 @media (max-width: 767px) { .je-artfoot__tags { width: 100%; } .je-tags { justify-content: flex-start; } }
 .je-relcard .je-relcard__title a { color: inherit; text-decoration: none; font-weight: 400; }
+
+/* 1.0.1 — gallery article: the pictures become a slider in the hero place, previous / next arrows on the sides and
+   thumbnails along the bottom (assets/js/wp-ja-essence.js); without script the pictures follow the text. */
+.je-gslider-on .je-page__hero, .je-gslider-on .jes-gallery { display: none; }
+.je-gslider { margin: 0 0 18px; }
+.je-gslider__viewport { position: relative; overflow: hidden; border-radius: 8px; background: var(--wp--preset--color--bg); }
+.je-gslider__slide { margin: 0; }
+.je-gslider__slide[hidden] { display: none; }
+.je-gslider__slide img { display: block; width: 100%; height: auto; }
+.je-gslider__arrow { position: absolute; top: 50%; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: light-dark(#fff, #1a2130); color: light-dark(#212529, #eef1f6); box-shadow: 0 2px 8px rgba(0, 0, 0, .2); font-size: 26px; line-height: 1; cursor: pointer; }
+.je-gslider__prev { left: 12px; }
+.je-gslider__next { right: 12px; }
+.je-gslider__thumbs { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.je-gslider__thumbs button { width: 48px; height: 48px; padding: 0; overflow: hidden; border: 2px solid light-dark(#fff, #1a2130); border-radius: 6px; background: light-dark(#fff, #1a2130); opacity: .8; cursor: pointer; }
+.je-gslider__thumbs button[aria-current="true"] { opacity: 1; border-color: var(--wp--preset--color--accent); }
+.je-gslider__thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.je-gslider__arrow:focus-visible, .je-gslider__thumbs button:focus-visible { outline: 2px solid light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); outline-offset: 2px; }
+
+/* 1.0.1 — login: the two recovery links under the form, as the source prints them. */
+.je-login-links { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 18px 0 0; }
+.je-login-links a { color: var(--wp--preset--color--accent); }
+.je-login-links a { display: inline-block; margin: 0 24px 4px 0; white-space: nowrap; font-size: 14px; line-height: 21px; color: var(--wp--preset--color--muted); }

@@ -76,3 +76,15 @@
 :root[data-theme="dark"] .je-pager .page-numbers:not(.current), :root[data-theme="dark"] .je-pager .wp-block-query-pagination-next, :root[data-theme="dark"] .je-pager .wp-block-query-pagination-previous { background: rgba(255, 255, 255, 0.1); color: #eef1f6; }
 :root[data-theme="dark"] .je-footer__logo img { filter: invert(1); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .je-footer__logo img { filter: invert(1); } :root:not([data-theme="light"]) .je-pager .page-numbers:not(.current), :root:not([data-theme="light"]) .je-pager .wp-block-query-pagination-next, :root:not([data-theme="light"]) .je-pager .wp-block-query-pagination-previous { background: rgba(255, 255, 255, 0.1); color: #eef1f6; } }
+
+/* 1.0.1 — lead slider controls (assets/js/wp-ja-essence.js): previous / next buttons around one dot per page, under a row
+   that scrolls natively (touch swipe works without them). 24px+ targets. */
+.je-slider__nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 20px; }
+.je-slider__nav[hidden] { display: none; }
+.je-slider__btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--wp--preset--color--border); border-radius: 50%; background: var(--wp--preset--color--surface); color: var(--wp--preset--color--fg-2); font-size: 28px; line-height: 1; cursor: pointer; }
+.je-slider__btn:disabled { opacity: .4; cursor: default; }
+.je-slider__btn:focus-visible, .je-slider__dots button:focus-visible { outline: 2px solid light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); outline-offset: 2px; }
+.je-slider__dots { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.je-slider__dots button { position: relative; width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; }
+.je-slider__dots button::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: light-dark(rgba(33, 37, 41, .25), rgba(238, 241, 246, .35)); }
+.je-slider__dots button[aria-current="true"]::before { background: var(--wp--preset--color--accent); }

@@ -78,11 +78,11 @@ unless the owner disagrees.
 - The newsletter box sends nothing and has no list (D-10); the footer's "Become a subscriber" and
   the header's "Subscribe" buttons link to `/contact`.
 - The header's social links, and the follow-me card's service buttons, point at `#` as placeholders until the owner supplies real addresses.
-- The footer keeps the source's words: "Copyright (c) 2026 JA Essence. All Rights Reserved." and
-  "Joomla! is Free Software released under the GNU General Public License.", and the tagline "A
-  super modern theme following the latest trends with premium membership". Whether a WordPress
-  site should keep a Joomla mention is the owner's call; the words are in the `footer` template
-  part (docs/content-model.md).
+- The footer keeps the source's words, with the CMS named for what the site runs on (1.0.1):
+  "Copyright (c) 2026 JA Essence. All Rights Reserved." and "WordPress is Free Software released
+  under the GNU General Public License.", and the tagline "A super modern theme following the
+  latest trends with premium membership". The words are in the `footer` template part
+  (docs/content-model.md).
 - Tool-level findings accepted by name in `parity-accepted.json` and the severity list (S-numbers,
   D-numbers) are measurement limits, not site differences.
 

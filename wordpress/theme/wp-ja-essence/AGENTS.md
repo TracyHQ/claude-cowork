@@ -35,8 +35,9 @@ plugins (docs/install.md).
    body class, the `topic` category base, term ids inside the category pages' queries, and the
    redirect rules in `wp_ja_essence_redirects`. Read docs/content-model.md before renaming,
    moving, deleting or publishing a page or category.
-8. Dark mode: three states kept in the `tracy_theme` cookie and applied as `data-theme` on `<html>`;
-   no attribute = auto, the operating system decides (docs/design-system.md).
+8. Dark mode: the `tracy_theme` cookie (`light`, `dark`, or a 1.0.0 `auto`) applied as `data-theme` on
+   `<html>`; no attribute = auto, the operating system decides; a click on the toggle flips what the
+   page shows (docs/design-system.md).
 9. Do not fabricate business facts, legal text, people, prices or images: everything on the site
    is demonstration data until the owner replaces it. Open decisions: docs/content-rules.md.
 10. Back up before a structural change (`wp db export`, `wp-content/uploads`). No automatic theme
