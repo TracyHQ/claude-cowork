@@ -523,3 +523,58 @@ function wp_ja_impact_keep_first_theme_value( $redirect_url, $requested_url ) {
 	return false;
 }
 add_filter( 'redirect_canonical', 'wp_ja_impact_keep_first_theme_value', 20, 2 );
+
+/**
+ * The section a single post belongs to, by its category: the menu's Donations, Events and Blog items stay current on an
+ * article inside them, as the source's menu does. A category counts for the nearest of itself or its ancestors that is
+ * one of the three; a post that lands in more than one section (or in none) marks nothing rather than guess.
+ *
+ * @return string The slug of the top-level page of the section ('donations', 'events', 'category-blog'), or ''.
+ */
+function wp_ja_impact_single_section(): string {
+	// An article opened at a menu address (Pages › Blog Detail) is that menu item, not a member of the Blog section: the source's menu marks the item only.
+	if ( ! is_singular( 'post' ) || get_query_var( 'wp_ja_impact_article_route' ) ) {
+		return '';
+	}
+	$sections = array(
+		'donations' => 'donations',
+		'events'    => 'events',
+		'blog'      => 'category-blog',
+	);
+	$found    = array();
+	foreach ( get_the_category( (int) get_queried_object_id() ) as $term ) {
+		$chain = array_merge( array( (int) $term->term_id ), array_map( 'intval', get_ancestors( (int) $term->term_id, 'category' ) ) );
+		foreach ( $chain as $term_id ) {
+			$candidate = get_term( $term_id, 'category' );
+			if ( $candidate instanceof WP_Term && isset( $sections[ $candidate->slug ] ) ) {
+				$found[ $sections[ $candidate->slug ] ] = true;
+				break;
+			}
+		}
+	}
+	return 1 === count( $found ) ? (string) array_key_first( $found ) : '';
+}
+
+/**
+ * The menu link to the section of the single post being shown is the current one (a top-level page whose slug names the
+ * section; the same page reached through the Pages menu's nested items is not).
+ *
+ * @param string $content The block's render.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_impact_section_menu_link( string $content, array $block ): string {
+	if ( '' === $content || str_contains( $content, 'current-menu-item' ) || 'post-type' !== ( $block['attrs']['kind'] ?? '' ) || 'page' !== ( $block['attrs']['type'] ?? '' ) ) {
+		return $content;
+	}
+	$section = wp_ja_impact_single_section();
+	if ( '' === $section ) {
+		return $content;
+	}
+	$page = get_post( (int) ( $block['attrs']['id'] ?? 0 ) );
+	if ( ! $page instanceof WP_Post || 0 !== (int) $page->post_parent || $section !== $page->post_name ) {
+		return $content;
+	}
+	return (string) preg_replace( '/^(<li class="[^"]*)"/', '$1 current-menu-item"', $content, 1 );
+}
+add_filter( 'render_block_core/navigation-link', 'wp_ja_impact_section_menu_link', 20, 2 );

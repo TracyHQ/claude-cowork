@@ -96,7 +96,7 @@ function wp_ja_impact_ga_account_form( string $content, array $block ): string {
 			. '<div class="com-users-registration__submit control-group"><div class="controls"><button type="submit" class="btn btn-primary validate">' . esc_html__( 'Register', 'wp-ja-impact' ) . '</button> <a class="btn btn-danger" href="' . $home( '/' ) . '">' . esc_html__( 'Cancel', 'wp-ja-impact' ) . '</a></div></div>';
 		$action = esc_url( site_url( 'wp-login.php?action=register', 'login_post' ) );
 	} else {
-		$intro  = 'username-reminder-request' === $slug ? '<legend>' . esc_html__( 'Please enter the email address associated with your User account. Your username will be emailed to the email address on file.', 'wp-ja-impact' ) . '</legend>' : '<p></p>';
+		$intro  = 'username-reminder-request' === $slug ? '<legend>' . esc_html__( 'Please enter the email address associated with your account. WordPress does not email usernames: we will send a link to that address to reset your password.', 'wp-ja-impact' ) . '</legend>' : '<p></p>';
 		$fields = $intro . wp_ja_impact_ga_field( 'user_login', __( 'Email Address', 'wp-ja-impact' ), 'text', true, ' autocomplete="email"' )
 			. '<div class="control-group"><div class="controls"><button type="submit" class="btn btn-primary validate">' . esc_html__( 'Submit', 'wp-ja-impact' ) . '</button></div></div>';
 		$action = esc_url( site_url( 'wp-login.php?action=lostpassword', 'login_post' ) );
