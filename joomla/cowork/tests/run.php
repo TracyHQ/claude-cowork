@@ -1866,6 +1866,7 @@ require __DIR__ . "/leaf-codec.php";
 require __DIR__ . "/builder-fixtures.php";
 require __DIR__ . "/visible-text.php";
 require __DIR__ . "/derived-map.php";
+require __DIR__ . "/secret-leaf.php";
 require __DIR__ . "/derived-cache.php";
 // Derived contract: an imported site bound to its own rows, through the contract door.
 require __DIR__ . "/derived-contract.php";

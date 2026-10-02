@@ -182,6 +182,16 @@ PHP serialize, nested in any order). In Tracy, only the import provision calls i
 - The binding (`mode: 'derived'`) records `keep` (the nested slots calibration kept), the hash of the
   algorithm (never of the rows, which every apply changes) and the derive's answer. The map is made
   from the rows only when a request needs it (`db.*`, `files.*`, `info` never scan).
+- **A credential is never a slot** (`lib/SecretLeaf.php`, read by `LeafCodec::leaves` and
+  `WordPressDerivedRows::technicalOption`). A JSON or serialized key whose name says it holds one
+  (`smtp`, `api_key`, `password`, `client_secret`, `webhook`...) takes its whole subtree out of the map;
+  a text whose shape gives it away (a Google or Stripe key, a JWT, a webhook address, a URL that
+  carries a token) is skipped wherever it sits; an option a plugin named for one is never a row. A
+  derive that could not render the pages keeps every nested leaf, so a key typed into a setting was a
+  slot like any heading, listed by `inspect` and shown by `content.read` (found in a review of the
+  import work, 02/10/2026). Listing only: what is already written is not touched, and an address that
+  is given still reads and writes. `tests/secret-leaf.php` pins both sides: the credentials go, the
+  words, e-mails, phone numbers, links and picture paths stay.
 - **Memory.** Rows are read in batches of 200 posts (`WordPressDerivedRows::batches()`) and built into
   the map batch by batch (`DerivedMap::buildBatches`), so no request holds every row. What cannot be
   words stays in the database: bookkeeping meta and configuration options are excluded in the `WHERE`
