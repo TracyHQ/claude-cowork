@@ -31,7 +31,14 @@ const THRESHOLD = 2
 // checker runs inside `joomla/` and `joomla/scripts/…` when it runs from the repository root,
 // and a rule that only matched the first shape made the checker fail on its own word list the
 // moment a second platform gave anyone a reason to run it from the root.
-const SKIP = /(^|\/)(LICENSE\.txt$|dist\/|\.git\/|node_modules\/|scripts\/check-language\.mjs$)/
+//
+// A theme's translation catalogues (`languages/<locale>.l10n.php`) are skipped for the reason TCH's
+// own check exempts its dictionaries: in a dictionary the other language IS the purpose, not a
+// leak. Those strings are what a customer's site says to its visitors, and the language a product
+// speaks to them follows the site, not this repository. Only that file shape is skipped, so the
+// theme's PHP, CSS and comments next to it stay checked. (A Welsh catalogue trips the word list too: Welsh `neu`, "or", is
+// one of its words.)
+const SKIP = /(^|\/)(LICENSE\.txt$|dist\/|\.git\/|node_modules\/|scripts\/check-language\.mjs$|languages\/[^/]+\.l10n\.php$)/
 
 /**
  * Tracked files, plus whatever the build produced.

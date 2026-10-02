@@ -1,0 +1,9 @@
+{
+  "_comment": "What a WordPress site running the JA Essence theme (wp-ja-essence) asks for when it checks for updates. Read by wp-ja-essence/inc/update.php over the update_themes_github.com filter, reached because its style.css declares `Update URI: https://github.com/TracyHQ/claude-cowork`. Written by `node scripts/release-wordpress-theme.mjs <version> --theme wp-ja-essence`, which reads the version off the mirrored style.css. The mirror (TCH scripts/sync-cms-themes.mjs) leaves this file alone.",
+  "version": "1.0.0",
+  "package": null,
+  "url": "https://github.com/TracyHQ/claude-cowork/tree/main/wordpress/theme/wp-ja-essence",
+  "requires": "7.0",
+  "requires_php": "8.1",
+  "tested": "7.1"
+}

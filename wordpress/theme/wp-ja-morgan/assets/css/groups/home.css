@@ -1,0 +1,556 @@
+/* Group A pages: home-style-2 / -3 / -4, about-us, services-page.
+ * Every value below was measured on the source (:8281) with computed styles, 1440 px, light. */
+
+/* ---- Per-style palette: each home style is a T3 style with its own brand colours ---- */
+body.jm-route-home-style-2 {
+	--jm-red: #21c674;
+	--ja-accent: #21c674;
+	--jm-secondary: #1e375c;
+}
+body.jm-route-home-style-3 {
+	--jm-red: #c5b48f;
+	--ja-accent: #c5b48f;
+	--jm-secondary: #67615c;
+}
+body.jm-route-home-style-4 {
+	--jm-red: #21c674;
+	--ja-accent: #21c674;
+	--jm-secondary: #333399;
+	--jm-text: #aaaaaa;
+	--jm-lead: #aaaaaa;
+	color: #aaaaaa;
+}
+body.jm-route-home-style-2 :is(.mod-bg-secondary, .t3-off-canvas-header, .acm-accordion .panel[open] summary, .acm-testimonial.style-1 .label-highlight),
+body.jm-route-home-style-3 :is(.mod-bg-secondary, .t3-off-canvas-header, .acm-accordion .panel[open] summary, .acm-testimonial.style-1 .label-highlight),
+body.jm-route-home-style-4 :is(.mod-bg-secondary, .t3-off-canvas-header, .acm-accordion .panel[open] summary, .acm-testimonial.style-1 .label-highlight) {
+	background: var(--jm-secondary);
+}
+
+/* ---- Section titles at 36 px on these pages ---- */
+body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, .jm-route-about-us, .jm-route-services-page) .jm-acm h3.jm-module-title {
+	font-size: 36px;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+	color: var(--wp--preset--color--fg-2, #333333);
+}
+body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, .jm-route-about-us, .jm-route-services-page) .jm-acm.mod-bg-secondary h3.jm-module-title {
+	color: #ffffff;
+}
+
+/* ---- Masthead of about-us and services-page: centred, 690 px ---- */
+:is(.jm-route-about-us, .jm-route-services-page) .ja-masthead-detail {
+	max-width: 690px;
+	text-align: center;
+}
+:is(.jm-route-about-us, .jm-route-services-page) .ja-masthead-title {
+	font-size: 60px;
+	line-height: 90px;
+	font-weight: 600;
+	letter-spacing: -0.6px;
+	margin: 0 0 12.5px;
+	color: #ffffff;
+}
+:is(.jm-route-about-us, .jm-route-services-page) .ja-masthead-description {
+	margin: 25px 0 0;
+	opacity: 0.75;
+}
+
+/* ---- features-intro style-4: colour tiles ---- */
+.acm-features.style-4 {
+	width: auto;
+}
+.acm-features.style-4 > .section-title {
+	max-width: 810px;
+	margin: 0 auto 150px;
+	padding-inline: 15px;
+	text-align: center;
+}
+.acm-features.style-4 .jm-ft-desc {
+	margin: 0;
+}
+.acm-features.style-4 .jm-ft-sign {
+	margin: 0;
+	font-size: 36px;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+}
+.acm-features.style-4 .jm-ft-sign img {
+	display: inline;
+	width: auto;
+	max-width: 100%;
+	height: auto;
+}
+.acm-features.style-4 .jm-tiles {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+}
+.acm-features.style-4 .col {
+	flex: 0 0 50%;
+	display: flex;
+	box-sizing: border-box;
+}
+.acm-features.style-4 .features-item {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	width: 100%;
+	color: #ffffff;
+}
+.acm-features.style-4 .col:nth-child(-n + 2) .features-item {
+	flex-direction: row-reverse;
+}
+.acm-features.style-4 .img-intro {
+	position: relative;
+	flex: 0 0 50%;
+	margin: 0;
+}
+.acm-features.style-4 .img-intro img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.acm-features.style-4 .content-wrap {
+	flex: 0 0 50%;
+	box-sizing: border-box;
+	padding: 90px;
+}
+.acm-features.style-4 .img-icon {
+	height: 60px;
+	margin: 0 0 30px;
+}
+.acm-features.style-4 .img-icon img {
+	width: 60px;
+	height: 60px;
+}
+.acm-features.style-4 .font-icon {
+	margin: 0 0 30px;
+	color: #ffffff;
+}
+.acm-features.style-4 h4 {
+	margin: 0 0 25px;
+	color: #ffffff;
+}
+.acm-features.style-4 .jm-description {
+	margin: 0 0 25px;
+	color: #ffffff;
+	opacity: 0.75;
+}
+.acm-features.style-4 .jm-tile-link {
+	margin: 0;
+}
+.acm-features.style-4 .jm-tile-link a {
+	color: #ffffff;
+	font-weight: 700;
+	text-decoration: none;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.acm-features.style-4 .jm-tile-link a::after {
+	content: "\f119";
+	font-family: "Ionicons";
+	font-weight: 400;
+	margin-left: 6.25px;
+}
+/* Tile colour levels bg-lv-1..4, by tile position on each page (level 1 is the style's primary colour). */
+.acm-features.style-4 .col .features-item {
+	background: var(--jm-red);
+}
+body.jm-route-home-style-3 .acm-features.style-4 .col:nth-child(1) .features-item {
+	background: var(--jm-red);
+}
+body.jm-route-home-style-3 .acm-features.style-4 .col:nth-child(2) .features-item {
+	background: #336666;
+}
+body.jm-route-home-style-3 .acm-features.style-4 .col:nth-child(3) .features-item {
+	background: #67615c;
+}
+body.jm-route-home-style-3 .acm-features.style-4 .col:nth-child(4) .features-item {
+	background: #979eb1;
+}
+body.jm-route-services-page .acm-features.style-4 .col:nth-child(1) .features-item,
+body.jm-route-services-page .acm-features.style-4 .col:nth-child(4) .features-item {
+	background: #67615c;
+}
+body.jm-route-services-page .acm-features.style-4 .col:nth-child(2) .features-item {
+	background: #336666;
+}
+body.jm-route-services-page .acm-features.style-4 .col:nth-child(3) .features-item {
+	background: #979eb1;
+}
+
+/* ---- features-intro style-5: a white panel over a picture ---- */
+.acm-features.style-5 .features-item {
+	position: relative;
+	padding: 150px 0;
+}
+.acm-features.style-5 .jm-item-bg {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+}
+.acm-features.style-5 .jm-item-bg img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.acm-features.style-5 .container {
+	position: relative;
+	z-index: 1;
+}
+.acm-features.style-5 .group-item {
+	box-sizing: border-box;
+	width: 570px;
+	max-width: 100%;
+	margin-left: auto;
+	padding: 90px 120px 90px 90px;
+	border-radius: 4px;
+	background: var(--jm-bg);
+	text-align: left;
+}
+.acm-features.style-5 .sub-heading {
+	margin: 0 0 25px;
+	font-weight: 500;
+	color: var(--jm-red);
+}
+.acm-features.style-5 h2 {
+	margin: 0 0 25px;
+	font-size: 36px;
+	font-weight: 400;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+	color: var(--wp--preset--color--fg-2, #333333);
+}
+.acm-features.style-5 .lead,
+.acm-features.style-6 .lead {
+	margin: 0 0 60px;
+	font-size: 18px;
+	line-height: 30px;
+}
+.acm-features.style-5 .btn-action,
+.acm-features.style-6 .btn-action {
+	margin: 0;
+}
+
+/* ---- features-intro style-6: a coloured statement band ---- */
+.acm-features.style-6 {
+	color: #ffffff;
+}
+.acm-features.style-6 .row {
+	display: flex;
+	margin: 0 -15px;
+}
+.acm-features.style-6 .col-md-4 {
+	flex: 0 0 33.3333%;
+	box-sizing: border-box;
+	padding: 0 15px;
+}
+.acm-features.style-6 .col-md-8 {
+	flex: 0 0 66.6667%;
+	box-sizing: border-box;
+	padding: 0 105px 0 15px;
+}
+.acm-features.style-6 .sub-heading {
+	margin: 0 0 25px;
+	font-weight: 500;
+	color: #ffffff;
+}
+.acm-features.style-6 h2 {
+	margin: 0 0 25px;
+	font-size: 36px;
+	font-weight: 400;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+}
+.acm-features.style-6 .lead {
+	color: #ffffff;
+	opacity: 0.7;
+}
+
+/* ---- statics: number counters ---- */
+.acm-statics.style-1 .row {
+	display: flex;
+	margin: 0;
+}
+.acm-statics.style-1 .col {
+	flex: 0 0 25%;
+	box-sizing: border-box;
+}
+.acm-statics.style-1 .statics-item {
+	padding: 180px 0;
+	text-align: center;
+	color: #ffffff;
+}
+.acm-statics.style-1 .number {
+	margin: 0;
+	font-size: 60px;
+	font-weight: 500;
+	line-height: 75px;
+	letter-spacing: -0.6px;
+	color: #ffffff;
+}
+.acm-statics.style-1 h5 {
+	margin: 10px 0 0;
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 20px;
+	color: #ffffff;
+}
+
+/* ---- testimonials style-3: quote cards ---- */
+.acm-testimonial.style-3 > .section-title {
+	max-width: 520px;
+	margin: 0 auto 60px;
+	text-align: center;
+}
+.acm-testimonial.style-3 .section-title h3 {
+	margin: 0;
+}
+.acm-testimonial.style-3 .testimonial-content {
+	overflow: hidden;
+}
+.acm-testimonial.style-3 .tracy-motion-track {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 30px;
+}
+.acm-testimonial.style-3 .testimonial-item {
+	flex: 0 0 390px;
+	box-sizing: border-box;
+	text-align: center;
+}
+.acm-testimonial.style-3 .lead-desc {
+	box-sizing: border-box;
+	min-height: 200px;
+	margin: 0 0 30px;
+	padding: 50px;
+	border-radius: 4px;
+	background: var(--jm-card);
+	box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
+}
+.acm-testimonial.style-3 .testimonial-img {
+	height: 60px;
+	margin: 0;
+}
+.acm-testimonial.style-3 .testimonial-img img {
+	width: 60px;
+	height: 60px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+.acm-testimonial.style-3 .testimonial-name {
+	margin: 15px 0 6px;
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 20px;
+	color: var(--jm-heading);
+}
+.acm-testimonial.style-3 .testimonial-position {
+	margin: 0;
+}
+
+/* ---- about-us and services-page: page-masthead template wraps the sections in a boxed .container; the source
+ * sections are full width (measured 1440 at 1440). ---- */
+body:is(.jm-route-about-us, .jm-route-services-page) .t3-mainbody.container {
+	width: auto;
+	max-width: none;
+	padding-inline: 0;
+}
+body:is(.jm-route-about-us, .jm-route-services-page) .item-page .acm-teams .jm-cards {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 30px;
+	margin: 0;
+}
+
+/* ---- Statement heading of features-intro (style-4, style-3 intro): 36 px on every group A page ---- */
+body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, .jm-route-about-us, .jm-route-services-page) .jm-acm h3.jm-ft-desc {
+	font-size: 36px;
+	line-height: 45px;
+	letter-spacing: -0.6px;
+	font-weight: 400;
+}
+
+/* ---- Hero call-to-action band on home-style-3 keeps the brand red although the page palette is sand ---- */
+body.jm-route-home-style-3 .acm-hero.t3-section .wp-block-button__link {
+	background: #d93030;
+	border-color: #d93030;
+}
+
+/* ---- features-intro style-1 with slide=0 (home-style-4, about-us): a 2 x 2 grid of icon items, not a carousel ---- */
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 {
+	grid-template-columns: 405px 1fr;
+	column-gap: 0;
+	align-items: start;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
+	max-width: 520px;
+	box-sizing: border-box;
+	padding-right: 30px;
+	margin-bottom: 60px;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .acm-feature-slide.tracy-motion-carousel {
+	margin: 0 -15px 0 0;
+	overflow: visible;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .tracy-motion-track {
+	flex-wrap: wrap;
+	transform: none !important;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-item {
+	min-height: 309.5px;
+	flex: 0 0 50%;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-img img {
+	width: 75px;
+	height: 75px;
+	object-fit: fill;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-feature-slide h4 {
+	margin: 12.5px 0 12.5px !important;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-feature-slide p:not(.action-link-icon) {
+	padding-right: 0;
+	margin: 0 0 25px;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .tracy-motion-nav {
+	display: none;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .t3-section:has(.acm-features.style-1) {
+	padding-bottom: 90px;
+}
+
+/* ---- teams on about-us: item 400 px tall, 15 px of row margin below the last row ---- */
+body:is(.jm-route-about-us, .jm-route-home-style-2, .jm-route-home-style-3) .acm-teams .teams-item {
+	min-height: 400px;
+	box-sizing: border-box;
+}
+body.jm-route-about-us .acm-teams {
+	padding-bottom: 15px;
+}
+
+/* Latest articles (mod_articles_latest of Home style 4): "view all" link over the title row, four cards. */
+.jm-acm .wrap-last-article {
+	position: relative;
+}
+.jm-acm .wrap-last-article > .view-all {
+	position: absolute;
+	top: 0;
+	right: 0;
+	margin: -90px 0 0;
+	text-align: right;
+	line-height: 25px;
+}
+.jm-acm .wrap-last-article > .view-all .wp-block-button {
+	display: inline;
+}
+.jm-acm .wrap-last-article > .view-all .wp-block-button__link {
+	padding: 0;
+	background: none;
+	border: 0;
+	border-bottom: 1px solid #eaeaea;
+	border-radius: 0;
+	color: #333333;
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 25px;
+	text-decoration: none;
+}
+.jm-acm .wrap-last-article > .view-all .wp-block-button__link::after {
+	content: "\f119";
+	font-family: "Ionicons";
+	font-weight: 400;
+	margin-left: 6.25px;
+}
+.latest-news .wp-block-post-template {
+	display: flex;
+	flex-wrap: wrap;
+	width: calc(100% + 30px);
+	max-width: none;
+	margin: 0 -15px;
+	padding: 0;
+	list-style: none;
+}
+.latest-news .wp-block-post-template > li {
+	width: 25%;
+	margin: 0;
+	padding: 0 15px;
+	box-sizing: border-box;
+}
+.latest-news .wp-block-post-template > li {
+	display: flex;
+}
+.latest-news .article-detail {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.latest-news .article-detail,
+.latest-news .article-content {
+	margin: 0;
+	padding: 0;
+}
+.latest-news .intro-image {
+	height: 190px;
+	margin: 0;
+	overflow: hidden;
+}
+.latest-news .intro-image img {
+	display: block;
+	width: 100%;
+	height: 190px;
+	object-fit: fill;
+	border-radius: 4px;
+}
+.jm-acm .wrap-last-article > .view-all .wp-block-button__link {
+	display: inline;
+	text-align: right;
+}
+.latest-news .date-create {
+	margin: 20px 0 10px;
+	font-size: 13px;
+	line-height: 20.3125px;
+	color: #aaaaaa;
+}
+.latest-news .heading-link {
+	margin: 0 0 25px;
+	font-size: 24px;
+	font-weight: 500;
+	line-height: 27.6px;
+	letter-spacing: -0.6px;
+}
+.latest-news .heading-link a {
+	display: inline;
+	font-size: 20px;
+	line-height: 23px;
+	color: #333333;
+	text-decoration: none;
+}
+.latest-news .articles-introtext {
+	margin: 0;
+	font-size: 16px;
+	line-height: 25px;
+	color: #aaaaaa;
+}
+@media (max-width: 991px) {
+	.latest-news .wp-block-post-template > li {
+		width: 50%;
+	}
+}
+@media (max-width: 575px) {
+	.latest-news .wp-block-post-template > li {
+		width: 100%;
+	}
+}
+
+/* The closing call to action of the team section in the danger colour (its "color-link" parameter). */
+.jm-link-danger .teams-action .wp-block-button__link {
+	background: #d93030;
+	border-color: #d93030;
+}
+
+/* The lead of a features section may be two paragraphs (the source: a <p> and a bare text line). */
+.acm-features.style-3 .lead.jm-lead-more {
+	margin-top: 0;
+}

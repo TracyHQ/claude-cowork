@@ -1,0 +1,411 @@
+{
+  "$schema": "https://schemas.wp.org/wp/6.6/theme.json",
+  "version": 3,
+  "settings": {
+    "appearanceTools": true,
+    "useRootPaddingAwareAlignments": false,
+    "layout": {
+      "contentSize": "1024px",
+      "wideSize": "1024px"
+    },
+    "color": {
+      "defaultPalette": false,
+      "defaultGradients": false,
+      "defaultDuotone": false,
+      "palette": [
+        {
+          "slug": "bg",
+          "name": "Background",
+          "color": "#ffffff"
+        },
+        {
+          "slug": "surface",
+          "name": "Surface",
+          "color": "#111111"
+        },
+        {
+          "slug": "surface-warm",
+          "name": "Surface warm",
+          "color": "#111111"
+        },
+        {
+          "slug": "fg",
+          "name": "Foreground",
+          "color": "#777777"
+        },
+        {
+          "slug": "fg-2",
+          "name": "Foreground 2",
+          "color": "#333333"
+        },
+        {
+          "slug": "muted",
+          "name": "Muted",
+          "color": "#6e6e73"
+        },
+        {
+          "slug": "meta",
+          "name": "Meta",
+          "color": "#86868b"
+        },
+        {
+          "slug": "border",
+          "name": "Border",
+          "color": "#eaeaea"
+        },
+        {
+          "slug": "border-soft",
+          "name": "Border soft",
+          "color": "#e8e8ed"
+        },
+        {
+          "slug": "accent",
+          "name": "Accent",
+          "color": "#d93030"
+        },
+        {
+          "slug": "accent-on",
+          "name": "On accent",
+          "color": "#d93030"
+        },
+        {
+          "slug": "accent-hover",
+          "name": "Accent hover",
+          "color": "#0077ed"
+        },
+        {
+          "slug": "accent-active",
+          "name": "Accent active",
+          "color": "#0066cc"
+        },
+        {
+          "slug": "success",
+          "name": "Success",
+          "color": "#16a34a"
+        },
+        {
+          "slug": "warn",
+          "name": "Warn",
+          "color": "#eab308"
+        },
+        {
+          "slug": "danger",
+          "name": "Danger",
+          "color": "#dc2626"
+        }
+      ]
+    },
+    "typography": {
+      "fluid": false,
+      "defaultFontSizes": false,
+      "fontFamilies": [
+        {
+          "slug": "display",
+          "name": "Display",
+          "fontFamily": "PTRootUI, Helvetica, Arial, sans-serif"
+        },
+        {
+          "slug": "body",
+          "name": "Body",
+          "fontFamily": "PTRootUI, Helvetica, Arial, sans-serif"
+        },
+        {
+          "slug": "mono",
+          "name": "Mono",
+          "fontFamily": "\"SF Mono\", ui-monospace, \"JetBrains Mono\", Menlo, Monaco, Consolas, monospace"
+        }
+      ],
+      "fontSizes": [
+        {
+          "slug": "xs",
+          "name": "XS",
+          "size": "12px"
+        },
+        {
+          "slug": "sm",
+          "name": "SM",
+          "size": "13px"
+        },
+        {
+          "slug": "base",
+          "name": "Base",
+          "size": "16px"
+        },
+        {
+          "slug": "lg",
+          "name": "LG",
+          "size": "16px"
+        },
+        {
+          "slug": "xl",
+          "name": "XL",
+          "size": "20px"
+        },
+        {
+          "slug": "xxl",
+          "name": "2XL",
+          "size": "24px"
+        },
+        {
+          "slug": "xxxl",
+          "name": "3XL",
+          "size": "36px"
+        },
+        {
+          "slug": "xxxxl",
+          "name": "4XL",
+          "size": "60px"
+        }
+      ]
+    },
+    "spacing": {
+      "units": [
+        "px",
+        "rem",
+        "em",
+        "%",
+        "vw",
+        "vh"
+      ],
+      "defaultSpacingSizes": false,
+      "spacingSizes": [
+        {
+          "slug": "1",
+          "name": "1",
+          "size": "5px"
+        },
+        {
+          "slug": "2",
+          "name": "2",
+          "size": "10px"
+        },
+        {
+          "slug": "3",
+          "name": "3",
+          "size": "15px"
+        },
+        {
+          "slug": "4",
+          "name": "4",
+          "size": "20px"
+        },
+        {
+          "slug": "5",
+          "name": "5",
+          "size": "25px"
+        },
+        {
+          "slug": "6",
+          "name": "6",
+          "size": "30px"
+        },
+        {
+          "slug": "8",
+          "name": "8",
+          "size": "40px"
+        },
+        {
+          "slug": "12",
+          "name": "12",
+          "size": "60px"
+        }
+      ]
+    },
+    "custom": {
+      "leading": {
+        "body": "1.56",
+        "tight": "1.25"
+      },
+      "tracking": {
+        "display": "-0.01em"
+      },
+      "sectionY": {
+        "desktop": "150px",
+        "tablet": "64px",
+        "phone": "60px"
+      },
+      "radius": {
+        "sm": "8px",
+        "md": "4px",
+        "lg": "18px",
+        "pill": "980px"
+      },
+      "elev": {
+        "flat": "none",
+        "ring": "0 0 0 1px var(--wp--preset--color--border)",
+        "raised": "0 12px 32px rgba(0, 0, 0, 0.08)"
+      },
+      "focusRing": "0 0 0 4px color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%)",
+      "motion": {
+        "fast": "150ms",
+        "base": "220ms"
+      },
+      "ease": {
+        "standard": "cubic-bezier(0.28, 0, 0.22, 1)"
+      },
+      "container": {
+        "max": "1024px",
+        "gutterDesktop": "15px",
+        "gutterTablet": "18px",
+        "gutterPhone": "15px"
+      },
+      "tracy": {
+        "inspiration": "wp-ja-morgan"
+      }
+    }
+  },
+  "styles": {
+    "color": {
+      "background": "var:preset|color|bg",
+      "text": "var:preset|color|fg"
+    },
+    "typography": {
+      "fontFamily": "var:preset|font-family|body",
+      "fontSize": "var:preset|font-size|base",
+      "lineHeight": "var(--wp--custom--leading--body)"
+    },
+    "spacing": {
+      "padding": {
+        "top": "0",
+        "right": "0",
+        "bottom": "0",
+        "left": "0"
+      },
+      "blockGap": "var:preset|spacing|4"
+    },
+    "elements": {
+      "heading": {
+        "typography": {
+          "fontFamily": "var:preset|font-family|display",
+          "lineHeight": "var(--wp--custom--leading--tight)",
+          "letterSpacing": "var(--wp--custom--tracking--display)"
+        },
+        "color": {
+          "text": "var:preset|color|fg"
+        }
+      },
+      "h1": {
+        "typography": {
+          "fontSize": "var:preset|font-size|xxxl"
+        }
+      },
+      "h2": {
+        "typography": {
+          "fontSize": "var:preset|font-size|xxl"
+        }
+      },
+      "h3": {
+        "typography": {
+          "fontSize": "var:preset|font-size|xl"
+        }
+      },
+      "link": {
+        "color": {
+          "text": "var:preset|color|fg"
+        },
+        ":hover": {
+          "color": {
+            "text": "var:preset|color|accent"
+          }
+        }
+      },
+      "button": {
+        "color": {
+          "background": "var:preset|color|accent",
+          "text": "var:preset|color|accent-on"
+        },
+        "border": {
+          "radius": "var(--wp--custom--radius--md)"
+        },
+        "typography": {
+          "fontWeight": "600"
+        },
+        ":hover": {
+          "color": {
+            "background": "var:preset|color|accent-hover",
+            "text": "var:preset|color|accent-on"
+          }
+        }
+      }
+    },
+    "css": "/* wp-ja-morgan: dark mode. The source (JA Morgan, Joomla 6 T3) follows the OS until the visitor picks: its pre-paint script sets html[data-theme] from localStorage or prefers-color-scheme (tpls/blocks/head-prepaint.php), and css/darkmode.css scopes the dark look under html[data-theme=\"dark\"]. Here every colour preset carries both halves through light-dark(): light = tokens.css (measured 29/09 on :8281), dark = the computed values of the source in dark (body #0f1320 / #a7b0c2, headings #f2f4f8, accent --ja-accent #e0463f, declared per mode because the design contract reads it as a resolved colour, form surfaces #1a2032, borders #2a3247, navy re-tint #6f8fd6). The footer band is #111111 in both modes, as measured. No attribute = auto, the OS decides; assets/js/wp-ja-morgan-dark.js writes data-theme light|dark from the tracy_theme cookie before the first paint. */ :root{color-scheme:light dark;--ja-accent:#d93030;--wp--preset--color--bg:light-dark(#ffffff,#0f1320);--wp--preset--color--surface:light-dark(#f6f7fb,#1a2032);--wp--preset--color--surface-warm:light-dark(#111111,#111111);--wp--preset--color--fg:light-dark(#777777,#a7b0c2);--wp--preset--color--fg-2:light-dark(#333333,#f2f4f8);--wp--preset--color--muted:light-dark(#777777,#8b93a4);--wp--preset--color--border:light-dark(#eaeaea,#2a3247);--wp--preset--color--border-soft:light-dark(#eaeaea,#2a3247);--wp--preset--color--accent:light-dark(#d93030,#e0463f);--wp--preset--color--accent-on:light-dark(#ffffff,#ffffff);--wp--preset--color--accent-hover:light-dark(#b22323,#f06b64);--wp--preset--color--accent-active:light-dark(#b22323,#e0463f);}:root[data-theme=\"light\"]{color-scheme:light}:root[data-theme=\"dark\"]{color-scheme:dark;--ja-accent:#e0463f}@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){--ja-accent:#e0463f}}"
+  },
+  "customTemplates": [
+    {
+      "name": "landing",
+      "title": "Landing",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "fixture",
+      "title": "Design system page",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "artifact",
+      "title": "Design page (engine)",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "pricing",
+      "title": "Pricing",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-landing",
+      "title": "Landing (sections only)",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-masthead",
+      "title": "Page with masthead",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-masthead-sidebar",
+      "title": "Page with masthead and sidebar",
+      "postTypes": [
+        "page"
+      ]
+    }
+  ],
+  "templateParts": [
+    {
+      "name": "header",
+      "title": "Header",
+      "area": "header"
+    },
+    {
+      "name": "footer",
+      "title": "Footer",
+      "area": "footer"
+    },
+    {
+      "name": "sidebar",
+      "title": "Sidebar",
+      "area": "uncategorized"
+    },
+    {
+      "name": "search-description",
+      "title": "Search page description",
+      "area": "uncategorized"
+    },
+    {
+      "name": "search-form",
+      "title": "Search page form and tips",
+      "area": "uncategorized"
+    }
+  ]
+}
