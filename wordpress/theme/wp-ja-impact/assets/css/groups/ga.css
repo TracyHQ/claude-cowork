@@ -319,24 +319,30 @@ body.tracy .jim-contactpage__main .wpcf7-form :is(input:not([type='checkbox']), 
 @media (max-width: 575.98px) {
   body.tracy .jim-contactpage__main .wpcf7-form { grid-template-columns: 1fr; }
 }
-body.tracy .jim-contactpage__main .wpcf7-acceptance .wpcf7-list-item { margin: 0; }
-body.tracy .jim-contactpage__main .wpcf7-acceptance label { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-weight: 400; color: var(--jim-text); }
-body.tracy .jim-contactpage__main .wpcf7-acceptance input[type='checkbox'] {
+body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) .wpcf7-list-item { margin: 0; }
+body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) label { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-weight: 400; color: var(--jim-text); }
+body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) input[type='checkbox'] {
   flex: none; width: 16px; height: 16px; margin: 4px 0 0; border: 1px solid var(--jim-line); border-radius: 4px; background: light-dark(#ffffff, #28354f);
   appearance: none; -webkit-appearance: none; cursor: pointer;
 }
-body.tracy .jim-contactpage__main .wpcf7-acceptance input[type='checkbox']:checked { border-color: var(--jim-primary); background: var(--jim-primary) url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") center / contain no-repeat; }
+body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) input[type='checkbox']:checked { border-color: var(--jim-primary); background: var(--jim-primary) url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") center / contain no-repeat; }
 body.tracy .jim-contactpage__main .wpcf7-form input.wpcf7-submit {
   padding-right: 56px;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 8h12M9 3l5 5-5 5'/%3e%3c/svg%3e");
   background-repeat: no-repeat; background-position: right 24px center; background-size: 16px;
 }
 body.tracy .jim-contactpage__main .wpcf7-form { row-gap: 0; }
-body.tracy .jim-contactpage__main .wpcf7-form > p:has(.wpcf7-acceptance) { margin-top: 16px; }
-body.tracy .jim-contactpage__main .wpcf7-form > p:has(.wpcf7-acceptance) { margin-top: 20px; }
+body.tracy .jim-contactpage__main .wpcf7-form > p:has(:is(.wpcf7-acceptance, .wpcf7-checkbox)) { margin-top: 16px; }
+body.tracy .jim-contactpage__main .wpcf7-form > p:has(:is(.wpcf7-acceptance, .wpcf7-checkbox)) { margin-top: 20px; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(input[name='acceptance-1']) { margin-top: 39px; }
+body.tracy .jim-contactpage__main .wpcf7-form > p:has(input[name='send-a-copy-to-yourself']) { margin-top: 20px; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(.wpcf7-submit) { margin-top: 62px; }
 
 /* The offline page's notice box: a #28354f fill in dark (light has none). */
 html[data-theme='dark'] body.tracy .jim-prose .well { background: #28354f; }
 @media (prefers-color-scheme: dark) { html:not([data-theme]) body.tracy .jim-prose .well { background: #28354f; } }
+
+/* A Send button that cannot be used right now reads as such (Contact Form 7 disables it while its form is sending or, with
+   acceptance-as-validation off, until the consent is ticked): dimmed and not clickable-looking. Release 1.0.1 validates on
+   submit instead, so this is the safety net for the sending state. */
+body.tracy .wpcf7 :is(input.wpcf7-submit, button[type='submit']):disabled { opacity: 0.5; cursor: not-allowed; }

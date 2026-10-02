@@ -12,7 +12,7 @@
       "Text Domain": "wp-ja-impact",
       "Theme Name": "JA Impact",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
-      "Version": "1.0.0"
+      "Version": "1.0.2"
     },
     "themeJson": {
       "version": 3,
@@ -1453,6 +1453,11 @@
       },
       {
         "kind": "filter",
+        "hook": "redirect_canonical",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
         "hook": "render_block",
         "file": "functions.php"
       },
@@ -1469,6 +1474,11 @@
       {
         "kind": "filter",
         "hook": "render_block_core/image",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/navigation-link",
         "file": "inc/extra.php"
       },
       {
@@ -1505,6 +1515,11 @@
         "kind": "filter",
         "hook": "run_wptexturize",
         "file": "functions.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "run_wptexturize",
+        "file": "inc/extra.php"
       },
       {
         "kind": "filter",
@@ -1665,18 +1680,18 @@
     "fileCount": 123,
     "fingerprints": {
       "assets/css/fixture-page.css": "sha256:d2c9d7c59ba6ed16038ac7879d0a07813e3d46046f16dff44e51278087a3f173",
-      "assets/css/groups/g1.css": "sha256:0cc9e49f5e0554f34c8dc24e43a62a35d781e26d6a6cb6aadef6cf2001a3a187",
-      "assets/css/groups/g2.css": "sha256:12bf92ba40401e698508d800878c691d2c9c060e1e7e7ed154d8e3fba6d66c88",
-      "assets/css/groups/g3.css": "sha256:53506526ece460f03faf1a092b5a414243120d2d074f88486e0e9d0dc57e81d6",
-      "assets/css/groups/ga.css": "sha256:f81f74e8dca6f91e467d08809aeae417c49f66bef3a57eb3e138315285236b8b",
-      "assets/css/groups/gb.css": "sha256:c1707ce60aab197c2f71227ca19d15813a70b0207161d7302f44b43ddc9272af",
+      "assets/css/groups/g1.css": "sha256:863fee9d78b07c9f34d79bd3caa8b85709070c2dcddc32d49068d03b2479a68e",
+      "assets/css/groups/g2.css": "sha256:29da751e1f0e62787128157560c8f1248bce5216842335ad8db1a49e3a6ecdbe",
+      "assets/css/groups/g3.css": "sha256:38729374413b146d632caac77bad0a5e47a3b45a985d6327984050ca044d6795",
+      "assets/css/groups/ga.css": "sha256:80737661aa41b11a75636d5059cba5284c015204864b52884f603a3e16b7f306",
+      "assets/css/groups/gb.css": "sha256:fa22e903218139163c953e7c2600e32515c0a17ad5c1892801c73708fc781110",
       "assets/css/groups/gc.css": "sha256:aae4b2008e791579e765938ade9f102d00f9f19d64e1e2b8186dcf62900c9636",
-      "assets/css/groups/z-pilot.css": "sha256:fc8e7f2332de9e692e6c7a3ee3034b5be3730ea28114d585711db630b7b1e885",
+      "assets/css/groups/z-pilot.css": "sha256:48b285e53bc1cc645a2a09131b0145fcc3f6cc1da7a4df5fdffaf825f3466f7e",
       "assets/css/layout.css": "sha256:dca7d68d13067d81e306200f1ec08e2a5fa03b05bf3b46202ebe69ae86d9c06f",
       "assets/css/sections.css": "sha256:d287eb0b26beee53654bdab114c23195e72b212240d9e5703d9546252a130a3f",
       "assets/css/tracy-motion.css": "sha256:656642b63d46e2cb41fcd5af3437e25fed38175280bfcf14e9a1f6da5efb6bec",
       "assets/css/tracy.css": "sha256:e4ff46badd4a022c1e0a0fcd742d5ce1acbcd329bc769de5a23f7d65381b0e71",
-      "assets/css/wp-ja-impact.css": "sha256:6358f0604bb82a83d5efd5723be47ca266c794cde68bebcc9bd51b705bc05f91",
+      "assets/css/wp-ja-impact.css": "sha256:e350872cc9cd168f9b0c9d8ffa5550dac43a54b56e3c0dc545882f24fdff2781",
       "assets/fonts/fa-brands-400.woff2": "sha256:4d46c3bcd49e008582f1c01ee88ed9a494d150643e3e947eb7710180808403c9",
       "assets/fonts/fa-solid-900.woff2": "sha256:38e76ab3d359e772e9f2aab11fbb07a2e2209318183a89ced0a97d6b958a7a6f",
       "assets/fonts/font-awesome-LICENSE.txt": "sha256:a50d0ebf314ce29576e1db15f04c419b94b25d0fc6729d835dceb33b15c221ea",
@@ -1691,19 +1706,19 @@
       "assets/img/gc-hero.jpg": "sha256:371b5083d08272485553e5ee80b80d1f538a5214d13914f7162187d53ab796f3",
       "assets/img/hero-placeholder.svg": "sha256:76cadc072b438fc2ec4e892db5f0d8146c4323b360f37a848c57193ecade5bf1",
       "assets/img/placeholder.svg": "sha256:5b52348d76b613eac5151fe5ca1ffcb5ebd1191595462752d384f5ab14db1fe6",
-      "assets/js/groups/g2.js": "sha256:089a473f1f6e183113de0ac6fa51d9357d62bb2a5a6360121b197dc5a040a611",
-      "assets/js/groups/g3.js": "sha256:1be10b9efd3e21f659be31eb9c0baf9edfd3dbc225564e86f89dc6e184dfebb4",
+      "assets/js/groups/g2.js": "sha256:fab945a4e697aacccd3ec4da9f23b7964cdf1f00e2cc3f673d0668a22fc25f7f",
+      "assets/js/groups/g3.js": "sha256:7fbc12a5ad3e77bdd99f854bcfc3203860414b27f7d50609d5815caf695d2044",
       "assets/js/tracy-motion.js": "sha256:e0de98821c906566fe3cb2e4ba7d4203375f61e1061a869fe5b53c566a796c36",
-      "assets/js/tracy-preview.js": "sha256:963089b30e6a825135a0fed7ade1f455a9e5b0e602ef53518fa98729eb43fd6c",
+      "assets/js/tracy-preview.js": "sha256:174189d9b2412fe0b7a3f69dde16d901d43d24528b89d3bbad3c78adacb54eed",
       "assets/js/tracy.js": "sha256:88c0d89600b0320a54eb34f943c4f29f631a920eca0866a78e2f054837ae1df4",
-      "assets/js/wp-ja-impact-dark.js": "sha256:9ff24b9527fa6e0fc6d73298e63c7d7135c9d56cceb42497831a26742b0657d6",
-      "assets/js/wp-ja-impact.js": "sha256:9d6103e9450d4dbc86a27a11e92992f4bbc38c0f1a14d6775317851a2d094791",
+      "assets/js/wp-ja-impact-dark.js": "sha256:31878f739a3f915162f6a639d774cb4048bc369f47af499609daa465144b4168",
+      "assets/js/wp-ja-impact.js": "sha256:f9b8a7115bedfb873ebc34f895f6d01adca0726cd209637169e2569617800479",
       "functions.php": "sha256:60eff34ab071981697e31164004a9ef94ea5da3667d6679d09812d64fc3e0fc8",
       "inc/asset-version.php": "sha256:3a714c4a5c7cc86565cbafdb063a68340b09c58045962b8751ef3ed66c415b1d",
-      "inc/extra.php": "sha256:1627854077b8254dcfb8321de990a8972eeaf5d90a246c69a397ac92a8abd6b9",
+      "inc/extra.php": "sha256:236d740b3a23cc4c49bfa8c02823a39745f3fc814d4045f0ad587b08614c8915",
       "inc/groups/g1.php": "sha256:8a23bfccd380f19db6595e8c7020f52f1e2db3e08eaf915c116af609ee4426cf",
-      "inc/groups/g3.php": "sha256:8fa2601bd111799782e5a2202f85c707e1661ca07eef2a2151baa12177c4ed71",
-      "inc/groups/ga.php": "sha256:7a714f335b03198b84cea511a9bc953e3e75b74f09d3866624486be2f42fe141",
+      "inc/groups/g3.php": "sha256:60838c00b792aec9a89eef2ac2a981aa4d802c2b47722b66730247c695216fc4",
+      "inc/groups/ga.php": "sha256:8fbb6c260914cf052d228dd392a6b68f2c46438044b710bb6256bf7033f37bae",
       "inc/groups/gb.php": "sha256:fd3aac3b489ba1d9f44885df583e99e060cb89abbac0b5c13cb385b7d8580dc7",
       "inc/groups/gc.php": "sha256:e084f02b88e698206be53bbdae69e93ab745ce5871120f5b14a012674ba07086",
       "inc/motion-head.php": "sha256:e8e3b5b22ac792cf8ce2ee97ff4dfdce949fc85d2f5aab34bdb8a21a498e41d5",
@@ -1711,12 +1726,12 @@
       "inc/variations.php": "sha256:54eee8dcec3f61fcaaffa3ecde6887b2b467cec816cce873f47aa4389d79a447",
       "inspirations.json": "sha256:06bb695e44d4727d2694f45f89d854da162a22637931614b76743ecf34c98ff4",
       "parts/contact.html": "sha256:756afae2522dd86da16b2985b26269a2a5cd149add8187921d9fe7a251cb7ea4",
-      "parts/footer.html": "sha256:c7cd95403a21161a23b576bf1655eb07530bf06dd914b5f09365ce8439008de5",
-      "parts/header.html": "sha256:a82b67e85dc34bd063ec6b6ff49d83c183b42647c5329884044af41902b61bf5",
+      "parts/footer.html": "sha256:d428eb5a583eda767ad1adbe1bc0f2256bebce93053c293e0826a9315aa1a150",
+      "parts/header.html": "sha256:6b04efe767c44f403870d147e038cb27c15ae82fca77af68d5c54c9ae610918d",
       "patterns/acm-accordion.php": "sha256:409b3430d7770c73d60eaa30cd35e618b92e9beb81d801b7cc3938555d6462d7",
       "patterns/acm-cta-1.php": "sha256:946be52b15d71a7e3903b6f32011c8d4886a61d8b26cf0759764b4d1d93e5e25",
       "patterns/acm-cta-2.php": "sha256:ad1c9e830e3cbe927e6d3ff545bd2f8781fce5fe3a4b9650dcfc3b10eab10a89",
-      "patterns/acm-events.php": "sha256:179c0fb6272d545906dd22eb8c8ed6dfc9126d4ff478740de40407c822943dfd",
+      "patterns/acm-events.php": "sha256:03b0028706c7f1b4415d6dfb3c4d8e1ae0b1dadd5c62f79c47d94367edd725d5",
       "patterns/acm-features-1.php": "sha256:5674b872f1d66337400f0bcf041b30334e839f0310c45a495569bb7d413ff91c",
       "patterns/acm-features-2.php": "sha256:b359ca09ec02b9cad03d3406ccaa6aec9d3ef8f673cb9ed5e5418d8e5e2da479",
       "patterns/acm-features-3.php": "sha256:668917dfab1b91486d86c5024c51d1462a1625817ce483f855f6e42f473a08e3",
@@ -1724,22 +1739,22 @@
       "patterns/acm-features-5.php": "sha256:5c6f5c295d79ec005d18f19f5d268828a0be3f77cd2d8f942e169115ed4d18d5",
       "patterns/acm-features-6.php": "sha256:cd651e8889e01653ef37d0af004666ae7d6b86fb219bfe7cae3af8b4016ecc46",
       "patterns/acm-features-7.php": "sha256:5dc50b144dc26d633d9463cda70a48e80162099ace31e7c3f197a8db9fb6772e",
-      "patterns/acm-funds.php": "sha256:530a7d7fe87fb9c76306d81f381360fb38fe725a33b8c97086a96c91db25a984",
+      "patterns/acm-funds.php": "sha256:a7ce4585904d6813f8b6818774aabad878ec7f3db559e08ffec94ed939d61044",
       "patterns/acm-hero.php": "sha256:2a629a71bbfcba281ada9bc8cc2837eda79372b42f740990d4d063b14ecfb28d",
-      "patterns/acm-news.php": "sha256:0b7878921df790db1caddbe729654e7f64362972450fcce9e98212841a050089",
+      "patterns/acm-news.php": "sha256:1a7008dc7cc207c077bef73faebbb5530980d0bb4408ca491d5d6dccfae0d7df",
       "patterns/acm-related.php": "sha256:75618587a62d3189bcdf6abd3b8941a561877e1bbeeabf24e0b158323a2a742b",
       "patterns/cards.php": "sha256:b9cff6d1aebcff1665eb25508e27b38d9527e406740683b56035a715b57b3f85",
       "patterns/gb-authors.php": "sha256:280b281b3a0c4f36f40f8bce59da968d73767ed0b9e269e0d4f56335ea8543bd",
       "patterns/gb-events.php": "sha256:54dad43d8fec1d2cfaf905f303b0b43ab90ea19e204ae335cbe0bdd6c37c8f5d",
       "patterns/gb-funds.php": "sha256:7d71a5bd8528bdf3637600716ff57ec106442ffd3ffe91bd0a6eb1311d13fbf7",
       "patterns/gb-news-children.php": "sha256:bf29bea3f15bc66fd85a96b148897f717c391451d57d1c3ee4b0d191be6a06e7",
-      "patterns/gb-news-featured.php": "sha256:db53225affdad235a51b27026e98aaef01438cfe9e3d9a8704c122747862b493",
+      "patterns/gb-news-featured.php": "sha256:55c9fb7b59764b3c87d76931f811ba253b290a5d99aabea991379edf2a49aeb1",
       "patterns/gb-news-ordered.php": "sha256:e6e43d94a9e2eeec42871a8f7314f7ad8d303398cbc1f54a75ca0587eeadefc4",
       "patterns/gb-news.php": "sha256:c58a6d75f000d91ea5329bb1e08200348e2ff9d04be59ab4f189d92e018c9cd9",
       "patterns/gb-table.php": "sha256:1f463e87dfa8b20bd9fd1e1418d69d8ae19f9455ee8ddd68c6ba20f6ae330d3f",
       "patterns/gb-tagged.php": "sha256:043f3e74f9ac0b0ff269278617bea5ad403f8b18312020fa221d02b071ee05f1",
       "patterns/gc-related.php": "sha256:f609cc4eaf57c3c51c97789ce3c61cac46b0fd4935c12f9f11aed13026e2b373",
-      "patterns/gc-sidebar.php": "sha256:450f288727e2b479c9c4e4deece018bcbb9a8e1dd893f1d5445a39cbc2f6b67d",
+      "patterns/gc-sidebar.php": "sha256:31e548c6ab2a8598717e9af93a7ae796cd3db0828a8b6ae1893e7e2ee7b664f0",
       "patterns/landing.php": "sha256:8d34c7c6c4385651fc63db98ad8dd380800aaf33e64821381b0b4b1754c8cde3",
       "patterns/pricing.php": "sha256:31f9e291814519b99566250b97ac6d86011c41b5089da4a28ca0061348880e72",
       "patterns/section-contact.php": "sha256:60fdcec2f10f1086a8049b1acebbd024978576af1c1080c838787105dd33b0eb",
@@ -1760,7 +1775,7 @@
       "patterns/section-team.php": "sha256:539399cdefc0989bfdc07cc6ef300e1a632db5d1c40e067cfcae545adff68092",
       "readme.txt": "sha256:a18197359db260c208bdee84ef927e122917f8bae400feb1935eeadb79144519",
       "screenshot.png": "sha256:f02d6016b09875cbad0ce2db9a763a41b4aa11896ecfe4aba1872727d5181e00",
-      "style.css": "sha256:d0464c0742ee70ae729d161870565d154023c4ff941b0c87bb134bea326a0d0f",
+      "style.css": "sha256:f56b6ca4cb922a7f87a61bde6efdfde3efd3913cf4de572725e7661974d4910b",
       "styles/wp-ja-impact.json": "sha256:35a4885fbd28663e5cabf13ede0172a73c4385d50c666c2504d0f9726387c1ed",
       "templates/404.html": "sha256:cc3e999c851baca8a41ffc99387cde33f6eefcccc37236d986cf3c690568315e",
       "templates/archive.html": "sha256:fc6d41404a1a7e4cd2849229344814af9ab393b3d67742a8b2a9efa26422d602",
@@ -1780,7 +1795,7 @@
       "templates/page-sidebar-left.html": "sha256:fc6d41404a1a7e4cd2849229344814af9ab393b3d67742a8b2a9efa26422d602",
       "templates/page.html": "sha256:fc6d41404a1a7e4cd2849229344814af9ab393b3d67742a8b2a9efa26422d602",
       "templates/pricing.html": "sha256:4ec92f84723376773688c77dc42261c379b09ac2c78a539de894414c64d24fa7",
-      "templates/search.html": "sha256:a9202916552645633cf119fb056a5d9b59d25f1fbb7f1b90d1b2b68e8b7e2338",
+      "templates/search.html": "sha256:fb70a4ea522d801f00a30a4d9a94d00eba7b7a1511cfad721871bd40afe53e27",
       "templates/single-blog-detail.html": "sha256:87f45eab5f5526ced6dd2554504494037dacf03924cba79582f04037497abaf2",
       "templates/single-donation.html": "sha256:43a69572aacce518db42b1d6863546d956da7b765274fcd03080128992020bb8",
       "templates/single-event.html": "sha256:b5878f0d917bfaa5e2c8de63b7bf19541c10144d2202a2d93c3aca24d1e42f52",
@@ -1987,160 +2002,9 @@
     "redirects": 0,
     "inputs": {
       "page-map.json": "sha256:dad065d71a4f1cfb452d981e4a8c6a557b599c7149ac81095e1ec00fb634a459",
-      "menus.json": "sha256:dca1f8e2bf6ec6ae06ae51f8723e7aa9921571d9d08d5a1346dff0bc433b2391",
+      "menus.json": "sha256:031c6fb32dbc5781a72b70819a03596864b2e760d6a1076e35caf7b1385bcaec",
       "redirects.json": "sha256:50856157d653fba165cddc577c7928c192318a92c2aff574a4d8c5420daf610b"
     }
   },
-  "seed": {
-    "file": "seed-54.json",
-    "startedAt": "2026-10-01T20:41:14.486Z",
-    "label": "at seed time, not live",
-    "counts": {
-      "authors": {
-        "total": 9,
-        "created": 0,
-        "updated": 0,
-        "skipped": 9
-      },
-      "categories": {
-        "total": 6,
-        "created": 0,
-        "updated": 0,
-        "skipped": 6
-      },
-      "forms": {
-        "total": 2,
-        "created": 0,
-        "updated": 0,
-        "skipped": 2
-      },
-      "navigation": {
-        "total": 6,
-        "created": 0,
-        "updated": 0,
-        "skipped": 6
-      },
-      "options": {
-        "total": 9,
-        "created": 0,
-        "updated": 0,
-        "skipped": 9
-      },
-      "pages": {
-        "total": 27,
-        "created": 0,
-        "updated": 0,
-        "skipped": 27
-      },
-      "posts": {
-        "total": 42,
-        "created": 0,
-        "updated": 0,
-        "skipped": 42
-      },
-      "templateParts": {
-        "total": 2,
-        "created": 0,
-        "updated": 0,
-        "skipped": 2
-      }
-    },
-    "navigation": [
-      "follow-us",
-      "get-to-know-us",
-      "guide",
-      "mainmenu",
-      "need-help",
-      "tracy-footer-1"
-    ],
-    "templateParts": [
-      "footer",
-      "header"
-    ],
-    "redirects": 1,
-    "sections": {
-      "total": 25,
-      "byKind": {
-        "acm": 25
-      },
-      "byPattern": {
-        "wp-ja-impact/acm-accordion": 1,
-        "wp-ja-impact/acm-cta-1": 1,
-        "wp-ja-impact/acm-events": 1,
-        "wp-ja-impact/acm-features-1": 2,
-        "wp-ja-impact/acm-features-2": 1,
-        "wp-ja-impact/acm-features-3": 2,
-        "wp-ja-impact/acm-features-4": 2,
-        "wp-ja-impact/acm-features-5": 1,
-        "wp-ja-impact/acm-features-6": 1,
-        "wp-ja-impact/acm-features-7": 1,
-        "wp-ja-impact/acm-funds": 1,
-        "wp-ja-impact/acm-hero": 1,
-        "wp-ja-impact/acm-news": 1,
-        "wp-ja-impact/gb-authors": 1,
-        "wp-ja-impact/gb-events": 1,
-        "wp-ja-impact/gb-funds": 1,
-        "wp-ja-impact/gb-news": 1,
-        "wp-ja-impact/gb-news-children": 1,
-        "wp-ja-impact/gb-news-featured": 1,
-        "wp-ja-impact/gb-news-ordered": 1,
-        "wp-ja-impact/gb-table": 1,
-        "wp-ja-impact/gb-tagged": 1
-      },
-      "pages": 12
-    },
-    "routes": {
-      "checked": 26,
-      "ok": 25
-    },
-    "media": {
-      "files": 104,
-      "imported": 0
-    },
-    "notes": [
-      "slug charity-of-the-month-plan-international-uk is shared by 2 source articles; \"Charity of the month plan international UK\" takes its own alias charity-of-the-month-plan-international-uk-2",
-      "22 post(s) shared a post_date with another; each got one second in source order so date-sorted listings serve the same order on every request",
-      "not in the source image tree; not imported",
-      "Contact Form 7 form contact built from section ga-contact-form: text first-name, email email-address, text your-subject, textarea message, acceptance acceptance-1, acceptance send-a-copy-to-yourself",
-      "Contact Form 7 form newsletter built from section g2-newsletter: email email-1",
-      "post authors: srcadmin \"Src Admin\" [source joomla-user-42] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), gbush \"J. Bush\" [source joomla-user-43] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), rcoleman \"R. Coleman\" [source joomla-user-45] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), jsteele \"J. Steele\" [source joomla-user-44] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), clitchfield \"D. Litchfield\" [source joomla-user-46] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), jsteve \"A. Steve\" [source joomla-user-47] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), mbrown \"B. Brown\" [source joomla-user-48] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), slee \"Sara J. Lee\" [source joomla-user-49] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n), jsmith \"D. Smith\" [source joomla-user-50] (I love exploring new design techniques and keeping up with the latest trends in graphic design\r\n\r\nExperience\r\nRebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\nEducation\r\nRebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.\r\n)",
-      "module mod_jamasthead has no block rendering; skipped",
-      "no pattern mapped for contact-info:style-2",
-      "route module 145 (mod_jamasthead at masthead) is not drawn in the post: no block rendering for it",
-      "route module 155 (contact-info at contact) is not drawn in the post: no block rendering for it",
-      "route module 163 (social at footer-r) is not drawn in the post: no block rendering for it",
-      "the source has no not-found page: draft \"page-not-found\" holds the page-map title \"Not found\" only — the source's other 404 words are not in the spec; write them in the admin",
-      "110 hero.btn-link-2: block hero.button-2.<n> not in pattern",
-      "110 hero.btn-link-2: block hero.button-2.<n> not in pattern",
-      "129 features.link: block features.label not in pattern",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for social:style-1",
-      "111 features.link: block features.label not in pattern",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "no pattern mapped for contact-info:style-2",
-      "gb-9 author-list.list: attr perPage not handled",
-      "no pattern mapped for contact-info:style-2",
-      "module mod_login has no block rendering; skipped",
-      "no page with view home in the page-map; page_for_posts left unset",
-      "single view: redirected to article 12 (charity-of-the-month-plan-international-uk)"
-    ],
-    "hash": "sha256:9b4f89d3dd569b39d2108e72426ab44c4c9e443c4a7008e2b784adc2d7eff452"
-  }
+  "seed": null
 }

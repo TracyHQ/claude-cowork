@@ -15,7 +15,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Text Domain | wp-ja-impact |
 | Theme Name | JA Impact |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
-| Version | 1.0.0 |
+| Version | 1.0.2 |
 
 theme.json version 3; 123 files fingerprinted; 85 of them are the `wp-ja-impact` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-impact` design system.
 
@@ -194,10 +194,12 @@ _none_
 | query_vars | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
+| redirect_canonical | filter | inc/extra.php |
 | render_block | filter | functions.php |
 | render_block_core/group | filter | inc/extra.php |
 | render_block_core/group | filter | inc/extra.php |
 | render_block_core/image | filter | inc/extra.php |
+| render_block_core/navigation-link | filter | inc/extra.php |
 | render_block_core/navigation-link | filter | inc/extra.php |
 | render_block_core/navigation-link | filter | inc/extra.php |
 | render_block_core/post-title | filter | inc/extra.php |
@@ -205,6 +207,7 @@ _none_
 | render_block_core/search | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | run_wptexturize | filter | functions.php |
+| run_wptexturize | filter | inc/extra.php |
 | style_loader_src | filter | inc/asset-version.php |
 | template_redirect | action | functions.php |
 | template_redirect | action | inc/extra.php |
@@ -276,154 +279,6 @@ Routes by template view:
 | /password-reset | page-password | Password Reset |
 | /tagged-items | tag | Tagged Items |
 | /username-reminder-request | page-password | Username Reminder Request |
-
-## Seed report — at seed time, not live
-
-From `seed-54.json` (run started 2026-10-01T20:41:14.486Z). Totals are what the seeder found or wrote; the live site may differ.
-
-| Kind | Total | Created | Updated | Skipped (unchanged) |
-| --- | --- | --- | --- | --- |
-| authors | 9 | 0 | 0 | 9 |
-| categories | 6 | 0 | 0 | 6 |
-| forms | 2 | 0 | 0 | 2 |
-| navigation | 6 | 0 | 0 | 6 |
-| options | 9 | 0 | 0 | 9 |
-| pages | 27 | 0 | 0 | 27 |
-| posts | 42 | 0 | 0 | 42 |
-| templateParts | 2 | 0 | 0 | 2 |
-
-- Navigation posts (`wp_navigation`, by slug): `follow-us`, `get-to-know-us`, `guide`, `mainmenu`, `need-help`, `tracy-footer-1`
-- Template part overrides (`wp_template_part`, by slug): `footer`, `header`
-- Redirect rules written: 1
-- Sections placed: 25 on 12 pages — acm 25
-- Routes checked after seeding: 25/26 as expected
-- Media: 104 files, 0 imported this run
-
-Sections by pattern:
-
-| Pattern | Placed |
-| --- | --- |
-| wp-ja-impact/acm-accordion | 1 |
-| wp-ja-impact/acm-cta-1 | 1 |
-| wp-ja-impact/acm-events | 1 |
-| wp-ja-impact/acm-features-1 | 2 |
-| wp-ja-impact/acm-features-2 | 1 |
-| wp-ja-impact/acm-features-3 | 2 |
-| wp-ja-impact/acm-features-4 | 2 |
-| wp-ja-impact/acm-features-5 | 1 |
-| wp-ja-impact/acm-features-6 | 1 |
-| wp-ja-impact/acm-features-7 | 1 |
-| wp-ja-impact/acm-funds | 1 |
-| wp-ja-impact/acm-hero | 1 |
-| wp-ja-impact/acm-news | 1 |
-| wp-ja-impact/gb-authors | 1 |
-| wp-ja-impact/gb-events | 1 |
-| wp-ja-impact/gb-funds | 1 |
-| wp-ja-impact/gb-news | 1 |
-| wp-ja-impact/gb-news-children | 1 |
-| wp-ja-impact/gb-news-featured | 1 |
-| wp-ja-impact/gb-news-ordered | 1 |
-| wp-ja-impact/gb-table | 1 |
-| wp-ja-impact/gb-tagged | 1 |
-
-Seeder notes:
-
-- slug charity-of-the-month-plan-international-uk is shared by 2 source articles; "Charity of the month plan international UK" takes its own alias charity-of-the-month-plan-international-uk-2
-- 22 post(s) shared a post_date with another; each got one second in source order so date-sorted listings serve the same order on every request
-- not in the source image tree; not imported
-- Contact Form 7 form contact built from section ga-contact-form: text first-name, email email-address, text your-subject, textarea message, acceptance acceptance-1, acceptance send-a-copy-to-yourself
-- Contact Form 7 form newsletter built from section g2-newsletter: email email-1
-- post authors: srcadmin "Src Admin" [source joomla-user-42] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), gbush "J. Bush" [source joomla-user-43] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), rcoleman "R. Coleman" [source joomla-user-45] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), jsteele "J. Steele" [source joomla-user-44] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), clitchfield "D. Litchfield" [source joomla-user-46] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), jsteve "A. Steve" [source joomla-user-47] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), mbrown "B. Brown" [source joomla-user-48] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), slee "Sara J. Lee" [source joomla-user-49] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-), jsmith "D. Smith" [source joomla-user-50] (I love exploring new design techniques and keeping up with the latest trends in graphic design
-
-Experience
-Rebecca Norris is a full-time freelance writer living in the DC metro area who has worked in beauty editorial for seven years. Previously, she was the Beauty Editor for Brit + Co. She joined the Byrdie team as a nail expert in 2019 and contributes to a number of lifestyle publications. She is a graduate of George Mason University. There, she earned her B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-Education
-Rebecca graduated from George Mason University with a B.A. in Media: Production, Consumption, and Critique, along with a minor in Electronic Journalism.
-)
-- module mod_jamasthead has no block rendering; skipped
-- no pattern mapped for contact-info:style-2
-- route module 145 (mod_jamasthead at masthead) is not drawn in the post: no block rendering for it
-- route module 155 (contact-info at contact) is not drawn in the post: no block rendering for it
-- route module 163 (social at footer-r) is not drawn in the post: no block rendering for it
-- the source has no not-found page: draft "page-not-found" holds the page-map title "Not found" only — the source's other 404 words are not in the spec; write them in the admin
-- 110 hero.btn-link-2: block hero.button-2.<n> not in pattern
-- 110 hero.btn-link-2: block hero.button-2.<n> not in pattern
-- 129 features.link: block features.label not in pattern
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for social:style-1
-- 111 features.link: block features.label not in pattern
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- no pattern mapped for contact-info:style-2
-- gb-9 author-list.list: attr perPage not handled
-- no pattern mapped for contact-info:style-2
-- module mod_login has no block rendering; skipped
-- no page with view home in the page-map; page_for_posts left unset
-- single view: redirected to article 12 (charity-of-the-month-plan-international-uk)
 
 ## Drift detection
 
