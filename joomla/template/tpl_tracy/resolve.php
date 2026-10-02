@@ -172,3 +172,55 @@ function tpl_tracy_page_system(string $html, string $fallback): string
 
     return $fallback;
 }
+
+/**
+ * Give every active stylesheet of this template a version that changes with its file.
+ *
+ * WHY (stage 6 acceptance v5, R05, 30/09/2026). A look change rewrites a template stylesheet in place
+ * (`css/sections.css`, `css/tracy.css`, …), while the address the page names for it stays the same:
+ * the assets declare no version, so Joomla prints its media version, which moves only when Joomla or
+ * an extension is updated. Served with `Last-Modified` and no `Cache-Control`, the old copy stays
+ * "fresh" in a browser that has seen the page, by the browser's own estimate — on WordPress the sender
+ * watched the old size ~10 minutes after Tracy said done. With the file's modification time as the
+ * version, the address is a new one the moment the file is rewritten (an undo included), and no cache
+ * holds anything under it.
+ *
+ * Every active style asset whose file lives under this template's media folder (a bare name from
+ * joomla.asset.json, or a `media/templates/site/tpl_tracy/…` path registered in PHP) is registered
+ * again under the same name, URI, options, attributes and dependencies, with the version added; core,
+ * extension and external sheets are left alone. Called last in index.php and component.php, after the
+ * component's layout (a design page's fenced sheet) has registered its own.
+ *
+ * @param   \Joomla\CMS\WebAsset\WebAssetManager  $wa    The document's asset manager.
+ * @param   string                                $root  The site root on disk (JPATH_ROOT).
+ *
+ * @return  void
+ */
+function tpl_tracy_stamp_styles($wa, string $root): void
+{
+    $own = 'media/templates/site/tpl_tracy/';
+
+    foreach ($wa->getAssets('style') as $asset) {
+        $uri = $asset->getUri(false);
+
+        if ($uri === '' || str_contains($uri, '..') || str_contains($uri, '://') || str_starts_with($uri, '//')) {
+            continue;
+        }
+
+        $file = str_contains($uri, '/') ? ltrim($uri, '/') : $own . 'css/' . $uri;
+
+        if (!str_starts_with($file, $own) || !is_file($root . '/' . $file)) {
+            continue;
+        }
+
+        $mtime   = (string) filemtime($root . '/' . $file);
+        $version = $asset->getVersion();
+        $wa->registerStyle(
+            $asset->getName(),
+            $uri,
+            ['version' => ($version === '' || $version === 'auto' ? '' : $version . '-') . $mtime] + $asset->getOptions(),
+            $asset->getAttributes(),
+            $asset->getDependencies()
+        );
+    }
+}

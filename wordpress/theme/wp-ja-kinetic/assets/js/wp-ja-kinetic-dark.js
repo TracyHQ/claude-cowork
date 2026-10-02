@@ -17,7 +17,11 @@
  * `data-theme` attribute, which the dark palette (theme.overlay.json) and the sun/moon icon swap
  * in assets/css/wp-ja-kinetic.css read, and the `t4-dark` class, which the source's own apply()
  * sets alongside it and which the rules carried over in assets/css/wp-ja-kinetic-sections.css
- * still key on. */
+ * still key on.
+ *
+ * `?theme=dark|light` on the address wins for that load, over the cookie and the page default, and
+ * is never saved: a page framing the site from another origin (Tracy's Design inspiration preview)
+ * cannot set this cookie. Only a click on the toggle writes it. */
 ;(() => {
   const COOKIE = 'tracy_theme'
   const root = document.documentElement
@@ -39,7 +43,18 @@
     root.classList.toggle('t4-dark', state === 'dark')
   }
 
-  let state = read()
+  // The first `theme` value decides: `?theme=purple&theme=dark` and `?theme=&theme=dark` ask for
+  // nothing valid, so the cookie and the default stand.
+  const asked = () => {
+    try {
+      const value = new URLSearchParams(location.search).get('theme')
+      return value === 'dark' || value === 'light' ? value : ''
+    } catch {
+      return ''
+    }
+  }
+
+  let state = asked() || read()
   apply(state)
   // Running in the head, before <body> exists: re-apply once it has parsed, in case something
   // between here and DOMContentLoaded reset the root attribute.

@@ -15,6 +15,11 @@ defined( 'ABSPATH' ) || exit;
 // Where new versions come from: a GitHub release of TracyHQ/claude-cowork, checked through the
 // `Update URI:` header in style.css. See inc/update.php.
 require_once __DIR__ . '/inc/update.php';
+// Where a variation lives (theme, then uploads) and which systems the site may wear: inc/variations.php.
+require_once __DIR__ . '/inc/variations.php';
+// A theme stylesheet's `ver` carries its file's modification time, so a look change that rewrites the
+// file reaches every browser at once instead of after its cache gives up: inc/asset-version.php.
+require_once __DIR__ . '/inc/asset-version.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );
@@ -29,6 +34,8 @@ function tracy_inspirations(): array {
 	if ( null === $systems ) {
 		$decoded = wp_json_file_decode( get_theme_file_path( 'inspirations.json' ), array( 'associative' => true ) );
 		$systems = is_array( $decoded ) && isset( $decoded['systems'] ) && is_array( $decoded['systems'] ) ? $decoded['systems'] : array();
+		// Plus what Tracy wrote at runtime under uploads (a brand's look, ADR 0023).
+		$systems = tracy_inspirations_merged( $systems );
 	}
 	return $systems;
 }
@@ -62,7 +69,11 @@ function tracy_apply_inspiration( string $id ): bool {
 	if ( null === $meta || ! preg_match( '/^[a-z0-9-]+$/', $id ) ) {
 		return false;
 	}
-	$variation = wp_json_file_decode( get_theme_file_path( "styles/$id.json" ), array( 'associative' => true ) );
+	$file = tracy_variation_file( $id );
+	if ( null === $file ) {
+		return false;
+	}
+	$variation = wp_json_file_decode( $file, array( 'associative' => true ) );
 	if ( ! is_array( $variation ) ) {
 		return false;
 	}
@@ -315,6 +326,17 @@ add_action(
 			}
 			if ( null !== $file && preg_match( '/^[a-z0-9-]+$/', $id ) && file_exists( get_theme_file_path( $file ) ) ) {
 				wp_enqueue_style( 'tracy-' . $kind, get_theme_file_uri( $file ), array(), $version );
+			} elseif ( 'artifact' === $kind && isset( $artifact ) && null !== $file ) {
+				// A look with no sheet of its own — a brand, made at build time under
+				// uploads/tracy/styles (ADR 0023) — wears the theme-driven sheet: the same rules, its
+				// varying properties read from the worn variation's variables. Those are printed here
+				// (variables only, no element rule) because `global-styles` is dequeued below. Measured
+				// 30/09 on `dfbrandwp1`: without it the home page rendered unstyled, `shot` 49/100.
+				$generic = "assets/css/artifacts/$artifact/_theme.css";
+				if ( file_exists( get_theme_file_path( $generic ) ) ) {
+					wp_enqueue_style( 'tracy-' . $kind, get_theme_file_uri( $generic ), array(), $version );
+					wp_add_inline_style( 'tracy-' . $kind, wp_get_global_stylesheet( array( 'variables' ) ) );
+				}
 			}
 			wp_enqueue_style( 'tracy-fixture-page', get_theme_file_uri( 'assets/css/fixture-page.css' ), array(), $version );
 			return;

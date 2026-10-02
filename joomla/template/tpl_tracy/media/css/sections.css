@@ -145,6 +145,9 @@
 .gap-1 {
   gap: var(--space-1);
 }
+.gap-2 {
+  gap: var(--space-2);
+}
 .gap-4 {
   gap: var(--space-4);
 }
@@ -254,6 +257,9 @@
 }
 .p-8 {
   padding: var(--space-8);
+}
+.px-3 {
+  padding-inline: var(--space-3);
 }
 .px-8 {
   padding-inline: var(--space-8);
@@ -654,4 +660,22 @@
 
 .tracy-form__note--bad {
   color: var(--danger);
+}
+
+/* The current page of a listing. A utility cannot say "this one, because of its state", and the
+   pagination row is the only place in the library where one item of a set is marked. */
+.tracy-pagination__item.is-current {
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* An entry title is a link that should read as a heading, not as body-text link decoration. */
+.tracy-entry__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tracy-entry__title a:hover {
+  color: var(--accent);
 }
