@@ -15,7 +15,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Text Domain | wp-ja-impact |
 | Theme Name | JA Impact |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
-| Version | 1.0.2 |
+| Version | 1.0.3 |
 
 theme.json version 3; 123 files fingerprinted; 85 of them are the `wp-ja-impact` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-impact` design system.
 
@@ -205,6 +205,7 @@ _none_
 | render_block_core/post-title | filter | inc/extra.php |
 | render_block_core/post-title | filter | inc/extra.php |
 | render_block_core/search | filter | inc/extra.php |
+| render_block_data | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | run_wptexturize | filter | functions.php |
 | run_wptexturize | filter | inc/extra.php |
