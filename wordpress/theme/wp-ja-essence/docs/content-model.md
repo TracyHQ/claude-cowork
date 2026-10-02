@@ -79,7 +79,7 @@ is `<type>.item.<n>`, the section's anchor is `acm-<type>-<module id>`). No sync
 
 `section-articles-*` patterns name their categories by slug in the query (`wpJaEssenceCategory`),
 resolved at render time with their sub-categories; the slugs on the seeded pages are `blog-health`,
-`blog-design`, `blog-fashion`, `blog`, `blog-normal` and `blog-normal-health`/`-fashion`. Posts are
+`blog-design`, `blog-fashion`, `blog` and `blog-normal` (the marker category below). Posts are
 newest first: the source orders some lists by hits, and WordPress has no hit counter (D-09, D-14).
 The seeded queries set `"sticky":"ignore"` because 20 posts are sticky (the source's featured
 articles) and WordPress would otherwise prepend them to every nested query on the static front page
@@ -89,13 +89,17 @@ articles) and WordPress would otherwise prepend them to every nested query on th
 
 - The category pages' query blocks are bound by **term id**, not by slug: `category-style-1` to
   term 5 (`blog-health`), `category-style-2` to 6 (`blog-design`), `category-style-3` and
-  `category-blog` to 7 (`blog-fashion`), `category-style-4` to 4, 10, 11, 12 (`blog-normal` and its
-  children), `resources` to 8, `lifestyle` to 9 (ids on the build stand). A site restored from a
+  `category-blog` to 7 (`blog-fashion`), `category-style-4` to the term `blog-normal` (a flat marker
+  category, no children), `resources` to 8, `lifestyle` to the term `lifestyle` (ids on the build
+  stand). A site restored from a
   quickstart keeps the ids; a re-seed on another database writes the ids that database assigned.
   Deleting and recreating a category breaks its listing silently.
-- Duplicate category titles are disambiguated by slug: Health, Design, Fashion exist twice
-  (`blog-health` and `blog-normal-health`, and so on) because the source has two blog trees; a
-  Joomla alias that repeats across categories got a `-2` slug.
+- **One category tree** (1.0.1): `blog` > Health (`blog-health`), Design (`blog-design`), Fashion
+  (`blog-fashion`), Resources (`resources`), Lifestyle (`lifestyle`). The source's second tree (Blog
+  Normal > Health, Design, Fashion) is why 1.0.0 drew those chips twice; its ten articles are filed
+  under the flat marker category `blog-normal`, which no chip, badge or count ever draws
+  (`WP_JA_ESSENCE_HIDDEN_CATEGORIES` in `inc/extra.php`); a card of that group keeps the label of the
+  category it stands for in the post meta `je_label`. `/category/category-style-4` lists it.
 - Category views differ in the source (hero card, horizontal cards, sidebar); here one `tracy/cards`
   card serves all, and type sizes vary per page through the body class `je-slug-<page slug>`; do
   not rename those pages (D-53). Category Blog also shows the card's intro and tags
@@ -114,16 +118,26 @@ works.
 
 ## Posts, categories, tags
 
-- 46 posts under `blog-*`, `blog-normal-*`, `resources` or `resources-2` (Lifestyle); 20 are
+- 46 posts under `blog-*`, `blog-normal`, `resources` or `lifestyle`; 20 are
   sticky. Their authors are nine imported users (role `author`); a post's byline
   is the post-author block, the author pictures come from user meta `tracy_avatar`
   (must-use plugin). Posts keep their tags (6 tags on the stand).
-- Categories on the stand: `blog`, `blog-normal` (both empty parents), `blog-health` 9,
-  `blog-design` 9, `blog-fashion` 7, `blog-normal-health` 4, `blog-normal-design` 3,
-  `blog-normal-fashion` 3, `resources` 7, `resources-2` 5, `uncategorised` and WordPress's own
-  `uncategorized`, 0.
+- Categories on the stand and their counts, which are the source's (home-2 chips): `blog-health`
+  12, `blog-design` 9, `blog-fashion` 9, `resources` 6, `lifestyle` 5; `blog-normal` 10 (marker, not
+  drawn); `blog`, `uncategorised` and WordPress's own `uncategorized`, 0. The five article pages
+  (Layout 1-3, Video, Gallery) are filed under their category too (`pages[].je.category`, written by
+  `tasks/ja-essence-wp7/tools/reconcile.php`; the theme registers `category` for pages), which is
+  how Health reaches 12 and Fashion 9 as in the source.
+- **Copies.** The source keeps 19 articles twice under different categories and 5 article pages
+  as posts too (same title and picture, another Joomla article); 1.0.0 listed them as separate
+  posts, 13 titles up to four times. The port keeps every copy so each category still lists what the
+  source lists, and flags it: post meta `je_copy_of` (the article it copies), `je_unlisted` (a copy
+  that repeats a title inside its own category), `je_label`. `wp_ja_essence_listing_args()` lists a
+  copy only under the one category it is filed under; the home page, trending, latest, "more
+  reading", search, tags and the authors leave copies out. A new post is an original unless it
+  carries those meta keys.
 - 19 articles share an alias across categories; WordPress renumbered the later ones with `-2`
-  (S-03). Articles answer at `/<slug>/`; the one Joomla article address kept is the article route
+  (S-03; they are the copies above). Articles answer at `/<slug>/`; the one Joomla article address kept is the article route
   (docs/architecture.md). The spec's `redirects.json` carries one rule (`/home/home-3` to `/`).
 
 ## Menus

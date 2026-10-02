@@ -12,7 +12,7 @@
       "Text Domain": "wp-ja-essence",
       "Theme Name": "JA Essence",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
-      "Version": "1.0.0"
+      "Version": "1.0.2"
     },
     "themeJson": {
       "version": 3,
@@ -1240,6 +1240,21 @@
         "file": "inc/extra.php"
       },
       {
+        "kind": "action",
+        "hook": "init",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "action",
+        "hook": "init",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "action",
+        "hook": "pre_get_posts",
+        "file": "inc/extra.php"
+      },
+      {
         "kind": "filter",
         "hook": "query_loop_block_query_vars",
         "file": "inc/extra.php"
@@ -1258,6 +1273,16 @@
         "kind": "filter",
         "hook": "render_block",
         "file": "functions.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/categories",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/post-terms",
+        "file": "inc/extra.php"
       },
       {
         "kind": "filter",
@@ -1408,14 +1433,14 @@
     "fileCount": 95,
     "fingerprints": {
       "assets/css/fixture-page.css": "sha256:d2c9d7c59ba6ed16038ac7879d0a07813e3d46046f16dff44e51278087a3f173",
-      "assets/css/je-category.css": "sha256:5ab25820f2843a4d29549e1e29cdb509f80b590120c288e519dd146968a2a449",
-      "assets/css/je-detail.css": "sha256:f9e40b9d7d385ae7a190b559cc39329aacd6c688bf5e9fc75a4e108fbb7dc5ca",
-      "assets/css/je-home.css": "sha256:ea5ab45293691766236c2d4031badac1abb3af3fb903e2da05d2dd57cdb89991",
+      "assets/css/je-category.css": "sha256:0af78feeab84d2269f959cc15330010363e18d55305fcb9c2502eb73eb6d5756",
+      "assets/css/je-detail.css": "sha256:1eaf2d5a16b7df0c7efd8a1969e516f08436a55163b2c9c1e22db4d6df407da3",
+      "assets/css/je-home.css": "sha256:6dac3803598db74c3920c81220bffbfdba1141d4e74ff5cae4b5ec636236ff84",
       "assets/css/layout.css": "sha256:dca7d68d13067d81e306200f1ec08e2a5fa03b05bf3b46202ebe69ae86d9c06f",
       "assets/css/sections.css": "sha256:d287eb0b26beee53654bdab114c23195e72b212240d9e5703d9546252a130a3f",
       "assets/css/tracy-motion.css": "sha256:656642b63d46e2cb41fcd5af3437e25fed38175280bfcf14e9a1f6da5efb6bec",
       "assets/css/tracy.css": "sha256:e4ff46badd4a022c1e0a0fcd742d5ce1acbcd329bc769de5a23f7d65381b0e71",
-      "assets/css/wp-ja-essence.css": "sha256:15d807970ddda57ae6b6873415c2d5ea9235f006c4d403a37b54525213cf2d40",
+      "assets/css/wp-ja-essence.css": "sha256:613af7820a9476567d718db2f20269de90c610e9649d12c890e67eabb99c2e1b",
       "assets/fonts/jost-400.woff2": "sha256:b8248fcea348b57e692c887d46c11f9c07b4ec24af9cff7ba1ae02b6de0ea0ae",
       "assets/fonts/jost-500.woff2": "sha256:7a953e2f57eb9fc6e509bc82454225bf15949dba2fae6ca497d41bfee565e9fe",
       "assets/fonts/jost-600.woff2": "sha256:37b3c26af24ff8fc63f1c044a90ccd9ee5d127c4ad1ab620816e8d93aa7a02d4",
@@ -1427,17 +1452,17 @@
       "assets/js/tracy-motion.js": "sha256:e0de98821c906566fe3cb2e4ba7d4203375f61e1061a869fe5b53c566a796c36",
       "assets/js/tracy-preview.js": "sha256:174189d9b2412fe0b7a3f69dde16d901d43d24528b89d3bbad3c78adacb54eed",
       "assets/js/tracy.js": "sha256:88c0d89600b0320a54eb34f943c4f29f631a920eca0866a78e2f054837ae1df4",
-      "assets/js/wp-ja-essence-dark.js": "sha256:982a1529f98589c1fd7a17716fb2f4e2dcbc7cd9c8bdc53909c8275cb944fee9",
-      "assets/js/wp-ja-essence.js": "sha256:18fc9f2534fda035032595de5790cd5a1921e2af261196fec9cfdc38032aabcd",
+      "assets/js/wp-ja-essence-dark.js": "sha256:8f2da984d3966f04646f6f485dc0a7c24100061e8effb780418eb696e9dc7959",
+      "assets/js/wp-ja-essence.js": "sha256:d66d921bfd9972d5958a00a7a06a4d0fcdc297488f22f1877b6da08f95df7471",
       "functions.php": "sha256:df3d2f3d7f267070a21350ad18cdd8ad1417cf156ab5d5128694a1b02a32c30d",
       "inc/asset-version.php": "sha256:3a714c4a5c7cc86565cbafdb063a68340b09c58045962b8751ef3ed66c415b1d",
-      "inc/extra.php": "sha256:a0aa7fdae6bcbbc2fc3507826ef94a4ab09612bb1404159f90e2d7398ab819c5",
+      "inc/extra.php": "sha256:9aca520b8098a82170d9d6536e4f14d07acaa6414cc36cf08d5201c347aafac8",
       "inc/motion-head.php": "sha256:e8e3b5b22ac792cf8ce2ee97ff4dfdce949fc85d2f5aab34bdb8a21a498e41d5",
       "inc/update.php": "sha256:2ac0b34cc782cd122390bfd71cea1b96de96ddd96a1751f8034781ca498918f1",
       "inc/variations.php": "sha256:54eee8dcec3f61fcaaffa3ecde6887b2b467cec816cce873f47aa4389d79a447",
       "inspirations.json": "sha256:76e3d5b5901fd5fc883dd890518ea900ffad199cf38aedb621134f9151f48436",
-      "parts/footer.html": "sha256:be353be0abbf04638a0ab11325795ee5619f0395f034b43d5c996a2525f4449e",
-      "parts/header.html": "sha256:2087de599172d635afb100792ad378e9c0cf4b59e9d8f5ae2a309aac84009159",
+      "parts/footer.html": "sha256:3a925df43fa9bdd3a1698d511767db74564aca557f0174f23adc7b372fbc6b79",
+      "parts/header.html": "sha256:97b514688dbb3ec54acd61830110f55be37a3cb1bfbe2f8241d730dbb71136f6",
       "patterns/cards.php": "sha256:d6f4b0a045eda08ff22d9c94e6036c6ee5ad44d03547c830537225f33bc78109",
       "patterns/editors-choice.php": "sha256:5d3742d616935e8991f68686625873a5e9e01cbc26e6a3811c07fb0f86f3ed8d",
       "patterns/front-list-grid.php": "sha256:150391a69517d53e3f0a766723ba575720dd5560db73883be87712bad62cb745",
@@ -1456,7 +1481,7 @@
       "patterns/section-articles-category-slide-feat.php": "sha256:3e64bad2ee407c1c94d8e2c37672604e6d72a50335684b9abe64d8dc886c4f6e",
       "patterns/section-articles-category-slide-normal.php": "sha256:6d72caa94c12b035ff633055497183ffc32f1f4b924aae96f4fc18cbfa056dc9",
       "patterns/section-articles-latest-latest-feat.php": "sha256:631b182a8a2321df362e342930acfc049ac2f07a363576461df64fd4caff38bc",
-      "patterns/section-articles-latest-latest-nsub.php": "sha256:35ec3b8be39844f3a16d90cbdb2b9becca1f4ae99b853044109c2fea8813bb15",
+      "patterns/section-articles-latest-latest-nsub.php": "sha256:7b8178113f5f77aa2a1a0b839bbe3d99501f7a771b836ec7f3ff8c1394bc8b34",
       "patterns/section-contact.php": "sha256:60fdcec2f10f1086a8049b1acebbd024978576af1c1080c838787105dd33b0eb",
       "patterns/section-cta-final.php": "sha256:ecd60c0133ebf1d5a02cec4f4eca766ea449864f5c767e0c10a84745d61c547e",
       "patterns/section-cta-inline.php": "sha256:462272c9187d7867520afc9879d39ca9863a890af69d807643caf879abb3cfdc",
@@ -1478,9 +1503,9 @@
       "patterns/section-styleguide.php": "sha256:036a6b9a7967f56b06786e21cba76eaa4845b4ade1c36c03f4634c9e042140cf",
       "patterns/section-tags-popular.php": "sha256:e2e523f27cfe03804d9e7b6dfe6e7fa124346022ced8db28e1f6b688859d2e41",
       "patterns/section-team.php": "sha256:539399cdefc0989bfdc07cc6ef300e1a632db5d1c40e067cfcae545adff68092",
-      "readme.txt": "sha256:9f515aa7a90fc817e77ea9fc90eccd4fe48fe89c62d7a41aa3ea7042592588e3",
+      "readme.txt": "sha256:e8eae4a60359d5c5985e15a314889b15c4cc07fb70a6f475ea305efaf35c8b65",
       "screenshot.png": "sha256:f02d6016b09875cbad0ce2db9a763a41b4aa11896ecfe4aba1872727d5181e00",
-      "style.css": "sha256:4dba33f15c6bacc3c7f31990bc09557770ce09a1beabe5b2c52dda5e2ee7f93d",
+      "style.css": "sha256:07e04ea037893847c47a66363ac2094d804476739fb4c38c027fb72a0c5643dd",
       "styles/wp-ja-essence.json": "sha256:10271c57bd4e170de52c8e6a4ac025e71809692c5159a50421be0ce3471045c3",
       "templates/404.html": "sha256:9a33cee0b0cb748c0c89cc60825834f3c5f45f56c1e4b2bce744d9fba2f10edb",
       "templates/archive.html": "sha256:76540c1a5d652b88b00a50fcce5098f83158d00e8894ed88af42b080b7fb6df5",
@@ -1722,12 +1747,12 @@
     "inputs": {
       "page-map.json": "sha256:c39e3c8a7ddbc39b783abc5535eaea3d8eb3ac89b6359ce0ca3a547457c15d98",
       "menus.json": "sha256:51a0f86874010d52336d48936a065ef1726964483524b660d778584384f0ed27",
-      "redirects.json": "sha256:e608555338b46844a9ea75f3355ea55b0745c538395b72e5de55e08c2020764f"
+      "redirects.json": "sha256:0748d0152d02fddc3e2834cd56099aa18c47c3a677ab817ea680d7c0dc14f68e"
     }
   },
   "seed": {
-    "file": "seed-report-40b.json",
-    "startedAt": "2026-10-02T04:02:25.027Z",
+    "file": "seed-report-102-c.json",
+    "startedAt": "2026-10-02T11:07:20.987Z",
     "label": "at seed time, not live",
     "counts": {
       "authors": {
@@ -1737,10 +1762,10 @@
         "skipped": 9
       },
       "categories": {
-        "total": 11,
+        "total": 8,
         "created": 0,
         "updated": 0,
-        "skipped": 11
+        "skipped": 8
       },
       "forms": {
         "total": 1,
@@ -1755,10 +1780,10 @@
         "skipped": 2
       },
       "options": {
-        "total": 9,
+        "total": 10,
         "created": 0,
         "updated": 1,
-        "skipped": 8
+        "skipped": 9
       },
       "pages": {
         "total": 37,
@@ -1864,11 +1889,11 @@
       "128 social.font-icon: className rule unknown",
       "128 social.font-icon: className rule unknown",
       "128 social.font-icon: className rule unknown",
-      "author view: WordPress has no users-list block; a post query is drawn instead of the source's list of people (photo, job title, bio)",
-      "tag route declares no tags (archive.tags): every post is listed, as the spec does not say which; the adapter must record the tag filter",
+      "author view: the patterns map's block wp-ja-essence/authors draws the list instead of the seeder's cards",
+      "tag view: the patterns map's block wp-ja-essence/tagged-list draws the list instead of the seeder's cards",
       "no page with view home in the page-map; page_for_posts left unset",
       "single view: redirected to article 3 (vintage-inspired-martini-and-cocktail-glasses)"
     ],
-    "hash": "sha256:7755404e9a04394f563b93963b7d57e1f886fda303d7d43e2baf9018353556a4"
+    "hash": "sha256:debc73e724c765fa68a7502b2cfff2c6180df2053dbff524dafd6ebb7b6f8e31"
   }
 }

@@ -15,7 +15,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Text Domain | wp-ja-essence |
 | Theme Name | JA Essence |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
-| Version | 1.0.0 |
+| Version | 1.0.2 |
 
 theme.json version 3; 95 files fingerprinted; 60 of them are the `wp-ja-essence` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-essence` design system.
 
@@ -174,10 +174,15 @@ _none_
 | content_save_pre | filter | functions.php |
 | content_save_pre | filter | functions.php |
 | init | action | inc/extra.php |
+| init | action | inc/extra.php |
+| init | action | inc/extra.php |
+| pre_get_posts | action | inc/extra.php |
 | query_loop_block_query_vars | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | render_block | filter | functions.php |
+| render_block_core/categories | filter | inc/extra.php |
+| render_block_core/post-terms | filter | inc/extra.php |
 | render_block_core/post-title | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | request | filter | inc/extra.php |
@@ -258,15 +263,15 @@ Routes by template view:
 
 ## Seed report — at seed time, not live
 
-From `seed-report-40b.json` (run started 2026-10-02T04:02:25.027Z). Totals are what the seeder found or wrote; the live site may differ.
+From `seed-report-102-c.json` (run started 2026-10-02T11:07:20.987Z). Totals are what the seeder found or wrote; the live site may differ.
 
 | Kind | Total | Created | Updated | Skipped (unchanged) |
 | --- | --- | --- | --- | --- |
 | authors | 9 | 0 | 0 | 9 |
-| categories | 11 | 0 | 0 | 11 |
+| categories | 8 | 0 | 0 | 8 |
 | forms | 1 | 0 | 0 | 1 |
 | navigation | 2 | 0 | 0 | 2 |
-| options | 9 | 0 | 1 | 8 |
+| options | 10 | 0 | 1 | 9 |
 | pages | 37 | 0 | 0 | 37 |
 | posts | 46 | 0 | 0 | 46 |
 | templateParts | 2 | 0 | 0 | 2 |
@@ -343,8 +348,8 @@ Seeder notes:
 - 128 social.font-icon: className rule unknown
 - 128 social.font-icon: className rule unknown
 - 128 social.font-icon: className rule unknown
-- author view: WordPress has no users-list block; a post query is drawn instead of the source's list of people (photo, job title, bio)
-- tag route declares no tags (archive.tags): every post is listed, as the spec does not say which; the adapter must record the tag filter
+- author view: the patterns map's block wp-ja-essence/authors draws the list instead of the seeder's cards
+- tag view: the patterns map's block wp-ja-essence/tagged-list draws the list instead of the seeder's cards
 - no page with view home in the page-map; page_for_posts left unset
 - single view: redirected to article 3 (vintage-inspired-martini-and-cocktail-glasses)
 

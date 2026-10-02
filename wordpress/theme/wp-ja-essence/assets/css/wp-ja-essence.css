@@ -103,8 +103,11 @@ a { color: var(--wp--preset--color--accent); }
 .je-sec__head--center .je-sec__title { display: inline-block; margin: 0; font-size: 24px; }
 .je-sec__desc { font-size: 13px; color: var(--wp--preset--color--muted); margin: 4px 0 0; }
 .je-sec--slide, .je-sec--choice, .je-sec--cats { max-width: 1164px; margin: 36px auto; padding-inline: 18px; box-sizing: border-box; }
-.je-lead--slide .je-lead__items { display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; list-style: none; padding: 0; margin: 0; }
-.je-lead--slide .je-lead__items > li { flex: 0 0 calc((100% - 48px) / 3); scroll-snap-align: start; }
+.je-lead--slide .je-lead__items { display: flex; gap: 32px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; list-style: none; padding: 0; margin: 0; }
+.je-lead--slide .je-lead__items::-webkit-scrollbar { display: none; }
+.je-lead--slide .je-lead__items > li { flex: 0 0 calc((100% - 64px) / 3); scroll-snap-align: start; }
+@media (max-width: 991px) { .je-lead--slide .je-lead__items > li { flex-basis: calc((100% - 32px) / 2); } }
+@media (max-width: 575px) { .je-lead--slide .je-lead__items > li { flex-basis: 100%; } }
 .je-choice .je-choice__items { gap: 32px; margin-block: 24px 0; }
 .je-vcard__img img { width: 100%; border-radius: 8px; object-fit: cover; }
 .je-vcard__title { font-size: 18px; margin: 12px 0 6px; }
@@ -128,7 +131,7 @@ a { color: var(--wp--preset--color--accent); }
 .je-side--num .je-mini--num::before { content: counter(je-n); font-family: Jost, sans-serif; font-size: 28px; color: var(--wp--preset--color--border); flex: 0 0 24px; }
 .je-tagcloud a { display: inline-block; margin: 0 8px 8px 0; font-size: 13px !important; color: var(--wp--preset--color--fg-2); text-decoration: none; }
 .je-prose > .je-side { float: right; width: 360px; clear: right; }
-@media (max-width: 767px) { .je-lead--slide .je-lead__items > li { flex-basis: 80%; } .je-prose > .je-side { float: none; width: auto; } }
+@media (max-width: 767px) { .je-prose > .je-side { float: none; width: auto; } }
 .je-gallery, .je-sec--more { clear: both; }
 .je-prose:has(> :first-child:not(.je-side)):has(> .je-side) { display: grid; grid-template-columns: minmax(0, 1fr) 360px; column-gap: 36px; align-items: start; }
 .je-prose:has(> :first-child:not(.je-side)):has(> .je-side) > :first-child { grid-column: 1; grid-row: 1 / span 30; }
@@ -161,6 +164,7 @@ a { color: var(--wp--preset--color--accent); }
 .je-lead__items { align-items: stretch; }
 .je-lead__items > li { display: flex; }
 .je-lead__card { width: 100%; min-height: 232px !important; align-items: center; }
+.je-lead--slide .je-lead__card { min-height: 350px !important; }
 .je-lead__card .je-meta, .je-lead__card .je-meta a, .je-lead__card .je-meta__author, .je-lead__card .je-meta__date { color: #fff; font-size: 11px; }
 .je-lead__title { font-size: 24px; line-height: 1.3; }
 .je-lead__card .je-lead__title a { color: #fff; }
@@ -219,9 +223,9 @@ a { color: var(--wp--preset--color--accent); }
 /* One-row header (the source's `t4-header-r`, every page of the default layout): name left, menu centred, theme
    toggle, search and Subscribe right. The two-row header stays on the landing pages and the front page. The same
    markup serves both: the two wrappers dissolve into one grid. */
-@media (min-width: 768px) {
+@media (min-width: 992px) {
   body:not(.home):not(.page-template-page-landing) .je-header { background: var(--wp--preset--color--surface); }
-  body:not(.home):not(.page-template-page-landing) .je-header__inner { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; column-gap: 12px; min-height: 78px; }
+  body:not(.home):not(.page-template-page-landing) .je-header__inner { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; column-gap: 12px; min-height: 123px; }
   body:not(.home):not(.page-template-page-landing) .je-header__top, body:not(.home):not(.page-template-page-landing) .je-header__bottom { display: contents; }
   body:not(.home):not(.page-template-page-landing) .je-header .je-social, body:not(.home):not(.page-template-page-landing) .je-header .je-drawer-toggle { display: none; }
   body:not(.home):not(.page-template-page-landing) .je-header .je-site-name { grid-area: 1 / 1; text-align: left; font-size: 14px; letter-spacing: .08em; }
@@ -259,13 +263,16 @@ a { color: var(--wp--preset--color--accent); }
 .je-nav .wp-block-navigation__submenu-container > .has-child > .wp-block-navigation-item__content .wp-block-navigation-item__label { display: inline-block; padding-bottom: 8px; font-size: 15px; line-height: 22.5px; }
 .je-nav .wp-block-navigation__submenu-container .wp-block-navigation__submenu-container a { padding: 8px 0 !important; }
 .je-nav .wp-block-navigation__submenu-container .wp-block-navigation__submenu-container { padding: 0; }
-@media (min-width: 768px) {
+@media (min-width: 992px) {
   body:not(.home):not(.page-template-page-landing) .je-header .je-nav { justify-self: end; margin-right: -4.4px; }
   body:not(.home):not(.page-template-page-landing) .je-header .je-nav > .wp-block-navigation__container > li:last-child > a { padding-right: 0; }
   body:not(.home):not(.page-template-page-landing) .je-header .je-nav > .wp-block-navigation__container > li > a { padding: 8px 20px 8px 0; margin-left: 20px; font-size: 18px; }
   body:not(.home):not(.page-template-page-landing) .je-header .je-nav .wp-block-navigation__container { gap: 24px; }
   body:not(.home):not(.page-template-page-landing) .je-header__inner { column-gap: 36px; }
-  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link { flex-direction: column; gap: 4px; padding: 12px 28px; font-size: 18px; line-height: 24px; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link { flex-direction: row; gap: 8px; padding: 12px 24px; font-size: 18px; line-height: 24px; }
+}
+@media (min-width: 1200px) {
+  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link { flex-direction: column; gap: 4px; padding: 12px 28px; }
 }
 
 /* Article and page bodies carry Bootstrap utility classes from the source; the type scale below is the one measured on /pages/j-pages/typography and the article pages (slice 6). */
@@ -299,7 +306,7 @@ a { color: var(--wp--preset--color--accent); }
 .je-drawer-nav .wp-block-navigation__container { gap: 0; width: 100%; }
 .je-drawer-nav .wp-block-navigation-item { width: 100%; height: 40px; box-sizing: border-box; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .je-drawer-nav .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation-item__label { font-weight: 600; font-size: 16px; line-height: 24px; color: var(--wp--preset--color--fg-2); }
-.je-drawer-nav .current-menu-item > .wp-block-navigation-item__content, .je-drawer-nav .current-menu-ancestor > .wp-block-navigation-item__content, .je-drawer-nav .current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label { color: var(--wp--preset--color--accent); }
+.je-drawer-nav .current-menu-item > .wp-block-navigation-item__content, .je-drawer-nav .current-menu-ancestor > .wp-block-navigation-item__content, .je-drawer-nav .current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label, .je-drawer-nav .current-menu-ancestor > .wp-block-navigation-item__content .wp-block-navigation-item__label { color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
 .je-drawer-nav .wp-block-navigation__submenu-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin: 0; border-radius: 8px; background: var(--wp--preset--color--bg); }
 .je-drawer-nav .wp-block-navigation__submenu-icon svg { width: 12px; height: 12px; transform: rotate(-90deg); }
 .je-drawer > *, .je-drawer__head > * { margin-block: 0 !important; }
@@ -320,3 +327,65 @@ a { color: var(--wp--preset--color--accent); }
 
 /* the open panel marks the page being viewed in the accent colour, as the source's `current active` item does */
 .je-nav .wp-block-navigation__submenu-container .current-menu-item > a, .je-nav .wp-block-navigation__submenu-container .current-menu-item > a .wp-block-navigation-item__label { color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)) !important; }
+
+/* 1.0.1 — default-layout header below 992px: one 80px row as the source draws it (name left; theme toggle, search and the
+   hamburger right). The two-row header stays on the home and landing pages. */
+@media (max-width: 991px) {
+  body:not(.home):not(.page-template-page-landing) .je-header { background: var(--wp--preset--color--surface); }
+  body:not(.home):not(.page-template-page-landing) .je-header__inner { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; column-gap: 0; min-height: 80px; }
+  body:not(.home):not(.page-template-page-landing) .je-header__top, body:not(.home):not(.page-template-page-landing) .je-header__bottom, body:not(.home):not(.page-template-page-landing) .je-header__tools { display: contents; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-social, body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe, body:not(.home):not(.page-template-page-landing) .je-header .je-nav { display: none; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-site-name { grid-column: 1; order: 0; text-align: left; font-size: 14px; letter-spacing: .08em; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-header__tools .je-theme-toggle { order: 1; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-search { order: 2; justify-self: end; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-drawer-toggle { order: 3; margin-right: -9px; }
+}
+
+/* 1.0.1 — the current section is blue on desktop as in the source: the item the visitor is on and the parent of the
+   page the visitor is on (Detail on /detail/layout-1), caret included. */
+.je-nav > .wp-block-navigation__container > .current-menu-item > a,
+.je-nav > .wp-block-navigation__container > .current-menu-ancestor > a,
+.je-nav > .wp-block-navigation__container > .current-menu-parent > a,
+.je-nav > .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation__submenu-icon,
+.je-nav > .wp-block-navigation__container > .current-menu-parent > .wp-block-navigation__submenu-icon { color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
+
+/* 1.0.1 — the caret is a real 24px button (touch target) and a click, a tap or the keyboard opens the panel (`.je-open`,
+   assets/js/wp-ja-essence.js) the way hover does. */
+.je-nav > .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; min-width: 24px; height: 24px; margin-left: -12px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; position: relative; z-index: 1; }
+.je-nav > .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon:focus-visible { outline: 2px solid currentColor; outline-offset: 0; border-radius: 4px; }
+.je-nav > .wp-block-navigation__container > li.je-open > .wp-block-navigation__submenu-container { visibility: visible !important; opacity: 1 !important; height: auto !important; width: auto !important; overflow: visible !important; }
+
+/* 1.0.1 — drawer submenus drill down as the source's do: choosing a parent replaces the list with its children under a
+   "back" row, three levels deep, in the colours of the drawer (light and dark). */
+.je-drawer-nav .wp-block-navigation__container { display: flex; flex-direction: column; align-items: stretch; }
+.je-drawer-nav .wp-block-navigation__submenu-container { display: none; position: static !important; visibility: visible !important; opacity: 1 !important; width: 100% !important; min-width: 0 !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0; box-shadow: none !important; background: transparent !important; transform: none !important; left: auto !important; right: auto !important; flex-direction: column; align-items: stretch; gap: 0; }
+.je-drawer-nav li.wp-block-navigation-item { display: none; }
+.je-drawer-nav ul.je-d-cur > li.wp-block-navigation-item { display: flex; }
+.je-drawer-nav li.wp-block-navigation-item.je-d-path { display: block; height: auto; }
+.je-drawer-nav li.je-d-path > .wp-block-navigation-item__content, .je-drawer-nav li.je-d-path > .wp-block-navigation-submenu__toggle { display: none !important; }
+.je-drawer-nav li.je-d-path > .wp-block-navigation__submenu-container { display: flex; }
+.je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__label { color: var(--wp--preset--color--fg-2); }
+.je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label { color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
+.je-drawer-nav .wp-block-navigation-submenu__toggle { border: 0; cursor: pointer; color: var(--wp--preset--color--fg-2); }
+.je-drill-back { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; margin: 0 0 4px; padding: 0; border: 0; border-bottom: 1px solid var(--wp--preset--color--border-soft); background: none; cursor: pointer; text-align: left; font: 600 16px/24px "Noto Serif", serif; text-transform: uppercase; color: var(--wp--preset--color--fg-2); }
+.je-drill-back[hidden] { display: none; }
+.je-drill-back__arrow { font-size: 26px; line-height: 1; color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
+.je-drawer-nav .wp-block-navigation-submenu__toggle:focus-visible, .je-drill-back:focus-visible { outline: 2px solid light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); outline-offset: 2px; }
+
+/* 1.0.1 — the one-row header at 992-1199px: the menu steps down so the Subscribe button keeps one line (source: 140x48 at
+   y 37), and at 1200px+ its stacked variant is 69px tall with a 20px icon (source: y 27). */
+.je-subscribe .wp-block-button__link { white-space: nowrap; }
+@media (min-width: 992px) and (max-width: 1199px) {
+  body:not(.home):not(.page-template-page-landing) .je-header__inner { column-gap: 12px; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-nav > .wp-block-navigation__container > li > a { font-size: 16px; margin-left: 4px; padding-right: 8px; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-nav .wp-block-navigation__container { gap: 8px; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link { padding: 11px 18px; }
+}
+@media (min-width: 1200px) {
+  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link { padding: 11px 28px; line-height: 20.7px; }
+  body:not(.home):not(.page-template-page-landing) .je-header .je-subscribe .wp-block-button__link::before { width: 20px; height: 20px; }
+}
+/* the drilled list sits right under its back row */
+.je-drawer-nav > *, .je-drawer-nav .wp-block-navigation__container, .je-drawer-nav .wp-block-navigation__submenu-container { margin-block: 0 !important; }
+.je-drawer-nav .wp-block-navigation__container { padding: 0; }
+nav.je-drawer-nav { display: flex; flex-direction: column; align-items: stretch !important; gap: 0 !important; }

@@ -24,7 +24,7 @@
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
-<!-- wp:query {"queryId":28,"query":{"perPage":4,"pages":1,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal-health,blog-normal-fashion"},"className":"je-side__list"} -->
+<!-- wp:query {"queryId":28,"query":{"perPage":4,"pages":1,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal"},"className":"je-side__list"} -->
 <div class="wp-block-query je-side__list">
 <!-- wp:post-template {"className":"je-side__items","layout":{"type":"default"}} -->
 <!-- wp:group {"className":"je-mini","layout":{"type":"default"}} -->

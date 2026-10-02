@@ -54,11 +54,14 @@ a body class `je-slug-<slug>`: type sizes and one listing layout (`category-blog
 
 ## Dark mode
 
-Three states, kept in the cookie `tracy_theme` (`light`, `dark`, `auto`; one year). Light and dark
+Three states can be saved in the cookie `tracy_theme` (`light`, `dark`, `auto`; one year). Light and dark
 are `data-theme` on `<html>`; **auto is no attribute**, and the stylesheet then follows the OS
 (`prefers-color-scheme`). `assets/js/wp-ja-essence-dark.js` runs in the head, blocking, so a visitor
 who chose dark never sees a light frame; each click on a header toggle (`data-tracy-theme-toggle`,
-one in the bar and one in the drawer) cycles light, dark, auto. `?theme=dark|light` on the address
+one in the bar and one in the drawer) flips what the page shows, light to dark and back, as the
+source's `darkmode.js` does (from auto it goes to the opposite of the OS setting, so the first click
+always changes the page; a click saves `light` or `dark`, never `auto`, which stays readable for a
+choice saved by 1.0.0). `?theme=dark|light` on the address
 wins for that load only and is never saved. Every colour preset carries both halves with CSS
 `light-dark()` (`theme.overlay.json`). The source keeps its choice in a cookie it reads back only
 when the OS setting changes, so a visitor who picked dark could see light again after a reload; this
@@ -70,7 +73,15 @@ switch reads its cookie on every load (the source behaviour is recorded as a sou
   stylesheet nor the motion library loads (`tracy_motion_effects()` returns an empty list). To turn
   one on, store `{"effects":[...]}` in `tracy_motion`; do not hand-edit the library.
 - The lead slider and the category slides are CSS rows (`overflow-x: auto`, scroll-snap) the
-  visitor scrolls; there is no autoplay and no slider script.
+  visitor scrolls (touch swipe needs no script); `assets/js/wp-ja-essence.js` adds previous / next
+  buttons and one dot per page (3 cards visible from 992px, 2 below, 1 below 576px; no autoplay),
+  and nothing is drawn when every card is already visible. A gallery article's pictures
+  (`.jes-gallery`) become a slider with arrows and thumbnails in the hero place; without the script
+  they follow the text.
+- Menus: below 992px the default layout has a one-row 80px header with the hamburger, from 992px the
+  menu is a 123px bar. A desktop submenu opens on hover, on keyboard focus, and on a tap of its
+  parent or of its 24px chevron (a tap outside or Escape closes it). The drawer's submenus drill
+  down: choosing a parent replaces the list with its children under a back row, three levels deep.
 - Header: the main menu is core's navigation block with nested submenus; the "Pages" panel prints
   its second level as columns by CSS (D-52); the drawer is described above.
 
