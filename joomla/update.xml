@@ -16,6 +16,23 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.20.1 plus: a credential is never a slot of a derived content map. A setting whose name says it holds one (smtp, api_key, password, client_secret, webhook...) takes its whole subtree out of the map, and a value whose shape gives it away (a Google or Stripe key, a JWT, a webhook address, a URL that carries a token) is skipped, so a key typed into a module or menu setting no longer reaches inspect, content.read or the files the Tracy host writes for an agent; nothing already written changes (TracyHQ/claude-cowork#87)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.20.2</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.2</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.20.2/pkg_claudecowork-0.20.2.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.20.0 plus: a write clears every cache group the site holds, as System › Clear Cache does, so a renamed article or a new picture shows in the module listings at once instead of after the cache lifetime; the groups of the article modules and of custom modules join the fallback list for a cache storage that lists none, and a group that will not clean never fails a write that landed (TracyHQ/claude-cowork#85)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
