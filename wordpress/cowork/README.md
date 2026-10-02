@@ -473,6 +473,7 @@ door in front of a copy. A server does not care which CMS wrote the files on it.
 
 ```bash
 ./build.sh          # → dist/claude-cowork.zip, installable through Plugins → Add New → Upload
+                    #   + dist/tracy-release.json (needs node)
 ```
 
 Against a real WordPress:
@@ -510,6 +511,18 @@ schedules a wp-cron event every 15 minutes (wp-cron runs on a visit, in a backgr
 reads `wordpress/update.json` and, only when that names a newer version, installs it through the
 same path as `plugin.selfUpdate`. It stands down when the site forbids file changes
 (`DISALLOW_FILE_MODS`, `AUTOMATIC_UPDATER_DISABLED`) and logs a failed install with `error_log`.
+
+**Every release says which files it is (unreleased).** `build.sh` writes `tracy-release.json` into
+the zip — `wp-content/plugins/claude-cowork/tracy-release.json` on a site — and into `dist/`, and
+`scripts/release-wordpress.mjs` attaches that copy to the GitHub release as an asset of its own:
+every file the plugin installs, by its path under the site root, with its sha256, the version and the
+tag (`scripts/release-manifest.mjs`; the Joomla README describes the format). The Tracy themes carry
+the same file at `wp-content/themes/<slug>/tracy-release.json`. Nothing in the plugin reads it: it is
+there for whoever keeps the site's files in git to tell this release's bytes from anyone else's.
+WordPress replaces the whole plugin folder on an upgrade (`Plugin_Upgrader` clears the destination),
+so unlike Joomla no file of an older release stays behind. Who started an update is not recorded
+here: both update paths end in `Plugin_Upgrader::upgrade()`, whose `upgrader_process_complete` a site
+host can hook, inside wp-cron for the quarter-hour check and inside admin-ajax for `plugin.selfUpdate`.
 
 ## Why admin-ajax, not the REST API
 
