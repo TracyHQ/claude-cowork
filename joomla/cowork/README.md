@@ -88,10 +88,10 @@ is taken without one.
 `plg_system_claudecoworkupdate` reads `joomla/update.xml` after a response has gone to the browser,
 at most once every 15 minutes, and installs the package (and `tpl_tracy`) when a newer version is
 announced. Its `autoupdate` switch turns that off. What it did is written to
-`administrator/logs/plg_system_claudecoworkupdate.php` (unreleased: until now `Log::add` had no
+`administrator/logs/plg_system_claudecoworkupdate.php` (since 0.21.0; before it `Log::add` had no
 logger registered for its category, so every line went nowhere).
 
-## What a release puts on a site, and who put it there (unreleased)
+## What a release puts on a site, and who put it there (since 0.21.0)
 
 A site Tracy keeps in git sees an update of this package as a few hundred changed files nobody
 claims: the updater writes them after the response, and nothing used to say so. Two records answer
