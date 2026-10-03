@@ -71,15 +71,16 @@ final class EngineFactory
      * the same trust, as the write token); a request can never reach it, because every action that
      * writes an extension row is refused on a bound site.
      *
-     * A site provisioned before this existed has no param, so the Apple profile is the default and
-     * those sites keep verifying against exactly the bytes they were bound to.
+     * A site with no param has no contract of its own and is UNBOUND (null): it is never held to a
+     * profile merely because that profile ships in `lib/contracts/`. Holding such sites to the Apple
+     * profile verified their files against Apple's lock, so every content.read on them threw inside
+     * the presentation check and answered a masked 503 (TCH #722). Unbound, content.read answers its
+     * honest 501 "Content mapping is unavailable" and the caller falls back to the open writes.
      *
      * Swapping the param on an already-bound site does NOT rebind it: `inspect()` compares the
      * stored `contractHash` against the loaded profile and fails closed, which is what a design
      * change on a live site has to do until a migration workflow exists to do it properly.
      */
-    private const DEFAULT_CONTRACT = 'tracy-apple/j6/1.1.0';
-
     private static function buildContract(): ?\QuickstartContract
     {
         // An imported site bound by `content.contract derive` is held to the map its own rows make,
@@ -96,25 +97,22 @@ final class EngineFactory
                 static fn(): array => JoomlaDerivedRows::built($db, $derived, $cache));
         }
         $configured = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
-        // A site under construction — provisioned from the Base archive with `tracy_build_baseline`
-        // and no `contract`, because its template is still to be built — carries NO contract. It
-        // must not fall through to the default profile below: that verified Base's files against
-        // Apple's lock and refused the first inspection of every such site ("Presentation asset
-        // changed: templates/tracy/acm/accordion/css/style.css", measured 14/09). The engine
-        // answers the contract door for it instead (`Engine::underConstruction`).
-        if ($configured === '' && self::constructionBaseline() !== null) return null;
+        // No `contract` means no contract of this site's own: unbound. That includes a site under
+        // construction — provisioned from the Base archive with `tracy_build_baseline` and no
+        // `contract`, because its template is still to be built; the engine answers the contract
+        // door for it instead (`Engine::underConstruction`). Whatever profiles ship on disk, none is
+        // this site's: Apple's, once the default here, verified Base's files against Apple's lock and
+        // refused the first inspection of every such site ("Presentation asset changed:
+        // templates/tracy/acm/accordion/css/style.css", measured 14/09).
+        if ($configured === '') return null;
         // Three segments of the shape the published profiles use, and nothing that could climb out
         // of `lib/contracts/` — this string becomes a directory. A param that is set but malformed
-        // is deliberately NOT waved through to the default: it names a site whose design nobody can
-        // account for, and that has to refuse rather than quietly verify against Apple's bytes.
-        $valid = $configured !== ''
-            && preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured);
-        $directory = self::libDir() . '/contracts/' . ($valid ? $configured : self::DEFAULT_CONTRACT);
-        // No contract configured and no default profile on disk is the one legacy shape that means
-        // "this receiver carries no contracts at all"; everything else hands back a contract that
-        // refuses, so a receiver older than the site's profile cannot read as an unbound site.
-        if ($configured === '' && !is_file($directory . '/manifest.json')) return null;
-        if ($configured !== '' && !$valid) $directory = self::libDir() . '/contracts/unconfigured';
+        // is deliberately NOT read as unbound: it names a site whose design nobody can account for,
+        // and that has to refuse. So does a well-formed profile this receiver does not carry: the
+        // contract handed back refuses, so a receiver older than the site's profile cannot read as
+        // an unbound site.
+        $valid = preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured) === 1;
+        $directory = self::libDir() . '/contracts/' . ($valid ? $configured : 'unconfigured');
         $writer = self::buildWriter();
         if (!$writer) return null;
         $db = Factory::getContainer()->get(DatabaseInterface::class);
