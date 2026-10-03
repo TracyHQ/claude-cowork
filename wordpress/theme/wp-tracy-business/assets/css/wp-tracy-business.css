@@ -411,6 +411,14 @@
   display: none;
 }
 
+/* A site with no logo renders the identity logo with the [hidden] attribute and an empty src. The browser's own
+   [hidden] rule is only a default, and tracy.css sets display: block on every img under .tracy, so the empty image
+   was drawn as a broken-image icon with the site name as its alt text, 160 x 25 px beside the monogram (measured
+   03/10/2026 on a new site, with and without Apply). An author rule of this specificity puts [hidden] back. */
+.tracy-header__brand img.tracy-logo[hidden] {
+  display: none;
+}
+
 .tracy-brand__text {
   display: grid;
   gap: 3px;
