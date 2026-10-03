@@ -18,12 +18,11 @@ $wp_ja_kinetic_class = isset( $attributes['className'] ) && is_string( $attribut
 
 // `categoryOnly`: the author archive row's eyebrow is the category title alone, never a tag
 // (`author_posts.php:27`: `$cat = $item->category_title`).
-$wp_ja_kinetic_tags = empty( $attributes['categoryOnly'] ) ? wp_get_object_terms( $wp_ja_kinetic_id, 'post_tag', array( 'orderby' => 'term_order' ) ) : array();
-if ( $wp_ja_kinetic_tags && ! is_wp_error( $wp_ja_kinetic_tags ) && isset( $wp_ja_kinetic_tags[0] ) ) {
-	$wp_ja_kinetic_label = $wp_ja_kinetic_tags[0]->name;
-} else {
+if ( ! empty( $attributes['categoryOnly'] ) ) {
 	$wp_ja_kinetic_cats  = get_the_category( $wp_ja_kinetic_id );
 	$wp_ja_kinetic_label = $wp_ja_kinetic_cats ? $wp_ja_kinetic_cats[0]->name : '';
+} else {
+	$wp_ja_kinetic_label = wp_ja_kinetic_post_topic( $wp_ja_kinetic_id );
 }
 if ( '' === $wp_ja_kinetic_label ) {
 	return;

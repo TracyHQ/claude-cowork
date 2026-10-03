@@ -18,22 +18,15 @@ if ( ! $wp_ja_kinetic_post ) {
 	return;
 }
 
-// Eyebrow: the post's FIRST tag, falling back to its category only when it has no tags — source
-// `category/blog.php:180` reads `$this->hxRowTopics` first, the same rule (and the same
-// assignment-order read) as the row eyebrow in `blocks/post-topic-eyebrow/render.php`.
-$wp_ja_kinetic_tags = wp_get_object_terms( $wp_ja_kinetic_post->ID, 'post_tag', array( 'orderby' => 'term_order' ) );
-if ( $wp_ja_kinetic_tags && ! is_wp_error( $wp_ja_kinetic_tags ) && isset( $wp_ja_kinetic_tags[0] ) ) {
-	$wp_ja_kinetic_cat = $wp_ja_kinetic_tags[0]->name;
-} else {
-	$wp_ja_kinetic_categories = get_the_category( $wp_ja_kinetic_post->ID );
-	$wp_ja_kinetic_cat        = $wp_ja_kinetic_categories ? $wp_ja_kinetic_categories[0]->name : '';
-}
+// Eyebrow: the post's primary tag, falling back to its category only when it has no tags — the same
+// rule as the row eyebrow in `blocks/post-topic-eyebrow/render.php` (`wp_ja_kinetic_post_topic()`).
+$wp_ja_kinetic_cat = wp_ja_kinetic_post_topic( $wp_ja_kinetic_post->ID );
 $wp_ja_kinetic_excerpt    = trim( wp_strip_all_tags( get_the_excerpt( $wp_ja_kinetic_post ) ) );
 if ( '' !== $wp_ja_kinetic_excerpt ) {
 	// Source: category/blog.php:186, `HTMLHelper::_('string.truncate', $fExcerpt, 180, true, false)`.
 	$wp_ja_kinetic_excerpt = wp_ja_kinetic_joomla_truncate( $wp_ja_kinetic_excerpt, 180 );
 }
-$wp_ja_kinetic_author = get_the_author_meta( 'display_name', $wp_ja_kinetic_post->post_author );
+$wp_ja_kinetic_author = wp_ja_kinetic_post_author_name( $wp_ja_kinetic_post );
 $wp_ja_kinetic_date    = get_the_date( 'M j, Y', $wp_ja_kinetic_post );
 $wp_ja_kinetic_read    = wp_ja_kinetic_readtime( $wp_ja_kinetic_post->post_content );
 $wp_ja_kinetic_has_img = has_post_thumbnail( $wp_ja_kinetic_post );

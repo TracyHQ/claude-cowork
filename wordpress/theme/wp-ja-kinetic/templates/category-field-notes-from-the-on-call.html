@@ -18,7 +18,6 @@
 <nav class="wp-block-group hx-blogtopics" aria-label="Browse">
 <!-- wp:group {"className":"hx-container hx-pad","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-container hx-pad">
-<!-- source: `<span class="hx-blogtopics__lbl">` (`category/blog.php:167`). -->
 <!-- wp:group {"tagName":"span","className":"hx-blogtopics__lbl","layout":{"type":"default"}} -->
 <span class="wp-block-group hx-blogtopics__lbl">Browse</span>
 <!-- /wp:group -->
@@ -39,12 +38,6 @@
 <!-- wp:group {"className":"hx-blog","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-blog">
 <!-- wp:wp-ja-kinetic/blog-rail /-->
-<!-- perPage 6: source `category/blog.php:53-64` merges lead+intro+link buckets into one
-     6-item page (`num_leading_articles` default 0 + `num_intro_articles` default 6), then
-     lifts 1 into the featured card on page 1 only (`inc/blog-dynamic.php`'s
-     `wp_ja_kinetic_exclude_featured_post()`) — net 5 grid rows on page 1, 6 on every page
-     after (the exclusion filter only ever fires when `paged <= 1`, so later pages' SQL
-     OFFSET math lines up with the source's fixed offset-per-page, unaffected by the shift). -->
 <!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"className":"hx-bloglist","layout":{"type":"default"}} -->
 <div class="wp-block-query hx-bloglist">
 <!-- wp:wp-ja-kinetic/blog-ledger-header /-->
@@ -67,7 +60,6 @@
 <!-- wp:group {"className":"hx-blogmeta","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-blogmeta">
 <!-- wp:post-author-name {"className":"hx-blogauthor"} /-->
-<!-- format "M j Y", no comma: source's own format string for this row (`category/blog_item.php:74`, `HTMLHelper::_('date', $dateField, 'M j Y')`) — distinct from the tag/date-archive rows elsewhere, which DO carry a comma. -->
 <!-- wp:post-date {"format":"M j Y","className":"hx-blogdatetxt"} /-->
 <!-- wp:wp-ja-kinetic/post-readtime /-->
 </div>
@@ -93,9 +85,6 @@
 <!-- /wp:group -->
 </section>
 <!-- /wp:group -->
-<!-- the source's `blog-page` module position: ACM `cta` module 234 "[Kinetic] Blog - CTA", edited in the
-     source's admin — here the synced pattern of that name (slug `wp-ja-kinetic-cta-blog`), written by
-     tasks/ja-kinetic-wp7/post-seed.mjs and edited under Patterns; inc/owner-text.php fills the reference (D-40). -->
 <!-- wp:block {"metadata":{"name":"cta.blog"}} /-->
 </main>
 <!-- /wp:group -->

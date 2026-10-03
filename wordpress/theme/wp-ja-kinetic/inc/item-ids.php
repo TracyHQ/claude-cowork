@@ -226,6 +226,29 @@ add_filter( 'the_author', 'wp_ja_kinetic_author_alias_override' );
 add_filter( 'get_the_author_display_name', 'wp_ja_kinetic_author_alias_override' );
 
 /**
+ * The byline name of ONE named post, independent of the global post. The two filters above read the
+ * alias of whatever post is current in the loop; a block that renders a post it fetched itself (the
+ * featured card of a category archive, a category card row) runs outside that loop, where the
+ * "current" post is another one, so it asks for the name here: the post's own alias meta, else the
+ * author's `display_name` read straight off the user row (never through the alias filters).
+ *
+ * @param int|WP_Post $post Post the byline belongs to.
+ * @return string Empty when the post or its author does not exist.
+ */
+function wp_ja_kinetic_post_author_name( $post ): string {
+	$post = get_post( $post );
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+	$alias = trim( (string) get_post_meta( $post->ID, 'wp_ja_kinetic_article_author_alias', true ) );
+	if ( '' !== $alias ) {
+		return $alias;
+	}
+	$user = get_userdata( (int) $post->post_author );
+	return $user instanceof WP_User ? (string) $user->display_name : '';
+}
+
+/**
  * An author archive's heading names the queried user. `get_the_archive_title()` reads it through
  * `get_the_author()`, where the first listed post is still current, so the alias above put that
  * post's byline (e.g. "Marco Vidal") over the whole archive of another user.

@@ -7,17 +7,6 @@
 <header class="wp-block-group hx-article__head hx-grid-bg">
 <!-- wp:group {"className":"hx-container hx-pad hx-article__head-inner","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-container hx-pad hx-article__head-inner">
-<!-- the ten standalone Pages the source renders as ARTICLE views (page-map.json
-     `source.view: "article"` — features/integrations/changelog/faq/pricing/about/team/kineticql/
-     privacy/terms) get the EXACT same frame as a single post: same breadcrumb/eyebrow/title/sub/
-     byline/body/tags/related/CTA markup as templates/single.html, byte-identical class chain, so
-     the source's `templates/ja_kinetic/css/single-article.css` rules apply unchanged (see that
-     file's own header comment in the article CSS sheet). Kept as its own file rather than folded
-     into single.html because a WordPress Page and a WordPress Post are different post types with
-     different template-hierarchy slots (`page-<template>.html` vs `single.html`); the content and
-     structure below is deliberately the same file read twice. The article and body wrappers
-     also carry the source's own `com-content-article item-page` / `com-content-article__body`
-     classes, which Joomla core rules key on (see wp-ja-kinetic-article.css `.item-page`). -->
 <!-- wp:group {"tagName":"nav","className":"hx-article__breadcrumb"} -->
 <nav class="wp-block-group hx-article__breadcrumb" aria-label="Breadcrumb">
 <!-- wp:paragraph {"metadata":{"name":"article-breadcrumb.home"}} -->
@@ -65,9 +54,6 @@
 </div>
 <!-- /wp:group -->
 <!-- wp:wp-ja-kinetic/related-posts /-->
-<!-- the source's `article-cta` module position: ACM `cta` module 235 "[Kinetic] Article - CTA", edited in the
-     source's admin — here the synced pattern of that name (slug `wp-ja-kinetic-cta-article`), written by
-     tasks/ja-kinetic-wp7/post-seed.mjs and edited under Patterns; inc/owner-text.php fills the reference (D-40). -->
 <!-- wp:block {"metadata":{"name":"cta.article"}} /-->
 </article>
 <!-- /wp:group -->

@@ -561,12 +561,9 @@ body.item-218 .acm-features-ledger .hx-spec-icon svg {
   width: 22px;
   height: 22px;
 }
-/* Measured 2026-09-22 verification: the ledger row title (module 192) measures 24px/25.44px
-   line-height on the running source; no ported stylesheet carries an override for it (checked
-   `css/page-218.css` and `acm/features-ledger/css/style.css` — neither declares one), so it is
-   set directly against the measured value. */
+/* The ledger row title keeps the base rule's 19px (`.acm-features-ledger .hx-spec-title`, the size the
+   source computes at every width); only its line-height is tightened here, as on the source (19px x 1.06). */
 body.item-218 .acm-features-ledger .hx-spec-title {
-  font-size: 24px;
   line-height: 1.06;
 }
 /* `css/page-218.css` never declares `.hx-spec-stat` at all (checked, grep -n "hx-spec-stat"
@@ -1200,13 +1197,9 @@ body.item-225 .acm-incident-timeline .hx-inc-time {
   font-weight: 600 !important;
   letter-spacing: 0 !important;
   margin-bottom: 6px !important;
-  /* neither page-225.css nor this ported block ever declared a line-height for this element —
-     the source's own rendered value (23.8px = 14px * 1.7, measured 2026-09-23) comes from
-     inheritance the WP side has no equivalent path for, and wp-ja-kinetic-article.css's
-     `.hx-article .hx-prose .article-body p { line-height: 1.75 }` fills the gap with the wrong
-     number since this element is a `<p>` inside an article-templated page (page-frame's file,
-     same clash as the item-220 block above). */
-  line-height: 1.7 !important;
+  /* The source computes 21.7px (14px x 1.55) here; the article frame's `p` line-height
+     (wp-ja-kinetic-article.css, `.article-body p`) would otherwise win, so it is set explicitly. */
+  line-height: 1.55 !important;
 }
 body.item-225 .acm-incident-timeline .hx-inc-phase {
   grid-column: 2 !important;
@@ -3391,6 +3384,14 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
   border-color: var(--primary);
 }
+/* The hover card bleeds 12px past each cell. On phones a full-width placement (the changelog, the About
+   timeline) has no side padding to absorb it, so the card stays inside the cell: that bleed was the page's
+   12px of horizontal overflow at 390px. Source: acm/incident-timeline/css/style.css, `max-width: 620px`. */
+@media (max-width: 620px) {
+  .acm-incident-timeline .hx-inc-cell::before {
+    inset: -16px 0 -20px;
+  }
+}
 
 /* connecting line across the row, behind the nodes */
 .acm-incident-timeline .hx-inc-line {
@@ -3650,6 +3651,10 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  /* The item holds no text of its own (a tick and a span), so these two change no pixel; they give
+     the li the same computed type as the source's 15px/22.5px item. */
+  font-size: 15px;
+  line-height: 1.5;
 }
 .acm-kineticql-split .acm-split-check .hx-check {
   width: 18px;

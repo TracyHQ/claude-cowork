@@ -1,19 +1,9 @@
-<!-- Source: .kinetic-header-inner { display:flex; justify-content:space-between } has exactly TWO
-     children — .hx-left (brand + nav together, its own `gap:38px`) and .hx-right (sign-in/CTA/
-     toggle) — not three groups spread apart by `space-between` (css/template.css:19958-19975).
-     `.tracy-header__left` below is that same pairing; `space-between` on the row then only ever
-     has two things to push apart, exactly like the source. -->
 <!-- wp:group {"tagName":"div","className":"tracy-header__inner","layout":{"type":"flex","justifyContent":"space-between","flexWrap":"nowrap"}} -->
 <div class="wp-block-group tracy-header__inner">
 <!-- wp:group {"className":"tracy-header__left","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group tracy-header__left">
 <!-- wp:group {"className":"tracy-header__brand","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group tracy-header__brand">
-<!-- The source's brand mark is not an uploaded image — two inline SVG strokes, css/template.css
-     source markup: `<span class="kinetic-logo"><svg class="kinetic-logo-glyph" …>…</svg>…</span>`.
-     A WordPress Site Logo block only ever renders an img element, so the glyph is carried the same way
-     the theme toggle icon already is (below, and in parts/footer.html): a static wp:html block,
-     stroked with the same --chrome-primary bridge custom property the source's own SVG reads. -->
 <!-- wp:html -->
 <a class="tracy-logo" href="/" aria-label="Home"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 4 Q16 12 8 20 Q16 28 24 20" stroke="var(--chrome-primary)" stroke-width="2.4" stroke-linecap="round"></path><path d="M24 12 Q16 20 24 28 Q16 4 8 12" stroke="var(--chrome-primary)" stroke-width="2.4" stroke-linecap="round" opacity="0.5"></path></svg></a>
 <!-- /wp:html -->
@@ -23,21 +13,6 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"tracy-header__menu","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group tracy-header__menu">
-<!-- The source's off-canvas drawer is its full `mainmenu` (mod_menu 227, position offcanvas,
-     showAllChildren) in menu order — Home / Product / Pricing / Company / Pages, measured with JS
-     running at 390px, 2026-09-24 — not the desktop mega bar. Its own script
-     (templates/ja_kinetic/js/darkmode.js, initDrill) then regroups each drilled panel under the
-     desktop mega panel's column titles (Platform / Content / Discover …), rows no column names
-     trailing unlabelled; assets/js/wp-ja-kinetic-drawer.js does the same from the mega blocks
-     below. Core's own Navigation block supplies the toggle button + overlay container
-     (overlayMenu:"always"); this is the only place that content is declared, since the block has
-     no ref to an existing wp_nav_menu (D-31). Two more links (sign-in, the full-width CTA) are
-     appended at the end, styled by their own className below the source's divider
-     (css/template.css:20444-20486) — core has no slot to inject arbitrary non-menu markup inside
-     its own overlay otherwise. The source's "Author" item links
-     `/index.php/index.php/product/authors/author/priya.raman` (a doubled `/index.php`); it points
-     here at the page that item names, `/pages/author`, and so does the desktop Pages panel's
-     Author link below — the regrouping matches rows to columns by link, as the source's does. -->
 <!-- wp:navigation {"className":"tracy-nav","overlayMenu":"always","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <!-- wp:navigation-submenu {"label":"Home","type":"custom","url":"#"} -->
 <!-- wp:navigation-link {"label":"Terminal","url":"/","type":"custom"} /-->
@@ -263,12 +238,6 @@
 <!-- /wp:button -->
 </div>
 <!-- /wp:buttons -->
-<!-- The source's toggle carries a static accessible name and a hard-coded `aria-pressed="false"`
-     regardless of the resolved theme (measured live, both light and the dark default: `aria-
-     label="Toggle dark mode" aria-pressed="false" title="Toggle light / dark"`) — not a label
-     that narrates the current state. wp-ja-kinetic-dark.js sets `data-theme` and the `t4-dark`
-     class on the root and leaves this button's attributes alone; the root's `data-theme` drives
-     the sun/moon swap below. -->
 <!-- wp:html -->
 <button type="button" class="tracy-theme-toggle" data-tracy-theme-toggle aria-label="Toggle dark mode" aria-pressed="false" title="Toggle light / dark"><svg class="tracy-theme-toggle__sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg><svg class="tracy-theme-toggle__moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
 <!-- /wp:html -->

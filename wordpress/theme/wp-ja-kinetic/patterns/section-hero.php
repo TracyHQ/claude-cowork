@@ -41,8 +41,8 @@
 <!-- /wp:buttons -->
 <!-- wp:group {"className":"hx-trust"} -->
 <div class="wp-block-group hx-trust">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"hero.trust"}} -->
-<p><?php esc_html_e( 'Trusted by 2,000+ on-call teams', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-hero-trust","metadata":{"role":"content","name":"hero.trust"}} -->
+<p class="acm-hero-trust"><?php esc_html_e( 'Trusted by 2,000+ on-call teams', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->

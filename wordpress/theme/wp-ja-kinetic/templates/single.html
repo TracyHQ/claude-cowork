@@ -7,14 +7,6 @@
 <header class="wp-block-group hx-article__head hx-grid-bg">
 <!-- wp:group {"className":"hx-container hx-pad hx-article__head-inner","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-container hx-pad hx-article__head-inner">
-<!-- the source's breadcrumb is a FLAT run of `<a>`/`<span>` siblings — NOT an `<ol><li>` list
-     (`article/default.php:80-90`, measured live): `.hx-bc-home` / `.hx-bc-sep` "/" /
-     `.hx-bc-cat` (the post's category) / `.hx-bc-sep` "/" / `.hx-bc-current` (the title,
-     truncated at 31 chars + "…" — `wp_ja_kinetic_truncate_article_breadcrumb()`,
-     inc/blog-dynamic.php). Rebuilt to match exactly instead of the generic `wp:breadcrumbs`
-     block, which renders a completely different `<ol><li>` shape. The `<p>` the paragraph
-     block forces around the static "Home /" and "/" pieces, and the post-terms wrapper
-     around the category link, are unwrapped at render (inc/tag-parity.php). -->
 <!-- wp:group {"tagName":"nav","className":"hx-article__breadcrumb"} -->
 <nav class="wp-block-group hx-article__breadcrumb" aria-label="Breadcrumb">
 <!-- wp:paragraph {"metadata":{"name":"article-breadcrumb.home"}} -->
@@ -62,9 +54,6 @@
 </div>
 <!-- /wp:group -->
 <!-- wp:wp-ja-kinetic/related-posts /-->
-<!-- the source's `article-cta` module position: ACM `cta` module 235 "[Kinetic] Article - CTA", edited in the
-     source's admin — here the synced pattern of that name (slug `wp-ja-kinetic-cta-article`), written by
-     tasks/ja-kinetic-wp7/post-seed.mjs and edited under Patterns; inc/owner-text.php fills the reference (D-40). -->
 <!-- wp:block {"metadata":{"name":"cta.article"}} /-->
 </article>
 <!-- /wp:group -->
