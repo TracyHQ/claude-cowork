@@ -512,7 +512,7 @@ reads `wordpress/update.json` and, only when that names a newer version, install
 same path as `plugin.selfUpdate`. It stands down when the site forbids file changes
 (`DISALLOW_FILE_MODS`, `AUTOMATIC_UPDATER_DISABLED`) and logs a failed install with `error_log`.
 
-**Every release says which files it is (unreleased).** `build.sh` writes `tracy-release.json` into
+**Every release says which files it is (since 0.17.2).** `build.sh` writes `tracy-release.json` into
 the zip — `wp-content/plugins/claude-cowork/tracy-release.json` on a site — and into `dist/`, and
 `scripts/release-wordpress.mjs` attaches that copy to the GitHub release as an asset of its own:
 every file the plugin installs, by its path under the site root, with its sha256, the version and the
