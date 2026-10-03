@@ -47,7 +47,9 @@ edit the copy — that is how the two silently diverge.
 ## Build and test
 
 ```bash
-./build.sh                                    # → dist/pkg_claudecowork.zip
+./build.sh                                    # → dist/pkg_claudecowork.zip + dist/tracy-release.json (needs node)
+node --test ../../scripts/release-manifest.test.mjs
+tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
@@ -85,7 +87,113 @@ is taken without one.
 **The site takes a release by itself, within a quarter hour of the next visit.**
 `plg_system_claudecoworkupdate` reads `joomla/update.xml` after a response has gone to the browser,
 at most once every 15 minutes, and installs the package (and `tpl_tracy`) when a newer version is
-announced. Its `autoupdate` switch turns that off.
+announced. Its `autoupdate` switch turns that off. What it did is written to
+`administrator/logs/plg_system_claudecoworkupdate.php` (unreleased: until now `Log::add` had no
+logger registered for its category, so every line went nowhere).
+
+## What a release puts on a site, and who put it there (unreleased)
+
+A site Tracy keeps in git sees an update of this package as a few hundred changed files nobody
+claims: the updater writes them after the response, and nothing used to say so. Two records answer
+the two questions separately.
+
+### The release manifest: "these are the bytes of release X"
+
+`build.sh` writes `tracy-release.json` (`scripts/release-manifest.mjs`): every file the package puts
+on a site, by the path it lands at under the site root, with its sha256.
+
+```json
+{
+  "schema": 1,
+  "product": "joomla-package",
+  "element": "pkg_claudecowork",
+  "version": "0.21.0",
+  "tag": "joomla-v0.21.0",
+  "generatedAt": "2026-10-02T17:26:37.671Z",
+  "path": "administrator/components/com_claudecowork/tracy-release.json",
+  "roots": ["administrator/components/com_claudecowork/", "components/com_claudecowork/",
+            "plugins/system/claudecoworkapi/", "plugins/system/claudecoworkupdate/", "plugins/system/tracyaccess/"],
+  "files": { "administrator/components/com_claudecowork/lib/Engine.php": "<sha256>", "…": "…" }
+}
+```
+
+- **Where it is.** Inside the package, installed at `path` (the component lists it in its `<files>`),
+  and in `dist/tracy-release.json`, which is **attached to the GitHub release as an asset of its own**:
+  `gh release create joomla-v<x> dist/pkg_claudecowork-<x>.zip dist/tracy-release.json`. The copy on a
+  site names a tag; the asset under that tag is the copy nobody on the site can change, so a file is
+  "Tracy's" only when its bytes hash to what the asset says. The template's manifest is
+  `templates/tpl_tracy/tracy-release.json`, attached by `scripts/release-joomla-template.mjs`.
+- **What it lists.** Read off the extension manifests the installer follows — `<files>`,
+  `<administration>`, `<languages>`, `<media>`, `<scriptfile>`, the package's own manifest and
+  script — so a file Joomla would not install is not listed and one it would install is never
+  forgotten. It never lists itself. `roots` are the folders the release owns whole (shared folders
+  such as `administrator/language/` are not roots, though files in them are listed).
+- **Proven on a real install** by `tests/e2e/updater.sh` on Joomla 5.4.8 and 6.1.3 (02/10/2026): after
+  each install every entry exists with the listed hash, and nothing under `roots` is unlisted —
+  160 entries for a build with extra files, 156 for this package, 827 for `tpl_tracy`.
+
+### What an upgrade leaves behind — measured, and why the manifest lists no deletions
+
+Installed over a build that shipped four more files, on Joomla 5.4.8 and 6.1.3 alike:
+
+| File the old build shipped and the new one does not | After the upgrade |
+| --- | --- |
+| `lib/ObsoleteProbe.php` (inside `<folder>lib</folder>`) | **still there** |
+| `lib/contracts/obsolete-probe/manifest.json` (nested in that folder) | **still there** |
+| `plugins/system/claudecoworkapi/src/Extension/ObsoleteProbe.php` (inside a plugin's `<folder>src</folder>`) | **still there** |
+| `administrator/components/com_claudecowork/obsolete-probe.php` (its own `<filename>` line, dropped) | **deleted** |
+
+Joomla removes what the old manifest named **line by line** and the new one does not; it never
+removes a file from inside a folder both name. So a file that leaves `lib/` stays on every site that
+ever had it (why `build.sh` clears its engine copy: the same thing, one step earlier). The manifest
+therefore lists what a release installs and nothing about deletions: which files disappear depends
+on the version a site came from, and the previous release's manifest — the copy on disk before the
+update — already says what that was. A file under `roots` that the current manifest does not list is
+a leftover of an earlier release, or somebody else's.
+
+### The update receipt: "and this is who installed it"
+
+The package now has an installer script of its own (`script.php`). Its `postflight` — which every path
+that installs the package runs through — adds one row to `#__claudecowork_update_log`:
+
+| Column | |
+| --- | --- |
+| `id` | `INT UNSIGNED AUTO_INCREMENT` |
+| `at` | `DATETIME`, UTC |
+| `element` | `pkg_claudecowork` |
+| `from_version` | the version installed before (read in `preflight`); `NULL` on a first install |
+| `to_version`, `tag` | the version installed, and its release tag `joomla-v<to_version>` |
+| `manifest_sha256` | sha256 of the `tracy-release.json` the install just put on disk; `NULL` if absent |
+| `trigger` | `auto-updater`, `door`, `admin` or `unknown` — **a reserved word in MySQL/MariaDB: quote it** |
+| `user_id` | the signed-in user for `admin`, else `0` |
+| `apply_id` | the `apply_id` the door's caller sent with `extension.install`, else `NULL` |
+
+`trigger` comes from evidence the request carries, never from the time:
+
+1. **An install context** a Tracy caller sets around its own `Installer::install()` — the self-updater
+   says `auto-updater`, the door's `extension.install` says `door` with its `apply_id`
+   (`$GLOBALS['claudecowork_install_context']`, restored in a `finally`).
+2. **The call stack**, when no context was set: the self-updater's class, or the engine's
+   `extensionInstall`. This is what names the updater already on a site — 0.20.x predates the context,
+   and it is the one that installs the first release with a receipt.
+3. **A signed-in user**: `admin` (Extensions → Update or Install in the administrator).
+4. Otherwise **`unknown`**: the CLI, provisioning, anything else.
+
+The end-to-end run records `auto-updater` (released 0.20.3 → a build of this tree, from the call
+stack), `unknown` (CLI) and `auto-updater` (from the context), in that order. A receipt proves the
+path, not the bytes: anyone with the database can write a row, so it counts only where its tag and
+manifest hash match the manifest asset of that tag. `tpl_tracy` writes no receipt — it is a mirror
+of Tracy's generator and carries no installer script; its files are proven by its manifest alone.
+
+### Testing the self-updater end to end, without loosening it
+
+`tests/e2e/updater.sh` (docker, node, curl) builds three versions of this tree, starts a throwaway
+Joomla, MariaDB and an nginx that answers for `raw.githubusercontent.com` and `github.com` on the
+test network (Docker network aliases, a TLS certificate from a CA made for the run and trusted inside
+the Joomla container), announces a build there, and requests a page. The updater runs as shipped:
+its manifest URLs and the "only a release asset of TracyHQ/claude-cowork" rule have no switch, not
+even behind `JDEBUG`, because a switch that widens where a site downloads code from is one somebody
+eventually leaves on. `JOOMLA_IMAGE=joomla:5-apache` runs it on Joomla 5; `KEEP=1` leaves it up.
 
 ## Why the door is ALSO a system plugin
 

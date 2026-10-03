@@ -26,6 +26,12 @@ cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
 # package forgets is a receiver that reports every locale as unverified, with no error anywhere.
 cp lib/language-packs.json com_claudecowork/administrator/lib/
 
+# The release manifest: every file the package puts on a site, by its webroot path, with its sha256
+# — read off the extension manifests the installer follows, after the engine copy above and before
+# anything is zipped. It ships inside the component (administrator/components/com_claudecowork/
+# tracy-release.json) and beside the zip in dist/, to be attached to the release as its own asset.
+node ../../scripts/release-manifest.mjs joomla-package . com_claudecowork/administrator/tracy-release.json
+
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
 # The auto-login system plugin ships in the SAME package as the component (ADR 0085): one upgrade
 # installs both, so a clone never carries a separate floating extension. It must be a system plugin —
@@ -40,6 +46,10 @@ cp lib/language-packs.json com_claudecowork/administrator/lib/
 # core notifies and stops there. Same package, same update, for the same reason as the two above.
 ( cd plg_system_claudecoworkupdate && zip -qr ../build/packages/plg_system_claudecoworkupdate.zip . -x '*.DS_Store' )
 cp pkg_claudecowork.xml build/
+# The package's own installer script: the update receipt (#__claudecowork_update_log).
+cp script.php build/
 ( cd build && zip -qr ../dist/pkg_claudecowork.zip . -x '*.DS_Store' )
+cp com_claudecowork/administrator/tracy-release.json dist/tracy-release.json
 
 echo "dist/pkg_claudecowork.zip  ($(du -h dist/pkg_claudecowork.zip | cut -f1))"
+echo "dist/tracy-release.json    (attach to the release as its own asset)"

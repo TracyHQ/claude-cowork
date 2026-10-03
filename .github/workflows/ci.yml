@@ -37,6 +37,11 @@ jobs:
       - name: Build the package
         run: ./build.sh
 
+      # After the build: the last case reads the real package, which needs the engine copy build.sh makes.
+      # The four build scripts share the generator, so this one job holds it for all of them.
+      - name: Release manifest generator
+        run: node --test ../../scripts/release-manifest.test.mjs
+
       - name: Language check
         run: node ../../scripts/check-language.mjs com_claudecowork/administrator/lib
 

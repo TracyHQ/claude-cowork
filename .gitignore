@@ -9,3 +9,7 @@ joomla/cowork/com_claudecowork/administrator/lib/
 # Built copy of wordpress/cowork/lib/ — that directory is the source of truth for this platform's
 # engine, and build.sh copies it in. Committing the copy is how the two silently diverge.
 wordpress/cowork/claude-cowork/lib/
+
+# The release manifest build.sh generates into the component (scripts/release-manifest.mjs). Built
+# from the tree it describes, so a committed copy could only ever be a stale one.
+joomla/cowork/com_claudecowork/administrator/tracy-release.json

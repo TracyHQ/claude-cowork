@@ -72,6 +72,8 @@ final class Engine
     private const MEDIA_ROOTS = ['images/', 'media/'];
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
+    /** The global joomla/cowork/script.php reads to name who installed the package (`door` here). */
+    public const INSTALL_CONTEXT = 'claudecowork_install_context';
 
     public function __construct(
         ?string $token,
@@ -1256,6 +1258,11 @@ final class Engine
             return $this->err('bad_params', $shape['error']);
         }
 
+        // Who is installing, for a package that keeps a receipt of its own installs (this package's
+        // script.php writes `door` and this apply_id). Installs stay out of the undo log; the
+        // apply_id only says which deliverable asked. Set for this call only.
+        $previous = $GLOBALS[self::INSTALL_CONTEXT] ?? null;
+        $GLOBALS[self::INSTALL_CONTEXT] = ['trigger' => 'door', 'apply_id' => $this->applyId($p)];
         try {
             if ($sha !== null) {
                 if (!method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -1263,6 +1270,8 @@ final class Engine
             } else $result = $this->extensions->installFromUrl($url);
         } catch (Throwable $e) {
             return $this->err('install_failed', $e->getMessage());
+        } finally {
+            $GLOBALS[self::INSTALL_CONTEXT] = $previous;
         }
         if (($result['ok'] ?? false) !== true) {
             return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));

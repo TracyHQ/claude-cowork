@@ -19,8 +19,17 @@ esac
 [ -f "$slug/style.css" ] || { echo "$slug/style.css is missing" >&2; exit 1; }
 
 mkdir -p dist && rm -f "dist/$slug.zip"
+# Staged, because the mirror is not written here: the release manifest goes into a copy.
 # update.json is the folder's announcement, read raw off main by the sites: never inside the zip.
-zip -qrX "dist/$slug.zip" "$slug" -x '*.DS_Store' "$slug/update.json"
+rm -rf "build/$slug" && mkdir -p build && cp -R "$slug" "build/$slug"
+rm -f "build/$slug/update.json"
+find "build/$slug" -name '.DS_Store' -delete
+# The release manifest: every file the zip puts under wp-content/themes/<slug>/, with its sha256.
+# Ships in the zip, and in dist/ to be attached to the release as its own asset — overwritten by
+# the next theme's build, which is why scripts/release-wordpress-theme.mjs builds right before it uploads.
+node ../../scripts/release-manifest.mjs wordpress-theme "build/$slug" "build/$slug/tracy-release.json"
+cp "build/$slug/tracy-release.json" dist/tracy-release.json
+( cd build && zip -qrX "../dist/$slug.zip" "$slug" -x '*.DS_Store' )
 
 # The listing is read ONCE into a variable: piping it into `grep -q` under `set -o pipefail`
 # fails the script even when the pattern matches, because grep leaves early and unzip dies of

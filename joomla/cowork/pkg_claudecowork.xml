@@ -11,6 +11,11 @@
          Changing an extension's install shape later is visible on every customer site
          already running it: they must uninstall and reinstall. A package manifest costs one
          file now and makes adding a plugin later a normal update. -->
+    <!-- One receipt per install of the package, whichever path started it: the self-updater, the
+         API door, the administrator, the CLI. Written here because every path ends here; see the
+         script for how it tells them apart. -->
+    <scriptfile>script.php</scriptfile>
+
     <files folder="packages">
         <file type="component" id="com_claudecowork">com_claudecowork.zip</file>
         <file type="plugin" id="tracyaccess" group="system">plg_system_tracyaccess.zip</file>

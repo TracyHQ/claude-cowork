@@ -36,6 +36,11 @@ mkdir -p claude-cowork/lib/contracts
 cp -R "$ENGINE"/contracts/. claude-cowork/lib/contracts/
 
 cp -R claude-cowork build/claude-cowork
+# The release manifest: every file the zip puts under wp-content/plugins/claude-cowork/, with its
+# sha256. Written into the staged copy so it ships in the zip, and beside the zip in dist/ to be
+# attached to the release as its own asset (scripts/release-wordpress.mjs does).
+node ../../scripts/release-manifest.mjs wordpress-plugin build/claude-cowork build/claude-cowork/tracy-release.json
+cp build/claude-cowork/tracy-release.json dist/tracy-release.json
 ( cd build && zip -qr ../dist/claude-cowork.zip claude-cowork -x '*.DS_Store' )
 
 unzip -l dist/claude-cowork.zip | grep -q 'claude-cowork/claude-cowork.php' || {
