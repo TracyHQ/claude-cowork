@@ -4,7 +4,12 @@
  *   drawer    — below the desktop breakpoint the header menu is a drawer from the right, as the
  *               source's off-canvas is: opened by `.jn-drawer-toggle`, closed by its × button
  *               (`.jn-drawer-close`), Escape or a click on the dimmed page; focus goes back to the
- *               toggle.
+ *               toggle. Inside it a parent item drills down: its caret opens the children as a panel with a
+ *               back row ("‹ ABOUT US") over the list, as the source's drawer does; Back, the caret again
+ *               and Escape return one level, closing the drawer closes them all.
+ *   menus     — from 992 px a parent item opens on its first touch tap (touch has no hover) and its
+ *               link opens the page on the second; mouse hover and the keyboard stay with the stylesheet
+ *               and WordPress's navigation script. A tap outside an open panel closes it.
  *   accordion — each `.jn-accordion__item` header becomes a button that shows or hides the part
  *               under it. `--single` lets one item be open at a time (the source's Bootstrap
  *               collapse with a data-parent); the first item of a questions list starts open, the
@@ -21,6 +26,9 @@
  *               motion.
  *   sign-in   — the sign-in page opens with the cursor in the username field, as the source's
  *               login view does.
+ *   passkey   — the sign-in form's "Sign in with a passkey" button and the account page's "Add a passkey" /
+ *               "Remove" buttons talk to the theme's REST routes (inc/extra.php), which verify everything; this file
+ *               only moves the browser's WebAuthn answer there.
  *   video     — a `.jn-play__button` link to a YouTube address opens the player in a dialog instead
  *               of leaving the page, as the source's play button opens its modal; Escape, the close
  *               button or a click on the backdrop close it and stop the video.
@@ -34,9 +42,12 @@
   const toggle = document.querySelector('.jn-drawer-toggle')
   const drawer = toggle ? document.getElementById(toggle.getAttribute('aria-controls') || '') : null
   const isDrawerOpen = () => document.documentElement.classList.contains('jn-drawer-open')
+  // Closes every drill-down panel; assigned below, once the menu's parts are known.
+  let closeAll = () => {}
   const setDrawer = (open, { restore = false } = {}) => {
     if (!toggle || !drawer) return
     document.documentElement.classList.toggle('jn-drawer-open', open)
+    if (!open) closeAll()
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
     toggle.setAttribute('aria-label', open ? t.closeMenu || 'Close the menu' : t.openMenu || 'Open the menu')
     if (open) {
@@ -73,8 +84,162 @@
     }
     if (desktop.addEventListener) desktop.addEventListener('change', onChange)
   }
+
+  // ── parent items ───────────────────────────────────────────────────────────────────────────────
+  const menu = document.querySelector('.jn-header__menu')
+  const parents = menu ? [...menu.querySelectorAll('li.wp-block-navigation-submenu')] : []
+  const child = (item, cls) => [...item.children].find((c) => c.classList.contains(cls)) || null
+  const partsOf = (item) => ({
+    toggle: child(item, 'wp-block-navigation-submenu__toggle'),
+    label: child(item, 'wp-block-navigation-item__content'),
+    panel: child(item, 'wp-block-navigation__submenu-container')
+  })
+  const isOpen = (item) => {
+    const { toggle: caret } = partsOf(item)
+    return Boolean(caret) && caret.getAttribute('aria-expanded') === 'true'
+  }
+  const openParents = () => parents.filter(isOpen)
+  const parentOf = (node) => (node && node.closest ? node.closest('li.wp-block-navigation-submenu') : null)
+  // While a panel covers the list, nothing behind it takes focus or a click.
+  const syncDrill = () => {
+    const top = openParents().pop() || null
+    const panel = top ? partsOf(top).panel : null
+    if (menu) menu.classList.toggle('jn-drill', Boolean(panel))
+    if (panel && drawer) drawer.scrollTop = 0
+    for (const node of menu
+      ? menu.querySelectorAll(
+          '.wp-block-navigation-item__content, .wp-block-navigation-submenu__toggle, .jn-drill-back__button'
+        )
+      : []) {
+      node.inert = Boolean(panel) && !panel.contains(node)
+    }
+  }
+  const setParent = (item, open, { focus = true } = {}) => {
+    const { toggle: caret, panel } = partsOf(item)
+    if (!caret || !panel) return
+    caret.setAttribute('aria-expanded', open ? 'true' : 'false')
+    syncDrill()
+    if (!focus) return
+    if (open) {
+      const back = panel.querySelector(':scope > .jn-drill-back .jn-drill-back__button')
+      // the panel is display:none until the attribute lands: focus on the next frame
+      requestAnimationFrame(() => isOpen(item) && back && back.focus())
+    } else caret.focus()
+  }
+  closeAll = () => {
+    for (const item of parents) {
+      const { toggle: caret } = partsOf(item)
+      if (caret) caret.setAttribute('aria-expanded', 'false')
+    }
+    syncDrill()
+  }
+  // A back row heads every panel (hidden from 992 px by the stylesheet).
+  for (const item of parents) {
+    const { label, panel } = partsOf(item)
+    if (!panel || panel.querySelector(':scope > .jn-drill-back')) continue
+    const row = document.createElement('li')
+    row.className = 'jn-drill-back'
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'jn-drill-back__button'
+    button.textContent = (label && label.textContent.trim()) || t.back || 'Back'
+    button.setAttribute('aria-label', `${t.backTo || 'Back'}: ${button.textContent}`)
+    row.append(button)
+    panel.prepend(row)
+  }
+
+  let syncing = false
+  // Which kind of pointer pressed last: the tap that follows decides whether a parent link opens its panel first.
+  let lastPointer = 'mouse'
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      lastPointer = event.pointerType || 'mouse'
+    },
+    true
+  )
+  const toggleOf = (item) => {
+    const { toggle: caret } = partsOf(item)
+    syncing = true
+    try {
+      caret.click()
+    } finally {
+      syncing = false
+    }
+  }
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (syncing || !menu || !(event.target instanceof Element)) return
+      if (!menu.contains(event.target)) {
+        // a tap outside an open desktop panel closes it
+        if (desktop.matches) for (const item of openParents()) toggleOf(item)
+        return
+      }
+      const back = event.target.closest('.jn-drill-back__button')
+      if (back) {
+        const item = parentOf(back.closest('.wp-block-navigation__submenu-container'))
+        if (item) setParent(item, false)
+        return
+      }
+      const item = parentOf(event.target)
+      if (!item || !partsOf(item).toggle) return
+      const { toggle: caret, label } = partsOf(item)
+      const onCaret = caret.contains(event.target)
+      const onLabel = Boolean(label) && label.contains(event.target)
+      if (!desktop.matches) {
+        // the drawer: the caret drills down, the link goes to its page
+        if (!onCaret) return
+        event.preventDefault()
+        event.stopPropagation()
+        setParent(item, !isOpen(item))
+        return
+      }
+      const top = !item.parentElement.closest('li.wp-block-navigation-submenu')
+      const touch = event.pointerType ? event.pointerType === 'touch' : lastPointer === 'touch'
+      if (onLabel && touch && top && !isOpen(item)) {
+        // first tap on a parent link: open its panel, stay on the page; the second tap follows the link
+        event.preventDefault()
+        event.stopPropagation()
+        for (const other of openParents()) if (other !== item) toggleOf(other)
+        toggleOf(item)
+      }
+    },
+    true
+  )
+  // Hover handlers of WordPress's navigation script would rewrite aria-expanded under the drawer's drill-down, and a
+  // touch tap would open a panel before the click decides: neither pointer event reaches them in those cases.
+  for (const type of ['pointerenter', 'pointerleave']) {
+    document.addEventListener(
+      type,
+      (event) => {
+        if (!(event.target instanceof Element) || !event.target.closest('.jn-header__menu')) return
+        if (!desktop.matches || event.pointerType === 'touch') event.stopPropagation()
+      },
+      true
+    )
+  }
+  // Crossing 992 px: the drill-down is the drawer's alone, WordPress's open state the desktop's alone: settle both.
+  const settle = () => {
+    for (const item of openParents()) {
+      const { toggle: caret } = partsOf(item)
+      // going to desktop the attribute was ours; going to the drawer it was WordPress's, so its own toggle closes it
+      if (desktop.matches) caret.setAttribute('aria-expanded', 'false')
+      else toggleOf(item)
+    }
+    closeAll()
+  }
+  if (desktop.addEventListener) desktop.addEventListener('change', settle)
+  syncDrill()
+
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && isDrawerOpen()) setDrawer(false, { restore: true })
+    if (event.key !== 'Escape') return
+    const top = !desktop.matches ? openParents().pop() : null
+    if (top) {
+      // a drill-down panel is open: Escape goes back one level before it closes the drawer
+      event.preventDefault()
+      setParent(top, false)
+    } else if (isDrawerOpen()) setDrawer(false, { restore: true })
   })
 
   // ── accordion ──────────────────────────────────────────────────────────────────────────────────
@@ -443,6 +608,120 @@
     panels.forEach(page)
     root.classList.add('is-ready')
     select(0, false)
+  })
+
+  // ── passkeys ───────────────────────────────────────────────────────────────────────────────────
+  const b64uToBuffer = (text) => {
+    const pad = '='.repeat((4 - (text.length % 4)) % 4)
+    const bin = atob(text.replace(/-/g, '+').replace(/_/g, '/') + pad)
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0)).buffer
+  }
+  const bufferToB64u = (buffer) =>
+    btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+  const post = async (path, body) => {
+    const response = await fetch((t.rest || '/wp-json/wp-ja-nova/v1/') + path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': t.restNonce || '' },
+      body: JSON.stringify(body || {})
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || t.passkeyFailed || 'The passkey could not be used.')
+    return data
+  }
+  const say = (button, text) => {
+    const status = button.parentElement && button.parentElement.querySelector('.jn-passkey__status')
+    if (status) status.textContent = text
+  }
+  const passkeyError = (button, error) =>
+    say(
+      button,
+      error && error.name === 'NotAllowedError'
+        ? t.passkeyCancelled || 'The passkey request was cancelled.'
+        : (error && error.message) || t.passkeyFailed || 'The passkey could not be used.'
+    )
+  const supported = Boolean(window.PublicKeyCredential && navigator.credentials)
+  for (const button of document.querySelectorAll('[data-jn-passkey]')) {
+    if (!supported) {
+      button.disabled = true
+      say(button, t.passkeyUnsupported || 'This browser does not support passkeys.')
+      continue
+    }
+    button.addEventListener('click', async () => {
+      if (button.disabled) return
+      button.disabled = true
+      say(button, '')
+      try {
+        if (button.dataset.jnPasskey === 'login') {
+          const options = await post('passkey/login-options')
+          const credential = await navigator.credentials.get({
+            publicKey: {
+              challenge: b64uToBuffer(options.challenge),
+              rpId: options.rpId,
+              userVerification: options.userVerification,
+              timeout: options.timeout
+            }
+          })
+          const response = credential.response
+          const done = await post('passkey/login', {
+            id: credential.id,
+            clientDataJSON: bufferToB64u(response.clientDataJSON),
+            authenticatorData: bufferToB64u(response.authenticatorData),
+            signature: bufferToB64u(response.signature)
+          })
+          window.location.assign(done.redirect || '/')
+          return
+        }
+        const options = await post('passkey/register-options')
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge: b64uToBuffer(options.challenge),
+            rp: options.rp,
+            user: { ...options.user, id: b64uToBuffer(options.user.id) },
+            pubKeyCredParams: options.pubKeyCredParams,
+            excludeCredentials: options.excludeCredentials.map((c) => ({ ...c, id: b64uToBuffer(c.id) })),
+            authenticatorSelection: options.authenticatorSelection,
+            attestation: options.attestation,
+            timeout: options.timeout
+          }
+        })
+        await post('passkey/register', {
+          id: credential.id,
+          clientDataJSON: bufferToB64u(credential.response.clientDataJSON),
+          attestationObject: bufferToB64u(credential.response.attestationObject)
+        })
+        window.location.reload()
+      } catch (error) {
+        passkeyError(button, error)
+        button.disabled = false
+      }
+    })
+  }
+  for (const button of document.querySelectorAll('[data-jn-passkey-remove]')) {
+    button.addEventListener('click', async () => {
+      button.disabled = true
+      try {
+        await post('passkey/remove', { id: button.dataset.jnPasskeyRemove })
+        window.location.reload()
+      } catch (error) {
+        passkeyError(button, error)
+        button.disabled = false
+      }
+    })
+  }
+
+  // The search page's "Advanced Search" button shows and hides its panel, as the source's collapse does.
+  document.querySelectorAll('.jn-search__advanced').forEach((button) => {
+    const panel = document.getElementById(button.getAttribute('aria-controls') || '')
+    if (!panel) return
+    button.addEventListener('click', () => {
+      const open = button.getAttribute('aria-expanded') !== 'true'
+      button.setAttribute('aria-expanded', open ? 'true' : 'false')
+      panel.hidden = !open
+    })
   })
 
   // The sign-in page opens with the cursor in the username field, as the source's login view does.

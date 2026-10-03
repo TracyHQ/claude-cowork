@@ -63,6 +63,13 @@ function wp_ja_nova_enqueue_assets(): void {
 			'openMenu'  => __( 'Open the menu', 'wp-ja-nova' ),
 			'closeMenu' => __( 'Close the menu', 'wp-ja-nova' ),
 			'close'     => __( 'Close', 'wp-ja-nova' ),
+			'rest'      => esc_url_raw( rest_url( 'wp-ja-nova/v1/' ) ),
+			'restNonce' => wp_create_nonce( 'wp_rest' ),
+			'passkeyUnsupported' => __( 'This browser does not support passkeys.', 'wp-ja-nova' ),
+			'passkeyCancelled'   => __( 'The passkey request was cancelled.', 'wp-ja-nova' ),
+			'passkeyFailed'      => __( 'The passkey could not be used.', 'wp-ja-nova' ),
+			'back'      => __( 'Back', 'wp-ja-nova' ),
+			'backTo'    => __( 'Back to', 'wp-ja-nova' ),
 			'video'     => __( 'Video', 'wp-ja-nova' ),
 			'pages'        => __( 'Pages', 'wp-ja-nova' ),
 			'previousPage' => __( 'Previous page', 'wp-ja-nova' ),
@@ -601,6 +608,11 @@ function wp_ja_nova_post_menu_path(): string {
 		return $path;
 	}
 	$path = '';
+	if ( is_search() ) {
+		// The search view answers at the Smart Search menu entry's address, so that entry is the current item.
+		$path = '/' . WP_JA_NOVA_SEARCH_PATHS[0];
+		return $path;
+	}
 	if ( ! is_singular( 'post' ) ) {
 		return $path;
 	}
@@ -1624,7 +1636,7 @@ function wp_ja_nova_login_links( string $html ): string {
 			'fields'      => 'ids',
 		)
 	);
-	if ( $register ) {
+	if ( $register && wp_ja_nova_registration_open() ) {
 		$items[] = sprintf( '<li><a href="%s">%s</a></li>', esc_url( get_permalink( $register[0] ) ), esc_html__( "Don't have an account?", 'wp-ja-nova' ) );
 	}
 	return $html . '<ul class="jn-login__links">' . implode( '', $items ) . '</ul>';
@@ -1661,7 +1673,7 @@ function wp_ja_nova_register_form( string $html, array $block ): string {
 		);
 	};
 	return sprintf(
-		'<form id="registerform" class="jn-reg" name="registerform" action="%1$s" method="post" novalidate><fieldset><legend>%2$s</legend><div class="jn-reg__group jn-reg__note"><span><strong class="jn-reg__required">*</strong> %3$s</span></div>%4$s%5$s%6$s<input type="hidden" name="redirect_to" value=""><div class="jn-reg__submit"><button type="submit" name="wp-submit" id="wp-submit" class="jn-reg__register">%7$s</button><a class="jn-reg__cancel" href="%8$s" title="%9$s">%9$s</a></div></fieldset></form>',
+		'<form id="registerform" class="jn-reg" name="registerform" action="%1$s" method="post" novalidate><fieldset><legend>%2$s</legend><div class="jn-reg__group jn-reg__note"><span><strong class="jn-reg__required">*</strong> %3$s</span></div>%4$s%5$s%6$s<input type="hidden" name="redirect_to" value="%10$s"><div class="jn-reg__submit"><button type="submit" name="wp-submit" id="wp-submit" class="jn-reg__register">%7$s</button><a class="jn-reg__cancel" href="%8$s" title="%9$s">%9$s</a></div></fieldset></form>',
 		esc_url( site_url( 'wp-login.php?action=register', 'login_post' ) ),
 		esc_html__( 'User Registration', 'wp-ja-nova' ),
 		esc_html__( 'Required field', 'wp-ja-nova' ),
@@ -1670,7 +1682,8 @@ function wp_ja_nova_register_form( string $html, array $block ): string {
 		$extra,
 		esc_html__( 'Register', 'wp-ja-nova' ),
 		esc_url( home_url( '/' ) ),
-		esc_html__( 'Cancel', 'wp-ja-nova' )
+		esc_html__( 'Cancel', 'wp-ja-nova' ),
+		esc_url( wp_ja_nova_registration_redirect( '' ) )
 	);
 }
 add_filter( 'render_block_core/loginout', 'wp_ja_nova_register_form', 10, 2 );
@@ -2107,3 +2120,646 @@ function wp_ja_nova_contact_card_spaces( string $content, array $parsed ): strin
 	return str_replace( array( "\xC2\xA0", '&nbsp;' ), ' ', $content );
 }
 add_filter( 'render_block_core/paragraph', 'wp_ja_nova_contact_card_spaces', 10, 2 );
+
+/* ── Sign-in with a passkey (WebAuthn) ───────────────────────────────────────────────────────────
+ * The source's login form carries a "Sign in with a passkey" button (Joomla's WebAuthn system plugin). This is the
+ * WordPress counterpart, with the verification done here and nothing taken on trust from the browser:
+ *
+ *   - a person adds a passkey on their account page while signed in (`passkey/register-options` → the browser's
+ *     navigator.credentials.create() → `passkey/register`), which stores the credential id and public key in user meta;
+ *   - the login form's button asks for a challenge (`passkey/login-options`), the browser signs it with the passkey
+ *     (navigator.credentials.get(), a discoverable credential, so no username is typed), and `passkey/login` checks the
+ *     whole assertion before it sets the sign-in cookie.
+ *
+ * A challenge is 32 random bytes held in a transient for five minutes and deleted when it is used: an expired, unknown
+ * or replayed one is refused. The assertion must be of type webauthn.get, carry that challenge, name this site's origin,
+ * be made for this site's relying party id (rpIdHash), have the user-present flag, verify against the stored public key
+ * (ES256 or RS256), and not roll the signature counter back. Attestation is not asked for ("none"). */
+const WP_JA_NOVA_PASSKEY_TTL     = 300;
+const WP_JA_NOVA_PASSKEY_PREFIX  = 'wp_ja_nova_pk_';
+const WP_JA_NOVA_PASSKEY_MAX     = 10;
+const WP_JA_NOVA_PASSKEY_BODY    = 20000;
+
+function wp_ja_nova_b64u_encode( string $bytes ): string {
+	return rtrim( strtr( base64_encode( $bytes ), '+/', '-_' ), '=' );
+}
+
+/** Strict base64url: only its own alphabet, no padding, and it must round-trip. */
+function wp_ja_nova_b64u_decode( $text ): ?string {
+	if ( ! is_string( $text ) || '' === $text || strlen( $text ) > 8192 || ! preg_match( '/^[A-Za-z0-9_-]+$/', $text ) ) {
+		return null;
+	}
+	$raw = base64_decode( strtr( $text, '-_', '+/' ) . str_repeat( '=', ( 4 - strlen( $text ) % 4 ) % 4 ), true );
+	return ( false !== $raw && wp_ja_nova_b64u_encode( $raw ) === $text ) ? $raw : null;
+}
+
+/**
+ * The relying party: the site's own host and origin, never read from the request.
+ *
+ * @return array{id: string, origin: string, name: string}
+ */
+function wp_ja_nova_passkey_rp(): array {
+	$parts  = wp_parse_url( home_url() );
+	$host   = strtolower( (string) ( $parts['host'] ?? '' ) );
+	$origin = ( $parts['scheme'] ?? 'https' ) . '://' . $host . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
+	return array(
+		'id'     => $host,
+		'origin' => $origin,
+		'name'   => (string) get_bloginfo( 'name' ),
+	);
+}
+
+/** One CBOR data item (RFC 8949) from `$data` at `$pos`; maps, arrays, integers, byte and text strings, booleans and null. Throws on anything else. */
+function wp_ja_nova_cbor_item( string $data, int &$pos, int $depth = 0 ) {
+	if ( $depth > 8 || $pos >= strlen( $data ) ) {
+		throw new UnexpectedValueException( 'cbor' );
+	}
+	$initial = ord( $data[ $pos++ ] );
+	$major   = $initial >> 5;
+	$info    = $initial & 31;
+	if ( $info < 24 ) {
+		$value = $info;
+	} elseif ( $info <= 27 ) {
+		$size = array( 24 => 1, 25 => 2, 26 => 4, 27 => 8 )[ $info ];
+		if ( $pos + $size > strlen( $data ) ) {
+			throw new UnexpectedValueException( 'cbor' );
+		}
+		$value = 0;
+		for ( $i = 0; $i < $size; $i++ ) {
+			$value = ( $value << 8 ) | ord( $data[ $pos++ ] );
+		}
+		if ( $value < 0 ) {
+			throw new UnexpectedValueException( 'cbor' );
+		}
+	} else {
+		if ( 7 === $major && in_array( $info, array( 20, 21, 22 ), true ) ) {
+			return array( 20 => false, 21 => true, 22 => null )[ $info ];
+		}
+		throw new UnexpectedValueException( 'cbor' );
+	}
+	switch ( $major ) {
+		case 0:
+			return $value;
+		case 1:
+			return -1 - $value;
+		case 2:
+		case 3:
+			if ( $value > strlen( $data ) - $pos ) {
+				throw new UnexpectedValueException( 'cbor' );
+			}
+			$out  = substr( $data, $pos, $value );
+			$pos += $value;
+			return $out;
+		case 4:
+			if ( $value > 64 ) {
+				throw new UnexpectedValueException( 'cbor' );
+			}
+			$list = array();
+			for ( $i = 0; $i < $value; $i++ ) {
+				$list[] = wp_ja_nova_cbor_item( $data, $pos, $depth + 1 );
+			}
+			return $list;
+		case 5:
+			if ( $value > 64 ) {
+				throw new UnexpectedValueException( 'cbor' );
+			}
+			$map = array();
+			for ( $i = 0; $i < $value; $i++ ) {
+				$key = wp_ja_nova_cbor_item( $data, $pos, $depth + 1 );
+				if ( ! is_int( $key ) && ! is_string( $key ) ) {
+					throw new UnexpectedValueException( 'cbor' );
+				}
+				$map[ $key ] = wp_ja_nova_cbor_item( $data, $pos, $depth + 1 );
+			}
+			return $map;
+	}
+	throw new UnexpectedValueException( 'cbor' );
+}
+
+function wp_ja_nova_der_length( int $length ): string {
+	if ( $length < 128 ) {
+		return chr( $length );
+	}
+	$bytes = ltrim( pack( 'N', $length ), "\0" );
+	return chr( 0x80 | strlen( $bytes ) ) . $bytes;
+}
+
+function wp_ja_nova_der_integer( string $unsigned ): string {
+	$unsigned = ltrim( $unsigned, "\0" );
+	if ( '' === $unsigned || ord( $unsigned[0] ) > 127 ) {
+		$unsigned = "\0" . $unsigned;
+	}
+	return "\x02" . wp_ja_nova_der_length( strlen( $unsigned ) ) . $unsigned;
+}
+
+/** A COSE public key (ES256 on P-256, or RS256) as a PEM public key, or null when it is neither. @return array{pem: string, alg: int}|null */
+function wp_ja_nova_cose_to_pem( array $cose ): ?array {
+	$kty = $cose[1] ?? null;
+	$alg = $cose[3] ?? null;
+	if ( 2 === $kty && -7 === $alg && 1 === ( $cose[-1] ?? null ) && is_string( $cose[-2] ?? null ) && is_string( $cose[-3] ?? null ) && 32 === strlen( $cose[-2] ) && 32 === strlen( $cose[-3] ) ) {
+		$der = hex2bin( '3059301306072a8648ce3d020106082a8648ce3d030107034200' ) . "\x04" . $cose[-2] . $cose[-3];
+	} elseif ( 3 === $kty && -257 === $alg && is_string( $cose[-1] ?? null ) && is_string( $cose[-2] ?? null ) && strlen( $cose[-1] ) >= 256 && strlen( $cose[-1] ) <= 1024 ) {
+		$rsa  = wp_ja_nova_der_integer( $cose[-1] ) . wp_ja_nova_der_integer( $cose[-2] );
+		$rsa  = "\x30" . wp_ja_nova_der_length( strlen( $rsa ) ) . $rsa;
+		$bits = "\x03" . wp_ja_nova_der_length( strlen( $rsa ) + 1 ) . "\0" . $rsa;
+		$algo = hex2bin( '300d06092a864886f70d0101010500' );
+		$body = $algo . $bits;
+		$der  = "\x30" . wp_ja_nova_der_length( strlen( $body ) ) . $body;
+	} else {
+		return null;
+	}
+	return array(
+		'pem' => "-----BEGIN PUBLIC KEY-----\n" . chunk_split( base64_encode( $der ), 64, "\n" ) . '-----END PUBLIC KEY-----',
+		'alg' => $alg,
+	);
+}
+
+/**
+ * The authenticator data of a response: the relying party hash, the flags, the counter and, when it carries one, the credential.
+ *
+ * @return array<string, mixed>|null
+ */
+function wp_ja_nova_passkey_auth_data( string $auth, bool $with_credential ): ?array {
+	if ( strlen( $auth ) < 37 ) {
+		return null;
+	}
+	$out = array(
+		'rp_hash' => substr( $auth, 0, 32 ),
+		'flags'   => ord( $auth[32] ),
+		'count'   => (int) unpack( 'N', substr( $auth, 33, 4 ) )[1],
+	);
+	if ( ! $with_credential ) {
+		return $out;
+	}
+	if ( ! ( $out['flags'] & 0x40 ) || strlen( $auth ) < 55 ) {
+		return null;
+	}
+	$id_length = (int) unpack( 'n', substr( $auth, 53, 2 ) )[1];
+	if ( $id_length < 16 || $id_length > 1023 || strlen( $auth ) < 55 + $id_length ) {
+		return null;
+	}
+	$out['credential_id'] = substr( $auth, 55, $id_length );
+	try {
+		$pos         = 55 + $id_length;
+		$cose        = wp_ja_nova_cbor_item( $auth, $pos );
+		$out['cose'] = is_array( $cose ) ? $cose : null;
+	} catch ( UnexpectedValueException $e ) {
+		return null;
+	}
+	return $out['cose'] ? $out : null;
+}
+
+/**
+ * Checks the client data of a response: its type, a challenge this site issued for this purpose (spent now), and its origin.
+ *
+ * @return array{ok: bool, user: int, error: string}
+ */
+function wp_ja_nova_passkey_client_data( $client_json, string $type, string $purpose ): array {
+	$fail = static fn( string $error ): array => array(
+		'ok'    => false,
+		'user'  => 0,
+		'error' => $error,
+	);
+	if ( ! is_string( $client_json ) ) {
+		return $fail( 'client data' );
+	}
+	$client = json_decode( $client_json, true );
+	if ( ! is_array( $client ) || ( $client['type'] ?? '' ) !== $type || ! is_string( $client['challenge'] ?? null ) || ! is_string( $client['origin'] ?? null ) ) {
+		return $fail( 'client data' );
+	}
+	$key    = WP_JA_NOVA_PASSKEY_PREFIX . 'c_' . hash( 'sha256', $client['challenge'] );
+	$stored = get_transient( $key );
+	delete_transient( $key );
+	if ( ! is_array( $stored ) || ( $stored['purpose'] ?? '' ) !== $purpose || ( $stored['expires'] ?? 0 ) < time() ) {
+		return $fail( 'challenge' );
+	}
+	if ( ! hash_equals( wp_ja_nova_passkey_rp()['origin'], $client['origin'] ) || ! empty( $client['crossOrigin'] ) ) {
+		return $fail( 'origin' );
+	}
+	return array(
+		'ok'    => true,
+		'user'  => (int) ( $stored['user'] ?? 0 ),
+		'error' => '',
+	);
+}
+
+/** The user-meta key one credential lives under: a fixed prefix and the first half of its id's hash. */
+function wp_ja_nova_passkey_meta_key( string $credential_id ): string {
+	return WP_JA_NOVA_PASSKEY_PREFIX . 'k_' . substr( hash( 'sha256', $credential_id ), 0, 32 );
+}
+
+/** The user holding a credential, or 0. */
+function wp_ja_nova_passkey_owner( string $credential_id ): int {
+	$found = get_users(
+		array(
+			'meta_key'     => wp_ja_nova_passkey_meta_key( $credential_id ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			'meta_compare' => 'EXISTS',
+			'number'       => 1,
+			'fields'       => 'ID',
+		)
+	);
+	return $found ? (int) $found[0] : 0;
+}
+
+/** At most 30 challenges per client address per five minutes: a challenge costs a database row. */
+function wp_ja_nova_passkey_throttled(): bool {
+	$key   = WP_JA_NOVA_PASSKEY_PREFIX . 't_' . hash( 'sha256', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$count = (int) get_transient( $key );
+	if ( $count >= 30 ) {
+		return true;
+	}
+	set_transient( $key, $count + 1, WP_JA_NOVA_PASSKEY_TTL );
+	return false;
+}
+
+function wp_ja_nova_passkey_issue( string $purpose, int $user ): string {
+	$challenge = wp_ja_nova_b64u_encode( random_bytes( 32 ) );
+	set_transient(
+		WP_JA_NOVA_PASSKEY_PREFIX . 'c_' . hash( 'sha256', $challenge ),
+		array(
+			'purpose' => $purpose,
+			'user'    => $user,
+			'expires' => time() + WP_JA_NOVA_PASSKEY_TTL,
+		),
+		WP_JA_NOVA_PASSKEY_TTL
+	);
+	return $challenge;
+}
+
+/** The credentials a user holds: [ [ id, name, created ], … ] from the meta rows. */
+function wp_ja_nova_passkeys_of( int $user_id ): array {
+	$out = array();
+	foreach ( get_user_meta( $user_id ) as $key => $rows ) {
+		if ( ! str_starts_with( (string) $key, WP_JA_NOVA_PASSKEY_PREFIX . 'k_' ) ) {
+			continue;
+		}
+		$row = maybe_unserialize( $rows[0] ?? '' );
+		if ( is_array( $row ) && isset( $row['id'] ) ) {
+			$out[] = $row;
+		}
+	}
+	return $out;
+}
+
+function wp_ja_nova_passkey_body( WP_REST_Request $request ): ?array {
+	$raw = $request->get_body();
+	if ( strlen( $raw ) > WP_JA_NOVA_PASSKEY_BODY ) {
+		return null;
+	}
+	$data = json_decode( $raw, true );
+	return is_array( $data ) ? $data : null;
+}
+
+function wp_ja_nova_passkey_error( string $message, int $status = 400 ): WP_REST_Response {
+	return new WP_REST_Response( array( 'error' => $message ), $status );
+}
+
+/** Challenge for a new passkey of the signed-in user. */
+function wp_ja_nova_rest_passkey_register_options(): WP_REST_Response {
+	if ( wp_ja_nova_passkey_throttled() ) {
+		return wp_ja_nova_passkey_error( __( 'Too many attempts. Try again in a few minutes.', 'wp-ja-nova' ), 429 );
+	}
+	$user = wp_get_current_user();
+	$rp   = wp_ja_nova_passkey_rp();
+	$have = wp_ja_nova_passkeys_of( $user->ID );
+	if ( count( $have ) >= WP_JA_NOVA_PASSKEY_MAX ) {
+		return wp_ja_nova_passkey_error( __( 'You have reached the passkey limit.', 'wp-ja-nova' ), 409 );
+	}
+	return new WP_REST_Response(
+		array(
+			'challenge'              => wp_ja_nova_passkey_issue( 'register', $user->ID ),
+			'rp'                     => array(
+				'id'   => $rp['id'],
+				'name' => $rp['name'],
+			),
+			'user'                   => array(
+				'id'          => wp_ja_nova_b64u_encode( hash( 'sha256', 'wp-ja-nova-passkey|' . home_url() . '|' . $user->ID, true ) ),
+				'name'        => $user->user_login,
+				'displayName' => $user->display_name,
+			),
+			'pubKeyCredParams'       => array(
+				array(
+					'type' => 'public-key',
+					'alg'  => -7,
+				),
+				array(
+					'type' => 'public-key',
+					'alg'  => -257,
+				),
+			),
+			'excludeCredentials'     => array_map(
+				static fn( array $row ): array => array(
+					'type' => 'public-key',
+					'id'   => $row['id'],
+				),
+				$have
+			),
+			'authenticatorSelection' => array(
+				'residentKey'      => 'required',
+				'userVerification' => 'preferred',
+			),
+			'attestation'            => 'none',
+			'timeout'                => 60000,
+		)
+	);
+}
+
+/** Stores the passkey a browser made: checks the attestation object, the challenge, the origin and the relying party. */
+function wp_ja_nova_rest_passkey_register( WP_REST_Request $request ): WP_REST_Response {
+	$data   = wp_ja_nova_passkey_body( $request );
+	$bad    = wp_ja_nova_passkey_error( __( 'The passkey could not be saved.', 'wp-ja-nova' ) );
+	$user   = get_current_user_id();
+	$client = wp_ja_nova_b64u_decode( $data['clientDataJSON'] ?? null );
+	$object = wp_ja_nova_b64u_decode( $data['attestationObject'] ?? null );
+	if ( null === $client || null === $object ) {
+		return $bad;
+	}
+	$checked = wp_ja_nova_passkey_client_data( $client, 'webauthn.create', 'register' );
+	if ( ! $checked['ok'] || $checked['user'] !== $user ) {
+		return $bad;
+	}
+	try {
+		$pos    = 0;
+		$parsed = wp_ja_nova_cbor_item( $object, $pos );
+	} catch ( UnexpectedValueException $e ) {
+		return $bad;
+	}
+	$auth = is_array( $parsed ) && is_string( $parsed['authData'] ?? null ) ? wp_ja_nova_passkey_auth_data( $parsed['authData'], true ) : null;
+	if ( ! $auth || ! hash_equals( hash( 'sha256', wp_ja_nova_passkey_rp()['id'], true ), $auth['rp_hash'] ) || ! ( $auth['flags'] & 0x01 ) ) {
+		return $bad;
+	}
+	$key = wp_ja_nova_cose_to_pem( $auth['cose'] );
+	if ( ! $key || wp_ja_nova_b64u_decode( $data['id'] ?? null ) !== $auth['credential_id'] ) {
+		return $bad;
+	}
+	if ( wp_ja_nova_passkey_owner( $auth['credential_id'] ) || count( wp_ja_nova_passkeys_of( $user ) ) >= WP_JA_NOVA_PASSKEY_MAX ) {
+		return wp_ja_nova_passkey_error( __( 'This passkey is already registered.', 'wp-ja-nova' ), 409 );
+	}
+	$name = isset( $data['name'] ) && is_string( $data['name'] ) ? sanitize_text_field( mb_substr( $data['name'], 0, 60 ) ) : '';
+	add_user_meta(
+		$user,
+		wp_ja_nova_passkey_meta_key( $auth['credential_id'] ),
+		array(
+			'id'      => wp_ja_nova_b64u_encode( $auth['credential_id'] ),
+			'pem'     => $key['pem'],
+			'alg'     => $key['alg'],
+			'count'   => $auth['count'],
+			'name'    => '' !== $name ? $name : __( 'Passkey', 'wp-ja-nova' ),
+			'created' => time(),
+		),
+		true
+	);
+	return new WP_REST_Response( array( 'ok' => true ) );
+}
+
+/** A challenge for a sign-in with any passkey (discoverable: no username is asked). */
+function wp_ja_nova_rest_passkey_login_options(): WP_REST_Response {
+	if ( wp_ja_nova_passkey_throttled() ) {
+		return wp_ja_nova_passkey_error( __( 'Too many attempts. Try again in a few minutes.', 'wp-ja-nova' ), 429 );
+	}
+	$rp = wp_ja_nova_passkey_rp();
+	return new WP_REST_Response(
+		array(
+			'challenge'        => wp_ja_nova_passkey_issue( 'login', 0 ),
+			'rpId'             => $rp['id'],
+			'userVerification' => 'preferred',
+			'timeout'          => 60000,
+		)
+	);
+}
+
+/** Verifies an assertion and signs the user in. */
+function wp_ja_nova_rest_passkey_login( WP_REST_Request $request ): WP_REST_Response {
+	$data   = wp_ja_nova_passkey_body( $request );
+	$bad    = wp_ja_nova_passkey_error( __( 'The passkey could not be verified.', 'wp-ja-nova' ), 401 );
+	$id     = wp_ja_nova_b64u_decode( $data['id'] ?? null );
+	$client = wp_ja_nova_b64u_decode( $data['clientDataJSON'] ?? null );
+	$auth   = wp_ja_nova_b64u_decode( $data['authenticatorData'] ?? null );
+	$sig    = wp_ja_nova_b64u_decode( $data['signature'] ?? null );
+	if ( null === $id || null === $client || null === $auth || null === $sig || strlen( $id ) > 1023 ) {
+		return $bad;
+	}
+	$checked = wp_ja_nova_passkey_client_data( $client, 'webauthn.get', 'login' );
+	if ( ! $checked['ok'] ) {
+		return $bad;
+	}
+	$parsed = wp_ja_nova_passkey_auth_data( $auth, false );
+	if ( ! $parsed || ! hash_equals( hash( 'sha256', wp_ja_nova_passkey_rp()['id'], true ), $parsed['rp_hash'] ) || ! ( $parsed['flags'] & 0x01 ) ) {
+		return $bad;
+	}
+	$meta_key = wp_ja_nova_passkey_meta_key( $id );
+	$user_id  = wp_ja_nova_passkey_owner( $id );
+	$row      = $user_id ? get_user_meta( $user_id, $meta_key, true ) : null;
+	if ( ! is_array( $row ) || wp_ja_nova_b64u_decode( $row['id'] ?? null ) !== $id ) {
+		return $bad;
+	}
+	$signed = $auth . hash( 'sha256', $client, true );
+	// ES256 and RS256 both sign a SHA-256 digest.
+	if ( 1 !== openssl_verify( $signed, $sig, (string) $row['pem'], OPENSSL_ALGO_SHA256 ) ) {
+		return $bad;
+	}
+	// A counter that does not move forward, when either side uses one, is a cloned authenticator.
+	if ( ( $parsed['count'] > 0 || (int) $row['count'] > 0 ) && $parsed['count'] <= (int) $row['count'] ) {
+		return $bad;
+	}
+	$row['count'] = $parsed['count'];
+	update_user_meta( $user_id, $meta_key, $row );
+	$user = get_userdata( $user_id );
+	if ( ! $user ) {
+		return $bad;
+	}
+	wp_set_current_user( $user_id );
+	wp_set_auth_cookie( $user_id, true );
+	do_action( 'wp_login', $user->user_login, $user );
+	$account = get_page_by_path( 'user-profile' );
+	return new WP_REST_Response(
+		array(
+			'ok'       => true,
+			'redirect' => $account && 'publish' === $account->post_status ? get_permalink( $account ) : home_url( '/' ),
+		)
+	);
+}
+
+/** Removes one of the signed-in user's passkeys. */
+function wp_ja_nova_rest_passkey_remove( WP_REST_Request $request ): WP_REST_Response {
+	$data = wp_ja_nova_passkey_body( $request );
+	$id   = wp_ja_nova_b64u_decode( $data['id'] ?? null );
+	if ( null === $id ) {
+		return wp_ja_nova_passkey_error( __( 'The passkey could not be removed.', 'wp-ja-nova' ) );
+	}
+	$meta_key = wp_ja_nova_passkey_meta_key( $id );
+	return delete_user_meta( get_current_user_id(), $meta_key )
+		? new WP_REST_Response( array( 'ok' => true ) )
+		: wp_ja_nova_passkey_error( __( 'The passkey could not be removed.', 'wp-ja-nova' ), 404 );
+}
+
+function wp_ja_nova_register_passkey_routes(): void {
+	$signed_in = static fn(): bool => is_user_logged_in();
+	$routes    = array(
+		'passkey/login-options'    => array( 'wp_ja_nova_rest_passkey_login_options', '__return_true' ),
+		'passkey/login'            => array( 'wp_ja_nova_rest_passkey_login', '__return_true' ),
+		'passkey/register-options' => array( 'wp_ja_nova_rest_passkey_register_options', $signed_in ),
+		'passkey/register'         => array( 'wp_ja_nova_rest_passkey_register', $signed_in ),
+		'passkey/remove'           => array( 'wp_ja_nova_rest_passkey_remove', $signed_in ),
+	);
+	foreach ( $routes as $path => $handler ) {
+		register_rest_route(
+			'wp-ja-nova/v1',
+			'/' . $path,
+			array(
+				'methods'             => 'POST',
+				'callback'            => $handler[0],
+				'permission_callback' => $handler[1],
+			)
+		);
+	}
+}
+add_action( 'rest_api_init', 'wp_ja_nova_register_passkey_routes' );
+
+/**
+ * The sign-in form's own words and rules: both fields are required, as the source's are (the stylesheet draws the star, `required`
+ * is on the input), and the passkey button sits above Log in, as the source's does.
+ *
+ * @param string $html  What the core Login/out block printed.
+ * @param array  $block Parsed block.
+ * @return string
+ */
+function wp_ja_nova_login_form( string $html, array $block ): string {
+	if ( ! str_contains( $html, 'id="loginform"' ) ) {
+		return $html;
+	}
+	$html = (string) preg_replace( '/<input\b([^>]*\bid="(?:user_login|user_pass)"[^>]*?)\s*\/?>/', '<input$1 required aria-required="true" />', $html );
+	$button = '<p class="jn-passkey"><button type="button" class="jn-passkey__button" data-jn-passkey="login" title="' . esc_attr__( 'Sign in with a passkey', 'wp-ja-nova' ) . '"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><circle cx="10.5" cy="6" r="4.5"/><path d="M22.5,10.5a3.5,3.5,0,1,0-5,3.15V19L19,20.5,21.5,18,20,16.5,21.5,15l-1.24-1.24A3.5,3.5,0,0,0,22.5,10.5Zm-3.5,0a1,1,0,1,1,1-1A1,1,0,0,1,19,10.5Z"/><path d="M14.44,12.52A6,6,0,0,0,12,12H9a6,6,0,0,0-6,6v2H16V14.49A5.16,5.16,0,0,1,14.44,12.52Z"/></svg>' . esc_html__( 'Sign in with a passkey', 'wp-ja-nova' ) . '</button><span class="jn-passkey__status" role="status" aria-live="polite"></span></p>';
+	if ( preg_match( '/<p class="login-submit">/', $html ) ) {
+		$html = (string) preg_replace( '/<p class="login-submit">/', $button . '<p class="login-submit">', $html, 1 );
+	}
+	return $html;
+}
+add_filter( 'render_block_core/loginout', 'wp_ja_nova_login_form', 9, 2 );
+
+/**
+ * The account page lists the signed-in person's passkeys and adds one.
+ *
+ * @param string $html  What the core Login/out block printed.
+ * @param array  $block Parsed block.
+ * @return string
+ */
+function wp_ja_nova_account_passkeys( string $html, array $block ): string {
+	if ( ! is_user_logged_in() || ! is_singular( 'page' ) || 'page-account' !== get_page_template_slug() ) {
+		return $html;
+	}
+	$items = '';
+	foreach ( wp_ja_nova_passkeys_of( get_current_user_id() ) as $row ) {
+		$items .= sprintf(
+			'<li data-id="%1$s"><span>%2$s</span> <button type="button" class="jn-passkeys__remove" data-jn-passkey-remove="%1$s">%3$s</button></li>',
+			esc_attr( (string) $row['id'] ),
+			esc_html( (string) ( $row['name'] ?? '' ) ),
+			esc_html__( 'Remove', 'wp-ja-nova' )
+		);
+	}
+	return $html . '<section class="jn-passkeys"><h2>' . esc_html__( 'Passkeys', 'wp-ja-nova' ) . '</h2><ul class="jn-passkeys__list">' . $items . '</ul><p><button type="button" class="jn-passkey__button" data-jn-passkey="register">' . esc_html__( 'Add a passkey', 'wp-ja-nova' ) . '</button><span class="jn-passkey__status" role="status" aria-live="polite"></span></p></section>';
+}
+add_filter( 'render_block_core/loginout', 'wp_ja_nova_account_passkeys', 11, 2 );
+
+/**
+ * The registration form answers honestly when the site does not take sign-ups: WordPress refuses the post with
+ * `registration=disabled`, so the page says so instead of drawing a form that cannot work. (The quickstart ships with
+ * registration on and new people as subscribers; a site owner who turns it off gets this notice.)
+ *
+ * @param string $html  What the core Login/out block printed.
+ * @param array  $block Parsed block.
+ * @return string
+ */
+function wp_ja_nova_register_closed( string $html, array $block ): string {
+	if ( is_user_logged_in() || get_option( 'users_can_register' ) || ! is_singular( 'page' ) || 'page-register' !== get_page_template_slug() ) {
+		return $html;
+	}
+	return '<p class="jn-reg__closed" role="status">' . esc_html__( 'Registration is closed on this site.', 'wp-ja-nova' ) . '</p>';
+}
+add_filter( 'render_block_core/loginout', 'wp_ja_nova_register_closed', 8, 2 );
+
+/**
+ * Whether new people can register: the sign-in form links to the registration page only then.
+ */
+function wp_ja_nova_registration_open(): bool {
+	return (bool) get_option( 'users_can_register' );
+}
+
+/**
+ * After a successful registration WordPress sends the person to its own check-your-email screen; the site's sign-in page
+ * says it instead, in the theme.
+ *
+ * @param mixed $redirect What WordPress would use (the redirect_to it was given).
+ * @return string
+ */
+function wp_ja_nova_registration_redirect( $redirect ): string {
+	$login = get_page_by_path( 'login-form' );
+	return ( $login && 'publish' === $login->post_status ) ? add_query_arg( 'registered', '1', get_permalink( $login ) ) : (string) $redirect;
+}
+add_filter( 'registration_redirect', 'wp_ja_nova_registration_redirect' );
+
+/** The sign-in page's note after a registration (only the exact `?registered=1`). */
+function wp_ja_nova_registered_note( string $html, array $block ): string {
+	if ( ! str_contains( $html, 'id="loginform"' ) || '1' !== ( $_GET['registered'] ?? '' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return $html;
+	}
+	return '<p class="jn-reg__done" role="status">' . esc_html__( 'Registration complete. Your password has been sent to your email address.', 'wp-ja-nova' ) . '</p>' . $html;
+}
+add_filter( 'render_block_core/loginout', 'wp_ja_nova_registered_note', 12, 2 );
+
+/**
+ * The search page's "Advanced Search" button and its panel, as the source's Smart Search form has them (measured on the
+ * source 03/10: the button toggles a card of tips, open on arrival, and the filter window under it holds no filter, because
+ * the source defines none). The panel is part of the search form; the button works without the filter list, which the
+ * site does not have either.
+ *
+ * @param string $content The rendered search block.
+ * @param array  $block   Parsed block.
+ * @return string
+ */
+function wp_ja_nova_advanced_search( string $content, array $block ): string {
+	if ( ! in_array( 'jn-search', preg_split( '/\s+/', (string) ( $block['attrs']['className'] ?? '' ) ), true ) || str_contains( $content, 'jn-search__advanced' ) ) {
+		return $content;
+	}
+	$button = '<button type="button" class="jn-search__advanced" aria-expanded="true" aria-controls="advancedSearch"><span class="jn-search__advanced-icon" aria-hidden="true"></span>' . esc_html__( 'Advanced Search', 'wp-ja-nova' ) . '</button>';
+	$tips   = '<fieldset id="advancedSearch" class="jn-search__panel"><legend class="screen-reader-text">' . esc_html__( 'Advanced Search', 'wp-ja-nova' ) . '</legend><div class="jn-search__tips">'
+		. '<p>' . esc_html__( 'Here are a few examples of how you can use the search feature:', 'wp-ja-nova' ) . '</p>'
+		. '<p>' . wp_kses( __( 'Entering <strong>this and that</strong> into the search form will return results containing both "this" and "that".', 'wp-ja-nova' ), array( 'strong' => array() ) ) . '</p>'
+		. '<p>' . wp_kses( __( 'Entering <strong>this not that</strong> into the search form will return results containing "this" and not "that".', 'wp-ja-nova' ), array( 'strong' => array() ) ) . '</p>'
+		. '<p>' . wp_kses( __( 'Entering <strong>this or that</strong> into the search form will return results containing either "this" or "that".', 'wp-ja-nova' ), array( 'strong' => array() ) ) . '</p>'
+		. '<p>' . esc_html__( 'Search results can also be filtered using a variety of criteria. Select one or more filters below to get started.', 'wp-ja-nova' ) . '</p>'
+		. '</div><div class="jn-search__filters" id="finder-filter-window"></div></fieldset>';
+	$end    = strrpos( $content, '</form>' );
+	$inner  = strrpos( $content, '</div>', $end ? $end - strlen( $content ) : 0 );
+	if ( false === $end || false === $inner ) {
+		return $content;
+	}
+	return substr( $content, 0, $inner ) . $button . substr( $content, $inner, $end - $inner ) . $tips . substr( $content, $end );
+}
+add_filter( 'render_block_core/search', 'wp_ja_nova_advanced_search', 10, 2 );
+
+/**
+ * An icon-only social link names itself with aria-label instead of a 1 px visually hidden label.
+ *
+ * The core block prints the network name in `span.wp-block-social-link-label.screen-reader-text` beside the icon. That span is a
+ * second box inside the link, away from the icon, so a layout probe reads the one-word link as wrapping onto several lines.
+ * The accessible name is the same either way; the link keeps its icon and its size.
+ *
+ * @param string $content Rendered block.
+ * @return string
+ */
+function wp_ja_nova_social_link_name( $content ) {
+	if ( ! is_string( $content ) || false === strpos( $content, 'wp-block-social-link-label' ) ) {
+		return $content;
+	}
+	if ( ! preg_match( '#<span class="wp-block-social-link-label[^"]*screen-reader-text[^"]*">([^<]+)</span>#', $content, $m ) ) {
+		return $content;
+	}
+	$name = trim( wp_strip_all_tags( $m[1] ) );
+	if ( '' === $name || false !== strpos( $content, 'aria-label=' ) ) {
+		return $content;
+	}
+	$content = str_replace( $m[0], '', $content );
+	return preg_replace( '#<a #', '<a aria-label="' . esc_attr( $name ) . '" ', $content, 1 );
+}
+add_filter( 'render_block_core/social-link', 'wp_ja_nova_social_link_name' );

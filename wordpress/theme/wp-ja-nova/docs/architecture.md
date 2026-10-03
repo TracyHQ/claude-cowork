@@ -35,7 +35,7 @@ stylesheet, script or template file of the source was copied (docs/content-rules
 | Navigation | — | `wp_navigation` posts `mainmenu` (header), `services` (service pages' side menu), `jcontent`, `jpages`, `users` (footer) |
 | Contact form | — | Contact Form 7's `wpcf7_contact_form` post titled "Contact" |
 | Global styles (Site Editor > Styles) | `theme.json` + `styles/wp-ja-nova.json` | `wp_global_styles` row holding any override |
-| Site identity | — | options `blogname` ("ja_nova", the source's site name, which its header prints as the logo), `blogdescription`, `show_on_front`, `page_on_front` |
+| Site identity | — | options `blogname` ("ja_nova", the source's site name), `blogdescription`, `show_on_front`, `page_on_front` |
 | Project fields (client, services, date, live link, budget) | the template `single-project` and the card filters of `inc/extra.php` | post meta `prj-client`, `prj-services`, `prj-date`, `prj-completed`, `prj-client-name`, `prj-budget` |
 | 404 page text | the fallback text in `templates/404.html` | the draft page `page-not-found`, named by option `wp_ja_nova_404_page` |
 | Retired-URL redirects | the hook in `inc/extra.php` | option `wp_ja_nova_redirects`, JSON rules |

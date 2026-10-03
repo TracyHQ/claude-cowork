@@ -52,8 +52,8 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"jn-accordion__body jn-position__body","layout":{"type":"default"}} -->
 <div class="wp-block-group jn-accordion__body jn-position__body">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"features-intro.tab-body.1"}} -->
-<p><?php esc_html_e( 'The full description of the position.', 'wp-ja-nova' ); ?></p>
+<!-- wp:paragraph {"className":"jn-position__text","metadata":{"role":"content","name":"features-intro.tab-body.1"}} -->
+<p class="jn-position__text"><?php esc_html_e( 'The full description of the position.', 'wp-ja-nova' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- wp:buttons {"className":"jn-actions"} -->
 <div class="wp-block-buttons jn-actions">

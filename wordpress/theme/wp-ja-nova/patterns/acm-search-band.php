@@ -23,9 +23,9 @@
 <!-- /wp:heading -->
 <!-- wp:search {"label":"Search","showLabel":false,"placeholder":"Search …","buttonText":"Search","buttonUseIcon":true,"buttonPosition":"button-inside","className":"jn-search-band__form"} /-->
 <!-- wp:social-links {"className":"jn-social jn-search-band__social","metadata":{"name":"search-band.social"}} -->
-<ul class="wp-block-social-links jn-social jn-search-band__social"><!-- wp:social-link {"url":"https://www.joomlart.com/","service":"facebook"} /-->
-<!-- wp:social-link {"url":"https://www.joomlart.com/","service":"twitter"} /-->
-<!-- wp:social-link {"url":"https://www.joomlart.com/","service":"youtube"} /--></ul>
+<ul class="wp-block-social-links jn-social jn-search-band__social"><!-- wp:social-link {"url":"#","service":"facebook"} /-->
+<!-- wp:social-link {"url":"#","service":"twitter"} /-->
+<!-- wp:social-link {"url":"#","service":"youtube"} /--></ul>
 <!-- /wp:social-links -->
 </div>
 <!-- /wp:group -->

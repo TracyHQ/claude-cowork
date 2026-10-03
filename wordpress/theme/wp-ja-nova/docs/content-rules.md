@@ -29,7 +29,7 @@ over an owner's edits.
   used by the 404 page as on the source; the site makes no request to Google Fonts. The rest of
   the site uses no web font (below, "Typography").
 - Accounts: the posts belong to the source's nine authors, created as WordPress users with their
-  pictures. Registration is closed (`users_can_register` = 0).
+  pictures. Registration is open to new people as subscribers (`users_can_register` = 1, `default_role` = subscriber: data of the quickstart, set on the site, never forced by the theme).
 
 ## What the port changed on purpose
 
@@ -42,15 +42,14 @@ over an owner's edits.
   menu's order, as the source's category of services orders them.
 - **Footer copyright** keeps "Copyright © 2026 ja_nova. All Rights Reserved."; the source's
   second line ("Joomla! is Free Software …") was dropped: it names Joomla.
-- **Site name** is `ja_nova`, the source's site name, which its header prints as the logo.
+- **Site name** is `ja_nova`, the source's site name. The header logo is the source's image logo, not the name (measured 03/10: `images/joomlart/logo/item-1.png` 162×48 light, `item-2.png` 161×49 dark).
 - **The 404 page** is drawn as the source's own error page (no header or footer, colour switch at
   the corner, Golos Text), with its words in the draft page `page-not-found`. In dark, the source's
   "Home Page" button is purple text on purple; the port keeps the text white.
 - **Dark mode fixes of source defects**: the phone drawer's items (the source keeps light-mode
   grey text on the dark drawer), the rule under each tag-list row (the source keeps a light rule on
   the dark page). Visual comparisons with the source show these as differences on purpose.
-- **Joomla view chrome with no WordPress counterpart** was not drawn: the Smart Search help text
-  under an empty search, the e-mail cloaking script of the contact page (WordPress prints the
+- **Joomla view chrome with no WordPress counterpart** was not drawn: the e-mail cloaking script of the contact page (WordPress prints the
   address as a `mailto:` link, the words a visitor sees on the source), "Forgot your username?"
   (WordPress has no such flow; the sign-in form links "Forgot your password?" and "Don't have an
   account?").
@@ -63,12 +62,21 @@ were written:
 
 | | Source | This site | Why it stays |
 | --- | --- | --- | --- |
-| G12 | show-password button on the sign-in form; the registration form | the sign-in form without that button; `/registration-form` shows a "Log in" link (registration closed) | opening registration is the owner's security decision |
+| G12 | the registration form of the source asks name, password and a user profile | the registration form asks username and email (WordPress sends the password) | WordPress stores no profile fields (D-17) |
 | G15 | `/typography`: the Bootstrap component samples (buttons, badges, alerts, cards, progress bars, pagination, spinners) drawn as on the source | the sample markup with partial styling | not measured yet |
 | G18 | `/project`: a "We have an experienced team of production" block with tabs All project / Branding / UI/UX design / Illustration over project cards | the contact bar only | not ported yet |
 
-Registration: turning it on is `wp option update users_can_register 1` plus a `default_role`;
-decide it, do not assume it.
+Registration: the quickstart ships with it on and new people as subscribers; the theme never turns it on. A site owner who
+turns it off (`wp option update users_can_register 0`) gets a "Registration is closed on this site." note on the page and no
+registration link on the sign-in form.
+
+Passkeys: the sign-in form's passkey button and the account page's "Add a passkey" use the theme's REST routes
+(`wp-json/wp-ja-nova/v1/passkey/*`, `inc/extra.php`). Every assertion is verified on the server (challenge used once within
+five minutes, origin, relying party id, user-present flag, ES256/RS256 signature, signature counter); a site on a changed
+domain registers its passkeys again, since a passkey is bound to the domain.
+
+Advanced Search: the button on `/smart-search` shows and hides the tips card, as the source's does. The source defines no
+search filter (its filter window is empty, measured 03/10), so the site has none either.
 
 ## Seed vs. site
 
