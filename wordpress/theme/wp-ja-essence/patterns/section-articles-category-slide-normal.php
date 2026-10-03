@@ -24,7 +24,7 @@
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
-<!-- wp:query {"queryId":21,"query":{"perPage":6,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal"},"className":"je-lead je-lead--slide"} -->
+<!-- wp:query {"queryId":21,"query":{"perPage":6,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal","wpJaEssenceOrder":"title"},"className":"je-lead je-lead--slide"} -->
 <div class="wp-block-query je-lead je-lead--slide">
 <!-- wp:post-template {"className":"je-lead__items","layout":{"type":"default"}} -->
 <!-- wp:cover {"useFeaturedImage":true,"dimRatio":50,"minHeight":362,"isDark":true,"className":"je-lead__card","layout":{"type":"constrained"}} -->

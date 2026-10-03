@@ -14,7 +14,12 @@
 <!-- wp:post-template {"className":"tracy-grid","layout":{"type":"grid","columnCount":3}} -->
 <!-- wp:group {"className":"tracy-card","layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-card">
-<!-- wp:post-featured-image {"isLink":true,"aspectRatio":"3/2","className":"tracy-card__media"} /-->
+<!-- wp:group {"className":"tracy-card__media je-card__media","layout":{"type":"default"}} -->
+<div class="wp-block-group tracy-card__media je-card__media">
+<!-- wp:post-featured-image {"isLink":true,"aspectRatio":"3/2","className":"je-card__img"} /-->
+<!-- wp:wp-ja-essence/media-icon /-->
+</div>
+<!-- /wp:group -->
 <!-- wp:group {"className":"tracy-card__body","layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-card__body">
 <!-- wp:post-terms {"term":"category","className":"tracy-eyebrow"} /-->
@@ -23,6 +28,9 @@
 <div class="wp-block-group je-meta">
 <!-- wp:post-author-name {"isLink":false,"prefix":"By ","className":"je-meta__author"} /-->
 <!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:wp-ja-essence/hits {"label":true} /-->
+</div>
+<!-- /wp:group -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"je-card__extra","layout":{"type":"default"}} -->
@@ -30,8 +38,6 @@
 <!-- wp:post-excerpt {"excerptLength":40,"moreText":"","className":"je-card__intro"} /-->
 <!-- wp:post-terms {"term":"post_tag","className":"je-card__tags"} /-->
 <!-- wp:read-more {"content":"Read more ...","className":"je-card__more"} /-->
-</div>
-<!-- /wp:group -->
 </div>
 <!-- /wp:group -->
 </div>

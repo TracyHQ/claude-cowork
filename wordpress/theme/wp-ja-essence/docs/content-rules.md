@@ -60,7 +60,7 @@ with the default stated, and is the owner's to confirm or change.
 | Id | Question | Current default |
 | --- | --- | --- |
 | D-41 | The source registration and profile forms are Joomla user forms (about 15 fields); WordPress has no equivalent without a plugin | registration page keeps core's Log in link (registration closed); profile pages are static previews |
-| D-42 | The source contact form has Name, Email, Subject, Message and Send a copy; the seeder builds a Contact Form 7 form with Your name, Your email, Your message and a privacy note | form as the seeder builds it, styled only |
+| D-42 | The source contact form has Name, Email, Subject, Message and Send a copy; the seeder builds a Contact Form 7 form with Your name, Your email, Your message and a privacy note | 1.0.3 (D-75): the form of the source: Name*, Email*, Subject*, the message, an optional "Send a copy to yourself" box and "Send message", no privacy gate; ticking the box mails the visitor a copy (Mail (2), switched off when it is not ticked) |
 | D-50 | The Health listing shows 9 posts, not the source's 12: three source articles became the `/detail/*` pages | 9 posts, no pager (appears only when the data needs it), no invented copies |
 | D-53 | Category views differ in the source (hero card, horizontal cards, sidebar, title-only table for tagged items, people grid for authors) | one card layout for all, type sizes per page; the other layouts are not ported |
 | D-61, D-64 | Source chrome with no WordPress counterpart: the gallery strip on the search view, the "Trending" and "Editor's choice" labels, the "Written by" prefix, the login module's "Don't have an account?" link | not drawn |

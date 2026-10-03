@@ -2,7 +2,7 @@
 /**
  * Title: Newsletter
  * Slug: wp-ja-essence/section-newsletter
- * Description: A blue sidebar card: a title, a line about the subscribers and a sign-up button. The source draws an AcyMailing form; WordPress has no mailing list here, so the button is a link to edit (DECISIONS D-10).
+ * Description: A blue sidebar card: a title, a line about the subscribers and the Newsletter form (email, Sign up, Terms box). The source draws an AcyMailing form; WordPress has no mailing list here, so the form is a Contact Form 7 form that mails the sign-up request to the site owner (DECISIONS D-10, D-81).
  * Categories: wp-ja-essence
  * Post Types: page
  * Viewport Width: 1440
@@ -20,12 +20,8 @@
 <!-- wp:paragraph {"className":"je-side__intro","metadata":{"role":"content","name":"newsletter.introtext"}} -->
 <p class="je-side__intro">Join 70,000 subscribers!</p>
 <!-- /wp:paragraph -->
-<!-- wp:buttons {"className":"je-side__action"} -->
-<div class="wp-block-buttons je-side__action">
-<!-- wp:button {"className":"je-btn-dark","metadata":{"role":"content","name":"newsletter.subtext"}} -->
-<div class="wp-block-button je-btn-dark"><a class="wp-block-button__link wp-element-button" href="/contact/">Sign up</a></div>
-<!-- /wp:button -->
-</div>
-<!-- /wp:buttons -->
+<!-- wp:shortcode -->
+[contact-form-7 title="Newsletter" html_class="je-nl"]
+<!-- /wp:shortcode -->
 </div>
 <!-- /wp:group -->

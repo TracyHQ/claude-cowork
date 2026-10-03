@@ -1,19 +1,19 @@
 <?php
 /**
- * Title: Front list (warm cards)
- * Slug: wp-ja-essence/front-list-warm
- * Description: The blog list: one warm-tinted card per post with its picture, category, title, byline, excerpt and a read-more link, then the pager.
+ * Title: Front list (home 1)
+ * Slug: wp-ja-essence/front-list-home-1
+ * Description: home-1: every featured article in the source’s featured order, six per page.
  * Categories: wp-ja-essence
  * Post Types: page
  * Viewport Width: 1440
- * Inserter: yes
+ * Inserter: no
  * Keywords: posts, blog, list
  *
  * @package wp-ja-essence
  */
 ?>
-<!-- wp:query {"queryId":5,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":false,"sticky":"ignore"},"className":"je-list je-list--warm","metadata":{"name":"postlist.query"}} -->
-<div class="wp-block-query je-list je-list--warm">
+<!-- wp:query {"queryId":40,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":false,"sticky":"ignore","wpJaEssenceFeatured":true,"wpJaEssenceOrder":"front"},"className":"je-list","metadata":{"name":"postlist.query"}} -->
+<div class="wp-block-query je-list">
 <!-- wp:post-template {"className":"je-list__items","layout":{"type":"default"}} -->
 <!-- wp:group {"className":"je-card","layout":{"type":"default"}} -->
 <div class="wp-block-group je-card">

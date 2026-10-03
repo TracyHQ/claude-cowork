@@ -1,6 +1,12 @@
 <!-- wp:template-part {"slug":"header","tagName":"header","className":"je-header","area":"header"} /-->
-<!-- wp:group {"tagName":"main","className":"je-main je-container je-page je-page--article je-single","layout":{"type":"default"}} -->
-<main class="wp-block-group je-main je-container je-page je-page--article je-single">
+<!-- wp:group {"tagName":"main","className":"je-main je-page je-page--article je-single","layout":{"type":"default"}} -->
+<main class="wp-block-group je-main je-page je-page--article je-single">
+<!-- wp:group {"className":"je-container","layout":{"type":"default"}} -->
+<div class="wp-block-group je-container">
+<!-- wp:group {"className":"je-twocol je-single__cols","layout":{"type":"default"}} -->
+<div class="wp-block-group je-twocol je-single__cols">
+<!-- wp:group {"className":"je-article-main","layout":{"type":"default"}} -->
+<div class="wp-block-group je-article-main">
 <!-- wp:group {"className":"je-articlecard","layout":{"type":"default"}} -->
 <div class="wp-block-group je-articlecard">
 <!-- wp:post-featured-image {"isLink":false,"aspectRatio":"auto","className":"je-page__hero"} /-->
@@ -9,19 +15,25 @@
 <!-- wp:group {"className":"je-meta","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <div class="wp-block-group je-meta">
 <!-- wp:post-author-name {"isLink":false,"prefix":"By ","className":"je-meta__author"} /-->
-<!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:post-date {"format":"F j, Y","isLink":false,"className":"je-meta__date"} /-->
+<!-- wp:wp-ja-essence/hits {"label":true} /-->
 </div>
 <!-- /wp:group -->
 <!-- wp:post-content {"className":"je-prose","layout":{"type":"default"}} /-->
-<!-- wp:group {"className":"je-neighbours","layout":{"type":"flex","justifyContent":"space-between"}} -->
-<div class="wp-block-group je-neighbours">
-<!-- wp:post-navigation-link {"type":"previous"} /-->
-<!-- wp:post-navigation-link {"type":"next"} /-->
+<!-- wp:wp-ja-essence/article-footer /-->
 </div>
 <!-- /wp:group -->
-<!-- wp:post-terms {"term":"post_tag","separator":" ","className":"je-tags"} /-->
+<!-- wp:wp-ja-essence/author-latest /-->
 </div>
 <!-- /wp:group -->
+<!-- wp:pattern {"slug":"wp-ja-essence/section-newsletter"} /-->
+<!-- wp:pattern {"slug":"wp-ja-essence/single-side-social"} /-->
+<!-- wp:pattern {"slug":"wp-ja-essence/single-side-trending"} /-->
+</div>
+<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+<!-- wp:wp-ja-essence/instagram /-->
 </main>
 <!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer","tagName":"footer","className":"je-footer","area":"footer"} /-->

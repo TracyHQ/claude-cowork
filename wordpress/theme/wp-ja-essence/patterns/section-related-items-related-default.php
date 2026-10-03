@@ -2,7 +2,7 @@
 /**
  * Title: More reading
  * Slug: wp-ja-essence/section-related-items-related-default
- * Description: A section title and two columns of small posts: picture, title and date.
+ * Description: A section title and two columns of small posts: picture, title and views.
  * Categories: wp-ja-essence
  * Post Types: page
  * Viewport Width: 1440
@@ -33,7 +33,11 @@
 <!-- wp:group {"className":"je-mini__body","layout":{"type":"default"}} -->
 <div class="wp-block-group je-mini__body">
 <!-- wp:post-title {"level":4,"isLink":true,"className":"je-mini__title"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"je-meta__date"} /-->
+<!-- wp:group {"className":"je-mini__meta","layout":{"type":"flex","flexWrap":"wrap"}} -->
+<div class="wp-block-group je-mini__meta">
+<!-- wp:wp-ja-essence/hits /-->
+</div>
+<!-- /wp:group -->
 </div>
 <!-- /wp:group -->
 </div>

@@ -24,7 +24,7 @@
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
-<!-- wp:query {"queryId":24,"query":{"perPage":3,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-health,blog-design,blog-fashion"},"className":"je-choice"} -->
+<!-- wp:query {"queryId":24,"query":{"perPage":3,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-health,blog-design,blog-fashion","wpJaEssenceOrder":"title"},"className":"je-choice"} -->
 <div class="wp-block-query je-choice">
 <!-- wp:post-template {"className":"je-choice__items","layout":{"type":"grid","columnCount":3}} -->
 <!-- wp:group {"className":"je-vcard","layout":{"type":"default"}} -->

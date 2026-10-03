@@ -2,7 +2,7 @@
 /**
  * Title: Post list (nsub)
  * Slug: wp-ja-essence/section-articles-latest-latest-nsub
- * Description: A card for a sidebar: a title and a short list of posts, each a small picture, title and date.
+ * Description: A card for a sidebar: a title and a short list of posts, each a small picture, title, date and views.
  * Categories: wp-ja-essence
  * Post Types: page
  * Viewport Width: 1440
@@ -12,8 +12,8 @@
  * @package wp-ja-essence
  */
 ?>
-<!-- wp:group {"className":"je-sec je-side","layout":{"type":"default"}} -->
-<div class="wp-block-group je-sec je-side">
+<!-- wp:group {"className":"je-sec je-side je-side--latest","layout":{"type":"default"}} -->
+<div class="wp-block-group je-sec je-side je-side--latest">
 <!-- wp:group {"className":"je-sec__head je-sec__head--side","layout":{"type":"default"}} -->
 <div class="wp-block-group je-sec__head je-sec__head--side">
 <!-- wp:heading {"level":2,"className":"je-sec__title","metadata":{"role":"content","name":"articles-latest.main-section"}} -->
@@ -24,7 +24,7 @@
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
-<!-- wp:query {"queryId":28,"query":{"perPage":4,"pages":1,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal"},"className":"je-side__list"} -->
+<!-- wp:query {"queryId":28,"query":{"perPage":4,"pages":1,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal","wpJaEssenceOrder":"latest","wpJaEssenceLabels":"Health,Fashion"},"className":"je-side__list"} -->
 <div class="wp-block-query je-side__list">
 <!-- wp:post-template {"className":"je-side__items","layout":{"type":"default"}} -->
 <!-- wp:group {"className":"je-mini","layout":{"type":"default"}} -->
@@ -33,7 +33,12 @@
 <!-- wp:group {"className":"je-mini__body","layout":{"type":"default"}} -->
 <div class="wp-block-group je-mini__body">
 <!-- wp:post-title {"level":4,"isLink":true,"className":"je-mini__title"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"je-meta__date"} /-->
+<!-- wp:group {"className":"je-mini__meta","layout":{"type":"flex","flexWrap":"wrap"}} -->
+<div class="wp-block-group je-mini__meta">
+<!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:wp-ja-essence/hits /-->
+</div>
+<!-- /wp:group -->
 </div>
 <!-- /wp:group -->
 </div>

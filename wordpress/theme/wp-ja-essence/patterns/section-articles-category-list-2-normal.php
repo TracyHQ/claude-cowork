@@ -24,7 +24,7 @@
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
-<!-- wp:query {"queryId":23,"query":{"perPage":3,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal"},"className":"je-minirow"} -->
+<!-- wp:query {"queryId":23,"query":{"perPage":3,"pages":1,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"ignore","inherit":false,"wpJaEssenceCategory":"blog-normal","wpJaEssenceOrder":"title"},"className":"je-minirow"} -->
 <div class="wp-block-query je-minirow">
 <!-- wp:post-template {"className":"je-minirow__items","layout":{"type":"grid","columnCount":3}} -->
 <!-- wp:group {"className":"je-mini","layout":{"type":"default"}} -->

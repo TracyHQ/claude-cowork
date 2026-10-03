@@ -15,9 +15,9 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Text Domain | wp-ja-essence |
 | Theme Name | JA Essence |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
-| Version | 1.0.2 |
+| Version | 1.0.3 |
 
-theme.json version 3; 95 files fingerprinted; 60 of them are the `wp-ja-essence` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-essence` design system.
+theme.json version 3; 101 files fingerprinted; 66 of them are the `wp-ja-essence` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-essence` design system.
 
 ## Templates
 
@@ -69,7 +69,7 @@ A `wp_template_part` row of the same name in the database shadows the file.
 
 ## Patterns
 
-40 patterns; "Content blocks" counts blocks carrying `"role":"content"`, "Names" the distinct `metadata.name` values.
+46 patterns; "Content blocks" counts blocks carrying `"role":"content"`, "Names" the distinct `metadata.name` values.
 
 | Slug | Own | Title | Categories | Block types | Content blocks | Names |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -93,8 +93,14 @@ A `wp_template_part` row of the same name in the database shadows the file.
 | tracy/section-team | no | Team | tracy |  | 0 | 0 |
 | wp-ja-essence/editors-choice | yes | Editor's choice | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/front-list | yes | Front list | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-featured | yes | Front list (featured articles) | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/front-list-grid | yes | Front list (grid) | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-grid-home-4 | yes | Front list (home 4, grid) | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-home-1 | yes | Front list (home 1) | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-home-3 | yes | Front list (home 3) | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/front-list-warm | yes | Front list (warm cards) | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-warm-home-2 | yes | Front list (home 2, warm cards) | wp-ja-essence |  | 0 | 1 |
+| wp-ja-essence/front-list-warm-home-5 | yes | Front list (home 5, warm cards) | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/lead-slider | yes | Lead slider | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/post-list | yes | Post list | wp-ja-essence |  | 0 | 1 |
 | wp-ja-essence/section-articles-categories-slide | yes | Category chips | wp-ja-essence |  | 1 | 1 |
@@ -176,14 +182,18 @@ _none_
 | init | action | inc/extra.php |
 | init | action | inc/extra.php |
 | init | action | inc/extra.php |
+| posts_clauses | filter | inc/extra.php |
 | pre_get_posts | action | inc/extra.php |
 | query_loop_block_query_vars | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | render_block | filter | functions.php |
 | render_block_core/categories | filter | inc/extra.php |
+| render_block_core/post-template | filter | inc/extra.php |
 | render_block_core/post-terms | filter | inc/extra.php |
 | render_block_core/post-title | filter | inc/extra.php |
+| render_block_core/query-pagination | filter | inc/extra.php |
+| render_block_core/search | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | run_wptexturize | filter | functions.php |
@@ -199,71 +209,23 @@ _none_
 | wp_enqueue_scripts | action | functions.php |
 | wp_enqueue_scripts | action | inc/extra.php |
 | wp_head | action | functions.php |
+| wpcf7_before_send_mail | action | inc/extra.php |
 
 ## Spec-pack
 
-From `spec`: 31 routes in page-map.json (0 gaps recorded), 2 menus, 1 redirect rules.
+From `spec`: 0 routes in page-map.json (0 gaps recorded), 0 menus, 0 redirect rules.
 
 Routes by template view:
 
-| View | Routes |
-| --- | --- |
-| 404 | 1 |
-| author | 1 |
-| category | 7 |
-| front-page | 1 |
-| page | 8 |
-| page-account | 2 |
-| page-contact | 1 |
-| page-landing | 5 |
-| page-login | 1 |
-| page-register | 1 |
-| search | 1 |
-| single | 1 |
-| tag | 1 |
+_none_
 
-| Menu slug | Title | Items (tree) |
-| --- | --- | --- |
-| mainmenu | mainmenu | 37 |
-| category | category | 6 |
+_none_
 
-| Route | View | Title |
-| --- | --- | --- |
-| / | front-page | Home 3 |
-| /404 | 404 | Not found |
-| /category/category-style-1 | category | Category Style 1 |
-| /category/category-style-2 | category | Category Style 2 |
-| /category/category-style-3 | category | Category Style 3 |
-| /category/category-style-3/vintage-inspired-martini-cocktail-glasses | single | Vintage-inspired martini & cocktail glasses |
-| /category/category-style-4 | category | Category Style 4 |
-| /contact | page-contact | Contact |
-| /detail/gallery | page | Natural Remedies for Common Ailments |
-| /detail/layout-1 | page | Abstract Wonders: Exploring Line Art Composition |
-| /detail/layout-2 | page | Mental Health and Well-being Strategies |
-| /detail/layout-3 | page | Essential Nutrients for Optimal Health |
-| /detail/video | page | Fitness Tips for a Healthy Lifestyle |
-| /home/home-1 | page-landing | Home 1 |
-| /home/home-2 | page-landing | Home 2 |
-| /home/home-4 | page-landing | Home 4 |
-| /home/home-5 | page-landing | Home 5 |
-| /lifestyle | category | Lifestyle |
-| /pages/j-content/author-listting | author | Author listting |
-| /pages/j-content/category-blog | category | Category Blog |
-| /pages/j-content/featured-articles | page-landing | Featured Articles |
-| /pages/j-content/tagged-items | tag | Tagged Items |
-| /pages/j-pages/error-page | page | Error Page |
-| /pages/j-pages/offline-pages | page | Offline Pages |
-| /pages/j-pages/smart-search | search | Smart Search |
-| /pages/j-pages/typography | page | Typography |
-| /pages/user/edit-user-profile | page-account | Edit User Profile |
-| /pages/user/login-form | page-login | Login Form |
-| /pages/user/registration-form | page-register | Registration Form |
-| /pages/user/user-profile | page-account | User Profile |
-| /resources | category | Resources |
+_none_
 
 ## Seed report — at seed time, not live
 
-From `seed-report-102-c.json` (run started 2026-10-02T11:07:20.987Z). Totals are what the seeder found or wrote; the live site may differ.
+From `seed-report-103-last.json` (run started 2026-10-02T13:42:56.738Z). Totals are what the seeder found or wrote; the live site may differ.
 
 | Kind | Total | Created | Updated | Skipped (unchanged) |
 | --- | --- | --- | --- | --- |
