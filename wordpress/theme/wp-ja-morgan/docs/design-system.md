@@ -49,13 +49,16 @@ are the same `parts/header.html`; only CSS and one PHP filter (the info block) d
 
 ## Dark mode
 
-Three states, kept in the cookie `tracy_theme` (`light`, `dark`, `auto`; one year). Light and dark
-are `data-theme` on `<html>`; **auto is no attribute**, and the stylesheet then follows the OS
-(`prefers-color-scheme`). `assets/js/wp-ja-morgan-dark.js` runs in the head, blocking, so a visitor
-who chose dark never sees a light frame; each click on the header toggle (`data-tracy-theme-toggle`)
-cycles light, dark, auto. Every colour preset carries both halves with CSS `light-dark()`
-(`theme.overlay.json`). The source keeps a two-state choice in `localStorage`; Tracy's convention
-replaced it so previews and pages agree (D-11).
+The page is light or dark and a click flips whichever is showing, as the source's toggle does. The
+choice is kept in the cookie `tracy_theme` (one year). Light and dark are `data-theme` on `<html>`;
+**no attribute** (no cookie yet, or an old `auto` cookie) follows the OS (`prefers-color-scheme`), so
+the first click from there picks the opposite of what the OS shows and always changes the page.
+`assets/js/wp-ja-morgan-dark.js` runs in the head, blocking, so a visitor who chose dark never sees a
+light frame; the toggle (`data-tracy-theme-toggle`, 36 x 40 px, also on phones) labels itself from what
+the page shows. `?theme=dark|light` wins for that load and is never saved. Every colour preset carries
+both halves with CSS `light-dark()` (`theme.overlay.json`). The source keeps its choice in
+`localStorage`; the cookie is Tracy's convention so previews and pages agree (D-11, 1.1.5: two states,
+not three).
 
 ## Motion and interaction
 

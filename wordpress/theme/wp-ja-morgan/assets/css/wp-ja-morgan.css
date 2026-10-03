@@ -184,6 +184,7 @@ body a {
 	line-height: 30px;
 }
 .action-link-icon a {
+	vertical-align: top;
 	display: inline-block;
 	width: 30px;
 	height: 30px;
@@ -312,12 +313,28 @@ body a {
 	display: block;
 	padding: 32.5px 15px 32.5px 0;
 	margin-left: 30px;
-	color: var(--jm-heading);
+	color: light-dark(var(--jm-heading), #cdd4e0);
 }
 .t3-mainnav .current-menu-item > .wp-block-navigation-item__content,
 .t3-mainnav .current-menu-ancestor > .wp-block-navigation-item__content,
 .t3-mainnav .wp-block-navigation-item__content:hover {
 	color: var(--ja-accent);
+}
+/* The top-level colour rule above is (0,4,0): restate the lit states at the same weight and later (audit 03/10, defect 3).
+   Measured on the source: the current item is #d93030 in light and dark; hover reddens in light and leaves the colour alone in dark. */
+.t3-mainnav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
+.t3-mainnav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
+	color: var(--jm-red);
+}
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content:hover,
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:hover > .wp-block-navigation-item__content,
+.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:focus-within > .wp-block-navigation-item__content {
+	color: light-dark(var(--jm-red), #cdd4e0);
+}
+.t3-mainnav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content:hover,
+.t3-mainnav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content:hover,
+.t3-mainnav .wp-block-navigation__container > .current-menu-ancestor:hover > .wp-block-navigation-item__content {
+	color: var(--jm-red);
 }
 /* Escape closed the dropdown (assets/js/wp-ja-morgan.js): it stays closed until the pointer leaves. */
 .t3-mainnav .wp-block-navigation-submenu.jm-submenu-closed > .wp-block-navigation__submenu-container {
@@ -332,8 +349,23 @@ body a {
 	position: absolute;
 	right: 15px;
 	top: 50%;
-	width: 12px;
-	margin: -6px 0 0;
+	/* A 24 px square (WCAG 2.5.8) that owns its centre; the glyph keeps the source's place (8 px caret, 6 px from the box edge). */
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	margin: -12px 0 0;
+	padding: 0;
+	transform: translateX(6px);
+}
+.t3-mainnav .wp-block-navigation-submenu.jm-touch-open > .wp-block-navigation__submenu-container {
+	visibility: visible;
+	opacity: 1;
+	height: auto;
+	width: 200px;
+	overflow: visible;
 }
 .t3-mainnav .wp-block-navigation__submenu-container {
 	font-size: 15px;
@@ -415,9 +447,12 @@ body a {
 .theme-toggle__sun {
 	display: none;
 }
+/* The script reports what the page shows (data-theme-state), so auto on a dark OS shows the sun too. */
+.theme-toggle[data-theme-state="dark"] .theme-toggle__moon,
 :root[data-theme="dark"] .theme-toggle__moon {
 	display: none;
 }
+.theme-toggle[data-theme-state="dark"] .theme-toggle__sun,
 :root[data-theme="dark"] .theme-toggle__sun {
 	display: inline;
 }
@@ -442,7 +477,7 @@ body a {
 	border-radius: 1px;
 }
 
-/* ---- Off-canvas sidebar (the source's "Sidebar" panel with the Joomla Pages menu) ---- */
+/* ---- Off-canvas sidebar (the source's "Sidebar" panel with the Site Pages menu) ---- */
 .t3-off-canvas {
 	position: fixed;
 	top: 0;
@@ -774,7 +809,7 @@ html.jm-off-canvas-open body::after {
 	padding: 0;
 }
 .jm-slide-tab {
-	flex: 1 1 0;
+	flex: 1 1 auto;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -794,14 +829,24 @@ html.jm-off-canvas-open body::after {
 :root[data-theme="dark"] .jm-slide-tab:not(.is-current) {
 	color: #dfe4ec;
 }
-.jm-slide-tab.is-current::after {
+.jm-slide-tab + .jm-slide-tab {
+	border-left: 1px solid var(--jm-line);
+}
+/* The source's notch: a white triangle on the active tab that points up into the picture. */
+.jm-slide-tab::before {
 	content: "";
 	position: absolute;
-	left: 0;
-	right: 0;
-	top: -1px;
-	height: 3px;
-	background: var(--ja-accent);
+	box-sizing: border-box;
+	left: 50%;
+	top: -15px;
+	width: 30px;
+	height: 30px;
+	margin-left: -15px;
+	border: 15px solid transparent;
+	border-bottom-color: #ffffff;
+}
+.jm-slide-tab.is-current::before {
+	top: -30px;
 }
 /* The library's own dots stand behind the titled tabs above (they step the same carousel). */
 .acm-slideshow > .tracy-motion-dots,
@@ -816,8 +861,19 @@ html.jm-off-canvas-open body::after {
 /* ---- features-intro style-1 ---- */
 .acm-features.style-1 {
 	display: grid;
-	grid-template-columns: 4fr 8fr;
-	gap: 30px;
+	grid-template-columns: 1fr 2fr;
+	gap: 0;
+	margin: 0 -15px;
+}
+.acm-features.style-1 > .section-title {
+	padding: 0 45px 0 15px;
+	margin: 0 0 60px;
+}
+.acm-features.style-1 .acm-feature-slide.tracy-motion-carousel {
+	margin: 0;
+}
+.acm-features.style-1 > .section-title > :last-child {
+	margin-bottom: 0;
 }
 .acm-features.style-1 .acm-features-intro {
 	margin: 30px 0 25px;
@@ -839,7 +895,8 @@ html.jm-off-canvas-open body::after {
 .acm-feature-slide .features-img img {
 	display: block;
 	width: 100%;
-	height: 260px;
+	height: auto;
+	aspect-ratio: 3 / 2;
 	object-fit: cover;
 	border-radius: 4px;
 }
@@ -852,10 +909,11 @@ html.jm-off-canvas-open body::after {
 	line-height: 30px;
 }
 .acm-feature-slide h4 {
-	margin: 25px 0 12.5px !important;
+	margin: 30px 0 12.5px !important;
 }
 .acm-feature-slide p:not(.action-link-icon) {
 	padding-right: 30px;
+	margin-bottom: 25px;
 }
 .acm-feature-slide .action-link-icon {
 	margin-top: 0;
@@ -879,8 +937,16 @@ html.jm-off-canvas-open body::after {
 }
 .style-normal .acm-features.style-2 .features-item {
 	background: none;
+	padding: 0;
 }
 .align-left .acm-features.style-2 .features-item {
+	text-align: left;
+}
+.acm-features.style-2 .features-item .jm-description {
+	margin-bottom: 25px;
+}
+.align-left .acm-features.style-2 > .section-title {
+	margin: 0 0 60px;
 	text-align: left;
 }
 .acm-features.style-2 .font-icon {
@@ -954,14 +1020,20 @@ html.jm-off-canvas-open body::after {
 }
 .content-left .acm-features.style-3 .features-content {
 	margin-left: auto;
-	padding: 120px 180px 120px 0;
+	padding: 150px 180px 150px 0;
 }
 .acm-features.style-3 .lead {
 	margin: 30px 0 25px;
 }
+.acm-features.style-3 .features-content > .section-title {
+	margin-bottom: 40px;
+}
+.acm-features.style-3 .features-module-wrap:not(:empty) {
+	margin-bottom: 25px;
+}
 .acm-features.style-3 .list-check {
 	list-style: none;
-	margin: 0 0 25px;
+	margin: 40px 0 25px;
 	padding: 0;
 }
 .acm-features.style-3 .list-check li {
@@ -1018,11 +1090,16 @@ html.jm-off-canvas-open body::after {
 	content: "\f067";
 	font-family: "FontAwesome";
 	position: absolute;
-	right: 0;
-	top: 0;
-	width: 60px;
+	right: 15px;
+	top: 15px;
+	width: 30px;
+	height: 30px;
+	border-radius: 4px;
+	background: var(--ja-accent);
+	font-size: 11px;
+	line-height: 31px;
 	text-align: center;
-	color: #999999;
+	color: #ffffff;
 }
 .acm-accordion .panel[open] summary {
 	background: #1b3060;
@@ -1044,15 +1121,21 @@ html.jm-off-canvas-open body::after {
 .jm-quick-contact {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0 15px;
-	margin-top: 10px;
+	gap: 0;
+	margin: 0 -7.5px;
+	padding-top: 25px;
 }
 .jm-quick-contact .jm-field {
+	box-sizing: border-box;
 	flex: 1 1 100%;
-	margin: 0 0 30px;
+	margin: 0;
+	padding: 25px 7.5px 15px;
 }
 .jm-quick-contact .jm-field--half {
-	flex: 1 1 calc(50% - 15px);
+	flex: 0 0 50%;
+}
+.jm-quick-contact .jm-field:has(.btn) {
+	padding: 35px 7.5px 0;
 }
 .jm-quick-contact label {
 	position: absolute;
@@ -1062,6 +1145,7 @@ html.jm-off-canvas-open body::after {
 	clip: rect(0 0 0 0);
 }
 .jm-quick-contact :where(input, textarea) {
+	display: block;
 	width: 100%;
 	box-sizing: border-box;
 	font-family: var(--jm-font);
@@ -1073,11 +1157,13 @@ html.jm-off-canvas-open body::after {
 	border: 0;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 	padding: 0 10px 15px 0;
+	height: 36px;
 }
 .jm-quick-contact :where(input, textarea)::placeholder {
 	color: rgba(255, 255, 255, 0.75);
 }
 .jm-quick-contact textarea {
+	height: 60px;
 	min-height: 60px;
 	line-height: 25px;
 	padding-top: 10px;
@@ -1189,15 +1275,30 @@ html.jm-off-canvas-open body::after {
 	flex-wrap: nowrap;
 }
 .acm-testimonial.style-1 .testimonial-item {
+	position: relative;
 	flex: 0 0 33.3333%;
 	box-sizing: border-box;
-	padding: 0 15px;
+	border: solid transparent;
+	border-width: 0 15px;
+	background: var(--jm-bg);
+	background-clip: padding-box;
+	padding: 0 0 52px;
 	text-align: center;
 	margin: 0;
 }
+.acm-testimonial.style-1 .testimonial-item:has(.action-link-icon) {
+	padding-bottom: 90px;
+}
 .acm-testimonial.style-1 .testimonial-img {
 	position: relative;
-	margin-bottom: 30px;
+	margin-bottom: 45px;
+}
+.acm-testimonial.style-1 .action-link-icon {
+	position: absolute;
+	bottom: 60px;
+	left: 50%;
+	width: 30px;
+	margin: 0 0 0 -15px;
 }
 .acm-testimonial.style-1 .testimonial-img figure {
 	margin: 0;
@@ -1205,7 +1306,8 @@ html.jm-off-canvas-open body::after {
 .acm-testimonial.style-1 .testimonial-img img {
 	display: block;
 	width: 100%;
-	height: 260px;
+	height: auto;
+	aspect-ratio: 3 / 2;
 	object-fit: cover;
 }
 .acm-testimonial.style-1 .label-highlight {
@@ -1242,20 +1344,40 @@ html.jm-off-canvas-open body::after {
 .tracy-motion-dots {
 	display: flex;
 	justify-content: center;
-	gap: 12px;
+	gap: 0;
 	margin-top: 60px;
 }
+/* The source's Owl dot: an 8 px ring with a 4 px dot inside; the current one keeps the ring and loses the dot. */
 .tracy-motion-dots button {
-	width: 12px;
-	height: 12px;
+	position: relative;
+	box-sizing: border-box;
+	width: 8px;
+	height: 8px;
+	margin: 0 6px;
 	padding: 0;
-	border: 2px solid var(--jm-line);
+	border: 2px solid transparent;
 	border-radius: 50%;
 	background: transparent;
 	cursor: pointer;
 }
+.tracy-motion-dots button::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background: #d2d3d7;
+}
+/* The dot is 8 px, the target around it is not: it reaches 24 px. */
+.tracy-motion-dots button::before {
+	content: "";
+	position: absolute;
+	inset: -8px;
+}
 .tracy-motion-dots button[aria-current="true"] {
-	border-color: var(--ja-accent);
+	border-color: var(--jm-secondary, #1b3060);
+}
+.tracy-motion-dots button[aria-current="true"]::after {
+	background: transparent;
 }
 
 /* ---- testimonials style-2 (the quote over the footer) ---- */
@@ -1266,7 +1388,8 @@ html.jm-off-canvas-open body::after {
 .t3-section-footer > .container {
 	padding-top: 150px;
 	padding-bottom: 60px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	/* The source's rule sits inside the container's padding (105-1335 px at 1440), not across the whole container. */
+	background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)) 15px 100% / calc(100% - 30px) 1px no-repeat;
 }
 .acm-testimonial.style-2 {
 	overflow: hidden;
@@ -1278,6 +1401,7 @@ html.jm-off-canvas-open body::after {
 .acm-testimonial.style-2 .testimonial-item {
 	flex: 0 0 100%;
 	display: flex;
+	align-items: center;
 	gap: 30px;
 	margin: 0;
 }
@@ -1293,7 +1417,6 @@ html.jm-off-canvas-open body::after {
 }
 .acm-testimonial.style-2 .testimonial-content-wrap {
 	max-width: 615px;
-	padding-top: 9px;
 }
 .acm-testimonial.style-2 .testimonial-content {
 	font-size: 24px;
@@ -1318,7 +1441,10 @@ html.jm-off-canvas-open body::after {
 }
 .acm-testimonial.style-2 .tracy-motion-dots {
 	justify-content: flex-start;
-	margin: 30px 0 0 210px;
+	margin: 25px 0 0 210px;
+}
+.acm-testimonial.style-2 .tracy-motion-dots button[aria-current="true"] {
+	border-color: #ffffff;
 }
 
 /* ---- clients style-1 ---- */
@@ -1337,8 +1463,10 @@ html.jm-off-canvas-open body::after {
 	margin: 0 !important;
 }
 .acm-cliens .client-img img {
-	width: 152px;
-	height: 152px;
+	width: 100%;
+	max-width: 152px;
+	height: auto;
+	aspect-ratio: 1;
 	object-fit: contain;
 }
 .jm-opacity-30 .client-img img {
@@ -1362,6 +1490,11 @@ html.jm-off-canvas-open body::after {
 }
 .t3-footnav .jm-foot-col {
 	margin-top: 12.5px;
+	margin-bottom: 12.5px;
+}
+/* With the quote above it the footer columns start 60 px under the rule; without it, 150 px under the top. */
+body:has(.t3-section-footer) .t3-footnav {
+	padding-top: 60px;
 }
 .t3-footnav .module-title {
 	font-size: 16px;
@@ -1373,6 +1506,9 @@ html.jm-off-canvas-open body::after {
 }
 .t3-footnav .wp-block-navigation {
 	gap: 0;
+}
+.t3-footnav .wp-block-navigation-item + .wp-block-navigation-item {
+	margin-top: 2px;
 }
 .t3-footnav .wp-block-navigation-item__content {
 	display: block;
@@ -1401,6 +1537,14 @@ html.jm-off-canvas-open body::after {
 .social-follow .wp-social-link svg {
 	width: 13px;
 	height: 13px;
+}
+/* The source's icons are white on the brand fill; core's logos-only style paints them in the brand colour. */
+.social-follow.wp-block-social-links.is-style-logos-only .wp-social-link,
+.social-follow.wp-block-social-links.is-style-logos-only .wp-social-link a {
+	color: #ffffff;
+}
+.social-follow.wp-block-social-links.is-style-logos-only .wp-social-link svg {
+	fill: #ffffff;
 }
 .social-follow .wp-social-link-facebook {
 	background: #3b5999;
@@ -1680,7 +1824,10 @@ html.jm-off-canvas-open body::after {
 	clip: rect(0 0 0 0);
 }
 .jm-login form p {
-	margin: 0 0 15px;
+	margin: 0 0 25px;
+}
+.jm-login .login-submit {
+	margin-bottom: 12.5px;
 }
 .jm-login input[type="text"],
 .jm-login input[type="password"] {
@@ -1737,13 +1884,15 @@ html.jm-off-canvas-open body::after {
 	cursor: pointer;
 }
 .jm-login .unstyled {
-	margin: 20px 0 0;
+	margin: 25px 0 12.5px;
 	padding-left: 25px;
-	font-size: 15px;
-	line-height: 23.44px;
+	font-size: 16px;
+	line-height: 25px;
 }
 .jm-login .unstyled a {
 	color: var(--jm-text);
+	font-size: 15px;
+	line-height: 1.5625;
 }
 .mostread.wp-block-latest-posts {
 	padding: 0;
@@ -1774,14 +1923,18 @@ html.jm-off-canvas-open body::after {
 	margin: 0;
 }
 .categories-module li {
-	padding: 10px 0;
+	position: relative;
+	padding: 10px 0 10px 23px;
 	line-height: 24px;
 	color: var(--jm-text);
 }
+/* The folder icon hangs in the margin, so a wrapped name stays under its first word (as in the source). */
 .categories-module li::before {
 	content: "\f07b";
 	font-family: "FontAwesome";
-	margin-right: 8px;
+	position: absolute;
+	left: 0;
+	top: 10px;
 	color: #999999;
 }
 .categories-module li a {
@@ -2196,11 +2349,11 @@ html.jm-off-canvas-open body::after {
 }
 /* The seeder's Joomla pager (tracy-pager): boxes as the source's, the current page filled, the
    disabled steps not drawn, the page counter boxed on the right. */
-.blog .tracy-joomla-pager {
+.tracy-joomla-pager {
 	display: flex;
 	justify-content: space-between;
 	align-items: flex-start;
-	margin-top: 30px;
+	padding: 25px 0;
 }
 .tracy-joomla-pager .tracy-pager__list {
 	display: flex;
@@ -2215,6 +2368,7 @@ html.jm-off-canvas-open body::after {
 }
 .tracy-joomla-pager .tracy-pager__link {
 	display: block;
+	margin-bottom: 6.25px;
 	padding: 12.5px 25px;
 	border: 1px solid var(--jm-line);
 	border-radius: 4px;
@@ -2429,7 +2583,7 @@ ul.tagspopular li {
 	}
 	/* The open panel is the source's collapse: a full-width list under the header, in the page
 	   surface. The close button takes the open button's place. */
-	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open {
+	.t3-header .t3-mainnav.wp-block-navigation .wp-block-navigation__responsive-container.is-menu-open:not(.disable-default-overlay) {
 		position: absolute;
 		inset: 60px 0 auto 0;
 		z-index: 100;
@@ -2449,10 +2603,14 @@ ul.tagspopular li {
 		margin: 0;
 		display: block;
 	}
+	/* The source's toggle stays where it is and closes the menu (assets/js/wp-ja-morgan.js), so the panel's own close
+	   button is kept for the script and drawn nowhere: two red boxes would show otherwise (audit 03/10, defect 12). */
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-container-close {
 		position: absolute;
 		top: -45px;
 		right: 15px;
+		visibility: hidden;
+		pointer-events: none;
 	}
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container {
 		display: block;
@@ -2482,7 +2640,7 @@ ul.tagspopular li {
 	}
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
-		color: var(--jm-red);
+		color: light-dark(var(--jm-red), var(--ja-accent));
 	}
 	/* The submenu stays folded until its caret is opened, as in the source. */
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__submenu-container {
@@ -2543,4 +2701,92 @@ ul.tagspopular li {
 	.t3-spotlight {
 		padding-top: 30.5px; /* measured on the source: heading 43 px below the footer top at 480-576 px */
 	}
+}
+
+/* ---- Back to top (source `.back-to-top`: 60 px square, 30 px from the corner, from 200 px of scroll, 992 px and up) ---- */
+.back-to-top {
+	display: none;
+}
+@media (min-width: 992px) {
+	.back-to-top {
+		display: block;
+		position: fixed;
+		right: 30px;
+		bottom: 30px;
+		z-index: 99;
+		width: 60px;
+		height: 60px;
+		opacity: 0;
+		visibility: hidden;
+		transition: opacity 0.3s, visibility 0.3s;
+	}
+	.back-to-top.is-visible {
+		opacity: 1;
+		visibility: visible;
+	}
+	.back-to-top .btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 60px;
+		height: 60px;
+		padding: 0;
+		border: 0;
+		border-radius: 4px;
+		background: var(--jm-navy);
+		color: #ffffff;
+		cursor: pointer;
+	}
+}
+
+/* ---- Footers of Home Style 3 and 4: the source's own column splits (3/4/3/2 and 3/3/3/3 of 12), logo "Morgan." in 24 px bold ---- */
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) {
+	grid-template-columns: 3fr 4fr 3fr 2fr;
+	gap: 0;
+	margin: 0 -15px;
+}
+.t3-footnav.jm-foot-hs4 {
+	grid-template-columns: repeat(4, 1fr);
+}
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) .jm-foot-col {
+	padding: 0 15px;
+	margin-bottom: 12.5px;
+}
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) .logo-footer {
+	display: inline;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 37.5px;
+	color: #ffffff;
+}
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) p {
+	margin: 0 0 25px;
+	font-size: 16px;
+	line-height: 25px;
+	color: #888888;
+}
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) p a {
+	color: inherit;
+}
+.jm-footer-hs4 .t3-footnav p,
+.jm-footer-hs4 .t3-copyright,
+.jm-footer-hs4 .t3-copyright small {
+	color: #aaaaaa;
+}
+@media (max-width: 767px) {
+	.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) {
+		grid-template-columns: 1fr;
+	}
+}
+/* The copyright row is as tall as the source's (its T3 logo column keeps 76 px under the two lines). */
+.t3-copyright > .container {
+	min-height: 76px;
+	box-sizing: border-box;
+}
+
+/* A social link's label is read by screen readers only. Its clipped 1 px box sat on a different line from the icon, so the narrow-screen
+   probe counted the 30 px square as a control wrapping to three lines; at font-size 0 the text has no box and keeps its name for assistive tech. */
+.wp-block-social-links .wp-block-social-link-label {
+	font-size: 0;
+	white-space: nowrap;
 }

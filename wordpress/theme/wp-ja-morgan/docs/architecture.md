@@ -115,7 +115,9 @@ custom templates (https://developer.wordpress.org/themes/global-settings-and-sty
 The theme registers no block of its own. Contact forms are plain HTML in patterns: `/contact-us`
 posts to `admin-post.php` (`jm_contact`, `jm_register`, `jm_remind`, each with a nonce) and
 WordPress core sends the mail through `wp_mail`, so the host needs an outbound mail route. The
-home-style-1 "Quick Contact" form is drawn with `action="#"` and sends nothing (D-13).
+home-style-1 and -2 "Quick Contact" form posts to `admin-post.php` (`jm_quick_contact`) the same way and
+answers in place when JavaScript runs (D-13); a stored copy of the form in a page is swapped for the live
+one (fresh nonce) when the page is printed.
 
 ## Theme layout
 

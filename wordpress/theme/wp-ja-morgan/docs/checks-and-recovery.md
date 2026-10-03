@@ -76,9 +76,9 @@ rows (the registration form creates real accounts) and any plugin secret.
 
 ## Known limits
 
-- The home-style-1 quick contact form sends nothing (D-13). Delivery of the other forms' mail was
-  not tested on the build stand.
-- No autoplay on carousels (D-15); Joomla mentions in the footer and tagline (D-14).
+- Delivery of every form's mail is measured with a stand-only capture (`tasks/ja-morgan-wp7/tools/stand-mail-capture.php`); a real mail route is the host's.
+- No autoplay on carousels (D-15). The carousel runtime pages by position where the source pages by view, so a
+  carousel's dot count differs from the source's Owl pages (D-45, measured, listed in the browser record).
 - Tag-list cards and category-list pictures are hard-coded from the source
   (docs/content-model.md); hit counts are a snapshot.
 - The source theme's design pages (`fixture`, `artifact`, `landing`, `pricing` templates) and its

@@ -850,3 +850,98 @@
 .jm-finder-form details:not([open]) > .com-finder__tips {
 	display: none;
 }
+
+/* ---- Smart search: the source stacks the label over a full-width field, with the two buttons side by side under it ---- */
+.jm-finder-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0 12.5px;
+}
+.jm-finder-form fieldset,
+.jm-finder-form .form-inline,
+.jm-finder-form .input-group {
+	display: contents;
+}
+.jm-finder-form .com-finder__search-legend {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+}
+.jm-finder-form .form-inline > label {
+	flex: 0 0 100%;
+	margin: 0 0 12.5px;
+	line-height: 25px;
+}
+.jm-finder-form .input-group .form-control {
+	flex: 0 0 100%;
+	box-sizing: border-box;
+	height: 60px;
+	margin: 0 0 12px;
+}
+.jm-finder-form details {
+	flex: 0 0 auto;
+}
+.jm-finder-form details[open] {
+	flex: 0 0 100%;
+}
+.jm-finder-form .btn,
+.jm-finder-form summary.btn {
+	margin: 0;
+}
+.t3-content .jm-finder-form .btn,
+.t3-content .jm-finder-form summary.btn {
+	margin: 0;
+}
+/* The source sets Advanced Search 12.5px in from the Search button, so their borders never share one edge. */
+.t3-content .jm-finder-form .js-finder-advanced > summary.btn {
+	margin-left: 12.5px;
+}
+/* Below 419px the two buttons stack; the Search border already closes the edge, so Advanced Search draws no second line on top of it. */
+@media (max-width: 418px) {
+	.t3-content .jm-finder-form .js-finder-advanced > summary.btn {
+		border-top-color: transparent;
+	}
+}
+.jm-finder-form .icon-search,
+.jm-finder-form .icon-search-plus {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	margin-right: 6px;
+	font: normal 16px/16px "FontAwesome";
+	text-align: center;
+}
+.jm-finder-form .icon-search::before {
+	content: "\f002";
+}
+.jm-finder-form .icon-search-plus::before {
+	content: "\f00e";
+}
+
+/* ---- Account forms: the label row is a full-width block, 35 px tall, with no gap under it (measured on Registration 03/10/2026) ---- */
+.t3-content .jm-form .control-label {
+	display: block;
+	margin-bottom: 0;
+}
+
+/* The profile fields and the password fields of the source form keep their natural 310 px width (size=30); the password toggle then overhangs the column by 20 px, as there. */
+@media (min-width: 768px) {
+	#member-registration fieldset + fieldset input.form-control:not([type="checkbox"], [type="radio"]) {
+		width: 310px;
+	}
+	#member-registration .password-group .input-group > input.form-control {
+		flex: 0 0 310px;
+		width: 310px;
+	}
+}
+
+/* Terms-of-service radios sit 21 px under their label row; the action row is the full row (408 px), so its 15 px padding lines the buttons up with the fields. */
+#member-registration .radio {
+	padding-top: 21px;
+}
+#member-registration .form-actions {
+	margin-inline: -15px;
+}

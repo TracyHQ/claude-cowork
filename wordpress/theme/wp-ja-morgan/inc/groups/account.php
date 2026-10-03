@@ -148,6 +148,160 @@ add_action( 'admin_post_nopriv_jm_contact', 'wp_ja_morgan_handle_contact' );
 add_action( 'admin_post_jm_contact', 'wp_ja_morgan_handle_contact' );
 
 /**
+ * Quick Contact (the JA Quick Contact module the source loads on Home Style 1 and 2).
+ *
+ * The form posts to an admin-post handler, never to the page's own address: its field names are
+ * namespaced (`jm_qc[...]`) because a bare `name` field collides with WordPress's `name` query
+ * variable and the post would answer with the 404 template. With JavaScript the form is sent
+ * with fetch and answers in place (the typed text stays); without it the handler redirects back
+ * with a short-lived copy of the non-secret fields so a failed send does not lose them.
+ */
+function wp_ja_morgan_qc_messages(): array {
+	return array(
+		'ok-qc'          => __( 'Thank you. Your message has been sent.', 'wp-ja-morgan' ),
+		'error-qc-token' => __( 'The form expired. Please send it again.', 'wp-ja-morgan' ),
+		'error-qc-field' => __( 'Please fill in your name, a valid email address, a subject and a message.', 'wp-ja-morgan' ),
+		'error-qc-send'  => __( 'The message could not be sent. Please try again later.', 'wp-ja-morgan' ),
+	);
+}
+
+/**
+ * The fields of the Quick Contact post, trimmed and bounded; every value is a plain string.
+ *
+ * @param mixed $raw The unslashed `jm_qc` value.
+ * @return array{name:string,email:string,subject:string,text:string}
+ */
+function wp_ja_morgan_qc_fields( $raw ): array {
+	$raw    = is_array( $raw ) ? $raw : array();
+	$take   = static function ( string $key, int $max, bool $multiline ) use ( $raw ): string {
+		$value = isset( $raw[ $key ] ) && is_string( $raw[ $key ] ) ? $raw[ $key ] : '';
+		$value = $multiline ? sanitize_textarea_field( $value ) : sanitize_text_field( $value );
+		return mb_substr( trim( $value ), 0, $max );
+	};
+	return array(
+		'name'    => $take( 'name', 60, false ),
+		'email'   => $take( 'email', 64, false ),
+		'subject' => $take( 'subject', 200, false ),
+		'text'    => $take( 'text', 5000, true ),
+	);
+}
+
+/**
+ * The page the visitor came from, as a path under this site, or '' when it names no page.
+ *
+ * @return string
+ */
+function wp_ja_morgan_qc_back_path(): string {
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- read inside the handler after the nonce check, only to pick a redirect target.
+	$raw  = isset( $_POST['jm_back'] ) && is_string( $_POST['jm_back'] ) ? wp_unslash( $_POST['jm_back'] ) : '';
+	$path = trim( (string) wp_parse_url( $raw, PHP_URL_PATH ), '/' );
+	return ( '' !== $path && url_to_postid( home_url( '/' . $path . '/' ) ) ) ? $path : '';
+}
+
+function wp_ja_morgan_handle_quick_contact() {
+	$ajax = isset( $_POST['jm_ajax'] ) && '1' === $_POST['jm_ajax'];
+	$done = static function ( string $code, array $fields = array() ) use ( $ajax ) {
+		$messages = wp_ja_morgan_qc_messages();
+		if ( $ajax ) {
+			wp_send_json(
+				array(
+					'ok'      => 0 === strpos( $code, 'ok' ),
+					'code'    => $code,
+					'message' => $messages[ $code ],
+				),
+				0 === strpos( $code, 'ok' ) ? 200 : ( 'error-qc-send' === $code ? 502 : 422 )
+			);
+		}
+		$path = wp_ja_morgan_qc_back_path();
+		$url  = add_query_arg( 'jm_notice', $code, home_url( '' === $path ? '/' : '/' . $path . '/' ) );
+		if ( $fields ) {
+			$token = strtolower( wp_generate_password( 12, false ) );
+			set_transient( 'jm_qc_' . $token, $fields, 10 * MINUTE_IN_SECONDS );
+			$url = add_query_arg( 'jm_qc', $token, $url );
+		}
+		wp_safe_redirect( $url . '#jm-quick-contact', 303 );
+		exit;
+	};
+	if ( ! isset( $_POST['jm_nonce'] ) || ! is_string( $_POST['jm_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['jm_nonce'] ) ), 'jm_quick_contact' ) ) {
+		$done( 'error-qc-token', wp_ja_morgan_qc_fields( isset( $_POST['jm_qc'] ) ? wp_unslash( $_POST['jm_qc'] ) : array() ) );
+	}
+	$f = wp_ja_morgan_qc_fields( isset( $_POST['jm_qc'] ) ? wp_unslash( $_POST['jm_qc'] ) : array() );
+	if ( '' === $f['name'] || ! is_email( $f['email'] ) || '' === $f['subject'] || '' === $f['text'] ) {
+		$done( 'error-qc-field', $f );
+	}
+	$headers = array( 'Reply-To: ' . $f['name'] . ' <' . $f['email'] . '>' );
+	$body    = $f['text'] . "\n\n" . $f['name'] . ' <' . $f['email'] . '>';
+	$sent    = wp_mail( get_option( 'admin_email' ), $f['subject'], $body, $headers );
+	$done( $sent ? 'ok-qc' : 'error-qc-send', $sent ? array() : $f );
+}
+add_action( 'admin_post_nopriv_jm_quick_contact', 'wp_ja_morgan_handle_quick_contact' );
+add_action( 'admin_post_jm_quick_contact', 'wp_ja_morgan_handle_quick_contact' );
+
+/**
+ * The Quick Contact form as it is printed: fresh nonce, the page to return to, and the fields a
+ * failed post left behind.
+ *
+ * @return string
+ */
+function wp_ja_morgan_quick_contact_form(): string {
+	$vals = array(
+		'name'    => '',
+		'email'   => '',
+		'subject' => '',
+		'text'    => '',
+	);
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- a display-only copy of a failed post.
+	$token = isset( $_GET['jm_qc'] ) && is_string( $_GET['jm_qc'] ) && preg_match( '/^[a-z0-9]{12}$/', $_GET['jm_qc'] ) ? $_GET['jm_qc'] : '';
+	// phpcs:enable
+	if ( '' !== $token ) {
+		$kept = get_transient( 'jm_qc_' . $token );
+		if ( is_array( $kept ) ) {
+			$vals = array_merge( $vals, array_intersect_key( array_map( 'strval', $kept ), $vals ) );
+		}
+	}
+	$notice = wp_ja_morgan_form_notice( wp_ja_morgan_qc_messages() );
+	$back   = (string) wp_parse_url( get_permalink( get_queried_object_id() ), PHP_URL_PATH );
+	$e      = static fn( string $label ): string => esc_attr( $label );
+	return '<form class="jm-quick-contact" id="jm-quick-contact" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post" data-jm-quick-contact aria-label="' . esc_attr__( 'Quick contact', 'wp-ja-morgan' ) . '">'
+		. '<input type="hidden" name="action" value="jm_quick_contact"><input type="hidden" name="jm_nonce" value="' . esc_attr( wp_create_nonce( 'jm_quick_contact' ) ) . '"><input type="hidden" name="jm_back" value="' . esc_attr( $back ) . '">'
+		. '<div class="jm-qc-status" role="status" aria-live="polite">' . $notice . '</div>'
+		. '<p class="jm-field jm-field--half"><label for="jm-qc-name">' . esc_html__( 'Name', 'wp-ja-morgan' ) . '</label><input id="jm-qc-name" type="text" name="jm_qc[name]" maxlength="60" required value="' . esc_attr( $vals['name'] ) . '" placeholder="' . $e( __( 'Name', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field jm-field--half"><label for="jm-qc-email">' . esc_html__( 'Email', 'wp-ja-morgan' ) . '</label><input id="jm-qc-email" type="email" name="jm_qc[email]" maxlength="64" required value="' . esc_attr( $vals['email'] ) . '" placeholder="' . $e( __( 'Email', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field"><label for="jm-qc-subject">' . esc_html__( 'Subject', 'wp-ja-morgan' ) . '</label><input id="jm-qc-subject" type="text" name="jm_qc[subject]" maxlength="200" required value="' . esc_attr( $vals['subject'] ) . '" placeholder="' . $e( __( 'Subject', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field"><label for="jm-qc-text">' . esc_html__( 'Message', 'wp-ja-morgan' ) . '</label><textarea id="jm-qc-text" name="jm_qc[text]" rows="3" maxlength="5000" required placeholder="' . $e( __( 'Message', 'wp-ja-morgan' ) ) . '">' . esc_textarea( $vals['text'] ) . '</textarea></p>'
+		. '<p class="jm-field"><button type="submit" class="btn btn-primary jm-arrow">' . esc_html__( 'Send Email', 'wp-ja-morgan' ) . '</button></p></form>';
+}
+
+/**
+ * A seeded page keeps the form it was written with (a stored copy, stale nonce and a dead action):
+ * every Quick Contact in the page is swapped for the live one when it is printed.
+ */
+add_filter(
+	'render_block_core/html',
+	static function ( string $content ): string {
+		if ( false === strpos( $content, 'class="jm-quick-contact"' ) ) {
+			return $content;
+		}
+		$swapped = preg_replace( '#<form class="jm-quick-contact".*?</form>#s', '__JM_QC__', $content );
+		return null === $swapped ? $content : str_replace( '__JM_QC__', wp_ja_morgan_quick_contact_form(), $swapped );
+	}
+);
+
+/**
+ * The sign-in module's "Create an account" link leads to a form; with registration closed it would
+ * lead to a dead end, so the link is not printed then.
+ */
+add_filter(
+	'render_block_core/list-item',
+	static function ( string $content ): string {
+		if ( get_option( 'users_can_register' ) || false === strpos( $content, '/j-pages/registration/' ) ) {
+			return $content;
+		}
+		return '';
+	}
+);
+
+/**
  * The seeded content of the four account pages is a bare sign-in block. The page shows the form the
  * source shows: the pattern that belongs to the page address replaces it when nothing else was written.
  */

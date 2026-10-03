@@ -32,6 +32,11 @@
 .tag-category .item-image {
 	margin: 0;
 }
+/* The blog cards bleed their picture 30 px past the card padding (`.blog .item-image`, !important); the tagged items have no card padding, so
+   the bleed pushed the picture 30 px out of its column and the page 6 px wider than the screen at 768 px (audit 03/10, defect 9). */
+.blog.tag-category .item-image {
+	margin: 0 !important;
+}
 .tag-category .item-image img {
 	display: block;
 	width: 100%;
@@ -355,7 +360,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 }
 
 /* Buttons */
-.t3-content .btn {
+.t3-content .btn:where(:not(.wp-block-button)) {
 	display: inline-block;
 	margin: 12.5px 12.5px 0 0;
 	padding: 20px 30px;
@@ -811,4 +816,40 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 }
 .t3-content .is-layout-constrained > :is(.example-row, .tags) {
 	margin-block-start: 0;
+}
+
+/* ---- Tagged items: the source keeps the search group at the left edge and the page-size select flush right ---- */
+.tag-category .tagged-items-form fieldset.filters {
+	justify-content: space-between;
+}
+.tag-category .tagged-items-form .filters .btn-group.pull-right {
+	margin-right: 0;
+}
+
+/* Sidebar modules keep their last child's bottom margin inside, as the source's module boxes do. */
+.t3-sidebar .t3-module {
+	display: flow-root;
+}
+
+/* The excerpt of a tagged item is an inline paragraph, so the source's "..." continues its last line. */
+.tag-category .cat-list .item .tag-body p {
+	display: inline;
+}
+
+@media (max-width: 767px) {
+	.tag-category .tagged-items-form fieldset.filters {
+		flex-wrap: wrap;
+	}
+}
+@media (max-width: 767px) {
+	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) {
+		flex: 1 1 100%;
+		min-width: 0;
+		margin-right: 0;
+	}
+	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) .inputbox {
+		flex: 1 1 auto;
+		width: auto;
+		min-width: 0;
+	}
 }

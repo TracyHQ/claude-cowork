@@ -89,8 +89,11 @@ Choices the source's template printed as classes ride on the section root (`alig
   no WordPress data source for a tag's picture, description or hit counter, so a new tag does not
   appear here and edits to a tag do not change a card; edit the function or replace the pattern.
   Pictures are looked up in the media library by file name.
-- The category list has pictures hard-coded by category slug in the same way
-  (`wp_ja_morgan_b_category_pictures()`, seven slugs).
+- The category list prints seven categories (`wp_ja_morgan_b_category_slugs()`). Each card's picture
+  is the attachment id stored on the term (term meta `thumbnail_id`), drawn with the attachment API,
+  so the media audit counts it as a reference and a category's picture is changed by editing that
+  meta; a category without it prints no picture. The seed step sets it from the source's category
+  pictures (`tasks/ja-morgan-wp7/tools/category-pictures.json`).
 - Featured card "Hits: N" comes from the post meta `hits` through the placeholder `{jm-hits}`. On
   the sidebar list ("News & Update.") the same meta orders the posts (D-21). The counter is a
   **snapshot** of the source at dump time; WordPress does not increment it (gap G3). Tagged Items

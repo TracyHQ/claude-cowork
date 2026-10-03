@@ -53,3 +53,19 @@ function wp_ja_morgan_latest_excerpt( string $content, array $block ): string {
 	);
 }
 add_filter( 'render_block_core/post-excerpt', 'wp_ja_morgan_latest_excerpt', 10, 2 );
+
+/**
+ * The picture half of a "features" section (class `features-image`) is shown at its own size and cropped by the frame, as the
+ * source does. A responsive `srcset` would swap in a smaller file and so change that size; the full-size file is the only candidate.
+ *
+ * @param string $content The rendered image block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_morgan_features_image_size( string $content, array $block ): string {
+	if ( false === strpos( (string) ( $block['attrs']['className'] ?? '' ), 'features-image' ) ) {
+		return $content;
+	}
+	return (string) preg_replace( '/\s(?:srcset|sizes)="[^"]*"/', '', $content );
+}
+add_filter( 'render_block_core/image', 'wp_ja_morgan_features_image_size', 10, 2 );

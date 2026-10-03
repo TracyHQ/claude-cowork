@@ -57,7 +57,7 @@
 </div>
 <!-- /wp:group -->
 <!-- wp:html {"metadata":{"role":"content","name":"features-intro.form"}} -->
-<form class="jm-quick-contact" action="#" method="post" aria-label="<?php esc_attr_e( 'Quick contact', 'wp-ja-morgan' ); ?>"><p class="jm-field jm-field--half"><label for="jm-qc-name"><?php esc_html_e( 'Name', 'wp-ja-morgan' ); ?></label><input id="jm-qc-name" type="text" name="name" maxlength="60" placeholder="<?php esc_attr_e( 'Name', 'wp-ja-morgan' ); ?>"></p><p class="jm-field jm-field--half"><label for="jm-qc-email"><?php esc_html_e( 'Email', 'wp-ja-morgan' ); ?></label><input id="jm-qc-email" type="email" name="email" maxlength="64" placeholder="<?php esc_attr_e( 'Email', 'wp-ja-morgan' ); ?>"></p><p class="jm-field"><label for="jm-qc-subject"><?php esc_html_e( 'Subject', 'wp-ja-morgan' ); ?></label><input id="jm-qc-subject" type="text" name="subject" placeholder="<?php esc_attr_e( 'Subject', 'wp-ja-morgan' ); ?>"></p><p class="jm-field"><label for="jm-qc-text"><?php esc_html_e( 'Message', 'wp-ja-morgan' ); ?></label><textarea id="jm-qc-text" name="text" rows="3" placeholder="<?php esc_attr_e( 'Message', 'wp-ja-morgan' ); ?>"></textarea></p><p class="jm-field"><button type="submit" class="btn btn-primary jm-arrow"><?php esc_html_e( 'Send Email', 'wp-ja-morgan' ); ?></button></p></form>
+<?php echo function_exists( 'wp_ja_morgan_quick_contact_form' ) ? wp_ja_morgan_quick_contact_form() : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built and escaped by wp_ja_morgan_quick_contact_form(). ?>
 <!-- /wp:html -->
 <!-- wp:buttons {"className":"features-action"} -->
 <div class="wp-block-buttons features-action">

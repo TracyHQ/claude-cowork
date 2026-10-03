@@ -125,6 +125,139 @@ function wp_ja_morgan_b_tag_body( string $content, array $block ): string {
 add_filter( 'render_block_core/post-excerpt', 'wp_ja_morgan_b_tag_body', 10, 2 );
 
 /**
+ * The options of the "Display #" select, as the source offers them; 0 is "All".
+ *
+ * @return int[]
+ */
+function wp_ja_morgan_b_limits(): array {
+	return array( 5, 10, 15, 20, 25, 30, 50, 100, 200, 500, 0 );
+}
+
+/**
+ * What the visitor asked of a listing filter: the title part and the page size.
+ *
+ * `filter-search` is the source's field name. Anything that is not a plain string (an array, a
+ * very long value) is ignored, and a limit outside the offered list falls back to 20.
+ *
+ * @return array{search:string,limit:int}
+ */
+function wp_ja_morgan_b_filter_params(): array {
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- a read-only display filter.
+	$search = isset( $_GET['filter-search'] ) && is_string( $_GET['filter-search'] ) ? sanitize_text_field( wp_unslash( $_GET['filter-search'] ) ) : '';
+	$limit  = isset( $_GET['limit'] ) && is_string( $_GET['limit'] ) && preg_match( '/^\d{1,3}$/', $_GET['limit'] ) ? (int) $_GET['limit'] : 20;
+	// phpcs:enable
+	if ( ! in_array( $limit, wp_ja_morgan_b_limits(), true ) ) {
+		$limit = 20;
+	}
+	return array(
+		'search' => mb_substr( trim( $search ), 0, 100 ),
+		'limit'  => $limit,
+	);
+}
+
+/**
+ * The filter bar of the tag list and the tagged items: the title box with its search and clear
+ * buttons, and the page size. It is a GET form to the page's own address, so a filtered list can be
+ * shared; assets/js/wp-ja-morgan.js submits it when the size changes and clears the box.
+ *
+ * @param array{search:string,limit:int} $params The current filter.
+ * @param string                         $class  Extra class of the form.
+ * @return string
+ */
+function wp_ja_morgan_b_filter_form( array $params, string $class = '' ): string {
+	$options = '';
+	foreach ( wp_ja_morgan_b_limits() as $n ) {
+		$label    = 0 === $n ? __( 'All', 'wp-ja-morgan' ) : (string) $n;
+		$options .= '<option value="' . (int) $n . '"' . selected( $params['limit'], $n, false ) . '>' . esc_html( $label ) . '</option>';
+	}
+	return '<form class="tag-list-form ' . esc_attr( $class ) . '" method="get" action="' . esc_url( get_permalink( get_queried_object_id() ) ) . '" data-jm-filter>'
+		. '<fieldset class="filters btn-toolbar"><div class="btn-group">'
+		. '<label class="filter-search-lbl screen-reader-text" for="filter-search">' . esc_html__( 'Enter Part of Title', 'wp-ja-morgan' ) . '</label>'
+		. '<input type="text" name="filter-search" id="filter-search" maxlength="100" value="' . esc_attr( $params['search'] ) . '" class="inputbox" placeholder="' . esc_attr__( 'Enter Part of Title', 'wp-ja-morgan' ) . '" />'
+		. '<button type="submit" class="btn" title="' . esc_attr__( 'Search', 'wp-ja-morgan' ) . '"><span class="fa fa-search"></span></button>'
+		. '<button type="button" class="btn" data-jm-filter-clear title="' . esc_attr__( 'Clear', 'wp-ja-morgan' ) . '"><span class="fa fa-remove"></span></button>'
+		. '</div><div class="btn-group pull-right"><label for="limit" class="screen-reader-text">' . esc_html__( 'Display #', 'wp-ja-morgan' ) . '</label>'
+		. '<select id="limit" name="limit" class="form-select">' . $options . '</select></div></fieldset></form>';
+}
+
+/**
+ * The tag cards the filter lets through: the tags whose name holds the typed part (any case), cut
+ * to the page size.
+ *
+ * @param array<string,array{0:string,1:string,2:int}> $cards  Slug => card.
+ * @param array{search:string,limit:int}               $params The current filter.
+ * @return array<string,array{0:string,1:string,2:int}>
+ */
+function wp_ja_morgan_b_filter_cards( array $cards, array $params ): array {
+	if ( '' !== $params['search'] ) {
+		$cards = array_filter(
+			$cards,
+			static function ( string $slug ) use ( $params ): bool {
+				$term = get_term_by( 'slug', $slug, 'post_tag' );
+				$name = $term ? $term->name : ucfirst( $slug );
+				return false !== mb_stripos( $name, $params['search'] );
+			},
+			ARRAY_FILTER_USE_KEY
+		);
+	}
+	return $params['limit'] > 0 ? array_slice( $cards, 0, $params['limit'], true ) : $cards;
+}
+
+/**
+ * Tagged Items: the same filter reaches the listing's query (title part, page size) and the bar is
+ * printed above it. Nothing here touches another query block.
+ */
+add_filter(
+	'query_loop_block_query_vars',
+	static function ( array $query, $block ): array {
+		// The page holds one listing, so the route decides (the post template carries no class of the query block).
+		if ( ! is_page() || 'wp-ja-morgan/b-tagged-items' !== wp_ja_morgan_b_route_pattern() ) {
+			return $query;
+		}
+		// Only the listing itself (the query on a tag): the sidebar's "most read" query sits on the same page and keeps its own size.
+		$context = isset( $block->context['query'] ) && is_array( $block->context['query'] ) ? $block->context['query'] : array();
+		if ( empty( $context['taxQuery']['post_tag'] ) ) {
+			return $query;
+		}
+		$params = wp_ja_morgan_b_filter_params();
+		if ( '' !== $params['search'] ) {
+			$query['jm_title_like'] = $params['search'];
+		}
+		$query['posts_per_page'] = 0 === $params['limit'] ? -1 : $params['limit'];
+		return $query;
+	},
+	10,
+	2
+);
+add_filter(
+	'posts_where',
+	static function ( string $where, WP_Query $query ): string {
+		global $wpdb;
+		$part = $query->get( 'jm_title_like' );
+		if ( is_string( $part ) && '' !== $part ) {
+			$where .= $wpdb->prepare( " AND {$wpdb->posts}.post_title LIKE %s", '%' . $wpdb->esc_like( $part ) . '%' );
+		}
+		return $where;
+	},
+	10,
+	2
+);
+add_filter(
+	'render_block_core/query',
+	static function ( string $content, array $block ): string {
+		if ( ! is_page() || 'wp-ja-morgan/b-tagged-items' !== wp_ja_morgan_b_route_pattern() || false === strpos( (string) ( $block['attrs']['className'] ?? '' ), 'tag-category' ) ) {
+			return $content;
+		}
+		$params = wp_ja_morgan_b_filter_params();
+		$empty  = false === strpos( $content, 'class="item' ) ? '<p class="alert alert-info">' . esc_html__( 'No items match this filter.', 'wp-ja-morgan' ) . '</p>' : '';
+		// The filter bar's styles hang on `.tag-category`; the query block that carries that class is the list, not its bar.
+		return '<div class="tag-category jm-tagged-filter">' . wp_ja_morgan_b_filter_form( $params, 'tagged-items-form' ) . '</div>' . $content . $empty;
+	},
+	10,
+	2
+);
+
+/**
  * The URL of a picture in the media library by file name, or '' when it was never imported.
  *
  * @param string $file File name, e.g. img-7-thumb.jpg.
@@ -146,25 +279,26 @@ function wp_ja_morgan_b_tag_cards(): array {
 	return array(
 		'business' => array( 'img-7-thumb.jpg', 'Doing business', 3 ),
 		'finance'  => array( 'img-11-thumb.jpg', 'Gregor then', 2 ),
-		'joomla'   => array( 'img-17-thumb.jpg', 'He felt a', 8 ),
-		'joomlart' => array( 'img-8-thumb.jpg', 'I am so happy,', 8 ),
+		'platform' => array( 'img-17-thumb.jpg', 'He felt a', 8 ),
+		'studio'   => array( 'img-8-thumb.jpg', 'I am so happy,', 8 ),
 		'morgan'   => array( 'img-19-thumb.jpg', 'A wonderful', 218 ),
 	);
 }
 
 /**
- * The picture the source prints for each category of the category list, by category slug.
+ * The categories the source's category list prints, in its order. The picture of each card is the attachment id stored on
+ * the term (term meta `thumbnail_id`), set when the content is seeded; nothing here names a picture file.
  *
- * @return array<string,string> Slug => picture file.
+ * @return string[] Category slugs.
  */
-function wp_ja_morgan_b_category_pictures(): array {
+function wp_ja_morgan_b_category_slugs(): array {
 	return array(
-		'investment-managment'          => 'img-2.jpg',
-		'business-growth-advice'        => 'img-10.jpg',
-		'tax-advice-and-management'     => 'img-13.jpg',
-		'business-insights'             => 'img-19.jpg',
-		'investment-and-superannuation' => 'img-11.jpg',
-		'retirement-planning'           => 'img-5.jpg',
-		'tax-planning'                  => 'img-8.jpg',
+		'investment-managment',
+		'business-growth-advice',
+		'tax-advice-and-management',
+		'business-insights',
+		'investment-and-superannuation',
+		'retirement-planning',
+		'tax-planning',
 	);
 }

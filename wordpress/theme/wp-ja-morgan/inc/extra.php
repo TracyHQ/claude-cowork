@@ -56,6 +56,7 @@ function wp_ja_morgan_enqueue_assets(): void {
 			'closeMenu' => __( 'Close the menu', 'wp-ja-morgan' ),
 			'dark'      => __( 'Switch to dark mode', 'wp-ja-morgan' ),
 			'light'     => __( 'Switch to light mode', 'wp-ja-morgan' ),
+			'quickContactFailed' => __( 'The message could not be sent. Please try again later.', 'wp-ja-morgan' ),
 		)
 	);
 	wp_add_inline_script(
@@ -700,3 +701,60 @@ function wp_ja_morgan_single_h1( string $content, array $block ): string {
 	return (string) preg_replace( '/^(\s*)<h1\b([^>]*)>(.*)<\/h1>(\s*)$/s', '$1<p$2>$3</p>$4', $content );
 }
 add_filter( 'render_block_core/post-title', 'wp_ja_morgan_single_h1', 11, 2 );
+
+/**
+ * The back-to-top button every page carries (the source's `.back-to-top`: a 60 px square in the
+ * corner, shown after 200 px of scrolling and only on screens of 992 px and wider).
+ */
+add_action(
+	'wp_footer',
+	static function () {
+		echo '<div class="back-to-top"><button type="button" class="btn btn-primary" title="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '" aria-label="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V5M5 12l7-7 7 7"/></svg></button></div>';
+	}
+);
+
+/**
+ * Home Style 3 and 4 close with their own footers (the source's modules differ there: logo, info,
+ * office, social on style 3; logo, office, conversation, copyright on style 4). The templates all
+ * name the one `footer` part, so on those two pages the part is swapped when it is rendered.
+ *
+ * @param array $parsed_block The block about to render.
+ * @return array
+ */
+add_filter(
+	'render_block_data',
+	static function ( array $parsed_block ): array {
+		if ( 'core/template-part' !== ( $parsed_block['blockName'] ?? '' ) || 'footer' !== ( $parsed_block['attrs']['slug'] ?? '' ) || ! is_page() ) {
+			return $parsed_block;
+		}
+		$slug = (string) get_post_field( 'post_name', get_queried_object_id() );
+		$path = trim( (string) wp_parse_url( get_permalink( get_queried_object_id() ), PHP_URL_PATH ), '/' );
+		if ( in_array( $slug, array( 'home-style-3', 'home-style-4' ), true ) && 0 === strpos( $path, 'home/' ) ) {
+			$parsed_block['attrs']['slug'] = 'home-style-3' === $slug ? 'footer-hs3' : 'footer-hs4';
+		}
+		return $parsed_block;
+	}
+);
+
+/**
+ * A social link names itself with a visually hidden label next to its icon. Narrow-screen probes count that 1 px box as a second
+ * line of the 30 px control, and the source's link carries its name as `title`. The label becomes the anchor's own `aria-label`
+ * and `title`, and the span goes: same accessible name, one box.
+ *
+ * @param string $content The rendered social link.
+ * @return string
+ */
+add_filter(
+	'render_block_core/social-link',
+	static function ( string $content ): string {
+		if ( ! preg_match( '#<span class="wp-block-social-link-label[^"]*">(.*?)</span>#s', $content, $m ) ) {
+			return $content;
+		}
+		$name = trim( wp_strip_all_tags( $m[1] ) );
+		if ( '' === $name ) {
+			return $content;
+		}
+		$content = str_replace( $m[0], '', $content );
+		return preg_replace( '#<a ([^>]*class="wp-block-social-link-anchor")#', '<a aria-label="' . esc_attr( $name ) . '" title="' . esc_attr( $name ) . '" $1', $content, 1 ) ?? $content;
+	}
+);
