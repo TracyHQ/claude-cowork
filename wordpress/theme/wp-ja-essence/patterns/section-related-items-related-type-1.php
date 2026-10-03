@@ -32,7 +32,12 @@
 <!-- wp:post-featured-image {"isLink":true,"aspectRatio":"3/2","className":"je-relcard__img"} /-->
 <!-- wp:post-terms {"term":"category","className":"je-badge"} /-->
 <!-- wp:post-title {"level":3,"isLink":true,"className":"je-relcard__title"} /-->
+<!-- wp:group {"className":"je-relcard__meta","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"center"}} -->
+<div class="wp-block-group je-relcard__meta">
 <!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:wp-ja-essence/hits /-->
+</div>
+<!-- /wp:group -->
 </div>
 <!-- /wp:group -->
 <!-- /wp:post-template -->

@@ -17,15 +17,22 @@
 <!-- wp:post-template {"className":"je-list__items","layout":{"type":"default"}} -->
 <!-- wp:group {"className":"je-card","layout":{"type":"default"}} -->
 <div class="wp-block-group je-card">
+<!-- wp:group {"className":"je-card__media","layout":{"type":"default"}} -->
+<div class="wp-block-group je-card__media">
 <!-- wp:post-featured-image {"isLink":true,"aspectRatio":"auto","className":"je-card__img"} /-->
+<!-- wp:wp-ja-essence/media-icon /-->
+</div>
+<!-- /wp:group -->
 <!-- wp:group {"className":"je-card__body","layout":{"type":"default"}} -->
 <div class="wp-block-group je-card__body">
 <!-- wp:post-terms {"term":"category","className":"je-badge"} /-->
 <!-- wp:post-title {"level":2,"isLink":true,"className":"je-card__title"} /-->
 <!-- wp:group {"className":"je-meta","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <div class="wp-block-group je-meta">
+<!-- wp:wp-ja-essence/author-avatar /-->
 <!-- wp:post-author-name {"isLink":false,"prefix":"By ","className":"je-meta__author"} /-->
 <!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:wp-ja-essence/hits {"label":true} /-->
 </div>
 <!-- /wp:group -->
 </div>

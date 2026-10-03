@@ -12,7 +12,7 @@
       "Text Domain": "wp-ja-essence",
       "Theme Name": "JA Essence",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
-      "Version": "1.0.2"
+      "Version": "1.0.3"
     },
     "themeJson": {
       "version": 3,
@@ -759,6 +759,23 @@
         "own": true
       },
       {
+        "file": "patterns/front-list-featured.php",
+        "slug": "wp-ja-essence/front-list-featured",
+        "title": "Front list (featured articles)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
         "file": "patterns/front-list-grid.php",
         "slug": "wp-ja-essence/front-list-grid",
         "title": "Front list (grid)",
@@ -776,6 +793,57 @@
         "own": true
       },
       {
+        "file": "patterns/front-list-grid-home-4.php",
+        "slug": "wp-ja-essence/front-list-grid-home-4",
+        "title": "Front list (home 4, grid)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
+        "file": "patterns/front-list-home-1.php",
+        "slug": "wp-ja-essence/front-list-home-1",
+        "title": "Front list (home 1)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
+        "file": "patterns/front-list-home-3.php",
+        "slug": "wp-ja-essence/front-list-home-3",
+        "title": "Front list (home 3)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
         "file": "patterns/front-list-warm.php",
         "slug": "wp-ja-essence/front-list-warm",
         "title": "Front list (warm cards)",
@@ -788,6 +856,40 @@
         ],
         "templateTypes": [],
         "inserter": true,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
+        "file": "patterns/front-list-warm-home-2.php",
+        "slug": "wp-ja-essence/front-list-warm-home-2",
+        "title": "Front list (home 2, warm cards)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
+        "contentBlocks": 0,
+        "namedBlocks": 1,
+        "own": true
+      },
+      {
+        "file": "patterns/front-list-warm-home-5.php",
+        "slug": "wp-ja-essence/front-list-warm-home-5",
+        "title": "Front list (home 5, warm cards)",
+        "categories": [
+          "wp-ja-essence"
+        ],
+        "blockTypes": [],
+        "postTypes": [
+          "page"
+        ],
+        "templateTypes": [],
+        "inserter": false,
         "contentBlocks": 0,
         "namedBlocks": 1,
         "own": true
@@ -1250,6 +1352,11 @@
         "file": "inc/extra.php"
       },
       {
+        "kind": "filter",
+        "hook": "posts_clauses",
+        "file": "inc/extra.php"
+      },
+      {
         "kind": "action",
         "hook": "pre_get_posts",
         "file": "inc/extra.php"
@@ -1281,12 +1388,27 @@
       },
       {
         "kind": "filter",
+        "hook": "render_block_core/post-template",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
         "hook": "render_block_core/post-terms",
         "file": "inc/extra.php"
       },
       {
         "kind": "filter",
         "hook": "render_block_core/post-title",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/query-pagination",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/search",
         "file": "inc/extra.php"
       },
       {
@@ -1363,6 +1485,11 @@
         "kind": "action",
         "hook": "wp_head",
         "file": "functions.php"
+      },
+      {
+        "kind": "action",
+        "hook": "wpcf7_before_send_mail",
+        "file": "inc/extra.php"
       }
     ],
     "overlay": {
@@ -1387,7 +1514,13 @@
         "patterns.map.json",
         "patterns/cards.php",
         "patterns/editors-choice.php",
+        "patterns/front-list-featured.php",
+        "patterns/front-list-grid-home-4.php",
         "patterns/front-list-grid.php",
+        "patterns/front-list-home-1.php",
+        "patterns/front-list-home-3.php",
+        "patterns/front-list-warm-home-2.php",
+        "patterns/front-list-warm-home-5.php",
         "patterns/front-list-warm.php",
         "patterns/front-list.php",
         "patterns/lead-slider.php",
@@ -1430,17 +1563,17 @@
         "tokens.css"
       ]
     },
-    "fileCount": 95,
+    "fileCount": 101,
     "fingerprints": {
       "assets/css/fixture-page.css": "sha256:d2c9d7c59ba6ed16038ac7879d0a07813e3d46046f16dff44e51278087a3f173",
       "assets/css/je-category.css": "sha256:0af78feeab84d2269f959cc15330010363e18d55305fcb9c2502eb73eb6d5756",
-      "assets/css/je-detail.css": "sha256:1eaf2d5a16b7df0c7efd8a1969e516f08436a55163b2c9c1e22db4d6df407da3",
-      "assets/css/je-home.css": "sha256:6dac3803598db74c3920c81220bffbfdba1141d4e74ff5cae4b5ec636236ff84",
+      "assets/css/je-detail.css": "sha256:087cd79eb59258e3d51b3614e01a65f3fda6254b7082270962e492d2fb666493",
+      "assets/css/je-home.css": "sha256:beab3b94bfbb58940133b22385675ce4800aef61e777273d53df5aa0f34a77a5",
       "assets/css/layout.css": "sha256:dca7d68d13067d81e306200f1ec08e2a5fa03b05bf3b46202ebe69ae86d9c06f",
       "assets/css/sections.css": "sha256:d287eb0b26beee53654bdab114c23195e72b212240d9e5703d9546252a130a3f",
       "assets/css/tracy-motion.css": "sha256:656642b63d46e2cb41fcd5af3437e25fed38175280bfcf14e9a1f6da5efb6bec",
       "assets/css/tracy.css": "sha256:e4ff46badd4a022c1e0a0fcd742d5ce1acbcd329bc769de5a23f7d65381b0e71",
-      "assets/css/wp-ja-essence.css": "sha256:613af7820a9476567d718db2f20269de90c610e9649d12c890e67eabb99c2e1b",
+      "assets/css/wp-ja-essence.css": "sha256:f8d031e16cddd6051065584b68a36e1f7c5042f5d119c406b8e5096e3ac3e25e",
       "assets/fonts/jost-400.woff2": "sha256:b8248fcea348b57e692c887d46c11f9c07b4ec24af9cff7ba1ae02b6de0ea0ae",
       "assets/fonts/jost-500.woff2": "sha256:7a953e2f57eb9fc6e509bc82454225bf15949dba2fae6ca497d41bfee565e9fe",
       "assets/fonts/jost-600.woff2": "sha256:37b3c26af24ff8fc63f1c044a90ccd9ee5d127c4ad1ab620816e8d93aa7a02d4",
@@ -1456,7 +1589,7 @@
       "assets/js/wp-ja-essence.js": "sha256:d66d921bfd9972d5958a00a7a06a4d0fcdc297488f22f1877b6da08f95df7471",
       "functions.php": "sha256:df3d2f3d7f267070a21350ad18cdd8ad1417cf156ab5d5128694a1b02a32c30d",
       "inc/asset-version.php": "sha256:3a714c4a5c7cc86565cbafdb063a68340b09c58045962b8751ef3ed66c415b1d",
-      "inc/extra.php": "sha256:9aca520b8098a82170d9d6536e4f14d07acaa6414cc36cf08d5201c347aafac8",
+      "inc/extra.php": "sha256:2221830132ca683657e5baff3c170d0068a16034ce21973ef2c08899e7e2e78a",
       "inc/motion-head.php": "sha256:e8e3b5b22ac792cf8ce2ee97ff4dfdce949fc85d2f5aab34bdb8a21a498e41d5",
       "inc/update.php": "sha256:2ac0b34cc782cd122390bfd71cea1b96de96ddd96a1751f8034781ca498918f1",
       "inc/variations.php": "sha256:54eee8dcec3f61fcaaffa3ecde6887b2b467cec816cce873f47aa4389d79a447",
@@ -1465,7 +1598,13 @@
       "parts/header.html": "sha256:97b514688dbb3ec54acd61830110f55be37a3cb1bfbe2f8241d730dbb71136f6",
       "patterns/cards.php": "sha256:d6f4b0a045eda08ff22d9c94e6036c6ee5ad44d03547c830537225f33bc78109",
       "patterns/editors-choice.php": "sha256:5d3742d616935e8991f68686625873a5e9e01cbc26e6a3811c07fb0f86f3ed8d",
+      "patterns/front-list-featured.php": "sha256:73bbd4061927f3089811906806de84b96e09922d3b700224fe3cdbb5eeb4dc95",
+      "patterns/front-list-grid-home-4.php": "sha256:68a0787e24b3100883130ebb92bfed7bb3442d2732010e40900ec4f32e26bc45",
       "patterns/front-list-grid.php": "sha256:150391a69517d53e3f0a766723ba575720dd5560db73883be87712bad62cb745",
+      "patterns/front-list-home-1.php": "sha256:88a772464c6938d1d1cb14c5702be13c4b37fefaf1125eac31d1efb57eedfa38",
+      "patterns/front-list-home-3.php": "sha256:aa103de5a7109f95fb88ee77b0905ec700f60786c1ed576354e5b7ff747e1a7b",
+      "patterns/front-list-warm-home-2.php": "sha256:85129396e2341d5c0a4e686947e40cd1ec05b291f2dd8c4bf1b431ae44f25840",
+      "patterns/front-list-warm-home-5.php": "sha256:38ea406a8a053b613ce525692a50d842b40a85338d0be3b4ce3b6c4ddac260f6",
       "patterns/front-list-warm.php": "sha256:2690f5b119b3ae00e60173482faabcfba917941ec27518a60cad442eb0f94263",
       "patterns/front-list.php": "sha256:9cb00a95ca896aaf38e932e3a65bf3899184cc7555b55ee351e893b1fdc0cd9c",
       "patterns/landing.php": "sha256:8d34c7c6c4385651fc63db98ad8dd380800aaf33e64821381b0b4b1754c8cde3",
@@ -1473,15 +1612,15 @@
       "patterns/post-list.php": "sha256:15c3d63d013990368ad5d74895050df2eb85c09650a7848f98329833af0be4b1",
       "patterns/pricing.php": "sha256:31f9e291814519b99566250b97ac6d86011c41b5089da4a28ca0061348880e72",
       "patterns/section-articles-categories-slide.php": "sha256:a2a95b36366ff5d30842fbd183860c1f8a0d02954ff685fdf11dd1e9a33072ad",
-      "patterns/section-articles-category-default-feat.php": "sha256:c9f49715872d4c8dc1b555c624cd03a86a503862c2a0975cb4318c8c31b69848",
-      "patterns/section-articles-category-horizontal-feat.php": "sha256:ebc7123f3a8d2318107ae0ee3de5f6458f3d31f70f631c4ac7d67c2b37b56b1d",
-      "patterns/section-articles-category-list-2-feat.php": "sha256:9650684c73d2b6272d8b898de696311a5a33962008a929f75b67b9f4448bbd6b",
-      "patterns/section-articles-category-list-2-normal.php": "sha256:d1ce18dcf4ee8b3c05752cc9d8aea1fb330634284b3e6a63a3bd976c4bf4f442",
-      "patterns/section-articles-category-list-blog.php": "sha256:76bc2839d3f48d13d4dcc59d584b33b168395c0973ee3287f06df3840ef655a4",
-      "patterns/section-articles-category-slide-feat.php": "sha256:3e64bad2ee407c1c94d8e2c37672604e6d72a50335684b9abe64d8dc886c4f6e",
-      "patterns/section-articles-category-slide-normal.php": "sha256:6d72caa94c12b035ff633055497183ffc32f1f4b924aae96f4fc18cbfa056dc9",
-      "patterns/section-articles-latest-latest-feat.php": "sha256:631b182a8a2321df362e342930acfc049ac2f07a363576461df64fd4caff38bc",
-      "patterns/section-articles-latest-latest-nsub.php": "sha256:7b8178113f5f77aa2a1a0b839bbe3d99501f7a771b836ec7f3ff8c1394bc8b34",
+      "patterns/section-articles-category-default-feat.php": "sha256:5eaef81101e1bd30fa1d2896ca9139628576334962e91b172e735e7aa566a1f8",
+      "patterns/section-articles-category-horizontal-feat.php": "sha256:33ce751bba31d44e6d1b9f689ea2f101402e0c2f3e71fb98faa07dda8000eaf0",
+      "patterns/section-articles-category-list-2-feat.php": "sha256:89f6a8a3211367d233f75e37591b9441dc629726b4238c27bb9b539042cfd925",
+      "patterns/section-articles-category-list-2-normal.php": "sha256:22e39be3952ff99f6769ae0df18ab4624451553dd2058f81ed2f785c217bb2c1",
+      "patterns/section-articles-category-list-blog.php": "sha256:5fc540a28eaa07e065b9a6261daee05af3f347c389622313297005b244bca684",
+      "patterns/section-articles-category-slide-feat.php": "sha256:8e27f93646e0744f026ad691675aefa02b50fd43431a3e5892cff3e7538feef6",
+      "patterns/section-articles-category-slide-normal.php": "sha256:2d1172871e6c42ed0d60986821eaa5873a3f3ee024e5147cf66b52b83d6bb22c",
+      "patterns/section-articles-latest-latest-feat.php": "sha256:72b635c1063a8bc02e57e9500782e07557e2788cffd499416fc387efbe5b25f4",
+      "patterns/section-articles-latest-latest-nsub.php": "sha256:aa19833da69fc40faccb04f3aba148af898528b2990f9f9f27c83625ecca8953",
       "patterns/section-contact.php": "sha256:60fdcec2f10f1086a8049b1acebbd024978576af1c1080c838787105dd33b0eb",
       "patterns/section-cta-final.php": "sha256:ecd60c0133ebf1d5a02cec4f4eca766ea449864f5c767e0c10a84745d61c547e",
       "patterns/section-cta-inline.php": "sha256:462272c9187d7867520afc9879d39ca9863a890af69d807643caf879abb3cfdc",
@@ -1503,9 +1642,9 @@
       "patterns/section-styleguide.php": "sha256:036a6b9a7967f56b06786e21cba76eaa4845b4ade1c36c03f4634c9e042140cf",
       "patterns/section-tags-popular.php": "sha256:e2e523f27cfe03804d9e7b6dfe6e7fa124346022ced8db28e1f6b688859d2e41",
       "patterns/section-team.php": "sha256:539399cdefc0989bfdc07cc6ef300e1a632db5d1c40e067cfcae545adff68092",
-      "readme.txt": "sha256:e8eae4a60359d5c5985e15a314889b15c4cc07fb70a6f475ea305efaf35c8b65",
+      "readme.txt": "sha256:e5ce5e999e9850bb27653b60568a81125e20950e1ec30f375bf8042fd6410f7a",
       "screenshot.png": "sha256:f02d6016b09875cbad0ce2db9a763a41b4aa11896ecfe4aba1872727d5181e00",
-      "style.css": "sha256:07e04ea037893847c47a66363ac2094d804476739fb4c38c027fb72a0c5643dd",
+      "style.css": "sha256:401233c249754a58ddb9094b6b38d504a259d0c62a0f3c9efbe93adab7b12c97",
       "styles/wp-ja-essence.json": "sha256:10271c57bd4e170de52c8e6a4ac025e71809692c5159a50421be0ce3471045c3",
       "templates/404.html": "sha256:9a33cee0b0cb748c0c89cc60825834f3c5f45f56c1e4b2bce744d9fba2f10edb",
       "templates/archive.html": "sha256:76540c1a5d652b88b00a50fcce5098f83158d00e8894ed88af42b080b7fb6df5",
@@ -1531,228 +1670,17 @@
   },
   "spec": {
     "dir": "spec",
-    "theme": {
-      "palette": {
-        "light": {
-          "primary": "#4d6bff",
-          "secondary": "#fdf6f2",
-          "body_bg": "#f8f8ff",
-          "text": "rgba(37, 36, 36, 0.7)"
-        },
-        "dark": {
-          "primary": "#4d6bff",
-          "secondary": "#1a2130",
-          "body_bg": "#11151f",
-          "text": "#c2c9d6"
-        }
-      },
-      "darkDerived": false,
-      "fonts": {
-        "body": "Noto Serif",
-        "heading": "Jost"
-      },
-      "hook": {
-        "selector": "html",
-        "attribute": "data-theme",
-        "lightValue": "light",
-        "darkValue": "dark"
-      }
-    },
-    "routes": [
-      {
-        "path": "/",
-        "view": "front-page",
-        "title": "Home 3"
-      },
-      {
-        "path": "/404",
-        "view": "404",
-        "title": "Not found"
-      },
-      {
-        "path": "/category/category-style-1",
-        "view": "category",
-        "title": "Category Style 1"
-      },
-      {
-        "path": "/category/category-style-2",
-        "view": "category",
-        "title": "Category Style 2"
-      },
-      {
-        "path": "/category/category-style-3",
-        "view": "category",
-        "title": "Category Style 3"
-      },
-      {
-        "path": "/category/category-style-3/vintage-inspired-martini-cocktail-glasses",
-        "view": "single",
-        "title": "Vintage-inspired martini & cocktail glasses"
-      },
-      {
-        "path": "/category/category-style-4",
-        "view": "category",
-        "title": "Category Style 4"
-      },
-      {
-        "path": "/contact",
-        "view": "page-contact",
-        "title": "Contact"
-      },
-      {
-        "path": "/detail/gallery",
-        "view": "page",
-        "title": "Natural Remedies for Common Ailments"
-      },
-      {
-        "path": "/detail/layout-1",
-        "view": "page",
-        "title": "Abstract Wonders: Exploring Line Art Composition"
-      },
-      {
-        "path": "/detail/layout-2",
-        "view": "page",
-        "title": "Mental Health and Well-being Strategies"
-      },
-      {
-        "path": "/detail/layout-3",
-        "view": "page",
-        "title": "Essential Nutrients for Optimal Health"
-      },
-      {
-        "path": "/detail/video",
-        "view": "page",
-        "title": "Fitness Tips for a Healthy Lifestyle"
-      },
-      {
-        "path": "/home/home-1",
-        "view": "page-landing",
-        "title": "Home 1"
-      },
-      {
-        "path": "/home/home-2",
-        "view": "page-landing",
-        "title": "Home 2"
-      },
-      {
-        "path": "/home/home-4",
-        "view": "page-landing",
-        "title": "Home 4"
-      },
-      {
-        "path": "/home/home-5",
-        "view": "page-landing",
-        "title": "Home 5"
-      },
-      {
-        "path": "/lifestyle",
-        "view": "category",
-        "title": "Lifestyle"
-      },
-      {
-        "path": "/pages/j-content/author-listting",
-        "view": "author",
-        "title": "Author listting"
-      },
-      {
-        "path": "/pages/j-content/category-blog",
-        "view": "category",
-        "title": "Category Blog"
-      },
-      {
-        "path": "/pages/j-content/featured-articles",
-        "view": "page-landing",
-        "title": "Featured Articles"
-      },
-      {
-        "path": "/pages/j-content/tagged-items",
-        "view": "tag",
-        "title": "Tagged Items"
-      },
-      {
-        "path": "/pages/j-pages/error-page",
-        "view": "page",
-        "title": "Error Page"
-      },
-      {
-        "path": "/pages/j-pages/offline-pages",
-        "view": "page",
-        "title": "Offline Pages"
-      },
-      {
-        "path": "/pages/j-pages/smart-search",
-        "view": "search",
-        "title": "Smart Search"
-      },
-      {
-        "path": "/pages/j-pages/typography",
-        "view": "page",
-        "title": "Typography"
-      },
-      {
-        "path": "/pages/user/edit-user-profile",
-        "view": "page-account",
-        "title": "Edit User Profile"
-      },
-      {
-        "path": "/pages/user/login-form",
-        "view": "page-login",
-        "title": "Login Form"
-      },
-      {
-        "path": "/pages/user/registration-form",
-        "view": "page-register",
-        "title": "Registration Form"
-      },
-      {
-        "path": "/pages/user/user-profile",
-        "view": "page-account",
-        "title": "User Profile"
-      },
-      {
-        "path": "/resources",
-        "view": "category",
-        "title": "Resources"
-      }
-    ],
-    "routesByView": {
-      "404": 1,
-      "author": 1,
-      "category": 7,
-      "front-page": 1,
-      "page": 8,
-      "page-account": 2,
-      "page-contact": 1,
-      "page-landing": 5,
-      "page-login": 1,
-      "page-register": 1,
-      "search": 1,
-      "single": 1,
-      "tag": 1
-    },
+    "theme": null,
+    "routes": [],
+    "routesByView": {},
     "gaps": 0,
-    "menus": [
-      {
-        "slug": "mainmenu",
-        "title": "mainmenu",
-        "items": 37
-      },
-      {
-        "slug": "category",
-        "title": "category",
-        "items": 6
-      }
-    ],
-    "redirects": 1,
-    "inputs": {
-      "page-map.json": "sha256:c39e3c8a7ddbc39b783abc5535eaea3d8eb3ac89b6359ce0ca3a547457c15d98",
-      "menus.json": "sha256:51a0f86874010d52336d48936a065ef1726964483524b660d778584384f0ed27",
-      "redirects.json": "sha256:0748d0152d02fddc3e2834cd56099aa18c47c3a677ab817ea680d7c0dc14f68e"
-    }
+    "menus": [],
+    "redirects": 0,
+    "inputs": {}
   },
   "seed": {
-    "file": "seed-report-102-c.json",
-    "startedAt": "2026-10-02T11:07:20.987Z",
+    "file": "seed-report-103-last.json",
+    "startedAt": "2026-10-02T13:42:56.738Z",
     "label": "at seed time, not live",
     "counts": {
       "authors": {
@@ -1894,6 +1822,6 @@
       "no page with view home in the page-map; page_for_posts left unset",
       "single view: redirected to article 3 (vintage-inspired-martini-and-cocktail-glasses)"
     ],
-    "hash": "sha256:debc73e724c765fa68a7502b2cfff2c6180df2053dbff524dafd6ebb7b6f8e31"
+    "hash": "sha256:e635810c1da281b11c1bf8c4ad0dad89955448bcc2c367a4454cc4220d1090ef"
   }
 }

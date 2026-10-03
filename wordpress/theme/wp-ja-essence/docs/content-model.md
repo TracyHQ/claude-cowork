@@ -104,6 +104,22 @@ articles) and WordPress would otherwise prepend them to every nested query on th
   card serves all, and type sizes vary per page through the body class `je-slug-<page slug>`; do
   not rename those pages (D-53). Category Blog also shows the card's intro and tags
   (`.je-slug-category-blog`).
+- **The order of a list** (1.0.3): the source orders its lists by fields WordPress has no column for, so
+  every article keeps them as post meta and `inc/extra.php` (`wp_ja_essence_order_clauses()`) sorts by
+  them again. `je_src_id` is the Joomla article id (the last tie-break everywhere), `je_catpos` the
+  position of its Joomla category, `je_ordering` its manual order inside the category, `je_hits` the
+  counter the Trending lists sort by (ascending), `je_created` its creation time (`YYYYMMDDHHMMSS`; the
+  seeder moves post dates by seconds, so lists never sort by `post_date`), `je_front` its place in the
+  source's featured order (absent: not featured), `je_metakey` the keywords "More reading" relates by.
+  A list names its order in its query (`wpJaEssenceOrder`: `category`, `front`, `hits`, `latest`,
+  `title`); a category page's own list takes `category` unless the owner sets another order. The
+  featured lists (`wpJaEssenceFeatured`) are the articles that have a `je_front` place, copies of the
+  second tree included, as the source's featured view prints them; `front-list-home-1/-home-3/
+  -warm-home-2/-grid-home-4/-warm-home-5/-featured` are those lists, one pattern per source page
+  (`tools/gen-patterns.mjs` LISTS). Every pager of a list with more than one page prints "Page N of M".
+  An article added by the owner has none of this meta and sorts after the ones that have it.
+  "More reading" lists the first articles that share a keyword with the page by Joomla id, printed by
+  manual order then id (`wp_ja_essence_related_ids()`); an article with no keyword relates to nothing.
 - Pagers: a pager block with the class `tracy-joomla-pager` is drawn by the must-use plugin
   `tracy-joomla-pagination`; a listing of one page prints no pager. Without the plugin core's pager
   prints.
