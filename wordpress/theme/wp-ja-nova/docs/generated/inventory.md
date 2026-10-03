@@ -15,7 +15,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Text Domain | wp-ja-nova |
 | Theme Name | JA Nova |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
-| Version | 1.1.3 |
+| Version | 1.1.5 |
 
 theme.json version 3; 99 files fingerprinted; 62 of them are the `wp-ja-nova` overlay's own ("Own" below), the rest come from the source theme; default look is the `wp-ja-nova` design system.
 
@@ -163,6 +163,7 @@ _none_
 - `tracy_inspiration`
 - `tracy_motion`
 - `tracy_nav`
+- `users_can_register`
 - `wp_ja_nova_404_page`
 - `wp_ja_nova_redirects`
 
@@ -199,6 +200,8 @@ _none_
 | redirect_canonical | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
 | redirect_canonical | filter | inc/extra.php |
+| redirect_canonical | filter | inc/extra.php |
+| registration_redirect | filter | inc/extra.php |
 | render_block | filter | functions.php |
 | render_block | filter | inc/extra.php |
 | render_block | filter | inc/extra.php |
@@ -207,6 +210,10 @@ _none_
 | render_block_core/group | filter | inc/extra.php |
 | render_block_core/group | filter | inc/extra.php |
 | render_block_core/group | filter | inc/extra.php |
+| render_block_core/loginout | filter | inc/extra.php |
+| render_block_core/loginout | filter | inc/extra.php |
+| render_block_core/loginout | filter | inc/extra.php |
+| render_block_core/loginout | filter | inc/extra.php |
 | render_block_core/loginout | filter | inc/extra.php |
 | render_block_core/navigation-link | filter | inc/extra.php |
 | render_block_core/navigation-link | filter | inc/extra.php |
@@ -221,6 +228,8 @@ _none_
 | render_block_core/post-title | filter | inc/extra.php |
 | render_block_core/query | filter | inc/extra.php |
 | render_block_core/query-pagination | filter | inc/extra.php |
+| render_block_core/search | filter | inc/extra.php |
+| render_block_core/social-link | filter | inc/extra.php |
 | render_block_core/tag-cloud | filter | inc/extra.php |
 | render_block_core/template-part | filter | inc/extra.php |
 | render_block_data | filter | inc/extra.php |
@@ -228,6 +237,7 @@ _none_
 | render_block_data | filter | inc/extra.php |
 | request | filter | inc/extra.php |
 | request | filter | inc/extra.php |
+| rest_api_init | action | inc/extra.php |
 | run_wptexturize | filter | functions.php |
 | run_wptexturize | filter | inc/extra.php |
 | show_user_profile | action | inc/extra.php |
@@ -309,74 +319,6 @@ Routes by template view:
 | /typography | page | Typography |
 | /user-profile | page-account | User Profile |
 | /virtualization | page | Virtualization |
-
-## Seed report — at seed time, not live
-
-From `seed-report-last.json` (run started 2026-10-01T11:55:17.912Z). Totals are what the seeder found or wrote; the live site may differ.
-
-| Kind | Total | Created | Updated | Skipped (unchanged) |
-| --- | --- | --- | --- | --- |
-| authors | 9 | 0 | 0 | 9 |
-| categories | 7 | 0 | 0 | 7 |
-| forms | 1 | 0 | 0 | 1 |
-| navigation | 6 | 0 | 0 | 6 |
-| options | 8 | 0 | 0 | 8 |
-| pages | 28 | 0 | 0 | 28 |
-| posts | 45 | 0 | 0 | 45 |
-| templateParts | 2 | 0 | 0 | 2 |
-
-- Navigation posts (`wp_navigation`, by slug): `jcontent`, `jpages`, `mainmenu`, `services`, `tracy-footer-1`, `users`
-- Template part overrides (`wp_template_part`, by slug): `footer`, `header`
-- Redirect rules written: 2
-- Sections placed: 68 on 25 pages — acm 68
-- Routes checked after seeding: 31/33 as expected
-- Media: 142 files, 0 imported this run
-
-Sections by pattern:
-
-| Pattern | Placed |
-| --- | --- |
-| wp-ja-nova/section-cards | 2 |
-| wp-ja-nova/section-cards-inline | 7 |
-| wp-ja-nova/section-clients | 1 |
-| wp-ja-nova/section-cta | 1 |
-| wp-ja-nova/section-cta-bar | 25 |
-| wp-ja-nova/section-expertise | 1 |
-| wp-ja-nova/section-faq | 9 |
-| wp-ja-nova/section-feature | 5 |
-| wp-ja-nova/section-hero | 1 |
-| wp-ja-nova/section-latest | 1 |
-| wp-ja-nova/section-news | 1 |
-| wp-ja-nova/section-positions | 1 |
-| wp-ja-nova/section-pricing | 1 |
-| wp-ja-nova/section-project-tabs | 1 |
-| wp-ja-nova/section-related | 1 |
-| wp-ja-nova/section-related-projects | 1 |
-| wp-ja-nova/section-search-band | 1 |
-| wp-ja-nova/section-stats | 2 |
-| wp-ja-nova/section-teams | 2 |
-| wp-ja-nova/section-text-slider | 2 |
-| wp-ja-nova/section-values | 1 |
-| wp-ja-nova/section-video | 1 |
-
-Seeder notes:
-
-- 43 post(s) shared a post_date with another; each got one second in source order so date-sorted listings serve the same order on every request
-- Contact Form 7 form contact built from section contact-form-1: text name, email email, tel phone, text subject, textarea message
-- no section of the spec draws a subscribe box (one email field and a Subscribe button); no newsletter form created — a sidebar calling [contact-form-7 title="Newsletter"] prints "Contact form not found"
-- post authors: antoinette-huff "Antoinette Huff" [source joomla-user-47] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), brian-jennings "Brian Jennings" [source joomla-user-45] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), dewey-mann "Dewey Mann" [source joomla-user-48] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), elijah-knight "Elijah Knight" [source joomla-user-46] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), henry-delgado "Henry Delgado" [source joomla-user-43] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), hubert-santos "Hubert Santos" [source joomla-user-49] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), tracyagent "Tracy Agent" [source joomla-user-42] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), lucy-reid "Lucy Reid" [source joomla-user-44] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), warren-stevens "Warren Stevens" [source joomla-user-50] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc)
-- 111 hero.btn-link-2: block hero.button-2 not in pattern
-- 123 features-intro.btn-link: block features-intro.button not in pattern
-- 123 features-intro.link-style: block features-intro.button not in pattern
-- 125 features-intro.btn-link: block features-intro.button not in pattern
-- 125 features-intro.link-style: block features-intro.button not in pattern
-- 144 features-intro.link-btn: block features-intro.title-btn not in pattern
-- 144 features-intro.link-style: block features-intro.title-btn not in pattern
-- 143 features-intro.btn-link: block features-intro.button not in pattern
-- 143 features-intro.link-style: block features-intro.button not in pattern
-- no page with view home in the page-map; page_for_posts left unset
-- single view: redirected to article 5 (virtual-memorials-exploring-the-impact-of-business-technology-on-mourning)
-- single view: redirected to article 42 (brochure-and-flyer-design)
 
 ## Drift detection
 

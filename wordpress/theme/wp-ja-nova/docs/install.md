@@ -15,7 +15,7 @@ complete JA Nova site.
 | Requires PHP | 8.1 (the site was built on 8.3) |
 | Plugin | Contact Form 7 (`contact-form-7`, active). The `/about-us-2/contact` page carries its shortcode; without the plugin the shortcode prints as text and the rest of the page is unchanged |
 | Permalinks | `/%postname%/` — the source's paths (`/about-us-2/contact`, `/category-blog/<post>`, `/project/<category>/<post>`) rely on it |
-| Registration | `users_can_register` = 0: `/registration-form` shows a "Log in" link, not a sign-up form (docs/content-rules.md) |
+| Registration | `users_can_register` = 1 with `default_role` = subscriber (data of the quickstart; the theme never turns it on). Off: `/registration-form` says registration is closed (docs/content-rules.md) |
 
 ## Theme alone
 

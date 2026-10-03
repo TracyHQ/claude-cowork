@@ -185,9 +185,22 @@ body.tracy .jn-header__inner {
 body.tracy .jn-header__menu { flex: 0 0 41.667%; order: 1; display: flex; align-items: center; height: 100%; }
 body.tracy .jn-header__brand { flex: 0 0 16.667%; order: 2; padding-inline: 16px; box-sizing: border-box; text-align: left; }
 body.tracy .jn-header__right { flex: 0 0 41.667%; order: 3; display: flex; align-items: center; justify-content: flex-end; gap: 0; padding-inline: 16px; box-sizing: border-box; }
-body.tracy .jn-site-name { margin: 0 0 8px; font-size: 16px; line-height: 16px; font-weight: 600; letter-spacing: 1.5px; }
-body.tracy .jn-site-name a { color: light-dark(#212529, #eef1f6); }
-body.tracy .jn-site-name a:hover { color: var(--jn-link); }
+/* The brand is the source's image logo, a light and a dark file (item-1 / item-2), one shown per theme. The block's own
+   width/height style is neutral here: the logo fills its column up to 48 px tall (32 px on a phone), as the source's
+   `max-width: 100%; max-height` does. */
+body.tracy .jn-logo { margin: 0; line-height: 0; }
+body.tracy .jn-header__inner > .jn-header__brand,
+body.tracy .jn-header__brand > *,
+body.tracy .jn-drawer__head > * { margin-block: 0; }
+body.tracy .jn-logo a { display: block; }
+body.tracy .jn-logo img { display: block; width: auto !important; height: auto !important; max-width: 100%; max-height: 48px; }
+body.tracy .jn-logo--dark { display: none; }
+:root[data-theme='dark'] body.tracy .jn-logo--light { display: none; }
+:root[data-theme='dark'] body.tracy .jn-logo--dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) body.tracy .jn-logo--light { display: none; }
+  :root:not([data-theme]) body.tracy .jn-logo--dark { display: block; }
+}
 body.tracy .jn-drawer__head { display: none; }
 body.tracy .jn-header__menu > * { margin-block: 0; }
 
@@ -206,7 +219,7 @@ body.tracy .jn-nav .current-menu-ancestor > .wp-block-navigation-item__content {
 body.tracy .jn-nav .wp-block-navigation__submenu-icon { width: 10px; height: 10px; margin-left: 6px; }
 /* The source caret is a 22px box between the title and the link's right padding. */
 body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation-item__content { padding-right: 0; }
-body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin: 0 16px 0 0; padding: 0; }
+body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0 15px 0 -1px; padding: 0; }
 body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon svg { width: 10px; height: 10px; }
 body.tracy .jn-nav .wp-block-navigation .has-child .wp-block-navigation__submenu-container,
 body.tracy .jn-nav .has-child > .wp-block-navigation__submenu-container { left: 0; }
@@ -275,15 +288,20 @@ body.tracy .jn-drawer-toggle { display: none; }
   body.tracy .jn-quick { display: none; }
 }
 @media (max-width: 1399.98px) and (min-width: 992px) {
-  body.tracy .jn-header__menu { flex-basis: 50%; }
-  body.tracy .jn-header__brand { flex-basis: 16.667%; }
-  body.tracy .jn-header__right { flex-basis: 33.333%; }
+  /* From lg to xxl the source keeps its markup order: logo (col-2), menu (col-6), controls (col-4); only from 1400 px
+     does order-xxl put the menu first and the logo in the middle. */
+  body.tracy .jn-header__brand { order: 1; flex-basis: 16.667%; }
+  body.tracy .jn-header__menu { order: 2; flex-basis: 50%; }
+  body.tracy .jn-header__right { order: 3; flex-basis: 33.333%; }
 }
 
+@media (max-width: 767.98px) {
+  body.tracy .jn-logo img { max-height: 32px; }
+}
 @media (max-width: 991.98px) {
   /* The source's mobile header row: brand col-6 and controls col-5 (the col-1 between them is the
      hidden menu), each with a 16 px gutter and no outer padding; 56 px tall below 768 px, 120 px
-     from 768 px. The site name sits at the top of a 25 px brand box, as the source's logo text. */
+     from 768 px. */
   body.tracy .jn-header__inner { height: 56px; padding-inline: 0; }
   body.tracy .jn-header__brand { order: 1; flex: 0 0 50%; text-align: left; }
   body.tracy .jn-header__right { order: 2; flex: 0 0 41.667%; margin-left: auto; }
@@ -331,8 +349,6 @@ body.tracy .jn-drawer-toggle { display: none; }
     :root:not([data-theme]) body.tracy .jn-drawer__head { border-bottom: 1px solid #2e353f; }
   }
   body.tracy .jn-drawer__head > * { margin-block: 0; }
-  body.tracy .jn-drawer__title { margin: 0; font-size: 16px; font-weight: 400; }
-  body.tracy .jn-drawer__title a { color: var(--jn-link); }
   body.tracy .jn-drawer-close {
     width: 32px;
     height: 32px;
@@ -372,15 +388,15 @@ body.tracy .jn-drawer-toggle { display: none; }
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation__submenu-icon,
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation__submenu-icon { color: var(--jn-link-hover); }
   body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon {
-    position: absolute;
-    top: 8px;
-    right: 0;
+    position: static;
+    flex: 0 0 24px;
+    align-self: flex-start;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: 9px;
+    width: 24px;
     height: 30px;
-    margin: 0;
+    margin: 8px 0 0;
     padding: 0;
     cursor: pointer;
   }
@@ -396,37 +412,84 @@ body.tracy .jn-drawer-toggle { display: none; }
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M1.8 1.6 6.8 6l-5 4.4' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M1.8 1.6 6.8 6l-5 4.4' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
   }
-  body.tracy .jn-nav .wp-block-navigation__submenu-container { display: none !important; }
-  /* The chevron opens the item's children under it (the source drills down to them). */
-  body.tracy .jn-nav .wp-block-navigation__submenu-icon[aria-expanded='true'] + .wp-block-navigation__submenu-container {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
+  /* A parent item drills down, as the source's drawer does: its children replace the list under the head, behind a back
+     row ("‹ ABOUT US"), each row ruled like the top list. wp-ja-nova.js sets the toggle's aria-expanded below 992 px. */
+  body.tracy .jn-header__menu :is(nav.jn-nav, ul.jn-nav, .wp-block-navigation__container) { position: static; }
+  body.tracy .jn-nav .wp-block-navigation__container > .has-child { position: static; flex-wrap: nowrap; }
+  body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation-item__content { flex: 1 1 auto; min-width: 0; }
+  body.tracy .jn-nav .wp-block-navigation__submenu-container {
+    position: absolute !important;
+    inset: 56px 0 0 0 !important;
+    z-index: 2;
+    display: none !important;
+    box-sizing: border-box;
+    width: auto !important;
     min-width: 0 !important;
     height: auto !important;
-    padding: 0 0 8px 16px;
+    margin: 0;
+    padding: 18px 24px 16px;
     border-radius: 0;
-    background: transparent !important;
+    background: light-dark(#ffffff, #14171c) !important;
     box-shadow: none;
+    overflow: hidden auto;
     opacity: 1 !important;
     visibility: visible !important;
+    transform: none !important;
   }
-  body.tracy .jn-nav .wp-block-navigation__submenu-icon[aria-expanded='true']::before { transform: rotate(90deg); }
+  body.tracy .jn-nav .wp-block-navigation__submenu-icon[aria-expanded='true'] ~ .wp-block-navigation__submenu-container { display: block !important; }
+  body.tracy .jn-header__menu.jn-drill { overflow: hidden; }
+  body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item { border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+  body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item > .wp-block-navigation-item__content { padding: 12px 0; font-size: 16px; line-height: 1.5; }
+  body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item.jn-drill-back { border-bottom: 0; }
+  body.tracy .jn-drill-back { margin: 0; padding: 0; list-style: none; }
+  body.tracy .jn-drill-back__button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 0 8px;
+    border: 0;
+    background: transparent;
+    color: light-dark(#212529, #eef1f6);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    text-align: left;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  body.tracy .jn-drill-back__button::before {
+    content: '';
+    flex: none;
+    width: 9px;
+    height: 12px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M7.2 1.6 2.2 6l5 4.4' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M7.2 1.6 2.2 6l5 4.4' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  /* The drawer head carries the logo (left) and the close control (right). */
+  body.tracy .jn-drawer__head .jn-logo img { max-height: 32px; }
   body.tracy .jn-drawer-toggle {
     display: inline-flex;
     flex-direction: column;
     justify-content: center;
     gap: 3.5px;
+    box-sizing: content-box;
     width: 19px;
     height: 22px;
-    margin-left: 16px;
-    padding: 0;
+    margin: 0 -2.5px 0 13.5px;
+    padding: 1px 2.5px;
     border: 0;
     background: transparent;
     cursor: pointer;
   }
   body.tracy .jn-drawer-toggle span { display: block; height: 3px; border-radius: 1.5px; background: light-dark(#333333, #c2c9d2); }
 }
+
+@media (min-width: 992px) { body.tracy .jn-drill-back { display: none; } }
 
 /* ── Breadcrumbs ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -629,7 +692,8 @@ body.tracy .jn-feature__more { display: flex; align-items: center; gap: 16px; }
 body.tracy .jn-feature__more-icon img { width: 64px; height: 64px; }
 body.tracy .jn-feature__more-text { margin: 8px 0; max-width: 190px; font-size: var(--jn-h4); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 @media (max-width: 991.98px) {
-  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 0; }
+  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 16px; }
+  body.tracy .jn-feature .jn-feature__cta > .jn-actions.jn-actions { margin-top: 0; }
   body.tracy .jn-feature__row.is-right .jn-feature__media { order: 0; }
   body.tracy .jn-feature__title { margin-bottom: 16px; }
   body.tracy .jn-feature__item-icon { flex-basis: 60px; margin-right: 24px; }
@@ -639,7 +703,8 @@ body.tracy .jn-feature__more-text { margin: 8px 0; max-width: 190px; font-size: 
 
 /* ── Moving tag rows (text-slider style-1) ────────────────────────────────────────────────────── */
 
-body.tracy .jn-marquee { overflow: hidden; }
+/* Paint containment clips the drifting row to the band like overflow does, but is not a scroll box, so a row cut by the viewport is the animation's own business. */
+body.tracy .jn-marquee { contain: paint; }
 body.tracy .jn-marquee__track { display: flex; gap: 32px; width: max-content; }
 body.tracy .jn-marquee__track.is-moving { animation: jn-marquee var(--jn-marquee-duration, 90s) linear infinite; }
 body.tracy .jn-marquee.cta-1 .jn-marquee__track.is-moving { animation-direction: reverse; }
@@ -1036,6 +1101,27 @@ body.tracy .jn-position__head { display: grid; grid-template-columns: 3fr 1fr; g
 body.tracy .jn-position__title { margin: 0 0 8px; font-size: var(--jn-h3); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-position__info { display: flex; gap: 32px; }
 body.tracy .jn-position__info p { margin: 0; color: var(--jn-text); }
+/* The contract and place lines carry the source's two Font Awesome Free 6 solid icons (clock 16 px, location dot 12 px wide, 16 px tall,
+   purple, 8 px before the text and 16 px from 1200 px, plus the space the source's markup has after the icon, 4 px), drawn as masks so they follow the theme colour. */
+body.tracy .jn-position__type::before,
+body.tracy .jn-position__place::before {
+  content: '';
+  display: inline-block;
+  height: 16px;
+  margin-right: 12px;
+  vertical-align: -2px;
+  background: var(--jn-purple);
+  -webkit-mask: var(--jn-icon) center / contain no-repeat;
+  mask: var(--jn-icon) center / contain no-repeat;
+}
+body.tracy .jn-position__type { --jn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M256 0a256 256 0 1 1 0 512 256 256 0 1 1 0-512zM232 120l0 136c0 8 4 15.5 10.7 20l96 64c11 7.4 25.9 4.4 33.3-6.7s4.4-25.9-6.7-33.3L280 243.2 280 120c0-13.3-10.7-24-24-24s-24 10.7-24 24z'/%3E%3C/svg%3E"); }
+body.tracy .jn-position__type::before { width: 16px; }
+body.tracy .jn-position__place { --jn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath d='M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z'/%3E%3C/svg%3E"); }
+body.tracy .jn-position__place::before { width: 12px; }
+@media (min-width: 1200px) {
+  body.tracy .jn-position__type::before,
+  body.tracy .jn-position__place::before { margin-right: 20px; }
+}
 body.tracy .jn-position__desc { grid-column: 1; margin: 16px 0 0; padding-right: 32px; color: var(--jn-text); }
 body.tracy .jn-position__toggle { grid-column: 2; grid-row: 1 / span 2; justify-self: end; margin: 0; }
 /* The source's .btn: 16 px / 1.63. */
@@ -1117,8 +1203,9 @@ body.tracy .jn-sec.bg-green { background: var(--jn-green); color: var(--jn-on-ba
 body.tracy .jn-sec.bg-green .jn-sec__title { color: #ffffff; }
 body.tracy .jn-news__items { display: grid; grid-template-columns: 887fr 425fr; grid-auto-rows: 300px; gap: 32px; margin: 0; padding: 0 0 32px; list-style: none; }
 body.tracy .jn-news__items > li:first-child { grid-row: span 2; }
+body.tracy .jn-news__items > li { margin: 0; }
 body.tracy .jn-news__item { position: relative; height: 100%; overflow: hidden; border-radius: var(--jn-radius); }
-body.tracy .jn-news__item::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.85) 100%); pointer-events: none; }
+body.tracy .jn-news__item::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 10%, #000000 100%); pointer-events: none; }
 body.tracy .jn-news__image { position: absolute; inset: 0; margin: 0; }
 body.tracy .jn-news__image a, body.tracy .jn-news__image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 body.tracy .jn-news__content { position: absolute; left: 32px; right: 32px; bottom: 32px; z-index: 2; color: var(--jn-on-band); }
@@ -1243,7 +1330,7 @@ body.tracy .jn-auth #loginform .input { display: block; width: 100%; height: 64p
 body.tracy .jn-auth #loginform .input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; color: light-dark(#212529, #eef1f6); }
 body.tracy .jn-auth #loginform .login-remember { display: flex; align-items: center; height: 24px; margin-top: -1px; }
 body.tracy .jn-auth #loginform .login-remember label { display: flex; align-items: center; gap: 12px; margin: 0; line-height: 1.5; }
-body.tracy .jn-auth #loginform .login-remember input { width: 16px; height: 16px; margin: 0; }
+body.tracy .jn-auth #loginform .login-remember input { width: 16px; height: 16px; margin: 0; border-color: light-dark(#ced4da, #3c444f); background-color: light-dark(#ffffff, var(--jn-raised)); }
 body.tracy .jn-auth #loginform .login-submit { margin-bottom: 16px; }
 body.tracy .jn-auth #loginform #wp-submit { width: 100%; height: 64px; padding: 18px 32px; border: 1px solid var(--jn-purple); border-radius: 16px; background: var(--jn-purple); font: inherit; font-weight: 500; line-height: 26.08px; color: #ffffff; cursor: pointer; }
 body.tracy .jn-auth #loginform #wp-submit:hover { background: #3014cc; border-color: #3014cc; }
@@ -1254,7 +1341,7 @@ body.tracy .jn-login__links a { font-size: 14px; line-height: 21px; color: #6c75
   body.tracy .jn-auth #loginform #wp-submit { height: 60px; padding: 16px; }
 }
 
-/* ── Search page (template search: the source's Smart Search form, without its "Advanced Search" toggle, D-09) ── */
+/* ── Search page (template search: the source's Smart Search form with its Advanced Search toggle) ── */
 body.tracy .jn-page .jn-search { max-width: 1000px; margin: 0 auto 16px; }
 body.tracy .jn-page .jn-search .wp-block-search__label { display: inline-block; margin: 0 8px 16px 0; font-size: 22px; font-weight: 400; line-height: 33px; letter-spacing: -0.22px; color: var(--jn-heading); }
 body.tracy .jn-page .jn-search .wp-block-search__inside-wrapper { display: flex; flex-wrap: wrap; align-items: flex-start; width: 100%; padding: 0; border: 0; }
@@ -1819,6 +1906,8 @@ body.tracy .jn-author__social--twitter { background: #1da1f2; }
 @media (max-width: 575.98px) { body.tracy .jn-author__name a { font-size: 24px; line-height: 24px; } }
 
 /* Hidden level-1 heading of pages whose source has none (inc/extra.php wp_ja_nova_hidden_heading). */
+/* Visually hidden text (skip link, social link labels) lives in a 1 px box: without nowrap its words wrap one per line. */
+body.tracy .screen-reader-text { white-space: nowrap; }
 body.tracy .screen-reader-text.jn-page-heading { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* The search view's form (/smart-search): the source field is ringed by a 10% black rule on both
@@ -1909,3 +1998,66 @@ body.tracy .jn-article__nav > * { margin-top: 0; } /* the block gap must not pus
 /* Author list: the counter chip sits 4 px under the row top at desktop, and right under the list at phone widths. */
 body.tracy.jn-route-author-listting .jn-pager-row .tracy-pager__counter { margin-top: 4px; }
 @media (max-width: 767.98px) { body.tracy.jn-route-author-listting .jn-pager-row .tracy-pager__counter { margin-top: 0; } }
+
+/* Sign in with a passkey: the source's full-width secondary button above Log in, and the account page's passkey list. */
+body.tracy .jn-auth #loginform .jn-passkey { margin: 0 0 16px; }
+body.tracy .jn-auth .jn-passkey__button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 64px; padding: 18px 32px; border: 1px solid #6c757d; border-radius: 16px; background: #6c757d; color: #ffffff; font: inherit; font-weight: 500; line-height: 24px; cursor: pointer; }
+body.tracy .jn-auth .jn-passkey__button:hover:not(:disabled) { border-color: #5c636a; background: #5c636a; }
+body.tracy .jn-auth .jn-passkey__button:disabled { opacity: 0.65; cursor: not-allowed; }
+body.tracy .jn-auth .jn-passkey__button svg { fill: currentColor; }
+body.tracy .jn-auth .jn-passkey__status { display: block; margin-top: 8px; color: var(--jn-text); }
+body.tracy .jn-auth .jn-passkey__status:empty { display: none; }
+body.tracy .jn-auth .jn-passkeys { margin-top: 48px; }
+body.tracy .jn-auth .jn-passkeys__list { margin: 0 0 24px; padding: 0; list-style: none; }
+body.tracy .jn-auth .jn-passkeys__list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--jn-line); }
+body.tracy .jn-auth .jn-passkeys__remove { padding: 4px 12px; border: 1px solid #dc3545; border-radius: 8px; background: transparent; color: #dc3545; font: inherit; cursor: pointer; }
+body.tracy .jn-auth .jn-reg__closed,
+body.tracy .jn-auth .jn-reg__done { margin: 0 0 24px; padding: 16px 24px; border-radius: 16px; background: light-dark(#e9ecef, #1e232b); color: var(--jn-heading); }
+@media (max-width: 767.98px) {
+  body.tracy .jn-auth .jn-passkey__button { height: 60px; padding: 16px; }
+}
+
+/* Search page: the Advanced Search button beside Search (secondary grey) and its tips card (the source's, open on arrival). */
+body.tracy .jn-page .jn-search .jn-search__advanced { display: flex; flex: none; align-items: center; justify-content: center; height: 60px; margin: 0 0 0 4px; padding: 16px; border: 1px solid #6c757d; border-radius: 16px; background: #6c757d; font: inherit; font-weight: 500; line-height: 26.08px; color: #ffffff; cursor: pointer; box-sizing: border-box; }
+body.tracy .jn-page .jn-search .jn-search__advanced:hover { border-color: #5c636a; background: #5c636a; }
+body.tracy .jn-page .jn-search .jn-search__advanced-icon { width: 16px; height: 16px; margin-right: 12px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23fff' d='M416 208c0 45.9-14.9 88.3-40 122.7l126.6 126.7c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0s208 93.1 208 208zm-176-48V112c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v48h-48c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h48v48c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-48h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16h-48z'/%3E%3C/svg%3E") center / contain no-repeat; }
+body.tracy .jn-page .jn-search .jn-search__panel { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
+body.tracy .jn-page .jn-search .jn-search__panel[hidden] { display: none; }
+body.tracy .jn-page .jn-search .jn-search__tips { margin: 0 0 16px; padding: 16px; border-radius: 16px; background: light-dark(#f7f7f7, #1e232b); color: light-dark(#212529, #adb5bd); }
+body.tracy .jn-page .jn-search .jn-search__tips p { margin: 0 0 8px; }
+@media (min-width: 768px) {
+  body.tracy .jn-page .jn-search .jn-search__advanced { height: 64px; margin-left: 8px; padding: 18px 32px; }
+  body.tracy .jn-page .jn-search .jn-search__tips { padding: 32px; }
+}
+
+/* ── Lens fixes 1.1.5 (checkpoint-115 notes) ────────────────────────────────────────────────── */
+
+/* The service FAQ band keeps the source's section rule (1px, #e9ecef light / #495057 dark). */
+body.tracy.page-template-page-service .jn-faq { border-top: 1px solid light-dark(#e9ecef, #495057); }
+/* The search form's block margin and the empty results block's 8px are not in the source: the band under the form starts 128px below it. */
+body.tracy.search-no-results .jn-page form.wp-block-search { margin-bottom: 0; }
+body.tracy.search-no-results .jn-page .jn-search-results { margin-block: 0; }
+/* News card meta row: one baseline (flow-layout margins removed), the source's 4px author inset and dash spacing. */
+body.tracy .jn-news__info { gap: 6px; min-height: 24px; }
+body.tracy .jn-news__info > * { margin: 0; }
+body.tracy .jn-news__author { padding-left: 4px; }
+/* The right-to-left tag row (source style-rtl) lays its pills out last-first, so it reads Marketing … Business consultant. */
+body.tracy .jn-marquee.cta-1 .jn-marquee__track { flex-direction: row-reverse; }
+/* Password field: the input and its show-password button join into one group, square seam (source: radius 16px 0 0 16px). */
+body.tracy .jn-auth :is(#loginform, .jn-reg) .jn-input-group .input { border-radius: 16px 0 0 16px; }
+/* Remember me: the source's Bootstrap box (16px, 1px #ced4da border, dark fill in dark mode), purple when checked. */
+body.tracy .jn-auth #rememberme { appearance: none; -webkit-appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border: 1px solid #ced4da; border-radius: 4px; background: light-dark(#ffffff, #212529) center / 12px no-repeat; cursor: pointer; }
+body.tracy .jn-auth #rememberme:checked { border-color: var(--jn-purple); background-color: var(--jn-purple); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3E%3C/svg%3E"); }
+body.tracy .jn-auth #rememberme:focus-visible { outline: 2px solid var(--jn-purple); outline-offset: 2px; }
+/* The passkey button is a secondary action: a dark surface in dark mode instead of the bright grey block. */
+body.tracy .jn-auth .jn-passkey__button { border-color: light-dark(#6c757d, #495057); background: light-dark(#6c757d, #2a3038); }
+body.tracy .jn-auth .jn-passkey__button:hover:not(:disabled) { border-color: light-dark(#5c636a, #5e6670); background: light-dark(#5c636a, #343b44); }
+/* Field placeholders carry the source's colour (muted text, lighter in dark mode). */
+body.tracy ::placeholder { color: light-dark(rgba(19, 21, 21, 0.7), #8b94a0); opacity: 1; }
+/* A disabled pager item fades once, through its list item (the link inside stays at full strength). */
+body.tracy .jn-pager-row .tracy-pager__item.is-disabled .tracy-pager__link { opacity: 1; }
+/* Breadcrumb separator: grey in light, the full text colour in dark, as the source's divider image. */
+body.tracy .jn-breadcrumbs li:not(:last-child)::after { opacity: 1; background: light-dark(color-mix(in srgb, currentColor 55%, transparent), currentColor); }
+/* 404 button: no border, the source 64px (50px under 768px) height. */
+body.tracy .jn-404__home.wp-block-button .wp-block-button__link { display: inline-flex; align-items: center; box-sizing: border-box; height: 64px; border: 0; }
+@media (max-width: 767.98px) { body.tracy .jn-404__home.wp-block-button .wp-block-button__link { height: 50px; } }

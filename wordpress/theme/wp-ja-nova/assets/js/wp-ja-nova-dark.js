@@ -1,10 +1,13 @@
 /* wp-ja-nova: the dark mode switch.
  *
- * Three states — light, dark, auto — kept for a year in the `tracy_theme` cookie. Light and dark
- * are `data-theme` on the root element; auto is its absence, and the stylesheet then follows the
- * OS through prefers-color-scheme. This file is enqueued in the head, blocking, so the attribute
- * is on the root before the first paint; the toggle buttons ([data-tracy-theme-toggle]) are wired
- * once the document has parsed. Each click cycles light → dark → auto.
+ * The visible theme is light or dark; a click flips whichever one is showing, as the source's
+ * darkmode.js does. The choice is kept for a year in the `tracy_theme` cookie. Light and dark are
+ * `data-theme` on the root element; "auto" (no cookie yet, or an old `auto` one) is its absence, and
+ * the stylesheet then follows the OS through prefers-color-scheme. The first click from auto
+ * therefore always changes the page: it picks the opposite of what the OS shows. This file is
+ * enqueued in the head, blocking, so the attribute is on the root before the first paint; the
+ * toggle buttons ([data-tracy-theme-toggle], one in the desktop bar and one beside the drawer
+ * button) are wired once the document has parsed.
  *
  * The source (JA Nova, js/darkmode.js) keeps the choice in a `ja_nova-theme` cookie but reads it back
  * only when the OS setting changes, so a visitor who picked dark sees light again after a reload on a
@@ -16,13 +19,12 @@
  * on the toggle writes the cookie. */
 ;(() => {
   const COOKIE = 'tracy_theme'
-  const STATES = ['light', 'dark', 'auto']
   const LABELS = {
     light: 'Theme: light. Switch to dark',
-    dark: 'Theme: dark. Switch to automatic',
-    auto: 'Theme: automatic. Switch to light'
+    dark: 'Theme: dark. Switch to light'
   }
   const root = document.documentElement
+  const os = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
 
   const read = () => {
     const match = document.cookie.match(/(?:^|;\s*)tracy_theme=(light|dark|auto)(?:;|$)/)
@@ -34,13 +36,18 @@
     document.cookie = `${COOKIE}=${state}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`
   }
 
+  // What the page shows for a state: auto shows what the OS asks for.
+  const shown = (state) =>
+    state === 'dark' || state === 'light' ? state : os && os.matches ? 'dark' : 'light'
+
   const apply = (state) => {
     if (state === 'auto') root.removeAttribute('data-theme')
     else root.setAttribute('data-theme', state)
+    const now = shown(state)
     for (const button of document.querySelectorAll('[data-tracy-theme-toggle]')) {
-      button.setAttribute('aria-pressed', state === 'dark' ? 'true' : 'false')
-      button.setAttribute('aria-label', LABELS[state])
-      button.setAttribute('data-theme-state', state)
+      button.setAttribute('aria-pressed', now === 'dark' ? 'true' : 'false')
+      button.setAttribute('aria-label', LABELS[now])
+      button.setAttribute('data-theme-state', now)
     }
   }
 
@@ -61,13 +68,15 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => apply(state))
   }
+  // In auto the page follows the OS live, so the buttons' label and icon must too.
+  if (os && os.addEventListener) os.addEventListener('change', () => state === 'auto' && apply(state))
 
   document.addEventListener('click', (event) => {
     const target = event.target
     const button = target && target.closest ? target.closest('[data-tracy-theme-toggle]') : null
     if (!button) return
     event.preventDefault()
-    state = STATES[(STATES.indexOf(state) + 1) % STATES.length]
+    state = shown(state) === 'dark' ? 'light' : 'dark'
     apply(state)
     write(state)
   })

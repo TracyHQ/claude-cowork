@@ -12,7 +12,7 @@
       "Text Domain": "wp-ja-nova",
       "Theme Name": "JA Nova",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
-      "Version": "1.1.3"
+      "Version": "1.1.5"
     },
     "themeJson": {
       "version": 3,
@@ -1221,6 +1221,7 @@
       "tracy_inspiration",
       "tracy_motion",
       "tracy_nav",
+      "users_can_register",
       "wp_ja_nova_404_page",
       "wp_ja_nova_redirects"
     ],
@@ -1372,6 +1373,16 @@
       },
       {
         "kind": "filter",
+        "hook": "redirect_canonical",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "registration_redirect",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
         "hook": "render_block",
         "file": "functions.php"
       },
@@ -1408,6 +1419,26 @@
       {
         "kind": "filter",
         "hook": "render_block_core/group",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/loginout",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/loginout",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/loginout",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/loginout",
         "file": "inc/extra.php"
       },
       {
@@ -1482,6 +1513,16 @@
       },
       {
         "kind": "filter",
+        "hook": "render_block_core/search",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
+        "hook": "render_block_core/social-link",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "filter",
         "hook": "render_block_core/tag-cloud",
         "file": "inc/extra.php"
       },
@@ -1513,6 +1554,11 @@
       {
         "kind": "filter",
         "hook": "request",
+        "file": "inc/extra.php"
+      },
+      {
+        "kind": "action",
+        "hook": "rest_api_init",
         "file": "inc/extra.php"
       },
       {
@@ -1681,7 +1727,7 @@
       "assets/css/tracy-motion.css": "sha256:656642b63d46e2cb41fcd5af3437e25fed38175280bfcf14e9a1f6da5efb6bec",
       "assets/css/tracy.css": "sha256:e4ff46badd4a022c1e0a0fcd742d5ce1acbcd329bc769de5a23f7d65381b0e71",
       "assets/css/wp-ja-nova-typography.css": "sha256:2941ac81d4646d322d47d8ee6a39bc4c063c0c36ec287731344554aef68b2a94",
-      "assets/css/wp-ja-nova.css": "sha256:b3468b2b82ad18278df1f155d716ba25b270bbcb204318d23e2ebd5207e3ffd0",
+      "assets/css/wp-ja-nova.css": "sha256:bab0e944f0d8fb41fb9713ea0ec7311250856df9f9c7e8503613d83d8c8d9fcc",
       "assets/fonts/golos-text-latin.woff2": "sha256:f8d71091110f0113ba8bd16bee2ac68b51dd6491c5b9404e9fbb82b20ae632f1",
       "assets/fonts/golos-text-OFL.txt": "sha256:ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
       "assets/img/hero-placeholder.svg": "sha256:76cadc072b438fc2ec4e892db5f0d8146c4323b360f37a848c57193ecade5bf1",
@@ -1695,19 +1741,19 @@
       "assets/img/icon-decor-4.png": "sha256:46ac8ce6b992a688c81d571122283ba6ca34634ba58908497b45d59b3fb41f26",
       "assets/img/placeholder.svg": "sha256:b2d770577c7a42644670e479de92ba44c2039b96256e8739a6d69361905ec15e",
       "assets/js/tracy-motion.js": "sha256:e0de98821c906566fe3cb2e4ba7d4203375f61e1061a869fe5b53c566a796c36",
-      "assets/js/tracy-preview.js": "sha256:963089b30e6a825135a0fed7ade1f455a9e5b0e602ef53518fa98729eb43fd6c",
+      "assets/js/tracy-preview.js": "sha256:174189d9b2412fe0b7a3f69dde16d901d43d24528b89d3bbad3c78adacb54eed",
       "assets/js/tracy.js": "sha256:88c0d89600b0320a54eb34f943c4f29f631a920eca0866a78e2f054837ae1df4",
-      "assets/js/wp-ja-nova-dark.js": "sha256:88a903473f71985eeee4ff13dc3edaeb7ac56dde2edc390db87dc7c33be3f69f",
-      "assets/js/wp-ja-nova.js": "sha256:211f1e641d4faa0abcd6e59c66348483a1d910326047ceaa1baa744995f141d3",
+      "assets/js/wp-ja-nova-dark.js": "sha256:65bdeb6724ad364feb6ccdc737dbe28926f1d3ff6c7a2a69c962ad5065b15b54",
+      "assets/js/wp-ja-nova.js": "sha256:8eca464a6a1756ee6d4065a531c50495d99b7dbcdd801b85dfaaeafd3d406372",
       "functions.php": "sha256:5dda5319824e29cf270ec230fd7f5e498711fe32ca05201ae071cadd47840788",
       "inc/asset-version.php": "sha256:3a714c4a5c7cc86565cbafdb063a68340b09c58045962b8751ef3ed66c415b1d",
-      "inc/extra.php": "sha256:0f1d79755ad36313d12fc2ec59ea09dec0f8298d75b58d0cd03cb19824158a01",
+      "inc/extra.php": "sha256:84ab84452c25bfd81a3b78b6edb0a9663e521aa1d9f14053122b4efb1b110a56",
       "inc/motion-head.php": "sha256:e8e3b5b22ac792cf8ce2ee97ff4dfdce949fc85d2f5aab34bdb8a21a498e41d5",
       "inc/update.php": "sha256:f89a7bbe5b99c393fc78b9f27742a7ce13a07afa1f9caf45326fcc63a3808532",
       "inc/variations.php": "sha256:54eee8dcec3f61fcaaffa3ecde6887b2b467cec816cce873f47aa4389d79a447",
       "inspirations.json": "sha256:071a7c430dfbdec5e69af730cf5e88f51741cfd05b3222f663eb28fb1d1897c7",
-      "parts/footer.html": "sha256:5724f320144d79c7873068329061bca0defb93973846f668c810ffb425a6e057",
-      "parts/header.html": "sha256:523e558cf97208b95e7c44c2d64b1d370fdf5e4ee0202967a0dc6635fe2474bf",
+      "parts/footer.html": "sha256:c924bcf22824e68ef21dcc4bd948b7808cbab9449775e22d19959c4e3cda3c01",
+      "parts/header.html": "sha256:b358dbf9a2250bf7418e6f89619cb66fe64278af05bb03eddbe29e65ffffef5c",
       "parts/share.html": "sha256:43b8a048bed75275ab340293d161b056643675646c2292314ede8b69adfa0bf6",
       "patterns/acm-cards-inline.php": "sha256:879f6587d4499d9c0c86a5fa542b8b383402b168d354d6079f4c2c8feb19d088",
       "patterns/acm-cards.php": "sha256:d1734f7237bd5a0035a3ba277407747b15154a9ce08cc8acc20d9347622bb9a9",
@@ -1720,12 +1766,12 @@
       "patterns/acm-hero.php": "sha256:e421d75e053a89f72635d48ae824dbf037c86738dbf6c2deb98799bc2da669db",
       "patterns/acm-latest.php": "sha256:103de50b223ec4a4f15bd5c51bd2d3e6af6adb220e44cf3e32876041920112b4",
       "patterns/acm-news.php": "sha256:ca1b66f10d417fa30378f5642c0af007870a2c87315387da350dfb57edd9aed8",
-      "patterns/acm-positions.php": "sha256:5695db126c87d0f2daa8a9ab6456349d4fc854ce5e1d95ce191c8a72d155ab84",
+      "patterns/acm-positions.php": "sha256:c9c452f7322bf670745b84a3b784f6d7fc8ae43416687e2fc0bf9f95fb7fad25",
       "patterns/acm-pricing.php": "sha256:b213e521a12b98a6c4b8a76f3932da945b4f047dbc1de0260fba1a2a0e83f648",
       "patterns/acm-project-tabs.php": "sha256:d41880a45b8fb788933371efc4d8215640179da910b2d262b0ae3c093a68f48f",
       "patterns/acm-related-projects.php": "sha256:51970af4a8cff81b0336c7d36eebbc8fc248e64dfc6550314b4b9cd27236791c",
       "patterns/acm-related.php": "sha256:7f208bfc59ee3b96c62e6c183ed8e01fb25734655b893c4e3972f61851b281c5",
-      "patterns/acm-search-band.php": "sha256:e27bb751b37d81533235dad3262d63eb76b5d4122ba2783e126521651f701934",
+      "patterns/acm-search-band.php": "sha256:e5de3c7db0d8d7a0d527e34c10b5091a2f862cc58324e8acb60174f168042de6",
       "patterns/acm-stats.php": "sha256:0620310f26505126df7a94a9f64d25fc37f29f096bb4a7d6d5e5c18a0b2efd5e",
       "patterns/acm-teams.php": "sha256:128306e48801da11372c01839aa4fcc4bcc40077673cd82b7cec93dba4f9bde6",
       "patterns/acm-text-slider.php": "sha256:91d4f271d3a52258f9aec73795ff2a9e72d026416edb9764d65ea3331fcee887",
@@ -1752,7 +1798,7 @@
       "patterns/section-team.php": "sha256:539399cdefc0989bfdc07cc6ef300e1a632db5d1c40e067cfcae545adff68092",
       "readme.txt": "sha256:77462bb0f645a5e357002bbcdbcf7d08e62f0ca66c55e4b4bfc6e78c960cb9d5",
       "screenshot.png": "sha256:f02d6016b09875cbad0ce2db9a763a41b4aa11896ecfe4aba1872727d5181e00",
-      "style.css": "sha256:fcac4f4e59b717ef2e6ac2a5e0ab5b8926c9d41b5a27f81d58e3293b4cadcfcc",
+      "style.css": "sha256:351f3bc4912eae06e355532d822a6e18d6af1132a57611d87f4409fefeb66839",
       "styles/wp-ja-nova.json": "sha256:a338f41150f7362ff39a30f251563bf906c54e21475333e29a6590ddcd991338",
       "templates/404.html": "sha256:5b0b349d68c010b9da0436c58d1ca5980c3556af03b948e13c72aab15cd18922",
       "templates/archive.html": "sha256:eec1b5f210594812bffce95228a2a18de25e4341b92172e8fea832e6d549b3fd",
@@ -2003,134 +2049,9 @@
     "redirects": 0,
     "inputs": {
       "page-map.json": "sha256:3615dc69bf381ef37f3f7dc405e1c44d73f4ddf3103a31e5681d6c5d2f896ad5",
-      "menus.json": "sha256:5f8b1b76910528ccc8ab0f790971c37c008bbd509e15ec11e3451010b3661af9",
+      "menus.json": "sha256:3fbc6bd7b037249d09a5c8a3a1c7c940ab11cd9b305e377e41723972377b21ab",
       "redirects.json": "sha256:50856157d653fba165cddc577c7928c192318a92c2aff574a4d8c5420daf610b"
     }
   },
-  "seed": {
-    "file": "seed-report-last.json",
-    "startedAt": "2026-10-01T11:55:17.912Z",
-    "label": "at seed time, not live",
-    "counts": {
-      "authors": {
-        "total": 9,
-        "created": 0,
-        "updated": 0,
-        "skipped": 9
-      },
-      "categories": {
-        "total": 7,
-        "created": 0,
-        "updated": 0,
-        "skipped": 7
-      },
-      "forms": {
-        "total": 1,
-        "created": 0,
-        "updated": 0,
-        "skipped": 1
-      },
-      "navigation": {
-        "total": 6,
-        "created": 0,
-        "updated": 0,
-        "skipped": 6
-      },
-      "options": {
-        "total": 8,
-        "created": 0,
-        "updated": 0,
-        "skipped": 8
-      },
-      "pages": {
-        "total": 28,
-        "created": 0,
-        "updated": 0,
-        "skipped": 28
-      },
-      "posts": {
-        "total": 45,
-        "created": 0,
-        "updated": 0,
-        "skipped": 45
-      },
-      "templateParts": {
-        "total": 2,
-        "created": 0,
-        "updated": 0,
-        "skipped": 2
-      }
-    },
-    "navigation": [
-      "jcontent",
-      "jpages",
-      "mainmenu",
-      "services",
-      "tracy-footer-1",
-      "users"
-    ],
-    "templateParts": [
-      "footer",
-      "header"
-    ],
-    "redirects": 2,
-    "sections": {
-      "total": 68,
-      "byKind": {
-        "acm": 68
-      },
-      "byPattern": {
-        "wp-ja-nova/section-cards": 2,
-        "wp-ja-nova/section-cards-inline": 7,
-        "wp-ja-nova/section-clients": 1,
-        "wp-ja-nova/section-cta": 1,
-        "wp-ja-nova/section-cta-bar": 25,
-        "wp-ja-nova/section-expertise": 1,
-        "wp-ja-nova/section-faq": 9,
-        "wp-ja-nova/section-feature": 5,
-        "wp-ja-nova/section-hero": 1,
-        "wp-ja-nova/section-latest": 1,
-        "wp-ja-nova/section-news": 1,
-        "wp-ja-nova/section-positions": 1,
-        "wp-ja-nova/section-pricing": 1,
-        "wp-ja-nova/section-project-tabs": 1,
-        "wp-ja-nova/section-related": 1,
-        "wp-ja-nova/section-related-projects": 1,
-        "wp-ja-nova/section-search-band": 1,
-        "wp-ja-nova/section-stats": 2,
-        "wp-ja-nova/section-teams": 2,
-        "wp-ja-nova/section-text-slider": 2,
-        "wp-ja-nova/section-values": 1,
-        "wp-ja-nova/section-video": 1
-      },
-      "pages": 25
-    },
-    "routes": {
-      "checked": 33,
-      "ok": 31
-    },
-    "media": {
-      "files": 142,
-      "imported": 0
-    },
-    "notes": [
-      "43 post(s) shared a post_date with another; each got one second in source order so date-sorted listings serve the same order on every request",
-      "Contact Form 7 form contact built from section contact-form-1: text name, email email, tel phone, text subject, textarea message",
-      "no section of the spec draws a subscribe box (one email field and a Subscribe button); no newsletter form created — a sidebar calling [contact-form-7 title=\"Newsletter\"] prints \"Contact form not found\"",
-      "post authors: antoinette-huff \"Antoinette Huff\" [source joomla-user-47] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), brian-jennings \"Brian Jennings\" [source joomla-user-45] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), dewey-mann \"Dewey Mann\" [source joomla-user-48] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), elijah-knight \"Elijah Knight\" [source joomla-user-46] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), henry-delgado \"Henry Delgado\" [source joomla-user-43] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), hubert-santos \"Hubert Santos\" [source joomla-user-49] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), tracyagent \"Tracy Agent\" [source joomla-user-42] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), lucy-reid \"Lucy Reid\" [source joomla-user-44] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc), warren-stevens \"Warren Stevens\" [source joomla-user-50] (Posuere nibh vestibulum, velit pulvinar interdum sed in. Magnis netus magna urna, in tempor magna. Tortor vel vitae vel mi. Leo pellentesque eget pellentesque magnis. Pellentesque molestie sem massa nibh suspendisse ante eget. Sit dolor arcu scelerisque sit nibh nunc)",
-      "111 hero.btn-link-2: block hero.button-2 not in pattern",
-      "123 features-intro.btn-link: block features-intro.button not in pattern",
-      "123 features-intro.link-style: block features-intro.button not in pattern",
-      "125 features-intro.btn-link: block features-intro.button not in pattern",
-      "125 features-intro.link-style: block features-intro.button not in pattern",
-      "144 features-intro.link-btn: block features-intro.title-btn not in pattern",
-      "144 features-intro.link-style: block features-intro.title-btn not in pattern",
-      "143 features-intro.btn-link: block features-intro.button not in pattern",
-      "143 features-intro.link-style: block features-intro.button not in pattern",
-      "no page with view home in the page-map; page_for_posts left unset",
-      "single view: redirected to article 5 (virtual-memorials-exploring-the-impact-of-business-technology-on-mourning)",
-      "single view: redirected to article 42 (brochure-and-flyer-design)"
-    ],
-    "hash": "sha256:6b3fad9e837e0a4d95d8c05caaba81b8c47663f3d12c6c13c7d7ceca7fc57794"
-  }
+  "seed": null
 }

@@ -48,10 +48,10 @@ no second look to switch to.
 
 ## Dark mode
 
-**Three states — light, dark, auto.** The visitor's choice is kept a year in the **`tracy_theme`
-cookie** (`light`, `dark` or `auto`; `Path=/`) and applied as **`data-theme="light|dark"`** on
-`<html>`. **No attribute = auto**: the operating system decides through `prefers-color-scheme`,
-which is also what a first visit gets. Colours carry both halves through `light-dark()`, and
+**Light or dark, flipped on every click.** The toggle flips whichever theme the page shows, so the first
+click always changes the page. The visitor's choice is kept a year in the **`tracy_theme` cookie** (`light`,
+`dark`; an old `auto` is still read) and applied as **`data-theme="light|dark"`** on `<html>`. **No attribute =
+auto**: the operating system decides through `prefers-color-scheme`, which is also what a first visit gets. Colours carry both halves through `light-dark()`, and
 `color-scheme` is `light dark`, narrowed to one by `data-theme`. The dark half is the source's own
 dark stylesheet, read back as computed style (page `#14171c`, raised surfaces `#1e232b`, text
 `#c2c9d2`, headings `#eef1f6`, link `#9d8cff`); where the source's dark mode leaves a light-mode

@@ -73,7 +73,7 @@ The quickstart is the site **as built**; anything edited since lives only in you
 
 - The contact form needs Contact Form 7 and an outbound mail route; the build stand's mail was not
   configured, so delivery was not tested.
-- Closed registration, the open items listed in docs/content-rules.md.
+- The open items listed in docs/content-rules.md. Mail for registration passwords and passkeys on a domain other than the one they were made on are the site owner's to set up.
 - No update offer until the theme's update manifest is published (above).
 - The source theme's design pages (`fixture`, `artifact`, `landing`, `pricing` templates) and its
   19 `tracy/*` library patterns are not used by this site and were not reviewed on it.
