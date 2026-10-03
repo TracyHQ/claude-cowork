@@ -45,7 +45,7 @@ html body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-styl
 	}
 	body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4) .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
 	body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4) .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
-		color: var(--jm-red);
+		color: light-dark(var(--jm-red), var(--ja-accent));
 	}
 	body.jm-route-home-style-2 .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-item {
 		padding-left: 20px;

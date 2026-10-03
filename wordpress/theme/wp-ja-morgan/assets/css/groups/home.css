@@ -279,6 +279,7 @@ body.jm-route-services-page .acm-features.style-4 .col:nth-child(3) .features-it
 	box-sizing: border-box;
 }
 .acm-statics.style-1 .statics-item {
+	border-right: 1px solid rgba(255, 255, 255, 0.2);
 	padding: 180px 0;
 	text-align: center;
 	color: #ffffff;
@@ -553,4 +554,46 @@ body.jm-route-about-us .acm-teams {
 /* The lead of a features section may be two paragraphs (the source: a <p> and a bare text line). */
 .acm-features.style-3 .lead.jm-lead-more {
 	margin-top: 0;
+}
+
+/* ---- Feature slide arrows: the source shows them only where the slide pages (one item per view, under 768 px): 50 px squares, grey, 13 px apart ---- */
+.acm-feature-slide .tracy-motion-nav {
+	display: none;
+}
+@media (max-width: 767px) {
+	.acm-feature-slide .tracy-motion-nav {
+		display: flex;
+		gap: 13px;
+		margin: 25px 0 0 15px;
+	}
+	.acm-feature-slide .tracy-motion-nav button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 50px;
+		height: 50px;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: light-dark(#f2f3f7, #1d2434);
+		color: var(--jm-navy-fg);
+		font-size: 0;
+		cursor: pointer;
+	}
+	.acm-feature-slide .tracy-motion-nav button::before {
+		content: "";
+		width: 10px;
+		height: 10px;
+		border: solid currentColor;
+		border-width: 0 0 2px 2px;
+		transform: translateX(2px) rotate(45deg);
+	}
+	.acm-feature-slide .tracy-motion-nav .tracy-motion-next::before {
+		transform: translateX(-2px) rotate(-135deg);
+	}
+}
+
+/* A carousel whose slides all fit has one page: the source draws no dots then (the runtime draws one). */
+.tracy-motion-dots:has(> .tracy-motion-dot:only-child) {
+	display: none;
 }

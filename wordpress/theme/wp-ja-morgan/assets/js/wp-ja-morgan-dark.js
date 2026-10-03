@@ -1,27 +1,27 @@
 /* wp-ja-morgan: the dark mode switch.
  *
- * Three states — light, dark, auto — kept for a year in the `tracy_theme` cookie. Light and dark
- * are `data-theme` on the root element; auto is its absence, and the stylesheet then follows the
- * OS through prefers-color-scheme. This file is enqueued in the head, blocking, so the attribute
- * is on the root before the first paint; the toggle buttons ([data-tracy-theme-toggle]) are wired
- * once the document has parsed. Each click cycles light → dark → auto.
+ * The visible theme is light or dark; a click flips whichever one is showing. The choice is kept
+ * for a year in the `tracy_theme` cookie. Light and dark are `data-theme` on the root element;
+ * "auto" (no cookie yet, or an old `auto` one) is its absence, and the stylesheet then follows the
+ * OS through prefers-color-scheme. The first click from auto therefore always changes the page: it
+ * picks the opposite of what the OS shows. This file is enqueued in the head, blocking, so the
+ * attribute is on the root before the first paint; the toggle buttons ([data-tracy-theme-toggle] —
+ * one in the desktop header, one in the phone header) are wired once the document has parsed.
  *
- * The source (JA Morgan, js/theme-switch.js) keeps the choice in localStorage `ja-morgan-theme` and
- * toggles two states; the Tracy themes keep one convention for every port, a cookie and three
- * states (skill invariant 4), so the admin preview and the page agree.
+ * The source (JA Morgan, js/theme-switch.js) toggles two states too; it keeps the choice in
+ * localStorage `ja-morgan-theme`, the Tracy themes keep it in the cookie, so the admin preview and
+ * the page agree.
  *
- * `?theme=dark|light` on the address wins for that load and is never saved, as in the other ported
- * themes: a page framing the site from another origin (Tracy's Design inspiration preview) can
- * neither set this cookie nor change the OS preference. Only a click on the toggle writes the
- * cookie. */
+ * `?theme=dark|light` on the address wins for that load and is never saved: a page framing the
+ * site from another origin (Tracy's Design inspiration preview) can neither set this cookie nor
+ * change the OS preference. Only a click on the toggle writes the cookie. */
 ;(() => {
   const COOKIE = 'tracy_theme'
-  const STATES = ['light', 'dark', 'auto']
   const LABELS = {
     light: 'Theme: light. Switch to dark',
-    dark: 'Theme: dark. Switch to automatic',
-    auto: 'Theme: automatic. Switch to light'
+    dark: 'Theme: dark. Switch to light'
   }
+  const os = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
   const root = document.documentElement
 
   const read = () => {
@@ -34,13 +34,18 @@
     document.cookie = `${COOKIE}=${state}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`
   }
 
+  // What the page shows for a state: auto shows what the OS asks for.
+  const shown = (state) =>
+    state === 'dark' || state === 'light' ? state : os && os.matches ? 'dark' : 'light'
+
   const apply = (state) => {
+    const now = shown(state)
     if (state === 'auto') root.removeAttribute('data-theme')
     else root.setAttribute('data-theme', state)
     for (const button of document.querySelectorAll('[data-tracy-theme-toggle]')) {
-      button.setAttribute('aria-pressed', state === 'dark' ? 'true' : 'false')
-      button.setAttribute('aria-label', LABELS[state])
-      button.setAttribute('data-theme-state', state)
+      button.setAttribute('aria-pressed', now === 'dark' ? 'true' : 'false')
+      button.setAttribute('aria-label', LABELS[now])
+      button.setAttribute('data-theme-state', now)
     }
   }
 
@@ -62,12 +67,15 @@
     document.addEventListener('DOMContentLoaded', () => apply(state))
   }
 
+  // In auto the page follows the OS live, so the buttons' label and icon must too.
+  if (os && os.addEventListener) os.addEventListener('change', () => state === 'auto' && apply(state))
+
   document.addEventListener('click', (event) => {
     const target = event.target
     const button = target && target.closest ? target.closest('[data-tracy-theme-toggle]') : null
     if (!button) return
     event.preventDefault()
-    state = STATES[(STATES.indexOf(state) + 1) % STATES.length]
+    state = shown(state) === 'dark' ? 'light' : 'dark'
     apply(state)
     write(state)
   })

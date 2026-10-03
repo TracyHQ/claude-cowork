@@ -10,29 +10,14 @@
  * @package wp-ja-morgan
  */
 
-$cards = function_exists( 'wp_ja_morgan_b_tag_cards' ) ? wp_ja_morgan_b_tag_cards() : array();
-$rows  = array_chunk( $cards, 3, true );
+$jm_params = wp_ja_morgan_b_filter_params();
+$cards     = function_exists( 'wp_ja_morgan_b_tag_cards' ) ? wp_ja_morgan_b_filter_cards( wp_ja_morgan_b_tag_cards(), $jm_params ) : array();
+$rows      = array_chunk( $cards, 3, true );
 ?>
 <!-- wp:html -->
 <div class="tag-category">
-<form class="tag-list-form" method="get" action="">
-<fieldset class="filters btn-toolbar">
-<div class="btn-group">
-<label class="filter-search-lbl screen-reader-text" for="filter-search"><?php esc_html_e( 'Enter Part of Title', 'wp-ja-morgan' ); ?></label>
-<input type="text" name="filter-search" id="filter-search" value="" class="inputbox" placeholder="<?php esc_attr_e( 'Enter Part of Title', 'wp-ja-morgan' ); ?>" />
-<button type="submit" class="btn" title="<?php esc_attr_e( 'Search', 'wp-ja-morgan' ); ?>"><span class="fa fa-search"></span></button>
-<button type="reset" class="btn" title="<?php esc_attr_e( 'Clear', 'wp-ja-morgan' ); ?>"><span class="fa fa-remove"></span></button>
-</div>
-<div class="btn-group pull-right">
-<label for="limit" class="screen-reader-text"><?php esc_html_e( 'Display #', 'wp-ja-morgan' ); ?></label>
-<select id="limit" name="limit" class="form-select">
-<?php foreach ( array( 5, 10, 15, 20, 25, 30, 50, 100, 200, 500 ) as $n ) : ?>
-<option value="<?php echo (int) $n; ?>"<?php selected( 20, $n ); ?>><?php echo (int) $n; ?></option>
-<?php endforeach; ?>
-<option value="0"><?php esc_html_e( 'All', 'wp-ja-morgan' ); ?></option>
-</select>
-</div>
-</fieldset>
+<?php echo wp_ja_morgan_b_filter_form( $jm_params ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the builder. ?>
+<div class="tag-list-results">
 <?php foreach ( $rows as $row ) : ?>
 <div class="cats-list row">
 <?php
@@ -41,9 +26,6 @@ foreach ( $row as $slug => $card ) :
 	// A tag no post carries has no term here (WordPress keeps none), so it points at the tagged-items listing like `morgan`.
 	$link = ( 'morgan' === $slug || ! $term ) ? home_url( '/joomlart-content/tagged-items/' ) : get_term_link( $term );
 	$name = $term ? $term->name : ucfirst( $slug );
-	if ( 'joomlart' === $slug ) {
-		$name = 'JoomlArt';
-	}
 	$img = wp_ja_morgan_b_media( $card[0] );
 	?>
 <div class="col-sm-4">
@@ -59,6 +41,7 @@ foreach ( $row as $slug => $card ) :
 <?php endforeach; ?>
 </div>
 <?php endforeach; ?>
-</form>
+</div>
+<?php if ( ! $cards ) : ?><p class="alert alert-info"><?php esc_html_e( 'No tags match this filter.', 'wp-ja-morgan' ); ?></p><?php endif; ?>
 </div>
 <!-- /wp:html -->

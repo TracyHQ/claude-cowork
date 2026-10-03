@@ -10,17 +10,17 @@
  * @package wp-ja-morgan
  */
 
-$pictures = function_exists( 'wp_ja_morgan_b_category_pictures' ) ? wp_ja_morgan_b_category_pictures() : array();
+$slugs = function_exists( 'wp_ja_morgan_b_category_slugs' ) ? wp_ja_morgan_b_category_slugs() : array();
 ?>
 <!-- wp:html -->
 <div class="categories-list row">
 <?php
-foreach ( $pictures as $slug => $file ) :
+foreach ( $slugs as $slug ) :
 	$term = get_term_by( 'slug', $slug, 'category' );
 	if ( ! $term ) {
 		continue;
 	}
-	$img = wp_ja_morgan_b_media( $file );
+	$img = wp_get_attachment_image_url( (int) get_term_meta( $term->term_id, 'thumbnail_id', true ), 'full' );
 	?>
 <div class="category-item col-md-6">
 <div class="category-item-inner">

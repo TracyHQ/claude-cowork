@@ -393,6 +393,16 @@
       "area": "footer"
     },
     {
+      "name": "footer-hs3",
+      "title": "Footer (Home Style 3)",
+      "area": "footer"
+    },
+    {
+      "name": "footer-hs4",
+      "title": "Footer (Home Style 4)",
+      "area": "footer"
+    },
+    {
       "name": "sidebar",
       "title": "Sidebar",
       "area": "uncategorized"

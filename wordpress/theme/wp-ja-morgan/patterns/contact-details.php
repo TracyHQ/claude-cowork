@@ -75,7 +75,7 @@
 <p class="title"><?php esc_html_e( 'Website', 'wp-ja-morgan' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- wp:paragraph {"className":"content"} -->
-<p class="content"><a target="_blank" rel="noopener" href="https://joomlart.com">https://joomlart.com</a></p>
+<p class="content"><a target="_blank" rel="noopener" href="https://example.com">https://example.com</a></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->

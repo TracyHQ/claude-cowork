@@ -17,7 +17,7 @@ been published). The tag `quickstart/ja-morgan/j6` is the Joomla **source**, not
 | Plugins | none required by the theme. Forms need a mail route on the host, not a plugin (docs/architecture.md); D-13 leaves open whether to add a form plugin |
 | Table prefix | `tr_` on the build stand |
 | Permalinks | `/%postname%/`: the source's nested paths rely on it |
-| Registration | the `/j-pages/registration` form works only when the core setting `users_can_register` is on; otherwise the handler answers with an error notice (`error-closed`) |
+| Registration | the source's registration is open, so the build stand and the quickstart ship `users_can_register` = 1 with `default_role` = `subscriber`; the `/j-pages/registration` form creates that account. With the setting off the page shows "Registration is closed on this site" and a Log in link (no form), the sign-in module drops its "Create an account" link, and a direct post answers `error-closed` |
 
 ## Theme alone
 
