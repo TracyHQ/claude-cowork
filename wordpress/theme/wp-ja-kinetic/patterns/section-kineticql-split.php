@@ -33,17 +33,17 @@
 <!-- /wp:paragraph -->
 <!-- wp:list {"className":"acm-split-checks"} -->
 <ul class="wp-block-list acm-split-checks">
-<!-- wp:list-item {"metadata":{"role":"content","name":"kineticql-split.bullet-text.1"}} -->
-<li><?php esc_html_e( 'Join logs to traces in one expression', 'wp-ja-kinetic' ); ?></li>
+<!-- wp:list-item {"className":"acm-kineticql-bullet","metadata":{"role":"content","name":"kineticql-split.bullet-text.1"}} -->
+<li class="acm-kineticql-bullet"><?php esc_html_e( 'Join logs to traces in one expression', 'wp-ja-kinetic' ); ?></li>
 <!-- /wp:list-item -->
-<!-- wp:list-item {"metadata":{"role":"content","name":"kineticql-split.bullet-text.2"}} -->
-<li><?php esc_html_e( 'Save and share queries as alerts', 'wp-ja-kinetic' ); ?></li>
+<!-- wp:list-item {"className":"acm-kineticql-bullet","metadata":{"role":"content","name":"kineticql-split.bullet-text.2"}} -->
+<li class="acm-kineticql-bullet"><?php esc_html_e( 'Save and share queries as alerts', 'wp-ja-kinetic' ); ?></li>
 <!-- /wp:list-item -->
-<!-- wp:list-item {"metadata":{"role":"content","name":"kineticql-split.bullet-text.3"}} -->
-<li><?php esc_html_e( 'Sub-second over 13 months of data', 'wp-ja-kinetic' ); ?></li>
+<!-- wp:list-item {"className":"acm-kineticql-bullet","metadata":{"role":"content","name":"kineticql-split.bullet-text.3"}} -->
+<li class="acm-kineticql-bullet"><?php esc_html_e( 'Sub-second over 13 months of data', 'wp-ja-kinetic' ); ?></li>
 <!-- /wp:list-item -->
-<!-- wp:list-item {"metadata":{"role":"content","name":"kineticql-split.bullet-text.4"}} -->
-<li><?php esc_html_e( 'Versioned, reviewable, in git', 'wp-ja-kinetic' ); ?></li>
+<!-- wp:list-item {"className":"acm-kineticql-bullet","metadata":{"role":"content","name":"kineticql-split.bullet-text.4"}} -->
+<li class="acm-kineticql-bullet"><?php esc_html_e( 'Versioned, reviewable, in git', 'wp-ja-kinetic' ); ?></li>
 <!-- /wp:list-item -->
 </ul>
 <!-- /wp:list -->

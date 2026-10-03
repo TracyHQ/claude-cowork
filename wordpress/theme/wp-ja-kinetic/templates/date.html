@@ -5,11 +5,6 @@
 <header class="wp-block-group hx-archmast hx-grid-bg">
 <!-- wp:group {"className":"hx-container hx-pad hx-archmast__inner","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-container hx-pad hx-archmast__inner">
-<!-- the source's crumb (`archive/default.php:100-113`) prints three language strings — Home,
-     `TPL_JA_KINETIC_BLOG_KICKER_CAP`, `TPL_JA_KINETIC_ARCHIVE_CRUMB` — not the generic `wp:breadcrumbs`
-     block's real WP date-archive segments ("Home / 2026 / July"). Here the archive page's custom
-     fields, filled by inc/owner-text.php (D-40); the lede below is that page's excerpt.
-     The `<p>` the paragraph block forces is dropped with `display: contents`. -->
 <!-- wp:group {"tagName":"nav","className":"hx-archmast__bc"} -->
 <nav class="wp-block-group hx-archmast__bc" aria-label="Breadcrumb">
 <!-- wp:paragraph {"metadata":{"name":"page.crumb"}} -->
@@ -17,10 +12,6 @@
 <!-- /wp:paragraph -->
 </nav>
 <!-- /wp:group -->
-<!-- source: `<span class="hx-archmast__pill">` (`archive/default.php:108`) — group's `tagName`
-     already renders arbitrary HTML elements elsewhere in this overlay (`nav`/`header`/`main`/
-     `section`/`aside`/`footer`, all verified live); `span` is the same free string, no dynamic
-     render callback validates it against a fixed list. -->
 <!-- wp:group {"tagName":"span","className":"hx-archmast__pill","layout":{"type":"default"}} -->
 <span class="wp-block-group hx-archmast__pill"><span class="hx-archmast__dot" aria-hidden="true"></span>ARCHIVE</span>
 <!-- /wp:group -->
@@ -79,7 +70,6 @@
 <!-- /wp:group -->
 <!-- wp:group {"tagName":"aside","className":"hx-arch-rail hx-arch-tags","layout":{"type":"default"}} -->
 <aside class="wp-block-group hx-arch-rail hx-arch-tags" aria-label="Tags">
-<!-- source: `<span class="hx-arch-rail__h">` (`archive/default.php:153`). -->
 <!-- wp:group {"tagName":"span","className":"hx-arch-rail__h","layout":{"type":"default"}} -->
 <span class="wp-block-group hx-arch-rail__h">Tags</span>
 <!-- /wp:group -->

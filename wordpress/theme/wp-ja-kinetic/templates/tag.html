@@ -5,12 +5,6 @@
 <div class="wp-block-group com-tags__masthead kinetic-tags-masthead hx-grid-bg">
 <!-- wp:group {"className":"hx-container kinetic-tags-mast-inner","layout":{"type":"default"}} -->
 <div class="wp-block-group hx-container kinetic-tags-mast-inner">
-<!-- source: "Home / Tags / {tag}" (`com_tags/tag/default.php:38-41`), reusing the exact
-     `hx-author__bc-*` classes/CSS the single-author breadcrumb already carries — the source
-     styles both from the same rule (`style="..."` inline on this element there, ported as the
-     shared `.hx-author__bc` class here instead of repeating the inline declarations).
-     inc/tag-parity.php drops the paragraph's `<p>` and moves the tag name into the trail span,
-     where the source prints it. -->
 <!-- wp:group {"tagName":"nav","className":"hx-author__bc kinetic-tags-bc"} -->
 <nav class="wp-block-group hx-author__bc kinetic-tags-bc" aria-label="Breadcrumb">
 <!-- wp:paragraph -->
@@ -22,8 +16,6 @@
 <!-- wp:paragraph {"className":"hx-eyebrow kinetic-eyebrow kinetic-tags-eyebrow"} -->
 <p class="hx-eyebrow kinetic-eyebrow kinetic-tags-eyebrow">TAGGED</p>
 <!-- /wp:paragraph -->
-<!-- "Tagged: {name}" prefix comes from `wp_ja_kinetic_tag_archive_title()` (inc/blog-dynamic.php)
-     filtering `get_the_archive_title()`, which this block calls when `showPrefix` is true. -->
 <!-- wp:query-title {"type":"archive","level":1,"className":"hx-h1 com-tags__title kinetic-tags-h1","showPrefix":true} /-->
 <!-- wp:term-description {"className":"hx-mast-sub com-tags__sub kinetic-tags-sub"} /-->
 </div>
@@ -36,9 +28,6 @@
 <div class="wp-block-group hx-container">
 <!-- wp:group {"className":"com-tags__items","layout":{"type":"default"}} -->
 <div class="wp-block-group com-tags__items">
-<!-- perPage 20, orderby title ASC: source `TagModel.php:211,228,237` — Joomla's global
-     `list_limit` default (20) and the tag view's own default sort (`c.core_title` ASC), NOT
-     the date-desc order every other listing in this overlay uses. -->
 <!-- wp:query {"queryId":1,"query":{"perPage":20,"pages":0,"offset":0,"postType":"post","order":"asc","orderBy":"title","inherit":true},"className":"com-tags__rows","layout":{"type":"default"}} -->
 <div class="wp-block-query com-tags__rows">
 <!-- wp:post-template {"layout":{"type":"default"}} -->
@@ -51,8 +40,6 @@
 <!-- wp:group {"className":"com-tags__row-meta","layout":{"type":"default"}} -->
 <div class="wp-block-group com-tags__row-meta">
 <!-- wp:post-author-name {"className":"com-tags__row-author"} /-->
-<!-- the source's dot is a real element (`default_items.php`: `<span class="com-tags__row-dot"
-     aria-hidden="true">·</span>`), not CSS-generated content — matched literally here. -->
 <!-- wp:paragraph {"className":"com-tags__row-dot"} -->
 <p class="com-tags__row-dot" aria-hidden="true">&middot;</p>
 <!-- /wp:paragraph -->
@@ -78,10 +65,6 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"com-tags-tag__pagination w-100","layout":{"type":"default"}} -->
 <div class="wp-block-group com-tags-tag__pagination w-100">
-<!-- a sibling of `.com-tags__items` inside `.hx-container`, outside the rows, as on the source.
-     com_tags/tag/default.php:51-58 renders the counter BEFORE the links, with Bootstrap
-     utility classes (`counter float-end pt-3 pe-2`) — unlike every other listing in this
-     overlay, which renders links then counter (`counter hx-muted`). -->
 <!-- wp:wp-ja-kinetic/kinetic-pagination {"counterFirst":true,"counterClassName":"counter float-end pt-3 pe-2"} /-->
 </div>
 <!-- /wp:group -->

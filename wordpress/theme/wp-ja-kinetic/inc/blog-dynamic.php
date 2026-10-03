@@ -55,6 +55,56 @@ function wp_ja_kinetic_current_category_term(): ?WP_Term {
 }
 
 /**
+ * True for the listing of one of the blog's child categories (Incident retros, Product, Tutorials,
+ * Practice, Culture) — not the blog's own top list and not Engineering, which has its own layout.
+ * These are the lists whose row eyebrows and equal-date order differ from the top list's: the source
+ * lets the database settle both per page, so the same two articles can swap places between lists.
+ *
+ * @param WP_Term|null $term The category being listed; null when there is none.
+ */
+function wp_ja_kinetic_is_child_listing( ?WP_Term $term ): bool {
+	return $term instanceof WP_Term && (int) $term->parent > 0 && 'engineering' !== $term->slug;
+}
+
+/**
+ * Which way articles with the same date go in a category's list. The source's ORDER BY leaves them to
+ * the database: the top list and Engineering show the older id first (135 before 165, 87 before 162),
+ * the five child lists the newer one (Practice page 2: article 296 before 109, the only tie there).
+ *
+ * @param WP_Term|null $term The category being listed.
+ * @return string 'ASC' or 'DESC'.
+ */
+function wp_ja_kinetic_listing_tie_order( ?WP_Term $term ): string {
+	return wp_ja_kinetic_is_child_listing( $term ) ? 'DESC' : 'ASC';
+}
+
+/**
+ * The topic eyebrow of an article: its first tag by assignment order, else its category's name. On a
+ * child category's list it is the tag the source printed on that list (post meta
+ * `wp_ja_kinetic_listing_topic`, written by the post-seed step from the source's own page query);
+ * the source does not pick the same tag for an article on every list, so the top list keeps the
+ * assignment-order tag.
+ *
+ * @param int  $post_id    The article.
+ * @param bool $in_listing True where a child category's list is being drawn.
+ * @return string Empty when the article has neither tag nor category.
+ */
+function wp_ja_kinetic_post_topic( int $post_id, bool $in_listing = true ): string {
+	if ( $in_listing && wp_ja_kinetic_is_child_listing( wp_ja_kinetic_current_category_term() ) ) {
+		$topic = trim( (string) get_post_meta( $post_id, 'wp_ja_kinetic_listing_topic', true ) );
+		if ( '' !== $topic ) {
+			return $topic;
+		}
+	}
+	$tags = wp_get_object_terms( $post_id, 'post_tag', array( 'orderby' => 'term_order' ) );
+	if ( $tags && ! is_wp_error( $tags ) && isset( $tags[0] ) ) {
+		return (string) $tags[0]->name;
+	}
+	$cats = get_the_category( $post_id );
+	return $cats ? (string) $cats[0]->name : '';
+}
+
+/**
  * True on page 1 of the category archive currently being viewed — the one place the source's
  * `category/blog.php` lifts its newest post into a separate featured card (`array_shift($rows)`,
  * gated `$this->pagination->pagesCurrent <= 1`). Engineering (`category/thumbs.php`) never does
@@ -97,7 +147,7 @@ function wp_ja_kinetic_category_featured_post(): ?WP_Post {
 			// Same tie-break as the grid below (`wp_ja_kinetic_force_posts_per_page()`), so both agree on "newest".
 			'orderby'        => array(
 				'date' => 'DESC',
-				'ID'   => 'ASC',
+				'ID'   => wp_ja_kinetic_listing_tie_order( $term ),
 			),
 			'no_found_rows'  => true,
 			'ignore_sticky_posts' => true,
@@ -223,9 +273,11 @@ function wp_ja_kinetic_force_posts_per_page( WP_Query $query ): void {
 		$query->set( 'post_type', array( 'post', 'page' ) );
 		// Same-date posts in the source's own order: its ORDER BY (`CategoryModel::
 		// _buildContentOrderBy()`, "a.created DESC, a.created") leaves equal dates to the DB's
-		// row order, which renders them oldest id first (measured on `/product/blog`: 135 before
-		// 165, 87 before 162). Core's plain `ORDER BY post_date DESC` returned 165's post first.
-		$query->set( 'orderby', array( 'date' => 'DESC', 'ID' => 'ASC' ) );
+		// row order, which renders them oldest id first on the top list (measured on `/product/blog`:
+		// 135 before 165, 87 before 162) and newest id first on a child list (Practice: 296 before
+		// 109). Core's plain `ORDER BY post_date DESC` returned 165's post first.
+		$tie_term = wp_ja_kinetic_current_category_term();
+		$query->set( 'orderby', array( 'date' => 'DESC', 'ID' => wp_ja_kinetic_listing_tie_order( $tie_term ) ) );
 		return;
 	}
 	if ( $query->is_tag() ) {

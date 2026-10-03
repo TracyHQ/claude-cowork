@@ -46,18 +46,18 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"hx-prose-body"} -->
 <div class="wp-block-group hx-prose-body">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"prose-quote.body.1"}} -->
-<p><?php esc_html_e( 'Kinetic started at 3 a.m. during an incident nobody could explain. Three dashboards, two log tools and a tracing system that never agreed — and a checkout outage burning revenue by the minute.', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-prose-quote-body","metadata":{"role":"content","name":"prose-quote.body.1"}} -->
+<p class="acm-prose-quote-body"><?php esc_html_e( 'Kinetic started at 3 a.m. during an incident nobody could explain. Three dashboards, two log tools and a tracing system that never agreed — and a checkout outage burning revenue by the minute.', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
-<!-- wp:paragraph {"metadata":{"role":"content","name":"prose-quote.body.2"}} -->
-<p><?php esc_html_e( 'We were tired of stitching context together by hand while customers waited. So we built the tool we wished we’d had: one pipeline where logs, metrics and traces share a schema, a timeline and a query language.', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-prose-quote-body","metadata":{"role":"content","name":"prose-quote.body.2"}} -->
+<p class="acm-prose-quote-body"><?php esc_html_e( 'We were tired of stitching context together by hand while customers waited. So we built the tool we wished we’d had: one pipeline where logs, metrics and traces share a schema, a timeline and a query language.', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:quote {"className":"hx-prose-quote"} -->
 <blockquote class="wp-block-quote hx-prose-quote">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"prose-quote.quote"}} -->
-<p><?php esc_html_e( 'Observability shouldn’t require a second mortgage or a PhD. It should just answer the question.', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-prose-quote-text","metadata":{"role":"content","name":"prose-quote.quote"}} -->
+<p class="acm-prose-quote-text"><?php esc_html_e( 'Observability shouldn’t require a second mortgage or a PhD. It should just answer the question.', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </blockquote>
 <!-- /wp:quote -->

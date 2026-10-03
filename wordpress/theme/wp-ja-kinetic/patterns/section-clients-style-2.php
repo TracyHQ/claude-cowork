@@ -42,8 +42,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.1"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Node.js', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.1"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Node.js', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -66,8 +66,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.2"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Python', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.2"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Python', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -90,8 +90,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.3"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Go', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.3"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Go', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -114,8 +114,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.4"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Java', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.4"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Java', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -138,8 +138,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.5"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Ruby', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.5"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Ruby', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -162,8 +162,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.6"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Rust', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.6"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Rust', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -197,8 +197,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.7"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'AWS', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.7"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'AWS', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -221,8 +221,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.8"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'GCP', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.8"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'GCP', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -245,8 +245,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.9"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Azure', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.9"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Azure', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -269,8 +269,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.10"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Kubernetes', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.10"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Kubernetes', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -293,8 +293,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.11"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Docker', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.11"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Docker', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -317,8 +317,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.12"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Terraform', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.12"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Terraform', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -352,8 +352,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.13"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Slack', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.13"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Slack', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -376,8 +376,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.14"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'PagerDuty', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.14"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'PagerDuty', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -400,8 +400,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.15"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'GitHub', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.15"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'GitHub', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -424,8 +424,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.16"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Jira', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.16"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Jira', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -448,8 +448,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.17"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Webhooks', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.17"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Webhooks', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -472,8 +472,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.18"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Grafana', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.18"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Grafana', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -507,8 +507,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.19"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Postgres', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.19"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Postgres', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -531,8 +531,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.20"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'MySQL', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.20"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'MySQL', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -555,8 +555,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.21"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Redis', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.21"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Redis', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -579,8 +579,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.22"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Kafka', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.22"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Kafka', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -603,8 +603,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.23"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Elasticsearch', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.23"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'Elasticsearch', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->
@@ -627,8 +627,8 @@
 <div class="wp-block-group hx-card acm-clients-card">
 <!-- wp:group {"className":"acm-clients-mark"} -->
 <div class="wp-block-group acm-clients-mark">
-<!-- wp:image {"sizeSlug":"large","metadata":{"role":"content","name":"clients.item-image.24"}} -->
-<figure class="wp-block-image size-large"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'ClickHouse', 'wp-ja-kinetic' ); ?>"/></figure>
+<!-- wp:image {"sizeSlug":"large","className":"acm-clients-item-image","metadata":{"role":"content","name":"clients.item-image.24"}} -->
+<figure class="wp-block-image size-large acm-clients-item-image"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'ClickHouse', 'wp-ja-kinetic' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->

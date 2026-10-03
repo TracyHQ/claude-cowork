@@ -611,6 +611,53 @@ function wp_ja_kinetic_drawer_drill_back( string $content, array $block ): strin
 add_filter( 'render_block', 'wp_ja_kinetic_drawer_drill_back', 10, 2 );
 
 /**
+ * The drawer's "Start free" button ends in the source's own arrow, an inline `<svg class="hx-cta-arrow">`
+ * (the header CTA markup the source prints twice). Core's navigation-link label is text only, so the
+ * arrow is added here, after the label, as a real element: a mask drawn from CSS paints the same
+ * pixels but is no icon to a reader of the panel's markup, and the source's panel holds two.
+ *
+ * @param string $content The rendered block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_kinetic_drawer_cta_arrow( string $content, array $block ): string {
+	if ( is_404() || 'core/navigation-link' !== ( $block['blockName'] ?? '' ) ) {
+		return $content;
+	}
+	$classes = preg_split( '/\s+/', trim( (string) ( $block['attrs']['className'] ?? '' ) ) );
+	if ( ! in_array( 'tracy-nav__cta', is_array( $classes ) ? $classes : array(), true ) ) {
+		return $content;
+	}
+	$arrow = '<svg class="hx-cta-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
+	return (string) preg_replace( '~(</span>)(\s*</a>)~', '$1' . $arrow . '$2', $content, 1 );
+}
+add_filter( 'render_block', 'wp_ja_kinetic_drawer_cta_arrow', 10, 2 );
+
+/**
+ * The source's error page prints its own static header, and its drawer differs from the site-wide one in
+ * two places (`templates/ja_kinetic/error.php`, measured open on the source's 404 at 390): the fifth row
+ * is a plain "Search" link where every other page has the "Pages" drill, and the "Start free" button has
+ * no arrow (see wp_ja_kinetic_drawer_cta_arrow). The desktop menu of the error page is the full one, and
+ * is a different block, so only the drawer's row is swapped.
+ *
+ * @param string $content The rendered block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_kinetic_404_drawer_row( string $content, array $block ): string {
+	if ( ! is_404() || 'core/navigation-submenu' !== ( $block['blockName'] ?? '' ) ) {
+		return $content;
+	}
+	if ( 'Pages' !== trim( (string) ( $block['attrs']['label'] ?? '' ) ) ) {
+		return $content;
+	}
+	return '<li class="wp-block-navigation-item wp-block-navigation-link"><a class="wp-block-navigation-item__content" href="'
+		. esc_url( home_url( '/pages/search/' ) ) . '"><span class="wp-block-navigation-item__label">'
+		. esc_html__( 'Search', 'wp-ja-kinetic' ) . '</span></a></li>';
+}
+add_filter( 'render_block', 'wp_ja_kinetic_404_drawer_row', 11, 2 );
+
+/**
  * The source's drawer opens on a head row — the logo (glyph + site name, linking home) and the
  * close button, over a divider (`.t4-off-canvas-header`, markup captured live on the running
  * source: `<a href="/" class="kinetic-logo" aria-label="Kinetic home"><svg class="kinetic-logo-glyph"

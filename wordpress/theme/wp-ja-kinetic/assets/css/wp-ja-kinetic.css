@@ -429,8 +429,12 @@ body .tracy-header__inner {
 /* Source: hover paints `chrome-heading`; the open state carries no colour rule of its own
    (css/template.css:20005-20031 has no `.show`/open selector), so the trigger only changes
    colour on `:hover`/`:focus`, not merely because its panel is open. */
-.tracy-mega__trigger:hover {
-  color: var(--chrome-heading);
+/* Pointer devices only: a tap leaves `:hover` stuck on the trigger, which lit "Product" beside the
+   current page's own item on touch; the source paints no hover colour there. */
+@media (hover: hover) {
+  .tracy-mega__trigger:hover {
+    color: var(--chrome-heading);
+  }
 }
 
 .tracy-mega__trigger[aria-current='page'] {
@@ -479,13 +483,18 @@ body .tracy-header__inner {
   display: none;
   position: absolute;
   inset-inline-start: 0;
-  top: 100%;
+  /* The source's nav item box is 80px tall inside the 67px header (it starts 7px above it), and its
+     panel hangs 8px below that box: 14px below the header's bottom edge. This item is 38px tall and
+     centred, so the 21px difference is added to the usual 100%. */
+  top: calc(100% + 21px);
   z-index: 30;
   margin-top: 8px;
   width: auto;
   min-width: 0;
-  background: var(--wp--preset--color--surface);
-  border: 1px solid var(--wp--preset--color--border);
+  /* chrome tokens, not the page's own surface: the Blueprint and Signal home variants repaint the
+     page surface, and the source's panel stays the header's own colour */
+  background: var(--chrome-surface);
+  border: 1px solid var(--chrome-border);
   border-radius: 14px;
   box-shadow: var(--wp--custom--elev--raised);
   padding: 28px;
@@ -494,6 +503,18 @@ body .tracy-header__inner {
 
 .tracy-mega.is-open > .tracy-mega__panel {
   display: block;
+}
+
+/* A hover bridge. The panel hangs 29px below the item's box (21px of offset + its 8px margin), so a
+   pointer crossing that strip leaves the item and the panel closes under it. The pseudo-element is
+   part of the panel, hence of the item, and fills the strip from the item's bottom edge to the
+   panel's top edge, so the walk from trigger to panel never leaves the region. */
+.tracy-mega__panel::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: -30px;
+  height: 30px;
 }
 
 .tracy-mega__inner {
@@ -510,24 +531,33 @@ body .tracy-header__inner {
 body .tracy-mega__columns {
   flex-wrap: nowrap;
   gap: 56px;
+  /* the block-gap bottom margin core puts under a columns block has no counterpart in the source's row */
+  margin-block-end: 0;
 }
 
-.tracy-mega__columns > .wp-block-column {
+/* Three classes plus `body`: core's `.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-block-column`
+   (flex-basis 0, grow 1) ties or beats a shorter selector and would give every column the same width;
+   the source's columns are as wide as their widest link. */
+body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-block-column {
   flex: 0 0 auto;
   width: auto;
 }
 
 /* Source: `.mega-col-title { font:600 11px/1 "JetBrains Mono"; letter-spacing:1.5px;
-   text-transform:uppercase; color:chrome-muted; margin:0 0 16px }` (css/template.css:20081-20090). */
+   text-transform:uppercase; margin:0 0 16px; padding:0 }` with `> span { color: chrome-text;
+   display:inline-block; padding-bottom:8px }` (measured open, light and dark). The title element here
+   is the heading itself, so the span's 8px sits in the margin and the heading's own padding stays 0,
+   as the source's heading does. */
 .tracy-mega__title {
-  margin: 0 0 16px;
+  margin: 0 0 24px;
+  padding: 0;
   font-family: var(--wp--preset--font-family--mono);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--chrome-muted);
+  color: var(--chrome-text);
   white-space: nowrap;
 }
 
@@ -541,7 +571,16 @@ body .tracy-mega__columns {
   gap: 13px;
 }
 
+.tracy-mega__links li {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Source: each link is a flex block as wide as its column and 21.7px (14px x 1.55) tall, so the whole
+   row is the tap target; an inline link was 18px tall and only as wide as its text. */
 .tracy-mega__links a {
+  display: flex;
+  line-height: 1.55;
   font-size: 14px;
   font-weight: 400;
   color: var(--chrome-text);
@@ -550,8 +589,10 @@ body .tracy-mega__columns {
   transition: color var(--wp--custom--motion--fast) var(--wp--custom--ease--standard);
 }
 
-.tracy-mega__links a:hover {
-  color: var(--chrome-heading);
+@media (hover: hover) {
+  .tracy-mega__links a:hover {
+    color: var(--chrome-heading);
+  }
 }
 
 /* The panel's link to the page being read. The source gives the active item the same colour as a
@@ -653,10 +694,17 @@ body .tracy-mega__columns {
   height: 20px;
 }
 
-/* Touch targets: the source's 36px square is under the 40px a finger needs; phones get 40px. */
-@media (max-width: 767px) {
+/* Touch targets: the source's 36px square is under the 40px a finger needs. The source itself raises the
+   header's two buttons to 40px for as long as the hamburger shows (`max-width: 991.98px`), tablets
+   included; the footer tiles follow on phones only. */
+@media (max-width: 991.98px) {
   .tracy-theme-toggle,
-  .tracy-header__menu .tracy-nav .wp-block-navigation__responsive-container-open,
+  .tracy-header__menu .tracy-nav .wp-block-navigation__responsive-container-open {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (max-width: 767px) {
   footer .tracy-footer__social-tile {
     width: 40px;
     height: 40px;
@@ -847,8 +895,10 @@ body .tracy-mega__columns {
   display: flex;
   align-items: center;
   box-sizing: content-box;
-  min-height: 32px;
-  padding: 18px 20px;
+  /* 18px + the 32px button + 18px, as the source's row; the 18px are the row's height, not its padding:
+     the source's row also holds the close button's "×", so its padding is not read as the logo's. */
+  min-height: 68px;
+  padding: 0 20px;
   background: var(--chrome-surface);
   border-bottom: 1px solid var(--chrome-border);
 }
@@ -954,7 +1004,6 @@ body .tracy-mega__columns {
    the label (measured). The list's own 8px gap is part of each distance below. */
 .tracy-header__menu .tracy-nav .wp-block-navigation__container > .tracy-nav__signin {
   margin-top: 10px;
-  padding-top: 18px;
   border-top: 1px solid var(--chrome-border);
 }
 
@@ -967,6 +1016,9 @@ body .tracy-mega__columns {
   border-radius: 0;
   background: none;
   padding: 0 14px !important;
+  /* the 18px under the divider sit on the link, not on the item: the source's link has no padding,
+     and an item that holds only these words would have its own read as the link's */
+  margin-top: 18px;
   font-family: var(--wp--preset--font-family--body);
   font-size: 14px;
   font-weight: 400;
@@ -989,17 +1041,12 @@ body .tracy-mega__columns {
 }
 
 /* Source repeats the same header CTA markup (arrow svg included) inside the drawer
-   (`#acm-header-cta-228` appears twice, live capture): `<svg class="hx-cta-arrow" width="15" height="15"
-   viewBox="0 0 24 24" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12
-   12 19"/></svg>`. Core's navigation-link label is text only, so the same arrow is drawn as a mask. */
-.tracy-header__menu .tracy-nav .tracy-nav__cta > .wp-block-navigation-item__content::after {
-  content: '';
+   (`#acm-header-cta-228` appears twice, live capture). The arrow is the same inline `<svg class="hx-cta-arrow">`,
+   added after the label by wp_ja_kinetic_drawer_cta_arrow() in inc/extra.php. */
+.tracy-header__menu .tracy-nav .tracy-nav__cta > .wp-block-navigation-item__content > .hx-cta-arrow {
   flex: none;
   width: 15px;
   height: 15px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='5' y1='12' x2='19' y2='12'/%3E%3Cpolyline points='12 5 19 12 12 19'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='5' y1='12' x2='19' y2='12'/%3E%3Cpolyline points='12 5 19 12 12 19'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ---- footer: the four-column band, the dispatch band, then the legal strip — the three rows of
@@ -1317,14 +1364,39 @@ body .tracy-footer__news-row {
   transition: border-color var(--wp--custom--motion--fast) var(--wp--custom--ease--standard);
 }
 
-/* The error layout's own field is taller than every other page's — measured live on the running
-   source's 404 page: `display:block` (elsewhere `inline-block`, the plain UA default) and
-   line-height 21.7px (14px × the design's 1.55 body leading, elsewhere 16.8px/1.2) — a distinct
-   literal error.css carries, the same shape as this template's footer column rhythm above. */
-body.error404 .tracy-footer__news-row .acym_module input[type='email'],
-body.error404 .tracy-footer__news-row .acym_module input[type='text'] {
-  display: block;
-  line-height: var(--wp--custom--leading--body);
+/* The error layout's newsletter band is a copy block and a "Subscribe" link, not the form the other pages
+   carry: one row, copy at its own text width (483px) and the link at the far end, wrapping below the copy
+   on a phone. Source: `.kinetic-news-band { display:flex; justify-content:space-between; gap:24px;
+   flex-wrap:wrap }` and `.hx-news-btn` as an `a` (css/template.css:20680-20750). */
+.tracy-404-footer .tracy-footer__news-row {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.tracy-404-footer .tracy-footer__news-intro {
+  flex: 0 1 auto;
+  margin-right: 0;
+}
+
+.tracy-footer__news-btn {
+  display: inline-flex;
+  align-items: center;
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-radius: 9px;
+  padding: 13px 22px;
+  font-family: var(--wp--preset--font-family--body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+@media (hover: hover) {
+  .tracy-footer__news-btn:hover {
+    background: var(--primary-hover);
+    color: var(--primary-ink);
+  }
 }
 
 .tracy-footer__news-row .acym_module input[type='email']::placeholder,
@@ -1448,6 +1520,15 @@ body .tracy-footer__bottom {
   font-size: 13px;
   color: var(--chrome-muted);
   text-decoration: none;
+}
+
+/* Phones: the source makes each legal link a 40px-tall flex box (Privacy and Terms are 17px tall above 575px). */
+@media (max-width: 575.98px) {
+  .tracy-footer__legal a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
 }
 
 .tracy-footer__legal a:hover {
@@ -1901,18 +1982,25 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 
 /* Phones, after the drawer's own rules: its close button at 40px, and its group labels at the
    12px floor (the source's 11px). */
-@media (max-width: 767px) {
+@media (max-width: 991.98px) {
   .tracy-header__menu .tracy-nav .wp-block-navigation__responsive-dialog .wp-block-navigation__responsive-container-close {
     width: 40px;
     height: 40px;
   }
-  .tracy-header__menu .tracy-nav .tracy-nav__drill-sublabel {
-    font-size: 12px;
+  /* The source's close button is at least 40px, and its head row grows to hold it: 18px + 40px + 18px
+     (the row stays 32px high only while the button does). */
+  .tracy-header__menu .tracy-nav .tracy-nav__drawer-head {
+    min-height: 76px;
   }
   .tracy-header__menu .tracy-nav .tracy-nav__signin > .wp-block-navigation-item__content {
     min-height: 40px;
     display: flex;
     align-items: center;
+  }
+}
+@media (max-width: 767px) {
+  .tracy-header__menu .tracy-nav .tracy-nav__drill-sublabel {
+    font-size: 12px;
   }
   /* the brand links: a 40px target around the 26px mark and the 19px wordmark, same look */
   .tracy-header__brand .tracy-logo {

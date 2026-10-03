@@ -38,85 +38,85 @@
 <!-- /wp:paragraph -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.1"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.1"}} -->
-<p><?php esc_html_e( 'Ramp', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.1"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Ramp', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.2"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.2"}} -->
-<p><?php esc_html_e( 'Linear', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.2"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Linear', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.3"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.3"}} -->
-<p><?php esc_html_e( 'Supabase', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.3"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Supabase', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.4"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.4"}} -->
-<p><?php esc_html_e( 'Vercel', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.4"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Vercel', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.5"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.5"}} -->
-<p><?php esc_html_e( 'GitHub', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.5"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'GitHub', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.6"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.6"}} -->
-<p><?php esc_html_e( 'Render', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.6"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Render', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.7"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.7"}} -->
-<p><?php esc_html_e( 'Notion', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.7"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Notion', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.8"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.8"}} -->
-<p><?php esc_html_e( 'Stripe', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.8"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Stripe', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.9"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.9"}} -->
-<p><?php esc_html_e( 'Figma', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.9"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Figma', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.10"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.10"}} -->
-<p><?php esc_html_e( 'Retool', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.10"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Retool', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.11"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.11"}} -->
-<p><?php esc_html_e( 'Loom', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.11"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Loom', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"acm-clients-logo is-text","metadata":{"name":"clients.item.12"}} -->
 <div class="wp-block-group acm-clients-logo is-text">
-<!-- wp:paragraph {"metadata":{"role":"content","name":"clients.logo-name.12"}} -->
-<p><?php esc_html_e( 'Cloudflare', 'wp-ja-kinetic' ); ?></p>
+<!-- wp:paragraph {"className":"acm-clients-logo-name","metadata":{"role":"content","name":"clients.logo-name.12"}} -->
+<p class="acm-clients-logo-name"><?php esc_html_e( 'Cloudflare', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
