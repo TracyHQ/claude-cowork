@@ -4,7 +4,7 @@ Read ../AGENTS.md. Checks are run from the `tracy-wordpress-theme` skill's `scri
 **running** site (Playwright: `npm i playwright && npx playwright install chromium` once in a
 scratch directory). They observe; they do not change the site. Evidence of the build lives outside
 the theme, in the Tracy repository's `tasks/ja-vega-wp7/`: `STATUS.md` (every step and its
-result), `DECISIONS.md` (D-01 … D-55), the gap register `content-gaps.md`, `parity-accepted.json`,
+result), `DECISIONS.md` (D-01 … D-71; D-56 was never issued), the gap register `content-gaps.md`, `parity-accepted.json`,
 `review.config.json`, `design-contract.json`, `visual.contract.json` and the spec-pack `spec/`.
 Screenshots, reports and seed reports of the build were kept on the build machine, not in any
 repository.

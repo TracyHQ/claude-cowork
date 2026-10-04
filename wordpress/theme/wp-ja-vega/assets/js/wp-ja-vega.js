@@ -3,6 +3,8 @@
  *
  *   mega    — a `[data-jv-mega]` item opens its panel when the pointer rests on it (short intent
  *             delay), when keyboard focus reaches its caret button, or on a click of that button;
+ *             on a touch screen (no hover) the first tap on the item's LABEL opens the panel and does
+ *             not follow the link, the second tap on it follows the link, as the source's T4 menu does;
  *             it closes when the pointer leaves (a grace delay long enough to cross into the
  *             panel), on Escape (focus goes back to the button), on a click outside, when focus
  *             leaves it, or when another item opens. Panels are painted while `is-open` is on;
@@ -70,9 +72,29 @@
         setOpen(mega, !isOpen(mega))
       })
     }
+    // Touch has no hover: the first tap on the label of a closed item opens its panel instead of leaving
+    // the page; a tap on the label of an open one follows the link. A mouse click, a key press (Enter on
+    // the link has no pointerType) and the phone drawer (where the caret drills in) keep the link.
+    const link = mega.querySelector(':scope > .jv-mega__link')
+    if (link) {
+      link.addEventListener('click', (event) => {
+        if (!desktop.matches || isOpen(mega)) return
+        if (
+          event.pointerType !== 'touch' &&
+          event.pointerType !== 'pen' &&
+          !(event.pointerType === undefined && !hoverable)
+        )
+          return
+        event.preventDefault()
+        clear()
+        setOpen(mega, true)
+      })
+    }
     mega.addEventListener('focusin', (event) => {
       if (!desktop.matches) return
-      if (event.target === trigger && !trigger.matches(':focus-visible')) return
+      // Only a keyboard focus opens the panel. A tap or a click focuses the label first, and opening there would make the
+      // tap that follows look like a second one (and follow the link).
+      if (!(event.target instanceof Element) || !event.target.matches(':focus-visible')) return
       clear()
       setOpen(mega, true)
     })

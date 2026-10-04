@@ -32,7 +32,7 @@ that it renders the same pages; the WordPress quickstart is released under the t
 7. Some behaviour hangs on **slugs and options**, not on blocks: listing layouts on the page slug
    (`jv-route-<slug>`), the 404 text on option `wp_ja_vega_404_page`, the search page on the
    draft `smart-search`. Read docs/content-model.md before renaming, moving or publishing a page.
-8. Dark mode: three states kept in the `tracy_theme` cookie and applied as `data-theme` on
+8. Dark mode: a click flips light and dark; the choice is kept in the `tracy_theme` cookie and applied as `data-theme` on
    `<html>`; no attribute = auto, the operating system decides (docs/design-system.md).
 9. Do not fabricate business facts, legal text, people, prices or images. Everything on the site
    is demonstration data until the owner replaces it; a gap is recorded, not filled. Read
