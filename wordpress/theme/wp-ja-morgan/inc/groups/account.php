@@ -124,24 +124,147 @@ function wp_ja_morgan_handle_remind() {
 add_action( 'admin_post_nopriv_jm_remind', 'wp_ja_morgan_handle_remind' );
 add_action( 'admin_post_jm_remind', 'wp_ja_morgan_handle_remind' );
 
+/**
+ * The Contact Form's fields as plain bounded strings, or null when one is missing, not a string,
+ * empty, longer than the form allows, or (the address) not an email address. Nothing is cut to
+ * fit: a value over its limit is refused, and the form's own `maxlength` keeps a person inside it.
+ *
+ * @param mixed $raw The unslashed `jform` value.
+ * @return array{name:string,email:string,subject:string,message:string}|null
+ */
+function wp_ja_morgan_contact_fields( $raw ): ?array {
+	if ( ! is_array( $raw ) ) {
+		return null;
+	}
+	$limits = array(
+		'name'    => 60,
+		'email'   => 254,
+		'subject' => 200,
+		'message' => 5000,
+	);
+	$out    = array();
+	foreach ( $limits as $key => $max ) {
+		$value = $raw[ 'contact_' . $key ] ?? null;
+		if ( ! is_string( $value ) || mb_strlen( $value ) > $max ) {
+			return null;
+		}
+		$value = 'message' === $key ? sanitize_textarea_field( $value ) : sanitize_text_field( $value );
+		if ( '' === $value ) {
+			return null;
+		}
+		$out[ $key ] = $value;
+	}
+	// The address must already be clean: one that only becomes an address after characters are dropped is refused.
+	if ( ! is_email( $out['email'] ) || sanitize_email( $out['email'] ) !== $out['email'] ) {
+		return null;
+	}
+	return $out;
+}
+
+/**
+ * Take one of this hour's contact-mail places for the client behind the request, or say there is none.
+ *
+ * Both forms that mail the administrator (Contact and Quick Contact) spend the same five an hour.
+ * The client is the address of the connection (`REMOTE_ADDR`), never a forwarding header, which a
+ * visitor can set to anything; an IPv6 client is its /64, an IPv4-mapped address its IPv4 self,
+ * and requests with no usable address all share one bucket.
+ *
+ * A place is an option row whose NAME is the claim: `add_option()` adds a name once and answers
+ * false for a name that exists, so two requests cannot both hold the same place, and whatever the
+ * row holds, its presence is what counts. Every writer stores the same value on purpose: core adds
+ * with `INSERT … ON DUPLICATE KEY UPDATE`, which reports a change, and so a second winner, only
+ * when the values differ. A store that cannot be written answers false as well, so a broken
+ * database stops the mail instead of removing the limit.
+ *
+ * @return bool True when a place was taken and the message may be sent.
+ */
+function wp_ja_morgan_contact_reserve(): bool {
+	$addr   = isset( $_SERVER['REMOTE_ADDR'] ) && is_string( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+	$packed = false !== filter_var( $addr, FILTER_VALIDATE_IP ) ? inet_pton( $addr ) : false;
+	$client = 'unknown';
+	if ( is_string( $packed ) && 16 === strlen( $packed ) ) {
+		$mapped = 0 === strncmp( $packed, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12 );
+		$client = bin2hex( $mapped ? substr( $packed, 12 ) : substr( $packed, 0, 8 ) );
+	} elseif ( is_string( $packed ) ) {
+		$client = bin2hex( $packed );
+	}
+	// The hour is read when the place is taken, not when the request began: a request that waited
+	// across the turn of the hour counts in the hour it is sent in.
+	$window = intdiv( time(), HOUR_IN_SECONDS );
+	// The stored name carries a keyed hash of the address, not the address.
+	$bucket = 'jm_contact_rate_' . $window . '_' . substr( wp_hash( $client ), 0, 20 ) . '_';
+	for ( $slot = 1; $slot <= 5; $slot++ ) {
+		if ( add_option( $bucket . $slot, '1', '', false ) ) {
+			if ( 1 === $slot ) {
+				wp_ja_morgan_contact_rate_sweep( $window );
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Drop the places of hours BEFORE `$window`, so the counters never outgrow a few hours of visitors.
+ * Only earlier hours: a request still holding an older hour must not remove places already taken
+ * in a newer one. Best effort: a failed clean-up costs rows, never a message and never the limit.
+ */
+function wp_ja_morgan_contact_rate_sweep( int $window ): void {
+	global $wpdb;
+	if ( ! is_object( $wpdb ) ) {
+		return;
+	}
+	$prefix = 'jm_contact_rate_';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- option names by prefix; the options API has no such delete, and these rows are never read through its cache.
+	$wpdb->query(
+		$wpdb->prepare(
+			"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s AND CAST(SUBSTRING_INDEX(SUBSTRING(option_name, %d), '_', 1) AS UNSIGNED) < %d",
+			$wpdb->esc_like( $prefix ) . '%',
+			strlen( $prefix ) + 1,
+			$window
+		)
+	);
+}
+
+/**
+ * The Contact Form mails the site administrator, and nobody else.
+ *
+ * The source's "Send a copy to yourself" is not offered: the handler cannot know that the visitor
+ * owns the address they typed, so a copy would let anyone send their own text from this site to
+ * any address. The box is printed switched off and a posted flag is not read. The visitor's
+ * address is used only as Reply-To, and their name only as far as it is letters, digits and
+ * `. ' -`, so neither can add a header or a second address.
+ */
 function wp_ja_morgan_handle_contact() {
-	if ( ! isset( $_POST['jm_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['jm_nonce'] ) ), 'jm_contact' ) ) {
+	if ( ! isset( $_POST['jm_nonce'] ) || ! is_string( $_POST['jm_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['jm_nonce'] ) ), 'jm_contact' ) ) {
 		wp_ja_morgan_form_back( 'contact-us', 'error-token' );
 	}
-	$f       = isset( $_POST['jform'] ) && is_array( $_POST['jform'] ) ? wp_unslash( $_POST['jform'] ) : array();
-	$name    = sanitize_text_field( isset( $f['contact_name'] ) ? $f['contact_name'] : '' );
-	$mail    = sanitize_email( isset( $f['contact_email'] ) ? $f['contact_email'] : '' );
-	$subject = sanitize_text_field( isset( $f['contact_subject'] ) ? $f['contact_subject'] : '' );
-	$message = sanitize_textarea_field( isset( $f['contact_message'] ) ? $f['contact_message'] : '' );
-	if ( '' === $name || ! is_email( $mail ) || '' === $subject || '' === $message ) {
+	$raw = isset( $_POST['jform'] ) && is_array( $_POST['jform'] ) ? wp_unslash( $_POST['jform'] ) : null;
+	if ( ! $raw ) {
 		wp_ja_morgan_form_back( 'contact-us', 'error-fields' );
 	}
-	$headers = array( 'Reply-To: ' . $name . ' <' . $mail . '>' );
-	$body    = $message . "\n\n" . $name . ' <' . $mail . '>';
-	$sent    = wp_mail( get_option( 'admin_email' ), $subject, $body, $headers );
-	if ( ! empty( $f['contact_email_copy'] ) ) {
-		wp_mail( $mail, $subject, $body );
+	// The trap field: a person never sees it, so it arrives empty. A form without it was printed before the trap existed.
+	if ( ! array_key_exists( 'contact_url', $raw ) ) {
+		wp_ja_morgan_form_back( 'contact-us', 'error-token' );
 	}
+	if ( '' !== $raw['contact_url'] ) {
+		wp_ja_morgan_form_back( 'contact-us', 'error-send' );
+	}
+	$f = wp_ja_morgan_contact_fields( $raw );
+	if ( null === $f ) {
+		wp_ja_morgan_form_back( 'contact-us', 'error-fields' );
+	}
+	$to = get_option( 'admin_email' );
+	if ( ! is_string( $to ) || ! is_email( $to ) ) {
+		wp_ja_morgan_form_back( 'contact-us', 'error-send' );
+	}
+	if ( ! wp_ja_morgan_contact_reserve() ) {
+		wp_ja_morgan_form_back( 'contact-us', 'error-send' );
+	}
+	$reply   = trim( (string) preg_replace( '/\s+/u', ' ', (string) preg_replace( '/[^\p{L}\p{N} .\'-]+/u', ' ', $f['name'] ) ) );
+	$headers = array( 'Reply-To: ' . ( '' === $reply ? $f['email'] : $reply . ' <' . $f['email'] . '>' ) );
+	$body    = $f['message'] . "\n\n" . $f['name'] . ' <' . $f['email'] . '>';
+	$sent    = wp_mail( $to, $f['subject'], $body, $headers );
 	wp_ja_morgan_form_back( 'contact-us', $sent ? 'ok' : 'error-send' );
 }
 add_action( 'admin_post_nopriv_jm_contact', 'wp_ja_morgan_handle_contact' );
@@ -228,6 +351,10 @@ function wp_ja_morgan_handle_quick_contact() {
 	$f = wp_ja_morgan_qc_fields( isset( $_POST['jm_qc'] ) ? wp_unslash( $_POST['jm_qc'] ) : array() );
 	if ( '' === $f['name'] || ! is_email( $f['email'] ) || '' === $f['subject'] || '' === $f['text'] ) {
 		$done( 'error-qc-field', $f );
+	}
+	// The same hourly count as the Contact Form: this form mails the administrator too.
+	if ( ! wp_ja_morgan_contact_reserve() ) {
+		$done( 'error-qc-send', $f );
 	}
 	$headers = array( 'Reply-To: ' . $f['name'] . ' <' . $f['email'] . '>' );
 	$body    = $f['text'] . "\n\n" . $f['name'] . ' <' . $f['email'] . '>';
