@@ -82,6 +82,22 @@ function wp_ja_essence_header_class( array $classes ): array {
 add_filter( 'body_class', 'wp_ja_essence_header_class', 12 );
 
 /**
+ * The article the source marks `item-highlight` (its note) carries `je-highlight`: the front page's masonry draws that card over its picture.
+ *
+ * @param string[] $classes Post classes.
+ * @param string[] $extra   Classes added by the caller.
+ * @param int      $post_id The post.
+ * @return string[]
+ */
+function wp_ja_essence_highlight_class( array $classes, array $extra, int $post_id ): array {
+	if ( 'item-highlight' === get_post_meta( $post_id, 'je_note', true ) ) {
+		$classes[] = 'je-highlight';
+	}
+	return $classes;
+}
+add_filter( 'post_class', 'wp_ja_essence_highlight_class', 10, 3 );
+
+/**
  * Home 4 prints a third masthead: the brand is a picture (avatar, script name and tagline in one 352x100 image) and the menu sits
  * in a white rounded bar. Whether the page being drawn is that one.
  */
