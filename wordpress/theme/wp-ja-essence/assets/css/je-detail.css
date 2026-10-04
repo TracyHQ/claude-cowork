@@ -1028,9 +1028,8 @@ body:not(.je-slug-category-blog):not(.je-slug-category-style-4):not(.je-slug-cat
 @media (max-width: 767px) { .je-minirow .je-mini__body { padding-bottom: 8px; } .je-minirow .je-mini__body > .je-meta__date { margin-bottom: 0 !important; } }
 @media (max-width: 767px) { .je-sec--minirow { padding-bottom: 18px; } .je-minirow .je-minirow__items { row-gap: 36px; } }
 
-/* the gallery field is data for the listing card; the source article does not draw it (measured 02/10: no slider above the title) */
-.je-articlecard .jes-gallery, .je-articlecard:has(.jes-gallery) .je-page__hero { display: none !important; }
-.je-articlecard:has(.jes-gallery) .je-page__title { padding-top: 24px; }
+/* the gallery field is data for the slider (assets/js/wp-ja-essence.js builds it above the title, 1.0.4); the raw list is never printed */
+.je-articlecard .jes-gallery { display: none !important; }
 .je-articlecard .je-meta .je-hits { min-width: 99px; box-sizing: border-box; }
 
 /* ===== 1.0.3 lens fixes: the typography specimen (Bootstrap 5 rhythm: block margins in rem, ps-lg-5 = 48px) ===== */
@@ -1533,3 +1532,34 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 .je-gslider__thumbs button[aria-current="true"] { opacity: 1; border-color: var(--wp--preset--color--accent); }
 .je-gslider__thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .je-gslider__arrow:focus-visible, .je-gslider__thumbs button:focus-visible { outline: 2px solid light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); outline-offset: 2px; }
+
+/* ===== 1.0.4 re-audit fixes ===== */
+/* Front page, below 992px: the source's masthead shows the menu button, the theme toggle and the search icon only; the menu row is in the drawer. */
+@media (max-width: 991px) { body.je-hdr-two .je-header .je-nav { display: none; } }
+/* Front page, 992-1199px: the masthead sits in the 960px container step of the source (the 1164px rule above it never took the steps). */
+@media (min-width: 992px) and (max-width: 1199px) { body.je-hdr-two .je-header__inner { max-width: 960px; } }
+
+/* Home 2: the source's page is white and its Editor's choice chips are #f8f8ff (#222a3b in dark) on it. */
+:root:not([data-theme="dark"]) body.je-slug-home-2 { background-color: #fff; }
+:root:not([data-theme="dark"]) body.je-slug-home-2 :is(.je-sec__title, .je-sec__desc) { background-color: #fff; }
+.je-slug-home-2 .je-sec--choice .je-vcard .je-badge a { background: #f8f8ff; color: #212529; }
+:root[data-theme="dark"] .je-slug-home-2 .je-sec--choice .je-vcard .je-badge a { background: #222a3b; color: #c2c9d6; }
+
+/* Home 4: the article the source marks `item-highlight` (post meta `je_note`) is the card drawn over its picture: scrim, white text, white chip. */
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card { position: relative; display: flex; flex-direction: column; justify-content: flex-end; box-sizing: border-box; min-height: 446px; overflow: hidden; background: #1c1c1c; color: #fff; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__media { position: absolute; inset: 0; z-index: 0; margin: 0 !important; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__img, .je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__img a { display: block; width: 100%; height: 100%; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__img img { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; object-fit: cover; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__media::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-media-icon { top: 36px; left: 36px; z-index: 3; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card__body { position: relative; z-index: 2; flex: 0 0 auto; padding-top: 200px; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight :is(.je-card__title a, .je-meta, .je-meta *) { color: #fff; }
+.je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-badge a { background: #f8f8ff; color: #212529; }
+
+/* Front page, 768-991px: the masthead's top row is as tall as the source's (the Subscribe button stacks its icon over its label, 69px) and the masthead
+   keeps its 36px under the rule, so the page below starts where the source's does. */
+@media (min-width: 768px) and (max-width: 991px) {
+  body:is(.home, .je-slug-home-3).je-hdr-two .je-header__inner { padding-bottom: 36px; }
+  body:is(.home, .je-slug-home-3).je-hdr-two .je-header__top .je-subscribe .wp-block-button__link { flex-direction: column; justify-content: center; gap: 0; min-height: 69px; padding-block: 0; }
+  body:is(.home, .je-slug-home-3).je-hdr-two .je-sec--slide { margin-top: 0; }
+}

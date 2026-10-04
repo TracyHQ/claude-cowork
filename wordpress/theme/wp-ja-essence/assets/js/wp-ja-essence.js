@@ -497,7 +497,7 @@
   if (!list) return
   const tabletOnly = !list.closest('.je-slug-home-4, .je-slug-category-style-3') // Style 1 and its siblings are one card wide except from 768px to 991px
   const phoneGap = list.closest('.je-slug-home-4') ? -9 : 24 // the card gap below 768px (home 4's cards carry their own margin)
-  const rowOrder = !list.closest('.je-slug-home-4') // the category list fills the columns row by row; home 4 puts each card under the shortest column
+  const rowOrder = true // the source's Isotope runs with horizontalOrder: card n goes to column n mod columns, under what that column holds (home 4 too, Trending included)
   const layout = () => {
     const items = [...list.children]
     if (tabletOnly && (innerWidth < 768 || innerWidth > 991)) {
@@ -649,8 +649,7 @@
     card.classList.add('je-gslider-on')
     show(0)
   }
-  /* the source draws the slider on its gallery article only; the other articles that carry the same pictures show them in the text */
-  if (document.body.classList.contains('je-slug-gallery')) {
-    for (const card of document.querySelectorAll('.je-articlecard')) initGallery(card)
-  }
+  /* the source draws the slider above the title of every gallery-format article (1.0.4: the posts too, not only the gallery page) */
+  for (const card of document.querySelectorAll('.je-articlecard'))
+    if (card.querySelector('.jes-gallery')) initGallery(card)
 })()
