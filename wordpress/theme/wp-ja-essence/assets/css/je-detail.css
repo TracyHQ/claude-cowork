@@ -931,7 +931,7 @@ body:not(.je-slug-category-blog):not(.je-slug-category-style-4):not(.je-slug-cat
 .je-lead__card { box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-height: 361.6px !important; padding: 36px; text-align: center; }
 .je-lead__card > .wp-block-cover__inner-container { width: 100%; }
 .je-lead__card .je-badge { display: block; margin: 0 0 0 !important; }
-.je-lead__card .je-badge a { background: #fff; color: #212529; }
+.je-lead__card .je-badge a { background: #f8f8ff; color: #212529; }
 .je-lead__title { margin: 0 0 8px !important; font-size: 24px; line-height: 31.2px; }
 .je-lead__card .je-meta, .je-lead__card .je-meta * { font-size: 14px !important; line-height: 21px; }
 .je-lead__card .je-meta { justify-content: center; margin: 0 !important; }
@@ -1257,7 +1257,7 @@ body.je-hdr-two .je-header__top .je-subscribe .wp-block-button__link { min-width
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) :is(.tracy-card__title a, .je-meta, .je-meta *) { color: #fff; }
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) :is(.je-card__intro, .je-card__intro p, .je-card__tags a) { color: rgba(255, 255, 255, 0.7); }
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .wp-block-post-terms.tracy-eyebrow { display: flex; }
-.je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .wp-block-post-terms.tracy-eyebrow a { background: #fff; color: #212529; }
+.je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .wp-block-post-terms.tracy-eyebrow a { background: #f8f8ff; color: #212529; }
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .je-card__tags a { background: rgba(255, 255, 255, 0.1); }
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .tracy-card__title { text-align: left; }
 .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .je-meta .wp-block-post-author-name::before { color: #fff; }
@@ -1378,7 +1378,7 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) :is(.tracy-card__body, .je-card__extra) { position: relative; z-index: 2; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) :is(.tracy-card__title a, .je-meta, .je-meta *, .je-card__intro, .je-card__intro p, .je-card__tags a) { color: #fff; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .wp-block-post-terms.tracy-eyebrow { display: flex; }
-.je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .wp-block-post-terms.tracy-eyebrow a { background: #fff; color: #212529; }
+.je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .wp-block-post-terms.tracy-eyebrow a { background: #f8f8ff; color: #212529; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .je-card__tags a { background: rgba(255, 255, 255, 0.1); }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .tracy-card__title { text-align: left; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .je-meta .wp-block-post-author-name::before { color: #fff; }
@@ -1417,8 +1417,8 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
   .je-sec--more .je-more__items { grid-template-columns: 1fr !important; }
 }
 /* 1.0.3 lens fixes (lists on a tablet): the blog, Category Style 2 and Category Style 4 lists are one card wide from 768px to 991px, as in the source */
-@media (min-width: 768px) and (max-width: 991px) {
-  :is(.je-slug-category-blog, .je-slug-category-style-2, .je-slug-category-style-4) .tracy-query .tracy-grid { grid-template-columns: 1fr !important; }
+@media (min-width: 768px) and (max-width: 1024px) {
+  :is(.je-slug-category-blog, .je-slug-category-style-2, .je-slug-category-style-4) .tracy-query .tracy-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
 @media (min-width: 768px) and (max-width: 991px) {
   :is(.je-slug-category-blog, .je-slug-category-style-2, .je-slug-category-style-4) .tracy-query { max-width: 684px; margin-inline: auto; }
@@ -1539,9 +1539,9 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 /* Front page, 992-1199px: the masthead sits in the 960px container step of the source (the 1164px rule above it never took the steps). */
 @media (min-width: 992px) and (max-width: 1199px) { body.je-hdr-two .je-header__inner { max-width: 960px; } }
 
-/* Home 2: the source's page is white and its Editor's choice chips are #f8f8ff (#222a3b in dark) on it. */
-:root:not([data-theme="dark"]) body.je-slug-home-2 { background-color: #fff; }
-:root:not([data-theme="dark"]) body.je-slug-home-2 :is(.je-sec__title, .je-sec__desc) { background-color: #fff; }
+/* Home 2 and 5: the source's page is white and its Editor's choice chips are #f8f8ff (#222a3b in dark) on it. */
+:root:not([data-theme="dark"]) body:is(.je-slug-home-2, .je-slug-home-5) { background-color: #fff; }
+:root:not([data-theme="dark"]) body:is(.je-slug-home-2, .je-slug-home-5) :is(.je-sec__title, .je-sec__desc) { background-color: #fff; }
 .je-slug-home-2 .je-sec--choice .je-vcard .je-badge a { background: #f8f8ff; color: #212529; }
 :root[data-theme="dark"] .je-slug-home-2 .je-sec--choice .je-vcard .je-badge a { background: #222a3b; color: #c2c9d6; }
 
@@ -1563,3 +1563,15 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
   body:is(.home, .je-slug-home-3).je-hdr-two .je-header__top .je-subscribe .wp-block-button__link { flex-direction: column; justify-content: center; gap: 0; min-height: 69px; padding-block: 0; }
   body:is(.home, .je-slug-home-3).je-hdr-two .je-sec--slide { margin-top: 0; }
 }
+
+/* ===== 1.0.5 ===== */
+/* Category chips in dark: the source's own #222a3b chip with the body text colour, whatever the page behind is (the theme drew the page colour, so the chip vanished). Pictures and slides keep their light chip (rules above, higher specificity). */
+:root[data-theme="dark"] .je-card .je-badge a,
+:root[data-theme="dark"] .tracy-card .wp-block-post-terms.tracy-eyebrow a,
+:root[data-theme="dark"] .je-relcard .je-badge a,
+:root[data-theme="dark"] .je-articlecard .je-badge a,
+:root[data-theme="dark"] .je-authorlatest__cat a { background: #222a3b; color: #c2c9d6; }
+/* The related-card chip in light uses the body text colour, as the source does. */
+.je-relcard .je-badge a { color: var(--wp--preset--color--fg); }
+/* Tags cloud in dark: the source paints the link as a plain rectangle on top of its rounded <li>. */
+:root[data-theme="dark"] .je-tagcloud__list a { border-radius: 0; }
