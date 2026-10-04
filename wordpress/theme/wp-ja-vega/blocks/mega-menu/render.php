@@ -18,7 +18,7 @@
 $wp_ja_vega_mega_label = isset( $attributes['label'] ) ? wp_kses( (string) $attributes['label'], array() ) : '';
 $wp_ja_vega_mega_url   = isset( $attributes['url'] ) ? (string) $attributes['url'] : '';
 $wp_ja_vega_mega_id    = wp_unique_id( 'jv-mega-' );
-$wp_ja_vega_mega_here  = '' !== $wp_ja_vega_mega_url && 0 === strpos( trailingslashit( (string) wp_parse_url( home_url( add_query_arg( array() ) ), PHP_URL_PATH ) ), trailingslashit( (string) wp_parse_url( home_url( $wp_ja_vega_mega_url ), PHP_URL_PATH ) ) );
+$wp_ja_vega_mega_here  = ( '' !== $wp_ja_vega_mega_url && 0 === strpos( trailingslashit( (string) wp_parse_url( home_url( add_query_arg( array() ) ), PHP_URL_PATH ) ), trailingslashit( (string) wp_parse_url( home_url( $wp_ja_vega_mega_url ), PHP_URL_PATH ) ) ) ) || ( '' !== $wp_ja_vega_mega_url && wp_ja_vega_is_project_of( $wp_ja_vega_mega_url ) );
 ?>
 <div <?php echo get_block_wrapper_attributes( array( 'class' => 'jv-mega has-child' . ( $wp_ja_vega_mega_here ? ' is-current' : '' ), 'data-jv-mega' => '' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?>>
 	<?php if ( '' !== $wp_ja_vega_mega_url ) : ?>

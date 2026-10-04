@@ -37,10 +37,10 @@ preview and `tracy_apply_inspiration()` exist in the code but have no second loo
 
 ## Dark mode
 
-**Three states — light, dark, auto.** The visitor's choice is kept a year in the **`tracy_theme`
+**Light or dark; a click flips what is showing (1.1.6).** The visitor's choice is kept a year in the **`tracy_theme`
 cookie** (`light`, `dark` or `auto`; `Path=/`, `SameSite=Lax`, `Secure` over HTTPS) and applied as
 **`data-theme="light|dark"`** on `<html>`. **No attribute = auto**: the operating system decides
-through `prefers-color-scheme`, which is also what a first visit gets, as on the source. Each
+through `prefers-color-scheme`, which is also what a first visit gets, as on the source. An old `auto` cookie is still read and behaves like no cookie. Each
 colour preset except `success`, `warn` and `danger` carries both halves through `light-dark()`,
 and `color-scheme` is `light dark`, narrowed to one by `data-theme` (theme.json `styles.css`). The
 dark half is the source's own dark stylesheet, read back as computed style: `bg` `#0f141c`,
@@ -49,8 +49,8 @@ dark half is the source's own dark stylesheet, read back as computed style: `bg`
 
 `assets/js/wp-ja-vega-dark.js` runs in the head, blocking, so the attribute is on the root before
 first paint; the header's toggle (`button.jv-theme-toggle[data-tracy-theme-toggle]`, in a
-`core/html` block of the header part) cycles light → dark → auto, writes the cookie and updates its
-`aria-label`. WordPress core has no colour-scheme mechanism of its own; this follows the
+`core/html` block of the header part) flips the page that is showing (so the first click always changes it, on a phone too), writes the
+cookie and updates its `aria-label`, `aria-pressed` and icon. WordPress core has no colour-scheme mechanism of its own; this follows the
 Developer Blog's `color-scheme` + toggle approach
 (https://developer.wordpress.org/news/2025/09/building-a-light-dark-toggle-with-the-interactivity-api/)
 with a cookie instead of the Interactivity API store.

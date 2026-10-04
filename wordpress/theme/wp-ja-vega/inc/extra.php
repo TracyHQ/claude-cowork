@@ -220,6 +220,9 @@ function wp_ja_vega_body_class( array $classes ): array {
 	$classes   = array_values( array_diff( $classes, $navs, $heros ) );
 	$classes[] = 'tracy-nav-top-left';
 	$classes[] = 'tracy-hero-split';
+	if ( is_singular( 'post' ) && 'post-project' === get_page_template_slug( (int) get_queried_object_id() ) ) {
+		$classes[] = 'jv-project-page';
+	}
 	if ( is_page() ) {
 		$page      = get_queried_object_id();
 		$classes[] = 'jv-route-' . sanitize_html_class( (string) get_post_field( 'post_name', $page ) );
@@ -1108,7 +1111,11 @@ add_filter( 'render_block_core/post-featured-image', 'wp_ja_vega_mega_thumb_size
  */
 function wp_ja_vega_service_wave( string $content, array $parsed ): string {
 	static $image = null;
-	if ( ! str_contains( (string) ( $parsed['attrs']['className'] ?? '' ), 'jv-related' ) || 'section' !== ( $parsed['attrs']['tagName'] ?? '' ) || ! is_page_template( 'page-service' ) ) {
+	$class = (string) ( $parsed['attrs']['className'] ?? '' );
+	// "Other Services" under a service page and "More our projects" under a project page: the same band on the source's wave.
+	$band = ( str_contains( $class, 'jv-related' ) && is_page_template( 'page-service' ) )
+		|| ( str_contains( $class, 'jv-more-projects' ) && 'post-project' === get_page_template_slug( (int) get_queried_object_id() ) );
+	if ( ! $band || 'section' !== ( $parsed['attrs']['tagName'] ?? '' ) ) {
 		return $content;
 	}
 	if ( null === $image ) {
@@ -1147,3 +1154,130 @@ function wp_ja_vega_service_wave( string $content, array $parsed ): string {
 	return (string) preg_replace( '#^(\s*<section\b[^>]*>)#', '$1<figure class="wp-block-image size-full jv-bg jv-bg--wave">' . $image . '</figure>', $content, 1 );
 }
 add_filter( 'render_block_core/group', 'wp_ja_vega_service_wave', 10, 2 );
+
+/**
+ * The footer's newsletter form (the source's mod_acym "Join 150K+ Designers For Weekly Creative Insights": an
+ * email field and Subscribe). WordPress has no mailing list, so the form does what a site without one can do
+ * truthfully: it mails the address to the site owner (the admin email) as a subscription request, and says
+ * "sent" only when wp_mail() accepted the message; every other outcome is named on the page. The form posts to
+ * admin-post.php with a nonce and a hidden field only a bot fills, a malformed address is refused, and the same
+ * address asked twice within an hour sends one message.
+ *
+ * @return string The form and, after a submit, its one-line result.
+ */
+function wp_ja_vega_newsletter_shortcode(): string {
+	$messages = array(
+		'sent'    => __( 'Thank you. Your subscription request was sent to the site owner.', 'wp-ja-vega' ),
+		'invalid' => __( 'Enter a valid email address.', 'wp-ja-vega' ),
+		'failed'  => __( 'Your request could not be sent. Please try again later.', 'wp-ja-vega' ),
+	);
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a read-only result word, matched against a fixed list.
+	$state = isset( $_GET['jv_newsletter'] ) ? sanitize_key( wp_unslash( $_GET['jv_newsletter'] ) ) : '';
+	$state = isset( $messages[ $state ] ) ? $state : '';
+	$id    = wp_unique_id( 'jv-newsletter-email-' );
+	ob_start();
+	?>
+	<form class="jv-newsletter__form" id="jv-newsletter" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<input type="hidden" name="action" value="wp_ja_vega_newsletter">
+		<?php wp_nonce_field( 'wp_ja_vega_newsletter', '_jv_nonce' ); ?>
+		<p class="jv-newsletter__trap" aria-hidden="true"><input type="text" name="jv_website" value="" tabindex="-1" autocomplete="off"></p>
+		<div class="jv-newsletter__row">
+			<label class="screen-reader-text" for="<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Email', 'wp-ja-vega' ); ?></label>
+			<input class="jv-newsletter__email" id="<?php echo esc_attr( $id ); ?>" type="email" name="jv_email" required autocomplete="email" placeholder="<?php esc_attr_e( 'Email', 'wp-ja-vega' ); ?>">
+			<button class="jv-newsletter__submit" type="submit"><?php esc_html_e( 'Subscribe', 'wp-ja-vega' ); ?></button>
+		</div>
+		<p class="jv-newsletter__status<?php echo '' !== $state ? ' jv-newsletter__status--' . esc_attr( $state ) : ''; ?>" role="status"><?php echo '' !== $state ? esc_html( $messages[ $state ] ) : ''; ?></p>
+	</form>
+	<?php
+	// One line: a shortcode's output runs through wpautop, which turns every newline into a <br> inside the form.
+	return trim( (string) preg_replace( '/\s*\n\s*/', ' ', (string) ob_get_clean() ) );
+}
+add_shortcode( 'wp_ja_vega_newsletter', 'wp_ja_vega_newsletter_shortcode' );
+
+/**
+ * Handle the newsletter form (see wp_ja_vega_newsletter_shortcode()) and send the visitor back to it.
+ */
+function wp_ja_vega_newsletter_submit(): void {
+	$back = wp_get_referer();
+	$back = $back ? $back : home_url( '/' );
+	$back = remove_query_arg( 'jv_newsletter', $back );
+	$done = static function ( string $state ) use ( $back ): void {
+		wp_safe_redirect( add_query_arg( 'jv_newsletter', $state, $back ) . '#jv-newsletter' );
+		exit;
+	};
+	$nonce = isset( $_POST['_jv_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_jv_nonce'] ) ) : '';
+	if ( ! wp_verify_nonce( $nonce, 'wp_ja_vega_newsletter' ) ) {
+		$done( 'failed' );
+	}
+	// The field no visitor sees: a bot filled it. Nothing is sent, and the bot is told nothing useful.
+	if ( ! empty( $_POST['jv_website'] ) ) {
+		$done( 'sent' );
+	}
+	$email = isset( $_POST['jv_email'] ) ? sanitize_email( wp_unslash( $_POST['jv_email'] ) ) : '';
+	if ( '' === $email || ! is_email( $email ) ) {
+		$done( 'invalid' );
+	}
+	$key = 'jv_nl_' . md5( strtolower( $email ) );
+	if ( false !== get_transient( $key ) ) {
+		$done( 'sent' );
+	}
+	set_transient( $key, 1, HOUR_IN_SECONDS );
+	$sent = wp_mail(
+		get_option( 'admin_email' ),
+		sprintf(
+			/* translators: %s: the site name. */
+			__( '[%s] Newsletter subscription request', 'wp-ja-vega' ),
+			wp_specialchars_decode( (string) get_option( 'blogname' ), ENT_QUOTES )
+		),
+		sprintf(
+			/* translators: %s: the visitor's email address. */
+			__( 'Please add this address to your mailing list: %s', 'wp-ja-vega' ),
+			$email
+		),
+		array( 'Reply-To: ' . $email )
+	);
+	if ( ! $sent ) {
+		delete_transient( $key );
+		$done( 'failed' );
+	}
+	$done( 'sent' );
+}
+add_action( 'admin_post_nopriv_wp_ja_vega_newsletter', 'wp_ja_vega_newsletter_submit' );
+add_action( 'admin_post_wp_ja_vega_newsletter', 'wp_ja_vega_newsletter_submit' );
+
+/**
+ * A project page (template post-project) sits under Portfolio in the source's menu, where its category's item is the current
+ * one (item 132 "Database Security" for the audited projects). The project posts live at the site root, so the address alone
+ * cannot say so: the menu's Portfolio item and the link to the post's category are marked current from the post's category.
+ *
+ * @param string $url A menu item's address.
+ * @return bool True when $url is /portfolio (the section) or /portfolio/<the current project's category>.
+ */
+function wp_ja_vega_is_project_of( string $url ): bool {
+	if ( ! is_singular( 'post' ) || 'post-project' !== get_page_template_slug( (int) get_queried_object_id() ) ) {
+		return false;
+	}
+	$path = untrailingslashit( (string) wp_parse_url( $url, PHP_URL_PATH ) );
+	if ( '/portfolio' === $path ) {
+		return true;
+	}
+	$cats = get_the_category( (int) get_queried_object_id() );
+	return ! empty( $cats ) && '/portfolio/' . $cats[0]->slug === $path;
+}
+
+/**
+ * Mark the link to a project's category current inside the Portfolio panel (see wp_ja_vega_is_project_of()).
+ *
+ * @param string $content The rendered navigation link.
+ * @param array  $parsed  The parsed block.
+ * @return string
+ */
+function wp_ja_vega_project_current_link( string $content, array $parsed ): string {
+	$url = (string) ( $parsed['attrs']['url'] ?? '' );
+	if ( '' === $url || '/portfolio' === untrailingslashit( (string) wp_parse_url( $url, PHP_URL_PATH ) ) || ! wp_ja_vega_is_project_of( $url ) ) {
+		return $content;
+	}
+	$content = (string) preg_replace( '#^(<li class="[^"]*)"#', '$1 current-menu-item"', $content, 1 );
+	return (string) preg_replace( '#(<a class="wp-block-navigation-item__content")#', '$1 aria-current="page"', $content, 1 );
+}
+add_filter( 'render_block_core/navigation-link', 'wp_ja_vega_project_current_link', 10, 2 );

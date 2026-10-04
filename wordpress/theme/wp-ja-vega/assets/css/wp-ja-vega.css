@@ -4331,7 +4331,8 @@ body.tracy {
 
   .jv-header .jv-mega__trigger {
     justify-content: center;
-    width: 22px;
+    width: 24px;
+    margin-inline-end: -2px;
   }
 }
 
@@ -6610,7 +6611,7 @@ body.tracy {
 .jv-prose :is(.jv-more__title, .tracy-more-articles .wp-block-post-title) a::before {
   width: 13.72px;
   height: 16px;
-  margin-right: 5px;
+  margin-right: 9px;
   vertical-align: -2px;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 16'%3E%3Cpath d='M1.2.7h7.4l3.9 3.9v10.7H1.2z' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='miter'/%3E%3Cpath d='M8.2.9v4.1h4.1' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3Cpath d='M3.4 7.6h7.2M3.4 9.9h7.2M3.4 12.2h7.2' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 16'%3E%3Cpath d='M1.2.7h7.4l3.9 3.9v10.7H1.2z' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='miter'/%3E%3Cpath d='M8.2.9v4.1h4.1' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3Cpath d='M3.4 7.6h7.2M3.4 9.9h7.2M3.4 12.2h7.2' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
@@ -7523,4 +7524,714 @@ body.tracy {
     padding-left: 10px;
     padding-right: 13.5px;
   }
+}
+
+/* ── Project page (1.1.6; audit 03/10, defect 1). Source: T4 `html/com_content/article/portfolio.php` and `scss/_joomla.scss`
+ * (.portfolio-lead, .task-wrap, .info-task-wrap, .gallery-wrap, .more-info-demo), measured on the local source stand at 1920, 1440,
+ * 1399, 1200, 1199, 992, 991, 768, 767, 576, 575 and 390: the masthead pads 192/128 (192/64 below 1400, 96/32 below 992, 96/16 below
+ * 576) under a 36 / 32 / 24 title, three stat tiles (48 / 32 / 28 / 26 values), a picture, "About Project" beside a card, a gallery
+ * of pictures at least 372 tall, a call to action and the wave band "More our projects" (templates/post-project.html). `--jv-gutter`
+ * is the source's `--gutter-lg` (64, then 32, then 24). ── */
+.jv-project {
+  --jv-gutter: 64px;
+}
+
+@media (max-width: 1399.98px) {
+  .jv-project {
+    --jv-gutter: 32px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .jv-project {
+    --jv-gutter: 24px;
+  }
+}
+
+.jv-masthead.jv-project__masthead:not(.jv-masthead--404) {
+  padding: 192px 0 128px;
+}
+
+.jv-project__masthead > .jv-container {
+  max-width: min(832px, var(--jv-container-max));
+}
+
+.tracy .jv-masthead.jv-project__masthead:not(.jv-masthead--404) .jv-masthead__desc {
+  max-width: 800px;
+  font-size: 18.24px;
+  line-height: 27.36px;
+}
+
+.jv-project__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: var(--jv-gutter) 0 0;
+}
+
+.jv-project__stat {
+  flex: 1 1 auto;
+  margin: 0 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+}
+
+.tracy .jv-project__stat-value {
+  margin: 0 0 8px;
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--jv-on-night);
+}
+
+.tracy .jv-project__stat-label {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.jv-project__main {
+  padding-top: var(--jv-gutter);
+  padding-bottom: 80px;
+}
+
+.jv-project__inner {
+  max-width: 1100px;
+  margin-inline: auto;
+}
+
+.tracy .jv-project__picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.jv-project__picture figure,
+.jv-project__gallery figure {
+  margin: 0;
+}
+
+.jv-project__columns {
+  display: grid;
+  grid-template-columns: calc((100% + 32px) * 2 / 3 - 32px) minmax(0, 1fr);
+  gap: 32px;
+  margin-top: 64px;
+}
+
+.tracy .jv-project__about-title {
+  margin: 0 0 16px;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: light-dark(#050505, #f1f3f6);
+}
+
+.tracy .jv-project__about > h4 {
+  margin: 16px 0;
+  padding-top: 8px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: light-dark(#050505, #f1f3f6);
+}
+
+.jv-project__about > p {
+  margin: 0 0 16px;
+}
+
+@media (min-width: 1200px) {
+  .jv-project__about > :not(.jv-project__about-title) {
+    max-width: calc(100% - 128px);
+  }
+}
+
+.jv-project__about > ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.jv-project__about > ul > li {
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.jv-project__info {
+  align-self: start;
+  padding: 32px;
+  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border-radius: 8px;
+}
+
+.jv-project__info .jv-project__logo {
+  margin: 0 0 16px;
+}
+
+.jv-project__info .jv-project__logo img {
+  display: block;
+  width: 121px;
+  max-height: 36px;
+  height: auto;
+}
+
+/* The source's logo is a black wordmark on transparent; in dark it is lifted as the other source icons are. */
+:root[data-theme='dark'] .jv-project__info .jv-project__logo img {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .jv-project__info .jv-project__logo img {
+    filter: invert(1);
+  }
+}
+
+.tracy .jv-project__client {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.jv-project__details {
+  margin-top: 32px;
+}
+
+.jv-project__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jv-project__row + .jv-project__row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed light-dark(#e6e6e6, #2a323d);
+}
+
+.tracy .jv-project__row p,
+.tracy .jv-project__row .jv-project__value {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.tracy .jv-project__label {
+  flex: 0 0 auto;
+  min-width: 100px;
+  margin-right: 4px;
+  font-weight: 600;
+  color: light-dark(#050505, #f1f3f6);
+}
+
+.jv-project__value {
+  flex: 0 1 auto;
+}
+
+.jv-project__value a,
+.jv-project__category a {
+  font-weight: 500;
+  color: var(--wp--preset--color--accent);
+  text-decoration: none;
+}
+
+.jv-project__value a:hover {
+  text-decoration: underline;
+}
+
+.tracy .jv-project__row .jv-project__category a {
+  font-weight: 500;
+}
+
+.tracy .jv-project__rating {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 24px;
+  font-size: 0;
+  line-height: 0;
+  background: linear-gradient(90deg, #f6b73c var(--jv-rating, 100%), light-dark(#d9d9d9, #3a4350) var(--jv-rating, 100%));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2.5 14.9,8.7 21.7,9.5 16.7,14.1 18,20.8 12,17.5 6,20.8 7.3,14.1 2.3,9.5 9.1,8.7'/%3E%3C/svg%3E") 0 0 / 24px 24px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2.5 14.9,8.7 21.7,9.5 16.7,14.1 18,20.8 12,17.5 6,20.8 7.3,14.1 2.3,9.5 9.1,8.7'/%3E%3C/svg%3E") 0 0 / 24px 24px repeat-x;
+}
+
+.jv-project__rating--0 { --jv-rating: 0%; }
+.jv-project__rating--20 { --jv-rating: 20%; }
+.jv-project__rating--40 { --jv-rating: 40%; }
+.jv-project__rating--60 { --jv-rating: 60%; }
+.jv-project__rating--80 { --jv-rating: 80%; }
+.jv-project__rating--100 { --jv-rating: 100%; }
+
+.jv-project__gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: var(--jv-gutter);
+}
+
+.jv-project__gallery figure {
+  padding: 0 16px;
+  margin-bottom: 32px;
+}
+
+.tracy .jv-project__gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 372px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 8px;
+}
+
+.jv-project__cta {
+  max-width: 600px;
+  margin: 16px auto 0;
+  text-align: center;
+}
+
+.tracy .jv-project__cta-title {
+  margin: 16px 0 8px;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: light-dark(#050505, #f1f3f6);
+}
+
+.tracy .jv-project__cta-text {
+  margin: 0;
+}
+
+.jv-project__cta .jv-actions {
+  margin-top: 32px;
+}
+
+.tracy .jv-section.jv-page.jv-more-projects {
+  position: relative;
+  overflow: hidden;
+  padding: 128px 0;
+}
+
+/* The source's band prints a 100 character intro (two lines) under each title. */
+.jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .wp-block-post-excerpt__excerpt {
+  -webkit-line-clamp: 2;
+}
+
+/* 1.1.6 (Opus layout lens): the source's band cards are solid panels (white; #161d28 in dark), radius 16, no border, a 16 px intro. */
+.tracy .jv-page.jv-more-projects .tracy-card {
+  border: 0;
+  border-radius: 16px;
+  background: light-dark(#fff, #161d28);
+}
+
+.tracy .jv-page.jv-more-projects .tracy-card__media img {
+  border-radius: 16px;
+}
+
+.tracy .jv-page.jv-more-projects .tracy-card__text {
+  font-size: 16px;
+}
+
+@media (max-width: 991.98px) {
+  .tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .tracy-card__body {
+    padding-inline: 20px;
+  }
+}
+
+/* Rhythm inside a band card, measured against the source's .portfolio-item at 1440, 1180, 768 and 390 (every card, the first
+ * included, which is why the /portfolio listing's rules, written for its leading card, do not serve): the chip 35 px under the
+ * picture (27 below 992), the title 40 px under the chip's top, a 24 px intro gap, the facts 24 px under the intro (16 on a phone). */
+.tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .tracy-card__body {
+  padding-top: 35px;
+  padding-bottom: 32px;
+}
+
+.tracy .jv-page.jv-more-projects .tracy-card__meta + .tracy-card__title.tracy-card__title,
+.tracy .jv-page.jv-more-projects .tracy-card__title.tracy-card__title {
+  margin-top: -8px;
+}
+
+.tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .tracy-card__text {
+  margin-top: 24px;
+}
+
+.tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .jv-portfolio-info {
+  margin-top: 8px;
+}
+
+@media (max-width: 991.98px) {
+  .tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .tracy-card__body {
+    padding-top: 27px;
+    padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .tracy-card__text {
+    margin-top: 16px;
+  }
+
+  .tracy .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .jv-portfolio-info {
+    margin-top: 0;
+  }
+}
+
+/* The chip is set plain: the base eyebrow tracks its capitals (0.12em), the source's does not (125 px wide, not 149). */
+.tracy .jv-page.jv-more-projects .tracy-card__meta .tracy-eyebrow,
+.tracy .jv-page.jv-more-projects .tracy-card__meta .tracy-eyebrow a {
+  letter-spacing: normal;
+}
+
+/* On a phone the intro wraps to three lines at the source's width. */
+@media (max-width: 575.98px) {
+  .jv-page.jv-more-projects .tracy-grid > li:not(.type-page) .wp-block-post-excerpt__excerpt {
+    -webkit-line-clamp: 3;
+  }
+}
+
+/* The source's band prints its card titles at 500 (the /portfolio listing's at 600). */
+.tracy .jv-more-projects .tracy-card__title.tracy-card__title {
+  font-weight: 500;
+}
+
+.tracy .jv-page.jv-more-projects .tracy-card__meta .tracy-eyebrow a {
+  font-weight: 400;
+  line-height: 17.4px;
+}
+
+.tracy .jv-project__masthead .jv-masthead__desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tracy .jv-more-projects .jv-main-title {
+  text-transform: capitalize;
+}
+
+.jv-more-projects:has(> .jv-bg--wave) {
+  background: none;
+}
+
+.jv-more-projects > .jv-container {
+  position: relative;
+}
+
+/* The source's band is row-cols-1, row-cols-lg-2 and row-cols-xxl-3 on a 32 px gutter (24 below 768), padded 128 / 64 / 32. */
+.jv-page.jv-more-projects .tracy-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1399.98px) {
+  .jv-page.jv-more-projects .tracy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .tracy .jv-section.jv-page.jv-more-projects {
+    padding: 64px 0;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .jv-page.jv-more-projects .tracy-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .tracy .jv-section.jv-page.jv-more-projects {
+    padding: 32px 0;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .jv-page.jv-more-projects .tracy-grid {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 1399.98px) {
+  .jv-masthead.jv-project__masthead:not(.jv-masthead--404) {
+    padding: 192px 0 64px;
+  }
+
+  .tracy .jv-project__masthead .jv-masthead__title {
+    font-size: 32px;
+  }
+
+  .tracy .jv-project__stat-value {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .jv-masthead.jv-project__masthead:not(.jv-masthead--404) {
+    padding: 96px 0 32px;
+  }
+
+  .tracy .jv-project__masthead .jv-masthead__title {
+    font-size: 24px;
+  }
+
+  .tracy .jv-project__stats > .jv-project__stat {
+    flex: 0 0 calc(50% - 32px);
+    margin-bottom: 16px;
+  }
+
+  .jv-project__info {
+    padding: 24px;
+  }
+
+  /* Opus lens (390 and 768): the source's card sits 12 px under the text column and its first row 24 px under the name. */
+  .jv-project__details {
+    margin-top: 24px;
+  }
+
+  .jv-project__cta .jv-actions {
+    margin-top: 24px;
+  }
+
+  .tracy .jv-project__stat-value {
+    font-size: 28px;
+  }
+
+  .jv-project__columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .tracy .jv-project__about-title,
+  .tracy .jv-project__cta-title {
+    font-size: 24px;
+  }
+
+  .tracy .jv-project__cta-title {
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .jv-project__columns {
+    margin-top: 16px;
+  }
+
+  /* One column gallery: the source keeps 48 px between the last picture and the call to action. */
+  .jv-project__cta {
+    margin-top: 48px;
+  }
+
+  .jv-project__gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .tracy .jv-more-projects .tracy-card__title.tracy-card__title {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .jv-masthead.jv-project__masthead:not(.jv-masthead--404) {
+    padding: 96px 0 16px;
+  }
+
+  .tracy .jv-project__stats > .jv-project__stat {
+    flex-basis: calc(100% - 32px);
+  }
+
+  .tracy .jv-project__stat-value {
+    font-size: 26px;
+  }
+
+  .tracy .jv-project__about > h4 {
+    font-size: 22px;
+  }
+}
+
+/* Opus lens (992-1399): the source's 222 px card wraps the rating, stars on their own line under the label. */
+@media (min-width: 992px) and (max-width: 1399.98px) {
+  .jv-project__row:has(.jv-project__rating) .jv-project__label {
+    flex-basis: 100%;
+  }
+}
+
+/* ── Footer newsletter (1.1.6; audit 03/10, defect 5). Source mod_acym measured at 1440, 1180, 768 and 390: a panel under Explore
+ * and Resources from 992 (3 % white, radius 16, 32 padding, 24 below 992), a 24/500 (22 on a phone) centred title at most 380
+ * wide, 33 px above the row of the email field (2 parts) and the Subscribe button (1 part). ── */
+@media (min-width: 992px) {
+  .jv-footer__grid > .jv-footer__col:nth-child(-n + 2) {
+    grid-row: 1 / span 2;
+  }
+
+  .jv-footer__grid > .jv-footer__newsletter {
+    grid-column: 3 / 5;
+    grid-row: 2;
+  }
+}
+
+.jv-footer__newsletter {
+  align-self: start;
+  margin-top: 16px;
+  padding: 32px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tracy .jv-newsletter__title {
+  max-width: 380px;
+  margin: 0 auto 33px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--jv-on-night);
+}
+
+.jv-newsletter__trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.jv-newsletter__trap input {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+}
+
+.jv-newsletter__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 21px;
+  align-items: stretch;
+  font-size: 16px;
+}
+
+.jv-newsletter__row .screen-reader-text {
+  position: absolute;
+}
+
+.jv-newsletter__email {
+  min-width: 0;
+  min-height: 56px;
+  padding: 15px 24px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font: inherit;
+  font-size: 16px;
+  color: #fff;
+}
+
+.jv-newsletter__email::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.jv-newsletter__submit {
+  min-width: 0;
+  min-height: 56px;
+  padding: 15px 24px;
+  border: 1px solid var(--wp--preset--color--accent);
+  border-radius: 8px;
+  background: var(--wp--preset--color--accent);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+}
+
+.jv-newsletter__submit:hover {
+  background: var(--wp--preset--color--accent-hover);
+}
+
+.jv-newsletter__status {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.jv-newsletter__status:not([class*='--']) {
+  display: none;
+}
+
+.jv-newsletter__status--invalid,
+.jv-newsletter__status--failed {
+  color: #ff9d9d;
+}
+
+@media (max-width: 991.98px) {
+  .jv-footer__newsletter {
+    padding: 24px;
+  }
+
+  .jv-footer__grid > .jv-footer__newsletter {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .tracy .jv-newsletter__title {
+    font-size: 22px;
+  }
+
+  .jv-newsletter__row {
+    grid-template-columns: minmax(0, 187fr) minmax(0, 109fr);
+    gap: 13px;
+  }
+
+  /* Measured 390/480/575 against the source: its copyright line sits 46 px closer to the last column on a phone. */
+  .tracy .jv-footer__bottom {
+    margin-top: 49px;
+  }
+
+  .jv-footer__bottom .jv-container {
+    padding-block: 17px 19px;
+  }
+}
+
+/* 1.1.6 (intrinsic mobile probe, 320–414): a visually hidden label is a 1 px box whose text runs past it, so the probe saw the
+ * social icons' names and "Skip to content" as controls wrapping onto several lines. The label keeps its words for assistive
+ * technology and no longer lays out any: no height, no font size, no wrapping. A focused skip link is drawn in full again. */
+.screen-reader-text,
+.wp-block-social-link-label {
+  white-space: nowrap;
+}
+
+.wp-block-social-link-label {
+  height: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+#wp-skip-link:not(:focus) {
+  height: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+/* The 404 figure is 176 px (the source's) and ran 18 px past a 320 px screen. */
+@media (max-width: 359.98px) {
+  .tracy .jv-masthead--404 .jv-masthead__title {
+    font-size: 150px;
+  }
+}
+
+/* The e-mail address of the contact list (20 px, no break) ran 15 px past a 320 px page; from the source's 390 down it keeps 20 px. */
+@media (max-width: 359.98px) {
+  .tracy .jv-prose .jv-contact__value {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
+/* Hidden text keeps its words for assistive technology and lays out none of them (see above). */
+.screen-reader-text:not(:focus) {
+  height: 0;
+  font-size: 0;
+  line-height: 0;
 }
