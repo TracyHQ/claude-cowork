@@ -22,6 +22,7 @@ require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/Extensions.php';
 require_once __DIR__ . '/SiteWriter.php';
+require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
@@ -2286,6 +2287,9 @@ final class Engine
      */
     private const RETIRE_CHUNK = 3000;
 
+    /** Every column `MultilingualApply::retireWrites` reads of a row, of any of the four kinds. */
+    private const RETIRE_COLUMNS = ['id' => true, 'lang_id' => true, 'lang_code' => true, 'published' => true, 'state' => true, 'language' => true, 'client_id' => true];
+
     /**
      * Show or hide one row by its visibility column, and nothing else. Not write(): for an article or
      * a module that goes through Joomla's Table, which mints an `#__assets` row and moves the ACL
@@ -2358,10 +2362,14 @@ final class Engine
             // kind. list() also works out, for every article, its routed URL, a menu lookup, its author,
             // its tags and its access level — none of which this pass reads, and 3.4 to 5 s of every
             // call on Business (05/10/2026). A writer without a bulk reader walks list() as before.
-            $source = new ContractRows($this->writer);
+            // Each kind is cut down to the columns retireWrites() reads as soon as it is read, so the
+            // full rows (an article's body, a module's content) are gone before the next kind and the
+            // transaction: one kind's full rows at a time, never all four.
             $rows = [];
-            foreach (['language', 'article', 'menuItem', 'module'] as $kind) $rows[$kind] = $source->summaries($kind);
-            unset($source);
+            foreach (['language', 'article', 'menuItem', 'module'] as $kind) {
+                $rows[$kind] = [];
+                foreach ((new ContractRows($this->writer))->summaries($kind) as $row) $rows[$kind][] = array_intersect_key($row, self::RETIRE_COLUMNS);
+            }
             Timing::end('retireList', $t);
             $t = Timing::begin();
             // A kept language the archive ships an edition of stays exactly as shipped: that edition IS

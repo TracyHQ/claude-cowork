@@ -51,6 +51,12 @@ foreach (['paged' => new PagedOnlyWriter(), 'bulk' => new BulkOnlyWriter()] as $
     $big->store['article'][20000] = ['id' => '20000'];
     try { (new ContractRows($big))->all('article'); $refused = 'read'; } catch (RuntimeException $e) { $refused = $e->getMessage(); }
     check("$mode: 20,000 rows exceed the inventory limit", $refused, 'Inventory limit exceeded');
+    // A scan's summaries refuse at the same size, whichever reader walks them.
+    unset($big->store['article'][20000]);
+    check("$mode: summaries of 19,999 rows are read", count((new ContractRows($big))->summaries('article')), 19999);
+    $big->store['article'][20000] = ['id' => '20000'];
+    try { (new ContractRows($big))->summaries('article'); $refused = 'read'; } catch (RuntimeException $e) { $refused = $e->getMessage(); }
+    check("$mode: summaries of 20,000 rows exceed the inventory limit too", $refused, 'Inventory limit exceeded');
 }
 
 // The real profile, both ways: the same inspect, the same mapping, the same apply — and the bulk

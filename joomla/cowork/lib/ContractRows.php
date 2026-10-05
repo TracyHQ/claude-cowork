@@ -61,7 +61,8 @@ final class ContractRows
 
     /**
      * The rows a scan over a kind needs (id, note, alias, language, catid). With a bulk reader the
-     * full rows already carry them; without one this is the writer's own list walk, as before.
+     * full rows already carry them; without one this is the writer's own list walk, as before. Both
+     * refuse a kind of LIMIT rows or more, as all() does.
      *
      * @return array<int,array>
      */
@@ -79,6 +80,8 @@ final class ContractRows
             $page = $this->writer->list($kind, $offset, 100);
             foreach ($page as $row) $rows[] = $row;
             if (count($page) < 100) break;
+            // all()'s refusal, so whether a kind this large is scanned does not depend on the reader.
+            if ($offset === self::LIMIT - 100) throw new RuntimeException('Inventory limit exceeded');
         }
         return $rows;
     }
