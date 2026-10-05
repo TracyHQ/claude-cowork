@@ -3,8 +3,9 @@
  * SiteIdentity — the two Global Configuration values that name a Joomla site to its visitors, and
  * nothing else of `configuration.php`.
  *
- * - `sitename`: the site name Joomla adds to every page `<title>` (Global Configuration › Site Name)
- *   and the sender name of the mail it sends.
+ * - `sitename`: the site name (Global Configuration › Site Name) — a page's `<title>` when the page
+ *   has none of its own, added to every `<title>` when the site says so (`sitename_pagetitles`), and
+ *   named in the mail Joomla writes. The mail's sender name is another key (`fromname`), not this one.
  * - `MetaDesc`: the site meta description, which every page without a description of its own falls
  *   back to (a menu item whose `menu-meta_description` is empty prints this one).
  *

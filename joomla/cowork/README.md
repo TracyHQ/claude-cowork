@@ -398,7 +398,8 @@ other write, so it reverts.
 ## The site name and description: `site.identity` (unreleased)
 
 A site made from a template keeps the template's words in Global Configuration: `sitename` (the site
-name in every `<title>` when the site adds it, and the mail sender name) and `MetaDesc` (what a page
+name: a page's `<title>` when it has none of its own, added to every `<title>` when the site says so,
+and named in the mail Joomla writes; the sender name is `fromname`, not this) and `MetaDesc` (what a page
 with no description of its own prints as its meta description). No other door reached
 `configuration.php`, so after every page was written in the owner's words the home page could still
 say "JA Vega - Modern Joomla Template…" (TCH ledger L24, 05/10/2026).
