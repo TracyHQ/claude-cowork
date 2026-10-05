@@ -69,7 +69,7 @@ body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, 
 	margin: 0;
 }
 .acm-features.style-4 .jm-ft-sign {
-	margin: 0;
+	margin: 48px 0 0;
 	font-size: 36px;
 	line-height: 45px;
 	letter-spacing: -0.6px;
@@ -357,13 +357,23 @@ body.jm-route-services-page .acm-features.style-4 .col:nth-child(3) .features-it
 body:is(.jm-route-about-us, .jm-route-services-page) .t3-mainbody.container {
 	width: auto;
 	max-width: none;
-	padding-inline: 0;
+	padding: 0;
 }
 body:is(.jm-route-about-us, .jm-route-services-page) .item-page .acm-teams .jm-cards {
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
 	gap: 30px;
 	margin: 0;
+}
+@media (max-width: 1199px) {
+	body:is(.jm-route-about-us, .jm-route-services-page) .item-page .acm-teams .jm-cards {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+@media (max-width: 767px) {
+	body:is(.jm-route-about-us, .jm-route-services-page) .item-page .acm-teams .jm-cards {
+		grid-template-columns: 1fr;
+	}
 }
 
 /* ---- Statement heading of features-intro (style-4, style-3 intro): 36 px on every group A page ---- */
@@ -431,6 +441,9 @@ body:is(.jm-route-about-us, .jm-route-home-style-2, .jm-route-home-style-3) .acm
 body.jm-route-about-us .acm-teams {
 	padding-bottom: 15px;
 }
+body.jm-route-about-us .t3-section:has(.acm-teams) {
+	padding-bottom: 120px;
+}
 
 /* Latest articles (mod_articles_latest of Home style 4): "view all" link over the title row, four cards. */
 .jm-acm .wrap-last-article {
@@ -493,14 +506,15 @@ body.jm-route-about-us .acm-teams {
 	padding: 0;
 }
 .latest-news .intro-image {
-	height: 190px;
+	/* The source's picture box is always 3:2 (190 px at the widest, 142 px in a narrow column). */
+	aspect-ratio: 3 / 2;
 	margin: 0;
 	overflow: hidden;
 }
 .latest-news .intro-image img {
 	display: block;
 	width: 100%;
-	height: 190px;
+	height: 100%;
 	object-fit: fill;
 	border-radius: 4px;
 }
@@ -596,4 +610,169 @@ body.jm-route-about-us .acm-teams {
 /* A carousel whose slides all fit has one page: the source draws no dots then (the runtime draws one). */
 .tracy-motion-dots:has(> .tracy-motion-dot:only-child) {
 	display: none;
+}
+
+/* ---- from 992: the source's title column is col-md-4 (one third, 15 px padding) beside two cards (col-md-8) ---- */
+@media (min-width: 992px) {
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 {
+		grid-template-columns: 33.3333% 66.6667%;
+	}
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
+		max-width: none;
+		padding: 0 45px 0 15px;
+	}
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .acm-feature-slide.tracy-motion-carousel {
+		margin: 0;
+	}
+}
+
+/* ---- features style-1 cards as the source builds them: 30 px under the icon, 30 px of padding right of the text, 60 px below ---- */
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-item {
+	min-height: 0;
+	padding: 0 45px 60px 15px;
+	box-sizing: border-box;
+}
+body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-img {
+	margin-bottom: 30px !important;
+}
+/* The source's cards share one height across both rows (equal-height script): a grid with equal rows does the same. */
+@media (min-width: 992px) {
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .tracy-motion-track {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-auto-rows: 1fr;
+	}
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-item {
+		flex: none;
+	}
+}
+
+/* ---- Home style 3 and 4 hero: 350/350 px on desktop, 150/75 px below 992 (the source's hero-item paddings) ---- */
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero.hero-extra-large:first-child {
+	padding-bottom: 75px;
+}
+@media (min-width: 992px) {
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero.hero-extra-large:first-child {
+		padding-top: 350px;
+		padding-bottom: 350px;
+	}
+}
+@media (max-width: 991px) {
+	body.jm-route-home-style-4 .jm-sections > .acm-hero:first-child .wrap-content {
+		padding-top: 90px;
+	}
+}
+@media (min-width: 768px) and (max-width: 991px) {
+	body.jm-route-home-style-3 .jm-sections > .acm-hero:first-child .lead {
+		padding: 0 90px;
+	}
+}
+
+/* ---- features style-5 (call to action): 75 px above and below, 30 px inside the box below 992 ---- */
+@media (max-width: 991px) {
+	body .acm-features.style-5 .features-item {
+		padding-block: 75px;
+	}
+	body .acm-features.style-5 .group-item {
+		padding: 30px;
+	}
+}
+
+/* ---- features style-4 tiles: the source's equal-height script gives every tile the height of the tallest one ---- */
+@media (min-width: 768px) {
+	.acm-features.style-4 .jm-tiles {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		grid-auto-rows: 1fr;
+	}
+	.acm-features.style-4 .jm-tiles > .col {
+		flex: none;
+		max-width: none;
+	}
+}
+@media (min-width: 1200px) {
+	.acm-features.style-4 .jm-tiles {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+/* Features style 4 title: 60 px under it below 1200 px (150 px above that). */
+@media (max-width: 1199px) {
+	.acm-features.style-4 > .section-title {
+		margin-bottom: 60px;
+	}
+}
+
+/* ---- features style-1 below 992: one card to a row, the title block 520 px wide ---- */
+@media (max-width: 991px) {
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 .features-item {
+		flex: 0 0 100%;
+	}
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
+		max-width: 535px !important;
+		padding: 0 30px 0 15px !important;
+	}
+}
+@media (max-width: 767px) {
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
+		max-width: none !important;
+		padding: 0 0 0 15px !important;
+	}
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+	.acm-features.style-5 h2.jm-module-title {
+		font-size: 28px;
+		line-height: 35px;
+	}
+}
+
+/* Features style 3 picture: the source draws it at its own 960 x 880 and grows it only to cover the half's height; the port's file is 3000 x 2750, so the size is stated, not inherited. */
+@media (min-width: 992px) {
+	body .acm-features.style-3 .features-image img {
+		width: auto;
+		height: max(880px, 100%);
+	}
+}
+
+/* ---- clients: six cells to a row from 768 px, two below (the source's col-xs-6 / col-sm-2) ---- */
+.acm-cliens.style-1 .client-item {
+	flex: 0 0 50%;
+	min-width: 0;
+}
+@media (min-width: 768px) {
+	.acm-cliens.style-1 .client-item {
+		flex-basis: 16.6667%;
+	}
+}
+
+/* ---- Home style 3 and 4, closing call to action (second hero): 90 px of space under the text that the source's group item carries ---- */
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero:not(:first-child) .wrap-content {
+	margin-bottom: 90px;
+}
+@media (max-width: 767px) {
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero:not(:first-child) {
+		padding-block: 75px;
+	}
+}
+
+/* Latest articles: the title block is 520 px wide with 60 px under it, so a long title takes two lines as in the source. */
+.jm-acm .section-title:has(+ .wrap-last-article) {
+	max-width: 520px;
+	margin-bottom: 60px;
+}
+
+/* An accordion wrapper with nothing in it takes no room; the call-to-action then sits 30 px under the lead as in the source. */
+.acm-features.style-3 .features-module-wrap:not(:has(*)) {
+	display: none;
+}
+.acm-features.style-3 .features-module-wrap:not(:has(*)) + .features-action {
+	margin-top: 30px;
+}
+
+/* Features style 3 is as tall as its text (570 px at 992-1199 in the source), not a fixed 600 px. */
+@media (min-width: 992px) {
+	body .acm-features.style-3 {
+		min-height: 0;
+	}
 }

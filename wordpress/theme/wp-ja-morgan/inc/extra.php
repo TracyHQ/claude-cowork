@@ -402,6 +402,8 @@ add_filter( 'redirect_canonical', 'wp_ja_morgan_search_no_canonical' );
  * @return string
  */
 function wp_ja_morgan_search_action( string $content, array $block ): string {
+	// The core Search block marks its input `required`; the source's search inputs are not, and an empty search just lists everything.
+	$content = (string) preg_replace( '/(<input\b[^>]*?)\s+required(?:="[^"]*")?(?=[\s\/>])/', '$1', $content );
 	if ( false === strpos( (string) ( $block['attrs']['className'] ?? '' ), 'head-search' ) ) {
 		return $content;
 	}
@@ -463,6 +465,35 @@ function wp_ja_morgan_fulltext_image( string $content, array $block ): string {
 	return '';
 }
 add_filter( 'render_block_core/image', 'wp_ja_morgan_fulltext_image', 10, 2 );
+
+/**
+ * A hero background picture is drawn at the full-size file, as the source's CSS background is:
+ * WordPress' srcset/sizes picked the 768 px size for a box that shows the picture 1400 px wide
+ * (blurry at 768 px). The block render marks the image; the content-tag filter, which adds the
+ * srcset afterwards, takes it out again (the whole template is filtered a second time, so the mark stays).
+ *
+ * @param string $content The rendered image.
+ * @return string
+ */
+function wp_ja_morgan_hero_picture_mark( string $content ): string {
+	if ( ! preg_match( '/<figure[^>]*class="[^"]*\bft-bg(-xs)?\b/', $content ) ) {
+		return $content;
+	}
+	return (string) preg_replace( '/<img /', '<img data-jm-hero-picture="1" ', $content, 1 );
+}
+add_filter( 'render_block_core/image', 'wp_ja_morgan_hero_picture_mark', 10, 1 );
+
+/**
+ * @param string $image The image tag after WordPress added its srcset and sizes.
+ * @return string
+ */
+function wp_ja_morgan_hero_picture_full( string $image ): string {
+	if ( false === strpos( $image, 'data-jm-hero-picture' ) ) {
+		return $image;
+	}
+	return (string) preg_replace( '/\s(srcset|sizes)="[^"]*"/', '', $image );
+}
+add_filter( 'wp_content_img_tag', 'wp_ja_morgan_hero_picture_full', 20, 1 );
 
 /**
  * The masthead heading: the seeder keeps a page's source heading in `tracy_page_heading` when it
@@ -709,7 +740,7 @@ add_filter( 'render_block_core/post-title', 'wp_ja_morgan_single_h1', 11, 2 );
 add_action(
 	'wp_footer',
 	static function () {
-		echo '<div class="back-to-top"><button type="button" class="btn btn-primary" title="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '" aria-label="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V5M5 12l7-7 7 7"/></svg></button></div>';
+		echo '<div class="back-to-top"><button type="button" class="btn btn-primary" title="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '" aria-label="' . esc_attr__( 'Back to Top', 'wp-ja-morgan' ) . '"><span aria-hidden="true"></span></button></div>';
 	}
 );
 
