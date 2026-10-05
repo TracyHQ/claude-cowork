@@ -34,7 +34,8 @@ that it renders the same pages; the WordPress quickstart is released under the t
    draft `smart-search`, the services side menu on the `wp_navigation` slug `services`, the
    current menu entry of a post on the redirect rules of `wp_ja_nova_redirects`. Read docs/content-model.md before renaming, moving or publishing a page.
 8. Dark mode: three states kept in the `tracy_theme` cookie and applied as `data-theme` on
-   `<html>`; no attribute = auto, the operating system decides (docs/design-system.md).
+   `<html>`; auto is resolved to light or dark from the operating system by the head script, so the
+   attribute is always set where scripts run (docs/design-system.md).
 9. Do not fabricate business facts, legal text, people, prices or images. Everything on the site
    is demonstration data until the owner replaces it; a gap is recorded, not filled. Read
    docs/content-rules.md.
