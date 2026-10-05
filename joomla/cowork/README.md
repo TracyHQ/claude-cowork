@@ -21,6 +21,7 @@ an empty token refuses every request.
 | `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
+| `site.identity` (unreleased) | Global Configuration's site name (`sitename`) and site description (`MetaDesc`) — read, and set under an `apply_id` so `apply.revert` takes it back. Those two keys of `configuration.php` and no other. See "The site name and description" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
 | `db.snapshot`, `db.rollback` | Copy the tables aside before something rewrites the schema, and rename them back if it does not land. Two renames per table, so a rollback is metadata and finishes in one request; what it displaces goes to the trash, not a `DROP`. |
@@ -393,6 +394,46 @@ a content map computed from the site's own rows, in the same `content-map` schem
 (`FieldValueKey`); only `value` is written; a pair stored in more than one row (a multiple-value
 field) reads as none and is refused; no create and no delete; recorded under the `apply_id` like every
 other write, so it reverts.
+
+## The site name and description: `site.identity` (unreleased)
+
+A site made from a template keeps the template's words in Global Configuration: `sitename` (the site
+name in every `<title>` when the site adds it, and the mail sender name) and `MetaDesc` (what a page
+with no description of its own prints as its meta description). No other door reached
+`configuration.php`, so after every page was written in the owner's words the home page could still
+say "JA Vega - Modern Joomla Template…" (TCH ledger L24, 05/10/2026).
+
+```
+site.identity {}                                   → {ok, fields: {sitename, MetaDesc}, writable}
+site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?}}
+                                                   → {ok, fields: {sitename, MetaDesc}, changed: [...]}
+```
+
+- **Two keys, both ways.** A read answers exactly those two (`fields` on a read may name only them);
+  a set takes one or both. Any other key is refused with `unsupported`, never ignored: the same file
+  holds the database password and the site secret. Nothing else of the file is ever returned.
+- **Values.** Strings only, cleaned as Joomla's own Global Configuration form cleans them
+  (`filter="string"`: entities decoded, tags removed), and made one line. `MetaDesc` holds Joomla's
+  300 characters and may be empty; `sitename` holds 200 and may not (Joomla requires one). Anything
+  else is `bad_params`. The answer carries the values as stored.
+- **Undo.** What changed is recorded under the `apply_id` with its previous value, so `apply.revert`
+  puts the site's own words back — together with the content writes of the same `apply_id`, if any. A
+  value already in place is not written; when nothing changes the answer is `unchanged: true` and no
+  undo step is recorded, so a retry after a lost reply is harmless. A set takes the site's write lock;
+  a read does not. It is not part of `content.batch`: a file is outside the database transaction.
+- **How it writes.** As Joomla's own save does (`ApplicationModel::writeConfigFile`, Joomla 4–6): the
+  configuration Joomla loaded (`new JConfig()`) with the two values merged in, formatted by Joomla's
+  `Registry` as the `JConfig` class, checked to parse as PHP, written in place, and the opcode cache
+  for the file dropped. Joomla's installer leaves the file `0444`, owned by the web server (measured on
+  5.4.9), so a file the web server owns is made writable for the write, as Joomla does — and then put
+  back to its own mode, which Joomla does not. A file the web server can neither write nor chmod is
+  refused with `unsupported` and `code: CONFIG_NOT_WRITABLE`; `writable: false` on a read says so in
+  advance. A plugin older than this answers `{error: "bad_action", message: "unknown action: site.identity"}`.
+- **Proven on a real install** (Joomla 5.4.9, this build, 05/10/2026): a set changed exactly the two
+  lines of `configuration.php`, left it `0444 www-data`, and the home page's meta description and
+  logo text showed the new words on the next request; `apply.revert` left the file byte-identical to
+  before; with the file owned by root the set was refused and the file unchanged. Joomla 6.1.3 writes
+  its configuration the same way (same `JConfig`, same `Registry` PHP format).
 
 ## Finding a row by its title: `content.list` `search` (unreleased)
 
