@@ -354,9 +354,11 @@ a { color: var(--wp--preset--color--accent); }
 .je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__label { color: var(--wp--preset--color--fg-2); }
 .je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label { color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
 .je-drawer-nav .wp-block-navigation-submenu__toggle { border: 0; cursor: pointer; color: var(--wp--preset--color--fg-2); }
-.je-drill-back { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; margin: 0 0 4px; padding: 0; border: 0; border-bottom: 1px solid var(--wp--preset--color--border-soft); background: none; cursor: pointer; text-align: left; font: 600 16px/24px "Noto Serif", serif; text-transform: uppercase; color: var(--wp--preset--color--fg-2); }
+.je-drawer-nav .je-drill-back, .je-drill-back { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; margin: 6px 0 0 !important; padding: 8px 16px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #2b3548); border-radius: 8px; background: var(--wp--preset--color--bg); cursor: pointer; text-align: left; font: 600 14.4px/21.6px "Noto Serif", serif; text-transform: uppercase; color: var(--wp--preset--color--fg-2); }
 .je-drill-back[hidden] { display: none; }
-.je-drill-back__arrow { font-size: 26px; line-height: 1; color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
+/* the chevron is a CSS shape (source: Font Awesome chevron-left, 8x12, #adb5bd), not a character in the text */
+.je-drill-back__arrow { position: relative; flex: none; width: 8px; height: 12px; }
+.je-drill-back__arrow::before { content: ""; position: absolute; top: 2px; left: 3px; width: 6px; height: 6px; border-left: 2px solid #adb5bd; border-bottom: 2px solid #adb5bd; transform: rotate(45deg); }
 .je-drawer-nav .wp-block-navigation-submenu__toggle:focus-visible, .je-drill-back:focus-visible { outline: 2px solid light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); outline-offset: 2px; }
 
 /* 1.0.1 — the one-row header at 992-1199px: the menu steps down so the Subscribe button keeps one line (source: 140x48 at
@@ -436,3 +438,18 @@ nav.je-drawer-nav { display: flex; flex-direction: column; align-items: stretch 
 .je-footer__small, .je-footer__tagline { font-size: 14px; line-height: 21px; }
 .je-footer__info { margin-top: -17px !important; }
 .je-footer__small { display: block; }
+
+/* 1.0.7 — sub-level rows of the drawer as the source draws them: 16px regular, body grey, 12px padding, a hairline under each row; the
+   current one stays bold blue. */
+.je-drawer-nav .wp-block-navigation__submenu-container > .wp-block-navigation-item { height: 49px; padding: 0; border-bottom: 1px solid light-dark(rgba(0, 0, 0, 0.1), #2b3548); }
+.je-drawer-nav .wp-block-navigation__submenu-container > .wp-block-navigation-item > .wp-block-navigation-item__content { box-sizing: border-box; width: 100%; padding: 12px 0 !important; }
+.je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .wp-block-navigation-item__label { font-weight: 400; color: var(--wp--preset--color--fg); }
+.je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content, .je-drawer-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label { font-weight: 600; color: light-dark(rgb(26, 62, 237), rgb(125, 147, 255)); }
+
+/* 1.0.7 — the open drawer pushes the page 300px to the left and dims what is left beside the panel (source: .c-offcanvas-content-wrap
+   translate3d(-300px), .c-offcanvas-bg rgba(0,0,0,.68)). The script moves the panel out of the header to the end of <body>, so it stays fixed while the page moves. */
+.wp-site-blocks { transition: transform 0.3s cubic-bezier(0.4, 0, 0.6, 1); }
+html.je-drawer-open .wp-site-blocks { transform: translateX(-300px); }
+html.je-drawer-open::after { content: ""; position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.68); animation: je-drawer-dim 0.3s ease; }
+@keyframes je-drawer-dim { from { background: rgba(0, 0, 0, 0); } }
+@media (prefers-reduced-motion: reduce) { .wp-site-blocks { transition: none; } html.je-drawer-open::after { animation: none; } }

@@ -12,7 +12,7 @@
 .je-contactcard textarea { min-height: 230px; padding-top: 16px; resize: vertical; }
 .je-contactcard .wpcf7-list-item label { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-family: var(--wp--preset--font-family--body, inherit); color: var(--wp--preset--color--fg-2); }
 .je-contactcard input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
-.je-contactcard .wpcf7-submit { min-height: 48px; padding: 0 20px; border: 0; border-radius: 6px; background: var(--wp--preset--color--accent, #4d6bff); color: var(--wp--preset--color--accent-on, #fff); font-family: var(--wp--preset--font-family--display, inherit); font-size: 16px; cursor: pointer; }
+.je-contactcard .wpcf7-submit { box-sizing: border-box; min-height: 48.3px; padding: 12.8px 18px; border: 1px solid var(--wp--preset--color--accent, #4d6bff); border-radius: 8px; background: var(--wp--preset--color--accent, #4d6bff); color: var(--wp--preset--color--accent-on, #fff); font: 400 18px/20.7px var(--wp--preset--font-family--display, inherit); cursor: pointer; }
 .je-contactcard .wpcf7-response-output { margin: 0; }
 
 /* Login: a 500px white card, full-width controls, gallery band below at container width. */
@@ -48,7 +48,7 @@
 .t4-typo-example .alert-info { color: light-dark(#055160, #6edff6); background: light-dark(#cff4fc, #032830); border-color: light-dark(#b6effb, #087990); }
 .t4-typo-example .alert-light { color: light-dark(#495057, #f8f9fa); background: light-dark(#fefefe, #343a40); border-color: light-dark(#fdfdfe, #495057); }
 .t4-typo-example .alert-dark { color: light-dark(#495057, #dee2e6); background: light-dark(#ced4da, #1a1d20); border-color: light-dark(#bcbebf, #343a40); }
-.t4-typo-example .badge { display: inline-block; padding: .35em .65em; border-radius: 6px; font: 700 .75em/1 var(--wp--preset--font-family--display); color: #fff; vertical-align: baseline; }
+.t4-typo-example .badge { display: inline-block; padding: .35em .65em; border-radius: 8px; font: 700 .75em/1 var(--wp--preset--font-family--display); color: #fff; vertical-align: baseline; }
 .t4-typo-example .badge.rounded-pill { border-radius: 50rem; }
 .t4-typo-example .bg-primary { background: var(--wp--preset--color--accent, #4d6bff); } .t4-typo-example .bg-secondary { background: #6c757d; }
 .t4-typo-example .bg-success { background: #20c997; } .t4-typo-example .bg-danger { background: #dc3545; } .t4-typo-example .bg-warning { background: #ffc107; }
@@ -1324,7 +1324,7 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
   body.je-hdr-pill .je-site-name--logo { order: 1; }
   body.je-hdr-pill .je-logo-img { width: 126.5px; height: 35.9px; margin: 0; }
   body.je-hdr-pill .je-header__top .je-social { display: flex; order: 2; margin: 0 -12px 0 0; }
-  body.je-hdr-pill .je-header__top .je-social .wp-social-link { padding: 0 14px; }
+  body.je-hdr-pill .je-header__top .je-social .wp-social-link { padding: 0 12px; }
   body.je-hdr-pill .je-header__top .je-subscribe { display: none; }
 }
 @media (min-width: 768px) and (max-width: 991px) {
@@ -1643,3 +1643,60 @@ body .je-footer .je-footer__small { color: light-dark(rgba(37, 36, 36, 0.7), #8c
 /* Menu button of the front-page masthead: the source's bars icon has 3.25px rounded bars 6.25px apart (the port drew 2px bars). */
 body.je-hdr-two .je-drawer-toggle { gap: 3px; }
 body.je-hdr-two .je-drawer-toggle span { height: 3.25px; border-radius: 1px; }
+
+/* 1.0.7 — field focus is the source's (Bootstrap's form-control): the border turns #86b7fe and nothing else changes, no ring and no
+   outline. The two fields the source leaves untouched on focus (newsletter email, tagged-items filter) keep the lightest mark: the same
+   border colour on the filter, a 1px inset outline on the borderless email (DECISIONS D-92). */
+:is(.je-acct, .je-contactcard, .je-sf) :is(input:not([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="hidden"]), textarea, select):focus-visible,
+.je-sf__input:focus-visible, .je-taglist__group input:focus-visible { outline: 0; box-shadow: none; border-color: #86b7fe; }
+.je-nl input[type="email"]:focus-visible { outline: 1px solid #86b7fe; outline-offset: -1px; box-shadow: none; }
+:root[data-theme="dark"] :is(.je-acct, .je-contactcard, .je-sf) :is(input:not([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="hidden"]), textarea, select):focus-visible { border-color: #86b7fe; }
+
+/* 1.0.7 — sign-in form box and links (source: the form keeps 17.7px under the button, the links start 3px below it) */
+.je-acct--login form { padding-bottom: 17.7px; }
+.je-acct--login .je-acct__links { margin-top: 3px !important; }
+.je-acct--login .je-acct__links + .je-acct__links { margin-top: 0 !important; }
+/* registration: the first password row is 3px taller on the source; the date row's field is 47.9px (the eye of the password fields is 53.7px) */
+.je-acct__group:has(#je-je_password) { margin-bottom: 35px; }
+.je-acct__pw:has(.je-acct__cal) input, .je-acct__pw:has(.je-acct__cal) .je-acct__cal { height: 47.9px !important; }
+
+/* 1.0.7 — back-to-top of Home 4 (source: #back-to-top, 50px, rgba(0,0,0,.5), 8px radius, chevron 16px white, right 32px, bottom 16px) */
+#back-to-top { display: none; position: fixed; right: 32px; bottom: 16px; z-index: 5; box-sizing: border-box; width: 50px; height: 50px; border-radius: 8px; background: rgba(0, 0, 0, 0.5); color: #fff; text-align: center; transition: all 0.35s ease; }
+#back-to-top svg { display: block; margin: 17px auto 0; }
+body.je-top-away #back-to-top { display: block; }
+#back-to-top:hover, #back-to-top:focus-visible { background: var(--wp--preset--color--accent); outline: 0; }
+
+/* 1.0.7 — Contact form rhythm as the source draws it (measured on the local source at 1440: label 18px, field 30px under the row top,
+   110px pitch, message field 230.6px high 36px under its label, 23.4px to the copy box, 50px to Send) */
+.je-contactcard .wpcf7-form label { line-height: 18px; }
+.je-contactcard .wpcf7-form .wpcf7-list-item label { line-height: 24px; }
+.je-contactcard .wpcf7-form-control-wrap { margin-top: 12px; }
+.je-contactcard .wpcf7-form p { margin: 0 0 32px; }
+.je-contactcard input[type="text"], .je-contactcard input[type="email"] { height: 47.9px; min-height: 0; }
+.je-contactcard .wpcf7-form p:has(textarea) .wpcf7-form-control-wrap { margin-top: 18px; }
+.je-contactcard textarea { height: 230.6px; min-height: 0; }
+.je-contactcard .wpcf7-form p:has(textarea) { margin-bottom: 23.4px; }
+.je-contactcard .wpcf7-form .je-email-copy { margin-bottom: 48px; }
+/* under 576px the source's rows are 3px lower and 113px apart (measured at 390) */
+@media (max-width: 575px) {
+  .je-contactcard .wpcf7-form { padding-top: 3px; }
+  .je-contactcard .wpcf7-form p { margin-bottom: 35px; }
+  .je-contactcard .wpcf7-form p:has(textarea) .wpcf7-form-control-wrap { margin-top: 15px; }
+  .je-contactcard .wpcf7-form p:has(textarea) { margin-bottom: 23.4px; }
+  .je-contactcard .wpcf7-form .je-email-copy { margin-bottom: 48px; }
+}
+
+/* 1.0.7 — Header icon controls (dark-mode switch, search, menu button) read the body text colour in dark, as the source's do
+   (#c2c9d6 measured on the local source at 1440 and 390; the heading colour #eef1f6 was brighter). Light is unchanged (#212529).
+   The drawer's own controls are not in the header and keep their colour. */
+.je-header .je-theme-toggle, .je-header .je-drawer-toggle, .je-header .je-search .wp-block-search__button { color: light-dark(#212529, #c2c9d6); }
+/* 1.0.7 — Menu button of the one-row header: the source draws three rounded 3.13px bars, 18.9px wide, 6.3px apart (measured at 390);
+   the two-row header already did. The button keeps its box, so its neighbours do not move. */
+body:not(.je-hdr-two) .je-header .je-drawer-toggle { gap: 3px; }
+body:not(.je-hdr-two) .je-header .je-drawer-toggle span { position: relative; left: .58px; width: 18.9px; height: 3.25px; border-radius: 1px; }
+/* The source's search glyph sits 20.3px from the left edge of its 48px box (the field's padding), ours 23.3px: 2.2px left on wide screens (measured at 1440). */
+@media (min-width: 1400px) { .je-header .je-search .wp-block-search__button svg { position: relative; left: -2.2px; } }
+/* The source's mode switch in the two-row header is 20px wide up to 480px (24px from 575px; measured at 390, 480, 575), so its glyph sits 2px further left. */
+@media (max-width: 480px) { body.je-hdr-two .je-header__tools .je-theme-toggle { width: 20px; } }
+/* The source's social glyphs of the two-row header sit about 1px lower inside the same 21px boxes at 390 (measured: 1.1px mean over the four). */
+@media (max-width: 575px) { body.je-hdr-two .je-header__top .je-social a { position: relative; top: 1px; } }

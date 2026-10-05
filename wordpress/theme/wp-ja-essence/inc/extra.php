@@ -532,6 +532,18 @@ function wp_ja_essence_search_icon( string $content ): string {
 add_filter( 'render_block_core/search', 'wp_ja_essence_search_icon' );
 
 /**
+ * The core search block prints `required` on its field; the source's search field (header and results page) has none, so an empty
+ * submit goes through to the results page there. The attribute is dropped from every search block.
+ *
+ * @param string $content Rendered block.
+ * @return string
+ */
+function wp_ja_essence_search_not_required( string $content ): string {
+	return (string) preg_replace( '#(<input\b[^>]*\btype="search"[^>]*?)\s+required(?:="[^"]*")?(?=[\s/>])#', '$1', $content );
+}
+add_filter( 'render_block_core/search', 'wp_ja_essence_search_not_required', 11 );
+
+/**
  * The pager of the source (Joomla's pagination, 1.0.3): "Page N of M" in a pill, centred above a row of 48px round buttons
  * « ‹ 1 2 3 › », the first/previous buttons dimmed on the first page and the next/last on the last. Every list's pager (the
  * query loops, the author and title lists) is drawn by this one function; a page link is a plain link, so it works without script.
@@ -1253,6 +1265,33 @@ function wp_ja_essence_slug_class( array $classes ): array {
 add_filter( 'body_class', 'wp_ja_essence_slug_class' );
 
 /**
+ * The back-to-top button: the source's template draws it (a 50px dark tab with a chevron, bottom right) on Home 4 only, and shows it
+ * once the header has scrolled out of view (`body.top-away`). The theme's script toggles `je-top-away` the same way.
+ */
+function wp_ja_essence_back_to_top(): void {
+	if ( ! is_page( 'home-4' ) ) {
+		return;
+	}
+	echo '<a href="#" id="back-to-top" aria-label="' . esc_attr__( 'Back to top', 'wp-ja-essence' ) . '"><svg viewBox="0 0 448 512" width="14" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M240.971 130.524l194.343 194.343c9.373 9.373 9.373 24.569 0 33.941l-22.667 22.667c-9.357 9.357-24.522 9.375-33.901.04L224 227.495 69.255 381.516c-9.379 9.335-24.544 9.317-33.901-.04l-22.667-22.667c-9.373-9.373-9.373-24.569 0-33.941L207.03 130.525c9.372-9.373 24.568-9.373 33.941-.001z"/></svg></a>';
+}
+add_action( 'wp_footer', 'wp_ja_essence_back_to_top' );
+
+/**
+ * wptexturize prints the source's straight quotes and apostrophes as typographic ones (&#8217; &#8216; &#8220; &#8221;): in titles and
+ * copy, and again over the whole template once the blocks are rendered (get_the_block_template_html() texturizes the finished HTML,
+ * so no per-field filter can reach the query cards or the search help). The source (Joomla) prints what was typed. The finished page
+ * is passed through one replacement of those four entities, written as `&#039;` and `&quot;` so they are safe inside an attribute
+ * too; dashes and ellipses keep the behaviour the heading and pager fixes above rely on.
+ */
+function wp_ja_essence_straight_apostrophe_start(): void {
+	if ( is_admin() || is_feed() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+		return;
+	}
+	ob_start( static fn( string $html ): string => strtr( $html, array( '&#8217;' => '&#039;', '&#8216;' => '&#039;', '&#8220;' => '&quot;', '&#8221;' => '&quot;' ) ) );
+}
+add_action( 'template_redirect', 'wp_ja_essence_straight_apostrophe_start', 0 );
+
+/**
  * The article footer's share links carry a token for the page address (the seeded content cannot know its own URL).
  *
  * @param string $content Rendered post content.
@@ -1392,6 +1431,10 @@ function wp_ja_essence_render_login(): string {
 	);
 	$star = '<span class="je-acct__star" aria-hidden="true">&nbsp;*</span>';
 	$form = (string) preg_replace( '#(<label for="user_(?:login|pass)">)([^<]*)(</label>)#', '$1$2' . $star . '$3', $form );
+	// The source's sign-in form requires both fields and puts the cursor in the username on load (Joomla's login module: `required`,
+	// `autofocus`); wp_login_form() prints neither.
+	$form = (string) preg_replace( '#(<input\b[^>]*\bid="user_login"[^>]*?)(\s*/?>)#', '$1 required aria-required="true" autofocus$2', $form, 1 );
+	$form = (string) preg_replace( '#(<input\b[^>]*\bid="user_pass"[^>]*?)(\s*/?>)#', '$1 required aria-required="true"$2', $form, 1 );
 	$recovery = esc_url( wp_lostpassword_url() );
 	return '<div class="je-acct je-acct--login">' . $notice . $form . '<div class="je-acct__links"><div class="je-acct__link"><a href="' . $recovery . '">' . esc_html__( 'Forgot your password?', 'wp-ja-essence' ) . '</a></div><div class="je-acct__link"><a href="' . $recovery . '">' . esc_html__( 'Forgot your username?', 'wp-ja-essence' ) . '</a></div></div><div class="je-acct__links"><div class="je-acct__link"><a href="' . esc_url( wp_ja_essence_account_url( 'register-form' ) ) . '">' . esc_html__( 'Don\'t have an account?', 'wp-ja-essence' ) . '</a></div></div></div>';
 }

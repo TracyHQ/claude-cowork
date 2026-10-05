@@ -7,7 +7,8 @@
  *     outside or Escape closes it, keyboard focus opens it;
  *  3. the lead slider: dots and previous/next buttons over a row that scrolls natively, so touch swipes work and
  *     every card is reachable by mouse, touch and keyboard;
- *  4. the gallery article: its pictures become a slider with arrows and thumbnails in the hero place.
+ *  4. the gallery article: its pictures become a slider with arrows and thumbnails in the hero place;
+ *  5. the back-to-top tab of Home 4: shown once the header has scrolled away.
  *
  * Every part is an enhancement: without this file the drawer stays closed, the menus open on hover and focus
  * through core, the slider is a row to scroll and the gallery pictures follow the text. */
@@ -24,6 +25,8 @@
   /* ---------- 1. drawer ---------- */
   const drawerToggle = document.querySelector('.je-drawer-toggle')
   const drawer = document.getElementById('je-drawer')
+  // The panel sits at the end of <body>, outside the page wrapper that slides away when it opens (a fixed box inside a moved box moves with it).
+  if (drawer && drawer.parentElement !== document.body) document.body.appendChild(drawer)
   let resetDrill = () => {}
   const drawerOpen = () => html.classList.contains('je-drawer-open')
   const setDrawer = (open) => {
@@ -56,8 +59,9 @@
     back.type = 'button'
     back.className = 'je-drill-back'
     back.hidden = true
+    // The chevron is drawn by CSS (the source's back row has no arrow character in its text).
     back.innerHTML =
-      '<span class="je-drill-back__arrow" aria-hidden="true">&lsaquo;</span><span class="je-drill-back__label"></span>'
+      '<span class="je-drill-back__arrow" aria-hidden="true"></span><span class="je-drill-back__label"></span>'
     drillNav.insertBefore(back, drillRoot)
     // The open path, outermost parent first; the last item's panel is the list on screen.
     let path = []
@@ -649,6 +653,24 @@
     card.classList.add('je-gslider-on')
     show(0)
   }
+  /* ---------- 5. back to top ---------- */
+  // Shown once the header has scrolled out of view, as the source's `top-away` does; the tab itself is printed by the theme on Home 4 only.
+  const toTop = document.getElementById('back-to-top')
+  if (toTop) {
+    const head = document.querySelector('.je-header')
+    const away = () =>
+      document.body.classList.toggle(
+        'je-top-away',
+        head ? head.getBoundingClientRect().bottom <= 0 : window.scrollY > 200
+      )
+    window.addEventListener('scroll', away, { passive: true })
+    away()
+    toTop.addEventListener('click', (e) => {
+      e.preventDefault()
+      window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' })
+    })
+  }
+
   /* the source draws the slider above the title of every gallery-format article (1.0.4: the posts too, not only the gallery page) */
   for (const card of document.querySelectorAll('.je-articlecard'))
     if (card.querySelector('.jes-gallery')) initGallery(card)
