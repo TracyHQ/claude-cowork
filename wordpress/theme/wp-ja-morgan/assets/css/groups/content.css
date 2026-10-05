@@ -489,14 +489,37 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	text-align: center;
 }
 
-/* Badges and list groups */
+/* The Bootstrap 3 indicator labels of the typography page (<span>): bold white on a solid colour. The soft grey
+   above is the tag chip, an <a>. */
+.t3-content span.label {
+	color: #ffffff;
+	font-weight: 700;
+}
+.t3-content span.label-default {
+	background: #999999;
+}
+.t3-content span.label-primary,
+.t3-content span.label-danger {
+	background: #d93030;
+}
+.t3-content span.label-success {
+	background: #5cb85c;
+}
+.t3-content span.label-info {
+	background: #5bc0de;
+}
+.t3-content span.label-warning {
+	background: #ffbb22;
+}
+
+/* Badges and list groups: a grey pill with white text; the active pill or list item turns white with red text. */
 .t3-content .badge {
 	display: inline-block;
 	margin-left: 3px;
 	padding: 3px 7px;
 	border-radius: 10px;
-	background: light-dark(#ffffff, #1a2032);
-	color: #d93030;
+	background: #999999;
+	color: #ffffff;
 	font-size: 12px;
 	font-weight: 700;
 	line-height: 12px;
@@ -538,7 +561,8 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	background: #d93030;
 	color: #ffffff;
 }
-.t3-content .list-group-item.active .badge {
+.t3-content .list-group-item.active .badge,
+.t3-content ul.nav-pills > li.active .badge {
 	background: #ffffff;
 	color: #d93030;
 }

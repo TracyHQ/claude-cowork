@@ -644,13 +644,51 @@
    logo row with contact info and a navy menu bar that overlaps the hero; styles 3 and 4 lay the header
    transparent over the hero with white text. The Home submenu opens at its trigger, so these
    geometries decide where the panel lands. */
-/* The header info row is a desktop element (the source hides it on phones). */
+/* The header info row is hidden on phones only (the source's hidden-xs): it shows from 768 px. */
 .jm-head-info {
 	display: none;
 }
-@media (min-width: 992px) {
+@media (min-width: 768px) {
 	body.jm-route-home-style-2 .jm-head-info {
 		display: block;
+	}
+	body.jm-route-home-style-2 .t3-header .jm-head-info {
+		order: 2;
+		margin: 0 0 30px auto;
+	}
+	body.jm-route-home-style-2 .jm-head-info ul {
+		display: flex;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	body.jm-route-home-style-2 .jm-head-info li {
+		min-height: 45.4px;
+		padding: 0 10px;
+	}
+	body.jm-route-home-style-2 .jm-head-info li + li {
+		margin-left: 15px;
+	}
+	body.jm-route-home-style-2 .jm-head-info h5 {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 400;
+		margin-bottom: 6.1px;
+		line-height: 16.3px;
+		color: #aaaaaa;
+	}
+	body.jm-route-home-style-2 .jm-head-info span,
+	body.jm-route-home-style-2 .jm-head-info a {
+		display: block;
+		font-size: 16px;
+		font-weight: 500;
+		line-height: 21px;
+		color: var(--jm-text-strong, #333333);
+	}
+}
+@media (min-width: 992px) {
+	body.jm-route-home-style-2 .jm-head-info li + li {
+		margin-left: 60px;
 	}
 	/* Style 2 */
 	body.jm-route-home-style-2 .t3-topbar {
@@ -682,39 +720,6 @@
 		order: 1;
 		line-height: 33.3px;
 		margin-bottom: 30px;
-	}
-	body.jm-route-home-style-2 .t3-header .jm-head-info {
-		order: 2;
-		margin: 0 0 30px auto;
-	}
-	body.jm-route-home-style-2 .jm-head-info ul {
-		display: flex;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-	body.jm-route-home-style-2 .jm-head-info li {
-		min-height: 45.4px;
-		padding: 0 10px;
-	}
-	body.jm-route-home-style-2 .jm-head-info li + li {
-		margin-left: 60px;
-	}
-	body.jm-route-home-style-2 .jm-head-info h5 {
-		margin: 0;
-		font-size: 13px;
-		font-weight: 400;
-		margin-bottom: 6.1px;
-		line-height: 16.3px;
-		color: #aaaaaa;
-	}
-	body.jm-route-home-style-2 .jm-head-info span,
-	body.jm-route-home-style-2 .jm-head-info a {
-		display: block;
-		font-size: 16px;
-		font-weight: 500;
-		line-height: 21px;
-		color: var(--jm-text-strong, #333333);
 	}
 	body.jm-route-home-style-2 .t3-header .header-inner {
 		order: 3;
@@ -787,6 +792,12 @@
 		max-width: none;
 		width: 100%;
 		padding: 0 0 0 15px;
+	}
+	/* Style 4: container-fluid with a 1230 px inner box: 15 px at each side up to 1260 px, centred beyond. */
+	body.jm-route-home-style-4 .t3-header > .container {
+		max-width: 1260px;
+		width: 100%;
+		padding: 0 15px;
 	}
 	body.jm-route-home-style-3 .t3-header .header-inner {
 		display: contents;

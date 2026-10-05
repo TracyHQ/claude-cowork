@@ -54,6 +54,13 @@
 	border-color: #2a3247;
 	box-shadow: none;
 }
+:root[data-theme="dark"] .jm-form:is(.registration, .profile, .profile-edit) .control-label label {
+	color: #cdd4e0;
+}
+/* Home styles 3 and 4: the header stays transparent over the hero in dark too (the shared dark header surface would paint a bar). */
+:root[data-theme="dark"] body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header {
+	background: transparent;
+}
 :root[data-theme="dark"] .acm-testimonial.style-1 .tracy-motion-dots button[aria-current="true"] {
 	border-color: #1e375c;
 }
@@ -211,6 +218,12 @@
 	:root:not([data-theme="light"]) .jm-form .form-control:focus {
 		border-color: #2a3247;
 		box-shadow: none;
+	}
+	:root:not([data-theme="light"]) .jm-form:is(.registration, .profile, .profile-edit) .control-label label {
+		color: #cdd4e0;
+	}
+	:root:not([data-theme]) body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header {
+		background: transparent;
 	}
 	:root:not([data-theme="light"]) .acm-testimonial.style-1 .tracy-motion-dots button[aria-current="true"] {
 		border-color: #1e375c;
