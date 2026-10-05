@@ -2035,7 +2035,7 @@ final class Engine
         $apply = $this->applyId($p);
         if (!$apply || strpos($apply, 'mlang-') !== 0) return $this->err('bad_params', 'the mlang- apply_id of the retire pass is required');
         try {
-            $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
+            $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => in_array($e['op'] ?? '', ['visibility', 'languageDefaults'], true)));
             if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
             $this->refuseLocked($this->undoRows($entries));
             $this->writer->transaction(function () use ($entries) {
@@ -2049,6 +2049,30 @@ final class Engine
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
+    }
+
+    /**
+     * Where `/` goes once a retire has hidden the languages nobody asked for — or null when the
+     * site's default language is one of those that stay published.
+     *
+     * 🔒 THE DEFAULT LANGUAGE IS NEVER LEFT HIDDEN. Joomla's language filter loads only the
+     * PUBLISHED content languages and resolves `/` through the default one; with that row hidden,
+     * `LanguageFilter.php:467` reads `sef` off null and redirects `/` to `//` forever. Measured
+     * 28/09/2026 on `r1j1734`: built in ru-RU, then "keep en-GB and es-ES" — every language row and
+     * every content row moved as asked, the receipt said `completed`, and the site was dead. The
+     * customer's own order decides among the languages that stay published (the source always does).
+     *
+     * @param array{site:string,administrator:string} $defaults com_languages' params as they stand
+     * @param string[] $keep the languages the customer named, in their order
+     * @param string[] $published the languages the pass leaves published: source, routed, spared
+     * @return array{from:string,to:string}|null
+     */
+    public static function retiredDefault(array $defaults, array $keep, array $published): ?array
+    {
+        $site = (string) ($defaults['site'] ?? '');
+        if (in_array($site, $published, true)) return null;
+        foreach ($keep as $tag) if (in_array($tag, $published, true)) return ['from' => $site, 'to' => (string) $tag];
+        return ['from' => $site, 'to' => (string) $published[0]];
     }
 
     /**
@@ -2109,11 +2133,26 @@ final class Engine
             // A kept language the archive ships an edition of stays exactly as shipped: that edition IS
             // the language the customer asked for, and its rows receive the translation in place.
             $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
-            $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
+            $source = $this->contract->profile()->sourceLanguage();
+            $writes = MultilingualApply::retireWrites($rows, $governed, $source, array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            $defaults = $this->writer->readLanguageDefaults();
+            // The languages whose row stays published once this pass is done: a spared edition whose
+            // row the archive shipped unpublished is kept as shipped, so it is not one of them.
+            $stays = [];
+            $untouched = array_flip(array_merge([$source], $routed, $spared));
+            foreach ($rows['language'] as $row)
+                if ((int) $row['published'] === 1 && isset($untouched[(string) $row['lang_code']])) $stays[] = (string) $row['lang_code'];
+            $siteDefault = self::retiredDefault($defaults, $keep, $stays ?: [$source]);
             // Every row this pass hides, before the first: one open in the editor refuses the pass.
             $this->refuseLocked(array_map(fn ($write) => [$write[0], (int) $write[1]], $slice));
-            $this->writer->transaction(function () use ($slice, $apply) {
+            $this->writer->transaction(function () use ($slice, $apply, $defaults, $siteDefault) {
+                // The default language first, before any row is hidden: a chunk that dies after this
+                // line leaves a site whose `/` still routes somewhere. Undo first, as for every row.
+                if ($siteDefault !== null) {
+                    $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $defaults]);
+                    $this->writer->writeLanguageDefaults($siteDefault['to'], (string) $defaults['administrator']);
+                }
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
                 foreach ($slice as [$kind, $id, $fields]) {
                     $column = (string) array_key_first($fields);
@@ -2123,13 +2162,21 @@ final class Engine
                 return [];
             });
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
-            if ($slice) $this->stamped('content');
+            if ($slice || $siteDefault !== null) $this->stamped('content');
             $hidden = [];
             foreach ($slice as [$kind]) $hidden[$kind] = ($hidden[$kind] ?? 0) + 1;
+            // The receipt of every chunk says where the pass moved `/`, not only the chunk that did it.
+            if ($siteDefault === null)
+                foreach ($this->log->entries($apply) as $entry)
+                    if (($entry['op'] ?? '') === 'languageDefaults') {
+                        $siteDefault = ['from' => (string) ($entry['before']['site'] ?? ''), 'to' => (string) $defaults['site']];
+                        break;
+                    }
             return $this->ok([
                 'status' => count($writes) > count($slice) ? 'running' : 'completed',
                 'hidden' => $hidden, 'remaining' => count($writes) - count($slice),
-                'routed' => array_merge([$this->contract->profile()->sourceLanguage()], $routed),
+                'routed' => array_merge([$source], $routed),
+                'siteDefault' => $siteDefault,
                 'applyId' => $apply,
             ]);
         } catch (Throwable $error) {
@@ -2706,6 +2753,11 @@ final class Engine
         }
         if ($op === 'visibility') {
             $this->setVisible((string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0), (string) ($entry['column'] ?? ''), (int) ($entry['before'] ?? 1));
+            return;
+        }
+        if ($op === 'languageDefaults') {
+            $before = is_array($entry['before'] ?? null) ? $entry['before'] : [];
+            $this->writer->writeLanguageDefaults((string) ($before['site'] ?? ''), (string) ($before['administrator'] ?? ''));
             return;
         }
         if ($op === 'content') {
