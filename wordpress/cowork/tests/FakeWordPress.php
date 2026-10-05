@@ -71,11 +71,14 @@ final class WP_Fake
     public static array $filters = [];
     /** @var array<string,array<string,mixed>> pattern name => what the block pattern registry holds for it */
     public static array $patterns = [];
+    /** What `get_queried_object()` answers for the page being rendered: a WP_Post, or null. */
+    public static $queried = null;
 
     public static function reset(): void
     {
         self::$themeDir = '/nonexistent-theme';
         self::$patterns = [];
+        self::$queried = null;
         self::$users = [];
         self::$filters = [];
         self::$polylang = false;
@@ -225,6 +228,12 @@ function delete_post_meta(int $id, string $key): bool
 {
     unset(WP_Fake::$meta[$id . ':' . $key]);
     return true;
+}
+
+/** The object the page being rendered is about, as the main query found it (`WP_Fake::$queried`). */
+function get_queried_object()
+{
+    return WP_Fake::$queried;
 }
 
 /** False for a user that does not exist, as WordPress answers: a lock held by one is no lock. */
