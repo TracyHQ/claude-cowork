@@ -645,3 +645,75 @@ function wp_ja_impact_navigation_read_items( array $parsed_block ): array {
 	return $parsed_block;
 }
 add_filter( 'render_block_data', 'wp_ja_impact_navigation_read_items' );
+
+/**
+ * The back-to-top button the source draws on every page (`#back-to-top`, a Font Awesome chevron in a 50 px square at the
+ * bottom right). The script (assets/js/wp-ja-impact.js) shows it once the visitor has scrolled past the header, and scrolls to the top.
+ */
+function wp_ja_impact_back_to_top(): void {
+	if ( in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
+		return;
+	}
+	printf(
+		'<a href="#" id="back-to-top" class="jim-back-to-top" aria-label="%s"><span class="jim-back-to-top__mark" aria-hidden="true"></span></a>',
+		esc_attr__( 'Back to top', 'wp-ja-impact' )
+	);
+}
+add_action( 'wp_footer', 'wp_ja_impact_back_to_top', 5 );
+
+/**
+ * A search box is not `required` in the source (an empty search is sent and answered with "no results"), so the core
+ * Search block's `required` attribute is dropped for every search form of the site.
+ *
+ * @param string $content The rendered search block.
+ * @return string
+ */
+function wp_ja_impact_search_not_required( string $content ): string {
+	return (string) preg_replace( '/(<input\b[^>]*?)\s+required(?:=("|\')[^"\']*\2)?(?=[\s>\/])/', '$1', $content );
+}
+add_filter( 'render_block_core/search', 'wp_ja_impact_search_not_required', 20 );
+
+/**
+ * The newsletter box of the source asks for a Name (optional) and an Email. The seeder makes the "Newsletter" Contact Form 7
+ * form from one email field (D-07); while the form still carries exactly that seeded template, the Name field is put in front
+ * of it. A form the site owner has edited is left alone.
+ *
+ * @param array $properties The form's properties.
+ * @param mixed $form       The Contact Form 7 form.
+ * @return array
+ */
+function wp_ja_impact_newsletter_name_field( array $properties, $form ): array {
+	if ( ! is_object( $form ) || ! method_exists( $form, 'title' ) || 'Newsletter' !== $form->title() ) {
+		return $properties;
+	}
+	$template = (string) ( $properties['form'] ?? '' );
+	if ( false !== strpos( $template, '[text ' ) || 1 !== preg_match( '/^\s*<label class="wtb-form__field">\s*\[email\* email-1 placeholder "Email"\]\s*<\/label>/', $template ) ) {
+		return $properties;
+	}
+	$properties['form'] = '<label class="wtb-form__field">[text your-name placeholder "Name"]</label>' . "\n\n" . ltrim( $template );
+	return $properties;
+}
+add_filter( 'wpcf7_contact_form_properties', 'wp_ja_impact_newsletter_name_field', 10, 2 );
+
+/**
+ * The source's contact form puts "Privacy Note *" as a label on its own line above the consent box. The seeded Contact Form 7
+ * template runs it into the consent sentence; while the template still carries exactly that sentence, the label is lifted out
+ * in front of the box. A form the site owner has edited is left alone.
+ *
+ * @param array $properties The form's properties.
+ * @return array
+ */
+function wp_ja_impact_contact_consent_label( array $properties ): array {
+	$template = (string) ( $properties['form'] ?? '' );
+	$lifted   = preg_replace(
+		'/\[acceptance (\S+)\]\s*Privacy Note \*\s*/',
+		'<span class="jim-consent__label">Privacy Note<span class="jim-consent__star" aria-hidden="true"> *</span></span>[acceptance $1] ',
+		$template,
+		1
+	);
+	if ( is_string( $lifted ) && $lifted !== $template ) {
+		$properties['form'] = $lifted;
+	}
+	return $properties;
+}
+add_filter( 'wpcf7_contact_form_properties', 'wp_ja_impact_contact_consent_label', 11 );

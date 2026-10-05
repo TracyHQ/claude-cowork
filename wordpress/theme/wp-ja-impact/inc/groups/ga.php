@@ -61,8 +61,8 @@ function wp_ja_impact_ga_account_form( string $content, array $block ): string {
 		$action = esc_url( site_url( 'wp-login.php', 'login_post' ) );
 		$addon  = static fn( string $glyph ): string => '<span class="input-group-text" aria-hidden="true"><span class="jim-fa">' . $glyph . '</span></span>';
 		return '<form class="jim-account-side" method="post" action="' . $action . '">'
-			. '<div class="input-group"><input class="form-control" type="text" name="log" placeholder="' . esc_attr__( 'Username', 'wp-ja-impact' ) . '" aria-label="' . esc_attr__( 'Username', 'wp-ja-impact' ) . '" required>' . $addon( '&#xf007;' ) . '</div>'
-			. '<div class="input-group"><input class="form-control" type="password" name="pwd" placeholder="' . esc_attr__( 'Password', 'wp-ja-impact' ) . '" aria-label="' . esc_attr__( 'Password', 'wp-ja-impact' ) . '" required>' . $addon( '&#xf023;' ) . '</div>'
+			. '<div class="input-group"><input class="form-control" type="text" name="log" placeholder="' . esc_attr__( 'Username', 'wp-ja-impact' ) . '" aria-label="' . esc_attr__( 'Username', 'wp-ja-impact' ) . '">' . $addon( '&#xf007;' ) . '</div>'
+			. '<div class="input-group"><input class="form-control" type="password" name="pwd" placeholder="' . esc_attr__( 'Password', 'wp-ja-impact' ) . '" aria-label="' . esc_attr__( 'Password', 'wp-ja-impact' ) . '">' . $addon( '&#xf023;' ) . '</div>'
 			. '<div class="form-check"><input id="jim-side-remember" type="checkbox" name="rememberme" class="form-check-input" value="forever"> <label class="form-check-label" for="jim-side-remember">' . esc_html__( 'Remember Me', 'wp-ja-impact' ) . '</label></div>'
 			. '<button type="submit" class="btn btn-primary">' . esc_html__( 'Log in', 'wp-ja-impact' ) . '</button>'
 			. '<ul class="jim-account-side__links"><li><a href="' . esc_url( home_url( '/pages/user/registration-form/' ) ) . '">' . esc_html__( 'Create an account', 'wp-ja-impact' ) . '<span class="jim-fa jim-fa--chevron" aria-hidden="true"></span></a></li>'
@@ -97,11 +97,11 @@ function wp_ja_impact_ga_account_form( string $content, array $block ): string {
 		$action = esc_url( site_url( 'wp-login.php?action=register', 'login_post' ) );
 	} else {
 		$intro  = 'username-reminder-request' === $slug ? '<legend>' . esc_html__( 'Please enter the email address associated with your account. WordPress does not email usernames: we will send a link to that address to reset your password.', 'wp-ja-impact' ) . '</legend>' : '<p></p>';
-		$fields = $intro . wp_ja_impact_ga_field( 'user_login', __( 'Email Address', 'wp-ja-impact' ), 'text', true, ' autocomplete="email"' )
+		$fields = $intro . wp_ja_impact_ga_field( 'user_login', __( 'Email Address', 'wp-ja-impact' ), 'email', true, ' autocomplete="email"' )
 			. '<div class="control-group"><div class="controls"><button type="submit" class="btn btn-primary validate">' . esc_html__( 'Submit', 'wp-ja-impact' ) . '</button></div></div>';
 		$action = esc_url( site_url( 'wp-login.php?action=lostpassword', 'login_post' ) );
 	}
-	return '<div class="frm-wrap jim-account jim-account--' . esc_attr( substr( $template, 5 ) ) . '"><form method="post" action="' . $action . '"><fieldset>' . $fields . '</fieldset></form></div>' . $after;
+	return '<div class="frm-wrap jim-account jim-account--' . esc_attr( substr( $template, 5 ) ) . '"><form method="post" action="' . $action . '"><fieldset>' . $fields . '</fieldset></form>' . $after . '</div>';
 }
 add_filter( 'render_block_core/loginout', 'wp_ja_impact_ga_account_form', 10, 2 );
 

@@ -238,7 +238,7 @@ html[data-theme='dark'] body.tracy .acm-related-items .jim-rel__title a { color:
     margin: 8px 0 0 auto;
     border-radius: 50%;
     background: light-dark(#f2f4f6, #28354f);
-    color: light-dark(#6c757d, #c2c9d6);
+    color: light-dark(#adb5bd, #eef1f6);
     text-align: center;
     cursor: pointer;
   }
@@ -475,11 +475,20 @@ body.tracy .wp-social-link a { font-family: 'Font Awesome 6 Brands'; }
 /* Final lens (Opus, final-7), below 992 px: the three home sections that rise over the hero on desktop sit in the container
    (16 px side inset, the source's `.container` gutter) instead of edge to edge; the cta card and the style-1 text block carry no
    top padding, the style-6 card keeps 24 px all round. Measured against the source at 390 px: x 16, width 358. */
-@media (max-width: 991.98px) {
+@media (max-width: 1199.98px) {
   body.tracy .jim-sections:has(#acm-cta-157) > :is(#acm-cta-157, #acm-features-129, #acm-features-161) { margin-inline: 16px; width: auto; max-width: none; box-sizing: border-box; }
   body.tracy .jim-sections:has(#acm-cta-157) > :is(#acm-cta-157, #acm-features-129) { padding: 0; }
   body.tracy .jim-sections:has(#acm-cta-157) > #acm-features-161 { padding: 24px; margin-top: 48px; }
 }
+/* The stacked layout is the container's width less its 16 px gutters: 508 px from 576, 688 from 768, 928 from 992 (the source's .container 540 / 720 / 960). */
+@media (min-width: 576px) and (max-width: 767.98px) { body.tracy .jim-sections:has(#acm-cta-157) > :is(#acm-cta-157, #acm-features-129, #acm-features-161) { margin-inline: auto; width: 508px; } }
+@media (min-width: 768px) and (max-width: 991.98px) { body.tracy .jim-sections:has(#acm-cta-157) > :is(#acm-cta-157, #acm-features-129, #acm-features-161) { margin-inline: auto; width: 688px; } }
+@media (min-width: 992px) and (max-width: 1199.98px) { body.tracy .jim-sections:has(#acm-cta-157) > :is(#acm-cta-157, #acm-features-129, #acm-features-161) { margin-inline: auto; width: 928px; } body.tracy .jim-sections:has(#acm-cta-157) > #acm-cta-157 { margin-top: -96px; position: relative; z-index: 2; }
+  body.tracy .jim-sections:has(#acm-cta-157) > #acm-features-161 { padding: 48px 32px; }
+  body.tracy .jim-sections:has(#acm-cta-157) .acm-features.style-1 .sub-features { flex-direction: row; margin-bottom: 0; }
+  body.tracy .jim-sections:has(#acm-cta-157) .acm-features.style-1 .sub-media { width: 294px; } }
+/* The style-6 card keeps 48 px above and below and 32 px at the sides from 576 px (the source's padding). */
+@media (min-width: 576px) and (max-width: 991.98px) { body.tracy .jim-sections:has(#acm-cta-157) > #acm-features-161 { padding: 48px 32px; } }
 /* Event card button row: the source centres the button (p.item-readmore, justify-content: center). */
 @media (max-width: 767.98px) {
   body.tracy .jim-evt__actions { justify-content: center; }
