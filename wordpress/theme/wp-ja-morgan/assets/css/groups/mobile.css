@@ -119,8 +119,6 @@
 	}
 	body.jm-route-home-style-2 .t3-header .logo {
 		order: 1;
-		flex: 0 0 100%;
-		text-align: center;
 		line-height: 33.3px;
 		margin-bottom: 30px;
 	}
@@ -148,6 +146,113 @@
 	}
 	body.jm-route-home-style-2 .off-canvas-toggle {
 		padding: 21px 22px;
+	}
+}
+/* Style 2 below 768 px: the logo takes its own centred row (the info row is hidden); from 768 px it sits at the left of the info row. */
+@media (max-width: 767px) {
+	body.jm-route-home-style-2 .t3-header .logo {
+		flex: 0 0 100%;
+		text-align: center;
+	}
+}
+
+/* ---- Home styles 3 and 4 below 992 px: the header is transparent over the hero with white controls ----
+   The source draws the same has-hero header at every width: 60 px tall plus a 1 px rule, the logo 15 px from the left
+   edge, and 60 px controls (theme toggle 36 px) ending flush at the right edge; style 4 also shows its search as a
+   60 px box. The hero pulls up under the header by 91 px (style 3: 61 px on phones) and keeps its content 120 px below
+   the top of the page, as there. */
+@media (max-width: 991px) {
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header {
+		box-sizing: border-box;
+		height: 61px;
+		margin-bottom: -91px;
+		background: transparent;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header > .container {
+		max-width: none;
+		width: 100%;
+		height: 60px;
+		padding: 0 0 0 15px;
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .header-inner,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .headright {
+		height: 60px;
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .logo {
+		height: 60px;
+		padding-right: 15px;
+		line-height: 60px;
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .logo a,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .theme-toggle,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .head-search .wp-block-search__button {
+		color: #ffffff;
+	}
+	body.jm-route-home-style-3 .t3-header .logo {
+		border-right: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .off-canvas-toggle,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-mainnav .wp-block-navigation__responsive-container-open {
+		box-sizing: border-box;
+		flex-shrink: 0;
+		width: 60px;
+		height: 60px;
+		margin: 0;
+		padding: 0;
+		border-radius: 0;
+		background: transparent;
+		color: #ffffff;
+	}
+	body.jm-route-home-style-3 .off-canvas-toggle {
+		border-right: 1px solid rgba(255, 255, 255, 0.2);
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .off-canvas-toggle {
+		margin-left: 6px;
+	}
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero:first-child {
+		padding-top: 150px;
+	}
+	/* Style 4 shows the search at every width: a 60 px box with a rule at its left. */
+	body.jm-route-home-style-4 .head-search.wp-block-search {
+		display: flex;
+		box-sizing: border-box;
+		width: 60px;
+		height: 60px;
+		margin: 0 0 0 6px;
+		border-left: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	body.jm-route-home-style-4 .head-search .wp-block-search__inside-wrapper,
+	body.jm-route-home-style-4 .head-search .wp-block-search__button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	/* The source's 30 px search icon sits at the top-left of its 60 px box, not centred in it. */
+	body.jm-route-home-style-4 .head-search .wp-block-search__inside-wrapper {
+		align-items: flex-start;
+		justify-content: flex-start;
+	}
+	body.jm-route-home-style-4 .head-search .wp-block-search__button {
+		flex: 0 0 30px;
+		width: 30px;
+		height: 30px;
+		margin: 0;
+		background: transparent;
+	}
+	/* On a 320 px phone the row is wider than the screen: the search box and the theme toggle give way. */
+	body.jm-route-home-style-4 .t3-header .header-inner,
+	body.jm-route-home-style-4 .headright,
+	body.jm-route-home-style-4 .head-search.wp-block-search,
+	body.jm-route-home-style-4 .head-search .wp-block-search__inside-wrapper,
+	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .theme-toggle {
+		flex-shrink: 1;
+		min-width: 0;
+	}
+}
+@media (max-width: 767px) {
+	body.jm-route-home-style-3 .t3-header {
+		margin-bottom: -61px;
 	}
 }
 

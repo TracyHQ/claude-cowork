@@ -470,11 +470,23 @@ body a {
 	flex-direction: column;
 	justify-content: space-between;
 }
+/* The source's three bars: 14 px wide, 1 px thick, 5 px apart, centred in the button. */
 .off-canvas-toggle span {
+	position: absolute;
+	top: 50%;
+	left: 50%;
 	display: block;
-	height: 2px;
+	width: 14px;
+	height: 1px;
+	margin-left: -7px;
 	background: #ffffff;
-	border-radius: 1px;
+	transform: translateY(-1px);
+}
+.off-canvas-toggle span:first-child {
+	margin-top: -5px;
+}
+.off-canvas-toggle span:last-child {
+	margin-top: 5px;
 }
 
 /* ---- Off-canvas sidebar (the source's "Sidebar" panel with the Site Pages menu) ---- */
@@ -2564,17 +2576,13 @@ ul.tagspopular li {
 		background: var(--ja-accent);
 		color: #ffffff;
 	}
+	/* The source's menu button is the solid three-bar glyph (Font Awesome "bars"); WordPress draws two thin lines.
+	   The button keeps its bars while the menu is open; the close button draws the same glyph, not a cross. */
 	.t3-mainnav .wp-block-navigation__responsive-container-open svg,
-	.t3-mainnav .wp-block-navigation__responsive-container-close svg {
-		width: 16px;
-		height: 16px;
-		fill: currentColor;
-	}
-	/* The source's button keeps its bars while the menu is open; the close button draws the same
-	   glyph, not a cross. */
 	.t3-mainnav .wp-block-navigation__responsive-container-close svg {
 		display: none;
 	}
+	.t3-mainnav .wp-block-navigation__responsive-container-open::before,
 	.t3-mainnav .wp-block-navigation__responsive-container-close::before {
 		content: "";
 		width: 14px;
