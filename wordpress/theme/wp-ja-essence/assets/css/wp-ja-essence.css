@@ -363,9 +363,6 @@ a { color: var(--wp--preset--color--accent); }
    y 37), and at 1200px+ its stacked variant is 69px tall with a 20px icon (source: y 27). */
 .je-subscribe .wp-block-button__link { white-space: nowrap; }
 @media (min-width: 992px) and (max-width: 1199px) {
-  body:not(.je-hdr-two) .je-header__inner { column-gap: 12px; }
-  body:not(.je-hdr-two) .je-header .je-nav > .wp-block-navigation__container > li > a { font-size: 16px; margin-left: 4px; padding-right: 8px; }
-  body:not(.je-hdr-two) .je-header .je-nav .wp-block-navigation__container { gap: 8px; }
   body:not(.je-hdr-two) .je-header .je-subscribe .wp-block-button__link { padding: 11px 18px; }
 }
 @media (min-width: 1200px) {

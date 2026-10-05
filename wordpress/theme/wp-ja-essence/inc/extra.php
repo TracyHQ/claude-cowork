@@ -1976,3 +1976,49 @@ function wp_ja_essence_render_author_avatar( array $attributes, string $content,
 	$img = wp_get_attachment_image( $photo, 'thumbnail', false, array( 'class' => 'je-meta__avatar-img', 'alt' => '', 'loading' => 'eager' ) );
 	return $img ? '<span class="je-meta__avatar">' . $img . '</span>' : '';
 }
+
+/**
+ * The menu marks the item the visitor is under, as the source does: Joomla's `current active` follows the
+ * menu item whose path starts the request's path, and the search results are the Smart Search item's page.
+ * Core marks only a link to the queried post or term, so an article served at its source address
+ * (/category/category-style-3/<alias>) and the search results kept every item plain. The link whose path is
+ * the request's path, or begins it, gets `current-menu-item`; core then marks the parents itself
+ * (`current-menu-ancestor`) because a rendered child carries the class. Read from the rendered href, same
+ * host only; the home link (an empty path) never begins a path.
+ *
+ * @param string $content The rendered link.
+ * @param array  $parsed  The parsed block (unused).
+ * @return string
+ */
+function wp_ja_essence_menu_current( string $content, array $parsed ): string {
+	unset( $parsed );
+	if ( '' === $content || str_contains( $content, 'current-menu-item' ) ) {
+		return $content;
+	}
+	$tags = new WP_HTML_Tag_Processor( $content );
+	if ( ! $tags->next_tag( 'a' ) ) {
+		return $content;
+	}
+	$href = (string) $tags->get_attribute( 'href' );
+	$host = (string) wp_parse_url( $href, PHP_URL_HOST );
+	$link = trim( (string) wp_parse_url( $href, PHP_URL_PATH ), '/' );
+	$here = trim( (string) wp_parse_url( (string) wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH ), '/' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+	if ( is_search() ) {
+		$here = WP_JA_ESSENCE_SEARCH_PATHS[0];
+	}
+	if ( '' === $link || '' === $here || null !== wp_parse_url( $href, PHP_URL_QUERY ) || ( '' !== $host && (string) wp_parse_url( home_url(), PHP_URL_HOST ) !== $host ) ) {
+		return $content;
+	}
+	if ( $link !== $here && ! ( is_singular( 'post' ) && str_starts_with( $here, $link . '/' ) ) ) {
+		return $content;
+	}
+	if ( $link === $here ) {
+		$tags->set_attribute( 'aria-current', 'page' );
+	}
+	$marked = new WP_HTML_Tag_Processor( $tags->get_updated_html() );
+	if ( $marked->next_tag( 'li' ) ) {
+		$marked->add_class( 'current-menu-item' );
+	}
+	return $marked->get_updated_html();
+}
+add_filter( 'render_block_core/navigation-link', 'wp_ja_essence_menu_current', 30, 2 );
