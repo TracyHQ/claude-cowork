@@ -2254,7 +2254,10 @@ final class Engine
             $t = Timing::begin();
             $this->writer->transaction(function () use ($entries) {
                 $t = Timing::begin();
-                foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
+                // Newest first, as revertOne() replays any log: where one row was recorded twice, the
+                // oldest entry's `before` is the value it is left with.
+                $this->setVisibleMany(array_map(fn (array $entry): array => [(string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0),
+                    (string) ($entry['column'] ?? ''), (int) ($entry['before'] ?? 1)], array_reverse($entries)));
                 Timing::end('restoreShow', $t);
                 return [];
             });
@@ -2275,9 +2278,11 @@ final class Engine
     }
 
     /**
-     * How many rows one retire call hides before it answers `running`. Each is one read and one
-     * UPDATE of one column (`setVisible`); through the full write path the same pass ran ~6 rows a
-     * second and outlived the 60 s its callers allowed (measured 23/09/2026).
+     * How many rows one retire call hides before it answers `running`. Through the full write path
+     * the same pass ran ~6 rows a second and outlived the 60 s its callers allowed (measured
+     * 23/09/2026). One read and one UPDATE per row (`setVisible`) still cost ~0.5 ms a row, and its
+     * undo row ~0.7 ms: 7 to 8 s a Business pass on an idle local stand (05/10/2026). A chunk is now
+     * written in bulk (`setVisibleMany`, `ApplyLog::recordMany`): 0.2 s for the same pass.
      */
     private const RETIRE_CHUNK = 3000;
 
@@ -2295,6 +2300,32 @@ final class Engine
             return;
         }
         $this->writer->setVisibility($kind, $id, $column, (string) $value);
+    }
+
+    /**
+     * setVisible() for many rows, each [kind, id, column, value]: the site is left as that many
+     * setVisible() calls in that order would leave it, so where one row is named twice the later
+     * value stands. A language still goes through setVisible() one row at a time (write(), see
+     * above; a site has a few dozen); every other kind in one setVisibilityMany() per kind, column
+     * and value, which refuses the whole set when one row is not there. The caller holds the
+     * transaction, so a refusal takes back whatever this wrote before it.
+     *
+     * @param list<array{0:string,1:int,2:string,3:int}> $rows
+     */
+    private function setVisibleMany(array $rows): void
+    {
+        $last = [];
+        foreach ($rows as [$kind, $id, $column, $value]) {
+            if ($kind === 'language') { $this->setVisible($kind, $id, $column, $value); continue; }
+            $last[$kind . "\0" . $column . "\0" . $id] = [$kind, $id, $column, $value];
+        }
+        $groups = [];
+        foreach ($last as [$kind, $id, $column, $value]) {
+            $group = $kind . "\0" . $column . "\0" . $value;
+            $groups[$group] ??= [$kind, $column, $value, []];
+            $groups[$group][3][] = $id;
+        }
+        foreach ($groups as [$kind, $column, $value, $ids]) $this->writer->setVisibilityMany($kind, $ids, $column, (string) $value);
     }
 
     /**
@@ -2348,15 +2379,20 @@ final class Engine
             $t = Timing::begin();
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
+                // Every undo is written, in the order the rows are listed, before the first row moves;
+                // one transaction holds both, so a row refused takes every undo and every row back.
+                $entries = []; $hide = [];
                 foreach ($slice as [$kind, $id, $fields]) {
                     $column = (string) array_key_first($fields);
-                    $t = Timing::begin();
-                    $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1]);
-                    Timing::end('retireLog', $t);
-                    $t = Timing::begin();
-                    $this->setVisible($kind, $id, $column, 0);
-                    Timing::end('retireHide', $t);
+                    $entries[] = ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1];
+                    $hide[] = [$kind, $id, $column, 0];
                 }
+                $t = Timing::begin();
+                $this->log->recordMany($apply, $entries);
+                Timing::end('retireLog', $t);
+                $t = Timing::begin();
+                $this->setVisibleMany($hide);
+                Timing::end('retireHide', $t);
                 return [];
             });
             Timing::end('retireTransaction', $t);
