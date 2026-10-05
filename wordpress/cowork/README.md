@@ -449,6 +449,49 @@ page has to know which ones the site has before `content.get {kind: "pattern", k
   string, and an `offset` or `limit` that is not a whole number (an integer, or a string of digits).
   A plugin too old to list patterns answers `unavailable`.
 
+## A page's search title and description (unreleased)
+
+WordPress has neither on its own: `<title>` is built from the post title and the site name, and no
+meta description is printed. So changing what a search engine shows for one page, and nothing else on
+it, needs a place to keep the value and something that prints it. Which place depends on the site:
+
+| The site runs | Where a page's title and description are kept | Who prints them |
+| --- | --- | --- |
+| Yoast SEO | `_yoast_wpseo_title`, `_yoast_wpseo_metadesc` | Yoast |
+| Rank Math | `rank_math_title`, `rank_math_description` | Rank Math |
+| All in One SEO, SEOPress, The SEO Framework, Slim SEO, Squirrly SEO, SmartCrawl, SureRank, Jetpack (with its SEO Tools module on) | in that plugin's own store, which this plugin does not write | that plugin |
+| no SEO plugin | `_claude_cowork_seo_title`, `_claude_cowork_seo_description` (this plugin's own post meta) | this plugin |
+
+On a site with no SEO plugin this plugin prints them: `_claude_cowork_seo_title` is the page's whole
+`<title>` (through `pre_get_document_title`, so the site name is in it only if the value says so), and
+`_claude_cowork_seo_description` is a `<meta name="description">` added at the end of `wp_head` unless
+something there already printed one. The page's own title, its breadcrumb and its heading do not
+change. A blank value prints nothing, and the page has the title WordPress builds; so do page 2 and on
+of a listing (`is_paged()`). Both keys hold plain one-line text (`sanitize_text_field`). Polylang is told
+not to copy them into a new translation (`pll_copy_post_metas`): they hold one language's words. No Tracy
+theme prints a meta description; `wp-ja-kinetic` sets its own `<title>` from a meta of its own, which a
+value here overrides.
+
+Writing one page's title, undone on its own by `apply.revert`:
+
+```
+{"action": "content.update", "params": {"apply_id": "…", "kind": "postmeta", "id": 42,
+ "key": "_claude_cowork_seo_title", "fields": {"value": "About Northgate — engineering since 1990"}}}
+```
+
+- **On a site with an SEO plugin** that key is refused (`write_failed`), naming the key that plugin
+  prints instead (or saying this door does not write it): nothing would print the value. A value that
+  is not text is refused too.
+- **`seo: {title, description}` beside a post write** (`content.update` kind `post` with a post field)
+  lands in the keys of the table above: the running plugin's, whether or not the post held one before,
+  or this plugin's own. Only the keys whose value changes are written, and each is recorded under the
+  same `apply_id` as its own `postmeta` step (the value before, or absent), so `apply.revert` puts each
+  back exactly and the row's own step is a span of its columns. Refused before anything is written, the
+  row included, when the site runs a plugin this door does not write, when `seo` is empty or not an
+  object of those two text fields, or when it is the only field (the refusal names the `postmeta` call).
+- **Read back:** every row of `content.list` carries `seo` as the site prints it — the running plugin's
+  keys, or this plugin's own — and `content.get {kind: "postmeta", id, key}` reads one value.
+
 ## Layout
 
 | Path | What |

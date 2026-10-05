@@ -2842,6 +2842,21 @@ final class Engine
                 return $stale;
             }
         }
+        // A post write's `seo` lands in post meta beside the row, which the row's undo cannot reach.
+        // Each meta key it will change is read now and recorded below as its own postmeta step (the
+        // value before, or absent), so apply.revert puts each back exactly. A refusal here is the
+        // write's own refusal, before anything is written.
+        $metaBefore = [];
+        $seoSteps = $kind === 'post' && array_key_exists('seo', $p['fields']) && method_exists($this->writer, 'seoTargets');
+        if ($seoSteps) {
+            try {
+                foreach ($this->writer->seoTargets($id, $p['fields']['seo']) as $metaKey) {
+                    $metaBefore[(string) $metaKey] = $this->writer->read('postmeta', $id, (string) $metaKey);
+                }
+            } catch (Throwable $e) {
+                return $this->err('write_failed', $e->getMessage());
+            }
+        }
         try {
             $newId = $this->writer->write($kind, $id, $p['fields'], $key);
         } catch (Throwable $e) {
@@ -2857,7 +2872,9 @@ final class Engine
         $after = null;
         try {
             $after = $this->writer->read($kind, $newId, $key);
-            $changes = ContentUndo::record($before, $after, array_keys($p['fields']));
+            // `seo` is not a column of the row: its keys are undone by their own steps below.
+            $rowFields = $seoSteps ? array_values(array_diff(array_keys($p['fields']), ['seo'])) : array_keys($p['fields']);
+            $changes = ContentUndo::record($before, $after, $rowFields);
         } catch (Throwable $e) {
             $changes = null;
         }
@@ -2865,10 +2882,32 @@ final class Engine
             $entry['undo'] = 'span';
             $entry['changes'] = $changes;
         }
+        $steps = [$entry];
+        foreach ($metaBefore as $metaKey => $metaWas) {
+            $step = ['op' => 'content', 'kind' => 'postmeta', 'id' => $newId, 'key' => $metaKey, 'before' => $metaWas];
+            try {
+                $metaChanges = ContentUndo::record($metaWas, $this->writer->read('postmeta', $newId, $metaKey), ['value']);
+            } catch (Throwable $e) {
+                $metaChanges = null;
+            }
+            if ($metaChanges !== null) {
+                $step['undo'] = 'span';
+                $step['changes'] = $metaChanges;
+            }
+            $steps[] = $step;
+        }
         try {
-            $this->log->record($applyId, $entry);
+            foreach ($steps as $step) {
+                $this->log->record($applyId, $step);
+            }
         } catch (Throwable $e) {
-            $this->rollbackContent($kind, $newId, $key, $before);
+            foreach (array_reverse($steps) as $step) {
+                try {
+                    $this->rollbackContent((string) $step['kind'], (int) $step['id'], (string) $step['key'], $step['before']);
+                } catch (Throwable $ignored) {
+                    // The row's own rollback below still runs; a meta left behind is named nowhere else.
+                }
+            }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
 
