@@ -1082,6 +1082,18 @@ function wp_ja_vega_login_helpers( string $html ): string {
 add_filter( 'render_block_core/loginout', 'wp_ja_vega_login_helpers' );
 
 /**
+ * The search field is not `required`, as the source's `q` field is not: an empty submit goes through (the source
+ * shows the empty-search page), where the core Search block prints `required` and blocks it in the browser.
+ *
+ * @param string $html The rendered block.
+ * @return string
+ */
+function wp_ja_vega_search_not_required( string $html ): string {
+	return (string) preg_replace( '/(<input\b[^>]*\bwp-block-search__input\b[^>]*?)\s+required(?:="[^"]*")?(?=[\s\/>])/', '$1', $html );
+}
+add_filter( 'render_block_core/search', 'wp_ja_vega_search_not_required' );
+
+/**
  * The intro of a "More our projects" card is cut on the server, as the source's Joomla module does with
  * `HTMLHelper::_( 'string.truncate', $text, 100 )`: at most 100 characters, the cut moved back to the last space, then
  * "..." (three ASCII dots), so "…because it is..." where the full text goes on "…because it is pain, but…". The
