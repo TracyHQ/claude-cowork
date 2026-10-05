@@ -5675,8 +5675,9 @@ body.tracy {
   }
 }
 
-/* Article quote: the source panel is 1.5rem in below 992 (`.item-page blockquote`, 2rem from 992). */
-@media (min-width: 576px) and (max-width: 991.98px) {
+/* Article quote: the source panel is 1.5rem in below 992 (`.item-page blockquote`, 2rem from 992), a phone included (1.1.9:
+ * the rule started at 576 and the quote was 16 px taller than the source's 274 px at 390). */
+@media (max-width: 991.98px) {
   .tracy:is(.page-template-page-article, .single) .jv-prose .wp-block-quote {
     padding: 24px;
   }
@@ -5816,7 +5817,7 @@ body.tracy {
   margin: 8px 0 0;
 }
 
-/* /portfolio cards (with their Client / Date / Type rows): the source's category line sits 16 px over the
+/* /portfolio and the project category listings' cards (with their Client / Date / Type rows; the category pages carry `jv-parent-portfolio`, not `jv-route-portfolio`, and kept the unfixed numbers until 1.1.9: 4 px short per card from 992, 4 px tall at 576–991, 8 px narrower text at 390): the source's category line sits 16 px over the
  * title at every width (the port's title followed it with no gap: the leading card 16 px short at 1440
  * and 600), and the text starts after the picture's 4 px frame (the port's card frames the picture on
  * top only). Below 992 the text is 24 px in on every side (28 on top here) and the facts list 24 px under
@@ -5828,19 +5829,19 @@ body.tracy {
 }
 
 @media (min-width: 992px) {
-  .jv-route-portfolio .jv-page .tracy-grid > li:not(:first-child):not(.category-blogs):not(.type-page) .tracy-card__body:has(.jv-portfolio-info) {
+  :is(.jv-route-portfolio, .jv-parent-portfolio) .jv-page .tracy-grid > li:not(:first-child):not(.category-blogs):not(.type-page) .tracy-card__body:has(.jv-portfolio-info) {
     padding-top: 36px;
   }
 }
 
 @media (max-width: 991.98px) {
-  .jv-route-portfolio .jv-page .tracy-grid > li:not(:first-child):not(.category-blogs):not(.type-page) .tracy-card__body:has(.jv-portfolio-info) {
+  :is(.jv-route-portfolio, .jv-parent-portfolio) .jv-page .tracy-grid > li:not(:first-child):not(.category-blogs):not(.type-page) .tracy-card__body:has(.jv-portfolio-info) {
     padding: 28px 20px 24px;
   }
 }
 
 @media (min-width: 576px) and (max-width: 991.98px) {
-  .jv-route-portfolio .jv-page .tracy-grid > li:not(.category-blogs):not(.type-page) .tracy-card__body .jv-portfolio-info {
+  :is(.jv-route-portfolio, .jv-parent-portfolio) .jv-page .tracy-grid > li:not(.category-blogs):not(.type-page) .tracy-card__body .jv-portfolio-info {
     margin-top: 24px;
   }
 }
@@ -7229,10 +7230,23 @@ body.tracy {
     transform: rotate(90deg);
   }
 
-  /* The pushed page keeps its menu button where the source's does (x 18, y 12, 56 × 56, radius 8, primary #1d4ed8 —
-   * dark #3b8bff — while its panel is open, under the veil); the real button is the panel's × above. */
+  /* The pushed page keeps its menu button where the source's does (x 18, y 12, 56 × 56) while its panel is open, under
+   * the veil: with a mouse no fill and the bars in the body text colour (#757575, dark #c7ccd4: the source's open toggler,
+   * measured 1.1.9), on a touch screen the sticky hover look (primary fill, white bars: the 1.1.8 box, which only
+   * matched the touch case); the real button is the panel's × above. */
   html.jv-drawer-open .jv-header .jv-header__right {
+    --jv-pushed-bars: light-dark(#757575, #c7ccd4);
+    --jv-pushed-fill: transparent;
     position: relative;
+  }
+
+  /* On a touch screen the tapped button keeps its hover look (the source's `.btn:hover`: the primary fill, white bars)
+   * after the page is pushed away; with a mouse the pointer is on the panel and the button is plain. */
+  @media (hover: none) {
+    html.jv-drawer-open .jv-header .jv-header__right {
+      --jv-pushed-bars: #fff;
+      --jv-pushed-fill: light-dark(#1d4ed8, #3b8bff);
+    }
   }
 
   html.jv-drawer-open .jv-header .jv-header__right::after {
@@ -7244,10 +7258,10 @@ body.tracy {
     height: 56px;
     border-radius: 8px;
     background:
-      linear-gradient(#fff, #fff) center calc(50% - 5px) / 14px 2px no-repeat,
-      linear-gradient(#fff, #fff) center / 14px 2px no-repeat,
-      linear-gradient(#fff, #fff) center calc(50% + 5px) / 14px 2px no-repeat,
-      light-dark(#1d4ed8, #3b8bff);
+      linear-gradient(var(--jv-pushed-bars), var(--jv-pushed-bars)) center calc(50% - 5px) / 14px 2px no-repeat,
+      linear-gradient(var(--jv-pushed-bars), var(--jv-pushed-bars)) center / 14px 2px no-repeat,
+      linear-gradient(var(--jv-pushed-bars), var(--jv-pushed-bars)) center calc(50% + 5px) / 14px 2px no-repeat,
+      var(--jv-pushed-fill);
     transform: translate(-300px, -50%);
   }
 
@@ -8349,4 +8363,93 @@ body.tracy {
   .jv-header .jv-header__menu .jv-mega__back {
     text-transform: uppercase;
   }
+}
+
+/* ── 1.1.9: layout and behaviour differences measured against the source (page heights, drawer, search) ── */
+
+/* The search field is a plain text box on the source: no clear (×) button appears in it while typing. */
+.tracy input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Project page: the source's main body keeps 48 px under the content below 992 and 80 px from 992 (the port kept 80). */
+@media (max-width: 991.98px) {
+  .jv-project__main {
+    padding-bottom: 48px;
+  }
+}
+
+/* /services listing and a project category with no "More projects" or pager under its cards: the source's last row of cards keeps its 32 px column margin under it (the cards are in `.row`
+ * columns), the port's grid ended on the card; the "Read more …" link is the source's `.btn` text with its ellipsis and its
+ * transparent 1 px border (26 px tall, 94 px wide), so every card is 2.6 px taller than the port's was. */
+.jv-page .tracy-grid:has(> .type-page),
+.jv-parent-portfolio .jv-page .tracy-query > .tracy-grid:last-child {
+  margin-bottom: 32px;
+}
+
+.jv-page .tracy-grid > .type-page .wp-block-post-excerpt__more-link {
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.jv-page .tracy-grid > .type-page .wp-block-post-excerpt__more-link::after {
+  content: ' \2026';
+}
+
+/* The source draws a Twitter bird under the article quote (`.e-q-footer .blockquote__tweet-button`, a Font Awesome
+ * glyph 20 px, #000, the primary in dark); the port's link was empty. The glyph is Font Awesome Free 5 Brands `twitter`
+ * (CC BY 4.0, credited in readme.txt) as a mask, centred in the 30 px footer row 16 px under the text. */
+.tracy blockquote .e-q-footer.e-q-footer {
+  height: 30px;
+  margin: 16px 0 0;
+  line-height: 30px;
+  text-align: center;
+}
+
+.tracy blockquote .e-q-footer a {
+  display: inline-block;
+  width: 20px;
+  height: 24px;
+  margin-top: 3px;
+  vertical-align: top;
+  color: light-dark(#000, #3b8bff);
+  text-decoration: none;
+}
+
+.tracy blockquote .e-q-footer a i {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath transform='translate(0 448) scale(1 -1)' d='M459.37 296.284c0.325 -4.547 0.325 -9.097 0.325 -13.645c0 -138.72 -105.583 -298.558 -298.559 -298.558c-59.452 0 -114.68 17.218 -161.137 47.105c8.447 -0.973 16.568 -1.298 25.339 -1.298 c49.054 0 94.212 16.568 130.274 44.832c-46.131 0.975 -84.792 31.188 -98.112 72.772c6.498 -0.974 12.995 -1.624 19.818 -1.624c9.420 0 18.842 1.299 27.613 3.573c-48.081 9.747 -84.142 51.979 -84.142 102.984v1.298 c13.968 -7.796 30.213 -12.669 47.430 -13.318c-28.263 18.842 -46.780 51.004 -46.780 87.390c0 19.492 5.196 37.360 14.293 52.954c51.654 -63.674 129.3 -105.258 216.364 -109.807c-1.624 7.796 -2.598 15.918 -2.598 24.04 c0 57.827 46.782 104.934 104.934 104.934c30.213 0 57.502 -12.669 76.670 -33.136c23.714 4.547 46.455 13.319 66.598 25.339c-7.797 -24.366 -24.366 -44.833 -46.131 -57.827c21.117 2.273 41.584 8.122 60.425 16.243 c-14.292 -20.791 -32.161 -39.308 -52.627 -54.252z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath transform='translate(0 448) scale(1 -1)' d='M459.37 296.284c0.325 -4.547 0.325 -9.097 0.325 -13.645c0 -138.72 -105.583 -298.558 -298.559 -298.558c-59.452 0 -114.68 17.218 -161.137 47.105c8.447 -0.973 16.568 -1.298 25.339 -1.298 c49.054 0 94.212 16.568 130.274 44.832c-46.131 0.975 -84.792 31.188 -98.112 72.772c6.498 -0.974 12.995 -1.624 19.818 -1.624c9.420 0 18.842 1.299 27.613 3.573c-48.081 9.747 -84.142 51.979 -84.142 102.984v1.298 c13.968 -7.796 30.213 -12.669 47.430 -13.318c-28.263 18.842 -46.780 51.004 -46.780 87.390c0 19.492 5.196 37.360 14.293 52.954c51.654 -63.674 129.3 -105.258 216.364 -109.807c-1.624 7.796 -2.598 15.918 -2.598 24.04 c0 57.827 46.782 104.934 104.934 104.934c30.213 0 57.502 -12.669 76.670 -33.136c23.714 4.547 46.455 13.319 66.598 25.339c-7.797 -24.366 -24.366 -44.833 -46.131 -57.827c21.117 2.273 41.584 8.122 60.425 16.243 c-14.292 -20.791 -32.161 -39.308 -52.627 -54.252z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+/* /portfolio "Testimonials" button: 24 px under the cards on a phone (the source's `.bottom-actions`), 32 px from 576. */
+@media (max-width: 575.98px) {
+  .jv-testimonials .jv-actions {
+    margin-top: 24px;
+  }
+}
+
+/* The header's sun (shown in dark): the source's is a 20 px Feather sun, circle r 5, 2 px strokes, rays 2 px long; the part
+ * stored in the site's database draws r 4, 1.8 px, so the glyph is painted from the theme instead (the part's markup is
+ * only the box): same box, `currentColor`, the source's geometry. */
+.jv-theme-toggle .jv-theme-toggle__sun > * {
+  display: none;
+}
+
+.jv-theme-toggle .jv-theme-toggle__sun {
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Cline x1='12' y1='1' x2='12' y2='3'/%3E%3Cline x1='12' y1='21' x2='12' y2='23'/%3E%3Cline x1='4.22' y1='4.22' x2='5.64' y2='5.64'/%3E%3Cline x1='18.36' y1='18.36' x2='19.78' y2='19.78'/%3E%3Cline x1='1' y1='12' x2='3' y2='12'/%3E%3Cline x1='21' y1='12' x2='23' y2='12'/%3E%3Cline x1='4.22' y1='19.78' x2='5.64' y2='18.36'/%3E%3Cline x1='18.36' y1='5.64' x2='19.78' y2='4.22'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Cline x1='12' y1='1' x2='12' y2='3'/%3E%3Cline x1='12' y1='21' x2='12' y2='23'/%3E%3Cline x1='4.22' y1='4.22' x2='5.64' y2='5.64'/%3E%3Cline x1='18.36' y1='18.36' x2='19.78' y2='19.78'/%3E%3Cline x1='1' y1='12' x2='3' y2='12'/%3E%3Cline x1='21' y1='12' x2='23' y2='12'/%3E%3Cline x1='4.22' y1='19.78' x2='5.64' y2='18.36'/%3E%3Cline x1='18.36' y1='5.64' x2='19.78' y2='4.22'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+/* Service pages' three benefit cards: the source's `.item h4.my-3` stays 20/24 below 576 as well (the page-wide "h4 22 px
+ * below 576" rule above out-weighed `.jv-benefits__title`, so a phone drew them 2 px larger and each card 2.4 px taller). */
+.tracy .jv-prose .jv-benefits__title {
+  font-size: 20px;
+  line-height: 1.2;
 }

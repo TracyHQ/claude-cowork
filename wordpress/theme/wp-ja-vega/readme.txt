@@ -42,4 +42,8 @@ icon, (C) The Bootstrap Authors, MIT License, https://github.com/twbs/bootstrap/
 The back-to-top chevron and the four social marks of the footer (Facebook, Instagram, Behance,
 Dribbble) in that stylesheet are outlines of the glyphs of Font Awesome 4.7.0, Copyright Dave Gandy,
 SIL Open Font License 1.1 (https://openfontlicense.org/), converted to SVG paths. The other icons
-in that stylesheet (contact icons, arrows, play button, check marks) were drawn for this theme.
+in that stylesheet (contact icons, arrows, play button, check marks) were drawn for this theme,
+except two: the Twitter mark under an article quote is the `twitter` glyph of Font Awesome Free 5
+Brands, Copyright Fonticons, Inc., icons licensed CC BY 4.0 (https://fontawesome.com/license/free),
+converted to an SVG path; the sun of the header's theme switch is the Feather sun icon, Copyright
+Cole Bemis, MIT License (https://github.com/feathericons/feather/blob/main/LICENSE).
