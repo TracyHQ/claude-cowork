@@ -2354,15 +2354,14 @@ final class Engine
             $routed = array_values(array_intersect($this->contract->derivedLanguages(), $keep));
             Timing::end('retireGoverned', $t);
             $t = Timing::begin();
+            // The rows read as an inspect reads them (ContractRows): with a bulk reader, one SELECT per
+            // kind. list() also works out, for every article, its routed URL, a menu lookup, its author,
+            // its tags and its access level — none of which this pass reads, and 3.4 to 5 s of every
+            // call on Business (05/10/2026). A writer without a bulk reader walks list() as before.
+            $source = new ContractRows($this->writer);
             $rows = [];
-            foreach (['language', 'article', 'menuItem', 'module'] as $kind) {
-                $rows[$kind] = [];
-                for ($offset = 0; $offset < 20000; $offset += 100) {
-                    $page = $this->writer->list($kind, $offset, 100);
-                    foreach ($page as $row) $rows[$kind][] = $row;
-                    if (count($page) < 100) break;
-                }
-            }
+            foreach (['language', 'article', 'menuItem', 'module'] as $kind) $rows[$kind] = $source->summaries($kind);
+            unset($source);
             Timing::end('retireList', $t);
             $t = Timing::begin();
             // A kept language the archive ships an edition of stays exactly as shipped: that edition IS

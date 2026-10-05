@@ -7,7 +7,8 @@
 //
 //   1. on the Business archive, the rows hidden and the undo entries are exactly what the per-row
 //      pass wrote: MultilingualApply::retireWrites, in its order, one `visibility` entry per row;
-//   2. written in bulk: one recordMany() per call, one setVisibilityMany() per kind per call;
+//   2. written in bulk: one recordMany() per call, one setVisibilityMany() per kind per call, and its
+//      rows read in bulk too (ContractRows, as an inspect reads them), never through list();
 //   3. a row open in the editor refuses the pass before anything is recorded or written;
 //   4. a row the site refuses mid-pass takes the whole call back, its undo entries included;
 //   5. restore shows every row again, in bulk, and a row recorded twice is left with its OLDEST
@@ -124,6 +125,8 @@ namespace {
         // 1-2. The pass, call after call until it completes.
         $rbBeforeStore = $rbSite->store;
         $rbAnswers = []; $rbBulkPerCall = []; $rbManyPerCall = [];
+        $rbBulkReads = $rbSite instanceof BulkSiteReader;
+        if ($rbBulkReads) $rbSite->reads = ['read' => 0, 'list' => 0, 'readAll' => 0, 'readMany' => 0];
         for ($i = 0, $rbR = ['status' => 'running']; $i < 20 && ($rbR['status'] ?? '') === 'running'; $i++) {
             $rbSite->bulkVisibility = []; $rbLog->many = [];
             $rbR = $rbCall(['operation' => 'multilingual.retire', 'keep' => $rbKeep, 'apply_id' => 'mlang-bulk']);
@@ -131,6 +134,9 @@ namespace {
             $rbBulkPerCall[] = $rbSite->bulkVisibility;
             $rbManyPerCall[] = $rbLog->many;
         }
+        // list() asks Joomla's router, author, tags and access level of every article; the pass needs none of it.
+        if ($rbBulkReads) check('bulk: each call reads its rows whole, one readAll() per kind, and never through list()',
+            [$rbSite->reads['list'], $rbSite->reads['readAll']], [0, 4 * count($rbChunks)]);
         check('bulk: the pass takes one call per chunk of 3,000 and completes',
             $rbAnswers, array_merge(array_fill(0, count($rbChunks) - 1, [true, 'running']), [[true, 'completed']]));
         check('bulk: the undo entries are the per-row pass\'s, entry for entry and in its order', $rbLog->log['mlang-bulk'] ?? null, $rbEntries);
