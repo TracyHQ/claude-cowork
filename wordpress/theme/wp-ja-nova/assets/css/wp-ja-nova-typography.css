@@ -651,5 +651,12 @@ body.tracy.jn-route-typography .t4-typo-example .alert a { font-weight: 700; col
 body.tracy.jn-route-typography .t4-typo-example button { font-family: inherit; font-size: inherit; line-height: inherit; margin: 0; }
 body.tracy.jn-route-typography .t4-typo-example { padding-top: 64px; }
 body.tracy.jn-route-typography .t4-typo-example.pt-0 { padding-top: 0; }
+/* The source's .t4-typo-example: 4rem above and below and a 2 px rule under each block, unless pb-0 / border-bottom-0. */
+body.tracy.jn-route-typography .t4-typo-example { padding-bottom: 64px; border-bottom: 2px solid light-dark(#e9ecef, var(--jn-line)); }
+body.tracy.jn-route-typography .t4-typo-example.pb-0 { padding-bottom: 0; }
+body.tracy.jn-route-typography .t4-typo-example.border-bottom-0 { border-bottom: 0; }
+/* The source's alert text sits straight in the box; the block paragraph's own bottom margin would add 16 px. */
+body.tracy.jn-route-typography .t4-typo-example .alert > .wp-block-paragraph { margin-bottom: 0; }
+body.tracy.jn-route-typography .t4-typo-example .bd-example.wp-block-paragraph:not(.mb-5) { margin-bottom: 0; }
 /* The demo block is a constrained group: its rows keep the source grid's negative gutter margins. */
 body.tracy.jn-route-typography .t4-typo-example .row { max-width: none; margin-left: calc(-0.5 * var(--t4-gutter-x)) !important; margin-right: calc(-0.5 * var(--t4-gutter-x)) !important; }

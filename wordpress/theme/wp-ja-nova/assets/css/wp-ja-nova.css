@@ -326,12 +326,14 @@ body.tracy .jn-drawer-toggle { display: none; }
   }
   .jn-drawer-open body.tracy .jn-header { z-index: 1000; }
   .jn-drawer-open body.tracy .jn-header__menu { transform: none; visibility: visible; box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15); }
-  .jn-drawer-open body.tracy::after {
+  /* The source's dim is rgba(0,0,0,.68) over the whole viewport, the header strip beside the panel included; the
+     panel lives in the header's stacking context, so the dim is the header's own ::after, under the panel. */
+  .jn-drawer-open body.tracy .jn-header::after {
     content: '';
     position: fixed;
     inset: 0;
     z-index: 999;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.68);
   }
   body.tracy .jn-drawer__head {
     display: flex;
@@ -520,7 +522,11 @@ body.tracy .jn-breadcrumbs li:not(:last-child)::after {
 /* ── Main body of a plain page ────────────────────────────────────────────────────────────────── */
 
 body.tracy .jn-main-body { padding-block: 128px; }
-@media (max-width: 991.98px) {
+/* the source steps 128 / 64 / 32 px at 1200 and 768 (T4 xl and md), not at 992 */
+@media (max-width: 1199.98px) {
+  body.tracy .jn-main-body { padding-block: 64px; }
+}
+@media (max-width: 767.98px) {
   body.tracy .jn-main-body { padding-block: 32px; }
 }
 
@@ -565,9 +571,11 @@ body.tracy .jn-sec.bg-yellow :where(h1, h2, h3, .jn-sec__title) { color: #ffffff
 body.tracy .jn-sec__head { max-width: 700px; margin-inline: auto; margin-bottom: 64px; text-align: center; }
 body.tracy .jn-sec__title { display: inline; margin: 0; font-size: var(--jn-h2); font-weight: 700; color: var(--jn-heading); text-align: center; }
 body.tracy .jn-sec__foot { text-align: center; }
+/* The source draws this line outside the container: 650 px, or the whole viewport when narrower. */
 body.tracy .jn-sec__bottom-desc {
-  max-width: 650px;
-  margin: 32px auto 0;
+  width: min(650px, 100vw);
+  max-width: none;
+  margin: 32px calc((100% - min(650px, 100vw)) / 2) 0;
   font-size: 18px;
   font-weight: 300;
   color: var(--jn-text);
@@ -576,9 +584,16 @@ body.tracy .jn-sec__bottom-desc {
 body.tracy .jn-sec__foot .jn-actions { margin-top: 64px; }
 @media (max-width: 1199.98px) {
   body.tracy .jn-sec__foot .jn-actions { margin-top: 32px; }
+  body.tracy .jn-sec__bottom-desc { margin-top: 16px; } /* the source's .section-bottom-desc: 2rem, 1rem to 992 px, 1.5rem below */
+}
+/* The source's .mod-title-wrap margin-bottom: 4rem, 2rem below 768 px, 1rem below 576 px. */
+@media (max-width: 767.98px) {
+  body.tracy .jn-sec__head { margin-bottom: 32px; }
+}
+@media (max-width: 575.98px) {
+  body.tracy .jn-sec__head { margin-bottom: 16px; }
 }
 @media (max-width: 991.98px) {
-  body.tracy .jn-sec__head { margin-bottom: 16px; }
   body.tracy .jn-sec__bottom-desc { margin-top: 24px; }
   body.tracy .jn-sec__foot .jn-actions { margin-top: 16px; }
 }
@@ -646,11 +661,26 @@ body.tracy .jn-hero__content { position: relative; z-index: 1; max-width: 732px;
 body.tracy .jn-hero__title { margin: 0 0 32px; font-size: var(--jn-h1); font-weight: 700; color: var(--jn-heading); text-align: center; }
 body.tracy .jn-hero__desc { margin: 8px 0; font-size: var(--jn-h4); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-hero .jn-actions { margin-top: 64px; }
+/* The source's hero item pads 160 px from 1400 px (xxl), 96 px from 768 px to there, 32 px below (T4 .acm-hero .item); the
+   hero sits in a Bootstrap container (540/720/960/1140 wide from 576/768/992/1200 px), so the picture and the text
+   follow the same steps. */
+@media (max-width: 1399.98px) {
+  body.tracy .jn-hero { max-width: 1140px; }
+  body.tracy .jn-hero__content { padding-block: 96px; }
+}
+@media (max-width: 1199.98px) { body.tracy .jn-hero { max-width: 960px; } }
 @media (max-width: 991.98px) {
-  body.tracy .jn-hero__decor { inset: 0; }
-  body.tracy .jn-hero__content { padding: 32px 0; max-width: none; }
-  body.tracy .jn-hero__title { margin-bottom: 16px; }
+  body.tracy .jn-hero { max-width: 720px; }
+  body.tracy .jn-hero__content { max-width: none; padding-inline: 0; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-hero { max-width: 540px; }
+  body.tracy .jn-hero__content { padding-block: 32px; }
   body.tracy .jn-hero .jn-actions { margin-top: 32px; }
+}
+@media (max-width: 575.98px) {
+  body.tracy .jn-hero { max-width: none; }
+  body.tracy .jn-hero__title { margin-bottom: 16px; }
 }
 
 /* ── Feature with picture (features-intro style-1) ────────────────────────────────────────────── */
@@ -663,7 +693,7 @@ body.tracy .jn-feature__title { margin: 16px 0 32px; font-size: var(--jn-h2); co
 body.tracy .jn-feature__desc { margin: 0; color: var(--jn-text); }
 /* The source's list items: 16 px above each (media-svg), 32 px above each with a picture (media-image),
    the first one included. */
-body.tracy .jn-feature__list { margin-top: 0; }
+body.tracy .jn-feature__list { display: flow-root; margin-top: 0; }
 body.tracy .jn-feature__item { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; }
 body.tracy .jn-feature__item:has(.jn-feature__item-icon) { margin-top: 32px; }
 body.tracy .jn-feature__item-icon { flex: 0 0 100px; margin-right: 24px; }
@@ -681,24 +711,32 @@ body.tracy .jn-feature__cta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 0 16px;
   margin-top: 32px;
   padding-top: 32px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 body.tracy .jn-sec:not(.bg-purple) .jn-feature__cta { border-top-color: var(--jn-line); }
 body.tracy .jn-feature__cta:not(:has(.jn-feature__more-text)):not(:has(.wp-block-button)) { display: none; }
-body.tracy .jn-feature__more { display: flex; align-items: center; gap: 16px; }
+body.tracy .jn-feature__more { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 body.tracy .jn-feature__more-icon img { width: 64px; height: 64px; }
 body.tracy .jn-feature__more-text { margin: 8px 0; max-width: 190px; font-size: var(--jn-h4); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 @media (max-width: 991.98px) {
-  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 16px; }
+  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 32px; }
   body.tracy .jn-feature .jn-feature__cta > .jn-actions.jn-actions { margin-top: 0; }
   body.tracy .jn-feature__row.is-right .jn-feature__media { order: 0; }
+  /* The source's .info-wrap keeps its 600 px cap only from 992 px; its .acm-action stays a wrapping row. */
+  body.tracy .jn-feature__info { max-width: none; }
+  body.tracy .jn-feature__cta { flex-wrap: wrap; }
+}
+/* The source's .info-title: 2rem, 1rem below 768 px; the item picture is 100 px down to 576 px, 60 px below. */
+@media (max-width: 767.98px) {
+  body.tracy .jn-feature__row { row-gap: 16px; }
   body.tracy .jn-feature__title { margin-bottom: 16px; }
+}
+@media (max-width: 575.98px) {
   body.tracy .jn-feature__item-icon { flex-basis: 60px; margin-right: 24px; }
   body.tracy .jn-feature__item-icon img { width: 60px; height: 60px; }
-  body.tracy .jn-feature__cta { flex-direction: column; align-items: flex-start; }
 }
 
 /* ── Moving tag rows (text-slider style-1) ────────────────────────────────────────────────────── */
@@ -733,7 +771,7 @@ body.tracy .jn-sec .jn-marquee__title { margin: 0; font-size: var(--jn-h3); whit
 
 /* ── Service cards (features-intro style-2) ───────────────────────────────────────────────────── */
 
-body.tracy .jn-cards__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+body.tracy .jn-cards__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
 body.tracy .jn-cards__grid.acm-features-intro--cols-4 { grid-template-columns: repeat(4, 1fr); }
 body.tracy .jn-cards__grid.acm-features-intro--cols-2 { grid-template-columns: repeat(2, 1fr); }
 body.tracy .jn-card {
@@ -751,16 +789,31 @@ body.tracy .jn-card__title { margin: 0 0 16px; font-size: var(--jn-h4); }
 body.tracy .jn-card__title a { color: var(--jn-heading); }
 body.tracy .jn-card__title a::after { content: ''; position: absolute; inset: 0; }
 body.tracy .jn-card__desc { margin: 0; }
+/* the highlighted card is the source's col-xl-8: two of the three columns from 1200 px */
+@media (min-width: 1200px) {
+  body.tracy .jn-cards__grid:not(.acm-features-intro--cols-4) > .jn-card.cta-highlight { grid-column: span 2; }
+}
+/* the source's cards pad 64 px from 1200 px and 32 px below; they go to two columns under 992 */
 @media (max-width: 1199.98px) {
+  body.tracy .jn-card { padding: 32px; }
+}
+@media (max-width: 991.98px) {
   body.tracy .jn-cards__grid,
-body.tracy .jn-cards__grid.acm-features-intro--cols-4 { grid-template-columns: repeat(2, 1fr); }
+body.tracy .jn-cards__grid.acm-features-intro--cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* inline cards (service article): the source's col-lg-4 keeps three columns from 992 px, even in the narrow article column */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  body.tracy .jn-cards--inline .jn-cards__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-cards__grid,
 body.tracy .jn-cards__grid.acm-features-intro--cols-4 { grid-template-columns: 1fr; gap: 16px; }
-  body.tracy .jn-card { padding: 32px 24px; }
+  body.tracy .jn-card { padding: 32px; }
   body.tracy .jn-card__icon { margin-bottom: 16px; }
   body.tracy .jn-card__icon img { width: 80px; height: 80px; }
+}
+@media (max-width: 575.98px) {
+  body.tracy .jn-card { padding: 32px 24px; }
 }
 
 /* ── Call to action (cta style-1) and contact bar (cta style-2) ───────────────────────────────── */
@@ -770,12 +823,12 @@ body.tracy .jn-cta__title { max-width: 1000px; margin: 0 auto 8px; font-size: va
 body.tracy .jn-cta__desc { max-width: 800px; margin: 32px auto 0; opacity: 0.8; color: var(--jn-text); }
 /* The source's .btn-action (32 px above) around a button with 8 px margins above and below. */
 body.tracy .jn-cta .jn-actions { margin-top: 40px; padding-bottom: 8px; }
-@media (max-width: 991.98px) {
+@media (max-width: 575.98px) {
   body.tracy .jn-cta__desc { margin-top: 16px; }
 }
 body.tracy .jn-cta-bar__inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 body.tracy .jn-cta-bar__text { margin: 0; padding-right: 32px; font-size: var(--jn-h2); font-weight: 700; color: #ffffff; }
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
   body.tracy .jn-cta-bar__inner { flex-direction: column; align-items: flex-start; }
 }
 
@@ -866,14 +919,18 @@ body.tracy .jn-teams .tracy-motion-next::before { transform: scaleX(-1); }
 @media (max-width: 991.98px) {
   body.tracy .jn-teams__item { flex-basis: calc((100% - 36px) / 2); }
   body.tracy .jn-teams__track { gap: 36px; }
-  body.tracy .jn-teams__desc { max-width: none; margin-bottom: 96px; }
+  /* Columns stacked: the navigation row sits under the line, the carousel 64 px under the row. */
+  body.tracy .jn-teams__desc { max-width: none; margin-bottom: 144px; }
   body.tracy .jn-teams .tracy-motion-prev,
-body.tracy .jn-teams .tracy-motion-next { top: auto; bottom: auto; width: 40px; height: 40px; }
+  body.tracy .jn-teams .tracy-motion-next { top: 133px; bottom: auto; width: 40px; height: 40px; }
+  body.tracy .jn-teams .tracy-motion-prev { left: 0; right: auto; }
+  body.tracy .jn-teams .tracy-motion-next { left: 52px; right: auto; }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-teams__item { flex-basis: 100%; }
-  body.tracy .jn-teams .tracy-motion-prev { left: 0; right: auto; top: 98px; }
-  body.tracy .jn-teams .tracy-motion-next { left: 52px; right: auto; top: 98px; }
+  body.tracy .jn-teams__desc { margin-bottom: 96px; }
+  body.tracy .jn-teams .tracy-motion-prev,
+  body.tracy .jn-teams .tracy-motion-next { top: 98px; }
 }
 
 /* ── Figures (features-intro style-3) ─────────────────────────────────────────────────────────── */
@@ -884,6 +941,7 @@ body.tracy .jn-stat__number { margin: 0; font-size: var(--jn-h2); font-weight: 7
 body.tracy .jn-stat__title { margin: 0 0 16px; font-size: var(--jn-h4); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 @media (max-width: 991.98px) {
   body.tracy .jn-stat__title { margin-bottom: 8px; }
+  body.tracy .jn-stat { padding: 32px; }
 }
 body.tracy .jn-stat__desc { margin: 0; color: var(--jn-text); }
 @media (max-width: 1199.98px) {
@@ -891,7 +949,6 @@ body.tracy .jn-stat__desc { margin: 0; color: var(--jn-text); }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-stats__grid { grid-template-columns: 1fr; gap: 16px; }
-  body.tracy .jn-stat { padding: 32px; }
 }
 
 /* ── Pricing (pricing style-1) ────────────────────────────────────────────────────────────────── */
@@ -936,7 +993,7 @@ body.tracy .jn-pricing__list li::before {
   background: url("data:image/svg+xml,%3Csvg width=%2221%22 height=%2220%22 viewBox=%220 0 21 20%22 fill=%22none%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cpath d=%22M4.92141 15.7452C4.20235 15.0262 4.67928 13.5165 4.31328 12.632C3.93387 11.715 2.54166 10.9769 2.54166 9.99997C2.54166 9.02301 3.93388 8.285 4.31328 7.36803C4.67928 6.48346 4.20235 4.97382 4.92141 4.25476C5.64048 3.53569 7.15012 4.01262 8.03469 3.64662C8.95168 3.26722 9.68971 1.875 10.6667 1.875C11.6436 1.875 12.3817 3.26722 13.2986 3.64663C14.1832 4.01263 15.6928 3.5357 16.4119 4.25476C17.131 4.97382 16.654 6.48346 17.02 7.36804C17.3994 8.28502 18.7917 9.02305 18.7917 10C18.7917 10.977 17.3994 11.715 17.02 12.632C16.654 13.5165 17.131 15.0262 16.4119 15.7452C15.6928 16.4643 14.1832 15.9874 13.2986 16.3534C12.3816 16.7328 11.6436 18.125 10.6666 18.125C9.68966 18.125 8.95166 16.7328 8.03469 16.3534C7.15011 15.9874 5.64048 16.4643 4.92141 15.7452Z%22 stroke=%22%235E48DB%22 stroke-width=%221.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M14.1042 8.125L9.5208 12.5L7.22916 10.3125%22 stroke=%22%235E48DB%22 stroke-width=%221.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E") center / 20px 20px no-repeat;
 }
 @media (max-width: 1199.98px) {
-  body.tracy .jn-pricing__body { grid-template-columns: minmax(0, 1fr); row-gap: 16px; }
+  body.tracy .jn-pricing__body { grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
   /* Tabs in a wrapping row on the page background, 8 px under each, 16 px apart (pricing-title). */
   body.tracy .jn-pricing__tabs { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; padding: 0 0 8px; border-radius: 0; background: transparent; }
   body.tracy .jn-pricing__tab { padding: 16px; font-size: var(--jn-h4); }
@@ -946,6 +1003,7 @@ body.tracy .jn-pricing__list li::before {
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-pricing__head { flex-direction: column; align-items: flex-start; }
+  body.tracy .jn-pricing__body { row-gap: 16px; }
 }
 @media (max-width: 575.98px) {
   body.tracy .jn-pricing__panels { padding: 32px 16px; }
@@ -997,10 +1055,19 @@ body.tracy .jn-faq .is-open .jn-accordion__button::after {
 body.tracy .jn-accordion__body { margin: 0; padding-top: 16px; color: var(--jn-card-text); }
 @media (max-width: 991.98px) {
   body.tracy .jn-faq__row { grid-template-columns: 1fr; row-gap: 32px; }
+  body.tracy .jn-accordion__header { font-size: 16px; }
+}
+/* the source keeps the 64 / 32 / 32 px spacing down to 768 px and the 22 px header line from 576 px */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  body.tracy .jn-faq .jn-accordion__button { line-height: 1.35; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-faq__title { margin-bottom: 32px; }
+  body.tracy .jn-accordion__item { padding: 16px; }
+}
+@media (max-width: 575.98px) {
   body.tracy .jn-faq__title { margin-bottom: 16px; }
   body.tracy .jn-faq__desc { margin-bottom: 16px; }
-  body.tracy .jn-accordion__item { padding: 16px; }
-  body.tracy .jn-accordion__header { font-size: 16px; }
 }
 
 /* ── Values (features-intro style-4) ──────────────────────────────────────────────────────────── */
@@ -1022,6 +1089,7 @@ body.tracy .jn-value__title { margin: 0 0 16px; font-size: var(--jn-h3); font-we
 body.tracy .jn-value__desc { margin: 0; color: var(--jn-text); }
 @media (max-width: 1199.98px) {
   body.tracy .jn-values__grid { grid-template-columns: repeat(2, 1fr); }
+  body.tracy .jn-values__top { padding-bottom: 32px; } /* the source's bottom-info: 32 px above its rule, 32 px of padding below it */
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-values__top { grid-template-columns: 1fr; row-gap: 8px; padding-bottom: 32px; }
@@ -1073,17 +1141,40 @@ body.tracy .jn-expertise__item { grid-column: span 12; }
 body.tracy .jn-expertise__item.acm-features-intro--cols-5 { grid-column: span 5; }
 body.tracy .jn-expertise__item.acm-features-intro--cols-7 { grid-column: span 7; }
 body.tracy .jn-expertise__box { height: 100%; padding: 64px; border-radius: 32px; background: var(--jn-raised); box-sizing: border-box; }
-body.tracy .jn-expertise__label { position: relative; margin: 0; padding-top: 72px; font-size: var(--jn-h5); font-weight: 500; text-transform: uppercase; color: var(--jn-text); }
+body.tracy .jn-expertise__label { position: relative; margin: 0; padding-top: 56px; font-size: var(--jn-h5); font-weight: 500; text-transform: uppercase; color: var(--jn-text); }
 body.tracy .jn-expertise__label::before { content: ''; position: absolute; left: 6px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 20%, transparent); }
+/* the source's boxes pad 64 px from 1200 px, 32 px below */
+@media (max-width: 1199.98px) {
+  body.tracy .jn-expertise__box { padding: 32px; }
+}
+/* from 1200 px the source's dot sits in the label and the list follows the text at 32 px */
+@media (min-width: 1200px) {
+  body.tracy .jn-expertise__label { padding-top: 72px; }
+  body.tracy .jn-expertise__desc { margin-bottom: 32px; }
+  body.tracy .jn-expertise__list { margin-top: 0; }
+}
 body.tracy .jn-expertise__label.cta-purple::before { background: var(--jn-purple); }
 body.tracy .jn-expertise__label.cta-yellow::before { background: var(--jn-yellow); }
 body.tracy .jn-expertise__label.cta-green::before { background: var(--jn-green); }
 body.tracy .jn-expertise__label.cta-red::before { background: var(--jn-red); }
 body.tracy .jn-expertise__label[class*='cta-'] { color: var(--jn-text); }
 body.tracy .jn-expertise__title { margin: 0 0 8px; font-size: var(--jn-h3); }
-body.tracy .jn-expertise__desc { margin: 0 0 32px; color: var(--jn-text); }
-body.tracy .jn-expertise__list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 32px 0 0; border-top: 1px solid var(--jn-line); list-style: none; }
+body.tracy .jn-expertise__desc { margin: 0 0 16px; color: var(--jn-text); }
+body.tracy .jn-expertise__list { display: flex; flex-wrap: wrap; gap: 8px; margin: 32px 0 0; padding: 32px 0 0; border-top: 1px solid var(--jn-line); list-style: none; }
 body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; background: light-dark(#f7f7f7, #1e232b); font-weight: 600; color: light-dark(#333333, #c2c9d2); }
+/* The source's pills carry 8 px above each (margin-top on the link) instead of a row gap; its list steps 32 -> 16 px below 992 px. */
+@media (max-width: 1199.98px) {
+  body.tracy .jn-expertise__list { gap: 0 8px; }
+  body.tracy .jn-expertise__list li { margin-top: 8px; }
+}
+@media (max-width: 991.98px) {
+  body.tracy .jn-expertise__list { margin-top: 16px; padding-top: 16px; }
+}
+/* below 768 px the source's dot sits 16 px above the label and its columns are 8 px apart on each side */
+@media (max-width: 767.98px) {
+  body.tracy .jn-expertise__label { padding-top: 40px; }
+  body.tracy .jn-expertise__grid { gap: 16px; }
+}
 @media (max-width: 991.98px) {
   /* Stacked, as the source's col-12 rows: one track, so eleven 32 px gaps no longer set a 352 px
      minimum width that overflows a 320-360 px screen. */
@@ -1091,7 +1182,6 @@ body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; back
   body.tracy .jn-expertise__item,
   body.tracy .jn-expertise__item.acm-features-intro--cols-5,
   body.tracy .jn-expertise__item.acm-features-intro--cols-7 { grid-column: auto; }
-  body.tracy .jn-expertise__box { padding: 32px; }
 }
 
 /* ── Open positions (features-intro style-7) ──────────────────────────────────────────────────── */
@@ -1142,7 +1232,14 @@ body.tracy .jn-position.is-open .jn-position__less { display: inline; }
 body.tracy .jn-position__body { padding-top: 32px; }
 @media (max-width: 991.98px) {
   body.tracy .jn-position__head { grid-template-columns: 1fr; }
-  body.tracy .jn-position__toggle { grid-column: 1; grid-row: auto; justify-self: end; margin-top: 16px; order: 3; }
+  body.tracy .jn-position__toggle { grid-column: 1; grid-row: auto; justify-self: end; margin-top: 32px; order: 3; }
+}
+/* The source puts title and info in a col-lg-6 of its col-lg-9, so a long job title breaks at half the text column. */
+@media (min-width: 992px) {
+  body.tracy .jn-position__title, body.tracy .jn-position__info { max-width: calc((100% + 16px) / 2 - 16px); }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-position__toggle { margin-top: 16px; } /* gutters are 8 px below 768 px: the source's two columns stack 16 px apart */
 }
 @media (max-width: 575.98px) {
   body.tracy .jn-position { padding: 32px 16px; }
@@ -1185,7 +1282,18 @@ body.tracy .jn-social.is-style-logos-only .wp-social-link-instagram { background
 body.tracy .jn-footer__bottom { margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
 body.tracy .jn-copyright { margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.7); }
 @media (max-width: 1199.98px) {
-  body.tracy .jn-footer__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block: -8px; }
+  body.tracy .jn-footer__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block: -16px; }
+  body.tracy .jn-footer__col,
+body.tracy .jn-footer__col--info { padding: 16px; }
+}
+/* the source's footer top padding and gutter step down at 992 and 768, copyright gap at 992 and 576 */
+@media (max-width: 991.98px) {
+  body.tracy .jn-footer { padding-top: 64px; }
+  body.tracy .jn-footer__bottom { margin-top: 32px; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-footer { padding-top: 32px; }
+  body.tracy .jn-footer__grid { margin-block: -8px; }
   body.tracy .jn-footer__col,
 body.tracy .jn-footer__col--info { padding: 8px 16px; }
 }
@@ -1258,8 +1366,9 @@ body.tracy .jn-article__title { max-width: 850px; margin: 0 auto 32px; font-size
 body.tracy .jn-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 body.tracy .jn-tags a { display: inline-block; padding: 12px 16px; line-height: 1.64; border-radius: 16px; background: var(--jn-surface); color: var(--jn-text); }
 body.tracy .jn-tags .wp-block-post-terms__separator { display: none; }
-body.tracy .jn-article__box { position: relative; }
-body.tracy .jn-article__share { position: absolute; left: 0; top: 0; width: 293px; }
+/* The source's article body is a flex row: the share column is sticky (top 24) and stays with the reader (T4 .box-content / .share-social). */
+body.tracy .jn-article__box { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; }
+body.tracy .jn-article__share { position: sticky; top: 24px; flex: 0 0 325px; box-sizing: border-box; width: 325px; padding-right: 32px; }
 body.tracy .jn-share { text-align: center; }
 body.tracy .jn-share__title { margin: 0 0 32px; font-size: 18px; font-weight: 500; color: var(--jn-heading); }
 body.tracy .jn-share__links.wp-block-social-links { align-items: center; gap: 18px; }
@@ -1268,15 +1377,14 @@ body.tracy .jn-share__links .wp-social-link a { display: flex; align-items: cent
 body.tracy .jn-share__links .wp-social-link-facebook { background: #3b5998; }
 body.tracy .jn-share__links .wp-social-link-x { background: #00aced; }
 body.tracy .jn-share__links .wp-social-link-reddit { background: #ff4500; }
-body.tracy .jn-article__content { margin-left: 325px; }
+body.tracy .jn-article__content { flex: 1 1 0; min-width: 0; margin-left: 0; }
 body.tracy .jn-prose .jn-fulltext-image { margin: 0 0 32px; }
 body.tracy .jn-prose .jn-fulltext-image img { width: 100%; height: auto; border-radius: 32px; }
 body.tracy .jn-article__nav { display: flex; align-items: flex-start; justify-content: space-between; margin-top: 48px; }
 body.tracy .jn-article__nav .jn-article__next { margin-left: auto; }
 body.tracy .jn-article__nav a { display: inline-block; padding: 12px 24px; border: 1px solid var(--jn-line-2); border-radius: 16px; background: var(--jn-surface); font-size: 18px; line-height: 1.63; color: var(--jn-text); }
-@media (max-width: 991.98px) {
-  body.tracy .jn-article__share { position: static; width: auto; margin-bottom: 32px; }
-  body.tracy .jn-article__content { margin-left: 0; }
+@media (max-width: 1199.98px) {
+  body.tracy .jn-article__share { flex: 0 0 auto; width: auto; }
 }
 
 /* ── Service page (template page-service: T4 item-page with the sidebar-l services menu, fix-spec S-23) ── */
@@ -1287,7 +1395,9 @@ body.tracy .jn-service__body { margin-top: 0; }
 body.tracy .jn-service__aside { position: absolute; left: 0; top: 0; width: calc((100% + 32px) / 3 - 32px); padding: 32px; border-radius: 16px; background: var(--jn-surface); box-sizing: border-box; }
 body.tracy .jn-service__menu-title { margin: 0 0 32px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-service__menu .wp-block-navigation__container { gap: 16px; width: 100%; align-items: stretch; }
-body.tracy .jn-service__menu .wp-block-navigation-item { width: 100%; }
+/* A word wider than the box overflows by a pixel in the source (225.4 px item in a 224 px column) instead
+   of breaking mid-word, so "Cybersecurity" stays on one line. */
+body.tracy .jn-service__menu .wp-block-navigation-item { width: 100%; min-width: min-content; }
 body.tracy .jn-service__menu .wp-block-navigation-item__content { display: block; width: 100%; padding: 32px; font-size: var(--jn-h4); line-height: 1.5; border-radius: 16px; background: var(--jn-raised); color: light-dark(#333333, #c2c9d2); box-sizing: border-box; }
 body.tracy .jn-service__menu .current-menu-item > .wp-block-navigation-item__content { border: 1px solid var(--jn-purple); background: light-dark(#efedfc, #262c36); font-weight: 700; color: var(--jn-purple-text); }
 body.tracy .jn-service__title { max-width: 850px; margin-block: 0; font-size: var(--jn-service-h1, 32px); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
@@ -1301,15 +1411,15 @@ body.tracy .jn-cards--inline .jn-card { padding: 32px; }
 body.tracy .jn-cards--inline .jn-card__icon img { width: 80px; height: 80px; border-radius: 16px; }
 @media (max-width: 1199.98px) {
   body.tracy .jn-service { --jn-service-h1: 32px; }
-  body.tracy .jn-service__share { margin-top: 32px; padding-top: 32px; }
 }
 @media (max-width: 991.98px) {
+  body.tracy .jn-service__share { margin-top: 32px; padding-top: 32px; }
   body.tracy .jn-service__aside { position: static; order: 0; width: auto; margin-bottom: 32px; }
   body.tracy .jn-service__content > :not(.jn-service__aside) { margin-left: 0; }
-  body.tracy .jn-service__share .jn-share__title { display: none; }
-  body.tracy .jn-service__share .jn-share__links .wp-social-link { width: 30px; height: 30px; }
 }
 @media (max-width: 767.98px) {
+  body.tracy .jn-service__share .jn-share__title { display: none; }
+  body.tracy .jn-service__share .jn-share__links .wp-social-link { width: 30px; height: 30px; }
   body.tracy .jn-service__aside { order: 1; margin-top: 32px; margin-bottom: 32px; padding: 16px; }
   body.tracy .jn-service__menu-title { margin-bottom: 16px; }
   body.tracy .jn-service__menu .wp-block-navigation-item__content { padding: 16px; }
@@ -1480,7 +1590,7 @@ body.tracy .jn-article__body > .row { margin-left: -16px; }
 
 /* Project category listings (pages under Project): two cards a row on a grey plate, no category
    eyebrow, the client name and budget under a rule (inc/extra.php wp_ja_nova_project_card_meta). */
-body.tracy.jn-parent-project .tracy-query .tracy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+body.tracy.jn-parent-project .tracy-query .tracy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; padding-bottom: 32px; } /* the source's cards carry 32 px below, the last row included */
 body.tracy.jn-parent-project .tracy-card { padding: 32px; border-radius: 32px; background: var(--jn-surface); }
 body.tracy.jn-parent-project .tracy-card__media img { aspect-ratio: 592 / 419 !important; border-radius: 16px; }
 body.tracy.jn-parent-project .tracy-card .tracy-eyebrow { display: none; }
@@ -1494,10 +1604,21 @@ body.tracy .jn-card-info > .jn-card-info__client-name { flex: 0 0 50%; box-sizin
 body.tracy .jn-card-info > div { flex: 1 1 0; }
 body.tracy .jn-card-info h5 { margin: 0 0 16px; font-size: 12px; font-weight: 500; text-transform: uppercase; color: var(--jn-purple-text); }
 body.tracy .jn-card-info p { margin: 0; font-size: 18px; font-weight: 500; color: var(--jn-heading); }
-@media (max-width: 991.98px) {
-  body.tracy.jn-parent-project .tracy-query .tracy-grid { grid-template-columns: minmax(0, 1fr); }
+/* the title-only recent-work band of a project listing: 32 px of padding under the title block in the source */
+body.tracy .jn-related--projects:not(:has(.jn-related__item)) { padding-bottom: 0; }
+@media (min-width: 768px) {
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) { padding-bottom: 32px; }
 }
-@media (max-width: 767.98px) {
+@media (min-width: 1200px) {
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) { padding-bottom: 96px; }
+}
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy.jn-parent-project .tracy-query .tracy-grid { padding-bottom: 0; } /* measured: the source has no trailing 32 px here */
+}
+@media (max-width: 991.98px) {
+  body.tracy.jn-parent-project .tracy-query .tracy-grid { grid-template-columns: minmax(0, 1fr) !important; } /* the shared layer's two-column rule below 1024 px is !important */
+}
+@media (max-width: 575.98px) {
   body.tracy.jn-parent-project .tracy-card { padding: 16px; border-radius: 16px; }
   body.tracy.jn-parent-project .tracy-card__title { font-size: 24px; }
   body.tracy .jn-card-info { margin-top: 16px; padding-top: 16px; }
@@ -1519,7 +1640,7 @@ body.tracy .jn-list-title { margin: 0 0 64px; font-size: var(--jn-h2); text-alig
 }
 body.tracy.jn-parent-project .tracy-card .wp-block-post-excerpt__excerpt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 body.tracy.jn-parent-project .tracy-card { border: 0; }
-@media (max-width: 767.98px) {
+@media (max-width: 575.98px) {
   body.tracy.jn-parent-project .tracy-card__title { margin-top: 24px; }
 }
 body.tracy .jn-share__links .wp-social-link:hover,
@@ -1564,6 +1685,10 @@ body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-feat
 body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-featured-articles) .tracy-card .wp-block-post-excerpt { margin: 0; }
 body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-featured-articles) .tracy-card .wp-block-post-excerpt__excerpt { display: -webkit-box; margin: 0; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; color: light-dark(rgba(19, 21, 21, 0.7), #c2c9d2); }
 body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-featured-articles) .tracy-card .wp-block-post-excerpt__more-text { display: none; }
+/* the shared layer's `@media (max-width: 1024px) .tracy-grid` two-column rule is !important; the source stays at three columns down to 992 px */
+@media (min-width: 992px) and (max-width: 1024px) {
+  body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-featured-articles) .tracy-query .tracy-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
 @media (max-width: 991.98px) {
   body.tracy:is(.jn-route-category-blog, .jn-route-author-listting, .jn-route-featured-articles) .tracy-query .tracy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1597,6 +1722,9 @@ body.tracy .jn-project__picture img { display: block; width: 100%; height: auto;
 @media (max-width: 991.98px) {
   body.tracy .jn-project__field { flex-basis: 50%; }
 }
+@media (max-width: 991.98px) {
+  body.tracy .jn-project__picture { margin-bottom: 32px; } /* the source's figure: 32 px under it below 992 px */
+}
 @media (max-width: 767.98px) {
   /* Stacked fields: each with 24 px under it and a rule inside the gutter (the source's .item-inner). */
   body.tracy .jn-project .jn-article__head { padding-bottom: 32px; margin-bottom: 32px; }
@@ -1616,12 +1744,22 @@ body.tracy .jn-related--projects .jn-related__items { gap: 0 32px; }
 body.tracy .jn-related--projects .jn-related__item { margin: 0 0 32px; padding: 32px; border-radius: 16px; background: var(--jn-raised); }
 body.tracy .jn-related--projects .jn-related__item > * { margin-block: 0; }
 body.tracy .jn-related--projects .jn-related__image { margin: 0 0 32px; }
-body.tracy .jn-related--projects .jn-related__image img { aspect-ratio: 592 / 419; border-radius: 16px; }
+body.tracy .jn-related--projects .jn-related__image img { width: auto; max-width: 100%; aspect-ratio: 592 / 419; border-radius: 16px; } /* the source keeps the picture at its own 592 px */
+body.tracy .jn-related--projects .jn-related__items { margin-bottom: -32px; } /* the source's list pulls its last row's 32 px margin back */
+@media (max-width: 767.98px) {
+  body.tracy .jn-related--projects .jn-related__image { margin-bottom: 16px; }
+}
+@media (max-width: 575.98px) {
+  body.tracy .jn-related--projects .jn-related__item { padding: 16px; }
+}
 body.tracy .jn-related--projects .jn-related__title { margin: 0 0 16px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.2; }
 body.tracy .jn-related--projects .jn-related__excerpt { margin: 0; }
 body.tracy .jn-related--projects .jn-card-info p { margin-bottom: 16px; }
 body.tracy .jn-card-info .jn-card-info__item-budget { text-align: right; }
 body.tracy .jn-related--projects .jn-related__item > .jn-card-info { margin-top: 32px; }
+@media (max-width: 767.98px) {
+  body.tracy .jn-related--projects .jn-related__item > .jn-card-info { margin-top: 16px; }
+}
 body.tracy .jn-related__items > li { margin-block: 0; }
 
 /* ── Category blog: latest posts (Joomla mod_articles_latest, type-1) ─────────────────────────────
@@ -1652,10 +1790,17 @@ body.tracy .jn-latest__items > li:first-child .jn-latest__excerpt p { color: rgb
 @media (max-width: 991.98px) {
   body.tracy .jn-latest__items { grid-template-columns: minmax(0, 1fr); }
   body.tracy .jn-latest__items > li:first-child { grid-row: auto; }
-  body.tracy .jn-latest__items > li:first-child .jn-latest__image { height: 420px; }
+  /* the source's first picture keeps its own 793 x 561 ratio down to 768 px, then a 420 px band */
+  body.tracy .jn-latest__items > li:first-child .jn-latest__image { height: auto; aspect-ratio: 793 / 561; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-latest__items > li:first-child .jn-latest__image { height: 420px; aspect-ratio: auto; }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-latest { padding: 32px 0; }
+  body.tracy .jn-latest .jn-sec__head { margin-bottom: 32px; }
+}
+@media (max-width: 575.98px) {
   body.tracy .jn-latest .jn-sec__head { margin-bottom: 16px; }
 }
 
@@ -1687,6 +1832,9 @@ body.tracy .jn-search-band__tags a { padding: 12px 16px; border-radius: 16px; ba
   body.tracy .jn-search-band__row { flex-direction: column; }
   body.tracy .jn-search-band__left { flex-basis: auto; margin: 0 -16px 32px; padding: 0 16px; border-right: 0; }
   body.tracy .jn-search-band__right { margin: 0 -16px; padding: 0 16px; }
+}
+/* the source's module titles keep their 32 px gap down to 768 px */
+@media (max-width: 767.98px) {
   body.tracy .jn-search-band .jn-search-band__title { margin-bottom: 16px; }
 }
 
@@ -1701,7 +1849,7 @@ body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__exc
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-text { display: block; margin: 24px 0 0; }
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-link { display: inline-block; padding: 8px 24px; border: 1px solid transparent; border-radius: 16px; background: var(--jn-surface); font-weight: 500; line-height: 26.08px; color: light-dark(#212529, #eef1f6); text-decoration: none; }
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-link:hover { color: var(--jn-link); }
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
   body.tracy .jn-featured .tracy-grid > li:first-child .tracy-card { grid-template-columns: minmax(0, 1fr); gap: 32px; }
 }
 
@@ -1709,6 +1857,7 @@ body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__mor
    main body 64 px at desktop widths; the article views and the tag list 128 px. */
 @media (min-width: 992px) {
   body.tracy:is(.jn-route-category-blog, .jn-route-featured-articles, .jn-route-contact) .jn-main-body { padding-block: 64px 128px; }
+@media (max-width: 1199.98px) { body.tracy:is(.jn-route-category-blog, .jn-route-featured-articles, .jn-route-contact) .jn-main-body { padding-block: 64px; } }
 }
 
 /* Joomla listing chrome: the "More Articles" titles in the text colour, the "Page N of M" counter as
@@ -1806,18 +1955,24 @@ body.tracy .jn-contact-form .wtb-form__actions { text-align: center; }
 body.tracy .jn-contact-form .wtb-form__actions p { margin: 0; position: relative; }
 body.tracy .jn-contact-form input[type='submit'] { width: 100%; padding: 18px 32px; border: 1px solid var(--jn-purple); border-radius: 16px; background: var(--jn-purple); color: #fff; font: inherit; font-size: 16px; font-weight: 500; line-height: 26.08px; cursor: pointer; }
 body.tracy .jn-contact-form .wpcf7-spinner { position: absolute; right: 16px; top: 50%; margin: -12px 0 0; }
-@media (max-width: 1399.98px) {
+/* the source's address cards turn into the centred, stacked card below 1200 px (icon beside the text from there up) */
+@media (max-width: 1199.98px) {
   body.tracy .jn-contact-address { margin-bottom: 48px; }
   body.tracy .jn-contact-card { padding: 24px; border-radius: 16px; text-align: center; }
   body.tracy .jn-contact-card::before { position: static; display: block; margin: 0 auto 16px; }
   body.tracy .jn-contact-card::after { left: 50%; top: 40px; margin-left: -24px; }
+}
+@media (max-width: 1399.98px) {
   body.tracy .jn-contact-info__title { font-size: 40px; }
   body.tracy .jn-contact-info__accent::after { width: 60px; height: 60px; }
   body.tracy .jn-contact-misc { padding-bottom: 32px; margin-bottom: 32px; }
 }
 @media (max-width: 1199.98px) {
-  body.tracy .jn-contact-address { grid-template-columns: repeat(2, 1fr); }
   body.tracy .jn-contact-card__title { font-size: 24px; }
+}
+/* the source's address cards: three across from 992 px, two from 576 px, one below */
+@media (max-width: 991.98px) {
+  body.tracy .jn-contact-address { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 991.98px) {
   body.tracy .jn-contact-card__title { font-size: 20px; }
@@ -1827,10 +1982,12 @@ body.tracy .jn-contact-form .wpcf7-spinner { position: absolute; right: 16px; to
   body.tracy .jn-contact-row > .jn-contact-info { margin-bottom: 32px; }
   body.tracy .jn-contact-form .wpcf7 { max-width: 100%; }
 }
-@media (max-width: 767.98px) {
+@media (max-width: 575.98px) {
   body.tracy .jn-contact-address { display: flex; flex-direction: column; gap: 32px; }
-  body.tracy .jn-contact-info__title { font-size: 32px; }
   body.tracy .jn-contact-form .wpcf7-form { grid-template-columns: 1fr; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jn-contact-info__title { font-size: 32px; }
   body.tracy .jn-contact-form input[type='submit'] { padding: 16px; }
 }
 
@@ -1931,14 +2088,12 @@ body.tracy .jn-tagged__button--clear { border-left-color: rgba(225, 225, 225, 0.
 body.tracy .jn-share__links .wp-social-link,
 body.tracy .jn-share__links .wp-social-link a,
 body.tracy .jn-share__links .wp-social-link svg { color: #ffffff !important; fill: #ffffff; }
-/* At phone widths the source keeps the share icons as a 30 px rail beside the article, without the title. */
-@media (max-width: 575.98px) {
-  body.tracy .jn-article__box { display: flex; align-items: flex-start; gap: 0; }
-  body.tracy .jn-article__share { position: static; flex: none; width: 46px; margin-bottom: 0; }
+/* Below 768 px the source keeps the share icons as a 30 px rail beside the article, without the title. */
+@media (max-width: 767.98px) {
+  body.tracy .jn-article__share { padding-right: 16px; }
   body.tracy .jn-article__share .jn-share__title { display: none; }
-  body.tracy .jn-article__share .jn-share__links.wp-block-social-links { flex-direction: column; align-items: flex-start; gap: 18px; }
+  body.tracy .jn-article__share .jn-share__links.wp-block-social-links { flex-direction: column; align-items: flex-start; gap: 18px; margin-block-start: 0; }
   body.tracy .jn-article__share .jn-share__links .wp-social-link { width: 30px; height: 30px; }
-  body.tracy .jn-article__box > .jn-article__content { flex: 1 1 0; min-width: 0; }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-article__head { padding-bottom: 40px; margin-bottom: 32px; }
@@ -1966,8 +2121,9 @@ body.tracy .jn-auth .jn-input-group input { flex: 1 1 auto; min-width: 0; width:
 body.tracy .jn-auth .jn-password-toggle { display: flex; flex: none; align-items: center; justify-content: center; width: 64px; height: 64px; margin-left: -1px; padding: 0; border: 0; border-radius: 0 16px 16px 0; background: #6c757d; color: #ffffff; cursor: pointer; }
 body.tracy .jn-auth .jn-password-toggle:hover { background: #5c636a; }
 body.tracy .jn-footer__links .current-menu-item > .wp-block-navigation-item__content { font-weight: 700; } /* the source marks the current page link bold */
-@media (min-width: 992px) { body.tracy:is(.jn-route-error-page, .jn-route-offline-pages) .jn-main-body { padding-bottom: 144px; } } /* the article column keeps 16 px under its last block */
-@media (max-width: 991.98px) { body.tracy:is(.jn-route-error-page, .jn-route-offline-pages) .jn-main-body { padding-bottom: 48px; } }
+@media (min-width: 1200px) { body.tracy:is(.jn-route-error-page, .jn-route-offline-pages) .jn-main-body { padding-bottom: 144px; } } /* the article column keeps 16 px under its last block */
+@media (min-width: 768px) and (max-width: 1199.98px) { body.tracy:is(.jn-route-error-page, .jn-route-offline-pages) .jn-main-body { padding-bottom: 80px; } }
+@media (max-width: 767.98px) { body.tracy:is(.jn-route-error-page, .jn-route-offline-pages) .jn-main-body { padding-bottom: 48px; } }
 /* Pager arrows are the source's Font Awesome angle icons (bold chevrons), and its disabled ends are drawn at 40 %. */
 body.tracy .jn-pager-row .tracy-pager__item.is-disabled { opacity: 0.4; }
 body.tracy .jn-pager-row .tracy-pager__item:is(:first-child, :nth-child(2), :nth-last-child(2), :last-child) .tracy-pager__link { position: relative; font-size: 0; color: inherit; }
@@ -2061,3 +2217,11 @@ body.tracy .jn-breadcrumbs li:not(:last-child)::after { opacity: 1; background: 
 /* 404 button: no border, the source 64px (50px under 768px) height. */
 body.tracy .jn-404__home.wp-block-button .wp-block-button__link { display: inline-flex; align-items: center; box-sizing: border-box; height: 64px; border: 0; }
 @media (max-width: 767.98px) { body.tracy .jn-404__home.wp-block-button .wp-block-button__link { height: 50px; } }
+
+/* ── Field focus (1.1.7): a select keeps the ring (the source's select draws one too). The source changes the border colour on focus and draws no halo; the shared focus ring is a
+   box-shadow on every :focus-visible, so a text field drops it and carries the source's border instead. ── */
+body.tracy :is(input:not([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='range'], [type='color'], [type='file'], [type='hidden']), textarea):focus-visible { box-shadow: none; }
+body.tracy .jn-contact-form :is(input:not([type='submit']), textarea):focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; }
+body.tracy .jn-tagged__search input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; }
+/* The band's search field has no border in the source and shows nothing on focus; the lightest indicator that keeps a focused field visible is a 1 px inset line in the focus colour (DECISIONS D-33). */
+body.tracy .jn-search-band__form .wp-block-search__input:focus-visible { outline: 1px solid light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline-offset: -1px; }

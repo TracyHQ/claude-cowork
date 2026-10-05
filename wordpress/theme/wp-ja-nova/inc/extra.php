@@ -480,6 +480,22 @@ function wp_ja_nova_tag_filter_form( string $content, array $parsed ): string {
 add_filter( 'render_block_core/query', 'wp_ja_nova_tag_filter_form', 10, 2 );
 
 /**
+ * The source's search fields are not `required` (an empty submit lists the search page); core's Search block
+ * renders `required` on its input, so the attribute is dropped from every search form of the theme.
+ *
+ * @param string $content The rendered Search block.
+ * @return string
+ */
+function wp_ja_nova_search_not_required( string $content ): string {
+	return (string) preg_replace_callback(
+		'/<input\b[^>]*\btype="search"[^>]*>/i',
+		static fn ( array $m ): string => (string) preg_replace( '/\s+required(?:=("|\')[^"\']*\1)?(?=[\s\/>])/i', '', $m[0] ),
+		$content
+	);
+}
+add_filter( 'render_block_core/search', 'wp_ja_nova_search_not_required' );
+
+/**
  * The search page at the source's address. The source's search (com_finder) lives at
  * /smart-search, and its footer and menus link there; the seeder keeps that route's page as a
  * draft (patterns.map.json `views.search.servedAtPath`) and this answers the path with the
@@ -1501,7 +1517,7 @@ const WP_JA_NOVA_PROJECT_BAND = 'acm-related-items-138';
  * @return string
  */
 function wp_ja_nova_project_band(): string {
-	if ( ! is_page() || ! in_array( 'jn-parent-project', get_body_class(), true ) ) {
+	if ( ! is_page() || ! in_array( 'jn-parent-project', get_body_class(), true ) || wp_ja_nova_project_band_seen() ) {
 		return '';
 	}
 	$holders = get_posts(
@@ -1535,6 +1551,32 @@ function wp_ja_nova_project_band(): string {
 		return str_replace( 'jn-related--projects', 'jn-related--projects jn-related--band', render_block( $block ) );
 	}
 	return '';
+}
+
+/**
+ * Note that the recent-work band rendered on this request (from the page's own content), so a
+ * listing that already holds it does not get a second copy under the main body.
+ *
+ * @param string $content The rendered block.
+ * @param array  $parsed  The parsed block.
+ * @return string
+ */
+function wp_ja_nova_note_project_band( string $content, array $parsed ): string {
+	if ( WP_JA_NOVA_PROJECT_BAND === ( $parsed['attrs']['anchor'] ?? '' ) ) {
+		wp_ja_nova_project_band_seen( true );
+	}
+	return $content;
+}
+add_filter( 'render_block', 'wp_ja_nova_note_project_band', 9, 2 );
+
+/**
+ * @param bool $seen True to record that the band rendered.
+ * @return bool Whether it rendered on this request.
+ */
+function wp_ja_nova_project_band_seen( bool $seen = false ): bool {
+	static $rendered = false;
+	$rendered = $rendered || $seen;
+	return $rendered;
 }
 
 /**
