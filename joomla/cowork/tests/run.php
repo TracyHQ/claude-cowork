@@ -890,10 +890,17 @@ class FakeSiteWriterBase implements SiteWriter
     }
     /** Every setVisibilityMany() call as [kind, ids, column, value], so a test can show a pass was written in bulk. */
     public array $bulkVisibility = [];
+    /**
+     * When a test binds it (`$writer->trace = &$trace`, and the same array to FakeApplyLog::$trace), every
+     * write() and setVisibilityMany() is appended to it as [method, kind], beside the log's recordMany()
+     * calls: one sequence, so a test can show the undo entries were recorded before any row moved.
+     */
+    public ?array $trace = null;
     /** All or nothing, as the real writer: a missing row refuses the call before any row is written. */
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void
     {
         $this->bulkVisibility[] = [$kind, array_values($ids), $column, $value];
+        if ($this->trace !== null) $this->trace[] = ['setVisibilityMany', $kind];
         foreach ($ids as $id) if (!isset($this->store[$kind][(int) $id])) throw new RuntimeException('target does not exist in this scope');
         // Row by row through setVisibility(), so a double that refuses one row there refuses it here too.
         foreach ($ids as $id) $this->setVisibility($kind, (int) $id, $column, $value);
@@ -938,6 +945,7 @@ class FakeSiteWriterBase implements SiteWriter
     }
     public function write(string $kind, int $id, array $fields): int
     {
+        if ($this->trace !== null) $this->trace[] = ['write', $kind];
         if ($kind === 'fieldValue' && $this->fieldValues !== null) {
             $rows = $this->fieldValueRows($id);
             FieldValueKey::single($rows);
@@ -1050,9 +1058,12 @@ final class FakeApplyLog implements ApplyLog
     }
     /** How many entries each recordMany() call carried, in call order: a bulk pass is one call, not one per row. */
     public array $many = [];
+    /** The writer's trace, when a test binds both to one array (FakeSiteWriterBase::$trace). */
+    public ?array $trace = null;
     public function recordMany(string $applyId, array $entries): void
     {
         $this->many[] = count($entries);
+        if ($this->trace !== null) $this->trace[] = ['recordMany', count($entries)];
         foreach ($entries as $entry) $this->record($applyId, $entry);
     }
     public function entries(string $applyId): array

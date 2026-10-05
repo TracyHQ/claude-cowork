@@ -67,7 +67,7 @@ namespace {
     // limit is raised while this runs, and everything it built is local to the function below, so it is
     // all given back when the function returns.
     $rbLimit = ini_get('memory_limit');
-    if ($rbLimit !== '-1') ini_set('memory_limit', '1G');
+    if ($rbLimit !== '-1') checkTrue('bulk: (the memory limit is raised for the Business archive)', ini_set('memory_limit', '1G') !== false);
     (function () use ($WTOKEN): void {
         $rbDir = gateContractCopy(__DIR__ . '/../lib/contracts/tracy-business/j6/1.2.0');
         $rbStore = new GateContractStore();
@@ -83,6 +83,21 @@ namespace {
             });
         $rbCall = fn (array $params) => $rbEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
         $rbState = fn () => [$rbSite->store, $rbLog->log, $rbStore->binding, $rbStore->job];
+        // One sequence for the writer's and the log's calls, to see which came first.
+        $rbTrace = [];
+        $rbSite->trace = &$rbTrace;
+        $rbLog->trace = &$rbTrace;
+        /** Whether a call recorded its undo entries once, first, and only then wrote rows (in bulk). */
+        $rbUndoFirst = function (array $trace): bool {
+            $ops = array_column($trace, 0);
+            return ($ops[0] ?? null) === 'recordMany' && count(array_keys($ops, 'recordMany', true)) === 1 && in_array('setVisibilityMany', $ops, true);
+        };
+        /** setVisibilityMany() calls as a set: by kind and value, each call's ids sorted (an IN list has no order). */
+        $rbAsSet = function (array $calls): array {
+            foreach ($calls as $i => $call) sort($calls[$i][1]);
+            usort($calls, fn (array $a, array $b): int => [$a[0], $a[3]] <=> [$b[0], $b[3]]);
+            return $calls;
+        };
         check('bulk: the Business archive binds', $rbCall(['operation' => 'bind'])['ok'] ?? null, true);
 
         // What the per-row pass wrote, from the same rows and the same rule: the rows retireWrites names,
@@ -103,11 +118,11 @@ namespace {
         foreach ($rbChunks[0] as [$kind, $id]) if ($kind === 'article') { $rbOpen = $id; break; }
         $rbHeld = ['article:' . $rbOpen => ['kind' => 'admin-user', 'name' => 'Jane Admin', 'since' => '2026-10-05T10:00:00Z', 'until' => null]];
         $rbBefore = $rbState();
-        $rbSite->bulkVisibility = []; $rbLog->many = [];
+        $rbTrace = [];
         $rbR = $rbCall(['operation' => 'multilingual.retire', 'keep' => $rbKeep, 'apply_id' => 'mlang-bulk']);
         check('bulk: a row open in the editor refuses the pass', [$rbR['ok'] ?? null, $rbR['errors'][0]['code'] ?? null, $rbR['errors'][0]['record'] ?? null],
             [false, 'SLOT_LOCKED_BY_USER', ['kind' => 'article', 'id' => $rbOpen]]);
-        check('bulk: and nothing is recorded or written, not even in bulk', [$rbState(), $rbLog->many, $rbSite->bulkVisibility], [$rbBefore, [], []]);
+        check('bulk: and nothing is recorded or written, not even in bulk', [$rbState(), $rbTrace], [$rbBefore, []]);
         $rbHeld = [];
 
         // 4. A row the site refuses in the middle of a call: the undo entries were written first (one
@@ -116,21 +131,23 @@ namespace {
         foreach ($rbChunks[0] as $w) if ($w[0] !== 'language') $rbLastBulk = $w;
         $rbSite->failOn = [$rbLastBulk[0], $rbLastBulk[1]];
         $rbBefore = $rbState();
+        $rbLog->many = []; $rbTrace = [];
         $rbR = $rbCall(['operation' => 'multilingual.retire', 'keep' => $rbKeep, 'apply_id' => 'mlang-bulk']);
         $rbSite->failOn = null;
         check('bulk: a row the site refuses fails the call', [$rbR['ok'] ?? null, str_contains((string) ($rbR['message'] ?? ''), 'The site refused')], [false, true]);
-        check('bulk: (its undo entries were written before any row moved)', $rbLog->many, [count($rbChunks[0])]);
+        check('bulk: (its undo entries were written, all at once, before any row moved)', [$rbLog->many, $rbUndoFirst($rbTrace)], [[count($rbChunks[0])], true]);
         check('bulk: and the call is taken back whole, undo entries and hidden rows', $rbState(), $rbBefore);
 
         // 1-2. The pass, call after call until it completes.
         $rbBeforeStore = $rbSite->store;
-        $rbAnswers = []; $rbBulkPerCall = []; $rbManyPerCall = [];
+        $rbAnswers = []; $rbBulkPerCall = []; $rbManyPerCall = []; $rbUndoFirstPerCall = [];
         $rbBulkReads = $rbSite instanceof BulkSiteReader;
         if ($rbBulkReads) $rbSite->reads = ['read' => 0, 'list' => 0, 'readAll' => 0, 'readMany' => 0];
         for ($i = 0, $rbR = ['status' => 'running']; $i < 20 && ($rbR['status'] ?? '') === 'running'; $i++) {
-            $rbSite->bulkVisibility = []; $rbLog->many = [];
+            $rbSite->bulkVisibility = []; $rbLog->many = []; $rbTrace = [];
             $rbR = $rbCall(['operation' => 'multilingual.retire', 'keep' => $rbKeep, 'apply_id' => 'mlang-bulk']);
             $rbAnswers[] = [$rbR['ok'] ?? null, $rbR['status'] ?? $rbR['message'] ?? null];
+            $rbUndoFirstPerCall[] = $rbUndoFirst($rbTrace);
             $rbBulkPerCall[] = $rbSite->bulkVisibility;
             $rbManyPerCall[] = $rbLog->many;
         }
@@ -141,6 +158,7 @@ namespace {
             $rbAnswers, array_merge(array_fill(0, count($rbChunks) - 1, [true, 'running']), [[true, 'completed']]));
         check('bulk: the undo entries are the per-row pass\'s, entry for entry and in its order', $rbLog->log['mlang-bulk'] ?? null, $rbEntries);
         check('bulk: one recordMany() per call, carrying that call\'s chunk', $rbManyPerCall, array_map(fn (array $chunk): array => [count($chunk)], $rbChunks));
+        check('bulk: in every call the chunk\'s undo entries are recorded before any row is written', $rbUndoFirstPerCall, array_fill(0, count($rbChunks), true));
         $rbWant = [];
         foreach ($rbChunks as $chunk) {
             $calls = [];
@@ -148,9 +166,10 @@ namespace {
                 $calls[$kind] ??= [$kind, [], (string) array_key_first($fields), '0'];
                 $calls[$kind][1][] = $id;
             }
-            $rbWant[] = array_values($calls);
+            $rbWant[] = $rbAsSet(array_values($calls));
         }
-        check('bulk: one setVisibilityMany() per kind per call, the rows in the pass\'s order; languages one at a time', $rbBulkPerCall, $rbWant);
+        check('bulk: one setVisibilityMany() per kind per call, holding that kind\'s rows of the chunk; languages one at a time',
+            array_map($rbAsSet, $rbBulkPerCall), $rbWant);
         $rbHidden = $rbBeforeStore;
         foreach ($rbWrites as [$kind, $id, $fields]) {
             $column = (string) array_key_first($fields);
@@ -169,7 +188,9 @@ namespace {
         check('bulk: every hidden row is shown again, and nothing else moved', $rbSite->store, $rbShown);
         check('bulk: the pass is forgotten once restored', isset($rbLog->log['mlang-bulk']), false);
         $rbKinds = array_values(array_unique(array_filter(array_column($rbWrites, 0), fn ($k) => $k !== 'language')));
-        check('bulk: restore writes one setVisibilityMany() per kind', array_column($rbSite->bulkVisibility, 0), array_reverse($rbKinds));
+        $rbRestoreKinds = array_column($rbSite->bulkVisibility, 0);
+        sort($rbRestoreKinds); sort($rbKinds);
+        check('bulk: restore writes one setVisibilityMany() per kind', $rbRestoreKinds, $rbKinds);
 
         // A log that names one row twice: replayed newest first, the oldest `before` is what stands.
         [$rbA, $rbB] = array_slice(array_keys(array_filter($rbSite->store['article'], fn ($row) => ($row['language'] ?? '') === 'de-DE')), 0, 2);
@@ -184,7 +205,7 @@ namespace {
         check('bulk: a row recorded twice is left with its oldest before, as the newest-first replay leaves it',
             [$rbR['ok'] ?? null, $rbSite->store['article'][$rbA]['state'], $rbSite->store['article'][$rbB]['state'], $rbSite->store['language'][2]['published']],
             [true, '0', '1', 1]);
-        check('bulk: and each such row is written once', $rbSite->bulkVisibility, [['article', [$rbB], 'state', '1'], ['article', [$rbA], 'state', '0']]);
+        check('bulk: and each such row is written once', $rbAsSet($rbSite->bulkVisibility), $rbAsSet([['article', [$rbB], 'state', '1'], ['article', [$rbA], 'state', '0']]));
 
         // A row the restore names that is gone: refused whole, as setVisibility() refused it, the log kept.
         $rbLog->record('mlang-bulk-gone', ['op' => 'visibility', 'kind' => 'article', 'id' => $rbA, 'column' => 'state', 'before' => 1]);
@@ -197,7 +218,8 @@ namespace {
     })();
     gc_collect_cycles();
     gc_mem_caches();
-    @ini_set('memory_limit', $rbLimit);
+    // Given back, or said: a suite left at 1G would hide the next file's appetite.
+    checkTrue('bulk: (and set back to ' . $rbLimit . ' once the archive is gone)', ini_set('memory_limit', $rbLimit) !== false);
 
     // ============================================ 6. the real writer and log, over SQLite
     /** Joomla's query builder as far as setVisibilityMany() and JoomlaApplyLog use it. */
