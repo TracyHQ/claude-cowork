@@ -30,6 +30,7 @@ require_once __DIR__ . '/QuickstartContract.php';
 require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
+require_once __DIR__ . '/SiteIdentity.php';
 
 final class Engine
 {
@@ -240,6 +241,16 @@ final class Engine
         return $this;
     }
 
+    /** Global Configuration's site name and site description (`site.identity`); null answers 'unavailable'. */
+    private ?SiteIdentityStore $siteIdentity = null;
+
+    /** Let `site.identity` read and write the site name and site description (lib/SiteIdentity.php). */
+    public function siteIdentity(?SiteIdentityStore $store): self
+    {
+        $this->siteIdentity = $store;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -292,8 +303,11 @@ final class Engine
                 $readOnly = false;
             }
         }
-        if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && in_array($action,
-            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)) {
+        // `site.identity` writes only on `set`; its read takes no lock, so it never waits on an apply.
+        $writes = in_array($action,
+            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
+            || ($action === 'site.identity' && ($params['operation'] ?? null) === 'set');
+        if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
                 'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
             try {
@@ -417,6 +431,8 @@ final class Engine
                 return $this->coreUpgrade($params);
             case 'files.restore':
                 return $this->filesRestore($params);
+            case 'site.identity':
+                return $this->siteIdentityDoor($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -3000,6 +3016,9 @@ final class Engine
                 $step['id'] = $entry['id'] ?? null;
             } elseif ($op === 'media') {
                 $step['path'] = $entry['path'] ?? null;
+            } elseif ($op === 'siteIdentity') {
+                // Which of the two it changed, never the words: a listing is for verifying.
+                $step['fields'] = array_keys(self::identityValues($entry['before'] ?? null));
             }
             return $step;
         }, $entries);
@@ -3070,7 +3089,140 @@ final class Engine
             $this->rollbackMedia((string) ($entry['path'] ?? ''), $entry['before'] ?? null);
             return;
         }
+        if ($op === 'siteIdentity') {
+            if ($this->siteIdentity === null) {
+                throw new RuntimeException('site identity store not wired');
+            }
+            $this->siteIdentity->write(self::identityValues($entry['before'] ?? null));
+            return;
+        }
         throw new RuntimeException("unknown step: {$op}");
+    }
+
+    /**
+     * `site.identity` — Global Configuration's site name (`sitename`) and site description
+     * (`MetaDesc`), and nothing else of configuration.php (lib/SiteIdentity.php).
+     *
+     * - `operation: read` (the default): `{fields: {sitename, MetaDesc}, writable}` — the two values
+     *   as the site holds them, and whether a `set` would land now.
+     * - `operation: set`, `apply_id`, `fields`: one or both of the two. Each value is a string,
+     *   cleaned as Joomla's own form cleans it (tags removed, one line) and refused past its length.
+     *   A field already holding that value is not written; when none changes, nothing is written or
+     *   recorded (`unchanged: true`), so a retry after a lost reply adds no second undo step. What
+     *   changes is recorded under the `apply_id` with its previous value, so `apply.revert` puts the
+     *   site's own words back. Answers the two values as now stored and which of them `changed`.
+     *
+     * Any other key — in `fields` or as the thing to read — is refused with `unsupported`, never
+     * quietly ignored: the file also holds the database password and the site secret. A file the web
+     * server cannot write is refused the same way, with `code: CONFIG_NOT_WRITABLE`, and nothing is
+     * written. Not part of a `content.batch`: a file is not inside the database's transaction.
+     */
+    private function siteIdentityDoor(array $p): array
+    {
+        if ($this->siteIdentity === null) {
+            return $this->err('unavailable', 'site identity store not wired');
+        }
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') {
+            // Asking for another key is refused, not answered with these two as if it had been read.
+            if (array_key_exists('fields', $p)) {
+                $asked = $p['fields'];
+                if (!is_array($asked) || array_diff(array_map(static fn($name) => is_string($name) ? $name : '', $asked), SiteIdentity::FIELDS) !== []) {
+                    return $this->err('unsupported', 'Only sitename and MetaDesc can be read through site.identity');
+                }
+            }
+            try {
+                return $this->ok(['fields' => $this->siteIdentity->read(), 'writable' => $this->siteIdentity->writable()]);
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
+        if ($operation !== 'set') {
+            return $this->err('bad_params', 'Unknown site.identity operation: use read or set');
+        }
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $fields = $p['fields'] ?? null;
+        if (!is_array($fields) || $fields === [] || array_keys($fields) === range(0, count($fields) - 1)) {
+            return $this->err('bad_params', 'fields required: an object with sitename, MetaDesc or both');
+        }
+        $clean = [];
+        foreach ($fields as $name => $value) {
+            if (!in_array($name, SiteIdentity::FIELDS, true)) {
+                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only sitename and MetaDesc can. Nothing was written');
+            }
+            $cleaned = SiteIdentity::clean($name, $value);
+            if (isset($cleaned['error'])) {
+                return $this->err('bad_params', $cleaned['error']);
+            }
+            $clean[$name] = $cleaned['value'];
+        }
+        try {
+            $before = $this->siteIdentity->read();
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $changes = [];
+        foreach ($clean as $name => $value) {
+            if ($before[$name] !== $value) $changes[$name] = $value;
+        }
+        if ($changes === []) {
+            return $this->ok(['fields' => $before, 'changed' => [], 'unchanged' => true]);
+        }
+        $previous = array_intersect_key($before, $changes);
+        $t = Timing::begin();
+        try {
+            $this->siteIdentity->write($changes);
+            Timing::end('write', $t);
+        } catch (SiteIdentityUnwritable $e) {
+            return $this->err('unsupported', $e->getMessage(), ['code' => 'CONFIG_NOT_WRITABLE']);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage());
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'siteIdentity', 'before' => $previous]);
+        } catch (Throwable $e) {
+            try {
+                $this->siteIdentity->write($previous);
+            } catch (Throwable $undo) {
+                // The recorder is down and so is the way back — the failure below says so.
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        if ($this->writer !== null) {
+            $t = Timing::begin();
+            try {
+                // A cached page still carries the old <title> and description.
+                if (!$this->batching) $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+            Timing::end('purge', $t);
+        }
+        $this->stamped('content');
+        return $this->ok(['fields' => array_merge($before, $changes), 'changed' => array_keys($changes)]);
+    }
+
+    /**
+     * The two identity values an undo entry holds, and only those, as strings: a log row is data,
+     * and whatever else it might carry never reaches configuration.php.
+     *
+     * @return array<string,string>
+     */
+    private static function identityValues($before): array
+    {
+        $out = [];
+        if (!is_array($before)) return $out;
+        foreach (SiteIdentity::FIELDS as $field) {
+            if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = (string) $before[$field];
+        }
+        return $out;
     }
 
     /** @param array<string,?scalar>|null $before */
