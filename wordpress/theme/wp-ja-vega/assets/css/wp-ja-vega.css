@@ -1735,7 +1735,8 @@ body.tracy {
 }
 
 /* Category chip, measured on the source listings (M4, 26/09): 8 px padding, radius 8, 11.6/13.92 500
- * in the accent on a 10 % accent fill. In a card the chip is the link itself (post terms). */
+ * in the accent on a 10 % accent fill. In a card the chip is the link itself (post terms). Set plain
+ * (1.1.7): the base eyebrow tracks its capitals at 0.12em, the source's chip does not (128 px wide, not 152). */
 .jv-page .tracy-eyebrow,
 .jv-page .wp-block-post-terms.tracy-eyebrow a {
   display: inline-block;
@@ -1746,6 +1747,7 @@ body.tracy {
   font-family: var(--jv-font);
   font-size: 11.6px;
   font-weight: 500;
+  letter-spacing: normal;
   line-height: 1.2;
   text-decoration: none;
 }
@@ -3688,7 +3690,8 @@ body.tracy {
  * parts take Bootstrap 5.3's dark values (alerts, buttons, cards, badges). Light mode is unchanged. */
 .tracy .jv-masthead__title,
 .tracy .jv-hero__title { color: light-dark(#ffffff, #f1f3f6); }
-.jv-pill { color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); }
+/* 1.1.7: the source's `.section-title span` is plain #000 in light (template.css), not the #050505 heading colour; the border and dot follow the text. */
+.jv-pill { color: light-dark(#000000, #c7ccd4); }
 /* M4d F6 (source measured in dark, `.section-title span`): the pill's border is #8b94a3 and its dot
  * the accent #3b8bff; in light both follow the text colour, as before. */
 .jv-pill { border-color: light-dark(currentColor, #8b94a3); }
@@ -4131,7 +4134,7 @@ body.tracy {
 .tracy .jv-prose ul.jv-tag-cloud { display: flex; flex-wrap: wrap; gap: 9px; margin: 0; padding: 0; list-style: none; }
 .tracy .jv-prose ul.jv-tag-cloud > li { margin: 0; padding: 0; border: 1px solid light-dark(#e6e6e6, #2a323d); border-radius: 4px; background: light-dark(#ffffff, #1d2530); }
 .tracy .jv-prose ul.jv-tag-cloud > li::before { content: none; }
-.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: 4px; background-color: light-dark(#ffffff, #1d2530); font-size: 14px; line-height: 14px; color: light-dark(#757575, #c7ccd4); text-decoration: none; }
+.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: 0; background-color: transparent; font-size: 14px; line-height: 14px; color: light-dark(#757575, #c7ccd4); text-decoration: none; }
 @media (max-width: 991px) {
   .jv-listing { grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
 }
@@ -7895,9 +7898,12 @@ body.tracy {
   font-weight: 500;
 }
 
+/* 1.1.7: the source's chip is an inline link, so its box is the words' content area plus the padding (30 px); here it is a flex
+ * item whose box takes the line height (33.4 px). The box is cut to 30 and the 3.4 px stay below it, so the card keeps its height. */
 .tracy .jv-page.jv-more-projects .tracy-card__meta .tracy-eyebrow a {
   font-weight: 400;
-  line-height: 17.4px;
+  line-height: 14px;
+  margin-bottom: 3.4px;
 }
 
 .tracy .jv-project__masthead .jv-masthead__desc {
