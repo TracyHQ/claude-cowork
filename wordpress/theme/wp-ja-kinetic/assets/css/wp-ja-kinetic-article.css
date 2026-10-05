@@ -412,6 +412,15 @@
   color: var(--muted);
 }
 
+/* Source (css/template.css:21516-21524): from 860px down the article title steps to 38px / 1.08 / -1px before the 30px phone size
+   below; measured on the stand at 768 (source 38px, site 44px, a 15px taller masthead on every article). */
+@media (max-width: 860px) {
+  .hx-article .hx-article__title {
+    font-size: 38px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -1px !important;
+  }
+}
 @media (max-width: 620px) {
   .hx-article .hx-article__head {
     padding-top: 40px;
@@ -3360,10 +3369,10 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
   line-height: inherit;
 }
 
-/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone every one of
+/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone (575.98px and below, where the source's own phone rules apply) every one of
    them is raised to 12px. Generated from this file's own rules: keep it last, and regenerate it
    when a label size changes. */
-@media (max-width: 767px) {
+@media (max-width: 575.98px) {
   .hx-article .hx-author__meta,
   .hx-article .hx-related__tag,
   .hx-article .hx-related__m,
@@ -3383,9 +3392,6 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
   body.item-251 .hx-archrow__m,
   body.item-251 .hx-tagchip,
   body.item-254 .hx-au-pill__t,
-  body.item-254 .hx-auaside__meta,
-  body.item-254 .hx-aupost__tag,
-  body.item-254 .hx-aupost__m,
   .hx-au-pill__t,
   .hx-aucard__r,
   body.item-250 .hx-cats-pill,

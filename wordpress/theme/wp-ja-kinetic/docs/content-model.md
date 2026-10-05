@@ -15,14 +15,14 @@ not the live site's; find current ids by slug with `wp post list`.
 | Newsletter form (footer, 404 page) | the AcyMailing block `acymailing/subscription-form`; lists and subscribers in AcyMailing | AcyMailing's screens | AcyMailing; the band's heading and copy around it are ordinary blocks in the `footer` row |
 | CTA band on the blog and article views | synced patterns (`wp_block`) `wp-ja-kinetic-cta-blog` and `wp-ja-kinetic-cta-article` | `wp post list --post_type=wp_block --fields=ID,post_name,post_title` | edit the `wp_block` once; every view that shows it follows |
 | Site name, tagline, front page | options `blogname` ("Kinetic"), `blogdescription` ("observability, reimagined"), `show_on_front=page`, `page_on_front` (the `/` page); `page_for_posts` is unset — the blog is `/product/blog` | `wp option get blogname` | `wp option update …`, or Settings > General / Reading |
-| Contact form | the theme's `wp-ja-kinetic/kinetic-contact-form` block on the page using the `page-contact` template; submissions are mailed to `admin_email` and not stored | the `/company/contact` page | the page; the recipient is Settings > General > Administration Email Address |
+| Contact form | the theme's `wp-ja-kinetic/kinetic-contact-form` block on the page using the `page-contact` template (`inc/contact.php`). The info column lists the site's public contact mailbox, `contact.email` of option `tracy_site_identity`; with none, the column is not drawn. Submissions are mailed to option `tracy_contact_to` (filter of the same name), else that public mailbox, else the administrator's `admin_email` (a message that cannot be delivered is worse than one delivered to the administrator); the page itself shows only the public mailbox, never `admin_email`. Nothing is stored | `wp option get tracy_site_identity --format=json`, `wp option get tracy_contact_to` | `wp option update tracy_site_identity '{"contact":{"email":"…"}}' --format=json`, `wp option update tracy_contact_to …`; the recipient is never printed on a page |
 | Sign in, register, password, account | pages using the `page-login`, `page-register`, `page-password`, `page-account` templates (`/pages/login`, `/pages/register`, `/pages/reset`, `/pages/remind`, `/pages/profile`), each drawn by a `kinetic-auth-*` block; the forms post to WordPress's own endpoints | as pages | the surrounding words are page content; the forms are the blocks |
 | Redirects from retired URLs | option `wp_ja_kinetic_redirects`: a JSON array `[{"from":"/home-menu/home","to":"/","status":301}, …]`, 2 rules seeded; exact path match, only when WordPress would otherwise answer 404 | `wp option get wp_ja_kinetic_redirects --format=json` | `wp option update wp_ja_kinetic_redirects --format=json < rules.json` |
 | Labels that are not content (the theme toggle's aria label, "Search") | the part HTML copied into the rows, or the block's `render.php` | grep the theme, then the rows | the row in the Site Editor; a change for every site is a theme change |
 
-Options the theme reads: `wp_ja_kinetic_redirects`, `admin_email` (contact form), `users_can_register`
-and `default_role` (the Register page), and, from the source theme, `tracy_inspiration`, `tracy_nav`,
-`tracy_hero`, `tracy_motion`, `tracy_contact_to` (not used by this site's contact page).
+Options the theme reads: `wp_ja_kinetic_redirects`, `tracy_site_identity` and `tracy_contact_to`
+(contact page), `users_can_register` and `default_role` (the Register page), and, from the source
+theme, `tracy_inspiration`, `tracy_nav`, `tracy_hero`, `tracy_motion`.
 
 ## Post meta the port wrote, and what reads it
 

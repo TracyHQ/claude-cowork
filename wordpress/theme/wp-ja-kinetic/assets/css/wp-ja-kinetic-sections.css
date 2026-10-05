@@ -2160,6 +2160,15 @@ body.item-227 .kinetic-contact__grid {
 body.item-227 .kinetic-contact__formwrap { order: 1; }
 body.item-227 .kinetic-contact__info     { order: 2; }
 }
+/* A site that gave no public mailbox gets no info column (`blocks/kinetic-contact-form/render.php`):
+   the form keeps the width it has beside that column, centred, instead of leaving half the grid
+   empty. Up to 860px the grid is one column already. */
+@media (min-width: 861px) {
+body.item-227 .kinetic-contact__grid--form-only {
+    grid-template-columns: minmax(0, calc((100% - 48px) / 2)) !important;
+    justify-content: center;
+  }
+}
 @media (max-width: 768px) {
 body.item-227 .t4-section.t4-main-body {
     padding-top: 40px !important;
@@ -7213,10 +7222,10 @@ html[data-style="signal"] {
 html[data-style="blueprint"] .acm-kineticql-split,
 html[data-style="signal"] .acm-kineticql-split { --split-syn-key: var(--primary); }
 
-/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone every one of
+/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone (575.98px and below, where the source's own phone rules apply) every one of
    them is raised to 12px. Generated from this file's own rules: keep it last, and regenerate it
    when a label size changes. */
-@media (max-width: 767px) {
+@media (max-width: 575.98px) {
   body.item-218 .acm-page-masthead .hx-eyebrow,
   body.item-218 .acm-features-ledger .hx-fl-ruled-count,
   body.item-220 .acm-page-masthead .hx-eyebrow,

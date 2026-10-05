@@ -39,6 +39,11 @@ require get_theme_file_path( 'inc/list-pages.php' );
 // item-ids.php above.
 require get_theme_file_path( 'inc/owner-text.php' );
 
+// The Contact page's mailboxes — the one it shows and the one its form sends to — read from the
+// site, never written into a template (ledger L17). Its own file for the same reason as
+// item-ids.php above.
+require get_theme_file_path( 'inc/contact.php' );
+
 /**
  * The chrome assets. The design pages (fixture, artifact) render a design system's own markup
  * under its own stylesheet and dequeue the theme's; nothing here belongs on them either.
@@ -2307,6 +2312,11 @@ add_action( 'template_redirect', 'wp_ja_kinetic_reset_new_password_submit' );
  * mailer; failure handling matches what a WordPress site actually reports (`wp_mail()` returns
  * `false` on failure, no exception), not a guess at Joomla's internal error text since this is a
  * different mail transport entirely.
+ *
+ * The message goes to `wp_ja_kinetic_contact_recipient()` (inc/contact.php): the recipient the site
+ * was given, else its public contact address, else the administrator's `admin_email` (product
+ * decision: a visitor's message never fails only because no recipient was configured). The visitor
+ * is told the message was not sent only when wp_mail() fails or no valid address exists at all.
  */
 function wp_ja_kinetic_contact_submit(): void {
 	if ( ! is_page_template( 'page-contact' ) || empty( $_POST['wp_ja_kinetic_contact'] ) ) {
@@ -2363,12 +2373,12 @@ function wp_ja_kinetic_contact_submit(): void {
 		return;
 	}
 
-	$to      = get_option( 'admin_email' );
+	$to      = wp_ja_kinetic_contact_recipient();
 	$subject = sprintf( '[%s] Website enquiry from %s', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $name );
 	$body    = $message . "\n\n---\nFrom: {$name} <{$email}>";
 	$headers = array( "Reply-To: {$name} <{$email}>" );
 
-	if ( ! wp_mail( $to, $subject, $body, $headers ) ) {
+	if ( '' === $to || ! wp_mail( $to, $subject, $body, $headers ) ) {
 		$state['contact_error'] = 'An error occurred while sending the email.';
 		wp_ja_kinetic_auth_state( $state );
 		return;
@@ -2522,3 +2532,17 @@ function wp_ja_kinetic_redirects(): void {
 	}
 }
 add_action( 'template_redirect', 'wp_ja_kinetic_redirects', 1 );
+
+/**
+ * The seeded pages carry a no-break space on each side of the middle dot in some lines (Pricing's "Every plan includes" text), so
+ * the line cannot break at the dots and wraps one line longer on a phone than the source's, whose spaces are plain. Page content
+ * is stored in the site's database; this filter fixes what is printed, so a site that already has the content gets it with the
+ * theme update.
+ *
+ * @param string $content Page content after blocks are rendered.
+ * @return string
+ */
+function wp_ja_kinetic_dot_spaces( string $content ): string {
+	return str_replace( "\u{00A0}·\u{00A0}", ' · ', $content );
+}
+add_filter( 'the_content', 'wp_ja_kinetic_dot_spaces', 99 );

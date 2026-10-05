@@ -15,6 +15,15 @@
  * is the page-227.css port in assets/css/wp-ja-kinetic-sections.css (`body.item-227
  * .t4-section.t4-main-body`).
  *
+ * What the page says about whom to write to is the site's, never the theme's (ledger L17): the
+ * contact's name is the site's name, and the info column lists the site's public contact mailbox
+ * (`wp_ja_kinetic_contact_email()`, inc/contact.php). Up to 1.1.5 that column was the JA Kinetic
+ * demo company's three desks (its Support, Sales and Security mailboxes, under the name "Kinetic
+ * Support"), literals no content write could reach. A site that gave no public mailbox gets no info
+ * column at all, and the form stands alone in the grid (`.kinetic-contact__grid--form-only`), rather
+ * than a demo address or an empty card. The form's recipient is never printed here: it may be the
+ * owner's account address.
+ *
  * Carried as the source prints it, hidden by the same page-227.css rules:
  *  - `.kinetic-contact__name` (the contact record's name), the empty `dl.contact-address` and the
  *    empty `.kinetic-contact__custom` wrapper — the record has no address or custom fields; the
@@ -46,27 +55,19 @@ $wp_ja_kinetic_name    = (string) ( $wp_ja_kinetic_state['contact_name'] ?? '' )
 $wp_ja_kinetic_email   = (string) ( $wp_ja_kinetic_state['contact_email'] ?? '' );
 $wp_ja_kinetic_msg     = (string) ( $wp_ja_kinetic_state['contact_message'] ?? '' );
 
-/** Method icon SVGs, verbatim from the running source (`lucide` outline set, 20x20, currentColor). */
-$wp_ja_kinetic_methods = array(
-	array(
-		'icon'  => '<circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/>',
-		'title' => 'Support',
-		'desc'  => 'Technical help for active accounts.',
-		'email' => 'support@kinetic.dev',
-	),
-	array(
-		'icon'  => '<rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
-		'title' => 'Sales',
-		'desc'  => 'Pricing, demos and migrations.',
-		'email' => 'sales@kinetic.dev',
-	),
-	array(
-		'icon'  => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-		'title' => 'Security',
-		'desc'  => 'Report a vulnerability responsibly.',
-		'email' => 'security@kinetic.dev',
-	),
-);
+/*
+ * The contact methods: the site's public mailbox, or none. The icon is from the same `lucide`
+ * outline set as the source's methods (20x20, currentColor) — its `mail` glyph.
+ */
+$wp_ja_kinetic_contact_email = wp_ja_kinetic_contact_email();
+$wp_ja_kinetic_methods       = array();
+if ( '' !== $wp_ja_kinetic_contact_email ) {
+	$wp_ja_kinetic_methods[] = array(
+		'icon'  => '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+		'title' => 'Email',
+		'email' => $wp_ja_kinetic_contact_email,
+	);
+}
 ?>
 <div id="t4-main-body" class="t4-section  t4-main-body">
 <?php if ( ! empty( $wp_ja_kinetic_errors ) ) : ?>
@@ -85,11 +86,12 @@ $wp_ja_kinetic_methods = array(
 <?php endif; ?>
 <div class="contact kinetic-contact" itemscope itemtype="https://schema.org/Person">
 	<div class="kinetic-contact__name">
-		<span class="contact-name" itemprop="name">Kinetic Support</span>
+		<span class="contact-name" itemprop="name"><?php echo esc_html( get_bloginfo( 'name' ) ); ?></span>
 	</div>
 
-	<div class="hx-split kinetic-contact__grid">
+	<div class="hx-split kinetic-contact__grid<?php echo $wp_ja_kinetic_methods ? '' : ' kinetic-contact__grid--form-only'; ?>">
 
+		<?php if ( $wp_ja_kinetic_methods ) : ?>
 		<aside class="kinetic-contact__info">
 			<div class="hx-card">
 				<span class="kinetic-eyebrow">// details</span>
@@ -105,11 +107,10 @@ $wp_ja_kinetic_methods = array(
 							<?php foreach ( $wp_ja_kinetic_methods as $wp_ja_kinetic_method ) : ?>
 								<div class="hx-method">
 									<div class="hx-method__icon">
-										<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><?php echo $wp_ja_kinetic_method['icon']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fixed literal paths above, not user input. ?></svg>
+										<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><?php echo $wp_ja_kinetic_method['icon']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the fixed literal path above, not user input. ?></svg>
 									</div>
 									<div class="hx-method__body">
 										<div class="hx-method__title"><?php echo esc_html( $wp_ja_kinetic_method['title'] ); ?></div>
-										<div class="hx-method__desc"><?php echo esc_html( $wp_ja_kinetic_method['desc'] ); ?></div>
 										<joomla-hidden-mail is-link="1" is-email="1"><a href="<?php echo esc_url( 'mailto:' . $wp_ja_kinetic_method['email'] ); ?>" class="hx-method__email"><?php echo esc_html( $wp_ja_kinetic_method['email'] ); ?></a></joomla-hidden-mail>
 									</div>
 								</div>
@@ -119,6 +120,7 @@ $wp_ja_kinetic_methods = array(
 				</div>
 			</div>
 		</aside>
+		<?php endif; ?>
 
 		<div class="kinetic-contact__formwrap">
 			<div class="hx-card hx-card--lg kinetic-contact__formcard">

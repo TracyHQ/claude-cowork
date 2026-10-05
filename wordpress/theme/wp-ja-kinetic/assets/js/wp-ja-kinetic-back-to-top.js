@@ -12,7 +12,8 @@
  * Signal pages pinned to their direction, D-14) one section per module; on the contact page its
  * page-top / main-body / page-bottom blocks; on the account and search pages the source's masthead
  * slot, which is `display:none` there (so it reports once, at load, and never again), before the main
- * body; elsewhere the main body as one section; then the footer, which is a section on the source too. */
+ * body; elsewhere the main body as one section (the page's masthead is part of it: measured on Features, Pricing, About and
+ * the other marketing pages, where the source lists only its header, main body and footer); then the footer, which is a section on the source too. */
 ;(() => {
   const button = document.getElementById('back-to-top')
   if (!button || !('IntersectionObserver' in window)) return
@@ -32,7 +33,10 @@
       el.before(slot)
       blocks.push(slot)
     } else if (content && home) blocks.push(...content.querySelectorAll(':scope > .ja-acm'))
-    else if (content?.firstElementChild?.classList.contains('acm-page-masthead'))
+    else if (
+      el.classList.contains('tracy-page-stack--contact') &&
+      content?.firstElementChild?.classList.contains('acm-page-masthead')
+    )
       blocks.push(...content.children)
     else blocks.push(el)
   }
@@ -53,6 +57,14 @@
     { root: null, rootMargin: '0px', threshold: 0 }
   )
   for (const el of sections) observer.observe(el)
+
+  // The header's shadow once the page has scrolled 100px past the header's bottom edge (T4 `not-at-top`, base.js).
+  const notAtTop = () => {
+    const bottom = header ? header.offsetHeight : 0
+    document.body.classList.toggle('tracy-not-at-top', window.scrollY - bottom >= 100)
+  }
+  window.addEventListener('scroll', notAtTop, { passive: true })
+  notAtTop()
 
   button.addEventListener('click', (event) => {
     event.preventDefault()
