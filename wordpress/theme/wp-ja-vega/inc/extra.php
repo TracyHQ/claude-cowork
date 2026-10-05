@@ -1052,6 +1052,9 @@ add_filter( 'login_form_defaults', 'wp_ja_vega_login_form_defaults' );
  * form another plugin changed, a block this filter already saw) is returned as it came. The button starts `hidden`; assets/js/wp-ja-vega.js shows it and
  * switches the field, so a page without the script has no button that does nothing.
  *
+ * Like the source's form, both fields are `required` (the password also `aria-required`) and the username field takes
+ * the focus on load (`autofocus`, which the browser honours without script).
+ *
  * @param string $html The rendered block.
  * @return string
  */
@@ -1066,8 +1069,10 @@ function wp_ja_vega_login_helpers( string $html ): string {
 		'<button type="button" class="jv-password__toggle" aria-controls="user_pass" aria-pressed="false" aria-label="%s" hidden></button>',
 		esc_attr__( 'Show password', 'wp-ja-vega' )
 	);
-	$html  = str_replace( $field[0][0], '<span class="jv-password">' . $field[0][0] . $toggle . '</span>', $html );
-	$links = sprintf(
+	$password = str_replace( '<input', '<input required aria-required="true"', $field[0][0] );
+	$html     = str_replace( $field[0][0], '<span class="jv-password">' . $password . $toggle . '</span>', $html );
+	$html     = preg_replace( '/<input\b(?=[^>]*\bid="user_login")/', '<input required autofocus', $html, 1 );
+	$links    = sprintf(
 		'<ul class="jv-login-links"><li><a href="%s">%s</a></li></ul>',
 		esc_url( wp_lostpassword_url() ),
 		esc_html__( 'Forgot your password?', 'wp-ja-vega' )
@@ -1075,6 +1080,47 @@ function wp_ja_vega_login_helpers( string $html ): string {
 	return str_replace( '</form>', '</form>' . $links, $html );
 }
 add_filter( 'render_block_core/loginout', 'wp_ja_vega_login_helpers' );
+
+/**
+ * The intro of a "More our projects" card is cut on the server, as the source's Joomla module does with
+ * `HTMLHelper::_( 'string.truncate', $text, 100 )`: at most 100 characters, the cut moved back to the last space, then
+ * "..." (three ASCII dots), so "…because it is..." where the full text goes on "…because it is pain, but…". The
+ * template marks the block `jv-excerpt-100`; the CSS clamp stays as a second guard. The rule is Joomla's own
+ * (StringHelper::truncate, no HTML, words not split), so a different text is cut where the source cuts it.
+ *
+ * @param string $html  The rendered block.
+ * @param array  $block The block.
+ * @return string
+ */
+function wp_ja_vega_card_excerpt( string $html, array $block ): string {
+	$class = (string) ( $block['attrs']['className'] ?? '' );
+	if ( ! preg_match( '/(^|\s)jv-excerpt-100(\s|$)/', $class ) ) {
+		return $html;
+	}
+	return (string) preg_replace_callback(
+		'#(<p class="wp-block-post-excerpt__excerpt">)(.*?)(</p>)#s',
+		static function ( array $m ): string {
+			$text = trim( html_entity_decode( wp_strip_all_tags( $m[2] ), ENT_QUOTES, 'UTF-8' ) );
+			if ( mb_strlen( $text ) > 100 ) {
+				$cut    = trim( mb_substr( $text, 0, 100 ) );
+				$offset = mb_strrpos( $cut, ' ' );
+				if ( false === $offset ) {
+					$text = '...';
+				} else {
+					$cut = mb_substr( $cut, 0, $offset + 1 );
+					if ( mb_strlen( $cut ) > 97 ) {
+						$cut = trim( mb_substr( $cut, 0, (int) mb_strrpos( $cut, ' ' ) ) );
+					}
+					$text = $cut . '...';
+				}
+			}
+			return $m[1] . esc_html( $text ) . $m[3];
+		},
+		$html,
+		1
+	);
+}
+add_filter( 'render_block_core/post-excerpt', 'wp_ja_vega_card_excerpt', 10, 2 );
 
 /**
  * The Portfolio mega panel's project pictures draw the attachment itself, as the source's `.latestnews` does with

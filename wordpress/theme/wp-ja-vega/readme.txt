@@ -39,5 +39,7 @@ source loads, self-hosted.
 
 The close icon of alert boxes in assets/css/wp-ja-vega.css is the path of Bootstrap's .btn-close
 icon, (C) The Bootstrap Authors, MIT License, https://github.com/twbs/bootstrap/blob/main/LICENSE.
-The other icons in that stylesheet (contact icons, arrows, play button, check marks) were drawn
-for this theme.
+The back-to-top chevron and the four social marks of the footer (Facebook, Instagram, Behance,
+Dribbble) in that stylesheet are outlines of the glyphs of Font Awesome 4.7.0, Copyright Dave Gandy,
+SIL Open Font License 1.1 (https://openfontlicense.org/), converted to SVG paths. The other icons
+in that stylesheet (contact icons, arrows, play button, check marks) were drawn for this theme.
