@@ -1,13 +1,17 @@
 /* wp-ja-nova: the dark mode switch.
  *
  * The visible theme is light or dark; a click flips whichever one is showing, as the source's
- * darkmode.js does. The choice is kept for a year in the `tracy_theme` cookie. Light and dark are
- * `data-theme` on the root element; "auto" (no cookie yet, or an old `auto` one) is its absence, and
- * the stylesheet then follows the OS through prefers-color-scheme. The first click from auto
- * therefore always changes the page: it picks the opposite of what the OS shows. This file is
- * enqueued in the head, blocking, so the attribute is on the root before the first paint; the
- * toggle buttons ([data-tracy-theme-toggle], one in the desktop bar and one beside the drawer
- * button) are wired once the document has parsed.
+ * darkmode.js does. The choice is kept for a year in the `tracy_theme` cookie. What the page shows is
+ * always `data-theme` on the root element: light and dark as chosen, "auto" (no cookie yet, or an
+ * old `auto` one) as whatever the OS says right now. (Until 1.1.5 auto was the attribute's absence;
+ * the hand-written dark rules are keyed on `[data-theme="dark"]`, so a visitor whose OS is dark and
+ * who had chosen nothing got a half-dark page: the typography page's cards stayed white. The
+ * source's darkmode.js resolves the OS setting to the attribute too.) Where no script runs, the
+ * stylesheet's tokens still follow prefers-color-scheme. The first click from auto always changes
+ * the page: it picks the opposite of what the OS shows. This file is enqueued in the head,
+ * blocking, so the attribute is on the root before the first paint; the toggle buttons
+ * ([data-tracy-theme-toggle], one in the desktop bar and one beside the drawer button) are wired
+ * once the document has parsed.
  *
  * The source (JA Nova, js/darkmode.js) keeps the choice in a `ja_nova-theme` cookie but reads it back
  * only when the OS setting changes, so a visitor who picked dark sees light again after a reload on a
@@ -41,9 +45,8 @@
     state === 'dark' || state === 'light' ? state : os && os.matches ? 'dark' : 'light'
 
   const apply = (state) => {
-    if (state === 'auto') root.removeAttribute('data-theme')
-    else root.setAttribute('data-theme', state)
     const now = shown(state)
+    root.setAttribute('data-theme', now)
     for (const button of document.querySelectorAll('[data-tracy-theme-toggle]')) {
       button.setAttribute('aria-pressed', now === 'dark' ? 'true' : 'false')
       button.setAttribute('aria-label', LABELS[now])

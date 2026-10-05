@@ -1083,7 +1083,7 @@ body.tracy .jn-expertise__label[class*='cta-'] { color: var(--jn-text); }
 body.tracy .jn-expertise__title { margin: 0 0 8px; font-size: var(--jn-h3); }
 body.tracy .jn-expertise__desc { margin: 0 0 32px; color: var(--jn-text); }
 body.tracy .jn-expertise__list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 32px 0 0; border-top: 1px solid var(--jn-line); list-style: none; }
-body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 30px; background: var(--jn-surface); font-weight: 600; color: light-dark(#333333, #c2c9d2); }
+body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; background: light-dark(#f7f7f7, #1e232b); font-weight: 600; color: light-dark(#333333, #c2c9d2); }
 @media (max-width: 991.98px) {
   /* Stacked, as the source's col-12 rows: one track, so eleven 32 px gaps no longer set a 352 px
      minimum width that overflows a 320-360 px screen. */
