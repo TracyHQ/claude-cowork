@@ -1683,9 +1683,22 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * @param mixed $seo
 	 */
 	private function write_seo( int $post_id, $seo ): void {
-		foreach ( SeoFields::plan( $seo ) as $field => $key ) {
-			update_post_meta( $post_id, $key, wp_slash( (string) $seo[ $field ] ) );
+		// Only the keys whose value changes: the engine recorded exactly these (`seoTargets`) as undo steps.
+		foreach ( SeoFields::changes( $post_id, $seo ) as $field => $key ) {
+			update_post_meta( $post_id, $key, wp_slash( SeoFields::stored( $key, (string) $seo[ $field ] ) ) );
 		}
+	}
+
+	/**
+	 * The post meta keys a post write's `seo` would change on this post — what the engine reads
+	 * before the write and records as postmeta undo steps, since the row's own undo cannot reach a
+	 * meta. Refused (a RuntimeException) exactly as the write would refuse that `seo`.
+	 *
+	 * @param mixed $seo
+	 * @return string[]
+	 */
+	public function seoTargets( int $post_id, $seo ): array {
+		return array_values( SeoFields::changes( $post_id, $seo ) );
 	}
 
 	/**
@@ -1704,9 +1717,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( null === get_post( $id ) ) {
 			throw new RuntimeException( "no such post: {$id}" );
 		}
-		// This plugin's own search title and description print only on a site with no SEO plugin;
-		// with one, the refusal names the key that does print.
-		SeoFields::guardOwnKey( $key );
+		// This plugin's own search title and description take text, print only on a site with no
+		// SEO plugin (with one, the refusal names the key that does print), and are stored plain.
+		$value = SeoFields::ownKeyValue( $key, $fields['value'] );
 
 		// Keys beginning with an underscore are WordPress's "protected" meta — hidden from the
 		// custom-fields box, and exactly where the SEO plugins keep the descriptions an Apply is
@@ -1715,7 +1728,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		// The return value is deliberately not checked: update_post_meta answers false both when
 		// nothing was stored and when the value it was handed is the one already there. Writing
 		// the same description twice is not a failure.
-		update_post_meta( $id, $key, wp_slash( $fields['value'] ) );
+		update_post_meta( $id, $key, wp_slash( $value ) );
 
 		$this->touched[ $id ] = $id;
 		return $id;

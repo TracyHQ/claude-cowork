@@ -13,11 +13,14 @@
  *  - an SEO plugin whose post meta it reads runs (Yoast SEO, Rank Math): a write goes to its keys,
  *    whether or not this post held one before, and this plugin prints nothing of its own;
  *  - another SEO plugin runs (All in One SEO 4 keeps its fields in its own table and only copies them
- *    to `_aioseo_*` meta for other plugins; SEOPress, The SEO Framework, Slim SEO, Squirrly): a write
- *    is refused by the plugin's name, because nothing this door can write would be printed;
+ *    to `_aioseo_*` meta for other plugins; SEOPress, The SEO Framework, Slim SEO, Squirrly, SmartCrawl,
+ *    SureRank, Jetpack with its SEO Tools module on): a write is refused by the plugin's name, because
+ *    nothing this door can write would be printed, and this plugin prints nothing of its own;
  *  - none runs: the values are this plugin's own post meta, `_claude_cowork_seo_title` (the whole
  *    `<title>`, through `pre_get_document_title`) and `_claude_cowork_seo_description` (a
- *    `<meta name="description">` added to `wp_head` unless something there already printed one).
+ *    `<meta name="description">` added to `wp_head` unless something there already printed one), both
+ *    stored as plain one-line text. Page 2 and on of a listing keep WordPress's own title. Polylang is
+ *    told not to copy either key into a new translation: they hold one language's words.
  *
  * No Tracy theme prints a meta description (checked 05/10/2026: wp-tracy-business, tracy, tracy-base
  * and the wp-ja-* themes print none; wp-ja-kinetic sets its own `<title>` from a meta of its own, which
@@ -98,6 +101,32 @@ final class SeoFields
             'description' => null,
             'writes' => false,
         ],
+        'smartcrawl' => [
+            'name' => 'SmartCrawl',
+            'constants' => ['SMARTCRAWL_VERSION'],
+            'folders' => ['smartcrawl-seo', 'wpmu-dev-seo'],
+            'title' => null,
+            'description' => null,
+            'writes' => false,
+        ],
+        'surerank' => [
+            'name' => 'SureRank',
+            'constants' => ['SURERANK_VERSION'],
+            'folders' => ['surerank'],
+            'title' => null,
+            'description' => null,
+            'writes' => false,
+        ],
+        // Jetpack prints a title and a description only while its SEO Tools module is on (`module`).
+        'jetpack-seo' => [
+            'name' => 'Jetpack SEO',
+            'constants' => ['JETPACK__VERSION'],
+            'folders' => ['jetpack'],
+            'module' => 'seo-tools',
+            'title' => null,
+            'description' => null,
+            'writes' => false,
+        ],
     ];
 
     /** The fields a write may carry, in the order a refusal names them. */
@@ -142,6 +171,9 @@ final class SeoFields
             foreach ($plugin['folders'] as $folder) {
                 $found = $found || isset($folders[$folder]);
             }
+            if ($found && isset($plugin['module']) && !self::jetpackModule($plugin['module'])) {
+                $found = false;
+            }
             if ($found) {
                 return ['id' => $id, 'name' => $plugin['name'], 'title' => $plugin['title'],
                     'description' => $plugin['description'], 'writes' => $plugin['writes']];
@@ -162,6 +194,9 @@ final class SeoFields
     {
         if (!is_array($seo) || ($seo !== [] && array_keys($seo) === range(0, count($seo) - 1))) {
             throw new RuntimeException('seo takes an object {title, description}; given ' . gettype($seo) . ', so nothing was written');
+        }
+        if ($seo === []) {
+            throw new RuntimeException('seo names no field: give ' . implode(', ', self::FIELDS) . ' or both, or leave seo out; nothing was written');
         }
         $unknown = array_diff(array_map('strval', array_keys($seo)), self::FIELDS);
         if ($unknown !== []) {
@@ -200,23 +235,75 @@ final class SeoFields
     }
 
     /**
-     * A write of this plugin's own key through `content.update {kind:"postmeta"}` on a site where an
-     * SEO plugin runs: nothing would print it, so it is refused with the key that would be.
+     * The keys one `seo` write would change on this post, field => key: `plan`, less every field whose
+     * value (as it would be stored) is the one the post already holds. Empty when the write changes
+     * nothing, so nothing is written and no undo step stands for it.
+     *
+     * @param mixed $seo
+     * @return array<string,string>
      */
-    public static function guardOwnKey(string $key): void
+    public static function changes(int $postId, $seo): array
+    {
+        $changes = [];
+        foreach (self::plan($seo) as $field => $key) {
+            $now = $postId > 0 && function_exists('metadata_exists') && metadata_exists('post', $postId, $key)
+                ? get_post_meta($postId, $key, true)
+                : null;
+            if ($now !== self::stored($key, (string) $seo[$field])) {
+                $changes[$field] = $key;
+            }
+        }
+        return $changes;
+    }
+
+    /** The value as it is stored under that key: this plugin's own keys hold plain one-line text. */
+    public static function stored(string $key, string $value): string
+    {
+        return $key === self::TITLE_KEY || $key === self::DESCRIPTION_KEY ? self::plainText($value) : $value;
+    }
+
+    /**
+     * The value a `content.update {kind:"postmeta"}` of this key stores. Any other key passes through
+     * untouched. This plugin's own two keys take text only (stored as plain one-line text), and only on
+     * a site where no SEO plugin runs: with one, nothing would print them, so the refusal names the key
+     * that would be.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    public static function ownKeyValue(string $key, $value)
     {
         if ($key !== self::TITLE_KEY && $key !== self::DESCRIPTION_KEY) {
-            return;
+            return $value;
+        }
+        if (!is_string($value)) {
+            throw new RuntimeException("{$key} must be text; given " . gettype($value) . ', so nothing was written');
         }
         $running = self::running();
-        if ($running === null) {
-            return;
+        if ($running !== null) {
+            $field = $key === self::TITLE_KEY ? 'title' : 'description';
+            $theirs = $running['writes'] ? $running[$field] : null;
+            throw new RuntimeException("this site runs {$running['name']}, which prints the search {$field} instead of {$key}"
+                . ($theirs !== null ? ": write {$theirs}" : ', from fields this door does not write')
+                . '; nothing was written');
         }
-        $field = $key === self::TITLE_KEY ? 'title' : 'description';
-        $theirs = $running['writes'] ? $running[$field] : null;
-        throw new RuntimeException("this site runs {$running['name']}, which prints the search {$field} instead of {$key}"
-            . ($theirs !== null ? ": write {$theirs}" : ', from fields this door does not write')
-            . '; nothing was written');
+        return self::plainText($value);
+    }
+
+    /**
+     * `pll_copy_post_metas`: the meta keys Polylang copies into a new translation (and keeps in sync),
+     * less this plugin's two. They hold one language's words; a translation that inherited them would
+     * show the source language's search title under another language's page.
+     *
+     * @param mixed $keys
+     * @return mixed
+     */
+    public static function notCopied($keys)
+    {
+        if (!is_array($keys)) {
+            return $keys;
+        }
+        return array_values(array_diff($keys, [self::TITLE_KEY, self::DESCRIPTION_KEY]));
     }
 
     /**
@@ -253,6 +340,7 @@ final class SeoFields
         // Late, so a value written for this page wins over a theme's own title (wp-ja-kinetic sets one
         // at the default priority); SEO plugins are left alone because none runs when this prints.
         add_filter('pre_get_document_title', [self::class, 'documentTitle'], 20);
+        add_filter('pll_copy_post_metas', [self::class, 'notCopied']);
         add_action('wp_head', [self::class, 'openHead'], PHP_INT_MIN);
         add_action('wp_head', [self::class, 'closeHead'], PHP_INT_MAX);
     }
@@ -327,10 +415,16 @@ final class SeoFields
         return ['title' => $running['title'], 'description' => $running['description']];
     }
 
-    /** This plugin's own value of the page being rendered, trimmed; null with an SEO plugin, no post or none. */
+    /**
+     * This plugin's own value of the page being rendered, trimmed; null with an SEO plugin, no post, none,
+     * or on page 2 and on of a listing (a posts page's own title would name every page of it alike).
+     */
     private static function ownValue(string $key): ?string
     {
         if (!function_exists('get_queried_object') || !function_exists('get_post_meta')) {
+            return null;
+        }
+        if (function_exists('is_paged') && is_paged()) {
             return null;
         }
         $post = get_queried_object();
@@ -342,6 +436,29 @@ final class SeoFields
             return null;
         }
         return $value;
+    }
+
+    /** Whether Jetpack has this module on: its own answer when loaded, else the option it keeps them in. */
+    private static function jetpackModule(string $module): bool
+    {
+        if (class_exists('Jetpack') && method_exists('Jetpack', 'is_module_active')) {
+            return (bool) call_user_func(['Jetpack', 'is_module_active'], $module);
+        }
+        $active = function_exists('get_option') ? get_option('jetpack_active_modules', []) : [];
+        return is_array($active) && in_array($module, $active, true);
+    }
+
+    /**
+     * Plain one-line text, as `sanitize_text_field` stores it: no tags (a script or style with its
+     * words), no line breaks or runs of spaces. Done by hand only where WordPress is absent (a test).
+     */
+    private static function plainText(string $text): string
+    {
+        if (function_exists('sanitize_text_field')) {
+            return (string) sanitize_text_field($text);
+        }
+        $text = strip_tags((string) preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $text));
+        return trim((string) preg_replace('/\s+/', ' ', $text));
     }
 
     private static function tag(string $description): string
