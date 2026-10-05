@@ -158,6 +158,39 @@ $cs->job=null;
 $plan=$contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.0'=>'Customer & partners']]);
 check('contract updates the original module ID',$plan['operations'][0]['id'],110);
 checkTrue('HTML content stays escaped',str_contains($plan['operations'][0]['fields']['content'],'Customer &amp; partners'));
+// An attribute written with `&` in it (a link's query, an alt text) is stored whole and reads back as
+// written. It used to go through DOMAttr::$nodeValue, which reads `&` as the start of an entity
+// reference: libxml 2.9 stored an empty attribute (with an "unterminated entity reference" warning),
+// libxml 2.13 dropped the `&`. A reference the value already spells out (`&amp;`) is still one
+// reference, so it is not escaped twice.
+$ampPlan=function(string $url) use($contract,$state):string {
+    try { return $contract->plan(['expected_revision'=>$state['revision'],'changes'=>['hero.1'=>$url]])['operations'][0]['fields']['content']; }
+    catch (Throwable $error) { return 'refused: '.$error->getMessage(); }
+};
+foreach(['/path?a=1&b=2'=>'/path?a=1&amp;b=2','https://x.test/search?q=a+b&lang=en&page=2'=>'https://x.test/search?q=a+b&amp;lang=en&amp;page=2'] as $url=>$stored) {
+    $content=$ampPlan($url);
+    check('a link with & in its query is stored whole: '.$url,$content,'<h1 class="hero">Demo title</h1><a href="'.$stored.'">Start</a>');
+    check('a link with & in its query reads back as written: '.$url,ContentSlots::htmlSlots($content)[1]['sample']??null,$url);
+}
+$ampPatch=function(string $html,string $xpath,string $value):array {
+    $out=ContentSlots::htmlPatch($html,[['xpath'=>$xpath,'value'=>$value]]);
+    return [$out,(new DOMXPath(ContentSlots::html($out)))->query($xpath)->item(0)->nodeValue];
+};
+check('a Joomla article link keeps every & of its query',
+    $ampPatch('<a href="/old">Read</a>','/html/body/div/a/@href','index.php?option=com_content&view=article&id=5'),
+    ['<a href="index.php?option=com_content&amp;view=article&amp;id=5">Read</a>','index.php?option=com_content&view=article&id=5']);
+check('a form action keeps every & of its query',
+    $ampPatch('<form action="/old"><button>Go</button></form>','/html/body/div/form/@action','/search?q=1&r=2'),
+    ['<form action="/search?q=1&amp;r=2"><button>Go</button></form>','/search?q=1&r=2']);
+check('an alt text keeps its &',
+    $ampPatch('<img src="/team.jpg" alt="Team">','/html/body/div/img/@alt','Sales & Marketing team'),
+    ['<img src="/team.jpg" alt="Sales &amp; Marketing team">','Sales & Marketing team']);
+check('a name that only looks like an entity, with no ;, stays text',
+    $ampPatch('<a href="/old">Go</a>','/html/body/div/a/@href','/p?a=1&copy=2&lang=en&amp=3'),
+    ['<a href="/p?a=1&amp;copy=2&amp;lang=en&amp;amp=3">Go</a>','/p?a=1&copy=2&lang=en&amp=3']);
+check('a link that already spells & as &amp; is not escaped twice',
+    $ampPatch('<a href="/old">Go</a>','/html/body/div/a/@href','/p?a=1&amp;b=2'),
+    ['<a href="/p?a=1&amp;b=2">Go</a>','/p?a=1&b=2']);
 function contractRejects(string $label, callable $work): void {
     try { $work();check($label,'accepted','rejected'); }
     catch (RuntimeException $error) { check($label,'rejected','rejected'); }

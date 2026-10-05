@@ -888,6 +888,23 @@ class FakeSiteWriterBase implements SiteWriter
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
         $this->store[$kind][$id][$column] = $value;
     }
+    /** Every setVisibilityMany() call as [kind, ids, column, value], so a test can show a pass was written in bulk. */
+    public array $bulkVisibility = [];
+    /**
+     * When a test binds it (`$writer->trace = &$trace`, and the same array to FakeApplyLog::$trace), every
+     * write() and setVisibilityMany() is appended to it as [method, kind], beside the log's recordMany()
+     * calls: one sequence, so a test can show the undo entries were recorded before any row moved.
+     */
+    public ?array $trace = null;
+    /** All or nothing, as the real writer: a missing row refuses the call before any row is written. */
+    public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void
+    {
+        $this->bulkVisibility[] = [$kind, array_values($ids), $column, $value];
+        if ($this->trace !== null) $this->trace[] = ['setVisibilityMany', $kind];
+        foreach ($ids as $id) if (!isset($this->store[$kind][(int) $id])) throw new RuntimeException('target does not exist in this scope');
+        // Row by row through setVisibility(), so a double that refuses one row there refuses it here too.
+        foreach ($ids as $id) $this->setVisibility($kind, (int) $id, $column, $value);
+    }
     public function relabelLanguage(string $from, string $to, ?array $label = null): array
     {
         $source = null; $removed = null;
@@ -928,6 +945,7 @@ class FakeSiteWriterBase implements SiteWriter
     }
     public function write(string $kind, int $id, array $fields): int
     {
+        if ($this->trace !== null) $this->trace[] = ['write', $kind];
         if ($kind === 'fieldValue' && $this->fieldValues !== null) {
             $rows = $this->fieldValueRows($id);
             FieldValueKey::single($rows);
@@ -1038,6 +1056,16 @@ final class FakeApplyLog implements ApplyLog
     {
         $this->log[$applyId][] = $entry;
     }
+    /** How many entries each recordMany() call carried, in call order: a bulk pass is one call, not one per row. */
+    public array $many = [];
+    /** The writer's trace, when a test binds both to one array (FakeSiteWriterBase::$trace). */
+    public ?array $trace = null;
+    public function recordMany(string $applyId, array $entries): void
+    {
+        $this->many[] = count($entries);
+        if ($this->trace !== null) $this->trace[] = ['recordMany', count($entries)];
+        foreach ($entries as $entry) $this->record($applyId, $entry);
+    }
     public function entries(string $applyId): array
     {
         return $this->log[$applyId] ?? [];
@@ -1052,6 +1080,10 @@ final class FakeApplyLog implements ApplyLog
 final class FailingApplyLog implements ApplyLog
 {
     public function record(string $applyId, array $entry): void
+    {
+        throw new RuntimeException('log write failed');
+    }
+    public function recordMany(string $applyId, array $entries): void
     {
         throw new RuntimeException('log write failed');
     }
@@ -1846,6 +1878,8 @@ require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
+// site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
+require __DIR__ . "/site-identity.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
@@ -1854,6 +1888,9 @@ require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";
 require __DIR__ . "/content-extras.php";
 require __DIR__ . "/contract-ops-locks.php";
+// multilingual.retire and .restore in bulk: the engine on the Business archive (the gate's doubles,
+// above), the real writer and undo log over SQLite. Early, while the suite still has memory to spare.
+require __DIR__ . "/multilingual-retire-bulk.php";
 require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";

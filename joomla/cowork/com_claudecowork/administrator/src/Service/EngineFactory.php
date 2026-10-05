@@ -15,6 +15,8 @@ use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Log\Log;
 use Joomla\Database\DatabaseInterface;
+use Joomla\Registry\Registry;
+use Joomla\Utilities\ArrayHelper;
 use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaApplyLog;
 use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaCoreUpgrader;
 use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaExtensions;
@@ -235,6 +237,8 @@ final class EngineFactory
         $engine->locks(static function (array $rows): array {
             return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
         });
+        // `site.identity`: Global Configuration's site name and site description, and no other key.
+        $engine->siteIdentity(self::buildSiteIdentity());
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $quickstart = $contract !== '';
         $baseline = self::constructionBaseline();
@@ -386,6 +390,30 @@ final class EngineFactory
             return new JoomlaMediaWriter(JPATH_ROOT);
         } catch (\Throwable $e) {
             self::logFailure('buildMedia', $e);
+            return null;
+        }
+    }
+
+    /**
+     * configuration.php for `site.identity`, read and written as Joomla's own Global Configuration
+     * save does (`ApplicationModel::save()` / `writeConfigFile()`): the configuration Joomla loaded
+     * (`new JConfig()`, through `ArrayHelper::fromObject`), and Joomla's `Registry` formatting it back
+     * as the `JConfig` class without a closing tag. `ConfigurationFile` merges only `sitename` and
+     * `MetaDesc` over it and does the write. Null leaves `site.identity` answering 'unavailable'.
+     */
+    private static function buildSiteIdentity(): ?\SiteIdentityStore
+    {
+        try {
+            if (!class_exists('JConfig', false) || !class_exists(Registry::class) || !class_exists(ArrayHelper::class)) {
+                throw new \RuntimeException('JConfig or Joomla\'s Registry is not loaded');
+            }
+            return new \ConfigurationFile(
+                (\defined('JPATH_CONFIGURATION') ? JPATH_CONFIGURATION : JPATH_ROOT) . '/configuration.php',
+                static fn(): array => ArrayHelper::fromObject(new \JConfig()),
+                static fn(array $config): string => (new Registry($config))->toString('PHP', ['class' => 'JConfig', 'closingtag' => false])
+            );
+        } catch (\Throwable $e) {
+            self::logFailure('buildSiteIdentity', $e);
             return null;
         }
     }

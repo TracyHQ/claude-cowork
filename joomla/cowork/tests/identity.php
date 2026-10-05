@@ -61,6 +61,41 @@ check('after the identity is written the contract still holds, with the new valu
 check('a phone link built from the identity is an editable link, not a directive',
     array_column(ContentSlots::htmlSlots('<a href="tel:{contact.tel}">{contact.phone}</a>'), 'sample'), ['tel:{contact.tel}', '{contact.phone}']);
 
+// Re-saving a row must keep the identity tokens of its links raw. libxml 2.9 (the Joomla site image)
+// percent-encodes `{` `}` in every href/src/action it saves, so a write to the top-bar module's text
+// turned its links into `tel:%7Bcontact.tel%7D` and `mailto:%7Bcontact.email%7D`, which the identity
+// plugin never fills (measured on a Business j6 vi-VN copy made by Apply, 05/10/2026). libxml 2.13
+// does not encode braces, so on it these cases passed before the fix too.
+$idTopBar = '<ul class="tb-contacts"><li><a href="tel:{contact.tel}">Hotline: {contact.phone}</a></li>'
+    . '<li><a href="mailto:{contact.email}">{contact.email}</a></li><li>{contact.address}</li></ul>';
+$idTopSlots = [];
+foreach (ContentSlots::htmlSlots($idTopBar) as $n => $s) $idTopSlots[] = ['key' => 'topbar.' . $n, 'entity' => 'topbar', 'column' => 'content'] + $s;
+check('a write beside an identity link keeps the link raw, byte for byte',
+    $idContract->patch(['content' => $idTopBar], $idTopSlots, ['topbar.1' => 'Đường dây nóng: {contact.phone}'])['content'],
+    str_replace('Hotline: {contact.phone}', 'Đường dây nóng: {contact.phone}', $idTopBar));
+check('a link written with an identity token keeps the token raw',
+    ContentSlots::htmlPatch('<p><a href="mailto:info@example.com">Mail</a></p>', [['xpath' => '/html/body/div/p/a/@href', 'value' => 'mailto:{contact.email}']]),
+    '<p><a href="mailto:{contact.email}">Mail</a></p>');
+check('a token the author wrote percent-encoded stays encoded',
+    ContentSlots::htmlPatch('<a href="https://x.test/?q=%7Bcontact.tel%7D">Find</a><p>Old</p>', [['xpath' => '/html/body/div/p/text()', 'value' => 'New']]),
+    '<a href="https://x.test/?q=%7Bcontact.tel%7D">Find</a><p>New</p>');
+// Everything but a raw identity token is saved as this libxml saves it, which is what htmlPatch did before.
+$idLibxmlSave = function (string $html, string $xpath, string $value): string {
+    $doc = ContentSlots::html($html); $xp = new DOMXPath($doc);
+    $xp->query($xpath)->item(0)->nodeValue = $value; $out = '';
+    foreach ($xp->query('//*[@id="contract-root"]')->item(0)->childNodes as $child) $out .= $doc->saveHTML($child);
+    return $out;
+};
+$idPlainRow = '<p class="lead">Hi {site.name}</p><img src="/img/a b/{size}.png" alt="{site.name}">'
+    . '<a href="https://x.test/?q=%7Bcontact.tel%7D&amp;r=1" title="{site.name} &amp; co">Find</a>';
+check('a row with no raw token in a link is saved exactly as libxml saves it',
+    ContentSlots::htmlPatch($idPlainRow, [['xpath' => '/html/body/div/a/text()', 'value' => 'Search']]),
+    $idLibxmlSave($idPlainRow, '/html/body/div/a/text()', 'Search'));
+$idMixedRow = '<img src="/img/{size}/logo.png" alt="Logo"><a href="tel:{contact.tel}">Call</a><p>Old</p>';
+check('beside a raw token, braces that are not an identity token are saved as libxml saves them',
+    ContentSlots::htmlPatch($idMixedRow, [['xpath' => '/html/body/div/p/text()', 'value' => 'New']]),
+    str_replace('tel:%7Bcontact.tel%7D', 'tel:{contact.tel}', $idLibxmlSave($idMixedRow, '/html/body/div/p/text()', 'New')));
+
 check('a translation that drops an identity token is refused',
     MultilingualProfile::preservationErrors('Why {site.name}', 'Warum Northgate') !== [], true);
 check('a translation that keeps every identity token passes',
