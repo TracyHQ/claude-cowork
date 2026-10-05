@@ -16,6 +16,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// Where a post's search title and description go, and the refusal when nothing would print them.
+require_once __DIR__ . '/SeoFields.php';
+
 /**
  * Posts, post meta and options — the three things an Apply may edit on a WordPress site.
  */
@@ -681,30 +684,17 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
-	 * The SEO title and description, from whichever plugin the site actually runs.
+	 * The SEO title and description, as the site holds them for this post's page.
 	 *
 	 * Read from the meta keys rather than through each plugin's API: a mirror must not require
 	 * Yoast to be loaded to describe a site that uses Rank Math, and the keys are the stable part
-	 * of both. Empty when the site runs neither, which is most sites.
+	 * of both. The running SEO plugin's keys, or with none this plugin's own (`SeoFields`), which is
+	 * what a site with no SEO plugin prints; empty when neither holds a value.
 	 *
 	 * @return array<string,string>
 	 */
 	private function describe_seo( int $post_id ): array {
-		$pairs = array(
-			'title'       => array( '_yoast_wpseo_title', 'rank_math_title', '_aioseo_title' ),
-			'description' => array( '_yoast_wpseo_metadesc', 'rank_math_description', '_aioseo_description' ),
-		);
-		$seo = array();
-		foreach ( $pairs as $field => $keys ) {
-			foreach ( $keys as $key ) {
-				$value = (string) get_post_meta( $post_id, $key, true );
-				if ( '' !== $value ) {
-					$seo[ $field ] = $value;
-					break;
-				}
-			}
-		}
-		return $seo;
+		return SeoFields::read( $post_id );
 	}
 
 	/**
@@ -1145,6 +1135,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				$data[ $field ] = $value;
 			}
 		}
+		// Where `seo` goes is decided, and refused, before the row is touched: a refusal after the row
+		// write would leave half the edit on the site with an error that says none of it landed.
+		if ( array_key_exists( 'seo', $fields ) ) {
+			if ( array() === $data ) {
+				throw new RuntimeException( SeoFields::aloneMessage( $id, $fields['seo'] ) );
+			}
+			SeoFields::plan( $fields['seo'] );
+		}
 		if ( array() === $data ) {
 			// Naming both lists turns a silent no-op into one retry.
 			throw new RuntimeException(
@@ -1254,7 +1252,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				update_post_meta( $post_id, '_wp_page_template', $template );
 			}
 		}
-		if ( isset( $fields['seo'] ) && is_array( $fields['seo'] ) ) {
+		if ( array_key_exists( 'seo', $fields ) ) {
 			$this->write_seo( $post_id, $fields['seo'] );
 		}
 	}
@@ -1676,36 +1674,17 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
-	 * SEO title and description, written to whichever plugin the site has.
+	 * SEO title and description, written where this site prints them (`SeoFields::plan`): the
+	 * running SEO plugin's keys (Yoast, Rank Math) whether or not this post held one before, or on a
+	 * site with no SEO plugin this plugin's own meta, which it prints itself. A site whose SEO plugin
+	 * keeps them where this door cannot write is refused by `plan` before the row is written — a value
+	 * is never left in a key nothing reads.
 	 *
-	 * Only to keys that ALREADY exist on this site: writing Yoast's keys to a site running Rank
-	 * Math leaves rows no plugin reads, and the editor's change appears to have vanished.
-	 *
-	 * @param array<string,mixed> $seo
+	 * @param mixed $seo
 	 */
-	private function write_seo( int $post_id, array $seo ): void {
-		$families = array(
-			'_yoast_wpseo_' => array( 'title' => '_yoast_wpseo_title', 'description' => '_yoast_wpseo_metadesc' ),
-			'rank_math_'    => array( 'title' => 'rank_math_title', 'description' => 'rank_math_description' ),
-			'_aioseo_'      => array( 'title' => '_aioseo_title', 'description' => '_aioseo_description' ),
-		);
-		foreach ( $families as $keys ) {
-			$present = false;
-			foreach ( $keys as $key ) {
-				if ( '' !== (string) get_post_meta( $post_id, $key, true ) ) {
-					$present = true;
-					break;
-				}
-			}
-			if ( ! $present ) {
-				continue;
-			}
-			foreach ( $keys as $field => $key ) {
-				if ( array_key_exists( $field, $seo ) ) {
-					update_post_meta( $post_id, $key, (string) $seo[ $field ] );
-				}
-			}
-			return;
+	private function write_seo( int $post_id, $seo ): void {
+		foreach ( SeoFields::plan( $seo ) as $field => $key ) {
+			update_post_meta( $post_id, $key, wp_slash( (string) $seo[ $field ] ) );
 		}
 	}
 
@@ -1725,6 +1704,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( null === get_post( $id ) ) {
 			throw new RuntimeException( "no such post: {$id}" );
 		}
+		// This plugin's own search title and description print only on a site with no SEO plugin;
+		// with one, the refusal names the key that does print.
+		SeoFields::guardOwnKey( $key );
 
 		// Keys beginning with an underscore are WordPress's "protected" meta — hidden from the
 		// custom-fields box, and exactly where the SEO plugins keep the descriptions an Apply is
