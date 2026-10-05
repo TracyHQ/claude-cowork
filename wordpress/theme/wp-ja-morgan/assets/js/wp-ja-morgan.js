@@ -29,14 +29,20 @@
     const toggle = document.querySelector('.off-canvas-toggle')
     if (!panel || !toggle) return
     const close = panel.querySelector('.close')
+    // The page is pushed 250 px aside while the panel is open, as the source's off-canvas effect does (CSS transform on the page
+    // wrapper). A transformed ancestor would carry the fixed panel with it, so the panel is a direct child of the body.
+    if (panel.parentElement !== document.body) document.body.append(panel)
     const set = (open) => {
       root.classList.toggle('jm-off-canvas-open', open)
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
       panel.setAttribute('aria-hidden', open ? 'false' : 'true')
+      // A closed panel is out of the tab order (its links used to be reachable by keyboard while hidden).
+      panel.inert = !open
       if (open) (panel.querySelector('a, button') || panel).focus()
       else toggle.focus()
     }
     panel.setAttribute('aria-hidden', 'true')
+    panel.inert = true
     panel.setAttribute('tabindex', '-1')
     toggle.addEventListener('click', () => set(!root.classList.contains('jm-off-canvas-open')))
     if (close) close.addEventListener('click', () => set(false))
@@ -287,4 +293,12 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start)
   else start()
+  // The Login field takes focus on load as the source's does, without the browser scrolling it into view.
+  const loginField = document.querySelector('.login-wrap input[name="log"], .login-wrap #jm-username')
+  if (loginField && !document.activeElement.matches('input, textarea, select'))
+    loginField.focus({ preventScroll: true })
+  document.addEventListener('click', (event) => {
+    const close = event.target.closest && event.target.closest('.jm-system-message__close')
+    if (close && close.parentElement) close.parentElement.remove()
+  })
 })()

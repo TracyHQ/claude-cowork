@@ -52,3 +52,11 @@ html body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-styl
 		padding-right: 20px;
 	}
 }
+
+/* The block gap of the flow layout put 20 px above the close button, the panel body and the menu; the source has none. */
+.t3-off-canvas-header .close,
+.t3-off-canvas-body,
+.t3-off-canvas-body > nav,
+.t3-off-canvas-body > .jm-off-canvas-nav {
+	margin-block-start: 0;
+}

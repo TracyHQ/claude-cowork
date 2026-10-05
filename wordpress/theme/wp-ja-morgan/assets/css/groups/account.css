@@ -341,12 +341,12 @@
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
 	gap: 30px;
-	margin: 15px 15px 0;
-	padding: 0;
+	margin: 0 15px;
+	padding: 15px 0;
 }
 .jm-contact-page .address-detail {
 	box-sizing: border-box;
-	padding: 50px 30px;
+	padding: 50px 15px;
 	border-radius: 4px;
 	background: var(--jm-card);
 	text-align: center;
@@ -569,9 +569,11 @@
 @media (max-width: 991px) {
 	.jm-contact-page .contact-info {
 		grid-template-columns: repeat(2, 1fr);
+		gap: 15px 30px;
+		margin-inline: 0;
 	}
 	.jm-contact-page .box-info {
-		padding: 90px 0;
+		padding: 150px 0;
 	}
 	.jm-contact-page .contact-inner {
 		flex-direction: column;
@@ -579,15 +581,28 @@
 	}
 	.jm-contact-page .contact-image {
 		flex-basis: auto;
-		height: 420px;
+		height: auto;
+		aspect-ratio: 2.18;
 	}
 	.jm-contact-page .contact-form-wrap {
-		padding: 60px 30px;
+		padding: 30px 10px;
 	}
 }
 @media (max-width: 767px) {
 	.jm-contact-page .contact-info {
 		grid-template-columns: 1fr;
+	}
+	.jm-contact-page .contact-form-wrap {
+		padding: 30px 10px;
+	}
+	.jm-contact-page .jm-contact-form .col-sm-6 {
+		flex-basis: 100%;
+	}
+	.jm-contact-page .box-info {
+		padding: 60px 0;
+	}
+	.jm-contact-page .address-detail {
+		padding: 25px 15px;
 	}
 	.login-wrap.jm-form,
 	.registration.jm-form,
@@ -600,8 +615,33 @@
 		width: 100%;
 	}
 	.registration.jm-form legend {
-		font-size: 28px;
-		line-height: 40px;
+		font-size: 24px;
+		line-height: 37.5px;
+	}
+	/* Stacked, the source's registration box sits right under the page (no 90 px margin), keeps 31 px at the sides, and its labels have no
+	   5 px top padding (field pitch 115 px, not 120). */
+	.registration.jm-form,
+	.login-wrap.jm-form {
+		margin-block: 0;
+	}
+	.login-wrap.jm-form {
+		margin-block: 25px;
+	}
+	.registration.jm-form {
+		padding: 30px 30px;
+	}
+	.login-wrap.jm-form,
+	:is(.reset, .remind).jm-form {
+		padding: 30px 25px;
+	}
+	.reset.jm-form .control-label {
+		padding-top: 21px;
+	}
+	.registration.jm-form .control-label {
+		padding-top: 0;
+	}
+	.registration.jm-form fieldset + fieldset {
+		margin-top: 15px;
 	}
 }
 
@@ -955,4 +995,42 @@
 }
 #member-registration .form-actions {
 	margin-inline: -15px;
+}
+
+/* The submit button of a generated form sits in its group with no margin (the base `.t3-content .btn` margin of 12.5 px made the row 73 px
+   against the source's 60), and the source's reset and username-reminder buttons start 15 px left of the field column (a -15 px group). */
+.jm-form .form-group:not(.form-actions) :is(.btn-primary, .btn-block) {
+	margin: 0;
+}
+.reset.jm-form .form-group .btn-primary {
+	margin-left: -15px;
+}
+/* The username reminder is an inline form in the source: labels without the 5 px top padding, 12.5 px under the field, the button
+   in line with the field column and nothing under it. */
+.remind.jm-form .control-label {
+	padding-top: 0;
+}
+.remind.jm-form .control-group {
+	margin-bottom: 12.5px;
+}
+.remind.jm-form .form-group {
+	margin-bottom: 0;
+}
+/* The links under the log-in button: the source stacks the second and third 12.5 px apart (row 75 px, not 50). */
+.jm-form .login .other-links li + li {
+	margin-top: 12.5px;
+}
+/* The registration's submit row starts 37.5 px under the last field group in the source. */
+.registration.jm-form .form-group.form-actions {
+	margin-top: 37.5px;
+}
+@media (max-width: 767px) {
+	.registration.jm-form .form-group.form-actions {
+		margin-top: 25px;
+	}
+}
+
+/* The source's first field row sits straight under the legend (its 12.5 px margin); the others carry the 25 px gap. */
+.jm-contact-form fieldset > legend + .form-group {
+	margin-top: 0;
 }

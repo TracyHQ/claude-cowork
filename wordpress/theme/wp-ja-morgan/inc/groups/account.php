@@ -23,6 +23,10 @@ add_action(
 		}
 		$login = get_page_by_path( 'j-pages/login' );
 		if ( $login ) {
+			// Joomla queues "Please login first" for the redirect of these four routes; a cookie carries it to the Login page (no query on the address).
+			if ( in_array( $request, array( 'your-profile', 'submit-an-article', 'template-settings', 'site-settings' ), true ) ) {
+				setcookie( 'jm_login_first', '1', array( 'expires' => time() + 300, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax' ) );
+			}
 			wp_safe_redirect( get_permalink( $login ), 303 );
 			exit;
 		}
@@ -392,10 +396,10 @@ function wp_ja_morgan_quick_contact_form(): string {
 	return '<form class="jm-quick-contact" id="jm-quick-contact" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post" data-jm-quick-contact aria-label="' . esc_attr__( 'Quick contact', 'wp-ja-morgan' ) . '">'
 		. '<input type="hidden" name="action" value="jm_quick_contact"><input type="hidden" name="jm_nonce" value="' . esc_attr( wp_create_nonce( 'jm_quick_contact' ) ) . '"><input type="hidden" name="jm_back" value="' . esc_attr( $back ) . '">'
 		. '<div class="jm-qc-status" role="status" aria-live="polite">' . $notice . '</div>'
-		. '<p class="jm-field jm-field--half"><label for="jm-qc-name">' . esc_html__( 'Name', 'wp-ja-morgan' ) . '</label><input id="jm-qc-name" type="text" name="jm_qc[name]" maxlength="60" required value="' . esc_attr( $vals['name'] ) . '" placeholder="' . $e( __( 'Name', 'wp-ja-morgan' ) ) . '"></p>'
-		. '<p class="jm-field jm-field--half"><label for="jm-qc-email">' . esc_html__( 'Email', 'wp-ja-morgan' ) . '</label><input id="jm-qc-email" type="email" name="jm_qc[email]" maxlength="64" required value="' . esc_attr( $vals['email'] ) . '" placeholder="' . $e( __( 'Email', 'wp-ja-morgan' ) ) . '"></p>'
-		. '<p class="jm-field"><label for="jm-qc-subject">' . esc_html__( 'Subject', 'wp-ja-morgan' ) . '</label><input id="jm-qc-subject" type="text" name="jm_qc[subject]" maxlength="200" required value="' . esc_attr( $vals['subject'] ) . '" placeholder="' . $e( __( 'Subject', 'wp-ja-morgan' ) ) . '"></p>'
-		. '<p class="jm-field"><label for="jm-qc-text">' . esc_html__( 'Message', 'wp-ja-morgan' ) . '</label><textarea id="jm-qc-text" name="jm_qc[text]" rows="3" maxlength="5000" required placeholder="' . $e( __( 'Message', 'wp-ja-morgan' ) ) . '">' . esc_textarea( $vals['text'] ) . '</textarea></p>'
+		. '<p class="jm-field jm-field--half"><label for="jm-qc-name">' . esc_html__( 'Name', 'wp-ja-morgan' ) . '</label><input id="jm-qc-name" type="text" name="jm_qc[name]" maxlength="60" value="' . esc_attr( $vals['name'] ) . '" placeholder="' . $e( __( 'Name', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field jm-field--half"><label for="jm-qc-email">' . esc_html__( 'Email', 'wp-ja-morgan' ) . '</label><input id="jm-qc-email" type="email" name="jm_qc[email]" maxlength="64" value="' . esc_attr( $vals['email'] ) . '" placeholder="' . $e( __( 'Email', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field"><label for="jm-qc-subject">' . esc_html__( 'Subject', 'wp-ja-morgan' ) . '</label><input id="jm-qc-subject" type="text" name="jm_qc[subject]" maxlength="200" value="' . esc_attr( $vals['subject'] ) . '" placeholder="' . $e( __( 'Subject', 'wp-ja-morgan' ) ) . '"></p>'
+		. '<p class="jm-field"><label for="jm-qc-text">' . esc_html__( 'Message', 'wp-ja-morgan' ) . '</label><textarea id="jm-qc-text" name="jm_qc[text]" rows="3" maxlength="5000" placeholder="' . $e( __( 'Message', 'wp-ja-morgan' ) ) . '">' . esc_textarea( $vals['text'] ) . '</textarea></p>'
 		. '<p class="jm-field"><button type="submit" class="btn btn-primary jm-arrow">' . esc_html__( 'Send Email', 'wp-ja-morgan' ) . '</button></p></form>';
 }
 
@@ -470,7 +474,8 @@ function wp_ja_morgan_masthead_description(): string {
 add_filter(
 	'get_the_excerpt',
 	static function ( $excerpt, $post ) {
-		if ( ! $post || 'page' !== $post->post_type || '' !== trim( (string) $post->post_excerpt ) ) {
+		// The typography page was seeded with its own first words as the excerpt; the source prints the module description there.
+		if ( ! $post || 'page' !== $post->post_type || ( '' !== trim( (string) $post->post_excerpt ) && 'typography' !== $post->post_name ) ) {
 			return $excerpt;
 		}
 		return wp_ja_morgan_masthead_description();
@@ -539,3 +544,28 @@ add_filter(
 	10,
 	2
 );
+
+/**
+ * The one-time "Please login first" message of the source's Login page. The cookie set by the guest redirect is read and expired
+ * before any output; the Login pattern prints the message through wp_ja_morgan_login_first_notice().
+ */
+add_action(
+	'template_redirect',
+	static function () {
+		if ( empty( $_COOKIE['jm_login_first'] ) ) {
+			return;
+		}
+		$GLOBALS['wp_ja_morgan_login_first'] = true;
+		setcookie( 'jm_login_first', '', array( 'expires' => time() - 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax' ) );
+		unset( $_COOKIE['jm_login_first'] );
+		nocache_headers();
+	},
+	5
+);
+
+function wp_ja_morgan_login_first_notice(): string {
+	if ( empty( $GLOBALS['wp_ja_morgan_login_first'] ) ) {
+		return '';
+	}
+	return '<div id="system-message-container" aria-live="polite"><div class="jm-system-message jm-system-message--danger" role="alert">' . esc_html__( 'Please login first', 'wp-ja-morgan' ) . '<button type="button" class="jm-system-message__close" aria-label="' . esc_attr__( 'Close', 'wp-ja-morgan' ) . '"><span aria-hidden="true">&times;</span></button></div></div>';
+}

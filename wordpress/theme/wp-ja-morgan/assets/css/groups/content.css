@@ -13,7 +13,7 @@
 	font-size: inherit;
 	line-height: inherit;
 }
-.blog-featured .tags {
+.t3-content .blog-featured .tags {
 	margin: 0 0 25px;
 }
 
@@ -429,7 +429,8 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	color: #777777;
 	font-weight: 500;
 }
-.t3-content ul.nav-tabs > li.active,
+/* Only the tab's link is painted, as in the source; the list item stays transparent (a painted item 68 px wide behind a 43 px link
+   showed on any band that is not white). */
 .t3-content ul.nav-tabs > li.active > a {
 	background: light-dark(#ffffff, transparent);
 }
@@ -658,6 +659,22 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	max-width: 100%;
 	padding: 0 15px;
 }
+/* Where the columns stack, the source's are plain blocks: their margins collapse (a flex row keeps every one of them). */
+@media (max-width: 767px) {
+	.t3-content .example-row {
+		display: flow-root;
+	}
+}
+@media (min-width: 768px) and (max-width: 991px) {
+	.t3-content .example-row:not(:has(> .col-sm-4)) {
+		display: flow-root;
+	}
+}
+@media (min-width: 992px) and (max-width: 1199px) {
+	.t3-content .example-row:has(> [class*="col-lg-"]):not(:has(> .col-md-6)) {
+		display: flow-root;
+	}
+}
 @media (min-width: 768px) {
 	.t3-content .example-row > .col-sm-4 {
 		flex-basis: 33.3333%;
@@ -715,6 +732,14 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	display: flex;
 	padding: 30px;
 }
+@media (max-width: 767px) {
+	.t3-content .tab-content {
+		padding: 12.5px;
+	}
+}
+.t3-content ul.nav-stacked > li + li {
+	margin-top: 2px;
+}
 .t3-content .tab-content > .tab-pane:not(.active) {
 	display: none;
 }
@@ -732,15 +757,20 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	margin-right: 2px;
 }
 
-/* Colour swatches */
+/* Colour swatches: 100 px tall, 123 px from 1200 px (the source's step) */
 .t3-content .swatch-item {
 	--sw-bg: #d93030;
 	--sw-fg: #ffffff;
 	position: relative;
-	min-height: 123px;
+	min-height: 100px;
 	margin: 0 0 25px;
 	background: var(--sw-bg);
 	color: var(--sw-fg);
+}
+@media (min-width: 1200px) {
+	.t3-content .swatch-item {
+		min-height: 123px;
+	}
 }
 .t3-content .swatch-item dl {
 	position: absolute;
@@ -875,5 +905,69 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 		flex: 1 1 auto;
 		width: auto;
 		min-width: 0;
+	}
+}
+
+/* ---- Card grids step at 992 like the source's col-md-*; core layout.css forces two columns up to 1024 with !important ---- */
+@media (max-width: 991px) {
+	.blog .tracy-grid.items-row {
+		grid-template-columns: minmax(0, 1fr) !important;
+	}
+}
+@media (min-width: 992px) {
+	.blog-featured .tracy-grid.items-row {
+		grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+	}
+}
+
+/* ---- Masthead title: 45/67.5 between 768 and 991 (the source's own step), 60/90 above ---- */
+@media (min-width: 768px) and (max-width: 991px) {
+	body .ja-masthead-title.wp-block-post-title,
+	body .ja-masthead .ja-masthead-title {
+		font-size: 45px;
+		line-height: 67.5px;
+	}
+}
+/* The h1-style mastheads (typography, error, offline, article) keep line-height 1.25 and use the whole container width. */
+@media (min-width: 768px) and (max-width: 991px) {
+	body:is(.jm-route-typography, .jm-route-error-page, .jm-route-offline-page) .ja-masthead-title.wp-block-post-title,
+	body .jm-article-masthead .ja-masthead-title.wp-block-post-title {
+		line-height: 56.25px;
+	}
+	body:is(.jm-route-typography, .jm-route-error-page, .jm-route-offline-page) .ja-masthead-detail {
+		margin-inline: 0;
+		max-width: none;
+	}
+}
+
+/* An article picture sits in its own <p> in the source (25 px margin below it, the 12.5 px above collapses into the previous margin). */
+.article-content > figure,
+.entry-content > figure {
+	margin-bottom: 25px;
+}
+/* Joomla's empty article-aside (a 25 px margin) sits above the text of these article pages. */
+body:is(.jm-route-offline-page, .jm-route-error-page, .jm-route-typography) .t3-content.item-page,
+body.jm-route-typography .t3-content .item-page {
+	padding-top: 25px;
+}
+body.jm-route-typography .core-typo {
+	padding-top: 25px;
+}
+/* Offline / error pages: the source's picture is an inline image with 12.5 px margins inside a paragraph (25 px margin below). */
+body:is(.jm-route-offline-page, .jm-route-error-page) .t3-content.item-page > figure {
+	padding-top: 12.5px;
+	margin-bottom: 37.5px;
+}
+@media (min-width: 992px) {
+	body:is(.jm-route-typography, .jm-route-error-page, .jm-route-offline-page) .ja-masthead-detail {
+		max-width: 800px;
+	}
+}
+
+/* Category cards are col-md-6 in the source: one column below 992. */
+@media (max-width: 991px) {
+	.categories-list .category-item {
+		flex-basis: 100%;
+		max-width: 100%;
 	}
 }
