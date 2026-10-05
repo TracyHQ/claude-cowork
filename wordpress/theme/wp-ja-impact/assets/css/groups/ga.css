@@ -334,7 +334,7 @@ body.tracy .jim-contactpage__main .wpcf7-form input.wpcf7-submit {
 body.tracy .jim-contactpage__main .wpcf7-form { row-gap: 0; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(:is(.wpcf7-acceptance, .wpcf7-checkbox)) { margin-top: 16px; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(:is(.wpcf7-acceptance, .wpcf7-checkbox)) { margin-top: 20px; }
-body.tracy .jim-contactpage__main .wpcf7-form > p:has(input[name='acceptance-1']) { margin-top: 39px; }
+body.tracy .jim-contactpage__main .wpcf7-form > p:has(input[name='acceptance-1']) { margin-top: 13px; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(input[name='send-a-copy-to-yourself']) { margin-top: 20px; }
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(.wpcf7-submit) { margin-top: 62px; }
 

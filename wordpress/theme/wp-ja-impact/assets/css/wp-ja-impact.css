@@ -390,9 +390,9 @@ body.tracy :is(.jim-logo, .jim-footer__logo) a { display: block; line-height: 0;
 
 /* Home page layout rows. The source's `content-left` and `content-right` positions are the two columns (col-lg-7 and
    col-lg-5 of one container) of the section that rises 128 px over the hero (`.t4-section-1`, margin-top -128 px);
-   the seeder places the three modules one after another, so from 992 px up the post content becomes a grid whose
-   columns are the container's, and those three sections take their places in it. */
-@media (min-width: 992px) {
+   the seeder places the three modules one after another, so from 1200 px up the post content becomes a grid whose
+   columns are the container's, and those three sections take their places in it (below that the source stacks them). */
+@media (min-width: 1200px) {
   body.tracy .jim-sections:has(#acm-cta-157) {
     --jim-cw: min(100%, 1376px);
     display: grid;

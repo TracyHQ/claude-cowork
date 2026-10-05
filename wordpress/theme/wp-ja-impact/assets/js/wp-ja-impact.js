@@ -6,6 +6,10 @@
  *            Escape or a click on the dimmed page; focus goes back to the toggle. Inside it every parent item
  *            (Pages, its three columns) opens as a drill-down panel with a back row — the state is the toggle's
  *            aria-expanded, which this script owns below 992 px (WordPress's navigation script owns it above).
+ *            Below 992 px the panel lives on `<body>` (the part that holds it is a stored row, so it cannot be
+ *            moved in the markup): a transform on the page wrapper pushes the page aside while it is open,
+ *            and a transform would turn a fixed panel inside that wrapper into a page-long one. Closed, the
+ *            panel is `inert`; from 992 px it goes back to its place in the header.
  *   menus  — from 992 px a parent item opens on a press of its label or its caret (touch has no hover) and closes
  *            on a press outside it; hover and keyboard stay with the stylesheet and WordPress's navigation script.
  *
@@ -17,9 +21,23 @@
   const toggle = document.querySelector('.jim-drawer-toggle')
   const drawer = toggle ? document.getElementById(toggle.getAttribute('aria-controls') || '') : null
   const isDrawerOpen = () => document.documentElement.classList.contains('jim-drawer-open')
+  // Where the panel sits in the header, kept so that it can go back from `<body>`.
+  const drawerHome = drawer && drawer.parentNode ? document.createComment('jim-drawer-home') : null
+  if (drawerHome) drawer.before(drawerHome)
+  const placeDrawer = () => {
+    if (!drawer || !drawerHome || !drawerHome.parentNode) return
+    if (desktop.matches) {
+      drawer.inert = false
+      if (drawer.parentNode !== drawerHome.parentNode) drawerHome.after(drawer)
+    } else {
+      if (drawer.parentNode !== document.body) document.body.append(drawer)
+      drawer.inert = !isDrawerOpen()
+    }
+  }
   const setDrawer = (open, { restore = false } = {}) => {
     if (!toggle || !drawer) return
     document.documentElement.classList.toggle('jim-drawer-open', open)
+    if (!desktop.matches) drawer.inert = !open
     if (!open && typeof closeAll === 'function') closeAll()
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
     toggle.setAttribute('aria-label', open ? t.closeMenu || 'Close the menu' : t.openMenu || 'Open the menu')
@@ -52,8 +70,12 @@
       if (drawer.contains(event.target) || toggle.contains(event.target)) return
       setDrawer(false, { restore: true })
     })
+    placeDrawer()
     if (desktop.addEventListener)
-      desktop.addEventListener('change', () => desktop.matches && setDrawer(false))
+      desktop.addEventListener('change', () => {
+        if (desktop.matches) setDrawer(false)
+        placeDrawer()
+      })
   }
   // ── Parent items ─────────────────────────────────────────────────────────────────────────────────
   const menu = document.querySelector('.jim-header__menu')
@@ -243,4 +265,19 @@
     input.type = show ? 'text' : 'password'
     button.classList.toggle('is-shown', show)
   })
+
+  // Back to top (the source's `#back-to-top`): shown once the page has been scrolled past the header, as the source does with
+  // its `top-away` class on <body>; a press scrolls to the top (smoothly unless the visitor asked for less motion).
+  const topButton = document.getElementById('back-to-top')
+  if (topButton) {
+    const sync = () =>
+      document.body.classList.toggle('top-away', (window.scrollY || document.documentElement.scrollTop) > 250)
+    window.addEventListener('scroll', sync, { passive: true })
+    sync()
+    topButton.addEventListener('click', (event) => {
+      event.preventDefault()
+      const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' })
+    })
+  }
 })()

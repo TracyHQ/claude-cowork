@@ -234,7 +234,7 @@ html[data-theme='dark'] body.tracy .jim-gb.jim-gb--featured .jim-news__title a {
 
 /* The tagged list sits directly in the page's main body (the source's component has no module spacing of its own). */
 body.tracy .jim-acm.jim-gb--tagged { padding-block: 0; }
-body.tracy .jim-main-body .jim-acm.jim-gb--authors { padding-block: 0; }
+body.tracy .jim-main-body .jim-acm.jim-gb { padding-block: 0; }
 /* A picture closing a page's text keeps the paragraph margin under it (the source's article body ends with a <p> around it). */
 body.tracy .jim-main-body .jim-prose > figure:last-child { margin-bottom: 16px; }
 
@@ -254,4 +254,47 @@ body.tracy .jim-main-body .jim-prose > figure:last-child { margin-bottom: 16px; 
 body.tracy .jim-pager-host .jim-gb__pager { margin-top: 0; }
 body.tracy .jim-pager-host .jim-pager-host__counter { margin: 64px 0 16px; }
 /* The source prints no "Page x of y" counter on the tag list. */
+body.tracy:not(.jim-route-donations) .jim-pager-host__counter { display: none; }
 body.tracy .jim-gb--tagged .jim-pager-host__counter { display: none; }
+
+/* Event cards keep the 32 px margin under every card, the last row included, and the pager sits 32 px under them (the source's .blog-item margin and navigation margin). */
+body.tracy .jim-gb--events .jim-evt-grid { padding-bottom: 32px; }
+body.tracy .jim-gb--events .jim-pager-host { margin-top: 32px; }
+@media (max-width: 991.98px) { body.tracy .jim-gb--events .jim-pager-host { margin-top: 0; } }
+
+/* Without the "Page n of m" line the list sits 128 px above the contact block (the source's main-body padding); donations keep it and the 96 px. */
+@media (min-width: 1200px) {
+  body.tracy:not(.jim-route-donations) .jim-gb { padding-bottom: 128px; }
+}
+
+/* Author list and tag list: the source's pagination wrap keeps 32 px under the buttons; the tag list's wrap has 32 px above (64 px from 1200 px). */
+body.tracy .jim-author-list .tracy-joomla-pager { margin-bottom: 32px; }
+body.tracy .jim-gb--tagged .jim-pager-host { margin: 32px 0; }
+@media (min-width: 1200px) { body.tracy .jim-gb--tagged .jim-pager-host { margin-top: 64px; } }
+
+/* The article table in the page body has 16 px under it (the source's list wrapper), not the 64 px of the full-width list sections. */
+body.tracy .jim-main-body .jim-gb-table__rows { margin-bottom: 16px; }
+
+/* Article table columns follow the source's auto-layout widths (author / hits) at each container width, so titles wrap where the source's do. */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  body.tracy .jim-gb-table__head, body.tracy .jim-gb-table__row { grid-template-columns: minmax(0, 1fr) 122px 82px; }
+}
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy .jim-gb-table__head, body.tracy .jim-gb-table__row { grid-template-columns: minmax(0, 1fr) 155px 82px; }
+}
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  body.tracy .jim-gb-table__head, body.tracy .jim-gb-table__row { grid-template-columns: minmax(0, 1fr) 200px 85px; }
+}
+@media (min-width: 1200px) { body.tracy .jim-main-body .jim-gb-table__rows { margin-bottom: 64px; } }
+
+/* Under 576 px the source's blog wrapper has 16 px above and below the cards. */
+@media (max-width: 575.98px) {
+  body.tracy .jim-gb--news .jim-news-list { padding-block: 16px; }
+  body.tracy .jim-gb--news .jim-pager-host { margin-top: 0; }
+  body.tracy .jim-pager-host .tracy-pager__list { gap: 8px; }
+  body.tracy .jim-pager-host .tracy-pager__link { width: 35px; height: 35px; min-width: 35px; min-height: 35px; font-size: 14px; }
+  body.tracy .jim-gb--events .jim-evt-list { padding-block: 16px; }
+}
+
+/* Event cards under 576 px: 24 px between the intro and the button (the source's .item-intro margin). */
+@media (max-width: 575.98px) { body.tracy .style-events .jim-evt__intro { margin-bottom: 24px; } }
