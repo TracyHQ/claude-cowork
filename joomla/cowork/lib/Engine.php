@@ -22,6 +22,7 @@ require_once __DIR__ . '/TarStream.php';
 require_once __DIR__ . '/Uploader.php';
 require_once __DIR__ . '/Extensions.php';
 require_once __DIR__ . '/SiteWriter.php';
+require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/ChangeStamp.php';
 require_once __DIR__ . '/CoreUpgrader.php';
 require_once __DIR__ . '/FilesRestorer.php';
@@ -2243,16 +2244,34 @@ final class Engine
         $apply = $this->applyId($p);
         if (!$apply || strpos($apply, 'mlang-') !== 0) return $this->err('bad_params', 'the mlang- apply_id of the retire pass is required');
         try {
+            $t = Timing::begin();
             $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
+            Timing::end('restoreEntries', $t);
+            Timing::count('restoreRows', count($entries));
             if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
+            $t = Timing::begin();
             $this->refuseLocked($this->undoRows($entries));
+            Timing::end('restoreLocks', $t);
+            $t = Timing::begin();
             $this->writer->transaction(function () use ($entries) {
-                foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
+                $t = Timing::begin();
+                // Newest first, as revertOne() replays any log: where one row was recorded twice, the
+                // oldest entry's `before` is the value it is left with.
+                $this->setVisibleMany(array_map(fn (array $entry): array => [(string) ($entry['kind'] ?? ''), (int) ($entry['id'] ?? 0),
+                    (string) ($entry['column'] ?? ''), (int) ($entry['before'] ?? 1)], array_reverse($entries)));
+                Timing::end('restoreShow', $t);
                 return [];
             });
+            Timing::end('restoreTransaction', $t);
+            $t = Timing::begin();
             $this->log->clear($apply);
+            Timing::end('restoreClear', $t);
+            $t = Timing::begin();
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            Timing::end('purge', $t);
+            $t = Timing::begin();
             $this->stamped('revert');
+            Timing::end('stamped', $t);
             return $this->ok(['restored' => count($entries), 'applyId' => $apply]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
@@ -2260,11 +2279,16 @@ final class Engine
     }
 
     /**
-     * How many rows one retire call hides before it answers `running`. Each is one read and one
-     * UPDATE of one column (`setVisible`); through the full write path the same pass ran ~6 rows a
-     * second and outlived the 60 s its callers allowed (measured 23/09/2026).
+     * How many rows one retire call hides before it answers `running`. Through the full write path
+     * the same pass ran ~6 rows a second and outlived the 60 s its callers allowed (measured
+     * 23/09/2026). One read and one UPDATE per row (`setVisible`) still cost ~0.5 ms a row, and its
+     * undo row ~0.7 ms: 7 to 8 s a Business pass on an idle local stand (05/10/2026). A chunk is now
+     * written in bulk (`setVisibleMany`, `ApplyLog::recordMany`): 0.2 s for the same pass.
      */
     private const RETIRE_CHUNK = 3000;
+
+    /** Every column `MultilingualApply::retireWrites` reads of a row, of any of the four kinds. */
+    private const RETIRE_COLUMNS = ['id' => true, 'lang_id' => true, 'lang_code' => true, 'published' => true, 'state' => true, 'language' => true, 'client_id' => true];
 
     /**
      * Show or hide one row by its visibility column, and nothing else. Not write(): for an article or
@@ -2280,6 +2304,32 @@ final class Engine
             return;
         }
         $this->writer->setVisibility($kind, $id, $column, (string) $value);
+    }
+
+    /**
+     * setVisible() for many rows, each [kind, id, column, value]: the site is left as that many
+     * setVisible() calls in that order would leave it, so where one row is named twice the later
+     * value stands. A language still goes through setVisible() one row at a time (write(), see
+     * above; a site has a few dozen); every other kind in one setVisibilityMany() per kind, column
+     * and value, which refuses the whole set when one row is not there. The caller holds the
+     * transaction, so a refusal takes back whatever this wrote before it.
+     *
+     * @param list<array{0:string,1:int,2:string,3:int}> $rows
+     */
+    private function setVisibleMany(array $rows): void
+    {
+        $last = [];
+        foreach ($rows as [$kind, $id, $column, $value]) {
+            if ($kind === 'language') { $this->setVisible($kind, $id, $column, $value); continue; }
+            $last[$kind . "\0" . $column . "\0" . $id] = [$kind, $id, $column, $value];
+        }
+        $groups = [];
+        foreach ($last as [$kind, $id, $column, $value]) {
+            $group = $kind . "\0" . $column . "\0" . $value;
+            $groups[$group] ??= [$kind, $column, $value, []];
+            $groups[$group][3][] = $id;
+        }
+        foreach ($groups as [$kind, $column, $value, $ids]) $this->writer->setVisibilityMany($kind, $ids, $column, (string) $value);
     }
 
     /**
@@ -2303,35 +2353,62 @@ final class Engine
         try {
             if (($job = $this->contract->job()) !== null)
                 return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase']);
+            $t = Timing::begin();
             $governed = $this->contract->governedIds();
             $routed = array_values(array_intersect($this->contract->derivedLanguages(), $keep));
+            Timing::end('retireGoverned', $t);
+            $t = Timing::begin();
+            // The rows read as an inspect reads them (ContractRows): with a bulk reader, one SELECT per
+            // kind. list() also works out, for every article, its routed URL, a menu lookup, its author,
+            // its tags and its access level — none of which this pass reads, and 3.4 to 5 s of every
+            // call on Business (05/10/2026). A writer without a bulk reader walks list() as before.
+            // Each kind is cut down to the columns retireWrites() reads as soon as it is read, so the
+            // full rows (an article's body, a module's content) are gone before the next kind and the
+            // transaction: one kind's full rows at a time, never all four.
             $rows = [];
             foreach (['language', 'article', 'menuItem', 'module'] as $kind) {
                 $rows[$kind] = [];
-                for ($offset = 0; $offset < 20000; $offset += 100) {
-                    $page = $this->writer->list($kind, $offset, 100);
-                    foreach ($page as $row) $rows[$kind][] = $row;
-                    if (count($page) < 100) break;
-                }
+                foreach ((new ContractRows($this->writer))->summaries($kind) as $row) $rows[$kind][] = array_intersect_key($row, self::RETIRE_COLUMNS);
             }
+            Timing::end('retireList', $t);
+            $t = Timing::begin();
             // A kept language the archive ships an edition of stays exactly as shipped: that edition IS
             // the language the customer asked for, and its rows receive the translation in place.
             $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
             $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            Timing::end('retireWrites', $t);
+            Timing::count('retireRows', count($slice));
+            $t = Timing::begin();
             // Every row this pass hides, before the first: one open in the editor refuses the pass.
             $this->refuseLocked(array_map(fn ($write) => [$write[0], (int) $write[1]], $slice));
+            Timing::end('retireLocks', $t);
+            $t = Timing::begin();
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
+                // Every undo is written, in the order the rows are listed, before the first row moves;
+                // one transaction holds both, so a row refused takes every undo and every row back.
+                $entries = []; $hide = [];
                 foreach ($slice as [$kind, $id, $fields]) {
                     $column = (string) array_key_first($fields);
-                    $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1]);
-                    $this->setVisible($kind, $id, $column, 0);
+                    $entries[] = ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1];
+                    $hide[] = [$kind, $id, $column, 0];
                 }
+                $t = Timing::begin();
+                $this->log->recordMany($apply, $entries);
+                Timing::end('retireLog', $t);
+                $t = Timing::begin();
+                $this->setVisibleMany($hide);
+                Timing::end('retireHide', $t);
                 return [];
             });
+            Timing::end('retireTransaction', $t);
+            $t = Timing::begin();
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            Timing::end('purge', $t);
+            $t = Timing::begin();
             if ($slice) $this->stamped('content');
+            Timing::end('stamped', $t);
             $hidden = [];
             foreach ($slice as [$kind]) $hidden[$kind] = ($hidden[$kind] ?? 0) + 1;
             return $this->ok([

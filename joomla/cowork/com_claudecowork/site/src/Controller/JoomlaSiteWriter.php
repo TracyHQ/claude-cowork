@@ -491,27 +491,55 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     /** The only column per kind setVisibility() may touch. */
     private const VISIBILITY = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
 
+    /**
+     * How many ids one IN list carries. 500 ids is ~4 KB of SQL, far under any max_allowed_packet, and
+     * the same batch readMany() reads in.
+     */
+    private const VISIBILITY_BATCH = 500;
+
     public function setVisibility(string $kind, int $id, string $column, string $value): void
     {
+        $this->setVisibilityMany($kind, [$id], $column, $value);
+    }
+
+    public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void
+    {
         if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
-        if ($id <= 0 || !$this->read($kind, $id)) throw new \RuntimeException('target does not exist in this scope');
-        // One raw UPDATE of one column. Deliberately not the Table: see SiteWriter::setVisibility().
-        $query = $this->db->getQuery(true)
-            ->update($this->db->quoteName($this->tableFor($kind)))
-            ->set($this->db->quoteName($column) . ' = ' . (int) $value)
-            ->where($this->db->quoteName($this->pkFor($kind)) . ' = ' . (int) $id);
-        $this->db->setQuery($query)->execute();
-        // 🔒 AN ARTICLE'S STATE LIVES TWICE. Joomla keeps a copy in `#__ucm_content.core_state`, and the
-        // tag pages (com_tags) list items by THAT copy — the Table keeps the two in step, a raw UPDATE
-        // does not. Measured 23/09/2026 on j-yo65dx (ja-kinetic): 240 trimmed demo posts still listed
-        // under /pages/tags/*, 205 links to 404. Not a contract field; only the listing reads it.
-        if ($kind === 'article') {
-            $ucm = $this->db->getQuery(true)
-                ->update($this->db->quoteName('#__ucm_content'))
-                ->set($this->db->quoteName('core_state') . ' = ' . (int) $value)
-                ->where($this->db->quoteName('core_type_alias') . ' = ' . $this->db->quote('com_content.article'))
-                ->where($this->db->quoteName('core_content_item_id') . ' = ' . (int) $id);
-            $this->db->setQuery($ucm)->execute();
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if ($ids === []) return;
+        if (min($ids) <= 0) throw new \RuntimeException('target does not exist in this scope');
+        $table = $this->db->quoteName($this->tableFor($kind));
+        $pk = $this->db->quoteName($this->pkFor($kind));
+        $batches = array_chunk($ids, self::VISIBILITY_BATCH);
+        // Every id is found under read()'s scope before the first row is written: one that is not
+        // refuses the whole call, as setVisibility() refuses that one row.
+        foreach ($batches as $batch) {
+            $query = $this->db->getQuery(true)
+                ->select($pk)
+                ->from($table)
+                ->where($pk . ' IN (' . implode(',', $batch) . ')');
+            $this->applyScope($kind, $query);
+            if (count($this->db->setQuery($query)->loadColumn() ?: []) !== count($batch)) throw new \RuntimeException('target does not exist in this scope');
+        }
+        foreach ($batches as $batch) {
+            // One raw UPDATE of one column. Deliberately not the Table: see SiteWriter::setVisibility().
+            $query = $this->db->getQuery(true)
+                ->update($table)
+                ->set($this->db->quoteName($column) . ' = ' . (int) $value)
+                ->where($pk . ' IN (' . implode(',', $batch) . ')');
+            $this->db->setQuery($query)->execute();
+            // 🔒 AN ARTICLE'S STATE LIVES TWICE. Joomla keeps a copy in `#__ucm_content.core_state`, and the
+            // tag pages (com_tags) list items by THAT copy — the Table keeps the two in step, a raw UPDATE
+            // does not. Measured 23/09/2026 on j-yo65dx (ja-kinetic): 240 trimmed demo posts still listed
+            // under /pages/tags/*, 205 links to 404. Not a contract field; only the listing reads it.
+            if ($kind === 'article') {
+                $ucm = $this->db->getQuery(true)
+                    ->update($this->db->quoteName('#__ucm_content'))
+                    ->set($this->db->quoteName('core_state') . ' = ' . (int) $value)
+                    ->where($this->db->quoteName('core_type_alias') . ' = ' . $this->db->quote('com_content.article'))
+                    ->where($this->db->quoteName('core_content_item_id') . ' IN (' . implode(',', $batch) . ')');
+                $this->db->setQuery($ucm)->execute();
+            }
         }
     }
 

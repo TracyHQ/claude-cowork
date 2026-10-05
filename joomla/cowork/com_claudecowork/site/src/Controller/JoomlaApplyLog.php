@@ -49,6 +49,55 @@ final class JoomlaApplyLog implements \ApplyLog
         $this->db->insertObject(self::TABLE, $object);
     }
 
+    /**
+     * Rows one multi-row INSERT carries, and the SQL it may grow to. 256 KB is far under the default
+     * max_allowed_packet of every database Joomla 4 and later runs on (4 MB on MySQL 5.6, 16 MB on
+     * MariaDB, 64 MB on MySQL 8). A retire's visibility step is ~200 bytes, so its 3,000 rows go in
+     * six statements. One entry over the limit (a media before-state) goes alone, exactly as record()
+     * would send it.
+     */
+    private const INSERT_ROWS = 500;
+    private const INSERT_BYTES = 262144;
+
+    /**
+     * The rows record() would write, one per entry and in the order given: the sequence is read once
+     * and counted on, instead of a MAX(seq) read and an INSERT per step.
+     */
+    public function recordMany(string $applyId, array $entries): void
+    {
+        if ($entries === []) {
+            return;
+        }
+        $seq = $this->nextSeq($applyId);
+        $apply = $this->db->quote($applyId);
+        $created = $this->db->quote(Factory::getDate()->toSql());
+        $rows = [];
+        $bytes = 0;
+        foreach (array_values($entries) as $entry) {
+            $row = $apply . ',' . $seq++ . ',' . $this->db->quote(base64_encode(serialize($entry))) . ',' . $created;
+            if ($rows !== [] && (\count($rows) >= self::INSERT_ROWS || $bytes + \strlen($row) > self::INSERT_BYTES)) {
+                $this->insertRows($rows);
+                $rows = [];
+                $bytes = 0;
+            }
+            $rows[] = $row;
+            $bytes += \strlen($row) + 3;
+        }
+        $this->insertRows($rows);
+    }
+
+    /** @param string[] $rows each the quoted values of one row, in the columns' order */
+    private function insertRows(array $rows): void
+    {
+        $query = $this->db->getQuery(true)
+            ->insert($this->db->quoteName(self::TABLE))
+            ->columns($this->db->quoteName(['apply_id', 'seq', 'entry', 'created']));
+        foreach ($rows as $row) {
+            $query->values($row);
+        }
+        $this->db->setQuery($query)->execute();
+    }
+
     public function entries(string $applyId): array
     {
         $query = $this->db->getQuery(true)

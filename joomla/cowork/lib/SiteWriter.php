@@ -145,6 +145,21 @@ interface SiteWriter
     public function setVisibility(string $kind, int $id, string $column, string $value): void;
 
     /**
+     * setVisibility() for many rows of one kind: the same column, the same value, the same rules —
+     * in a few statements instead of a read and an UPDATE (or two) per row.
+     *
+     * 🔒 ALL OR NOTHING. Every id must name a row in this kind's scope (the scope read() applies);
+     * one that does not is refused with setVisibility()'s own words, before any row is written. A
+     * retire pass hides 6,684 rows on Tracy Business: one row at a time, with its undo row, that
+     * was 7 to 8 s of transaction on an idle local stand and several times that under load; in
+     * bulk, 0.2 s (measured 05/10/2026).
+     *
+     * @param string $kind article (`state`), menuItem (`published`) or module (`published`).
+     * @param int[]  $ids  rows to write; a repeated id is written once.
+     */
+    public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void;
+
+    /**
      * Give one existing menu item a new alias, and its branch the paths that follow from it.
      *
      * Only for moving an archive's own row out of the way: Joomla keeps one alias per (client,
@@ -525,6 +540,16 @@ interface ApplyLog
      * @param array<string,mixed> $entry {op, ...target..., before}
      */
     public function record(string $applyId, array $entry): void;
+
+    /**
+     * Record many steps at once, exactly as one record() per entry in the order given would: the
+     * same entries, in the same order, so entries() and every revert read them back unchanged.
+     * A call that throws may have recorded a first part of them, as a loop of record() would have:
+     * a caller that must not keep half calls it inside the transaction that holds the change.
+     *
+     * @param list<array<string,mixed>> $entries
+     */
+    public function recordMany(string $applyId, array $entries): void;
 
     /**
      * Every step recorded under an apply_id, oldest first (the caller reverses to undo).
