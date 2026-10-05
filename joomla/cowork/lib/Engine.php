@@ -2243,16 +2243,31 @@ final class Engine
         $apply = $this->applyId($p);
         if (!$apply || strpos($apply, 'mlang-') !== 0) return $this->err('bad_params', 'the mlang- apply_id of the retire pass is required');
         try {
+            $t = Timing::begin();
             $entries = array_values(array_filter($this->log->entries($apply), fn ($e) => ($e['op'] ?? '') === 'visibility'));
+            Timing::end('restoreEntries', $t);
+            Timing::count('restoreRows', count($entries));
             if (!$entries) return $this->err('contract_failed', 'No retire pass is recorded under ' . $apply);
+            $t = Timing::begin();
             $this->refuseLocked($this->undoRows($entries));
+            Timing::end('restoreLocks', $t);
+            $t = Timing::begin();
             $this->writer->transaction(function () use ($entries) {
+                $t = Timing::begin();
                 foreach (array_reverse($entries) as $entry) $this->revertOne($entry);
+                Timing::end('restoreShow', $t);
                 return [];
             });
+            Timing::end('restoreTransaction', $t);
+            $t = Timing::begin();
             $this->log->clear($apply);
+            Timing::end('restoreClear', $t);
+            $t = Timing::begin();
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            Timing::end('purge', $t);
+            $t = Timing::begin();
             $this->stamped('revert');
+            Timing::end('stamped', $t);
             return $this->ok(['restored' => count($entries), 'applyId' => $apply]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
@@ -2303,8 +2318,11 @@ final class Engine
         try {
             if (($job = $this->contract->job()) !== null)
                 return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase']);
+            $t = Timing::begin();
             $governed = $this->contract->governedIds();
             $routed = array_values(array_intersect($this->contract->derivedLanguages(), $keep));
+            Timing::end('retireGoverned', $t);
+            $t = Timing::begin();
             $rows = [];
             foreach (['language', 'article', 'menuItem', 'module'] as $kind) {
                 $rows[$kind] = [];
@@ -2314,24 +2332,40 @@ final class Engine
                     if (count($page) < 100) break;
                 }
             }
+            Timing::end('retireList', $t);
+            $t = Timing::begin();
             // A kept language the archive ships an edition of stays exactly as shipped: that edition IS
             // the language the customer asked for, and its rows receive the translation in place.
             $spared = array_values(array_intersect($this->contract->profile()->editionLocales(), $keep));
             $writes = MultilingualApply::retireWrites($rows, $governed, $this->contract->profile()->sourceLanguage(), array_values(array_unique(array_merge($routed, $spared))), $spared);
             $slice = array_slice($writes, 0, self::RETIRE_CHUNK);
+            Timing::end('retireWrites', $t);
+            Timing::count('retireRows', count($slice));
+            $t = Timing::begin();
             // Every row this pass hides, before the first: one open in the editor refuses the pass.
             $this->refuseLocked(array_map(fn ($write) => [$write[0], (int) $write[1]], $slice));
+            Timing::end('retireLocks', $t);
+            $t = Timing::begin();
             $this->writer->transaction(function () use ($slice, $apply) {
                 // Undo first, then the change: a row whose undo could not be recorded is never hidden.
                 foreach ($slice as [$kind, $id, $fields]) {
                     $column = (string) array_key_first($fields);
+                    $t = Timing::begin();
                     $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $column, 'before' => 1]);
+                    Timing::end('retireLog', $t);
+                    $t = Timing::begin();
                     $this->setVisible($kind, $id, $column, 0);
+                    Timing::end('retireHide', $t);
                 }
                 return [];
             });
+            Timing::end('retireTransaction', $t);
+            $t = Timing::begin();
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            Timing::end('purge', $t);
+            $t = Timing::begin();
             if ($slice) $this->stamped('content');
+            Timing::end('stamped', $t);
             $hidden = [];
             foreach ($slice as [$kind]) $hidden[$kind] = ($hidden[$kind] ?? 0) + 1;
             return $this->ok([
