@@ -78,6 +78,7 @@ final class SiChildLog implements ApplyLog
 {
     public array $log = [];
     public function record(string $applyId, array $entry): void { $this->log[$applyId][] = $entry; }
+    public function recordMany(string $applyId, array $entries): void { foreach ($entries as $entry) $this->record($applyId, $entry); }
     public function entries(string $applyId): array { return $this->log[$applyId] ?? []; }
     public function clear(string $applyId): void { unset($this->log[$applyId]); }
 }
