@@ -73,13 +73,15 @@ custom templates — https://developer.wordpress.org/themes/global-settings-and-
 
 - `functions.php` (source theme): the design-system reading of the `tracy` theme, the `?style=`
   preview, the `tracy_nav`/`tracy_hero` body classes, motion (`tracy_motion`), the source theme's
-  own contact handler (`tracy_contact_to`, not used by this site's contact page). Loads `inc/*.php`.
+  own contact handler (not used by this site's contact page). Loads `inc/*.php`.
 - `inc/extra.php` (overlay): what this target adds — the chrome stylesheets, the light/dark switch
   (in the head, blocking), the mega menu, the `wp-ja-kinetic` pattern category, the registration of
   the 29 blocks under `blocks/`, the direction attributes on `<html>`, the contact form handler
-  (`template_redirect` on the `page-contact` page, mail to `admin_email`), the sign-in / register /
-  password flows (`login_url`, `register_url`, `lostpassword_url` point at the pages using the
-  `page-login`, `page-register`, `page-password` templates), the toolbar hidden for accounts that
+  (`template_redirect` on the `page-contact` page, mail to the recipient `inc/contact.php` reads:
+  option `tracy_contact_to`, else the site's public contact mailbox, else `admin_email`; the page never prints it), the
+  sign-in / register / password flows (`login_url`, `register_url`, `lostpassword_url` point at the
+  pages using the `page-login`, `page-register`, `page-password` templates), the toolbar hidden for
+  accounts that
   cannot edit, the document titles, and the redirect rules of `wp_ja_kinetic_redirects`.
 - `inc/owner-text.php`: words the source keeps editable in its admin, kept editable here too, so no
   template carries them.

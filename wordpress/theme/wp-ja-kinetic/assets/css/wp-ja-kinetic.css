@@ -148,26 +148,38 @@ h6 {
    stretched to the bar's full height so a mega panel hung from the bar's bottom edge starts
    exactly where its trigger box ends. ---- */
 
-/* The source declares .kinetic-header (and its T4 wrapper, .t4-sticky) position: sticky; top: 0,
-   but measured live (light mode, 1440, /pages/login): scrolling the page 300px moves the header's
-   own top to -300, and 600px (past the page's max scroll) to -387 — it does not stay pinned, it
-   scrolls away with the page like a static element. No ancestor breaks the sticky containing block
-   (overflow, transform and contain are all their initial values up the whole chain to <body>), so
-   whatever keeps it from sticking lives outside this measured DOM/CSS; D-11 is to match what the
-   source actually does, so the header is not made sticky here either. `relative` (not `static`)
-   on purpose: it stays in normal flow exactly like `static` with no offset set, but it is still a
-   POSITIONED ancestor, and the full-width mega panel (.tracy-mega__panel, position: absolute;
-   top: 100%, not itself inside a .tracy-mega--compact) needs one — the header used to supply it
-   only as a side effect of being sticky; dropping straight to `static` broke hover-to-panel travel
-   (measured: mega-hover.mjs FAIL, gapPx 834, before this line read `relative`). */
+/* The source's header bar is `position: sticky; top: 0` on its T4 wrapper (`#t4-header.t4-sticky`, z-index 1030) and stays pinned
+   while the page scrolls — measured on the local source stand at 1440, 992 and 576 on the home pages, Pricing, Contact, Blog and the
+   sign-in page (header top 0 after a 600px scroll). Two places do not pin it: from 575.98px down T4 resets `.t4-sticky` to
+   `position: relative !important`, and the 404 page (its own error template). An earlier reading (D-11) found it scrolling away;
+   that was not reproduced on the stand and is withdrawn (D-55). Sticky is also a positioned ancestor, which the full-width mega
+   panel (.tracy-mega__panel, position: absolute; top: 100%) needs. The bar's own surface is the CHROME background, which the
+   source never re-skins per home direction: #FBFCFA light, #0A0D0C dark on Terminal, Blueprint and Signal alike
+   (css/template.css:19328, css/darkmode.css:81), not the page colour that the directions change. */
 .tracy-header {
-  position: relative;
-  /* Source: z-index: 1030 on .kinetic-header (css/template.css:19947) — the literal number is
-     restated even though `relative` (see above) already keeps it off the sticky stacking order
-     the source's z-index was written for; no visible effect, kept for parity. */
+  position: sticky;
+  top: 0;
   z-index: 1030;
-  background: var(--wp--preset--color--bg);
+  background: light-dark(#fbfcfa, #0a0d0c);
   border-bottom: 1px solid var(--wp--preset--color--border);
+}
+
+@media (max-width: 575.98px) {
+  .tracy-header {
+    position: relative;
+    top: auto;
+  }
+}
+
+body.error404 .tracy-header {
+  position: relative;
+  top: auto;
+}
+
+/* Source: `.not-at-top #t4-header.t4-sticky { box-shadow: 0 3px 5px rgba(0,0,0,.08) }` once the page has scrolled 100px past the
+   header (T4 base.js); the class is set by assets/js/wp-ja-kinetic-back-to-top.js. */
+body.tracy-not-at-top .tracy-header {
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.08);
 }
 
 /* Source: .kinetic-header-inner { max-width: var(--content-max, 1240px); margin: 0 auto;
@@ -704,18 +716,27 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
     height: 40px;
   }
 }
-@media (max-width: 767px) {
+/* The footer's finger targets. Source (measured on the stand): from 576px up the social tiles are 34px and the link rows 30px on an
+   11px gap; from 575.98px down T4's phone rules make the tiles 40px and the link rows 40px on the same gap. The brand row stays 24px
+   at every width, so its 40px target is an invisible pseudo-element rather than a taller box. */
+@media (max-width: 575.98px) {
   footer .tracy-footer__social-tile {
     width: 40px;
     height: 40px;
   }
-  /* footer links: a 40px box, the row pitch kept (30px box + 11px gap before) */
   .tracy-footer__links a,
   nav.tracy-footer__links .wp-block-navigation-item__content.wp-block-navigation-item__content {
     padding: 9px 0;
   }
-  nav.tracy-footer__links .wp-block-navigation__container {
-    gap: 1px;
+}
+@media (max-width: 767px) {
+  .tracy-footer__lock {
+    position: relative;
+  }
+  .tracy-footer__lock::after {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
   }
 }
 
@@ -731,7 +752,9 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   height: 100%;
   background: var(--chrome-surface);
   border-left: 1px solid var(--chrome-border);
-  box-shadow: -24px 0 60px rgba(16, 20, 15, 0.18);
+  /* The dim behind the panel: the source paints `.kinetic-oc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55) }` over the
+     header and the page, under the panel, and does not push the page. A spread shadow of the fixed panel covers the same area. */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55);
 }
 
 .tracy-header__menu .tracy-nav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-container-content {
@@ -1409,9 +1432,12 @@ body .tracy-footer__news-row {
 .tracy-footer__news-row .acym_module input[type='email']:active,
 .tracy-footer__news-row .acym_module input[type='text']:focus,
 .tracy-footer__news-row .acym_module input[type='text']:active {
-  outline: none;
+  /* The source's newsletter field on focus (measured on the source stand in light and dark): the primary-colour border, a 2px outline
+     in the primary colour 3px off the box, and a 3px ring rgba(77,124,15,.25) in both schemes. */
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
   border-color: var(--primary);
-  box-shadow: none;
+  box-shadow: 0 0 0 3px rgba(77, 124, 15, 0.25);
 }
 
 /* AcyMailing's own client-side check marks a failed field with `.acym_invalid_field` and shows
@@ -1560,8 +1586,20 @@ body .tracy-footer__bottom {
 }
 
 .tracy-back-to-top svg {
-  width: 16px;
-  height: 16px;
+  display: none;
+}
+
+/* The mark: the source draws Font Awesome's chevron-up at 16px (a solid, thick chevron about 14.5 x 9.3px, measured at 4x scale);
+   the footer part in the database prints a thin stroked line chevron, so the stroked one is hidden and the solid one is drawn
+   here, by mask, in the button's own colour. */
+.tracy-back-to-top::before {
+  content: '';
+  width: 14.5px;
+  height: 9.3px;
+  transform: translateY(-0.6px);
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='90 480 1612 1035'%3E%3Cpath d='M1683 1331l-166 165q-19 19-45 19t-45-19l-531-531-531 531q-19 19-45 19t-45-19l-166-165q-19-19-19-45.5t19-45.5l742-741q19-19 45-19t45 19l742 741q19 19 19 45.5t-19 45.5z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='90 480 1612 1035'%3E%3Cpath d='M1683 1331l-166 165q-19 19-45 19t-45-19l-531-531-531 531q-19 19-45 19t-45-19l-166-165q-19-19-19-45.5t19-45.5l742-741q19-19 45-19t45 19l742 741q19 19 19 45.5t-19 45.5z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
 
 .tracy-back-to-top:hover,
@@ -1807,6 +1845,18 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   top: auto;
 }
 
+/* The error layout loads none of the phone rules the other pages get (measured on the source's 404 at 390): the legal links stay inline
+   (17px, not a 40px box) and the footer link rows are 40px (8px + a 24px line + 8px). */
+@media (max-width: 575.98px) {
+  .tracy-404-footer .tracy-footer__legal a {
+    display: inline;
+    min-height: 0;
+  }
+  .tracy-404-footer .tracy-footer__links a {
+    line-height: 24px;
+  }
+}
+
 /* Source error.css §2: Error body centred section (flex:1 → fills space between nav/footer) */
 .hx-error-body {
   flex: 1 0 auto;
@@ -2007,18 +2057,17 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
     padding: 7px;
     margin: -7px;
   }
-  .tracy-header__brand .tracy-brand a,
-  .tracy-footer__lock {
+  .tracy-header__brand .tracy-brand a {
     display: inline-flex;
     align-items: center;
     min-height: 40px;
   }
 }
 
-/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone every one of
+/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone (575.98px and below, where the source's own phone rules apply) every one of
    them is raised to 12px. Generated from this file's own rules: keep it last, and regenerate it
    when a label size changes. */
-@media (max-width: 767px) {
+@media (max-width: 575.98px) {
   .tracy-mega__title,
   .tracy-header__menu .tracy-nav .tracy-nav__drill-sublabel,
   .tracy-footer__title {

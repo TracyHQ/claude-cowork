@@ -63,7 +63,8 @@ The quickstart is the site **as built**; anything edited since lives only in you
 ## Known limits
 
 - The newsletter form needs AcyMailing and an outbound mail route; the contact form mails
-  `admin_email` and stores nothing.
+  option `tracy_contact_to`, else the public mailbox in `tracy_site_identity`, and stores nothing.
+  A site that has neither says every message failed: set one (`docs/content-model.md`).
 - Read counts and bylines are frozen at port time (post meta); WordPress does not count views.
 - The theme's self-update finds nothing until a manifest is published at
   `wordpress/theme/wp-ja-kinetic/update.json` in `TracyHQ/claude-cowork`.

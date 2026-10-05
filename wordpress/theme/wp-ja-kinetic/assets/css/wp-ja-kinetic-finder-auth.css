@@ -2625,10 +2625,10 @@ joomla-field-media img {
   max-height: 100%;
 }
 
-/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone every one of
+/* Phones: the 12px text floor (RSP-01). The source sets its mono labels at 10-11.5px; on a phone (575.98px and below, where the source's own phone rules apply) every one of
    them is raised to 12px. Generated from this file's own rules: keep it last, and regenerate it
    when a label size changes. */
-@media (max-width: 767px) {
+@media (max-width: 575.98px) {
   body.item-232 .kinetic-finder .kinetic-eyebrow,
   body.item-232 .kinetic-finder .kinetic-result__meta,
   body.item-232 .kinetic-finder .kinetic-result__url,

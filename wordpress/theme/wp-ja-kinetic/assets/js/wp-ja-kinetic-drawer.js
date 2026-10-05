@@ -136,6 +136,8 @@
   const syncOpenState = () => {
     const isOpen = root.classList.contains('is-menu-open')
     root.setAttribute('aria-hidden', isOpen ? 'false' : 'true')
+    // a closed panel takes no focus and no clicks (a hidden panel that stays in the tab order is a trap)
+    root.inert = !isOpen
     // The source's drawer always opens flat, closed submenu — reset the drill on every fresh
     // open, matching that, rather than leaving it wherever a previous visit left off.
     if (isOpen && !wasOpen) setDrill(null)
