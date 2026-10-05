@@ -1575,3 +1575,71 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 .je-relcard .je-badge a { color: var(--wp--preset--color--fg); }
 /* Tags cloud in dark: the source paints the link as a plain rectangle on top of its rounded <li>. */
 :root[data-theme="dark"] .je-tagcloud__list a { border-radius: 0; }
+
+/* ===== 1.0.6 sweep fixes (measured with site-sweep.mjs against the source stand, fonts loaded) ===== */
+/* Footer menu: the source paints its links #212529 (the dark text colour in dark) and the category the visitor is in blue. */
+body .je-footer .je-footer-nav .wp-block-navigation-item__content { color: light-dark(#212529, #c2c9d6); }
+body .je-footer .je-footer-nav .current-menu-item > .wp-block-navigation-item__content { color: light-dark(#4d6bff, #7d93ff); }
+/* Footer button: the source's dark button reads #eef1f6 on its #222a3b face in dark. */
+body .je-footer .je-btn-dark .wp-block-button__link { color: light-dark(#fff, #eef1f6); }
+/* Main menu in dark: the items that are not current use the body text colour (#c2c9d6), not the heading colour. */
+body .je-header .je-nav > .wp-block-navigation__container > li:not(.current-menu-item, .current-menu-ancestor, .current-menu-parent) > :is(a, .wp-block-navigation__submenu-icon) { color: light-dark(#212529, #c2c9d6); }
+body .je-header .je-nav > .wp-block-navigation__container > li:not(.current-menu-item, .current-menu-ancestor, .current-menu-parent) > a:hover { color: light-dark(#1a3eed, #7d93ff); }
+/* The first card of Category Style 2 (light): its chip is #f8f8ff, as on Style 3 and Style 4. */
+.je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .tracy-card .wp-block-post-terms.tracy-eyebrow a { background: #f8f8ff; color: #212529; }
+/* Typography page: Bootstrap's primary badge is #0d6efd, and the light badge turns dark with the page. */
+.t4-typo-example .badge.bg-primary { background: #0d6efd; }
+.t4-typo-example .badge.bg-light { background: light-dark(#f8f8ff, #222a3b); }
+.t4-typo-example .badge { font-family: "Noto Serif", serif; }
+.t4-typo-example .badge.bg-light.text-dark { color: light-dark(#212529, #eef1f6); }
+/* One-row header below 1400px as the source's 2/6/4 grid lays it out: the menu starts at the second column and the tools
+   (toggle 38, search 48, Subscribe) sit flush right 16px apart; the header runs edge to edge (18px) under 1200px. */
+@media (min-width: 992px) and (max-width: 1399px) {
+  body:not(.je-hdr-two) .je-header .je-header__inner { column-gap: 0; grid-template-columns: calc(16.6667% - 12px) minmax(0, 1fr) auto auto auto; }
+  body:not(.je-hdr-two) .je-header .je-nav { justify-self: start; margin-right: 0; }
+  body:not(.je-hdr-two) .je-header .je-search { margin: 0 0 0 16px; }
+  body:not(.je-hdr-two) .je-header .je-search .wp-block-search__button { width: 48px; height: 48px; }
+  body:not(.je-hdr-two) .je-header .je-subscribe { margin: 0 0 0 16px; }
+}
+@media (min-width: 992px) and (max-width: 1199px) { body:not(.je-hdr-two) .je-header .je-header__inner { max-width: none; margin-inline: 0; } }
+@media (min-width: 1400px) {
+  body:not(.je-hdr-two) .je-header .je-search { margin: 0 -20px; }
+  body:not(.je-hdr-two) .je-header .je-search .wp-block-search__button { width: 48px; height: 48px; }
+}
+/* Subscribe at 768-1399px: a row, 18px icon then the label with the space the source prints after its icon (145 x 48). */
+@media (min-width: 768px) and (max-width: 1399px) {
+  body:not(.je-hdr-two) .je-header .je-subscribe .wp-block-button__link { flex-direction: row; gap: 13.2px; padding: 12.8px 18px; font-size: 18px; line-height: 20.7px; }
+  body:not(.je-hdr-two) .je-header .je-subscribe .wp-block-button__link::before { width: 18px; height: 18px; }
+}
+/* Home 2 and Home 5: the source's masthead runs edge to edge under 1200px (a fluid container, 18px), where Home 1, 3 and 4 keep the 540/720/960 steps. */
+@media (max-width: 1199px) { body.je-hdr-two:is(.je-slug-home-2, .je-slug-home-5) .je-header__inner { max-width: none; margin-inline: 0; } }
+/* Front-page masthead from 992px: the menu button is the 19px bars icon, 24px before the theme toggle, and the search button is the source's 48px square. */
+@media (min-width: 992px) {
+  body.je-hdr-two .je-header__tools { gap: 24px; }
+  body.je-hdr-two .je-drawer-toggle { width: 18.9px; height: 22px; padding: 0; margin: 0; }
+  body.je-hdr-two .je-drawer-toggle span { width: 18.9px; margin-inline: 0; left: 0; }
+  body.je-hdr-two .je-header .je-search .wp-block-search__button { width: 48px; height: 48px; }
+}
+/* Home 4 masthead from 992px: the source's 3/6/3 columns keep the 352px picture whole; equal thirds squeezed it below 1143px. */
+@media (min-width: 992px) {
+  body.je-hdr-pill .je-header__top { display: grid; grid-template-columns: 1fr auto 1fr; }
+  body.je-hdr-pill .je-header__top .je-subscribe { justify-self: end; }
+}
+/* Home 4 masthead under 768px: the picture is the source's 5/12 column minus its gutters (97px at 320, 126.5px at 390). */
+@media (max-width: 767px) { body.je-hdr-pill .je-logo-img { width: calc(41.6667vw - 36px); height: auto; } }
+/* The site name in the one-row header: the source sets it 16px, 600, 1.5px apart (the port had 14px, 700, .08em). */
+body .je-header .je-site-name:not(.je-site-name--logo) { font-size: 16px; font-weight: 600; letter-spacing: 1.5px; }
+/* The footer's note under the button is the source's muted text in dark (#8c97a8). */
+body .je-footer .je-footer__small { color: light-dark(rgba(37, 36, 36, 0.7), #8c97a8); }
+/* The category picture row: the source shows three pictures from 992px (32px apart) and two from 480px; the port stepped to three only at 1200px. */
+@media (max-width: 1199px) and (min-width: 992px) { .je-cattiles__item { flex-basis: calc((100% - 64px) / 3); } .je-cattiles__list { gap: 32px; } }
+@media (max-width: 991px) and (min-width: 480px) { .je-cattiles__item { flex-basis: calc((100% - 16px) / 2); } .je-cattiles__list { gap: 16px; } }
+/* Header social icons: painted at the source's glyph size (Instagram 17px square, feed 16px, bird 17.5px, F 19px tall) and 2px higher. */
+.je-header .je-social .wp-social-link a::before { top: -1.8px; bottom: 1.8px; }
+.je-header .je-social .wp-social-link-facebook a::before { -webkit-mask-size: auto 18.8px; mask-size: auto 18.8px; }
+.je-header .je-social .wp-social-link-x a::before, .je-header .je-social .wp-social-link-twitter a::before { -webkit-mask-size: 17.5px auto; mask-size: 17.5px auto; }
+.je-header .je-social .wp-social-link-instagram { --je-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%223 3 18 18%22%3E%3Crect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%224.5%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22/%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%223.6%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22/%3E%3Ccircle cx=%2216.8%22 cy=%227.2%22 r=%221.1%22/%3E%3C/svg%3E"); }
+.je-header .je-social .wp-social-link-feed, .je-header .je-social .wp-social-link-rss { --je-ico: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%222 2 20 20%22%3E%3Cpath d=%22M2 8.667V12c5.515 0 10 4.485 10 10h3.333C15.333 14.637 9.363 8.667 2 8.667zM2 2v3.333c9.19 0 16.667 7.477 16.667 16.667H22C22 10.955 13.045 2 2 2zM4.5 17C3.118 17 2 18.12 2 19.5S3.118 22 4.5 22 7 20.88 7 19.5 5.882 17 4.5 17z%22/%3E%3C/svg%3E"); }
+/* Menu button of the front-page masthead: the source's bars icon has 3.25px rounded bars 6.25px apart (the port drew 2px bars). */
+body.je-hdr-two .je-drawer-toggle { gap: 3px; }
+body.je-hdr-two .je-drawer-toggle span { height: 3.25px; border-radius: 1px; }
