@@ -31,7 +31,15 @@ final class ContentSlots
             if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML slot is missing or ambiguous');
             $node = $nodes->item(0);
             if (!($node instanceof DOMText) && !($node instanceof DOMAttr)) throw new RuntimeException('HTML slot is not a scalar');
-            $node->nodeValue = $change['value'];
+            $value = $change['value'];
+            // An attribute's value set from PHP is read as markup: `&` starts an entity reference, and
+            // a bare one (`?a=1&b=2`, "Sales & Marketing") emptied the attribute on libxml 2.9 and was
+            // dropped on 2.13. So every `&` that does not begin a complete reference is written as
+            // `&amp;`, and reads back as the `&` that was written. A complete reference (`&amp;`,
+            // `&#38;`, `&copy;`) is decoded as before, so a value that already spells `&amp;` is not
+            // escaped twice; a name with no `;` (`&copy=2`, `&lang=en`) is text.
+            if ($node instanceof DOMAttr) $value = preg_replace('/&(?!(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#x[0-9A-Fa-f]+);)/', '&amp;', (string) $value);
+            $node->nodeValue = $value;
         }
         $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
         $restore = self::shieldTokens($xp, $seen);
