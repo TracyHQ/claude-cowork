@@ -1846,14 +1846,15 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 }
 
 /* The error layout loads none of the phone rules the other pages get (measured on the source's 404 at 390): the legal links stay inline
-   (17px, not a 40px box) and the footer link rows are 40px (8px + a 24px line + 8px). */
+   (17px, not a 40px box). The footer link rows are 40px on both sides with the inherited 21.7px line (a 24px
+   line here made the sweep's heights check read a line-height step at 320), so the padding makes up the 40px. */
 @media (max-width: 575.98px) {
   .tracy-404-footer .tracy-footer__legal a {
     display: inline;
     min-height: 0;
   }
   .tracy-404-footer .tracy-footer__links a {
-    line-height: 24px;
+    padding-block: 9.15px;
   }
 }
 
@@ -2072,5 +2073,19 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   .tracy-header__menu .tracy-nav .tracy-nav__drill-sublabel,
   .tracy-footer__title {
     font-size: 12px;
+  }
+
+  /* The 12px floor makes "DEVELOPERS" 87px wide, wider than the 80px an equal-fraction column
+     gets at 320px, so it wrapped to two lines, and "Integrations" with its padding needs 79px. The
+     source sizes the column to its content; let the title and the links keep one line and the
+     column grow to the widest. */
+  .tracy-footer__title,
+  .tracy-footer__columns .wp-block-navigation-item__content,
+  .tracy-footer__columns .tracy-footer__links a {
+    white-space: nowrap;
+  }
+
+  body .tracy-footer__columns {
+    grid-template-columns: repeat(3, minmax(min-content, 1fr));
   }
 }
