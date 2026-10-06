@@ -8453,3 +8453,33 @@ body.tracy {
   font-size: 20px;
   line-height: 1.2;
 }
+
+/* 1.1.10 (heights check, fix round 4).
+ *
+ * (1) The service listing and the "Other Services" band clamp each intro to 3 lines like the source `.item-intro`
+ * (`-webkit-line-clamp: 3`, overflow hidden); the clamp above only matched `li:not(.type-page)`, so the page cards
+ * and the related cards printed a 4th line at 320 (source 3 lines cut, port 4). */
+.jv-page .tracy-grid > .type-page .wp-block-post-excerpt__excerpt,
+.page-template-page-service .jv-related .wp-block-post-excerpt__excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* (2) "Continue Reading" under an article: the source's related band is 24 px tall above the pill (32 from 992 up); the port
+ * padded it 58-66 px, so the band was 34 px too tall (heights, padding-step, 576 and up). Below 576 it already matches. */
+@media (min-width: 576px) {
+  :is(.page-template-page-article, .single) .jv-related { padding-top: 24px; }
+}
+
+@media (min-width: 992px) {
+  :is(.page-template-page-article, .single) .jv-related { padding-top: 32px; }
+}
+
+/* (3) The source sets `small, .small` to .875em (14 px in a 16 px line); the port had no rule, so the browser's `smaller`
+ * (13.33 px) applied, e.g. "This line of text is meant to be treated as fine print" on /typography (heights, font-size-step). */
+small,
+.small {
+  font-size: 0.875em;
+}
