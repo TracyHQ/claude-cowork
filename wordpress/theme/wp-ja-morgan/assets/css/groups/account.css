@@ -454,6 +454,11 @@
 	flex-wrap: wrap;
 	margin: 25px -15px 0;
 }
+/* The source's first row sits 12.5 px under the legend: no 25 px top margin there */
+.jm-contact-page .jm-contact-form legend + .form-group,
+.jm-contact-page .jm-contact-form legend ~ .form-group:first-of-type {
+	margin-top: 0;
+}
 .jm-contact-page .jm-contact-form .form-group [class*="col-sm-"] {
 	box-sizing: border-box;
 	padding: 0 15px;
@@ -569,7 +574,7 @@
 @media (max-width: 991px) {
 	.jm-contact-page .contact-info {
 		grid-template-columns: repeat(2, 1fr);
-		gap: 15px 30px;
+		gap: 30px;
 		margin-inline: 0;
 	}
 	.jm-contact-page .box-info {
@@ -588,9 +593,16 @@
 		padding: 30px 10px;
 	}
 }
+/* The source's 150 px band padding holds down to 576 px and drops to 60 px only below it. */
+@media (min-width: 576px) and (max-width: 767px) {
+	.jm-contact-page .box-info.box-info {
+		padding: 150px 0;
+	}
+}
 @media (max-width: 767px) {
 	.jm-contact-page .contact-info {
 		grid-template-columns: 1fr;
+		gap: 15px;
 	}
 	.jm-contact-page .contact-form-wrap {
 		padding: 30px 10px;
@@ -601,8 +613,15 @@
 	.jm-contact-page .box-info {
 		padding: 60px 0;
 	}
+	/* Stacked, the source's send button sits 25 px lower under the checkbox row. */
+	.jm-contact-page .jm-contact-form .control-btn {
+		margin-top: 55px;
+	}
 	.jm-contact-page .address-detail {
 		padding: 25px 15px;
+	}
+	.jm-contact-page .address-detail .fa {
+		height: 36px;
 	}
 	.login-wrap.jm-form,
 	.registration.jm-form,
@@ -633,6 +652,10 @@
 	.login-wrap.jm-form,
 	:is(.reset, .remind).jm-form {
 		padding: 30px 25px;
+	}
+	/* Stacked, the source's username-reminder box is 5 px shorter above the form and 20 px taller below it. */
+	.remind.jm-form {
+		padding: 25px 25px 50px;
 	}
 	.reset.jm-form .control-label {
 		padding-top: 21px;

@@ -112,21 +112,24 @@ function wp_ja_morgan_login_links( string $bottom, array $args ): string {
 add_filter( 'login_form_bottom', 'wp_ja_morgan_login_links', 10, 2 );
 
 /**
- * A text cut the way the source cuts a listing text: at most 150 characters, ended on a whole word,
- * with "..." after the paragraph when something was left out.
+ * A text cut the way the source cuts a listing text. The source cuts the article's stored HTML (`<p>text</p>` and a CRLF),
+ * so its 150-character limit counts those 9 markup characters too: the text is cut on the last space of the first
+ * 150 characters of the markup, and "..." follows the paragraph when something was left out.
  *
  * @param string $text   Plain text.
- * @param int    $length The character limit.
+ * @param int    $length The character limit, counted on the markup.
  * @return array{0:string,1:bool} The text and whether it was cut.
  */
 function wp_ja_morgan_b_truncate( string $text, int $length = 150 ): array {
-	$text = trim( wp_strip_all_tags( $text ) );
-	if ( mb_strlen( $text ) <= $length ) {
+	$text   = trim( wp_strip_all_tags( $text ) );
+	$markup = "<p>{$text}</p>\r\n";
+	if ( mb_strlen( $markup ) <= $length ) {
 		return array( $text, false );
 	}
-	$cut   = mb_substr( $text, 0, $length - 3 );
+	$cut   = mb_substr( $markup, 0, $length );
 	$space = mb_strrpos( $cut, ' ' );
-	return array( rtrim( false === $space ? $cut : mb_substr( $cut, 0, $space ) ), true );
+	$cut   = false === $space ? $cut : mb_substr( $cut, 0, $space );
+	return array( trim( wp_strip_all_tags( $cut ) ), true );
 }
 
 /**

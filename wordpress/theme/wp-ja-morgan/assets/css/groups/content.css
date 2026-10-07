@@ -14,7 +14,7 @@
 	line-height: inherit;
 }
 .t3-content .blog-featured .tags {
-	margin: 0 0 25px;
+	margin: 0 0 18.75px;
 }
 
 /* ---- Tagged Items: two to a row, picture, title, text ---- */
@@ -69,6 +69,7 @@
 	padding: 0;
 	border: 0;
 	min-width: 0;
+	flex-wrap: wrap;
 }
 .tag-category .filters .btn-group {
 	display: flex;
@@ -165,8 +166,9 @@
 }
 .tag-category .cats-list .list-hits {
 	display: inline-block;
-	margin-top: 12.5px;
+	margin: 12.5px 0 0;
 	padding: 3px 7px;
+	vertical-align: middle;
 	border-radius: 4px;
 	background: var(--jm-gray);
 	color: var(--jm-text);
@@ -206,9 +208,6 @@
 	border-radius: 4px 4px 0 0;
 }
 .categories-list .item-title {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
 	margin: 0 0 25px;
 	font-size: 20px;
 	line-height: 30px;
@@ -217,7 +216,9 @@
 	color: var(--jm-navy-fg);
 }
 .categories-list .item-title .badge {
-	margin-left: 12.5px;
+	/* The source floats the badge right: a float also narrows the description lines beside it. */
+	float: right;
+	margin: 0 0 0 12.5px;
 	padding: 5px 10px;
 	border-radius: 50%;
 	background: var(--jm-gray);
@@ -890,24 +891,27 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	display: inline;
 }
 
-@media (max-width: 767px) {
-	.tag-category .tagged-items-form fieldset.filters {
-		flex-wrap: wrap;
-	}
+/* The source's toolbar wraps at every width (Bootstrap's btn-toolbar), so the page-size select drops under the search group when both do not fit. */
+.tag-category .tagged-items-form fieldset.filters {
+	flex-wrap: wrap;
 }
 @media (max-width: 767px) {
+	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) .btn {
+		padding-inline: 15px;
+	}
+	/* Like the source's inline-block input, the search box gives way when the group is wider than the toolbar. */
 	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) {
-		flex: 1 1 100%;
 		min-width: 0;
-		margin-right: 0;
+		max-width: 100%;
 	}
 	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) .inputbox {
-		flex: 1 1 auto;
-		width: auto;
+		flex: 0 1 230px;
 		min-width: 0;
 	}
+	.tag-category .tagged-items-form .filters .btn-group:not(.pull-right) .btn {
+		flex: none;
+	}
 }
-
 /* ---- Card grids step at 992 like the source's col-md-*; core layout.css forces two columns up to 1024 with !important ---- */
 @media (max-width: 991px) {
 	.blog .tracy-grid.items-row {
