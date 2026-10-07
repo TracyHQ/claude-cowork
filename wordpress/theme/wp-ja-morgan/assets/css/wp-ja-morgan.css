@@ -3250,3 +3250,32 @@ ul.tagspopular.wp-block-tag-cloud {
 	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1355 1472 1558'%3E%3Cpath transform='scale(1,-1)' d='M1472 576Q1472 522 1435 485L784 -166Q745 -203 693 -203Q642 -203 603 -166L528 -91Q490 -53 490 0Q490 53 528 91L821 384L117 384Q65 384 32.5 421.5Q0 459 0 512L0 640Q0 693 32.5 730.5Q65 768 117 768L821 768L528 1062Q490 1098 490 1152Q490 1206 528 1242L603 1317Q641 1355 693 1355Q746 1355 784 1317L1435 666Q1472 631 1472 576Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1355 1472 1558'%3E%3Cpath transform='scale(1,-1)' d='M1472 576Q1472 522 1435 485L784 -166Q745 -203 693 -203Q642 -203 603 -166L528 -91Q490 -53 490 0Q490 53 528 91L821 384L117 384Q65 384 32.5 421.5Q0 459 0 512L0 640Q0 693 32.5 730.5Q65 768 117 768L821 768L528 1062Q490 1098 490 1152Q490 1206 528 1242L603 1317Q641 1355 693 1355Q746 1355 784 1317L1435 666Q1472 631 1472 576Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
+
+/* 1.1.11 (Q8) — the header brand: the site's logo when it has one, else the name in Morgan's own text style ("Name."
+   with the accent full stop). Two Site Logo blocks: the light one on the light header, the dark one where the header is
+   dark (dark mode, and home styles 3 and 4 whose header sits over the dark hero). The text shows whenever the logo of
+   the current ground is missing. */
+.t3-header .jm-brand { display: flex; align-items: center; margin: 0; }
+.t3-header .jm-logo { margin: 0; line-height: 0; }
+.t3-header .jm-logo img { display: block; width: auto; height: auto; max-height: 40px; max-width: 200px; }
+.t3-header .jm-logo--dark { display: none; }
+.t3-header .jm-brand:has(> .jm-logo--light img) > .logo-text { display: none; }
+:root[data-theme="dark"] .t3-header .jm-logo--light,
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .jm-logo--light { display: none; }
+:root[data-theme="dark"] .t3-header .jm-logo--dark,
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .jm-logo--dark { display: block; }
+:root[data-theme="dark"] .t3-header .jm-brand > .logo-text,
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .jm-brand > .logo-text { display: block; }
+:root[data-theme="dark"] .t3-header .jm-brand:has(> .jm-logo--dark img) > .logo-text,
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .jm-brand:has(> .jm-logo--dark img) > .logo-text { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .t3-header .jm-logo--light { display: none; }
+  :root:not([data-theme]) .t3-header .jm-logo--dark { display: block; }
+  :root:not([data-theme]) .t3-header .jm-brand > .logo-text { display: block; }
+  :root:not([data-theme]) .t3-header .jm-brand:has(> .jm-logo--dark img) > .logo-text { display: none; }
+}
+/* The footers of home styles 3 and 4 (dark): the dark-background logo when the site has one, else the name in the same
+   text style ("Name."). */
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) .jm-footer-logo { margin: 0 0 12px; line-height: 0; }
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) .jm-footer-logo img { display: block; width: auto; height: auto; max-height: 40px; max-width: 200px; }
+.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) .jm-foot-col:has(> .jm-footer-logo img) .logo-footer { display: none; }

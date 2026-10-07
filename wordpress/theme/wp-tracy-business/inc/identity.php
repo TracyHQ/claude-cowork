@@ -196,8 +196,8 @@ function wp_tracy_business_identity_render_markup( string $html, array $as_text,
 			$pieces[ $i ] = strtr( $piece, $as_text );
 			continue;
 		}
-		if ( preg_match( '~^<img\b[^>]*\sdata-tracy-identity="site\.logo"~i', $piece ) ) {
-			$piece = wp_tracy_business_identity_logo_tag( $piece, (string) ( $vars['site.logo'] ?? '' ), $base );
+		if ( preg_match( '~^<img\b[^>]*\sdata-tracy-identity="(site\.logo|site\.logoDark)"~i', $piece, $which ) ) {
+			$piece = wp_tracy_business_identity_logo_tag( $piece, (string) ( $vars[ $which[1] ] ?? '' ), $base );
 		}
 		$pieces[ $i ] = strtr( $piece, $as_attr );
 	}
@@ -248,6 +248,20 @@ function wp_tracy_business_identity_drop_empty( string $html, array $vars ): str
 }
 
 /**
+ * The logo for the dark header, as the site-relative media path the logo `<img>` takes: the attachment
+ * option `tracy_logo_dark` names (Tracy's dark-logo convention, inc/brand-logo.php; written by the
+ * site build), or '' when there is none — the dark header then shows the monogram beside the name.
+ */
+function wp_tracy_business_identity_dark_logo(): string {
+	$id = (int) get_option( 'tracy_logo_dark', 0 );
+	if ( $id <= 0 || ! function_exists( 'wp_attachment_is_image' ) || ! wp_attachment_is_image( $id ) ) {
+		return '';
+	}
+	$file = (string) get_post_meta( $id, '_wp_attached_file', true );
+	return '' === $file ? '' : 'wp-content/uploads/' . ltrim( $file, '/' );
+}
+
+/**
  * The identity of this request, read once.
  *
  * @return array<string,string>
@@ -256,6 +270,10 @@ function wp_tracy_business_identity(): array {
 	static $vars = null;
 	if ( null === $vars ) {
 		$vars = wp_tracy_business_identity_vars_of( get_option( WP_TRACY_BUSINESS_IDENTITY_OPTION ) );
+		$dark = wp_tracy_business_identity_dark_logo();
+		if ( '' !== $dark ) {
+			$vars['site.logoDark'] = $dark;
+		}
 	}
 	return $vars;
 }

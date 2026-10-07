@@ -20,6 +20,9 @@ require_once __DIR__ . '/inc/variations.php';
 // A theme stylesheet's `ver` carries its file's modification time, so a look change that rewrites the
 // file reaches every browser at once instead of after its cache gives up: inc/asset-version.php.
 require_once __DIR__ . '/inc/asset-version.php';
+// The customer's logo for dark backgrounds (option tracy_logo_dark), the site name as text where no logo
+// fits, and {site.title}/{year} in a copyright line: inc/brand-logo.php.
+require_once __DIR__ . '/inc/brand-logo.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );
