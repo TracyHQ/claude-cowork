@@ -495,7 +495,6 @@ body.tracy .wp-social-link a { font-family: 'Font Awesome 6 Brands'; }
 }
 /* Post navigation on a phone: one row, one line per title, the title ends in an ellipsis (source). */
 @media (max-width: 767.98px) {
-  body.tracy .jim-art__pager { padding: 12px 0; }
   body.tracy .jim-art__pager > * { min-width: 0; overflow: hidden; }
   body.tracy .jim-art__pager .wp-block-post-navigation-link a { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
   body.tracy .jim-art__pager .post-navigation-link__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

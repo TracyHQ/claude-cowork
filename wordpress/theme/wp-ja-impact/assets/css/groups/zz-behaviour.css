@@ -136,12 +136,26 @@ body.tracy .t4-typo-example :is(h4, h5, h6, .h4, .h5, .h6) { margin-top: 8px; ma
   body.tracy .jim-footer__nav { padding-block: 64px; }
   body.tracy .jim-footer__col--about .jim-footer__about { max-width: none; }
 }
-@media (min-width: 768px) and (max-width: 991.98px) {
+@media (min-width: 576px) and (max-width: 991.98px) {
   body.tracy .jim-footer__logo img { width: 160px; height: auto; }
 }
 
 /* Feature rows stacked under 992 px: the media follows the text with no gap (the source's Bootstrap row has none). */
 body.tracy .acm-features.style-1 .feature-row:has(> .feature-media) { row-gap: 0; }
+
+/* The donations view's footer is four link columns under the brand text from 576 px (the source's col-sm-3 there); the other views keep two by two until 768 px. */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  body.tracy.jim-route-donations .jim-footer__col:not(.jim-footer__col--about) { flex: 0 0 25%; }
+}
+/* The brand text runs the full width from 576 px on every view, as the source's does. */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  body.tracy .jim-footer__col--about .jim-footer__about { max-width: none; }
+}
+
+/* The blog lists are two columns from 576 px (the source's row-cols-sm-2), not from 768 px; the featured list has no such class and stays one column until 768 px. */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  body.tracy .jim-gb:not(.jim-gb--featured) .style-news .jim-news-grid, body.tracy .style-news.jim-gb:not(.jim-gb--featured) .jim-news-grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* The featured-articles list is three columns from 992 px (the source's cols-3); the other news lists stay two until 1200 px. */
 @media (min-width: 992px) {
@@ -175,9 +189,138 @@ body.tracy .jim-prose .t4-typo-example .mb-4 { margin-bottom: 24px; }
 body.tracy .jim-prose .t4-typo-example .mb-5 { margin-bottom: 48px; }
 body.tracy .jim-prose .t4-typo-example p:is(.h1, .h2, .h3, .h4, .h5, .h6) { margin-bottom: 8px; }
 body.tracy .jim-prose .t4-typo-example p.bd-example, body.tracy .jim-prose .t4-typo-example .card p:last-child { margin-bottom: 0; }
-body.tracy .jim-prose .t4-typo-example .row-cols-1 > .col.mb-4 { margin-bottom: 0; }
+/* The source's card columns carry mb-lg-0: the 24px below 992px stays. */
+@media (min-width: 992px) { body.tracy .jim-prose .t4-typo-example .row-cols-1 > .col.mb-4 { margin-bottom: 0; } }
 body.tracy .jim-prose .t4-typo-example .card > p { margin: 0; }
 body.tracy .jim-prose .t4-typo-example .card a.btn { margin-bottom: 0; }
 body.tracy .jim-prose .t4-typo-example .card:not([class*='mb-']):not(.bg-primary):not(.bg-secondary) { margin-bottom: 0; }
 body.tracy .jim-prose .t4-typo-example :is(ul.pagination, .progress):not([class*='mb-']) { margin-bottom: 0; }
 body.tracy .jim-prose .t4-typo-example p:is(.spinner-border, .spinner-grow) { margin-bottom: 0; }
+
+/* The blog lists keep the source's 32 px under the section head at 768 px (the feature sections take 38 px there). */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy .jim-gb:has(.jim-news-grid) > .jim-sec__head, body.tracy .jim-gb:has(.jim-news-grid) .jim-sec__head { margin-bottom: 32px; }
+}
+
+/* Section titles of the fund / event / blog bands are 28 px from 576 to 768 px (the source steps down to 24 px only below 576 px). */
+@media (min-width: 576px) and (max-width: 768px) {
+  body.tracy .jim-acm:is(.jim-gb, .acm-articles-category) :is(.section-title, .jim-sec__title) { font-size: 28px; }
+}
+
+/* Author list at 768-991 px: the name is 20 px (24 px from 992) and the rows are 32 px apart (the source's card carries its own 16 px padding). */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy .jim-gb--authors .jim-author-grid { row-gap: 32px; }
+  body.tracy .jim-gb--authors .jim-author__name { font-size: 20px; }
+}
+
+/* Contact page under 992 px: the source's headings are 24 px with 16 px under them, and the map keeps 32 px below. */
+@media (max-width: 991.98px) {
+  body.tracy .jim-contactpage__title { margin-bottom: 16px; font-size: 24px; }
+  body.tracy .jim-contactpage__map { margin-bottom: 32px; }
+  body.tracy .jim-contactpage__map + .jim-contactpage__title { margin-bottom: 16px; }
+}
+
+/* Header logo from 576 to 991 px is 160 px wide (46.2 px high) and the bar is 94 px high with the logo 24 px from the top; 135 px only below 576 px. */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  body.tracy .jim-header__row { min-height: 94px; padding-block: 24px; align-items: flex-start; }
+  body.tracy .jim-logo img { width: 160px; height: 46.2px; }
+}
+
+/* Below 576 px the logo is capped at its column as the source's is (half the row less 32 px), so at 320 px it is 128 px wide and the bar 85 px high (the row follows the logo, 24 px above and below); from 334 px it keeps 135 px. */
+@media (max-width: 575.98px) {
+  body.tracy .jim-header__top .jim-header__row { min-height: 0; padding-block: 24px; align-items: flex-start; }
+  body.tracy .jim-logo img { width: min(135px, calc(50vw - 32px)); height: auto; aspect-ratio: 426 / 123; }
+}
+
+/* The "Card styles" demo block is a plain div, so the flow layout's 16 px block gap lands above it; the source has none between its demo blocks (measured at 320, 576, 768 and 992 px). */
+body.tracy .jim-prose > .t4-typo-example { margin-block-start: 0; }
+/* The card's col-md-5 label is a paragraph here; the source's is a div with no bottom margin. */
+body.tracy .jim-prose .t4-typo-example p[class*='col-md-'] { margin-bottom: 0; }
+
+/* Blog list pager: 0 above it from 768 to 991 px (the cards carry the gap) and 32 px from 992 px, as the source. */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy:is(.jim-route-blog, .jim-route-category-blog) .jim-gb--news .jim-pager-host { margin-top: 0; }
+  body.tracy:not(.jim-route-blog, .jim-route-category-blog) .jim-gb--news .jim-pager-host { margin-top: 32px; }
+}
+@media (min-width: 992px) {
+  body.tracy .jim-gb--news .jim-pager-host { margin-top: 32px; }
+}
+
+/* At 320 px the source's table (300 px wide, so it overflows its 288 px box) gives the title cell 133 px and the author cell 83 px; the 94/83 split from 390 px, or a title cell of 132 px, wraps the titles onto more lines. */
+@media (max-width: 359.98px) {
+  body.tracy .jim-gb-table__head,
+  body.tracy .jim-gb-table__row { grid-template-columns: minmax(0, 1fr) 83px 70px; }
+}
+
+/* From 768 to 991 px the source's form button row leaves 32 px under the button inside the single column; the 16 px paragraph margin made it 48 px.  The source also ends the side column 16 px under its last card, not 32 px. */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy .jim-contactpage__main .wtb-form__actions p { margin-bottom: 0; }
+  body.tracy .jim-contactpage__side > .jim-contactpage__card:last-child { margin-bottom: 16px; }
+}
+
+/* Donations list below 992 px: the "Page N of M" line sits 32 px under the last card, as in the source (was 80 px). */
+@media (max-width: 991.98px) {
+  body.tracy.jim-route-donations .jim-pager-host .jim-pager-host__counter { margin-top: 16px; }
+}
+/* Below 768 px the source keeps 16 px more over the counter (48 px under the last card). */
+@media (max-width: 767.98px) {
+  body.tracy.jim-route-donations .jim-pager-host .jim-pager-host__counter { margin-top: 48px; }
+}
+
+/* Donations list at 992 px and up: the counter sits 64 px under the last card (the host's own 16 px is dropped); the space
+   under the pager is 7 px more below 1200 px and 36 px more from 1200 px, measured against the source. */
+@media (min-width: 992px) {
+  body.tracy.jim-route-donations .jim-pager-host { margin: 0 0 7px; }
+}
+@media (min-width: 1200px) {
+  body.tracy.jim-route-donations .jim-pager-host { margin-bottom: 36px; }
+}
+
+/* Contact side cards: the source's card titles are 32 px above their content at every width and 20/24 px under 992 px (the port had 24 px and 29 px). */
+body.tracy .jim-contactpage__card-title { margin-bottom: 32px; }
+@media (max-width: 991.98px) {
+  body.tracy .jim-contactpage__card-title { font-size: 20px; line-height: 24px; }
+}
+
+/* Contact cards: the source value is an h5 that sits 8 px under its label, carries 32 px of padding above its 1 px rule and is followed by 32 px before the next item. */
+body.tracy .jim-contactpage__value { margin-top: 8px; }
+body.tracy .jim-contactpage__card:not(.jim-contactpage__hours) .jim-contactpage__item { padding: 0 0 32px; }
+body.tracy .jim-contactpage__card:not(.jim-contactpage__hours) .jim-contactpage__item + .jim-contactpage__item { margin-top: 32px; padding-top: 0; }
+body.tracy .jim-contactpage__hours .jim-contactpage__value { margin-top: 0; }
+
+/* Below 992 px the source's card value is a 24 px line (h5 line box), and the form's button row keeps 32 px under it. */
+@media (max-width: 991.98px) {
+  body.tracy .jim-contactpage__card:not(.jim-contactpage__hours) .jim-contactpage__value { font-size: 18px; line-height: 24px; }
+}
+@media (max-width: 767.98px) {
+  body.tracy .jim-contactpage__main .wtb-form__actions p { margin-bottom: 32px; }
+}
+
+/* Below 992 px the source stacks the form column and the side column with no gap between them. */
+@media (max-width: 991.98px) {
+  body.tracy .jim-contactpage { gap: 0; }
+  body.tracy .jim-contactpage__main .wpcf7 { margin-bottom: 0; }
+}
+
+@media (max-width: 991.98px) {
+  body.tracy .jim-contactpage__hours .jim-contactpage__value { font-size: 18px; line-height: 24px; }
+  body.tracy .jim-contactpage__side > .jim-contactpage__card:last-child { margin-bottom: 16px; }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  body.tracy .jim-contactpage { gap: 48px; }
+}
+
+/* The source gives each social icon a 16 px trailing margin, so the fourth wraps in a 254 px card. */
+body.tracy .jim-contactpage__social { gap: 0; }
+body.tracy .jim-contactpage__social .wp-social-link { margin-right: 16px; }
+
+@media (max-width: 575.98px) {
+  body.tracy .jim-contactpage__main .wpcf7 { margin-bottom: 16px; }
+}
+
+/* /about "Our Mission & Vision.": the source nests the title block in a second .container (16px side padding), so its title wraps one line sooner below 768px. */
+@media (max-width: 767.98px) { body.tracy #acm-features-116 .section-title-wrap { padding-inline: 16px; } }
+
+/* The source's feature section titles are 28 px from 576 to 991 px (24 px below 576, 40 px from 992). */
+@media (min-width: 576px) and (max-width: 991.98px) { body.tracy .jim-acm :is(.section-title, .jim-sec__title) { font-size: 28px; } }

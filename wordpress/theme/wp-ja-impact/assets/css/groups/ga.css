@@ -73,7 +73,7 @@ body.tracy .jim-contactpage__card-title { margin: 0 0 29px; font-size: 24px; lin
 body.tracy .jim-contactpage__item { margin: 0; padding: 0 0 31px; border-bottom: 1px solid var(--jim-line); }
 body.tracy .jim-contactpage__item + .jim-contactpage__item { padding-top: 31px; }
 body.tracy .jim-contactpage__hours .jim-contactpage__item:last-child { padding-bottom: 0; border-bottom: 0; }
-body.tracy .jim-contactpage__map + .jim-contactpage__title { margin-bottom: 8px; }
+body.tracy .jim-contactpage__map + .jim-contactpage__title { margin-bottom: 16px; }
 body.tracy .jim-contactpage__sub { margin: 0; font-size: 16px; line-height: 19.2px; text-transform: uppercase; color: var(--jim-text); }
 body.tracy .jim-contactpage__hours .jim-contactpage__sub { margin-top: 8px; line-height: 25.6px; text-transform: none; }
 body.tracy .jim-contactpage__hours .jim-contactpage__value { margin-top: 0; }
@@ -121,9 +121,10 @@ body.tracy .jim-404__digit--four2 { animation: jim-swing3 0.5s ease-in-out infin
 body.tracy .jim-404__bubble { position: absolute; top: 10%; left: -10%; z-index: 2; width: 80px; height: 80px; margin: 0; border-radius: 50%; background: light-dark(#1d3677, #28354f); color: light-dark(#ffffff, #eef1f6); font-size: 32px; font-style: italic; line-height: 80px; }
 body.tracy .jim-404__bubble::after { content: ''; position: absolute; top: 70%; right: 0; border-left: 20px solid light-dark(#1d3677, #28354f); border-top: 15px solid transparent; border-bottom: 15px solid transparent; transform: rotate(45deg); }
 body.tracy .jim-404__title { margin: 3.5rem 0 8px; font-size: 2.25rem; line-height: 1.6; letter-spacing: -0.8px; color: var(--jim-link); }
-body.tracy .jim-404__text { margin: 0; }
+body.tracy .jim-404__text { margin: 0; padding-top: 8px; }
 body.tracy .jim-404__text strong { font-weight: 500; }
 body.tracy .jim-404__home { margin: 2rem 0 0; justify-content: center; }
+@media (max-width: 575.98px) { body.tracy .jim-404__home { margin-top: 3rem; } }
 body.tracy .jim-404__home .wp-block-button__link { border-color: var(--jim-primary); background: var(--jim-primary); text-transform: uppercase; }
 @media (max-width: 767.98px) {
   body.tracy .jim-404__digit { font-size: 10rem; }
@@ -316,7 +317,7 @@ body.tracy .jim-prose .t4-typo-example { padding-block: 64px; border-bottom: 2px
 body.tracy .jim-contactpage__main .wpcf7-form > p:has(.wpcf7-form-control-wrap > :is(input:not([type='checkbox']), textarea)) { line-height: 0; }
 body.tracy .jim-contactpage__main .wtb-form__field br { display: none; }
 body.tracy .jim-contactpage__main .wpcf7-form :is(input:not([type='checkbox']), textarea) { margin: 0; line-height: 25.6px; }
-@media (max-width: 575.98px) {
+@media (max-width: 767.98px) {
   body.tracy .jim-contactpage__main .wpcf7-form { grid-template-columns: 1fr; }
 }
 body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) .wpcf7-list-item { margin: 0; }
