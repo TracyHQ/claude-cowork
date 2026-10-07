@@ -992,6 +992,12 @@ html.jm-off-canvas-open body::after {
 	color: var(--jm-navy-fg);
 	margin: 0 0 25px;
 }
+@media (max-width: 767px) {
+	/* One card per row: the source's icon box is 93.75 px; the glyph's line box would grow to 96 px. */
+	.acm-features.style-2 .font-icon {
+		height: 93.75px;
+	}
+}
 .acm-features.style-2 .font-icon::before {
 	font-family: "Ionicons";
 }
@@ -1530,6 +1536,10 @@ html.jm-off-canvas-open body::after {
 	margin-top: 12.5px;
 	margin-bottom: 12.5px;
 }
+/* The source's footer columns are floats: a second row starts right under the tallest column of the first, with no row gap. */
+.t3-footnav {
+	row-gap: 0;
+}
 /* With the quote above it the footer columns start 60 px under the rule; without it, 150 px under the top. */
 body:has(.t3-section-footer) .t3-footnav {
 	padding-top: 60px;
@@ -1800,8 +1810,8 @@ body:has(.t3-section-footer) .t3-footnav {
 .item-page .row figure {
 	margin: 12.5px 0;
 }
-@media (max-width: 767px) {
-	/* Stacked columns: the source's picture margins collapse between columns (12.5 px, not 25). */
+@media (max-width: 991px) {
+	/* Stacked columns (one column below 992): the source's picture margins collapse between columns (12.5 px, not 25). */
 	.item-page .row .wp-block-image,
 	.item-page .row figure {
 		margin: 12.5px 0 0;
@@ -1840,10 +1850,7 @@ body:has(.t3-section-footer) .t3-footnav {
 }
 .tags.wp-block-post-terms {
 	/* The source's tag boxes are inline-blocks with a 6.25 px bottom margin: one row is 31 px. */
-	margin: 0 0 18.75px;
-}
-.single-post .tags.wp-block-post-terms {
-	padding-bottom: 6.25px;
+	margin: 0 0 12.5px;
 }
 .tags a {
 	/* Inline like the source's `.label`: its box is the font's content area plus the padding (21 px), not the 12 px line plus the padding. */
@@ -1858,15 +1865,23 @@ body:has(.t3-section-footer) .t3-footnav {
 	line-height: 12px;
 }
 .tags.wp-block-post-terms a {
-	margin-right: 10px;
+	/* Inline-block like the source's tag boxes, so a row of tags wraps inside the column instead of running past it. */
+	display: inline-block;
+	vertical-align: top;
+	box-sizing: border-box;
+	/* The chip is the source's 21 px `.label` box, sitting 2 px into a 31.25 px row pitch. */
+	height: 21px;
+	padding: 0 7.2px;
+	line-height: 21px;
+	margin: 2px 10px 8.25px 0;
 }
 .tags .wp-block-post-terms__separator {
 	display: none;
 }
 .item-page > .pagenav.pagenav {
-	/* The source's pager: 25 px above and below the Next link (the flow layout zeroes the last child's bottom margin). */
-	margin: 25px 0;
-	margin-block-end: 25px;
+	/* The source's pager: 25 px above and 30 px (the item's own margin) below the Next link (the flow layout zeroes the last child's bottom margin). */
+	margin: 25px 0 30px;
+	margin-block-end: 30px;
 }
 .pagenav {
 	gap: 3.9px;
@@ -1921,6 +1936,15 @@ body:has(.t3-section-footer) .t3-footnav {
 	letter-spacing: -0.6px;
 	color: light-dark(var(--jm-red), #f2f4f8);
 	margin: 0 0 15px;
+}
+/* Below 768 px the source's sidebar modules use the xs spacing: 25 px between modules, 12.5 px under the title. */
+@media (max-width: 767px) {
+	.t3-sidebar .t3-module {
+		margin-bottom: 25px;
+	}
+	.t3-sidebar .module-title {
+		margin-bottom: 12.5px;
+	}
 }
 .jm-login .login-username label,
 .jm-login .login-password label {
@@ -2270,7 +2294,7 @@ body:has(.t3-section-footer) .t3-footnav {
 		min-height: 440px;
 	}
 	.acm-slideshow .description {
-		margin-top: 30px;
+		margin-top: 50px;
 	}
 	.acm-slideshow .wp-block-buttons {
 		margin-top: 30px;
@@ -2367,7 +2391,6 @@ body:has(.t3-section-footer) .t3-footnav {
 	.jm-with-sidebar > .t3-sidebar {
 		padding-left: 0;
 		border-left: 0;
-		margin-top: 45px;
 	}
 	.blog .tracy-grid.items-row {
 		grid-template-columns: 1fr;
@@ -2378,8 +2401,9 @@ body:has(.t3-section-footer) .t3-footnav {
 	.t3-section-footer > .container {
 		padding-top: 60px;
 	}
+	/* Below 768 px the source's copyright band is 30 px top and bottom. */
 	.t3-copyright {
-		padding-bottom: 60px;
+		padding: 30px 0;
 	}
 }
 
@@ -2526,11 +2550,14 @@ body:has(.t3-section-footer) .t3-footnav {
 }
 .mostread .wp-block-post-template {
 	list-style: none;
-	margin: 0;
+	margin: 0 0 12.5px;
 	padding: 0;
 }
 .mostread .wp-block-post-template > li {
-	margin: 0 0 25px;
+	margin: 0 0 30px;
+}
+.mostread .wp-block-post-template > li:last-child {
+	margin-bottom: 0;
 }
 .mostread .mostread-image {
 	margin: 0 0 15px;
@@ -2874,9 +2901,15 @@ ul.tagspopular.wp-block-tag-cloud {
 
 /* ---- Footers of Home Style 3 and 4: the source's own column splits (3/4/3/2 and 3/3/3/3 of 12), logo "Morgan." in 24 px bold ---- */
 .t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) {
-	grid-template-columns: 3fr 4fr 3fr 2fr;
+	grid-template-columns: repeat(4, 1fr);
 	gap: 0;
 	margin: 0 -15px;
+}
+/* The source's col-lg-3/4/3/2 split only applies from 1200 px; below it the four columns are equal (col-md-3). */
+@media (min-width: 1200px) {
+	.t3-footnav.jm-foot-hs3 {
+		grid-template-columns: 3fr 4fr 3fr 2fr;
+	}
 }
 .t3-footnav.jm-foot-hs4 {
 	grid-template-columns: repeat(4, 1fr);
@@ -2915,6 +2948,12 @@ ul.tagspopular.wp-block-tag-cloud {
 .t3-copyright > .container {
 	min-height: 76px;
 	box-sizing: border-box;
+}
+/* The source's copyright and logo columns stack below 992 px, so the row holds both. */
+@media (max-width: 991px) {
+	.t3-copyright > .container {
+		min-height: 101px;
+	}
 }
 
 /* A social link's label is read by screen readers only. Its clipped 1 px box sat on a different line from the icon, so the narrow-screen
@@ -3034,8 +3073,7 @@ ul.tagspopular.wp-block-tag-cloud {
 @media (max-width: 767px) {
 	.jm-route-offline-page .t3-content.item-page,
 	.jm-route-error-page .t3-content.item-page,
-	.jm-route-typography .t3-content.item-page,
-	.jm-route-featured-articles .t3-content.item-page {
+	.jm-route-typography .t3-content.item-page {
 		margin-bottom: 30px;
 	}
 }
@@ -3043,9 +3081,11 @@ ul.tagspopular.wp-block-tag-cloud {
 .registration.jm-form .form-actions {
 	margin-bottom: 0;
 }
-/* Page cards on the front page: the source's card is 2 px taller than picture + text (the picture's baseline gap). */
-.jm-cards > .teams-item {
-	padding-bottom: 2px;
+/* Page cards on the front page: from 768 px the source's card is 2 px taller than picture + text (the picture's baseline gap); below it they are flush. */
+@media (min-width: 768px) {
+	.jm-cards > .teams-item {
+		padding-bottom: 2px;
+	}
 }
 @media (min-width: 768px) {
 	/* The source's card grid keeps 15 px under its last row. */
@@ -3062,17 +3102,22 @@ ul.tagspopular.wp-block-tag-cloud {
 		padding-bottom: 30px;
 	}
 }
-/* On a phone the pager's "Page 1 of 2" would stack under the boxes; the source's category blog has no such line, so it stays for screen readers only. */
+/* On a phone the source stacks its "Page 1 of 2" box above the page boxes; the markup has them the other way round. */
 @media (max-width: 767px) {
-	.jm-route-category-blog .tracy-joomla-pager .tracy-pager__counter {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		margin: -1px;
-		padding: 0;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
+	.blog .pagination.tracy-joomla-pager.wp-block-query-pagination {
+		margin: 3px 0 25px;
+		flex-direction: column-reverse;
+		flex-wrap: nowrap;
+		align-items: flex-start;
+		justify-content: flex-end;
+		gap: 25px;
+		padding: 25px 0 0;
+	}
+	.tracy-joomla-pager .tracy-pager__counter { margin: 0; }
+	/* The featured list has no sidebar after it, so the source keeps the 25 px inside the pager box. */
+	.jm-route-featured-articles .pagination.tracy-joomla-pager.wp-block-query-pagination {
+		margin-bottom: 0;
+		padding-bottom: 25px;
 	}
 }
 @media (max-width: 767px) {

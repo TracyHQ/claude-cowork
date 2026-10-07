@@ -139,7 +139,8 @@ body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, 
 	opacity: 0.75;
 }
 .acm-features.style-4 .jm-tile-link {
-	margin: 0;
+	/* The source's link sits on a 28 px line box under its description; 2 px more than the paragraph's own 25 px keeps every tile 442 px tall. */
+	margin: 0 0 2px;
 }
 .acm-features.style-4 .jm-tile-link a {
 	color: #ffffff;
@@ -227,6 +228,12 @@ body.jm-route-services-page .acm-features.style-4 .col:nth-child(3) .features-it
 	margin: 0 0 60px;
 	font-size: 18px;
 	line-height: 30px;
+}
+/* The source's style-5 lead keeps 30 px under it below 768 px and 60 px from there up (style-6 keeps 60 at every width). */
+@media (max-width: 767px) {
+	.acm-features.style-5 .lead {
+		margin-bottom: 30px;
+	}
 }
 .acm-features.style-5 .btn-action,
 .acm-features.style-6 .btn-action {
@@ -551,11 +558,20 @@ body.jm-route-about-us .t3-section:has(.acm-teams) {
 @media (max-width: 991px) {
 	.latest-news .wp-block-post-template > li {
 		width: 50%;
+		margin-bottom: 30px;
 	}
 }
-@media (max-width: 575px) {
+/* The source's col-sm-6 starts at 768 px, so the latest-news cards stay one per row below it. */
+@media (max-width: 767px) {
 	.latest-news .wp-block-post-template > li {
 		width: 100%;
+		margin-bottom: 30px;
+	}
+	/* Below 768 px the source's "view all" link is a block under the title (30 px above the cards), not a link over the title row. */
+	.jm-acm .wrap-last-article > .view-all {
+		position: static;
+		margin: 0 0 30px;
+		text-align: left;
 	}
 }
 
@@ -716,6 +732,14 @@ body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero
 @media (max-width: 767px) {
 	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
 		max-width: none !important;
+		padding: 0 15px !important;
+		margin-bottom: 30px;
+	}
+}
+/* 481-767 px: the source keeps the title column at 520 px of text (450 px below that) */
+@media (min-width: 481px) and (max-width: 767px) {
+	body:is(.jm-route-home-style-4, .jm-route-about-us) .acm-features.style-1 > .section-title {
+		max-width: 535px !important;
 		padding: 0 0 0 15px !important;
 	}
 }
@@ -761,6 +785,11 @@ body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero
 	max-width: 520px;
 	margin-bottom: 60px;
 }
+@media (max-width: 767px) {
+	.jm-acm .section-title:has(+ .wrap-last-article) {
+		margin-bottom: 15px;
+	}
+}
 
 /* An accordion wrapper with nothing in it takes no room; the call-to-action then sits 30 px under the lead as in the source. */
 .acm-features.style-3 .features-module-wrap:not(:has(*)) {
@@ -774,5 +803,31 @@ body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero
 @media (min-width: 992px) {
 	body .acm-features.style-3 {
 		min-height: 0;
+	}
+}
+
+/* 768 px and up: the source's feature column is 2 px taller than its inner box */
+@media (min-width: 768px) {
+	body:is(.jm-route-about-us, .jm-route-home-style-4) .acm-features.style-1 .features-item {
+		margin-bottom: 2px;
+	}
+}
+
+/* Up to 767 px: the source's link line takes no 2 px tail under it in the home-style-3 tile text block */
+@media (max-width: 767px) {
+	body.jm-route-home-style-3 .acm-features.style-4 .content-wrap .jm-tile-link {
+		margin-bottom: 0;
+	}
+}
+
+/* home-style-3: the source's team cards end with a 1 px rule under the member info */
+body.jm-route-home-style-3 .acm-teams .member-info {
+	border-bottom: 1px solid var(--jm-line);
+}
+
+/* home-style-3 at 768 px and up: the source's carousel card is 1 px shorter under the link */
+@media (min-width: 768px) {
+	body.jm-route-home-style-3 .acm-testimonial.style-1 .testimonial-item:has(.action-link-icon) {
+		padding-bottom: 97px;
 	}
 }

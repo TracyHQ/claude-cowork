@@ -256,14 +256,24 @@
 	}
 }
 
-/* ---- Statement band and counters stack on phones ---- */
-@media (max-width: 767px) {
+/* ---- Statement band: the source's col-md-* columns stack below 992 px (title block, then text) ---- */
+@media (max-width: 991px) {
 	.acm-features.style-6 .row {
 		flex-wrap: wrap;
 	}
 	.acm-features.style-6 .col-md-4,
 	.acm-features.style-6 .col-md-8 {
 		flex: 0 0 100%;
+	}
+}
+/* ---- Statement band text and counters on phones ---- */
+@media (max-width: 767px) {
+	/* Below 768 px the source's testimonial slide ends 32 px under its title (52 px from there up). */
+	.acm-testimonial.style-1 .testimonial-item {
+		padding-bottom: 32px;
+	}
+	.acm-testimonial.style-1 .testimonial-item:has(.action-link-icon) {
+		padding-bottom: 97px;
 	}
 	.acm-features.style-6 .col-md-8 {
 		padding: 0 15px;
@@ -302,10 +312,6 @@
 	.acm-testimonial.style-3 .testimonial-item {
 		flex-basis: calc(100% - 30px);
 	}
-	/* The category title and its count wrap as two items instead of squeezing the title into two lines. */
-	.category-item-inner .item-title {
-		flex-wrap: wrap;
-	}
 }
 
 /* ---- statics counters: the source's 100 px padding under 1200 px and its two-column row from 768 to 991 px (measured 03/10/2026) ---- */
@@ -316,6 +322,12 @@
 	.acm-statics.style-1 .number {
 		font-size: 36px;
 		line-height: 45px;
+	}
+}
+/* Stacked on phones the source's counter cell is 276 px, one more than the 100 + 75 + 100 of the padded rows. */
+@media (max-width: 767px) {
+	.acm-statics.style-1 .statics-item {
+		padding-bottom: 101px;
 	}
 }
 @media (min-width: 768px) and (max-width: 991px) {
@@ -412,6 +424,14 @@
 	.acm-hero.hero-large {
 		padding: 100px 0 75px;
 	}
+	/* The source's closing call-to-action band: 75 px above and below, 10 px at the sides, and its container keeps 15 px
+	   gutters, so the title wraps to two lines (measured on the front page at 320-576 px). */
+	.acm-hero.hero-normal {
+		padding: 75px 10px;
+	}
+	.acm-hero.hero-normal > .container {
+		padding-inline: 15px;
+	}
 }
 
 /* ---- features-intro style-1: the stacked layout of the source (title column 520 px wide, then the cards) ---- */
@@ -485,7 +505,34 @@
 	}
 	.jm-quick-contact .jm-field:has(.btn) {
 		flex: 0 0 auto;
-		padding: 25px 7.5px 0;
+		padding: 35px 7.5px 0;
+	}
+}
+
+/* Below 768 px the intro signature sits 34 px under its title, not 48 (the source's title is one line shorter). */
+@media (max-width: 767px) {
+	.acm-features.style-4 .jm-ft-sign {
+		margin-top: 34px;
+	}
+}
+
+/* From 481 px the source's xs list keeps a 495 px column of 353 px cells, 76 px apart (25 above, 15 below the 36 px input). */
+@media (min-width: 481px) and (max-width: 767px) {
+	.jm-quick-contact {
+		max-width: 495px;
+		padding-top: 25px;
+	}
+	.jm-quick-contact .jm-field,
+	.jm-quick-contact .jm-field--half {
+		flex: 0 0 353px;
+		padding: 25px 15px 15px 0;
+	}
+	.jm-quick-contact .jm-field:has(textarea) {
+		padding-right: 7px;
+	}
+	.jm-quick-contact .jm-field:has(.btn) {
+		flex: 0 0 auto;
+		padding: 35px 7.5px 0;
 	}
 }
 
@@ -585,7 +632,7 @@
 	.acm-testimonial.style-2 .testimonial-avatar {
 		width: 60px;
 		height: 60px;
-		margin: 0 0 15px;
+		margin: 0 0 15px !important;
 	}
 	.acm-testimonial.style-2 .testimonial-avatar img {
 		width: 60px;
@@ -652,6 +699,18 @@
 		grid-template-columns: 1fr;
 	}
 	.acm-teams .jm-cards.acm-teams--cols-3 .avatar {
+		height: 420px;
+	}
+}
+@media (max-width: 480px) {
+	.acm-teams .jm-cards.acm-teams--cols-3 .avatar {
 		height: 368px;
+	}
+}
+
+/* ---- about-us team grid: the source's row has a -15 px bottom margin that pulls the section padding up on phones ---- */
+@media (max-width: 767px) {
+	body.jm-route-about-us .acm-teams.style-1 {
+		margin-bottom: -14px;
 	}
 }
