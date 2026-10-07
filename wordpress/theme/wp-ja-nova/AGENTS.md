@@ -3,7 +3,7 @@
 Read this before changing anything. It describes the **installed WordPress site and its theme**,
 not the Tracy skill (`tracy-wordpress-theme`) that produced them.
 
-Theme: **JA Nova**, slug `wp-ja-nova`, text domain `wp-ja-nova`, version in `style.css` (`Version:`
+Theme: **WP Nova**, slug `wp-ja-nova`, text domain `wp-ja-nova`, version in `style.css` (`Version:`
 is stamped at build; 1.1.2 when these documents were written). Requires WordPress 7.0 and PHP 8.1;
 built on WordPress 7.1.2 / PHP 8.3. The site it carries is "JA Nova", an IT-services company site,
 ported from the JoomlArt Joomla 6 quickstart `quickstart/ja-nova/j6` (template `ja_nova` 1.2.1) so

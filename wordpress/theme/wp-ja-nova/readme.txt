@@ -1,4 +1,4 @@
-=== JA Nova ===
+=== WP Nova ===
 Contributors: joomlart
 Requires at least: 7.0
 Tested up to: 7.1

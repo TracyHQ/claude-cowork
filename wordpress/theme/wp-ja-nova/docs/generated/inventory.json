@@ -10,7 +10,7 @@
       "Requires PHP": "8.1",
       "Tested up to": "7.1",
       "Text Domain": "wp-ja-nova",
-      "Theme Name": "JA Nova",
+      "Theme Name": "WP Nova",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
       "Version": "1.1.5"
     },
@@ -1134,7 +1134,7 @@
     "variations": [
       {
         "id": "wp-ja-nova",
-        "title": "JA Nova",
+        "title": "WP Nova",
         "inspiration": "wp-ja-nova"
       }
     ],

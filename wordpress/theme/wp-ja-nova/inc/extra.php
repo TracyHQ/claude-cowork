@@ -152,7 +152,7 @@ add_filter( 'redirect_canonical', 'wp_ja_nova_keep_first_theme_value', 20, 2 );
 
 /** The pattern category the overlay's patterns file under. */
 function wp_ja_nova_register(): void {
-	register_block_pattern_category( 'wp-ja-nova', array( 'label' => __( 'JA Nova', 'wp-ja-nova' ) ) );
+	register_block_pattern_category( 'wp-ja-nova', array( 'label' => __( 'WP Nova', 'wp-ja-nova' ) ) );
 	// The masthead prints a page's excerpt under its heading (the source's masthead description),
 	// and core's excerpt block reads nothing for a post type without excerpt support.
 	add_post_type_support( 'page', 'excerpt' );
