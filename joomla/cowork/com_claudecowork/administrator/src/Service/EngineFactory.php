@@ -64,6 +64,12 @@ final class EngineFactory
         require_once self::libDir() . '/RenderStamps.php';
     }
 
+    /** Only the site-settings rules, for the system plugin printing a non-T4 template's favicon. */
+    public static function loadTemplateSiteSettings(): void
+    {
+        require_once self::libDir() . '/TemplateSiteSettings.php';
+    }
+
     /**
      * The published contract profile this site is held to.
      *
@@ -239,6 +245,8 @@ final class EngineFactory
         });
         // `site.identity`: Global Configuration's site name and site description, and no other key.
         $engine->siteIdentity(self::buildSiteIdentity());
+        // `template.siteSettings`: a template's logo, name, slogan and favicon, in its etc/site profiles.
+        $engine->templateSiteSettings(self::buildTemplateSiteSettings());
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $quickstart = $contract !== '';
         $baseline = self::constructionBaseline();
@@ -414,6 +422,34 @@ final class EngineFactory
             );
         } catch (\Throwable $e) {
             self::logFailure('buildSiteIdentity', $e);
+            return null;
+        }
+    }
+
+    /**
+     * The files `template.siteSettings` reads and writes under the site root, and the profile each
+     * site style of a template names (`typelist-site` in its params; T4's default when absent).
+     * Null leaves the door answering 'unavailable'.
+     */
+    private static function buildTemplateSiteSettings(): ?\TemplateSiteFiles
+    {
+        try {
+            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            return new \TemplateSiteFiles(JPATH_ROOT, static function (string $template) use ($db): array {
+                $query = $db->getQuery(true)
+                    ->select($db->quoteName('params'))
+                    ->from($db->quoteName('#__template_styles'))
+                    ->where($db->quoteName('client_id') . ' = 0')
+                    ->where($db->quoteName('template') . ' = ' . $db->quote($template));
+                $profiles = [];
+                foreach ($db->setQuery($query)->loadColumn() ?: [] as $params) {
+                    $decoded = json_decode((string) $params, true);
+                    $profiles[] = \is_array($decoded) && \is_string($decoded['typelist-site'] ?? null) ? $decoded['typelist-site'] : null;
+                }
+                return $profiles;
+            });
+        } catch (\Throwable $e) {
+            self::logFailure('buildTemplateSiteSettings', $e);
             return null;
         }
     }

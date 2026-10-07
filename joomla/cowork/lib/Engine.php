@@ -31,6 +31,8 @@ require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/SiteIdentity.php';
+require_once __DIR__ . '/TemplateSiteSettings.php';
+require_once __DIR__ . '/TemplateSiteFiles.php';
 
 final class Engine
 {
@@ -251,6 +253,16 @@ final class Engine
         return $this;
     }
 
+    /** A template's logo, name, slogan and favicon files (`template.siteSettings`); null answers 'unavailable'. */
+    private ?TemplateSiteFiles $templateSite = null;
+
+    /** Let `template.siteSettings` read and write a template's site settings (lib/TemplateSiteFiles.php). */
+    public function templateSiteSettings(?TemplateSiteFiles $files): self
+    {
+        $this->templateSite = $files;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -303,10 +315,10 @@ final class Engine
                 $readOnly = false;
             }
         }
-        // `site.identity` writes only on `set`; its read takes no lock, so it never waits on an apply.
+        // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
-            || ($action === 'site.identity' && ($params['operation'] ?? null) === 'set');
+            || (in_array($action, ['site.identity', 'template.siteSettings'], true) && ($params['operation'] ?? null) === 'set');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
                 'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
@@ -433,6 +445,8 @@ final class Engine
                 return $this->filesRestore($params);
             case 'site.identity':
                 return $this->siteIdentityDoor($params);
+            case 'template.siteSettings':
+                return $this->templateSiteSettingsDoor($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -3019,6 +3033,11 @@ final class Engine
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
                 $step['fields'] = array_keys(self::identityValues($entry['before'] ?? null));
+            } elseif ($op === 'siteSettings') {
+                // Which files, never their bytes; created when none of them existed before.
+                $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
+                $step['created'] = $files !== [] && array_filter($files, static fn($f) => !is_array($f) || ($f['before'] ?? null) !== null) === [];
+                $step['files'] = array_map(static fn($f) => is_array($f) ? ($f['path'] ?? null) : null, array_values($files));
             }
             return $step;
         }, $entries);
@@ -3094,6 +3113,15 @@ final class Engine
                 throw new RuntimeException('site identity store not wired');
             }
             $this->siteIdentity->write(self::identityValues($entry['before'] ?? null));
+            return;
+        }
+        if ($op === 'siteSettings') {
+            if ($this->templateSite === null) {
+                throw new RuntimeException('template site settings not wired');
+            }
+            $this->templateSite->restore(is_array($entry['files'] ?? null) ? $entry['files'] : []);
+            // The combined CSS may still carry the logo just taken back.
+            $this->templateSite->clearOptimize();
             return;
         }
         throw new RuntimeException("unknown step: {$op}");
@@ -3207,6 +3235,142 @@ final class Engine
         }
         $this->stamped('content');
         return $this->ok(['fields' => array_merge($before, $changes), 'changed' => array_keys($changes)]);
+    }
+
+    /**
+     * `template.siteSettings` — a template's logo, name, slogan and favicon (TCH #1013, T18;
+     * lib/TemplateSiteSettings.php, lib/TemplateSiteFiles.php).
+     *
+     * - `operation: read` (the default), `template`: for a T4 template each site profile a style
+     *   uses (`profiles: {name: {source, settings}}`, `missing`); for any other `settings` with its
+     *   favicon. `framework` says which, `keys` what a set may write.
+     * - `operation: set`, `apply_id`, `template`, `fields` and/or `profiles`: on T4, `fields` go into
+     *   every profile a style uses and `profiles: {name: {...}}` into one (its values win). Each
+     *   profile is copied from where T4 reads it and only those keys change, written to
+     *   `templates/<t>/local/etc/site/<profile>.json`. On any other template the one key is
+     *   `other_faviconFile`, printed by the system plugin. A picture must already be on the site.
+     *   The files' previous state is recorded under the `apply_id` as one step, so `apply.revert`
+     *   puts them back — deleting what did not exist, `local/` included. T4's optimize cache is
+     *   emptied after the write and after the revert. Nothing changes → nothing is written or
+     *   recorded (`unchanged: true`).
+     *
+     * A key outside the whitelist is refused with `unsupported`, never ignored. Not part of a
+     * `content.batch`: a file is not inside the database's transaction.
+     */
+    private function templateSiteSettingsDoor(array $p): array
+    {
+        if ($this->templateSite === null) {
+            return $this->err('unavailable', 'template site settings not wired');
+        }
+        $template = $p['template'] ?? null;
+        if (!is_string($template) || !preg_match(TemplateSiteSettings::TEMPLATE, $template)) {
+            return $this->err('bad_params', 'template required: the folder name of a site template, e.g. ja_spa');
+        }
+        try {
+            $framework = $this->templateSite->framework($template);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($framework === null) {
+            return $this->err('not_found', 'No site template ' . $template . ' is installed');
+        }
+        $keys = $framework === 't4' ? TemplateSiteSettings::T4_KEYS : TemplateSiteSettings::OTHER_KEYS;
+        $head = ['template' => $template, 'framework' => $framework, 'keys' => $keys];
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') {
+            try {
+                return $this->ok($head + $this->templateSite->read($template, $framework));
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
+        if ($operation !== 'set') {
+            return $this->err('bad_params', 'Unknown template.siteSettings operation: use read or set');
+        }
+        if ($this->log === null) {
+            return $this->err('unavailable', 'apply log not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) {
+            return $this->err('bad_params', 'apply_id required');
+        }
+        $isObject = static fn($value): bool => is_array($value) && $value !== [] && array_keys($value) !== range(0, count($value) - 1);
+        $fields = $p['fields'] ?? [];
+        $byProfile = $p['profiles'] ?? [];
+        if (($fields !== [] && !$isObject($fields)) || ($byProfile !== [] && !$isObject($byProfile)) || ($fields === [] && $byProfile === [])) {
+            return $this->err('bad_params', 'fields or profiles required: an object of settings, or of profile names to settings');
+        }
+        if ($byProfile !== [] && $framework !== 't4') {
+            return $this->err('unsupported', 'profiles are T4 site profiles; ' . $template . ' is not a T4 template. Nothing was written');
+        }
+        // Every key is checked before any value: a refusal names the boundary, whatever came first.
+        $groups = ['' => $fields];
+        foreach ($byProfile as $profile => $values) {
+            if (!$isObject($values)) return $this->err('bad_params', 'profiles.' . substr((string) $profile, 0, 60) . ' must be an object of settings');
+            $groups[(string) $profile] = $values;
+        }
+        foreach ($groups as $values) foreach (array_keys($values) as $name) {
+            if (!in_array($name, $keys, true)) {
+                $what = $framework === 't4' ? '' : ' on a template without T4 (its logo is a template style param: templateStyle)';
+                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through template.siteSettings' . $what . ': only ' . implode(', ', $keys) . ' can. Nothing was written');
+            }
+        }
+        $clean = [];
+        foreach ($groups as $group => $values) foreach ($values as $name => $value) {
+            $cleaned = TemplateSiteSettings::clean($name, $value, $this->templateSite->root());
+            if (isset($cleaned['error'])) return $this->err('bad_params', $cleaned['error']);
+            $clean[$group][$name] = $cleaned['value'];
+        }
+        $cleanFields = $clean[''] ?? [];
+        unset($clean['']);
+        try {
+            $plan = $this->templateSite->plan($template, $framework, $cleanFields, $clean);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if (isset($plan['error'])) {
+            return $this->err($plan['error'], $plan['message']);
+        }
+        $answer = static function (array $extra) use ($head, $plan): array {
+            return $head + $extra + ($plan['skipped'] !== [] ? ['skipped' => $plan['skipped']] : []);
+        };
+        if ($plan['changes'] === []) {
+            return $this->ok($answer(['changed' => [], 'unchanged' => true]));
+        }
+        $t = Timing::begin();
+        try {
+            $files = $this->templateSite->write($plan['changes']);
+            Timing::end('write', $t);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage(), ['code' => 'TEMPLATE_NOT_WRITABLE']);
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'siteSettings', 'template' => $template, 'files' => $files]);
+        } catch (Throwable $e) {
+            try {
+                $this->templateSite->restore($files);
+            } catch (Throwable $undo) {
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        // The combined CSS may carry the old logo (a dark-mode content:url rule); T4 rebuilds it.
+        $cleared = $this->templateSite->clearOptimize();
+        if ($this->writer !== null) {
+            try {
+                if (!$this->batching) $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+        $this->stamped('content');
+        try {
+            $now = $this->templateSite->read($template, $framework);
+        } catch (Throwable $e) {
+            $now = [];
+        }
+        unset($now['missing']);
+        return $this->ok($answer(['changed' => array_column($plan['changes'], 'path'), 'cleared' => $cleared] + $now));
     }
 
     /**

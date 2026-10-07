@@ -47,6 +47,13 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * they were without this plugin. A stamped response is kept out of every cache: Joomla's page cache
  * would otherwise store it and serve the stamps to the public (or serve a public copy, unstamped,
  * to the picker), and the conservative view and module caches would do the same one layer down.
+ *
+ * ## A favicon for a template without T4
+ *
+ * T4 prints the favicon its site profile names; a T3 template (or any other) has no such setting,
+ * and Joomla prints `templates/<t>/favicon.ico`. `template.siteSettings` keeps the customer's
+ * favicon for those in `templates/<t>/local/etc/site/tracy-favicon.json`; `onBeforeCompileHead`
+ * swaps the head's favicon links for it. A template without that file costs one `is_file`.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -63,6 +70,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             'onAfterDispatch' => 'onAfterDispatch',
             'onContentBeforeDisplay' => 'onContentBeforeDisplay',
             'onAfterRender' => 'onAfterRender',
+            'onBeforeCompileHead' => 'onBeforeCompileHead',
         ];
     }
 
@@ -212,6 +220,39 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         $app = $this->getApplication();
         $app->allowCache(false);
         $app->setHeader('Vary', 'Cookie', false);
+    }
+
+    /**
+     * The customer's favicon on a page of a template without T4 (see the class comment): every
+     * favicon link Joomla or the template added goes, and the one `template.siteSettings` set is
+     * added. A page whose template has no setting is left exactly as it was.
+     */
+    public function onBeforeCompileHead(): void
+    {
+        try {
+            $app = $this->getApplication();
+            if (!$app->isClient('site') || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+                return;
+            }
+            $template = (string) $app->getTemplate();
+            if ($template === '' || !is_file(JPATH_ROOT . '/templates/' . basename($template) . '/local/etc/site/tracy-favicon.json')) {
+                return;
+            }
+            $document = $app->getDocument();
+            if (!$document || $document->getType() !== 'html' || !property_exists($document, '_links')) {
+                return;
+            }
+            EngineFactory::loadTemplateSiteSettings();
+            $link = \TemplateSiteSettings::faviconLink(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(true), $template);
+            if ($link === null) {
+                return;
+            }
+            $document->_links = \TemplateSiteSettings::withoutFavicons($document->_links);
+            $document->addFavicon($link['href'], $link['type'], 'icon');
+        } catch (\Throwable $e) {
+            // A favicon is never worth a page: the page keeps Joomla's own.
+            Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
     }
 
     /**

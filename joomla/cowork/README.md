@@ -22,6 +22,7 @@ an empty token refuses every request.
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `site.identity` (unreleased) | Global Configuration's site name (`sitename`) and site description (`MetaDesc`) — read, and set under an `apply_id` so `apply.revert` takes it back. Those two keys of `configuration.php` and no other. See "The site name and description" below. |
+| `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
 | `db.snapshot`, `db.rollback` | Copy the tables aside before something rewrites the schema, and rename them back if it does not land. Two renames per table, so a rollback is metadata and finishes in one request; what it displaces goes to the trash, not a `DROP`. |
@@ -32,6 +33,7 @@ uninstall. `extension.list` reports what is already there, so a caller can tell 
 installed" from "installed in another version" without guessing.
 
 There is no shell, no arbitrary file write, and no action that is not named and bounded above.
+(`template.siteSettings` writes JSON files, but only one shape of path and only eight named keys.)
 
 ## Layout
 
@@ -435,6 +437,61 @@ site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?}}
   logo text showed the new words on the next request; `apply.revert` left the file byte-identical to
   before; with the file owned by root the set was refused and the file unchanged. Joomla 6.1.3 writes
   its configuration the same way (same `JConfig`, same `Registry` PHP format).
+
+## A template's logo, name and favicon: `template.siteSettings` (unreleased)
+
+A T4 template keeps its logo, its name and slogan and its favicon in a FILE, not in the database:
+`etc/site/<profile>.json`, which T4 reads local-first (`templates/<t>/local/` → `templates/<t>/` →
+the base theme in `plugins/system/t4/themes/<base>/`), each template style naming its profile in
+`typelist-site`. A file in `local/` replaces the template's whole, keys are not merged. No door
+reached those files, so a site made from a template kept the template's logo (TCH #1013, T18). A T3
+template, or any other, has no favicon setting at all: Joomla prints `templates/<t>/favicon.ico`.
+
+```
+template.siteSettings {template}
+  T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing}
+  other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile"], settings: {other_faviconFile}}
+template.siteSettings {operation: "set", apply_id, template, fields?: {...}, profiles?: {<name>: {...}}}
+        → {ok, template, framework, keys, changed: [<paths>], cleared, profiles | settings, skipped?}
+```
+
+- **Eight keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
+  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`. On any
+  other template: `other_faviconFile` only (its logo is a template style param, written with
+  `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
+  ignored, and nothing is written.
+- **Which profiles.** `fields` go into every profile a site style of the template uses (`default`
+  always among them); `profiles: {name: {...}}` into that one, its values over `fields` (JA Spa:
+  style 13 uses `logo-light`, which wants the light logo as its `site_logo`). A profile a style
+  names but no file holds is `skipped` (T4 shows `default` for it); one named in `profiles` that no
+  file holds is `bad_params`.
+- **Every other byte kept.** Each profile is copied from where T4 reads it — the local copy when
+  there is one (JA Nova and JA Voyara ship one), else the template's, else the base theme's — and
+  only the given keys change, in place, in the file's own JSON style; a missing key is added at the
+  end. Written to `templates/<t>/local/etc/site/<profile>.json`, the file T4's own editor saves.
+  The answer reads the profiles back as now written.
+- **Values.** A picture is a path relative to the site root under `images/`, `media/` or a
+  template's `images/`, with a picture's extension (png, jpg, webp, gif, svg, avif, ico), naming a
+  file that is on the site now (`media.upload` first). Upload each new picture under a new name
+  (its hash in the name): static files are cached up to four hours, and a new name is never stale.
+  Empty clears a picture. A name or slogan is cleaned as `site.identity` cleans words, up to 200
+  characters; empty lets T4 show the global site name.
+- **Undo.** One step per set, recorded under the `apply_id`: each file's previous bytes, or that it
+  did not exist and which folders were made for it. `apply.revert` puts the bytes back, or deletes
+  the file and the `local/` folders it made — a template that had no `local/` has none again. A
+  set that changes nothing writes and records nothing (`unchanged: true`). An undo row naming any
+  other path is refused. A set takes the site's write lock; a read does not.
+- **Caches.** After a set and after its revert, T4's optimize cache (`media/t4/optimize/`) is
+  emptied — a dark-mode rule there may carry a logo as `content:url(…)` — and Joomla's cache groups
+  are purged. T4 reads the profile on every request, and Joomla's page cache is off on Tracy's
+  quickstarts (measured 07/10/2026), so the next request shows the new logo.
+- **The contract.** `templates/<t>/local/etc/site/*.json` are the customer's settings, not the
+  design: `content.contract inspect` neither reports them as `Unexpected presentation file` nor,
+  where a lock lists one, as `Presentation asset changed`. Anything else under `local/` still is.
+- **A favicon without T4.** The setting goes to `templates/<t>/local/etc/site/tracy-favicon.json`;
+  the system plugin (`onBeforeCompileHead`) removes the page's favicon links and prints that file.
+  A template without the file costs one `is_file` per page.
+- A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
 
 ## Finding a row by its title: `content.list` `search` (unreleased)
 
