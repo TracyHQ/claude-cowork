@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.24.0 plus: a T3 page shows only the customer's favicon, not also the template's favicon.ico (TracyHQ/claude-cowork#143); a content write keeps a module's ordering, so the contract apply is no longer refused as its own presentation drift; an article update that does not name tags keeps the article's tags (TracyHQ/tch#1013)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.1</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.1</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.1/pkg_claudecowork-0.24.1.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.23.0 plus: carries the content contracts of nine re-released Joomla quickstarts (JA Essence 1.0.1, JA Vital 1.0.2, JA Vogue 1.0.2, JA Phio 1.0.3, JA Trip 1.0.3, JA Kinetic 1.0.3, JA Voyara 1.0.4, JA Morgan 1.0.2, Tracy Base 1.0.2), the re-releases that carry a logo for dark backgrounds (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
