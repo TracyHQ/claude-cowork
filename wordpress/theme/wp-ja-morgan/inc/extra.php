@@ -142,7 +142,7 @@ add_action( 'wp_head', 'wp_ja_morgan_preload_font', 2 );
 
 /** The pattern category the overlay's patterns file under. */
 function wp_ja_morgan_register(): void {
-	register_block_pattern_category( 'wp-ja-morgan', array( 'label' => __( 'JA Morgan', 'wp-ja-morgan' ) ) );
+	register_block_pattern_category( 'wp-ja-morgan', array( 'label' => __( 'WP Morgan', 'wp-ja-morgan' ) ) );
 	add_post_type_support( 'page', 'excerpt' );
 }
 add_action( 'init', 'wp_ja_morgan_register' );
