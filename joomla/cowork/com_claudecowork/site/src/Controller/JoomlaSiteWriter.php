@@ -732,8 +732,19 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
                 $data += ['access' => 1, 'language' => '*'];
                 if ($kind === 'article') $data += ['created' => Factory::getDate()->toSql(), 'images' => '{}', 'urls' => '{}', 'attribs' => '{}', 'metadata' => '{}', 'metakey' => '', 'metadesc' => ''];
             }
+            // 🔒 AN UPDATE KEEPS THE ROW'S ORDERING UNLESS IT NAMES ONE. Joomla's Module::store() gives a
+            // module whose ordering is 0 the next free one, so writing words into it moved it, and the
+            // contract's verify refused the whole apply as presentation drift ("module-92 — ordering
+            // [want 0 got 1]") — measured 08/10/2026 on a JA Podcast j6 site, whose brief never landed.
+            $ordering = $id > 0 && !array_key_exists('ordering', $data) ? ($row->ordering ?? null) : null;
             if (!$row->bind($data) || !$row->check() || !$row->store()) throw new \RuntimeException((string) $row->getError());
             $newId = (int) $row->id;
+            if ($ordering !== null && (string) $row->ordering !== (string) $ordering) {
+                $this->db->setQuery($this->db->getQuery(true)->update($this->db->quoteName(self::MAP[$kind]['table']))
+                    ->set($this->db->quoteName('ordering') . ' = ' . (int) $ordering)
+                    ->where($this->db->quoteName('id') . ' = ' . $newId))->execute();
+                $row->ordering = $ordering;
+            }
             if ($hadAsset === 0 && (int) ($row->asset_id ?? 0) > 0) $this->dropMintedAsset($kind, $newId, (int) $row->asset_id);
             if ($tags !== null) $this->setTags($newId, $tags);
             if ($kind === 'article' && $id <= 0) {
