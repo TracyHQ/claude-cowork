@@ -33,7 +33,6 @@ body.tracy .acm-features .text-end { text-align: right; }
 /* The heading the module draws above its content: a green eyebrow and a 40 px headline, in a 660 px column. */
 body.tracy .acm-features .section-title-wrap { max-width: 660px; margin: 0 auto 64px; text-align: center; }
 @media (max-width: 991.98px) { body.tracy .acm-features .section-title-wrap { margin-bottom: 32px; } }
-@media (min-width: 768px) and (max-width: 991.98px) { body.tracy .acm-features .section-title-wrap { margin-bottom: 38px; } }
 body.tracy .acm-features .section-title-wrap .sub-title {
   margin: 0 0 16px;
   font-size: 16px;

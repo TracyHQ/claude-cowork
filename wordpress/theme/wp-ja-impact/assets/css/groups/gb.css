@@ -74,6 +74,10 @@ body.tracy .jim-gb--funds .jim-fund-grid > li { box-sizing: border-box; margin: 
 @media (min-width: 768px) {
   body.tracy .jim-gb--funds .jim-fund-grid { grid-template-columns: repeat(2, 1fr); }
 }
+/* The 1px divider eats into the card width; below 992 the 4/5 card is 1.2px too short without this. */
+@media (max-width: 991.98px) {
+  body.tracy .jim-gb--funds .jim-fund-grid > li { padding-right: 15px; }
+}
 @media (min-width: 1200px) {
   body.tracy .jim-gb--funds .jim-fund-grid { grid-template-columns: repeat(3, 1fr); }
   body.tracy .jim-gb--funds .jim-fund-grid > li:nth-child(3n) { border-right-color: transparent; }
@@ -287,8 +291,14 @@ body.tracy .jim-main-body .jim-gb-table__rows { margin-bottom: 16px; }
 }
 @media (min-width: 1200px) { body.tracy .jim-main-body .jim-gb-table__rows { margin-bottom: 64px; } }
 
-/* Under 576 px the source's blog wrapper has 16 px above and below the cards. */
-@media (max-width: 575.98px) {
+/* The source's pager buttons are 35 px up to 767 px, not 575 px. */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  body.tracy .jim-gb__pager .tracy-pager__list { gap: 8px; }
+  body.tracy .jim-gb__pager .tracy-pager__link { width: 35px; height: 35px; font-size: 14px; }
+}
+
+/* Under 768 px the source's blog wrapper has 16 px above and below the cards. */
+@media (max-width: 767.98px) {
   body.tracy .jim-gb--news .jim-news-list { padding-block: 16px; }
   body.tracy .jim-gb--news .jim-pager-host { margin-top: 0; }
   body.tracy .jim-pager-host .tracy-pager__list { gap: 8px; }
