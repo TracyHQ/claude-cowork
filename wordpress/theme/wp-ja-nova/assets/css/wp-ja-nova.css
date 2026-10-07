@@ -685,6 +685,8 @@ body.tracy .jn-hero .jn-actions { margin-top: 64px; }
 
 /* ── Feature with picture (features-intro style-1) ────────────────────────────────────────────── */
 
+/* The source's Bootstrap row pulls the section up by its gutter (16 px; 8 px below 768) and its column pads the picture back down. */
+body.tracy .jn-video-intro + .jn-sec.jn-feature { margin-top: -16px; padding-top: 16px; }
 body.tracy .jn-feature__row { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; align-items: start; }
 body.tracy .jn-feature__info { max-width: 600px; padding-top: 0; }
 body.tracy .jn-feature__row.is-right .jn-feature__media { order: 2; }
@@ -722,7 +724,10 @@ body.tracy .jn-feature__more { display: flex; align-items: center; gap: 16px; ma
 body.tracy .jn-feature__more-icon img { width: 64px; height: 64px; }
 body.tracy .jn-feature__more-text { margin: 8px 0; max-width: 190px; font-size: var(--jn-h4); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 @media (max-width: 991.98px) {
-  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 32px; }
+  body.tracy .jn-feature__row { grid-template-columns: 1fr; row-gap: 0; }
+  /* The source stacks its two columns with 16 px padding inside each, not a gap between them. */
+  body.tracy .jn-feature__media { padding-bottom: 16px; }
+  body.tracy .jn-feature__info { padding-top: 16px; }
   body.tracy .jn-feature .jn-feature__cta > .jn-actions.jn-actions { margin-top: 0; }
   body.tracy .jn-feature__row.is-right .jn-feature__media { order: 0; }
   /* The source's .info-wrap keeps its 600 px cap only from 992 px; its .acm-action stays a wrapping row. */
@@ -731,7 +736,9 @@ body.tracy .jn-feature__more-text { margin: 8px 0; max-width: 190px; font-size: 
 }
 /* The source's .info-title: 2rem, 1rem below 768 px; the item picture is 100 px down to 576 px, 60 px below. */
 @media (max-width: 767.98px) {
-  body.tracy .jn-feature__row { row-gap: 16px; }
+  body.tracy .jn-video-intro + .jn-sec.jn-feature { margin-top: -8px; padding-top: 8px; }
+  body.tracy .jn-feature__media { padding-bottom: 8px; }
+  body.tracy .jn-feature__info { padding-top: 8px; }
   body.tracy .jn-feature__title { margin-bottom: 16px; }
 }
 @media (max-width: 575.98px) {
@@ -943,6 +950,7 @@ body.tracy .jn-stat__title { margin: 0 0 16px; font-size: var(--jn-h4); font-wei
   body.tracy .jn-stat__title { margin-bottom: 8px; }
   body.tracy .jn-stat { padding: 32px; }
 }
+@media (max-width: 575.98px) { body.tracy .jn-stat__title { min-height: 24px; } }
 body.tracy .jn-stat__desc { margin: 0; color: var(--jn-text); }
 @media (max-width: 1199.98px) {
   body.tracy .jn-stats__grid { grid-template-columns: repeat(2, 1fr); }
@@ -1147,9 +1155,12 @@ body.tracy .jn-expertise__label::before { content: ''; position: absolute; left:
 @media (max-width: 1199.98px) {
   body.tracy .jn-expertise__box { padding: 32px; }
 }
-/* from 1200 px the source's dot sits in the label and the list follows the text at 32 px */
+/* below 576 px the source's boxes pad 24 px at the sides */
+@media (max-width: 575.98px) {
+  body.tracy .jn-expertise__box { padding: 32px 24px; }
+}
+/* from 1200 px the list follows the text at 32 px */
 @media (min-width: 1200px) {
-  body.tracy .jn-expertise__label { padding-top: 72px; }
   body.tracy .jn-expertise__desc { margin-bottom: 32px; }
   body.tracy .jn-expertise__list { margin-top: 0; }
 }
@@ -1162,11 +1173,9 @@ body.tracy .jn-expertise__title { margin: 0 0 8px; font-size: var(--jn-h3); }
 body.tracy .jn-expertise__desc { margin: 0 0 16px; color: var(--jn-text); }
 body.tracy .jn-expertise__list { display: flex; flex-wrap: wrap; gap: 8px; margin: 32px 0 0; padding: 32px 0 0; border-top: 1px solid var(--jn-line); list-style: none; }
 body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; background: light-dark(#f7f7f7, #1e232b); font-weight: 600; color: light-dark(#333333, #c2c9d2); }
-/* The source's pills carry 8 px above each (margin-top on the link) instead of a row gap; its list steps 32 -> 16 px below 992 px. */
-@media (max-width: 1199.98px) {
-  body.tracy .jn-expertise__list { gap: 0 8px; }
-  body.tracy .jn-expertise__list li { margin-top: 8px; }
-}
+/* The source's pills carry 8 px above each (margin-top on the link) instead of a row gap, at every width; its list steps 32 -> 16 px below 992 px. */
+body.tracy .jn-expertise__list { gap: 0 8px; }
+body.tracy .jn-expertise__list li { margin-top: 8px; }
 @media (max-width: 991.98px) {
   body.tracy .jn-expertise__list { margin-top: 16px; padding-top: 16px; }
 }
@@ -1189,8 +1198,8 @@ body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; back
 body.tracy .jn-position { margin-bottom: 32px; padding: 32px; border-radius: var(--jn-radius); background: var(--jn-surface); }
 body.tracy .jn-position__head { display: grid; grid-template-columns: 3fr 1fr; gap: 0 32px; align-items: start; }
 body.tracy .jn-position__title { margin: 0 0 8px; font-size: var(--jn-h3); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
-body.tracy .jn-position__info { display: flex; gap: 32px; }
-body.tracy .jn-position__info p { margin: 0; color: var(--jn-text); }
+body.tracy .jn-position__info { display: flex; } /* the source spaces its items with a 32 px margin each, so a narrow row shrinks and wraps them */
+body.tracy .jn-position__info p { margin: 0 32px 0 0; color: var(--jn-text); }
 /* The contract and place lines carry the source's two Font Awesome Free 6 solid icons (clock 16 px, location dot 12 px wide, 16 px tall,
    purple, 8 px before the text and 16 px from 1200 px, plus the space the source's markup has after the icon, 4 px), drawn as masks so they follow the theme colour. */
 body.tracy .jn-position__type::before,
@@ -1240,10 +1249,11 @@ body.tracy .jn-position__body { padding-top: 32px; }
 }
 @media (max-width: 767.98px) {
   body.tracy .jn-position__toggle { margin-top: 16px; } /* gutters are 8 px below 768 px: the source's two columns stack 16 px apart */
+  body.tracy .jn-position__toggle .jn-accordion__button { padding: 16px; } /* the source's .btn pads 16 px below 768 px */
+  body.tracy .jn-position__title { min-height: 27px; } /* the source's inline h3 sits on its parent's 27 px line box */
 }
 @media (max-width: 575.98px) {
   body.tracy .jn-position { padding: 32px 16px; }
-  body.tracy .jn-position__toggle .jn-accordion__button { padding: 16px; }
 }
 
 /* ── Footer ───────────────────────────────────────────────────────────────────────────────────── */
@@ -1362,7 +1372,7 @@ body.tracy .jn-404__home.wp-block-button .wp-block-button__link { padding: 16px 
 
 body.tracy .jn-article__head { padding-bottom: 72px; margin-bottom: 64px; border-bottom: 1px solid var(--jn-line); text-align: center; }
 body.tracy .jn-article__date { margin-bottom: 29px; font-weight: 500; text-transform: uppercase; color: var(--jn-red); }
-body.tracy .jn-article__title { max-width: 850px; margin: 0 auto 32px; font-size: var(--jn-h2); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
+body.tracy .jn-article__title { max-width: 850px; margin: 0 auto 32px; font-size: 32px; font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 body.tracy .jn-tags a { display: inline-block; padding: 12px 16px; line-height: 1.64; border-radius: 16px; background: var(--jn-surface); color: var(--jn-text); }
 body.tracy .jn-tags .wp-block-post-terms__separator { display: none; }
@@ -1708,6 +1718,11 @@ body.tracy .jn-project .jn-project__intro p { margin: 0; }
 body.tracy .jn-project .jn-article__tags { margin-bottom: 8px; }
 body.tracy .jn-project .jn-article__head { padding-bottom: 64px; }
 body.tracy .jn-project .jn-article__tags a { line-height: 22.96px; }
+/* Below 576 px the source's tag list stays on one nowrap row (the pills overflow, centred) and carries 32 px of padding and a 1 px rule under it; one 47 px row + 8 px item margin = 88 px. */
+@media (max-width: 575.98px) {
+  body.tracy .jn-project .jn-article__tags { flex-wrap: nowrap; justify-content: center; margin: 8px 0 0; padding-bottom: 40px; border-bottom: 1px solid var(--jn-line); } /* the list's own padding and rule replace the head's (see the head rule at the end of the 767 px block) */
+  body.tracy .jn-project .jn-article__tags a { flex: 0 0 auto; }
+}
 body.tracy .jn-project__fields { display: flex; flex-wrap: wrap; margin: 0 -32px 64px; }
 body.tracy .jn-project__fields > * { margin-block: 0; }
 body.tracy .jn-project__field { flex: 0 0 25%; padding: 0 32px; box-sizing: border-box; border-right: 1px solid light-dark(#e9ecef, var(--jn-line)); }
@@ -1749,7 +1764,7 @@ body.tracy .jn-related--projects .jn-related__items { margin-bottom: -32px; } /*
 @media (max-width: 767.98px) {
   body.tracy .jn-related--projects .jn-related__image { margin-bottom: 16px; }
 }
-@media (max-width: 575.98px) {
+@media (max-width: 767.98px) {
   body.tracy .jn-related--projects .jn-related__item { padding: 16px; }
 }
 body.tracy .jn-related--projects .jn-related__title { margin: 0 0 16px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.2; }
@@ -1757,7 +1772,7 @@ body.tracy .jn-related--projects .jn-related__excerpt { margin: 0; }
 body.tracy .jn-related--projects .jn-card-info p { margin-bottom: 16px; }
 body.tracy .jn-card-info .jn-card-info__item-budget { text-align: right; }
 body.tracy .jn-related--projects .jn-related__item > .jn-card-info { margin-top: 32px; }
-@media (max-width: 767.98px) {
+@media (max-width: 575.98px) {
   body.tracy .jn-related--projects .jn-related__item > .jn-card-info { margin-top: 16px; }
 }
 body.tracy .jn-related__items > li { margin-block: 0; }
@@ -1986,7 +2001,7 @@ body.tracy .jn-contact-form .wpcf7-spinner { position: absolute; right: 16px; to
   body.tracy .jn-contact-address { display: flex; flex-direction: column; gap: 32px; }
   body.tracy .jn-contact-form .wpcf7-form { grid-template-columns: 1fr; }
 }
-@media (max-width: 767.98px) {
+@media (max-width: 575.98px) {
   body.tracy .jn-contact-info__title { font-size: 32px; }
   body.tracy .jn-contact-form input[type='submit'] { padding: 16px; }
 }
@@ -2024,15 +2039,17 @@ body.tracy .jn-tagged__list .jn-tagged__title { margin: 0 0 16px; font-size: 16p
 body.tracy .jn-tagged__empty { margin: 0 0 16px; padding: 16px; border: 1px solid light-dark(#9eeaf9, #087990); border-radius: 16px; background: light-dark(#cff4fc, #032830); color: light-dark(#055160, #6edff6); font-size: 16px; line-height: 24px; }
 body.tracy .jn-tagged__title a { color: light-dark(#212529, #eef1f6); text-decoration: none; }
 body.tracy .jn-tagged__title a:hover { color: var(--jn-link); }
-/* The tag view puts the counter before the links: left of them from 768 px, above them below. */
+/* The tag view puts the counter before the links: left of them from 992 px, above them below. */
 body.tracy .jn-tagged .jn-pager-row { flex-direction: row-reverse; gap: 0 16px; margin-block: 48px 32px; }
 body.tracy .jn-tagged .jn-pager-row .tracy-pager__counter { align-self: center; margin-block-start: 16px; margin-block-end: 0; }
-@media (min-width: 768px) {
+@media (min-width: 992px) {
   body.tracy .jn-tagged .jn-pager-row .tracy-pager__counter { margin-block-start: 0; }
 }
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
   body.tracy .jn-tagged .jn-pager-row { flex-direction: column-reverse; align-items: flex-start; }
   body.tracy .jn-tagged .jn-pager-row .tracy-pager__counter { align-self: flex-start; margin-block-start: 0; }
+}
+@media (max-width: 767.98px) {
   body.tracy .jn-tagged__button { padding: 16px; }
   body.tracy .jn-tagged__button--search { width: 50px; }
   body.tracy .jn-tagged__button--clear { width: 45px; }
@@ -2060,7 +2077,7 @@ body.tracy .jn-author__socials { position: absolute; top: 0; right: 16px; displa
 body.tracy .jn-author__social { display: block; flex: 0 1 0; width: 0; min-width: 0; height: 32px; border-radius: 50%; line-height: 30px; color: #ffffff; background: #3b5999; }
 body.tracy .jn-author__social--instagram { background: #e4405f; }
 body.tracy .jn-author__social--twitter { background: #1da1f2; }
-@media (max-width: 575.98px) { body.tracy .jn-author__name a { font-size: 24px; line-height: 24px; } }
+@media (max-width: 991.98px) { body.tracy .jn-author__name a { font-size: 24px; line-height: 24px; } }
 
 /* Hidden level-1 heading of pages whose source has none (inc/extra.php wp_ja_nova_hidden_heading). */
 /* Visually hidden text (skip link, social link labels) lives in a 1 px box: without nowrap its words wrap one per line. */
@@ -2078,8 +2095,16 @@ body.tracy .jn-prose .mt-2 { margin-top: 8px; }
 body.tracy .jn-related--band { margin-top: 32px; }
 body.tracy .jn-related--band .jn-sec__head { margin-bottom: 32px; }
 @media (max-width: 767.98px) {
-  body.tracy .jn-related--band { padding-bottom: 16px; }
-  body.tracy .jn-related--band .jn-sec__head { margin-bottom: 0; }
+  body.tracy .jn-related--band { padding-bottom: 16px; } /* the source keeps the 16 px inside the band, not as a gap above the call-to-action band */
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) { padding-bottom: 32px; }
+  body.tracy .jn-related--band + .jn-cta-bar { margin-top: 0; }
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) + .jn-cta-bar { margin-top: 0; }
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) .jn-related__list { display: none; } /* an empty list still contributes margins */
+  body.tracy .jn-related--band .jn-sec__head,
+  body.tracy .jn-related--projects:not(:has(.jn-related__item)) .jn-sec__head { margin-bottom: 0; }
+  @media (max-width: 575.98px) {
+    body.tracy .jn-related--projects:not(:has(.jn-related__item)) { padding-bottom: 16px; }
+  }
 }
 /* The source's author card: a rounded grey plate holding a 1 px block (measured on .author / .author-block). */
 body.tracy .jn-author { padding: 16px 16px 32px; border-radius: 16px; background: light-dark(#f7f7f7, #1a1e25); }
@@ -2095,9 +2120,14 @@ body.tracy .jn-share__links .wp-social-link svg { color: #ffffff !important; fil
   body.tracy .jn-article__share .jn-share__links.wp-block-social-links { flex-direction: column; align-items: flex-start; gap: 18px; margin-block-start: 0; }
   body.tracy .jn-article__share .jn-share__links .wp-social-link { width: 30px; height: 30px; }
 }
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
   body.tracy .jn-article__head { padding-bottom: 40px; margin-bottom: 32px; }
+}
+@media (max-width: 767.98px) {
   body.tracy .jn-project .jn-article__head { padding-bottom: 32px; margin-bottom: 32px; }
+  @media (max-width: 575.98px) {
+    body.tracy .jn-project .jn-article__head { padding-bottom: 0; border-bottom: 0; }
+  }
 }
 /* Desktop menu carets are the source's solid down triangles (a font caret: 9 px wide, 4.5 px tall), not core's thin chevron. */
 @media (min-width: 992px) {
@@ -2176,6 +2206,11 @@ body.tracy .jn-auth .jn-reg__done { margin: 0 0 24px; padding: 16px 24px; border
 /* Search page: the Advanced Search button beside Search (secondary grey) and its tips card (the source's, open on arrival). */
 body.tracy .jn-page .jn-search .jn-search__advanced { display: flex; flex: none; align-items: center; justify-content: center; height: 60px; margin: 0 0 0 4px; padding: 16px; border: 1px solid #6c757d; border-radius: 16px; background: #6c757d; font: inherit; font-weight: 500; line-height: 26.08px; color: #ffffff; cursor: pointer; box-sizing: border-box; }
 body.tracy .jn-page .jn-search .jn-search__advanced:hover { border-color: #5c636a; background: #5c636a; }
+/* At 320 px the source's two buttons share one row and wrap their text onto two lines (86 px high); the port's would drop to a second row. */
+@media (max-width: 359.98px) {
+  body.tracy .jn-page .jn-search .wp-block-search__button.wp-element-button { flex: 0 0 102.7px; align-self: stretch; width: 102.7px; height: auto; min-height: 60px; }
+  body.tracy .jn-page .jn-search .jn-search__advanced { flex: 0 0 170.3px; height: auto; min-height: 60px; }
+}
 body.tracy .jn-page .jn-search .jn-search__advanced-icon { width: 16px; height: 16px; margin-right: 12px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23fff' d='M416 208c0 45.9-14.9 88.3-40 122.7l126.6 126.7c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0s208 93.1 208 208zm-176-48V112c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v48h-48c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h48v48c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-48h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16h-48z'/%3E%3C/svg%3E") center / contain no-repeat; }
 body.tracy .jn-page .jn-search .jn-search__panel { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
 body.tracy .jn-page .jn-search .jn-search__panel[hidden] { display: none; }
