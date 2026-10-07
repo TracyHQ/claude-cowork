@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "tracy-quickstart-contract/v1",
+  "id": "ja-phio/j6/1.0.3",
+  "platform": "joomla",
+  "template": "ja_phio",
+  "quickstart": {
+    "schemaVersion": "tracy-quickstart/v1",
+    "product": "ja-phio",
+    "id": "quickstart/ja-phio/j6",
+    "version": "1.0.3",
+    "platform": "joomla",
+    "cms": {
+      "name": "joomla",
+      "version": "6.1.2"
+    },
+    "template": "ja_phio",
+    "framework": "t4",
+    "prefix": "jd_",
+    "parts": {
+      "webroot": {
+        "file": "ja-phio-j6-webroot-1.0.3.tar.gz",
+        "bytes": 56144318,
+        "sha256": "b6810b892b11c069e42392e4dc6c71beb7450e43661a10479f5ef22359701c10"
+      },
+      "database": {
+        "file": "ja-phio-j6-database-1.0.3.sql.gz",
+        "bytes": 132226,
+        "sha256": "5fe3f747d26a32f1ef43390367b0db99756de99ecf7c0ffd8752a8e75e6ee7af"
+      }
+    },
+    "passwordsBlanked": true,
+    "createdAt": "2026-10-07T20:25:16.612Z",
+    "builtFrom": {
+      "site": "phio",
+      "tag": "quickstart/ja-phio/j6",
+      "by": "tracy-dev"
+    },
+    "release": "quickstart/ja-phio/j6",
+    "repository": "JoomlArt-Products/ja-products"
+  },
+  "coworkContractVersion": "0.24.0",
+  "mode": "content-recommendation"
+}
