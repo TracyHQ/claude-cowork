@@ -19,17 +19,17 @@
     "parts": {
       "webroot": {
         "file": "ja-vogue-j6-webroot-1.0.2.tar.gz",
-        "bytes": 78853030,
-        "sha256": "5509372c80f65f473f94bee517670e6b4a784795a1e6f0760354a72ce2f98fe2"
+        "bytes": 78849218,
+        "sha256": "405d42587524efc447a061b02485e06de5562a2bf09a54d198214c60b5d903cc"
       },
       "database": {
         "file": "ja-vogue-j6-database-1.0.2.sql.gz",
-        "bytes": 113069,
-        "sha256": "72064dbf9bfcef4bf8743c2669b773499045e587de9437c289f7c1901f3ee45a"
+        "bytes": 109641,
+        "sha256": "44926ef0faba9f5db3aa5da3d34af6e731d21eb93238b3187c31995fa1e04a9d"
       }
     },
     "passwordsBlanked": true,
-    "createdAt": "2026-10-07T20:19:29.736Z",
+    "createdAt": "2026-10-07T20:34:54.681Z",
     "builtFrom": {
       "site": "vog",
       "tag": "quickstart/ja-vogue/j6",

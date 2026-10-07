@@ -19,19 +19,19 @@
     "parts": {
       "webroot": {
         "file": "ja-essence-j6-webroot-1.0.1.tar.gz",
-        "bytes": 57412924,
-        "sha256": "3c1682ee02682616696cf4daf5a8bb180bf74c875002f6500e2cec47146d6560"
+        "bytes": 57412439,
+        "sha256": "27a90befba2c7c354bab9996bc426ce0fd20ca767d0784ba8b0161dedc6593dd"
       },
       "database": {
         "file": "ja-essence-j6-database-1.0.1.sql.gz",
-        "bytes": 106352,
-        "sha256": "a082306599138ab21737186fe6a37eebc6bd85b45f9bdfa3ef42d23285c6452e"
+        "bytes": 102836,
+        "sha256": "5f4ec948fb03a5c01914625005094fac50809be8e2659dbcdb689786a694859e"
       }
     },
     "passwordsBlanked": true,
-    "createdAt": "2026-10-07T19:58:41.931Z",
+    "createdAt": "2026-10-07T20:32:00.907Z",
     "builtFrom": {
-      "site": "ess-base",
+      "site": "ess",
       "tag": "quickstart/ja-essence/j6",
       "by": "tracy-dev"
     },

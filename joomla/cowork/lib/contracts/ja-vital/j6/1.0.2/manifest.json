@@ -19,17 +19,17 @@
     "parts": {
       "webroot": {
         "file": "ja-vital-j6-webroot-1.0.2.tar.gz",
-        "bytes": 49897026,
-        "sha256": "d1d2762a8417222058220307e694d2f74dd2055301f9a0026395862c450c5adc"
+        "bytes": 49889395,
+        "sha256": "e573f1dcddbb59d3e69243e82c1eb826a84dfb16625e1e9b1f297b6092b3e294"
       },
       "database": {
         "file": "ja-vital-j6-database-1.0.2.sql.gz",
-        "bytes": 132190,
-        "sha256": "6aec483d6456375aae4783d6a84e0b46e76d480cc8c22127c6ce7b613b9cd362"
+        "bytes": 127314,
+        "sha256": "9399870320e4e71a33195be6fb0c924895c1a3f8a720f66183fbf4c3f2bc4985"
       }
     },
     "passwordsBlanked": true,
-    "createdAt": "2026-10-07T20:14:25.438Z",
+    "createdAt": "2026-10-07T20:33:27.863Z",
     "builtFrom": {
       "site": "vit",
       "tag": "quickstart/ja-vital/j6",

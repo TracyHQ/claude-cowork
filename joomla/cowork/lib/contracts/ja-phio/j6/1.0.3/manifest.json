@@ -19,17 +19,17 @@
     "parts": {
       "webroot": {
         "file": "ja-phio-j6-webroot-1.0.3.tar.gz",
-        "bytes": 56144318,
-        "sha256": "b6810b892b11c069e42392e4dc6c71beb7450e43661a10479f5ef22359701c10"
+        "bytes": 56143752,
+        "sha256": "8701a0ba929951de66c75bd413cea3034f7d064d9a102f0a088fad0126b3f843"
       },
       "database": {
         "file": "ja-phio-j6-database-1.0.3.sql.gz",
-        "bytes": 132226,
-        "sha256": "5fe3f747d26a32f1ef43390367b0db99756de99ecf7c0ffd8752a8e75e6ee7af"
+        "bytes": 129808,
+        "sha256": "b395f7c297b4c1325f5da101208ed9f70f0f28c8b8903f15ff247a3e6d829707"
       }
     },
     "passwordsBlanked": true,
-    "createdAt": "2026-10-07T20:25:16.612Z",
+    "createdAt": "2026-10-07T20:36:59.542Z",
     "builtFrom": {
       "site": "phio",
       "tag": "quickstart/ja-phio/j6",
