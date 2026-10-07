@@ -3,7 +3,7 @@
 Read this before changing anything. It describes the **installed WordPress site and its theme**,
 not the Tracy skill (`tracy-wordpress-theme`) that produced them.
 
-Theme: **JA Vega**, slug `wp-ja-vega`, text domain `wp-ja-vega`, version in `style.css` (`Version:`
+Theme: **WP Vega**, slug `wp-ja-vega`, text domain `wp-ja-vega`, version in `style.css` (`Version:`
 is stamped at build; 1.1.2 when these documents were written). Requires WordPress 7.0 and PHP 8.1;
 built on WordPress 7.1.2 / PHP 8.3. The site it carries is "JA Vega", an IT-services company site,
 ported from the JoomlArt Joomla 6 quickstart `quickstart/ja-vega/j6` (template `ja_vega` 1.2.1) so

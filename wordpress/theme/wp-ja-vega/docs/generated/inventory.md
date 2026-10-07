@@ -13,7 +13,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Requires PHP | 8.1 |
 | Tested up to | 7.1 |
 | Text Domain | wp-ja-vega |
-| Theme Name | JA Vega |
+| Theme Name | WP Vega |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
 | Version | 1.1.4 |
 
@@ -105,7 +105,7 @@ A `wp_template_part` row of the same name in the database shadows the file.
 
 | Id | Title | Design system |
 | --- | --- | --- |
-| wp-ja-vega | JA Vega | wp-ja-vega |
+| wp-ja-vega | WP Vega | wp-ja-vega |
 
 ## Presets (theme.json)
 

@@ -10,7 +10,7 @@
       "Requires PHP": "8.1",
       "Tested up to": "7.1",
       "Text Domain": "wp-ja-vega",
-      "Theme Name": "JA Vega",
+      "Theme Name": "WP Vega",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
       "Version": "1.1.4"
     },
@@ -928,7 +928,7 @@
     "variations": [
       {
         "id": "wp-ja-vega",
-        "title": "JA Vega",
+        "title": "WP Vega",
         "inspiration": "wp-ja-vega"
       }
     ],

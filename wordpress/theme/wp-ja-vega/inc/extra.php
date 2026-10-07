@@ -171,7 +171,7 @@ function wp_ja_vega_register(): void {
 	if ( is_readable( get_theme_file_path( 'blocks/mega-menu/block.json' ) ) ) {
 		register_block_type( get_theme_file_path( 'blocks/mega-menu' ) );
 	}
-	register_block_pattern_category( 'wp-ja-vega', array( 'label' => __( 'JA Vega', 'wp-ja-vega' ) ) );
+	register_block_pattern_category( 'wp-ja-vega', array( 'label' => __( 'WP Vega', 'wp-ja-vega' ) ) );
 	// The masthead prints a page's excerpt under its heading (the source's masthead description),
 	// and core's excerpt block reads nothing for a post type without excerpt support.
 	add_post_type_support( 'page', 'excerpt' );
