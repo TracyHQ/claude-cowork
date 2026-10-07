@@ -12,6 +12,7 @@ require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
 require_once __DIR__ . '/DerivedCache.php';
+require_once __DIR__ . '/TemplateSiteSettings.php';
 
 interface ContractStore {
     public function load(): ?array;
@@ -482,6 +483,8 @@ final class QuickstartContract
         foreach($this->lock['files'] as $path=>$hash) {
             $file=$this->root.'/'.$path;
             if($this->generatedCache($path) && !is_link($file))continue;
+            // A site profile `template.siteSettings` writes (logo, name, favicon): the customer's, not the design's.
+            if(TemplateSiteSettings::isDoorFile($path) && !is_link($file))continue;
             if(is_link($file)||!is_file($file)){$this->drift('Presentation asset changed: '.$path);continue;}
             $st=@stat($file);
             $key=$st===false?null:[(int)$st['size'],(int)$st['mtime'],(int)$st['ctime'],(int)$st['ino']];
@@ -501,6 +504,7 @@ final class QuickstartContract
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if($this->generatedCache($relative) && !$file->isLink())continue;
+                if(TemplateSiteSettings::isDoorFile($relative) && !$file->isLink())continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }

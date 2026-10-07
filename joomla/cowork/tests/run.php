@@ -1880,6 +1880,8 @@ require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
 // site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
 require __DIR__ . "/site-identity.php";
+// template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
+require __DIR__ . "/template-site-settings.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";

@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.22.0 plus: the template.siteSettings door writes a template's logo, logo for dark backgrounds and small screens, name, slogan and favicon into its T4 site profiles (templates/&lt;t&gt;/local/etc/site), with undo through apply.revert and without a presentation-drift warning; a template without T4 gets the customer's favicon (TracyHQ/claude-cowork#138)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.23.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.23.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.23.0/pkg_claudecowork-0.23.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.21.2 plus: multilingual.retire and .restore write in bulk, so hiding the languages nobody chose takes about 2.4 s instead of 22 s on a Tracy Business site (TracyHQ/claude-cowork#115); the site.identity door reads and sets the site name and the home page meta description (#117); an HTML slot write keeps identity tokens raw and stores an ampersand whole (#120)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
