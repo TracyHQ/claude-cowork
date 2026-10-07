@@ -40,6 +40,14 @@
 </div>
 <!-- /wp:group -->
 <!-- /wp:post-template -->
+<!-- wp:query-no-results {"className":"je-noresults"} -->
+<!-- wp:heading {"level":2} -->
+<h2 class="wp-block-heading">No Results Found</h2>
+<!-- /wp:heading -->
+<!-- wp:paragraph -->
+<p>Nothing matched your search. Try different words.</p>
+<!-- /wp:paragraph -->
+<!-- /wp:query-no-results -->
 <!-- wp:query-pagination {"paginationArrow":"chevron","showLabel":false,"className":"je-pager","layout":{"type":"flex","justifyContent":"center"}} -->
 <!-- wp:query-pagination-previous /-->
 <!-- wp:query-pagination-numbers /-->

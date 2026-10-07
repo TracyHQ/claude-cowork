@@ -7,6 +7,9 @@
 .je-narrow:has(.je-prose > .tracy-query) { max-width: 1164px; }
 .je-prose:has(> .tracy-query) > .tracy-eyebrow { text-align: center; font-family: Jost, sans-serif; font-size: 40px; line-height: 52px; font-weight: 400; text-transform: none; letter-spacing: 0; color: light-dark(rgb(33, 37, 41), rgb(238, 241, 246)); margin: 36px 0 12px; }
 @media (max-width: 767px) { .je-prose:has(> .tracy-query) > .tracy-eyebrow { font-size: 28px; line-height: 36.4px; } }
+/* 1.0.8 pass 3: the source category title steps 36.4 / 42 / 49 / 52px line height at 320 / 576 / 768 / 1400 */
+@media (min-width: 576px) and (max-width: 767px) { .je-prose:has(> .tracy-query) > .tracy-eyebrow { font-size: 32.3px; line-height: 42px; } }
+@media (min-width: 768px) and (max-width: 1399px) { .je-prose:has(> .tracy-query) > .tracy-eyebrow { font-size: 37.7px; line-height: 49px; } }
 .je-prose:has(> .tracy-query) > .tracy-eyebrow::before { content: "•"; color: var(--wp--preset--color--accent); font-size: 0.6em; vertical-align: middle; margin-right: 12px; }
 .je-prose:has(> .tracy-query) > .tracy-eyebrow + p { max-width: 640px; margin: 64px auto 36px; text-align: center; font-size: 16px; line-height: 24px; color: light-dark(rgba(37, 36, 36, 0.7), rgb(194, 201, 214)); }
 
@@ -97,3 +100,30 @@
 .je-author__name { font-size: 24px; line-height: 24px; }
 @media (max-width: 767px) { .je-author__name { font-size: 22px; line-height: 22px; } }
 .je-author__job { font-size: 16px; line-height: 20.8px; color: var(--wp--preset--color--fg); }
+
+/* 1.0.8 pass 2 — author listing: Bootstrap's grid steps (1 column below 768, 2 below 992), the source's centred container
+   inset at 576/768, and the fixed 260px photo (the aspect-ratio rule above won over the 260px one in je-detail.css). */
+.je-authors .je-authors__items { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
+@media (max-width: 991px) { .je-authors .je-authors__items { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 24px; } }
+@media (max-width: 767px) { .je-authors .je-authors__items { grid-template-columns: minmax(0, 1fr); margin-inline: 0; } }
+.je-authors .je-author__photo { height: 260px; aspect-ratio: auto; }
+.je-authors .je-author__card { padding: 36px; }
+.je-authors .je-author__picture { margin: -18px -18px 24px; }
+
+/* 1.0.8 pass 2 — from 576 to 767 the source's Bootstrap container is 540px wide and its row gutter sits on top of the page margin,
+   so the main content is 36px in from each edge instead of the 18px of the phone layout, and the highlighted cards of style 3 and 4 are as tall as the source's. */
+@media (min-width: 576px) and (max-width: 767px) {
+  .je-main > .je-narrow { padding-inline: 36px; }
+  body.je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .tracy-card { min-height: 483.8px; }
+  body.je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .tracy-card { min-height: 372.6px; }
+}
+
+/* 1.0.8 pass 2 — the source keeps the 28px card title from 576 to 767 and drops to 24px only below 576. */
+@media (min-width: 576px) and (max-width: 767px) {
+  .je-main .je-list .je-card__title { font-size: 28px; line-height: 36.4px; }
+}
+
+/* 1.0.8 pass 2 — category-blog and category-style-4: the source's card title is 28px from 576 to 767 and spans the whole card. */
+@media (min-width: 576px) and (max-width: 767px) {
+  body:is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query .tracy-card .tracy-card__title { font-size: 28px; line-height: 36.4px; }
+}
