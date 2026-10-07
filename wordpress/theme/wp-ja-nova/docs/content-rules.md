@@ -42,7 +42,7 @@ over an owner's edits.
   menu's order, as the source's category of services orders them.
 - **Footer copyright** keeps "Copyright © 2026 ja_nova. All Rights Reserved."; the source's
   second line ("Joomla! is Free Software …") was dropped: it names Joomla.
-- **Site name** is `ja_nova`, the source's site name. The header logo is the source's image logo, not the name (measured 03/10: `images/joomlart/logo/item-1.png` 162×48 light, `item-2.png` 161×49 dark).
+- **Site name** is `ja_nova`, the source's site name. The header logo is the source's image logo, not the name (measured 03/10: `images/joomlart/logo/item-1.png` 162×48 light, `item-2.png` 161×49 dark); since 1.1.10 the demo ships them as `site_logo` (attachment 826) and `tracy_logo_dark` (attachment 65), read by Site Logo blocks.
 - **The 404 page** is drawn as the source's own error page (no header or footer, colour switch at
   the corner, Golos Text), with its words in the draft page `page-not-found`. In dark, the source's
   "Home Page" button is purple text on purple; the port keeps the text white.

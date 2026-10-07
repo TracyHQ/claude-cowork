@@ -409,3 +409,8 @@ body.tracy :is(.jim-logo, .jim-footer__logo) a { display: block; line-height: 0;
   body.tracy .jim-sections:has(#acm-cta-157) > #acm-features-129 { padding-top: 0; }
   body.tracy .jim-sections:has(#acm-cta-157) > #acm-features-161 { padding-top: 64px; padding-bottom: 64px; }
 }
+
+/* The logo spots are Site Logo blocks (1.0.7): a customer's logo keeps its own proportions inside the box the demo
+   logo was sized for, and a spot with no logo shows the site name as white text on the navy bar. */
+body.tracy :is(.jim-logo, .jim-drawer__logo, .jim-footer__logo) img.custom-logo { object-fit: contain; object-position: left center; }
+body.tracy :is(.jim-logo, .jim-drawer__logo, .jim-footer__logo).is-tracy-logo-text { color: #ffffff; }
