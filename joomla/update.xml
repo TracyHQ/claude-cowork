@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.23.0 plus: carries the content contracts of nine re-released Joomla quickstarts (JA Essence 1.0.1, JA Vital 1.0.2, JA Vogue 1.0.2, JA Phio 1.0.3, JA Trip 1.0.3, JA Kinetic 1.0.3, JA Voyara 1.0.4, JA Morgan 1.0.2, Tracy Base 1.0.2), the re-releases that carry a logo for dark backgrounds (TracyHQ/tch#1013)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.0</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.0</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.0/pkg_claudecowork-0.24.0.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.22.0 plus: the template.siteSettings door writes a template's logo, logo for dark backgrounds and small screens, name, slogan and favicon into its T4 site profiles (templates/&lt;t&gt;/local/etc/site), with undo through apply.revert and without a presentation-drift warning; a template without T4 gets the customer's favicon (TracyHQ/claude-cowork#138)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
