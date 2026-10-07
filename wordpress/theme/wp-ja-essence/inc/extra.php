@@ -28,7 +28,7 @@ add_action( 'wp_enqueue_scripts', 'wp_ja_essence_enqueue_assets', 11 );
 
 /** The pattern category the overlay's patterns file under. */
 function wp_ja_essence_register(): void {
-	register_block_pattern_category( 'wp-ja-essence', array( 'label' => __( 'JA Essence', 'wp-ja-essence' ) ) );
+	register_block_pattern_category( 'wp-ja-essence', array( 'label' => __( 'WP Essence', 'wp-ja-essence' ) ) );
 }
 add_action( 'init', 'wp_ja_essence_register' );
 
@@ -1250,6 +1250,40 @@ function wp_ja_essence_page_heading( string $content, array $block, $instance = 
 add_filter( 'render_block_core/post-title', 'wp_ja_essence_page_heading', 10, 3 );
 
 /**
+ * The document title (`<title>`): the source prints the page's own title and no site-name suffix ("Home 1", "Abstract Wonders:
+ * Exploring Line Art Composition"), so the suffix WordPress adds is dropped and an article page is titled by its source heading
+ * (not the menu word it is titled with).
+ *
+ * @param array $parts The title parts WordPress built.
+ * @return array
+ */
+function wp_ja_essence_title_parts( array $parts ): array {
+	unset( $parts['site'], $parts['tagline'] );
+	if ( is_page() ) {
+		$parts['title'] = wp_ja_essence_display_title( get_queried_object_id() );
+	}
+	return $parts;
+}
+add_filter( 'document_title_parts', 'wp_ja_essence_title_parts' );
+
+/**
+ * The two titles that are not a page's own: the home page and the error page, as the source prints them.
+ *
+ * @param string $title The title WordPress would build (empty to let it build one).
+ * @return string
+ */
+function wp_ja_essence_title_fixed( $title ) {
+	if ( is_front_page() ) {
+		return 'Minimal Blogging Template - ' . get_bloginfo( 'name' );
+	}
+	if ( is_404() ) {
+		return 'Error: 404 Page not found';
+	}
+	return $title;
+}
+add_filter( 'pre_get_document_title', 'wp_ja_essence_title_fixed' );
+
+/**
  * A page's slug as a body class (`je-slug-<slug>`): the listing variants of the source (category styles, tagged items)
  * differ per page by type size and card layout, and the seeded pages carry no class of their own.
  *
@@ -1904,11 +1938,11 @@ function wp_ja_essence_render_tagged_list(): string {
 		$opts .= '<option value="' . $size . '"' . selected( $limit, $size, false ) . '>' . $size . '</option>';
 	}
 	$html  = '<div class="je-taglist"><form class="je-taglist__filter" role="search" method="get" action="' . $clear . '">';
-	$html .= '<label class="je-sr" for="je-taglist-filter">' . esc_html__( 'Filter by part of a title', 'wp-ja-essence' ) . '</label>';
+	$html .= '<label class="je-sr" for="je-taglist-filter">' . esc_html__( 'Enter Part of Title', 'wp-ja-essence' ) . '</label>';
 	$html .= '<div class="je-taglist__group"><input id="je-taglist-filter" type="search" name="tf" value="' . esc_attr( $filter ) . '" placeholder="' . esc_attr__( 'Enter Part of Title', 'wp-ja-essence' ) . '" autocomplete="off">';
 	$html .= '<button type="submit" class="je-taglist__go" aria-label="' . esc_attr__( 'Filter', 'wp-ja-essence' ) . '">' . $lens . '</button>';
 	$html .= '<a class="je-taglist__clear" href="' . $clear . '" aria-label="' . esc_attr__( 'Clear', 'wp-ja-essence' ) . '">' . $times . '</a></div>';
-	$html .= '<label class="je-sr" for="je-taglist-limit">' . esc_html__( 'Items per page', 'wp-ja-essence' ) . '</label><select id="je-taglist-limit" name="tlimit" onchange="this.form.submit()">' . $opts . '</select></form>';
+	$html .= '<label class="je-sr" for="je-taglist-limit">' . esc_html__( 'Display #', 'wp-ja-essence' ) . '</label><select id="je-taglist-limit" name="tlimit" onchange="this.form.submit()">' . $opts . '</select></form>';
 	if ( ! $rows ) {
 		return $html . '<p class="je-taglist__empty">' . esc_html__( 'No title holds that text.', 'wp-ja-essence' ) . '</p></div>';
 	}

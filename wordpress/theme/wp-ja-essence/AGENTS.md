@@ -3,7 +3,7 @@
 Read this before changing anything. It describes the **installed WordPress site and its theme**,
 not the Tracy skill that produced them.
 
-Theme: **JA Essence**, slug `wp-ja-essence`, text domain `wp-ja-essence`, version in `style.css`
+Theme: **WP Essence**, slug `wp-ja-essence`, text domain `wp-ja-essence`, version in `style.css`
 (1.0.0 when these documents were written). Requires WordPress 7.0 and PHP 8.1; built on 7.1.2. The
 site is "JA Essence", an editorial blog (cards, category listings, article pages) ported from the
 JoomlArt Joomla 6 quickstart for template `ja_essence` (T4 framework) so that it renders the same

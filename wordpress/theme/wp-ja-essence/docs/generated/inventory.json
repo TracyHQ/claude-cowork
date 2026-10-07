@@ -10,7 +10,7 @@
       "Requires PHP": "8.1",
       "Tested up to": "7.1",
       "Text Domain": "wp-ja-essence",
-      "Theme Name": "JA Essence",
+      "Theme Name": "WP Essence",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
       "Version": "1.0.3"
     },
@@ -1204,7 +1204,7 @@
     "variations": [
       {
         "id": "wp-ja-essence",
-        "title": "JA Essence",
+        "title": "WP Essence",
         "inspiration": "wp-ja-essence"
       }
     ],

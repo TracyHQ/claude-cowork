@@ -13,7 +13,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Requires PHP | 8.1 |
 | Tested up to | 7.1 |
 | Text Domain | wp-ja-essence |
-| Theme Name | JA Essence |
+| Theme Name | WP Essence |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
 | Version | 1.0.3 |
 
@@ -124,7 +124,7 @@ A `wp_template_part` row of the same name in the database shadows the file.
 
 | Id | Title | Design system |
 | --- | --- | --- |
-| wp-ja-essence | JA Essence | wp-ja-essence |
+| wp-ja-essence | WP Essence | wp-ja-essence |
 
 ## Presets (theme.json)
 

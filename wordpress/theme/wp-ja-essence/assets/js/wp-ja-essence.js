@@ -61,7 +61,7 @@
     back.hidden = true
     // The chevron is drawn by CSS (the source's back row has no arrow character in its text).
     back.innerHTML =
-      '<span class="je-drill-back__arrow" aria-hidden="true"></span><span class="je-drill-back__label"></span>'
+      '<span class="je-drill-arrow" aria-hidden="true"></span><span class="je-drill-label"></span>'
     drillNav.insertBefore(back, drillRoot)
     // The open path, outermost parent first; the last item's panel is the list on screen.
     let path = []
@@ -77,9 +77,7 @@
         toggleOf(li)?.setAttribute('aria-expanded', path.includes(li) ? 'true' : 'false')
       }
       back.hidden = path.length === 0
-      back.querySelector('.je-drill-back__label').textContent = path.length
-        ? labelOf(path[path.length - 1])
-        : ''
+      back.querySelector('.je-drill-label').textContent = path.length ? labelOf(path[path.length - 1]) : ''
       if (focus) (focus === 'back' ? back : focus).focus({ preventScroll: true })
     }
     const drill = (li) => {
@@ -500,7 +498,7 @@
   )
   if (!list) return
   const tabletOnly = !list.closest('.je-slug-home-4, .je-slug-category-style-3') // Style 1 and its siblings are one card wide except from 768px to 991px
-  const phoneGap = list.closest('.je-slug-home-4') ? -9 : 24 // the card gap below 768px (home 4's cards carry their own margin)
+  const phoneGap = 24 // the card gap below 768px (1.0.8 pass 4: measured source pitch is card height + 24px on home 4 too)
   const rowOrder = true // the source's Isotope runs with horizontalOrder: card n goes to column n mod columns, under what that column holds (home 4 too, Trending included)
   const layout = () => {
     const items = [...list.children]
@@ -520,9 +518,11 @@
       li.style.left = `${at * (colW + gap)}px`
       li.style.top = `${heights[at]}px`
       heights[at] +=
-        li.offsetHeight + (cols === 1 ? phoneGap + (li.classList.contains('je-trend-cell') ? 49 : 0) : gap)
+        li.offsetHeight + (cols === 1 ? phoneGap + (li.classList.contains('je-trend-cell') ? 22 : 0) : gap)
     })
-    list.style.height = `${Math.max(...heights) - (cols === 1 ? phoneGap : gap)}px`
+    // home 4's one-column list keeps the last card's 24px margin inside the list, like the source
+    const keepTail = cols === 1 && list.closest('.je-slug-home-4')
+    list.style.height = `${Math.max(...heights) - (keepTail ? 0 : cols === 1 ? phoneGap : gap)}px`
   }
   layout()
   addEventListener('load', layout)

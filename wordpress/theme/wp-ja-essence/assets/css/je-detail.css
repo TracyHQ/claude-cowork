@@ -71,10 +71,12 @@
 .t4-typo-example .bg-primary.card, .t4-typo-example .card.bg-primary { background: #0d6efd; }
 .t4-typo-example .progress { height: 16px; margin: 0 0 8px; background: #e9ecef; border-radius: 6px; overflow: hidden; }
 .t4-typo-example .progress-bar { height: 100%; color: #fff; font-size: 12px; text-align: center; }
-.t4-typo-example .spinner-border { display: inline-block; width: 32px; height: 32px; margin-right: 8px; border: 4px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: je-spin .75s linear infinite; }
+.t4-typo-example .spinner-border { display: inline-block; box-sizing: border-box; vertical-align: -.125em; width: 32px; height: 32px; margin-right: 0; border: 4px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: je-spin .75s linear infinite; }
 @keyframes je-spin { to { transform: rotate(360deg); } }
+.t4-typo-example .spinner-grow { display: inline-block; box-sizing: border-box; vertical-align: -.125em; width: 32px; height: 32px; background-color: currentColor; border-radius: 50%; opacity: 0; animation: je-grow .75s linear infinite; }
+@keyframes je-grow { 0% { transform: scale(0); } 50% { opacity: 1; transform: none; } }
 .t4-typo-example .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.t4-typo-example .pagination { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.t4-typo-example .pagination { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
 .t4-typo-example .page-link { display: block; min-width: 48px; height: 48px; box-sizing: border-box; padding: 0 12px; border-radius: 30px; background: light-dark(rgba(0, 0, 0, 0.1), rgb(26, 33, 48)); text-align: center; text-decoration: none; color: light-dark(#212529, rgb(194, 201, 214)); }
 .t4-typo-example .page-item.active .page-link { background: var(--wp--preset--color--accent, #4d6bff); color: #fff; }
 .t4-typo-example .page-item.disabled .page-link { opacity: .5; }
@@ -181,8 +183,8 @@
 .je-relcard .je-badge { margin: 0; }
 .je-relcard .je-relcard__title { margin: 16px 0 8px; font-size: 24px; line-height: 1.3; }
 .je-relcard .je-meta__date { margin: 0; font-size: 14px; line-height: 1.5; }
-@media (max-width: 1023px) { .je-more__items--cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
-@media (max-width: 767px) { .je-more__items--cards { grid-template-columns: minmax(0, 1fr) !important; } .je-relcard { padding: 18px 18px 24px; } .je-relcard .je-relcard__img { width: 100%; margin: 0 0 24px; } }
+@media (max-width: 991px) { .je-more__items--cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 767px) { .je-more__items--cards { grid-template-columns: minmax(0, 1fr) !important; } }
 /* an article with no sidebar (layout-2) takes the full container width */
 .je-narrow:has(.je-articlecard):not(:has(.je-side)) { max-width: 1164px; }
 
@@ -242,7 +244,8 @@
 .je-mini__meta > * + *::before { content: "-"; font-size: 16px; margin: 0 8px; }
 .je-mini__meta .je-meta__date { color: inherit; }
 .je-hits { display: flex; align-items: center; }
-.je-hits__icon { flex: 0 0 auto; width: 15.75px; height: 14px; margin-right: 5px; color: var(--wp--preset--color--accent); }
+/* 1.0.8 pass 9: eye + gap is 20px in the source (14px glyph + 6px margin); 15.75 + 5 was 0.75px wider everywhere a hit counter sits beside other bylines */
+.je-hits__icon { flex: 0 0 auto; width: 15px; height: 14px; margin-right: 5px; color: var(--wp--preset--color--accent); }
 /* Features post: the big number beside each title */
 .je-side--num .je-mini--num { counter-increment: je-n; }
 .je-side--num .je-mini--num::before { content: counter(je-n); flex: 0 0 auto; padding-right: 33px; font-family: var(--wp--preset--font-family--display, Jost, sans-serif); font-size: 56px; line-height: 56px; letter-spacing: -0.02em; opacity: 0.2; color: var(--wp--preset--color--accent); }
@@ -490,7 +493,7 @@ a.je-pagination__link:focus-visible { outline: 2px solid var(--wp--preset--color
 }
 .je-authorcard--t1 { display: flex; box-sizing: border-box; margin: 48px 0 0; padding: 36px 0; border-radius: 16px; background: var(--wp--preset--color--surface); }
 .je-authorcard--t1 .je-authorlatest--list { width: 400px; max-width: 100%; box-sizing: border-box; padding: 0 36px; }
-@media (max-width: 767px) { .je-authorcard--t1 .je-authorlatest--list { padding: 0 18px; } }
+@media (max-width: 767px) { .je-authorcard--t1 .je-authorlatest--list { padding: 0 24px; } body .je-authorcard--t1 .je-authorlatest--list .je-authorlatest__title { margin-bottom: 24px; white-space: normal; } }
 /* type-2 (Layout 3): heading and picture above, then the text card and a right column */
 .je-t2 { max-width: none; }
 .je-t2 > .je-badge-static { background: var(--wp--preset--color--surface); }
@@ -758,7 +761,7 @@ body:not(.je-hdr-two) .je-landing { padding-top: 36px; }
 @media (max-width: 767px) { .je-twocol .je-list:not(.je-list--warm):not(.je-list--grid) .je-card .je-card__media, .je-list:not(.je-list--grid) .je-card:not(.je-card--v) .je-card__media { margin: 0 0 18px !important; width: auto; } }
 @media (max-width: 767px) { .je-list__items > li { margin: 0 0 24px !important; } }
 .je-sec--more:not(:has(li)) .je-sec__title { margin-bottom: 0; }
-@media (max-width: 767px) { .je-prose > .je-sec--more { padding-bottom: 60px; } }
+@media (max-width: 767px) { .je-prose > .je-sec--more { padding-bottom: 72px; } }
 .je-list--grid .je-list__items { display: grid; }
 .je-list--grid .je-card__media { margin: 0 !important; }
 .je-list--grid .je-card__img img { aspect-ratio: 632 / 422; }
@@ -949,8 +952,10 @@ body:not(.je-slug-category-blog):not(.je-slug-category-style-4):not(.je-slug-cat
 .je-sec--slide .je-lead--slide { margin-top: 0 !important; }
 .je-slider__dots button { margin: 0 4px; }
 @media (max-width: 991px) { .je-lead--slide .je-lead__items > li { flex-basis: calc((100% - 32px) / 2); } }
-@media (max-width: 575px) { .je-lead--slide .je-lead__items > li { flex-basis: 100%; } .je-lead--slide .je-lead__card { min-height: 353.8px !important; padding: 36px 18px; } }
+@media (max-width: 575px) { .je-lead--slide .je-lead__items > li { flex-basis: 100%; } .je-lead--slide .je-lead__card { min-height: 353.8px !important; padding: 144px 36px 36px; } }
 @media (max-width: 575px) { .je-slider__nav { margin-top: 18px; } }
+/* 1.0.8 pass 4: the source slider is 350px tall with 18px under it at 576-767 (362px and 36px from 768) */
+@media (min-width: 576px) and (max-width: 767px) { .je-lead--slide .je-lead__card { min-height: 350px !important; } .je-slider__nav { margin-top: 18px; } }
 
 /* two-row header on small screens (front page): brand left, social right; bars + theme left, search right */
 @media (max-width: 767px) {
@@ -1005,7 +1010,7 @@ body:not(.je-slug-category-blog):not(.je-slug-category-style-4):not(.je-slug-cat
   .je-minirow .je-minirow__items { grid-template-columns: 1fr; row-gap: 36px; }
   .je-minirow .je-mini { display: block; }
   .je-minirow .je-mini__img { max-width: none; margin-bottom: 18px; }
-  .je-minirow .je-mini__img img { width: 100% !important; height: 236px !important; aspect-ratio: 3 / 2; }
+  .je-minirow .je-mini__img img { width: 100% !important; height: auto !important; aspect-ratio: 3 / 2; }
 }
 @media (max-width: 991px) { .je-minirow .je-minirow__items { grid-template-columns: 1fr; row-gap: 36px; } }
 @media (min-width: 768px) and (max-width: 991px) { .je-sec--minirow { margin-top: 38.7px; } }
@@ -1060,6 +1065,8 @@ body:not(.je-slug-category-blog):not(.je-slug-category-style-4):not(.je-slug-cat
 .je-prose .t4-typo-example .btn { margin: 0 5px 5px 0; padding: 12.8px 18px; font-size: 18px; line-height: 20.7px; }
 .je-prose .t4-typo-example .btn.btn-sm { padding: 4px 8px; font-size: 14px; line-height: 16.1px; }
 .je-prose .t4-typo-example .btn.btn-lg { padding: 8px 16px; font-size: 20px; line-height: 23px; }
+/* 1.0.8 pass 2 — a button inside a card body has no margin and sits on the middle line (source), not on the baseline with a 5px gap */
+.je-prose .t4-typo-example .card-body > .btn { margin: 0; vertical-align: middle; }
 .je-prose .t4-typo-example .row[class*="row-cols-"] > .col { flex: 0 0 auto; width: 100%; }
 @media (min-width: 768px) { .je-prose .t4-typo-example .row.row-cols-md-2 > .col { width: 50%; } }
 @media (min-width: 992px) {
@@ -1282,7 +1289,7 @@ a[href*="blog-design"], .je-cat--design { --je-cat: #0d6efd; }
   .je-slug-category-style-2 .tracy-query .tracy-card__media img { aspect-ratio: 3 / 2 !important; height: auto; }
   .je-slug-category-style-2 .tracy-query .tracy-card__media { margin: 0 0 18px !important; }
   .je-slug-category-style-2 .tracy-query .tracy-card .tracy-card__title { font-size: 24px; line-height: 31.2px; }
-  .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .tracy-card { display: flex; flex-direction: column; justify-content: flex-end; min-height: 495.1px; padding: 24px; }
+  .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .tracy-card { display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; padding: 224px 24px 24px; }
   .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .tracy-card__media { position: absolute; inset: 0; margin: 0 !important; }
   .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .tracy-card__media img { height: 100%; aspect-ratio: auto !important; }
   .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .je-card__intro { display: none; }
@@ -1354,7 +1361,7 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
 }
 /* 1.0.3 lens fixes (mobile pager): the source wraps the page links from the left edge and sits 18px closer to the last card */
 @media (max-width: 767px) {
-  .je-pagination { margin-top: 13px; }
+  .je-pagination { margin-top: 18px; }
   .je-pagination__list { align-self: flex-start; justify-content: flex-start; margin-left: -1px; }
 }
 :root[data-theme="dark"] .je-list .wp-block-post-excerpt__more-link { color: rgb(194, 201, 214); }
@@ -1386,13 +1393,16 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .tracy-card__body, .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .je-card__extra { text-align: center; align-items: center; }
 .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .wp-block-post-terms.tracy-eyebrow { justify-content: center; }
 @media (max-width: 767px) { .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .tracy-card { min-height: 433.2px; } }
+/* 1.0.8 pass 3: from 768 to 1199 the source dark card is 406px tall (the port kept the 438.4px desktop value) */
+@media (min-width: 768px) and (max-width: 1199px) { .je-slug-category-style-3 .tracy-query .tracy-grid > li:nth-child(3) .tracy-card { min-height: 406px; } }
 @media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-3 .tracy-query { max-width: 684px; margin-inline: auto; } }
 /* 1.0.3 lens fixes (blog cards on a phone): wrapped tag rows sit 9px apart and the title is left-aligned, as in the source */
 .je-slug-category-blog .tracy-query .je-card__tags { row-gap: 9px; }
 @media (max-width: 767px) { .je-slug-category-blog .tracy-query .tracy-card__title { text-align: left; } }
 /* 1.0.3 lens fixes (tagged items): the list starts where the source's does; on a phone the field takes the whole row and the page-size select sits under it */
 .je-taglist { padding-top: 0 !important; }
-@media (max-width: 767px) {
+@media (min-width: 576px) { .je-taglist__group { flex: 1 1 auto; } .je-taglist__filter input[type="search"] { flex: 1 1 auto; width: auto; min-width: 0; } }
+@media (max-width: 575px) {
   .je-taglist__filter { flex-direction: column; align-items: stretch; gap: 16px; }
   .je-taglist__group { width: 100%; }
   .je-taglist__filter input[type="search"] { flex: 1 1 auto; width: auto; min-width: 0; }
@@ -1413,7 +1423,7 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
 }
 /* 1.0.3 lens fixes (article pages on a tablet): the source keeps a 684px column from 768px to 991px and lists the More Read cards one under another */
 @media (min-width: 768px) and (max-width: 991px) {
-  .je-narrow:has(.je-articlecard) { padding-inline: 42px; box-sizing: border-box; }
+  .je-narrow:has(.je-articlecard), .je-narrow:has(.je-taglist), .je-narrow:has(.je-authors), .je-page--login .je-narrow, .je-page--register .je-narrow, .je-page--contact .je-narrow { padding-inline: 42px; box-sizing: border-box; }
   .je-sec--more .je-more__items { grid-template-columns: 1fr !important; }
 }
 /* 1.0.3 lens fixes (lists on a tablet): the blog, Category Style 2 and Category Style 4 lists are one card wide from 768px to 991px, as in the source */
@@ -1433,11 +1443,15 @@ body.je-slug-category-style-2 .tracy-query .tracy-card__body { gap: 0; }
 /* 1.0.3 lens fixes (front page on a phone): the slide starts 21px under the header, the picture row's items are 4px further apart and the slide title is 22px */
 @media (max-width: 767px) {
   body:is(.home, .je-slug-home-3).je-hdr-two .je-sec--slide { margin-top: 21px; }
-  body:is(.home, .je-slug-home-3) .je-minirow .je-minirow__items { row-gap: 40px; }
+  body:is(.home, .je-slug-home-3) .je-minirow .je-minirow__items { row-gap: 36px; }
   body:is(.home, .je-slug-home-3) .je-lead--slide .je-lead__title, body:is(.home, .je-slug-home-3) .je-lead--slide .je-lead__title a { font-size: 22px; line-height: 28.6px; }
 }
 @media (min-width: 768px) and (max-width: 991px) { body:is(.home, .je-slug-home-3).je-hdr-two .je-sec--slide + .je-sec--minirow { margin-top: 54.4px; padding-bottom: 22px; } }
-@media (min-width: 768px) and (max-width: 991px) { body:is(.home, .je-slug-home-3) .je-list { margin-inline: -18px; } }
+@media (min-width: 576px) and (max-width: 991px) { body:is(.home, .je-slug-home-3) .je-list { margin-inline: -18px; } }
+/* 576-767: the source stacks its sections 18px apart; the 86px/72px gaps are the wide-screen rhythm */
+@media (min-width: 576px) and (max-width: 767px) { body:is(.home, .je-slug-home-3) .je-list { margin-top: 36px; } body:is(.home, .je-slug-home-3) #acm-gallery-120 { margin-top: 36px !important; } }
+@media (min-width: 576px) and (max-width: 767px) { body.je-slug-home-4 .je-list { margin-top: 0; } body.je-slug-home-4 #acm-gallery-120 { margin-top: 0 !important; } }
+@media (min-width: 576px) and (max-width: 767px) { body.je-slug-home-5 .je-twocol { margin-top: 0; } body.je-slug-home-5 #acm-gallery-140 { margin-top: 18px !important; } }
 .je-minirow .je-meta__date { font-family: var(--wp--preset--font-family--body, "Noto Serif", serif); line-height: 21px; }
 /* 1.0.3 lens fixes (home 2 Editor's choice on a tablet): one article per row, 632px wide, as in the source */
 @media (min-width: 768px) and (max-width: 991px) {
@@ -1519,7 +1533,7 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 :root[data-theme="dark"] .je-header__bottom { border-bottom-color: #2b3548; }
 /* 1.0.3 gallery slider (the source draws it on the gallery article) */
 .je-gslider-on .je-page__hero, .je-gslider-on .jes-gallery { display: none; }
-.je-gslider { margin: 0 0 18px; }
+.je-gslider { margin: 0 0 24px; }
 .je-gslider__viewport { position: relative; overflow: hidden; border-radius: 8px; background: var(--wp--preset--color--bg); }
 .je-gslider__slide { margin: 0; }
 .je-gslider__slide[hidden] { display: none; }
@@ -1591,6 +1605,8 @@ body .je-header .je-nav > .wp-block-navigation__container > li:not(.current-menu
 .t4-typo-example .badge.bg-primary { background: #0d6efd; }
 .t4-typo-example .badge.bg-light { background: light-dark(#f8f8ff, #222a3b); }
 .t4-typo-example .badge { font-family: "Noto Serif", serif; }
+/* 1.0.8 pass 2 — a badge inside a heading keeps the heading font (source: Jost); only standalone badges are Noto Serif */
+.t4-typo-example :is(.h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6) .badge { font-family: inherit; }
 .t4-typo-example .badge.bg-light.text-dark { color: light-dark(#212529, #eef1f6); }
 /* One-row header below 1400px as the source's 2/6/4 grid lays it out: the menu starts at the second column and the tools
    (toggle 38, search 48, Subscribe) sit flush right 16px apart; the header runs edge to edge (18px) under 1200px. */
@@ -1700,3 +1716,286 @@ body:not(.je-hdr-two) .je-header .je-drawer-toggle span { position: relative; le
 @media (max-width: 480px) { body.je-hdr-two .je-header__tools .je-theme-toggle { width: 20px; } }
 /* The source's social glyphs of the two-row header sit about 1px lower inside the same 21px boxes at 390 (measured: 1.1px mean over the four). */
 @media (max-width: 575px) { body.je-hdr-two .je-header__top .je-social a { position: relative; top: 1px; } }
+
+/* 1.0.8 footer — the source's band is 36px below 992px (not 768px), and its container fills the width until 1200px,
+   only then settling at 1164px; measured on login-form at 768, 800, 991, 1180 and 1200. */
+@media (max-width: 991px) { .je-footer { padding: 36px 0; } }
+@media (max-width: 1199px) { .je-footer__inner { max-width: none; margin-inline: 0; } }
+
+/* 1.0.8 listings — the source's container is 960px from 992px to 1199px (1164px from 1200px) and its card grid
+   holds two columns until 1200px; measured on category-style-1 at 1100, 1180 and 1199. */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-narrow:has(.je-prose > .tracy-query), .je-slug-category-style-2 .je-page--listing .je-narrow { max-width: 960px; }
+  .tracy-query:not(:where(:is(.je-slug-category-blog, .je-slug-category-style-4, .je-slug-category-style-2) *)) .tracy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* 1.0.8 Category Style 2 — the source keeps the 200px picture until 1200px (330px from 1200px) */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-slug-category-style-2 .tracy-query .tracy-card:not(:where(.tracy-grid > li:first-child *)) { grid-template-columns: 200px minmax(0, 1fr); }
+  .je-slug-category-style-2 .tracy-query .tracy-grid > li:not(:first-child) .tracy-card__media img { width: 200px !important; height: 200px !important; }
+}
+/* 1.0.8 two-column pages — below 1200px the source's right column is 284px wide (a third of its 960px container) */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-prose > .je-twocol:not(.je-side):not(.wp-block-columns), .je-twocol { grid-template-columns: minmax(0, 1fr) 284px; }
+}
+
+/* 1.0.8 front-page slides and picture row — the source shows two slides and one picture row per line until 1200px
+   (row-cols-xl-3); measured on home-5 at 1180. */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-lead--slide .je-lead__items > li { flex-basis: calc((100% - 32px) / 2); }
+  .je-minirow .je-minirow__items { grid-template-columns: 1fr; row-gap: 36px; }
+  body.je-hdr-two .je-lead--slide .je-lead__card { min-height: 350px !important; }
+  body.je-hdr-two .je-sec--slide + .je-sec--minirow { padding-bottom: 36px; }
+}
+
+/* 1.0.8 article, contact, account, tag and author pages — the same 960px container from 992px to 1199px
+   (measured on detail/layout-2 at 1180: the source card spans 128-1052px). */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-page--contact .je-narrow, .je-narrow:has(.je-articlecard):not(:has(.je-side)), .je-narrow:has(.je-t2),
+  .je-page--login .je-narrow, .je-page--register .je-narrow, .je-narrow:has(.je-taglist), .je-narrow:has(.je-authors),
+  .je-narrow:has(> .je-prose > .je-side), .je-narrow:has(.je-prose > .je-side), .je-narrow:has(.je-twocol) { max-width: 960px; }
+}
+@media (min-width: 992px) and (max-width: 1199px) {
+  .je-prose:has(> :first-child:not(.je-side)):has(> .je-side), .je-t2__cols { grid-template-columns: minmax(0, 1fr) 284px; }
+}
+
+/* 1.0.8: the tag box is 384px at most, so Share (124px) and Tags share a row in a 532px column and stack in a 452px one, as the source does */
+@media (min-width: 768px) { .je-artfoot__tags { max-width: 384px; } }
+
+/* 1.0.8: Layout 3 keeps a wider right column (364px) at 992-1199, as the source does */
+@media (min-width: 992px) and (max-width: 1199px) { body.je-slug-layout-3 .je-t2__cols { grid-template-columns: minmax(0, 1fr) 364px; } }
+/* 1.0.8: when Tags stack under Share in the 452px column the source leaves no row gap */
+@media (min-width: 992px) and (max-width: 1199px) { .je-artfoot__row { row-gap: 0; } }
+/* 1.0.8: the stacked Style 4 cards no longer overlap; the earlier negative margins hid a height difference that is fixed at the source */
+@media (max-width: 767px) { .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(n+2) { margin-top: 0; } }
+@media (max-width: 575px) { .je-slug-category-style-4 .tracy-query .je-card__tags { padding-bottom: 18px; } }
+/* 1.0.8 pass 3: tags fit on one row from 576, where the source list is 39px tall */
+@media (min-width: 576px) and (max-width: 767px) { .je-slug-category-style-4 .tracy-query .je-card__tags { padding-bottom: 9px; } }
+.je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(2) { margin-top: 0; }
+@media (min-width: 768px) and (max-width: 1199px) { .je-slug-category-style-4 .tracy-query .tracy-grid > li:nth-child(5) .tracy-card { min-height: 638px; } }
+
+/* 1.0.8: the Instagram row of Resources and Lifestyle sits 108px below the last card in the source; here it touched the cards */
+:is(.je-slug-resources, .je-slug-lifestyle, .je-slug-category-style-3) .je-gallery { margin-block-start: 107px !important; }
+@media (max-width: 991px) { :is(.je-slug-resources, .je-slug-lifestyle) .je-gallery { margin-block-start: 90px !important; } }
+@media (max-width: 767px) { :is(.je-slug-resources, .je-slug-lifestyle) .je-gallery { margin-block-start: 62px !important; } }
+/* 1.0.8 pass 3: below 768 the source Category Style 3 module sits 60px under its last card */
+@media (max-width: 767px) { .je-slug-category-style-3 .je-gallery { margin-block-start: 60px !important; } }
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-3 .je-gallery { max-width: 684px; margin-inline: auto; } }
+/* 1.0.8 pass 3: with the 406px dark card the source module sits 72px under the longest column */
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-3 .je-gallery { margin-block-start: 139px !important; } }
+@media (min-width: 992px) and (max-width: 1099px) { .je-slug-category-style-3 .je-gallery { margin-block-start: 130px !important; } }
+@media (min-width: 1100px) and (max-width: 1199px) { .je-slug-category-style-3 .je-gallery { margin-block-start: 109px !important; } }
+@media (min-width: 1200px) and (max-width: 1339px) { .je-slug-category-style-3 .je-gallery { margin-block-start: 77px !important; } }
+
+/* 1.0.8 pass 2 — author card spans the full card below 992px (source: the section is not capped at 400px there) */
+@media (max-width: 991px) {
+  body .je-authorcard--t1 .je-authorlatest--list { width: 100%; }
+}
+
+/* 1.0.8 pass 2 — related-card image at 768–991: the source picture is 16px narrower than its 648px box */
+@media (min-width: 768px) and (max-width: 991px) {
+  body .je-relcard .je-relcard__img img, body .je-authorlatest__img img { width: calc(100% - 16px) !important; }
+}
+
+/* 1.0.8 pass 2 — article title at 576–767 is 28px in the source (24px only below 576) */
+@media (min-width: 576px) and (max-width: 767px) {
+  body .je-page--article h1.je-page__title { font-size: 28px; line-height: 33.6px; }
+}
+
+/* 1.0.8 pass 3: below 768 the source keeps the 36px card padding and a 36px gap between the author block and More Read */
+@media (max-width: 767px) {
+	.je-article-main:has(> .je-authorcard) + .je-sec--more, .je-t2 + .je-sec--more { margin-top: 36px; }
+	.je-written { min-height: 0; }
+	.je-t2__right .je-authorlatest--list .je-authorlatest__title { margin-bottom: 24px; }
+}
+@media (min-width: 768px) and (max-width: 991px) { .je-t2__cols > .je-article-main { margin-bottom: 36px; } }
+
+/* 1.0.8 pass 3: once the sidebar stacks (below 992) the source gap above the home-1 and home-2 galleries is the 36px section padding, not 72px */
+@media (max-width: 991px) {
+	.je-slug-home-1 .je-gallery, .je-slug-home-2 .je-gallery { margin-block-start: 36px !important; }
+}
+
+/* 1.0.8 pass 3: the source draws a 1px hairline around the sidebar modules of home-2 and home-5 (it adds 2px to each module) */
+:is(.je-slug-home-2, .je-slug-home-5) .je-twocol > .je-sec { border: 1px solid rgba(0, 0, 0, 0.1); }
+:root[data-theme="dark"] :is(.je-slug-home-2, .je-slug-home-5) .je-twocol > .je-sec { border-color: rgba(255, 255, 255, 0.1); }
+
+/* 1.0.8 pass 3: beside the sidebar the source warm card keeps the title right under the category row and the byline on one line */
+@media (min-width: 992px) and (max-width: 1199px) {
+	.je-slug-home-2 .je-list--warm .je-card__body { padding-top: 0; }
+	.je-slug-home-2 .je-twocol .je-list--warm.je-list:not(.je-list--grid) .je-card:not(.je-card--v) .je-card__media { margin-top: 8px !important; }
+	.je-slug-home-2 .je-twocol .je-list--warm.je-list:not(.je-list--grid) .je-card:not(.je-card--v) .je-meta { flex-wrap: nowrap; margin-bottom: 16px !important; }
+}
+
+/* 1.0.8 pass 3: once the home-4 masonry has columns (768+) the source Trending module keeps a 16px bottom margin inside its cell, and the container includes the 36px margin of the last item in each column */
+@media (min-width: 768px) and (max-width: 991px), (min-width: 1200px) {
+	.je-slug-home-4 .je-list__items > li.je-trend-cell { padding-bottom: 16px; box-sizing: content-box; }
+	.je-slug-home-4 .je-list > .je-pagination { margin-top: 72px; }
+}
+
+/* 1.0.8 pass 3: at 992-1199 the source home-4 card content ends 8px higher than the port card (two columns of 444px) */
+@media (min-width: 992px) and (max-width: 1199px) {
+	.je-slug-home-4 .je-list--grid .je-card { padding-bottom: 30px; }
+}
+
+/* 1.0.8 pass 3: the source masonry container includes the 36px margin of the last item in each column, so its pager sits 36px lower */
+@media (min-width: 1200px) {
+	.je-slug-category-style-1 .tracy-query > .je-pagination { margin-top: 72px; }
+}
+
+/* 1.0.8 pass 3: below 992 the source sidebar modules are 684px wide and start 36px under the pager */
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-4 .je-prose > .je-sec { max-width: 684px; margin-inline: auto; } }
+@media (max-width: 359px) { .je-slug-category-style-4 .je-prose > .tracy-query + .je-sec { margin-top: 27px; } }
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-4 .je-prose > .tracy-query + .je-sec { margin-top: 36px; } }
+
+/* 1.0.8 pass 3: style-2 cards at 360-575 — the source's aside is followed by a 16px gap, not 22px */
+@media (min-width: 360px) and (max-width: 575px) { .je-slug-category-style-2 .tracy-query .je-card__extra { margin-top: 16px; } }
+
+/* 1.0.8 pass 4: smart-search below 768 — the source's examples card keeps its 16px bottom margin, the card is 60px above the gallery, the label is 22px; from 576 the buttons are 18px/48px under a 12px-gapped field */
+@media (max-width: 767px) {
+  .je-sf__tips { margin-bottom: 16px; }
+  .je-searchcard { margin-bottom: 60px; }
+  .je-sf__label { font-size: 22px; line-height: 33px; margin-bottom: 24px; }
+}
+@media (min-width: 576px) and (max-width: 767px) {
+  .je-sf__row { gap: 12px; }
+  .je-sf__go, .je-sf__adv { height: 48px; padding: 12.8px 18px; font-size: 18px; line-height: 20.7px; }
+}
+/* 1.0.8 pass 4: at 320 the source keeps both smart-search buttons on one row (100px + 137px in 253px) */
+@media (max-width: 359px) {
+  .je-sf__row { gap: 12px 6px; }
+  .je-sf__go, .je-sf__adv { padding: 12px; gap: 6px; }
+}
+/* 1.0.8 pass 4: stacked sidebar at 768–991 — the source's last module has no bottom margin */
+@media (min-width: 768px) and (max-width: 991px) {
+  .je-twocol > .je-side:not(:has(~ .je-side)) { margin-bottom: 0; }
+}
+/* 1.0.8 pass 4: "More Reading" block below 992 — the source's related-items list pulls 36px back under the title, and its title is 38px/49.4px at 768–991 */
+@media (max-width: 767px) {
+  .je-prose > .je-sec--more, .je-article-main > .je-sec--more { padding-bottom: 60px; }
+}
+@media (min-width: 768px) and (max-width: 991px) {
+  .wp-block-post-content .je-sec--more > .je-sec__head > h2.je-sec__title { font-size: 38px; line-height: 49.4px; }
+}
+
+/* 1.0.8 pass 4: read-more row — the source is a 16px/24px paragraph holding an inline-block link with a 24px top margin (45px); the padded 18px paragraph rounded to 46px */
+.je-list .je-card__excerpt p.wp-block-post-excerpt__more-text { padding-top: 0; font-size: 16px; line-height: 24px; }
+.je-list .je-card__excerpt p.wp-block-post-excerpt__more-text .wp-block-post-excerpt__more-link { display: inline-block; margin-top: 24px; vertical-align: top; }
+/* 1.0.8 pass 4: the source article-aside keeps a 16px margin under it in the home list cards */
+body:is(.home, .je-slug-home-3) .je-list:not(.je-list--grid) .je-card__body .je-meta { margin-bottom: 16px !important; }
+/* 1.0.8 pass 4: below 768 the source list sits 36px under the mini row (the 86px gap is the tablet and desktop one) */
+@media (max-width: 767px) { :is(.home, .je-slug-home-3) .je-container > .je-list, :is(.home, .je-slug-home-3) .je-list { margin-top: 36px; } }
+/* 1.0.8 pass 4: below 768 the source gallery module starts 36px under the list (72px from 768) */
+@media (max-width: 767px) { body:is(.home, .je-slug-home-3) .je-prose > .je-gallery { margin-block-start: 36px !important; } }
+/* 1.0.8 pass 4: the source slide meta wraps as 21px + 8px then 24px + 8px (61px), with no row gap */
+.je-lead__card .je-meta { row-gap: 0; align-items: flex-start; }
+.je-lead__card .je-meta__author { min-height: 0; }
+/* 1.0.8 pass 4: below 992 the source rows each keep a 36px margin, so the list ends 36px lower and the section keeps only 36px under it */
+@media (max-width: 991px) { .je-prose > .je-sec--more:has(.je-more__items) { padding-bottom: 36px; } .je-sec--more .je-more__items:is(.je-more__items--cards, :not(.x)) { padding-bottom: 36px; } }
+
+/* 1.0.8 pass 4: with no results the source keeps "No Results Found" inside the one search card; the card and the results block read as one surface */
+body.search:not(.je-search-empty) .je-searchcard:has(+ .je-search-results .je-noresults) { margin-bottom: 0; padding-bottom: 0; border-end-start-radius: 0; border-end-end-radius: 0; }
+body.search:not(.je-search-empty) .je-search-results:has(.je-noresults) { box-sizing: border-box; margin: 0 0 72px; padding: 32px 36px 36px; border-radius: 0 0 16px 16px; background: var(--wp--preset--color--surface); }
+body.search:not(.je-search-empty) .je-search-results:has(.je-noresults) .je-listing__title { margin-bottom: 24px; line-height: 24px; }
+.je-search-results .je-noresults { box-sizing: border-box; padding: 16px; }
+.je-search-results .je-noresults > h2 { margin: 16px 0 0; font-size: 28px; line-height: 1.3; font-weight: 700; }
+.je-search-results .je-noresults > p { margin: 0; }
+:root[data-theme="dark"] body.search:not(.je-search-empty) .je-search-results:has(.je-noresults) { background: #1a2130; }
+@media (max-width: 767px) { body.search:not(.je-search-empty) .je-search-results:has(.je-noresults) { margin-bottom: 60px; padding: 32px 16px 16px; } }
+/* 1.0.8 pass 4: home-5 below 576 the source gallery follows the main body's own 36px bottom padding, not the 72px used at wider widths */
+/* 576-767px: the source keeps 38px between the main body and its bottom module */
+@media (min-width: 576px) and (max-width: 767px) { body.je-slug-home-5 #acm-gallery-140 { margin-top: 39px !important; } }
+@media (max-width: 575px) { .je-slug-home-5 .je-twocol + .je-gallery, .je-slug-home-5 .je-gallery { margin-block-start: 36px !important; } }
+/* 1.0.8 pass 4: at 768-991 the source gallery gap is the sidebar column's 18px bottom padding plus the 54px section gap = 72px (measured on home-1 and home-2); below 768 it stays 36px */
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-home-1 .je-gallery, .je-slug-home-2 .je-gallery { margin-block-start: 72px !important; } }
+/* 1.0.8 pass 4: author card name follows the source steps (32px, 28px below 768, 24px below 576) and the pagination below the cards sits 36px away */
+@media (max-width: 767px) { .je-author__card .je-author__name { font-size: 28px; line-height: 28px; } }
+@media (max-width: 575px) { .je-author__card .je-author__name { font-size: 24px; line-height: 24px; } }
+.je-authors .je-pagination--counter-last { margin-top: 36px; }
+/* 1.0.8 pass 4: below 768 the source home-4 gallery follows the pagination by the main body's 36px bottom padding, not 72px */
+@media (max-width: 767px) { .je-slug-home-4 .je-sec.je-gallery, .je-slug-home-4 .je-gallery { margin-block-start: 36px !important; } }
+/* 1.0.8 pass 4: at 576-767 the source home-4 card ends 8px sooner (meta row 40px + 16px + 18px card padding) */
+@media (min-width: 576px) and (max-width: 767px) { .je-slug-home-4 .je-list--grid .je-card { padding-bottom: 26px; } }
+@media (min-width: 576px) and (max-width: 767px) { body.je-slug-home-4 #acm-gallery-120 { margin-top: 36px !important; } }
+/* 1.0.8 pass 4: below 768 the source highlight card is as tall as its content (no 446px floor) */
+@media (max-width: 767px) { .je-slug-home-4 .je-list--grid .je-list__items > li.je-highlight .je-card { min-height: 0 !important; } }
+@media (min-width: 576px) and (max-width: 767px) { body.je-slug-home-4 .je-list { margin-top: 36px; } }
+/* 1.0.8 pass 4: the source article-info row wraps its hit counter onto a second line when the three items do not fit the card width; the grid cards wrap the same way */
+.tracy-query .tracy-card .je-meta { flex-wrap: wrap; }
+
+/* 1.0.8 pass 5: style-2 horizontal cards — the source's intro starts 16px under the picture row, not 22px (card 1 keeps 22) */
+.je-slug-category-style-2 .tracy-query .tracy-grid > li:not(:first-child) .je-card__extra { margin-top: 16px; }
+
+/* 1.0.8 pass 5: style-2 cards 2+ at 500–767px — the source spends 11px more between the title and the byline */
+@media (min-width: 500px) and (max-width: 767px) {
+  .je-slug-category-style-2 .tracy-query .tracy-grid > li:not(:first-child) .tracy-card__title { margin-bottom: 23px; }
+}
+
+/* 1.0.8 pass 5: style-2 — the source's last card keeps its 36px bottom margin before the pagination */
+.je-slug-category-style-2 .tracy-query .tracy-grid { padding-bottom: 36px; }
+@media (max-width: 767px) { .je-slug-category-style-2 .tracy-query .tracy-grid { padding-bottom: 24px; } }
+@media (max-width: 767px) { .je-slug-category-style-2 .je-main section.je-sec { margin-top: 36px !important; } }
+
+/* 1.0.8 pass 5: style-2 overlay card below 360px — the source's readmore row starts 16px under the byline */
+@media (max-width: 359px) {
+  .je-slug-category-style-2 .tracy-query .tracy-grid > li:first-child .je-card__extra { margin-top: 16px; }
+}
+
+/* 1.0.8 pass 5: style-2 at 768–991px — the source's gallery band is 48px narrower than the port's, so its pictures are 16px shorter */
+@media (min-width: 768px) and (max-width: 991px) {
+  .je-slug-category-style-2 .je-main section.je-sec { margin-inline: 24px; }
+}
+
+/* 1.0.8 pass 5: contact — the source's form starts 48px under the intro and the card ends flush with the form; 96px before the gallery band */
+.je-contactcard { margin-bottom: 96px; }
+.je-contactcard .je-contactcard__intro { margin-bottom: 48px; }
+.je-contactcard > p:empty { margin: 0; }
+.je-contactcard .je-contactcard__intro { line-height: 24px; }
+.je-contactcard > .wpcf7 { margin: 0; }
+.je-contactcard > .wpcf7 { display: flow-root; }
+.je-contactcard .wpcf7-form > p:last-of-type { margin-bottom: 0; }
+@media (max-width: 767px) { .je-contactcard { margin-bottom: 61px; } }
+.je-contactcard .je-contactcard__title { font-size: 38px; line-height: 45.6px; }
+@media (min-width: 1200px) { .je-contactcard .je-contactcard__title { font-size: 40px; line-height: 48px; } }
+@media (max-width: 991px) { .je-contactcard .je-contactcard__title { font-size: 28px; line-height: 33.6px; } }
+
+/* 1.0.8 pass 5: category-blog — stacked sidebar starts 36px under the list (two 18px column paddings) */
+@media (max-width: 991px) { .je-slug-category-blog .tracy-query + .je-sec { margin-top: 36px; } }
+@media (min-width: 360px) and (max-width: 767px) { .je-slug-category-blog .tracy-query + .je-sec { margin-top: 6px; } }
+@media (max-width: 359px) { .je-slug-category-blog .tracy-query + .je-sec { margin-top: 0; } }
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-blog .je-main section.je-gallery { margin-inline: 24px; } }
+
+/* 1.0.8 pass 5: registration at 320 — the source's 288px strength meter overflows the 236px column and its output wraps to a second line */
+@media (max-width: 371px) { .je-acct meter.je-acct__strength { margin-bottom: 0; } .je-acct .je-acct__group:has(#je-je_password) { padding-bottom: 27px; margin-bottom: 32px; } }
+
+/* 1.0.8 pass 5: resources at 1440 — the source masonry column is 6px taller, so the gallery gap is 78px against the shared 107px */
+@media (min-width: 1300px) { .je-slug-resources .je-gallery { margin-block-start: 78px !important; } }
+
+/* 1.0.8 pass 5: below 1200px the source draws the author-latest and "More reading" titles at 38px/49.4px, not 40px/52px */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .wp-block-post-content h2.je-authorlatest__title.je-authorlatest__title:not(.je-authorlatest--list *),
+  .je-sec__head:has(+ .je-more) h2.je-sec__title.je-sec__title { font-size: 38px; line-height: 49.4px; }
+}
+
+/* 1.0.8 pass 5: stacked warm cards of home-2 at 576 — the source puts the category row directly under the image and keeps 16px between byline and excerpt */
+@media (min-width: 480px) and (max-width: 767px) {
+	.je-slug-home-2 .je-list--warm .je-card__body { padding-top: 0; }
+	.je-slug-home-2 .je-list--warm.je-list:not(.je-list--grid) .je-card:not(.je-card--v) .je-meta { margin-bottom: 16px !important; }
+	.je-slug-home-2 .je-twocol { margin-block-start: 18px !important; }
+}
+
+/* 1.0.8 pass 5: lifestyle at 768–991 — the source gallery sits in the 684px container, so its tiles are 222px wide and 16px shorter */
+@media (min-width: 768px) and (max-width: 991px) {
+	.je-slug-lifestyle .je-gallery { max-width: 684px; margin-inline: auto; margin-block-start: 110px !important; }
+}
+
+/* 1.0.8 pass 5: featured-articles at 576 — the source card image keeps its natural 632:422 ratio (304.47px), not 3:2 */
+@media (max-width: 767px) {
+	.je-slug-featured-articles .je-list .je-card__img img { aspect-ratio: 632 / 422 !important; }
+}
+
+/* 1.0.8 pass 5: category-style-1 — the source hit counter is 0.75px narrower, which lets author, date and hits share one line in a 288px card */
+.je-slug-category-style-1 .tracy-card .je-hits__icon { width: 15px; }
+/* 1.0.8 pass 5: the source masonry ends lower than the port grid; the gap is measured per width band */
+.je-slug-category-style-1 .tracy-query .je-pagination { margin-top: 43px !important; }
+@media (max-width: 767px) { .je-slug-category-style-1 .tracy-query .je-pagination { margin-top: 46px !important; } }
+@media (min-width: 768px) and (max-width: 991px) { .je-slug-category-style-1 .tracy-query .je-pagination { margin-top: 57px !important; } }
+@media (min-width: 1300px) { .je-slug-category-style-1 .tracy-query .je-pagination { margin-top: 105px !important; } }
