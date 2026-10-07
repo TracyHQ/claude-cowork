@@ -805,14 +805,17 @@ function wp_ja_nova_post_breadcrumbs( array $items ): array {
 	$trail  = array( $items[0] );
 	$prefix = '';
 	$parts  = array_values( array_filter( explode( '/', $path ), 'strlen' ) );
+	$own_path = wp_ja_nova_site_path( (string) get_permalink( get_queried_object() ) );
 	foreach ( $parts as $i => $part ) {
 		$prefix .= '/' . $part;
-		if ( ! isset( $labels[ $prefix ] ) ) {
+		$last    = $own && count( $parts ) - 1 === $i;
+		// The entry that names the article may link its permalink rather than the source path the redirect starts from.
+		$label = $labels[ $prefix ] ?? ( $last ? ( $labels[ $own_path ] ?? null ) : null );
+		if ( null === $label ) {
 			continue;
 		}
-		$last    = $own && count( $parts ) - 1 === $i;
-		$trail[] = $last ? array( 'label' => $labels[ $prefix ] ) : array(
-			'label' => $labels[ $prefix ],
+		$trail[] = $last ? array( 'label' => $label ) : array(
+			'label' => $label,
 			'url'   => home_url( $prefix . '/' ),
 		);
 	}
