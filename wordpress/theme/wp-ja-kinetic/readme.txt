@@ -1,4 +1,4 @@
-=== JA Kinetic ===
+=== WP Kinetic ===
 Contributors: joomlart
 Requires at least: 7.0
 Tested up to: 7.1

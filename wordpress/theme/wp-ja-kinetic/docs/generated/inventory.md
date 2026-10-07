@@ -13,7 +13,7 @@ Read from theme files, the spec-pack and the seed report only. No live site, no 
 | Requires PHP | 8.1 |
 | Tested up to | 7.1 |
 | Text Domain | wp-ja-kinetic |
-| Theme Name | JA Kinetic |
+| Theme Name | WP Kinetic |
 | Update URI | https://github.com/TracyHQ/claude-cowork |
 | Version | 1.1.0 |
 

@@ -4,7 +4,7 @@ Read this file before changing anything on this site. It describes the **install
 site and its theme**, not the Tracy skill (`tracy-wordpress-theme`) that produced them: a
 maintenance agent may receive only this webroot and this database.
 
-Theme: **JA Kinetic**, slug `wp-ja-kinetic`, text domain `wp-ja-kinetic`, version in `style.css`
+Theme: **WP Kinetic**, slug `wp-ja-kinetic`, text domain `wp-ja-kinetic`, version in `style.css`
 (`Version:` is stamped at build). Requires WordPress 7.0 and PHP 8.1; built and verified on
 WordPress 7.1 / PHP 8.3. The site it carries is "Kinetic — observability, reimagined", ported from
 the JoomlArt Joomla 6 quickstart `quickstart/ja-kinetic/j6` so that it renders the same pages; the

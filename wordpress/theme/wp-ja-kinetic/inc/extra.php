@@ -375,7 +375,7 @@ function wp_ja_kinetic_register(): void {
 			register_block_type( get_theme_file_path( "blocks/{$block}" ) );
 		}
 	}
-	register_block_pattern_category( 'wp-ja-kinetic', array( 'label' => __( 'JA Kinetic', 'wp-ja-kinetic' ) ) );
+	register_block_pattern_category( 'wp-ja-kinetic', array( 'label' => __( 'WP Kinetic', 'wp-ja-kinetic' ) ) );
 }
 add_action( 'init', 'wp_ja_kinetic_register' );
 
