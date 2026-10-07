@@ -173,46 +173,46 @@ function wp_ja_kinetic_direction_attributes( string $output ): string {
 add_filter( 'language_attributes', 'wp_ja_kinetic_direction_attributes' );
 
 /**
- * The browser title, as the source prints it: no site name after it (the source's global
- * `sitename_pagetitles` is off), the page's own title from the menu item it is reached by (post-seed
- * writes `wp_ja_kinetic_document_title`: the menu item's title, or the article's for an article menu
- * item — "Login" over the heading "Sign in to Kinetic", "About Kinetic"), a list page's for the list views
- * it answers (D-33), "<name> - <job title>" on the author view (the source's author override), and
- * "404 — <site>" on the error page (`error.php`).
+ * The browser title: the page's own title, then the site's name (1.1.9, so every tab names the customer's site; the
+ * source's global `sitename_pagetitles` was off). The page's own title comes from the menu item it is reached by
+ * (post-seed writes `wp_ja_kinetic_document_title`: the menu item's title, or the article's for an article menu item —
+ * "Login" over the heading "Sign in to Kinetic", "About Kinetic"), a list page's for the list views it answers (D-33),
+ * "<name> - <job title>" on the author view (the source's author override), and "404" on the error page (`error.php`).
  *
  * @param string $title The title WordPress would build; empty to let it.
  * @return string
  */
 function wp_ja_kinetic_document_title( string $title ): string {
+	// A title that already names the site (the home page's "<site> — <slogan>") is left as it is.
+	$named = static fn( string $own ): string => esc_html( str_contains( $own, get_bloginfo( 'name' ) ) ? $own : $own . ' ' . apply_filters( 'document_title_separator', '–' ) . ' ' . get_bloginfo( 'name' ) );
 	if ( is_404() ) {
-		return esc_html( '404 — ' . get_bloginfo( 'name' ) );
+		return $named( '404' );
 	}
 	$list = function_exists( 'wp_ja_kinetic_current_list' ) ? wp_ja_kinetic_current_list() : null;
 	if ( $list && 'author' === $list['kind'] && is_author() ) {
 		$user = get_queried_object();
 		if ( $user instanceof WP_User ) {
 			$job = (string) get_user_meta( $user->ID, 'wp_ja_kinetic_job_title', true );
-			return esc_html( $user->display_name . ( '' !== $job ? ' - ' . $job : '' ) );
+			return $named( $user->display_name . ( '' !== $job ? ' - ' . $job : '' ) );
 		}
 	}
 	$page = $list ? $list['page'] : ( is_singular() ? get_queried_object() : null );
 	if ( $page instanceof WP_Post ) {
 		$own = (string) get_post_meta( $page->ID, 'wp_ja_kinetic_document_title', true );
-		return esc_html( '' !== $own ? $own : get_the_title( $page ) );
+		return $named( '' !== $own ? $own : get_the_title( $page ) );
 	}
 	return $title;
 }
 add_filter( 'pre_get_document_title', 'wp_ja_kinetic_document_title' );
 
 /**
- * Any other view keeps WordPress's own title, without the site name and tagline the source never
- * appends.
+ * Any other view keeps WordPress's own title with the site's name, without the tagline.
  *
  * @param array $parts The title parts.
  * @return array
  */
 function wp_ja_kinetic_document_title_parts( array $parts ): array {
-	unset( $parts['site'], $parts['tagline'] );
+	unset( $parts['tagline'] );
 	return $parts;
 }
 add_filter( 'document_title_parts', 'wp_ja_kinetic_document_title_parts' );

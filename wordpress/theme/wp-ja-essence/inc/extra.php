@@ -1250,16 +1250,16 @@ function wp_ja_essence_page_heading( string $content, array $block, $instance = 
 add_filter( 'render_block_core/post-title', 'wp_ja_essence_page_heading', 10, 3 );
 
 /**
- * The document title (`<title>`): the source prints the page's own title and no site-name suffix ("Home 1", "Abstract Wonders:
- * Exploring Line Art Composition"), so the suffix WordPress adds is dropped and an article page is titled by its source heading
- * (not the menu word it is titled with).
+ * The document title (`<title>`): the page's own title, then the site's name (1.0.9, so every tab names the customer's
+ * site; the source printed no suffix). An article page is titled by its source heading (not the menu word it is titled
+ * with); the tagline WordPress adds on the front page is left out.
  *
  * @param array $parts The title parts WordPress built.
  * @return array
  */
 function wp_ja_essence_title_parts( array $parts ): array {
-	unset( $parts['site'], $parts['tagline'] );
-	if ( is_page() ) {
+	unset( $parts['tagline'] );
+	if ( is_page() && ! is_front_page() ) {
 		$parts['title'] = wp_ja_essence_display_title( get_queried_object_id() );
 	}
 	return $parts;
@@ -1267,17 +1267,18 @@ function wp_ja_essence_title_parts( array $parts ): array {
 add_filter( 'document_title_parts', 'wp_ja_essence_title_parts' );
 
 /**
- * The two titles that are not a page's own: the home page and the error page, as the source prints them.
+ * The two titles that are not a page's own: the home page is the site's name alone, and the error page says so before
+ * the site's name. Both name the site the customer gave, not the demo template's wording.
  *
  * @param string $title The title WordPress would build (empty to let it build one).
  * @return string
  */
 function wp_ja_essence_title_fixed( $title ) {
 	if ( is_front_page() ) {
-		return 'Minimal Blogging Template - ' . get_bloginfo( 'name' );
+		return esc_html( get_bloginfo( 'name' ) );
 	}
 	if ( is_404() ) {
-		return 'Error: 404 Page not found';
+		return esc_html( 'Page not found ' . apply_filters( 'document_title_separator', '–' ) . ' ' . get_bloginfo( 'name' ) );
 	}
 	return $title;
 }

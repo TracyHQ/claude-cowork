@@ -6,9 +6,13 @@
 <div class="wp-block-columns is-not-stacked-on-mobile tracy-footer__columns">
 <!-- wp:column {"width":"34%","className":"tracy-footer__brand"} -->
 <div class="wp-block-column tracy-footer__brand" style="flex-basis:34%">
-<!-- wp:html -->
-<a class="tracy-footer__lock" href="/" aria-label="Kinetic"><svg class="tracy-footer__logo" width="24" height="24" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 4 Q16 12 8 20 Q16 28 24 20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path><path d="M24 12 Q16 20 24 28 Q16 4 8 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity="0.5"></path></svg><span class="tracy-brand">Kinetic</span></a>
-<!-- /wp:html -->
+<!-- wp:group {"className":"tracy-footer__lock","layout":{"type":"flex","flexWrap":"nowrap"}} -->
+<div class="wp-block-group tracy-footer__lock">
+<!-- wp:site-logo {"width":24,"shouldSyncIcon":false,"className":"tracy-footer__logo tracy-footer__logo--light tracy-logo-bare"} /-->
+<!-- wp:site-logo {"width":24,"shouldSyncIcon":false,"className":"tracy-footer__logo tracy-footer__logo--dark tracy-logo-bare"} /-->
+<!-- wp:site-title {"level":0,"className":"tracy-brand"} /-->
+</div>
+<!-- /wp:group -->
 <!-- wp:paragraph {"className":"tracy-footer__blurb"} -->
 <p class="tracy-footer__blurb">Observability without the overhead. Logs, metrics and traces on one fast timeline.</p>
 <!-- /wp:paragraph -->
@@ -77,7 +81,7 @@
 <!-- wp:group {"className":"tracy-footer__bottom","layout":{"type":"flex","justifyContent":"space-between","flexWrap":"wrap"}} -->
 <div class="wp-block-group tracy-footer__bottom">
 <!-- wp:paragraph {"className":"tracy-footer__copy"} -->
-<p class="tracy-footer__copy">© 2026 Kinetic Labs, Inc. All rights reserved.</p>
+<p class="tracy-footer__copy">© {year} {site.title}. All rights reserved.</p>
 <!-- /wp:paragraph -->
 <!-- wp:list {"className":"tracy-footer__legal"} -->
 <ul class="wp-block-list tracy-footer__legal">

@@ -2991,3 +2991,18 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
     gap: var(--wp--preset--spacing--3);
   }
 }
+
+/* The dark header (1.1.6): the logo for a dark background (option tracy_logo_dark, `<img data-tracy-identity=
+   "site.logoDark">` after the mark) takes the light logo's place; with no dark logo the dark header shows the monogram
+   beside the name, never the light logo, which would vanish on #15181A. */
+.tracy-header__brand img.tracy-logo-dark { display: none; }
+html[data-theme='dark'] .tracy-header__brand img.tracy-logo:not([hidden]) { display: none; }
+html[data-theme='dark'] .tracy-header__brand img.tracy-logo + .tracy-brand__mark { display: grid; }
+html[data-theme='dark'] .tracy-header__brand img.tracy-logo-dark:not([hidden]) { display: block; height: 40px; width: auto; }
+html[data-theme='dark'] .tracy-header__brand .tracy-brand__mark:has(+ img.tracy-logo-dark:not([hidden])) { display: none; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .tracy-header__brand img.tracy-logo:not([hidden]) { display: none; }
+  html:not([data-theme]) .tracy-header__brand img.tracy-logo + .tracy-brand__mark { display: grid; }
+  html:not([data-theme]) .tracy-header__brand img.tracy-logo-dark:not([hidden]) { display: block; height: 40px; width: auto; }
+  html:not([data-theme]) .tracy-header__brand .tracy-brand__mark:has(+ img.tracy-logo-dark:not([hidden])) { display: none; }
+}

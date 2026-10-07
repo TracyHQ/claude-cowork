@@ -1412,3 +1412,16 @@
   letter-spacing: -0.12px;
   text-transform: none;
 }
+
+/* Two Site Logo blocks (1.1.5): the site logo on the light header, the dark-background logo (option tracy_logo_dark) on
+   the dark one. A dark header with no dark logo shows only the Site Title beside the empty spot. */
+.tracy-header__brand .tracy-logo-dark { display: none; }
+:root[data-theme='dark'] .tracy-header__brand .tracy-logo-light { display: none; }
+:root[data-theme='dark'] .tracy-header__brand .tracy-logo-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .tracy-header__brand .tracy-logo-light { display: none; }
+  :root:not([data-theme]) .tracy-header__brand .tracy-logo-dark { display: block; }
+}
+/* The copyright line under the site notice, in its small print. */
+.tracy-footer__strip .tracy-footer__copyright { padding-bottom: var(--wp--preset--spacing--6); font-size: var(--wp--preset--font-size--xs); color: var(--wp--preset--color--muted); }
+.tracy-footer__strip .acm-site-notice:has(+ .tracy-footer__copyright) { padding-bottom: var(--wp--preset--spacing--2); }

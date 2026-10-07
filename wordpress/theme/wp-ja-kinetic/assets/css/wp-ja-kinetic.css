@@ -2089,3 +2089,16 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
     grid-template-columns: repeat(3, minmax(min-content, 1fr));
   }
 }
+
+/* 1.1.9 — the brand is the customer's: Site Logo blocks (a light and a dark one, swapped with data-theme) beside the
+   Site Title, in the header and in the footer lock. An empty spot stays empty (tracy-logo-bare): the name beside it is
+   the text logo. The demo ships the Kinetic glyph as both logos. */
+.tracy-header__brand .tracy-logo img { display: block; height: 26px; width: auto; }
+.tracy-footer__lock { margin: 0; }
+.tracy-footer__lock .tracy-footer__logo { width: auto; height: auto; margin: 0; }
+.tracy-footer__lock .tracy-footer__logo img { display: block; height: 24px; width: auto; }
+.tracy-footer__lock .tracy-brand { margin: 0; }
+.tracy-footer__lock .tracy-brand a { color: inherit; text-decoration: none; }
+.tracy-header__brand .tracy-logo--dark, .tracy-footer__lock .tracy-footer__logo--dark { display: none; }
+:root[data-theme='dark'] .tracy-header__brand .tracy-logo--light, :root[data-theme='dark'] .tracy-footer__lock .tracy-footer__logo--light { display: none; }
+:root[data-theme='dark'] .tracy-header__brand .tracy-logo--dark, :root[data-theme='dark'] .tracy-footer__lock .tracy-footer__logo--dark { display: block; }

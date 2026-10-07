@@ -79,7 +79,7 @@ rows (nine imported authors and the administrator) and any plugin secret.
 - **Contact page shows `[contact-form-7 ...]` as text**: Contact Form 7 is inactive or the form id
   changed; `wp post list --post_type=wpcf7_contact_form --fields=ID,post_title`, then fix the id in
   the page's shortcode.
-- **Footer logo missing**: theme mod `custom_logo` is unset (`wp theme mod get custom_logo`).
+- **Footer logo missing**: option `site_logo` is unset (`wp option get site_logo`); in dark mode the footer reads option `tracy_logo_dark` instead and shows the site name as text without it (1.0.9).
 
 ## Known limits
 
