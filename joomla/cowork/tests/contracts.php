@@ -429,7 +429,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     }catch(Throwable $e){$loaded=$e->getMessage();}
     check("$id multilingual map is one this receiver can load",$loaded,true);
 }
-foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2'] as $id)
+foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2','tracy-base/j6/1.0.2'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
 // ja-kinetic's demo is 240 blog posts about a company that does not exist; without this file every
 // customer site built on it shows them, and nothing anywhere reports that.
