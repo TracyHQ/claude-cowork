@@ -10,7 +10,7 @@
       "Requires PHP": "8.1",
       "Tested up to": "7.1",
       "Text Domain": "wp-ja-impact",
-      "Theme Name": "JA Impact",
+      "Theme Name": "WP Impact",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
       "Version": "1.0.3"
     },
@@ -1287,7 +1287,7 @@
     "variations": [
       {
         "id": "wp-ja-impact",
-        "title": "JA Impact",
+        "title": "WP Impact",
         "inspiration": "wp-ja-impact"
       }
     ],

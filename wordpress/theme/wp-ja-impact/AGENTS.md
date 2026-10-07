@@ -3,7 +3,7 @@
 Read this before changing anything. It describes the **installed WordPress site and its theme**,
 not the Tracy skill (`tracy-wordpress-theme`) that produced them.
 
-Theme: **JA Impact**, slug `wp-ja-impact`, text domain `wp-ja-impact`, version in `style.css`
+Theme: **WP Impact**, slug `wp-ja-impact`, text domain `wp-ja-impact`, version in `style.css`
 (`Version:` is stamped at build; 1.0.0 when these documents were written). Requires WordPress 7.0
 and PHP 8.1; built on WordPress 7.1.2 / PHP 8.3. The site it carries is "JA Impact", a charity
 and non-profit site, ported from the JoomlArt Joomla 6 quickstart `quickstart/ja-impact/j6`

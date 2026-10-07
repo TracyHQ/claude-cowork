@@ -86,7 +86,7 @@ add_action( 'wp_head', 'wp_ja_impact_preload_font', 2 );
 
 /** The pattern category the overlay's patterns file under. */
 function wp_ja_impact_register(): void {
-	register_block_pattern_category( 'wp-ja-impact', array( 'label' => __( 'JA Impact', 'wp-ja-impact' ) ) );
+	register_block_pattern_category( 'wp-ja-impact', array( 'label' => __( 'WP Impact', 'wp-ja-impact' ) ) );
 	add_post_type_support( 'page', 'excerpt' );
 }
 add_action( 'init', 'wp_ja_impact_register' );
