@@ -10,7 +10,7 @@
       "Requires PHP": "8.1",
       "Tested up to": "7.1",
       "Text Domain": "wp-ja-morgan",
-      "Theme Name": "JA Morgan",
+      "Theme Name": "WP Morgan",
       "Update URI": "https://github.com/TracyHQ/claude-cowork",
       "Version": "1.1.2"
     },
@@ -1223,7 +1223,7 @@
     "variations": [
       {
         "id": "wp-ja-morgan",
-        "title": "JA Morgan",
+        "title": "WP Morgan",
         "inspiration": "wp-ja-morgan"
       }
     ],

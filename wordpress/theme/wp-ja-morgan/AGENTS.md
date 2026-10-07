@@ -3,7 +3,7 @@
 Read this before changing anything. It describes the **installed WordPress site and its theme**,
 not the Tracy skill (`tracy-wordpress-theme`) that produced them.
 
-Theme: **JA Morgan**, slug `wp-ja-morgan`, text domain `wp-ja-morgan`, version in `style.css`
+Theme: **WP Morgan**, slug `wp-ja-morgan`, text domain `wp-ja-morgan`, version in `style.css`
 (`Version:` is stamped at build; 1.1.2 when these documents were written). Requires WordPress 7.0
 and PHP 8.1; built on WordPress 7.1.2. The site is "JA Morgan", a business-consulting site ported
 from the JoomlArt Joomla 6 quickstart `quickstart/ja-morgan/j6` (template `ja_morgan` on the T3
