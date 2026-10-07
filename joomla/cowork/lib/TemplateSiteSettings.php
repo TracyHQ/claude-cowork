@@ -240,4 +240,36 @@ final class TemplateSiteSettings
             return !in_array('icon', $words ?: [], true);
         });
     }
+
+    /**
+     * A printed page whose `<head>` keeps one favicon: the customer's (`$keepHref`, as printed). Every
+     * other `<link>` whose `rel` words include `icon` goes, with the white space after it.
+     *
+     * Why the printed page and not only {@see withoutFavicons}: Joomla's MetasRenderer adds
+     * `templates/<t>/favicon.ico` AFTER `onBeforeCompileHead` whenever no head link has the type
+     * `image/vnd.microsoft.icon`, so a PNG favicon is always followed by the template's icon and a
+     * browser may show that one. A template printing its own icon tag is covered the same way. Only
+     * the head is read: a page without `</head>` (JSON, a fragment) is returned as it is.
+     */
+    public static function withoutOtherFaviconTags(string $html, string $keepHref): string
+    {
+        $end = stripos($html, '</head>');
+        if ($end === false) return $html;
+        $head = preg_replace_callback('~<link\b[^>]*>\s*~i', static function (array $m) use ($keepHref): string {
+            $rel = self::attributeOf($m[0], 'rel');
+            $words = $rel === null ? [] : (preg_split('/\s+/', strtolower(trim($rel))) ?: []);
+            if (!in_array('icon', $words, true) || self::attributeOf($m[0], 'href') === $keepHref) return $m[0];
+            return '';
+        }, substr($html, 0, $end));
+        return $head === null ? $html : $head . substr($html, $end);
+    }
+
+    /** One attribute of a tag, entities decoded, or null; `data-rel` is not `rel`. */
+    private static function attributeOf(string $tag, string $name): ?string
+    {
+        $pattern = '~(?<![\w-])' . preg_quote($name, '~') . '\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'>]+))~i';
+        if (!preg_match($pattern, $tag, $m)) return null;
+        $value = ($m[1] ?? '') !== '' ? $m[1] : (($m[2] ?? '') !== '' ? $m[2] : ($m[3] ?? ''));
+        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
 }

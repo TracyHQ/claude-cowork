@@ -53,12 +53,16 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * T4 prints the favicon its site profile names; a T3 template (or any other) has no such setting,
  * and Joomla prints `templates/<t>/favicon.ico`. `template.siteSettings` keeps the customer's
  * favicon for those in `templates/<t>/local/etc/site/tracy-favicon.json`; `onBeforeCompileHead`
- * swaps the head's favicon links for it. A template without that file costs one `is_file`.
+ * swaps the head's favicon links for it, and `onAfterRender` takes out the template icon Joomla
+ * adds after that event. A template without that file costs one `is_file`.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
     /** Whether this request prints render stamps. Decided once, at `onAfterInitialise`. */
     private bool $stamping = false;
+
+    /** The customer's favicon as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
+    private ?string $faviconHref = null;
 
     public static function getSubscribedEvents(): array
     {
@@ -214,6 +218,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
      */
     public function onAfterRender(): void
     {
+        $this->keepOnlyCustomerFavicon();
         if (!$this->stamping) {
             return;
         }
@@ -249,8 +254,32 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             }
             $document->_links = \TemplateSiteSettings::withoutFavicons($document->_links);
             $document->addFavicon($link['href'], $link['type'], 'icon');
+            $this->faviconHref = $link['href'];
         } catch (\Throwable $e) {
             // A favicon is never worth a page: the page keeps Joomla's own.
+            Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The page as printed keeps only the favicon `onBeforeCompileHead` set: Joomla adds the
+     * template's `favicon.ico` after that event whenever no head link is typed as an ICO file
+     * (`TemplateSiteSettings::withoutOtherFaviconTags`), and a browser may show that one instead.
+     */
+    private function keepOnlyCustomerFavicon(): void
+    {
+        if ($this->faviconHref === null) {
+            return;
+        }
+        try {
+            $app = $this->getApplication();
+            $body = (string) $app->getBody();
+            $clean = \TemplateSiteSettings::withoutOtherFaviconTags($body, $this->faviconHref);
+            if ($clean !== $body) {
+                $app->setBody($clean);
+            }
+        } catch (\Throwable $e) {
+            // A favicon is never worth a page: the page keeps both icons.
             Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
