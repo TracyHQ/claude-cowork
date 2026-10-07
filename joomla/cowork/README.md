@@ -490,6 +490,9 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   where a lock lists one, as `Presentation asset changed`. Anything else under `local/` still is.
 - **A favicon without T4.** The setting goes to `templates/<t>/local/etc/site/tracy-favicon.json`;
   the system plugin (`onBeforeCompileHead`) removes the page's favicon links and prints that file.
+  Joomla then adds `templates/<t>/favicon.ico` after that event whenever no head link is typed
+  `image/vnd.microsoft.icon` (its MetasRenderer fallback), so `onAfterRender` also takes every other
+  icon `<link>` out of the printed `<head>`: the page carries the customer's favicon and no other.
   A template without the file costs one `is_file` per page.
 - A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
 

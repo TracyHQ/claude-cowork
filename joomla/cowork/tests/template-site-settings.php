@@ -222,6 +222,26 @@ if (function_exists('check')) {
         '/sub/apple.png' => ['relation' => 'apple-touch-icon', 'relType' => 'rel', 'attribs' => []],
         '/sub/feed' => ['relation' => 'alternate', 'relType' => 'rel', 'attribs' => []]];
     check('every favicon link goes; the touch icon and the feed stay', array_keys(TemplateSiteSettings::withoutFavicons($tsLinks)), ['/sub/apple.png', '/sub/feed']);
+    // Joomla's MetasRenderer adds the template's favicon.ico AFTER onBeforeCompileHead whenever no head link has the
+    // type image/vnd.microsoft.icon (measured on JA Smallbiz, Sensei, Morgan, Joomla 6.1): the printed page is cleaned.
+    $tsKeep = '/sub/images/tracy-brand/5555eeee.png';
+    $tsPage = "<!DOCTYPE html>\n<html><head>\n\t<meta charset=\"utf-8\">\n"
+        . "\t<link href=\"/sub/images/tracy-brand/5555eeee.png\" rel=\"icon\" type=\"image/png\">\n"
+        . "\t<link href=\"/sub/templates/ja_sensei/favicon.ico\" rel=\"icon\" type=\"image/vnd.microsoft.icon\">\n"
+        . "\t<link rel='shortcut icon' href='/sub/favicon.ico' />\n"
+        . "\t<link href=\"/sub/apple.png\" rel=\"apple-touch-icon\">\n"
+        . "\t<link data-rel=\"icon\" href=\"/sub/x.css\" rel=\"stylesheet\">\n"
+        . "\t<link href=\"/sub/feed\" rel=\"alternate\" type=\"application/rss+xml\">\n"
+        . "</head><body><link href=\"/sub/body.ico\" rel=\"icon\"><p>icon</p></body></html>";
+    $tsClean = TemplateSiteSettings::withoutOtherFaviconTags($tsPage, $tsKeep);
+    check('the printed page keeps only the customer\'s favicon in its head', $tsClean, "<!DOCTYPE html>\n<html><head>\n\t<meta charset=\"utf-8\">\n"
+        . "\t<link href=\"/sub/images/tracy-brand/5555eeee.png\" rel=\"icon\" type=\"image/png\">\n"
+        . "\t<link href=\"/sub/apple.png\" rel=\"apple-touch-icon\">\n"
+        . "\t<link data-rel=\"icon\" href=\"/sub/x.css\" rel=\"stylesheet\">\n"
+        . "\t<link href=\"/sub/feed\" rel=\"alternate\" type=\"application/rss+xml\">\n"
+        . "</head><body><link href=\"/sub/body.ico\" rel=\"icon\"><p>icon</p></body></html>");
+    check('a page with no head is left as it is', TemplateSiteSettings::withoutOtherFaviconTags('{"ok":true}', $tsKeep), '{"ok":true}');
+    check('a page without other favicons is left byte for byte', TemplateSiteSettings::withoutOtherFaviconTags($tsClean, $tsKeep), $tsClean);
     $tsPut('templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE, '{"other_faviconFile":"../configuration.php"}');
     check('a setting file naming something else prints nothing', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_mood'), null);
     $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-mood']]);
