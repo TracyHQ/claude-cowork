@@ -24,6 +24,10 @@ require_once __DIR__ . '/lib/MultilingualHooks.php';
 MultilingualHooks::register();
 require_once __DIR__ . '/lib/NavigationLinks.php';
 NavigationLinks::register();
+// A Polylang source edition written in another language speaks it (`tracy_source_locale`): `<html lang>`, hreflang
+// and WordPress's own words follow the language the customer chose, on that edition's front end only.
+require_once __DIR__ . '/lib/SourceLocaleHooks.php';
+SourceLocaleHooks::register();
 // Content API identity: a new row gets its content uid when WordPress inserts it, on a site that
 // opted in with `content.identity`. One small file, no engine.
 require_once __DIR__ . '/lib/ContentIdentity.php';
