@@ -30,6 +30,19 @@ final class ContractTestWriter extends FakeSiteWriter {
     public bool $drift=false;
     /** [kind, id] whose next write throws, to stand in for a row Joomla refuses mid-batch. */
     public ?array $failOn=null;
+    /** [kind, id] whose next write (once) LANDS and then throws: a Joomla write that fails after Table::store() (tags, assets). */
+    public ?array $failAfter=null;
+    /** [kind, id] that refuses every write made outside a transaction: an undo that cannot be written back. */
+    public ?array $failOutside=null;
+    /**
+     * Joomla's Table::store() on an article or a module stores its `#__assets` row through
+     * Table\Nested::store(), which takes `LOCK TABLES #__assets WRITE`: an implicit COMMIT in MySQL
+     * and MariaDB, after which every statement autocommits. Measured 08/10/2026 on a JA Podcast j6
+     * stand (TCH #1013, D3): a failed contract apply kept every write before the failing one. On,
+     * this double's rollback does the same: once such a write ran, nothing is rolled back.
+     */
+    public bool $tableCommits=false;
+    private bool $committed=false;
     /**
      * Joomla's Table::store() on an article writes its `#__assets` row as a side effect —
      * creating one, parented at the root, for a row that had none. Measured 23/09/2026 on
@@ -57,6 +70,9 @@ final class ContractTestWriter extends FakeSiteWriter {
     }
     public function write(string $kind,int $id,array $fields):int {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
+        if($this->failOutside===[$kind,$id] && !$this->open)throw new RuntimeException('The site refused '.$kind.' '.$id.' outside a transaction');
+        if($this->tableCommits && $this->open && in_array($kind,['article','module'],true))$this->committed=true;
+        if($this->failAfter===[$kind,$id]){$this->failAfter=null;parent::write($kind,$id,array_merge($this->read($kind,$id)??[],$fields));throw new RuntimeException('The site refused '.$kind.' '.$id.' after storing it');}
         // JoomlaRelations' rules: one group per item, and a new group never swallows part of another.
         if($this->nestedPaths && isset(self::RELATIONS[$kind])){
             $old=json_decode($this->read($kind,$id)['members'],true);
@@ -106,9 +122,10 @@ final class ContractTestWriter extends FakeSiteWriter {
     public bool $open=false;
     public function transaction(callable $work):array {
         $before=[$this->store,$this->log->log,$this->binding->binding,$this->binding->job];
-        $this->open=true;
+        $this->open=true;$this->committed=false;
         try{return $work();}catch(Throwable $error){
-            [$this->store,$this->log->log,$this->binding->binding,$this->binding->job]=$before;throw $error;
+            if(!$this->committed)[$this->store,$this->log->log,$this->binding->binding,$this->binding->job]=$before;
+            throw $error;
         }finally{$this->open=false;}
     }
 }
@@ -429,7 +446,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     }catch(Throwable $e){$loaded=$e->getMessage();}
     check("$id multilingual map is one this receiver can load",$loaded,true);
 }
-foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2','tracy-base/j6/1.0.2'] as $id)
+foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2','tracy-base/j6/1.0.2','ja-social-ii/j6/1.0.1','ja-donate/j6/1.0.1','ja-rent/j6/1.0.1','ja-essence/j6/1.0.2','ja-vogue/j6/1.0.3','tracy-business/j6/1.2.1'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
 // ja-kinetic's demo is 240 blog posts about a company that does not exist; without this file every
 // customer site built on it shows them, and nothing anywhere reports that.
