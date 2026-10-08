@@ -927,6 +927,46 @@ class FakeSiteWriterBase implements SiteWriter
         $this->store['language'][$source] = ['lang_code' => $to] + $label + $old;
         return ['previous' => ['title' => (string) ($old['title'] ?? ''), 'title_native' => (string) ($old['title_native'] ?? ''), 'image' => (string) ($old['image'] ?? '')], 'removed' => $removedRow];
     }
+    public function swapLanguage(string $from, string $to, ?array $label = null): array
+    {
+        $source = null; $target = null;
+        foreach ($this->store['language'] ?? [] as $id => $row) {
+            if (($row['lang_code'] ?? null) === $from) $source = $id;
+            if (($row['lang_code'] ?? null) === $to) $target = $id;
+        }
+        if ($source === null) throw new RuntimeException('This site has no ' . $from . ' content language to relabel');
+        $shown = ['article' => 'state', 'menuItem' => 'published', 'module' => 'published'];
+        if ($target !== null && (string) ($this->store['language'][$target]['published'] ?? '0') === '1')
+            throw new RuntimeException('This site still routes ' . $to . '; hide that edition before its tag can name the source');
+        foreach ($shown as $kind => $column)
+            foreach ($this->store[$kind] ?? [] as $row)
+                if (($row['language'] ?? null) === $to && (string) ($row[$column] ?? '0') === '1' && (int) ($row['client_id'] ?? 0) === 0)
+                    throw new RuntimeException('This site still shows content in ' . $to . '; hide that edition before its tag can name the source');
+        $old = $this->store['language'][$source];
+        $previous = ['title' => (string) ($old['title'] ?? ''), 'title_native' => (string) ($old['title_native'] ?? ''), 'image' => (string) ($old['image'] ?? '')];
+        if ($target === null) {
+            $moved = $this->relabelLanguage($from, $to, $label);
+            return ['previous' => $moved['previous'], 'swapped' => false];
+        }
+        foreach ($this->store as $kind => $rows) {
+            if (!is_array($rows) || $kind === 'language') continue;
+            foreach ($rows as $id => $row)
+                if (is_array($row) && in_array($row['language'] ?? null, [$from, $to], true))
+                    $this->store[$kind][$id]['language'] = $row['language'] === $from ? $to : $from;
+        }
+        $other = $this->store['language'][$target];
+        $tagOf = fn (array $row) => ['lang_code' => $row['lang_code'], 'title' => $row['title'] ?? '', 'title_native' => $row['title_native'] ?? '', 'image' => $row['image'] ?? ''];
+        $this->store['language'][$source] = $tagOf($other) + $old;
+        $this->store['language'][$target] = $tagOf($old) + $other;
+        return ['previous' => $previous, 'swapped' => true];
+    }
+    public function writeModuleTitles(array $titles): void
+    {
+        foreach ($titles as $id => $title) {
+            if (!isset($this->store['module'][(int) $id])) throw new RuntimeException('target does not exist in this scope');
+            $this->store['module'][(int) $id]['title'] = (string) $title;
+        }
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
@@ -1878,6 +1918,7 @@ require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
 require __DIR__ . "/source-language.php";
+require __DIR__ . "/written-source-language.php";
 // site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
 require __DIR__ . "/site-identity.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.

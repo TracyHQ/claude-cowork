@@ -1242,7 +1242,7 @@ final class QuickstartContract
      * when $record is null. Every recorded row that carried the old tag carries the new one; nothing
      * else moves, because a relabel moves nothing else.
      */
-    public function bindingWithSourceRelabel(?array $record): array {
+    public function bindingWithSourceRelabel(?array $record, array $titles = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A source relabel needs a bound site');
         $from=$this->sourceLanguage();
@@ -1250,9 +1250,35 @@ final class QuickstartContract
         // `home` too: a template style set per language names its language there.
         foreach($binding['presentation'] as $key=>$fields)foreach(['language','home'] as $field)
             if(($fields[$field]??null)===$from)$binding['presentation'][$key][$field]=$to;
+        // A written relabel also writes the headings the source shows (writtenTitles), so they are what is protected.
+        foreach($titles as $key=>$title)if(isset($binding['presentation'][$key]))$binding['presentation'][$key]['title']=(string)$title;
         if(isset($binding['multilingual']['source']))$binding['multilingual']['source']=$to;
         if($record===null)unset($binding['sourceRelabel']);else $binding['sourceRelabel']=$record;
         return $binding;
+    }
+
+    /**
+     * The headings of the source edition: every base module bound on this site that SHOWS its title,
+     * front end, published, in the source language or in every language. The base contract carries
+     * a module's title as a label, not a slot, so a source WRITTEN in another language
+     * (`sourceLanguage.set` with `written`) is the one moment they are rewritten with it — a footer
+     * column headed "Services" over Vietnamese links is the defect this answers (TCH #1013).
+     *
+     * @return array<string,array{id:int,title:string}> base key => bound id and current title
+     */
+    public function writtenTitles(): array {
+        $this->ready();
+        $binding=$this->store->load();
+        if(!$binding)return [];
+        $out=[];
+        foreach($binding['presentation'] as $key=>$fields) {
+            if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key]))continue;
+            if((string)($fields['showtitle']??'0')!=='1'||(string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
+            if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
+            $out[$key]=['id'=>(int)$binding['ids'][$key],'title'=>(string)($fields['title']??'')];
+        }
+        ksort($out);
+        return $out;
     }
     /** A locked row's language as this site names it: the published source tag reads as the relabelled one. */
     private function lockedLanguage(string $key): string {

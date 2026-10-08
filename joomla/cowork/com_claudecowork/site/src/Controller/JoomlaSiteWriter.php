@@ -600,6 +600,91 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         ];
     }
 
+    /** The tag rows pass through while two tags trade places: not a Joomla tag, so no row ever carries it. */
+    private const SWAP_TAG = 'zz-ZZ';
+
+    public function swapLanguage(string $from, string $to, ?array $label = null): array
+    {
+        foreach ([$from, $to] as $tag)
+            if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag)) throw new \RuntimeException('Not a Joomla language tag: ' . $tag);
+        $db = $this->db;
+        $row = fn (string $tag) => $db->setQuery($db->getQuery(true)->select('*')->from($db->quoteName('#__languages'))
+            ->where($db->quoteName('lang_code') . ' = ' . $db->quote($tag)))->loadAssoc() ?: null;
+        $source = $row($from);
+        if ($source === null) throw new \RuntimeException('This site has no ' . $from . ' content language to relabel');
+        $target = $row($to);
+        // Nothing moves while `$to` is still routed or shown: that is an edition someone reads.
+        if ($target !== null && (int) $target['published'] === 1)
+            throw new \RuntimeException('This site still routes ' . $to . '; hide that edition before its tag can name the source');
+        foreach (['#__content' => ['state', null], '#__menu' => ['published', 0], '#__modules' => ['published', 0]] as $table => [$column, $client]) {
+            $query = 'SELECT COUNT(*) FROM ' . $db->quoteName($table) . ' WHERE ' . $db->quoteName('language') . ' = ' . $db->quote($to)
+                . ' AND ' . $db->quoteName($column) . ' = 1' . ($client === null ? '' : ' AND ' . $db->quoteName('client_id') . ' = ' . (int) $client);
+            if ((int) $db->setQuery($query)->loadResult() > 0)
+                throw new \RuntimeException('This site still shows content in ' . $to . '; hide that edition before its tag can name the source');
+        }
+        $previous = ['title' => (string) $source['title'], 'title_native' => (string) $source['title_native'], 'image' => (string) $source['image']];
+        if ($target === null) {
+            $moved = $this->relabelLanguage($from, $to, $label);
+            return ['previous' => $moved['previous'], 'swapped' => false];
+        }
+        // Every row of either tag takes the other, through a tag no row carries. Not one CASE statement: MySQL checks a
+        // unique key row by row, and `#__menu` keeps one alias per (client, parent, alias, language) — the source's `home`
+        // turned vi-VN while the edition's `home` still was refused the whole swap ("Duplicate entry '0-1-home-vi-VN'",
+        // measured 08/10/2026 on a Tracy Business 1.2.1 stand).
+        $parked = self::SWAP_TAG;
+        $move = fn (string $table, string $column, string $a, string $b, array $where = []) => $db->setQuery(
+            'UPDATE ' . $db->quoteName($table) . ' SET ' . $db->quoteName($column) . ' = ' . $db->quote($b)
+            . ' WHERE ' . $db->quoteName($column) . ' = ' . $db->quote($a)
+            . implode('', array_map(fn ($w) => ' AND ' . $w, $where))
+        )->execute();
+        $swap = function (string $table, string $column, array $where = []) use ($move, $from, $to, $parked) {
+            $move($table, $column, $to, $parked, $where);
+            $move($table, $column, $from, $to, $where);
+            $move($table, $column, $parked, $from, $where);
+        };
+        foreach (['#__content', '#__categories', '#__tags', '#__fields', '#__contact_details', '#__newsfeeds', '#__banners'] as $table)
+            $swap($table, 'language');
+        $swap('#__modules', 'language', [$db->quoteName('client_id') . ' = 0']);
+        $swap('#__menu', 'language', [$db->quoteName('client_id') . ' = 0']);
+        $swap('#__template_styles', 'home', [$db->quoteName('client_id') . ' = 0']);
+        $swap('#__ucm_content', 'core_language');
+        // The two content languages trade tag and label and keep their id, sef and state. lang_code is
+        // unique, so one passes through a tag no language has while the other takes its place.
+        $retag = fn (int $id, string $code, array $as) => $db->setQuery('UPDATE ' . $db->quoteName('#__languages')
+            . ' SET ' . $db->quoteName('lang_code') . ' = ' . $db->quote($code)
+            . ', ' . $db->quoteName('title') . ' = ' . $db->quote((string) $as['title'])
+            . ', ' . $db->quoteName('title_native') . ' = ' . $db->quote((string) $as['title_native'])
+            . ', ' . $db->quoteName('image') . ' = ' . $db->quote((string) $as['image'])
+            . ' WHERE ' . $db->quoteName('lang_id') . ' = ' . $id)->execute();
+        $retag((int) $target['lang_id'], $parked, $target);
+        $retag((int) $source['lang_id'], $to, $target);
+        $retag((int) $target['lang_id'], $from, $source);
+        $filter = $db->getQuery(true)->select([$db->quoteName('extension_id'), $db->quoteName('params')])->from($db->quoteName('#__extensions'))
+            ->where($db->quoteName('type') . ' = ' . $db->quote('plugin'))
+            ->where($db->quoteName('folder') . ' = ' . $db->quote('system'))
+            ->where($db->quoteName('element') . ' = ' . $db->quote('languagefilter'));
+        $plugin = $db->setQuery($filter)->loadAssoc();
+        $params = $plugin ? (json_decode((string) $plugin['params'], true) ?: []) : [];
+        if ($plugin && ($params['xdefault_language'] ?? null) === $from) {
+            $params['xdefault_language'] = $to;
+            $db->setQuery('UPDATE ' . $db->quoteName('#__extensions') . ' SET ' . $db->quoteName('params') . ' = '
+                . $db->quote(json_encode($params, JSON_UNESCAPED_SLASHES)) . ' WHERE ' . $db->quoteName('extension_id') . ' = ' . (int) $plugin['extension_id'])->execute();
+        }
+        return ['previous' => $previous, 'swapped' => true];
+    }
+
+    public function writeModuleTitles(array $titles): void
+    {
+        $db = $this->db;
+        foreach ($titles as $id => $title) {
+            $found = (int) $db->setQuery('SELECT COUNT(*) FROM ' . $db->quoteName('#__modules') . ' WHERE ' . $db->quoteName('id') . ' = ' . (int) $id
+                . ' AND ' . $db->quoteName('client_id') . ' = 0')->loadResult();
+            if ($found !== 1) throw new \RuntimeException('target does not exist in this scope');
+            $db->setQuery('UPDATE ' . $db->quoteName('#__modules') . ' SET ' . $db->quoteName('title') . ' = ' . $db->quote((string) $title)
+                . ' WHERE ' . $db->quoteName('id') . ' = ' . (int) $id)->execute();
+        }
+    }
+
     /** A content language's label from its installed pack, the way Joomla's installer names one. */
     private function languageLabel(string $tag): array
     {
