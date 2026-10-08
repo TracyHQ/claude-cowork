@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.24.3 plus: content.contract apply takes empty_links, link slots to empty where the layout the module renders was reviewed to draw no dead link without them (lib/link-layouts.json; Tracy Business j6 1.2.1): a button to a page the customer took off is taken off too, not sent to Contact (TracyHQ/tch#1013)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.4</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.4</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.4/pkg_claudecowork-0.24.4.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.24.2 plus: a source edition written in another language than its en-GB tag (sourceLanguage.set with written:true) is relabelled to the language it is really written in, with its module headings, and reverted; the multilingual setup refuses while such a relabel stands (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
