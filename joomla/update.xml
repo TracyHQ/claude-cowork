@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>0.24.2 plus: a source edition written in another language than its en-GB tag (sourceLanguage.set with written:true) is relabelled to the language it is really written in, with its module headings, and reverted; the multilingual setup refuses while such a relabel stands (TracyHQ/tch#1013)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.3</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.3</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.3/pkg_claudecowork-0.24.3.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>0.24.1 plus: a contract apply that fails partway takes back everything it wrote; carries the content contracts of the re-released quickstarts JA Social II 1.0.1, JA Donate 1.0.1 and JA Rent 1.0.1 (missing pages answer 404 instead of 500), JA Essence 1.0.2 and JA Vogue 1.0.3 (dark-mode footer logo) and Tracy Business 1.2.1 (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
