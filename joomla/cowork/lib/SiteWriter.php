@@ -186,6 +186,35 @@ interface SiteWriter
     public function relabelLanguage(string $from, string $to, ?array $label = null): array;
 
     /**
+     * Make the source edition carry `$to`, a tag of ANOTHER language, because its words are now
+     * written in it — the same rows, URLs and `sef` as relabelLanguage, so routing, the
+     * `tb-main-<sef>` menus and the T4 navigation keep working.
+     *
+     * A quickstart that ships a (hidden) edition of `$to` holds rows and a content language under
+     * that tag already. Folding the source into them would merge two editions, and leaving both
+     * under one tag puts two menu items on every alias Joomla keeps unique per language. So the two
+     * tags are SWAPPED: every row that carried `$from` carries `$to` and every row that carried
+     * `$to` carries `$from`; the two content-language rows trade their tag and label and keep their
+     * own id, `sef` and published state. A swap is its own inverse. Without a `$to` row this is
+     * relabelLanguage (the `$to` row's label from `$label`, else the installed pack).
+     *
+     * Refused, before anything is written, while `$to` is routed: its content language published,
+     * or any article, front-end menu item or front-end module in `$to` still shown.
+     *
+     * @param array{title: string, title_native: string, image: string}|null $label
+     * @return array{previous: array{title: string, title_native: string, image: string}, swapped: bool}
+     */
+    public function swapLanguage(string $from, string $to, ?array $label = null): array;
+
+    /**
+     * Set the title of front-end modules, raw, by id — the words of a module that SHOWS its title
+     * (a footer column's heading), which the base contract carries as a label and so has no slot for.
+     *
+     * @param array<int,string> $titles module id => title
+     */
+    public function writeModuleTitles(array $titles): void;
+
+    /**
      * The site's default languages, as Joomla keeps them in com_languages' params.
      *
      * @return array{site:string,administrator:string}

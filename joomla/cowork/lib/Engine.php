@@ -1739,6 +1739,11 @@ final class Engine
         if (!$this->contract->bound()) return $this->err('contract_failed', 'A language needs a bound site');
         $operation = substr((string) $p['operation'], strlen('multilingual.'));
         $locale = isset($p['locale']) && is_string($p['locale']) ? $p['locale'] : '';
+        // A source WRITTEN in another language traded tags with the archive's hidden edition of it
+        // (writtenSourceSet): no language is built on top of that until it is taken back.
+        $relabel = ($this->contract->binding() ?? [])['sourceRelabel'] ?? null;
+        if (in_array($operation, ['plan', 'package', 'apply'], true) && !empty($relabel['written']))
+            return $this->err('conflict', 'This site’s source edition is written in ' . $relabel['to'] . ' (sourceLanguage.set with `written`); take that back with sourceLanguage.revert before adding a language. Nothing has been written.');
         // 🔒 REFUSED, NOT IGNORED. A request that names its own archive is refused even when the
         // values happen to be right: accepting the SHAPE is accepting a request that could carry
         // wrong ones, and silently dropping the fields would let a caller believe it chose the
@@ -1995,7 +2000,9 @@ final class Engine
             $published = $this->contract->publishedSourceLanguage();
             $current = $this->contract->sourceLanguage();
             $sameLanguage = fn (string $tag) => preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag) && explode('-', $tag)[0] === explode('-', $published)[0];
+            $written = ($p['written'] ?? false) === true;
             if ($operation === 'plan') {
+                if ($written) return $this->writtenSourcePlan($locale, $major, $published, $current);
                 if ($locale !== '' && !$sameLanguage($locale))
                     return $this->err('bad_params', $locale . ' is not a variant of ' . $published . '; another language is added with multilingual.* or set with siteLanguage.*');
                 $pack = $locale === '' || $locale === $published ? null : $this->contract->languagePackage($locale, $major);
@@ -2018,10 +2025,12 @@ final class Engine
             $onRecord = $binding['sourceRelabel'] ?? null;
             if ($operation === 'revert') {
                 if ($onRecord === null) return $this->err('contract_failed', 'This site’s source edition still carries its published tag; there is nothing to take back');
+                if (!empty($onRecord['written'])) return $this->writtenSourceRevert($apply, $onRecord, $published);
                 $this->refuseLocked($this->rowsInLanguage((string) $onRecord['to']));
                 $this->relabelSource($apply, (string) $onRecord['to'], $published, null, $onRecord);
                 return $this->ok(['status' => 'reverted', 'source' => $published]);
             }
+            if ($written) return $this->writtenSourceSet($p, $locale, $major, $apply, $request, $binding, $published, $current);
             if (!$sameLanguage($locale))
                 return $this->err('bad_params', ($locale ?: 'That') . ' is not a variant of ' . $published . '; another language is added with multilingual.* or set with siteLanguage.*');
             if ($locale === $current) return $this->ok(['status' => 'completed', 'source' => $locale, 'alreadySet' => true]);
@@ -2053,6 +2062,137 @@ final class Engine
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
+    }
+
+    /** The longest heading a written relabel takes: a module title is a VARCHAR(100). */
+    private const WRITTEN_TITLE_MAX = 100;
+
+    /** Whether `$locale` is a tag of another language than the published source's: what `written` is for. */
+    private static function otherLanguage(string $locale, string $published): bool
+    {
+        return (bool) preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $locale) && explode('-', $locale)[0] !== explode('-', $published)[0];
+    }
+
+    /**
+     * `sourceLanguage.plan` with `written`: what a written relabel to `$locale` would install, and the
+     * headings it would ask to be given in that language (`<baseKey>.title`, the source's current
+     * title, at most WRITTEN_TITLE_MAX characters).
+     */
+    private function writtenSourcePlan(string $locale, int $major, string $published, string $current): array
+    {
+        if (!self::otherLanguage($locale, $published))
+            return $this->err('bad_params', ($locale ?: 'That') . ' is not another language than ' . $published . '; a variant of it is a plain relabel, without `written`');
+        $pack = $this->contract->languagePackage($locale, $major);
+        $titles = [];
+        foreach ($this->contract->writtenTitles() as $key => $row)
+            $titles[] = ['key' => $key . '.title', 'source' => $row['title'], 'maxCharacters' => self::WRITTEN_TITLE_MAX];
+        return $this->ok([
+            'published' => $published, 'current' => $current, 'locale' => $locale, 'written' => true,
+            'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
+            'installed' => $pack === null || $this->languagePackPresent($locale),
+            'onRecord' => $this->contract->binding()['sourceRelabel'] ?? null,
+            'titles' => $titles,
+        ]);
+    }
+
+    /**
+     * `sourceLanguage.set` with `written`: the source edition's words are now WRITTEN in `$locale`, a
+     * language other than the archive's (one language asked for, TCH #1013 D10), so it is called by
+     * that tag — `<html lang>`, Joomla's own words, the content language — and its headings are given
+     * in it (`titles`, keyed as the written plan names them; a heading left out keeps its title).
+     *
+     * 🔒 THE URL PREFIX STAYS. The source keeps its content-language row, so its `sef` and every URL
+     * (`/en/…`) with it: the T4 navigation, the `tb-main-<sef>` menus and the footer menus are keyed
+     * by that `sef` in hash-locked template files, and a new prefix would empty them. What changes is
+     * the tag the prefix answers with.
+     *
+     * 🔒 ONLY A SOURCE THAT IS THE SITE'S ONE EDITION. Refused while any language has been derived (a
+     * copy translated from the source's earlier words), while the contract governs rows of its own in
+     * `$locale` (an edition the archive ships under the contract), and — in the writer — while the
+     * site still routes or shows `$locale`. An archive's hidden edition of `$locale` trades tags with
+     * the source (SiteWriter::swapLanguage); nothing is merged and nothing is deleted.
+     */
+    private function writtenSourceSet(array $p, string $locale, int $major, string $apply, string $request, ?array $binding, string $published, string $current): array
+    {
+        if (!self::otherLanguage($locale, $published))
+            return $this->err('bad_params', ($locale ?: 'That') . ' is not another language than ' . $published . '; a variant of it is a plain relabel, without `written`');
+        $onRecord = $binding['sourceRelabel'] ?? null;
+        if ($onRecord !== null) {
+            if (!empty($onRecord['written']) && $onRecord['to'] === $locale)
+                return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'alreadySet' => true]);
+            return $this->err('conflict', 'This site’s source edition is already called ' . $current . '; take that back with sourceLanguage.revert before choosing another');
+        }
+        if (!empty($binding['multilingual']['languages']))
+            return $this->err('conflict', 'This site already has a language edition made from its source; the source cannot be renamed under it. Nothing has been written.');
+        foreach ($binding['presentation'] ?? [] as $key => $fields)
+            if (($fields['language'] ?? null) === $locale)
+                return $this->err('conflict', 'The contract governs this site’s own ' . $locale . ' edition (' . $key . '); its source cannot take that tag. Nothing has been written.');
+        $headings = $this->contract->writtenTitles();
+        $titles = $p['titles'] ?? [];
+        if (!is_array($titles)) return $this->err('bad_params', 'titles must map a heading key to its words');
+        $byId = []; $before = []; $after = [];
+        foreach ($titles as $slot => $title) {
+            $key = is_string($slot) && substr($slot, -6) === '.title' ? substr($slot, 0, -6) : '';
+            if (!isset($headings[$key])) return $this->err('bad_params', 'Not a heading of this source edition: ' . $slot . ' (sourceLanguage.plan with `written` lists them)');
+            if (!is_string($title) || trim($title) === '' || mb_strlen($title) > self::WRITTEN_TITLE_MAX || preg_match('/[<>]/', $title))
+                return $this->err('bad_params', 'A heading is plain text of 1 to ' . self::WRITTEN_TITLE_MAX . ' characters: ' . $slot);
+            $byId[$headings[$key]['id']] = $title; $before[$key] = $headings[$key]['title']; $after[$key] = $title;
+        }
+        // Before the pack too: an installer is a write, and a relabel refused afterwards would leave it behind for nothing.
+        $this->refuseLocked(array_merge($this->rowsInLanguage($current), array_map(fn (int $id) => ['module', $id], array_keys($byId))));
+        $pack = $this->contract->languagePackage($locale, $major);
+        if ($pack !== null && !$this->languagePackPresent($locale)) {
+            if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
+            $result = $this->extensions->installVerifiedFromUrl($pack['url'], $pack['sha256'], (int) $pack['bytes']);
+            if (($result['ok'] ?? false) !== true) return $this->err('install_failed', (string) ($result['error'] ?? 'installer refused the package'));
+            if (!$this->languagePackPresent($locale)) return $this->err('install_failed', 'The ' . $locale . ' pack installed but Joomla does not list it');
+            $this->stamped('extension');
+        }
+        if ($binding === null) $this->writer->transaction(function () {
+            $this->contract->bind($this->contract->inspect()['snapshot']);
+            return [];
+        });
+        $swapped = $this->writtenRelabel($apply, $current, $locale, null, $byId, $after, [
+            'from' => $current, 'to' => $locale, 'written' => true, 'titles' => $before, 'applyId' => $apply, 'requestId' => $request,
+            'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
+        ]);
+        return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'swapped' => $swapped, 'titles' => count($byId), 'packVersion' => $pack['version'] ?? null]);
+    }
+
+    /** A written relabel taken back: the tags swapped back, the headings and the defaults as they were. */
+    private function writtenSourceRevert(string $apply, array $onRecord, string $published): array
+    {
+        $binding = $this->contract->binding() ?? [];
+        $byId = [];
+        foreach ($onRecord['titles'] ?? [] as $key => $title)
+            if (isset($binding['ids'][$key])) $byId[(int) $binding['ids'][$key]] = (string) $title;
+        $this->refuseLocked(array_merge($this->rowsInLanguage((string) $onRecord['to']), array_map(fn (int $id) => ['module', $id], array_keys($byId))));
+        $this->writtenRelabel($apply, (string) $onRecord['to'], $published, $onRecord['label'] ?? null, $byId, $onRecord['titles'] ?? [], null);
+        return $this->ok(['status' => 'reverted', 'source' => $published]);
+    }
+
+    /** One written relabel or its undo, logged, recorded and proven in a single transaction; $record null takes it back. */
+    private function writtenRelabel(string $apply, string $from, string $to, ?array $label, array $titlesById, array $titlesByKey, ?array $record): bool
+    {
+        $swapped = $this->writer->transaction(function () use ($apply, $from, $to, $label, $titlesById, $titlesByKey, $record) {
+            $defaults = $this->writer->readLanguageDefaults();
+            $moved = $this->writer->swapLanguage($from, $to, $label);
+            if ($titlesById !== []) $this->writer->writeModuleTitles($titlesById);
+            $this->writer->writeLanguageDefaults(
+                $defaults['site'] === $from ? $to : $defaults['site'],
+                $defaults['administrator'] === $from ? $to : $defaults['administrator']
+            );
+            if ($record !== null) $record += ['label' => $moved['previous'], 'swapped' => $moved['swapped']];
+            $this->log->record($apply, ['op' => 'relabel', 'from' => $from, 'to' => $to, 'written' => true, 'swapped' => $moved['swapped'],
+                'label' => $moved['previous'], 'titles' => $titlesByKey, 'defaults' => $defaults]);
+            $this->contract->rebind($this->contract->bindingWithSourceRelabel($record, $titlesByKey));
+            // Proven, then stored — the same two steps every other sealed write ends with.
+            $this->contract->rebind($this->contract->inspect()['snapshot']);
+            return ['swapped' => $moved['swapped']];
+        });
+        try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+        $this->stamped('content');
+        return (bool) ($swapped['swapped'] ?? false);
     }
 
     /**

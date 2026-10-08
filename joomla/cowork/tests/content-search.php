@@ -900,6 +900,8 @@ $w = __WRITER__ ? new class implements SiteWriter, SearchableSiteWriter {
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void {}
     public function realiasMenuItem(int $id, string $alias): void {}
     public function relabelLanguage(string $from, string $to, ?array $label = null): array { return []; }
+    public function swapLanguage(string $from, string $to, ?array $label = null): array { return []; }
+    public function writeModuleTitles(array $titles): void {}
     public function readLanguageDefaults(): array { return []; }
     public function writeLanguageDefaults(string $site, string $administrator): void {}
     public function read(string $kind, int $id): ?array { return null; }
