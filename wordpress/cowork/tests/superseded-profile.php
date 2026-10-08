@@ -156,3 +156,22 @@ try {
 } catch (Throwable $e) {
     check('the shipped tracy-business/wp7/1.3.4 loads with its editions profile', $e->getMessage(), 'loaded');
 }
+
+// 8. JA Morgan wp7 1.1.12 (published 08/10/2026: 1.1.11 with a corrected wp-config.php) is carried and loads; a site
+//    built from it binds to it (TracyHQ/tch#1013).
+$real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+try {
+    $real->preview('ja-morgan/wp7/1.1.12');
+    check('the shipped ja-morgan/wp7/1.1.12 loads', true, true);
+} catch (Throwable $e) {
+    check('the shipped ja-morgan/wp7/1.1.12 loads', $e->getMessage(), 'loaded');
+}
+
+// 9. Tracy Base wp7 1.1.2 (TracyHQ/tch#1013): TCH sealed sites of this release with an id no plugin carried, so inspect
+//    answered "does not carry" and Apply wrote nothing but the brand. The profile is now carried and loads.
+try {
+    $real->preview('tracy-base/wp7/1.1.2');
+    check('the shipped tracy-base/wp7/1.1.2 loads', true, true);
+} catch (Throwable $e) {
+    check('the shipped tracy-base/wp7/1.1.2 loads', $e->getMessage(), 'loaded');
+}
