@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Edits to posts and media are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.3
+ * Version:     0.18.4
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -28,6 +28,10 @@ NavigationLinks::register();
 // and WordPress's own words follow the language the customer chose, on that edition's front end only.
 require_once __DIR__ . '/lib/SourceLocaleHooks.php';
 SourceLocaleHooks::register();
+// The address of a page that is not published (a page Tracy drafted because the customer unticked it) answers 404:
+// WordPress's 404 guess would otherwise send /news/ to a published /newsletter/.
+require_once __DIR__ . '/lib/UnpublishedAddressHooks.php';
+UnpublishedAddressHooks::register();
 // Content API identity: a new row gets its content uid when WordPress inserts it, on a site that
 // opted in with `content.identity`. One small file, no engine.
 require_once __DIR__ . '/lib/ContentIdentity.php';
