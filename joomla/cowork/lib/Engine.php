@@ -38,6 +38,12 @@ final class Engine
 {
     private ?QuickstartContract $contract;
     private bool $batching = false;
+    /**
+     * The batch write running now, as [kind, id, before] until its undo is recorded: a write that
+     * fails can have landed first (Joomla stored the row, then its tags or asset step threw), and
+     * its undo is in no log yet. Only an update has one; a create that failed has no id to take back.
+     */
+    private ?array $inFlight = null;
     private bool $writing = false;
     /** Inside an unlocked read (a contract inspect under a consistent snapshot). */
     private bool $reading = false;
@@ -2614,6 +2620,9 @@ final class Engine
                 if (is_array($step) && is_string($step['kind'] ?? null) && is_numeric($step['id'] ?? null)) $rows[] = [$step['kind'], (int) $step['id']];
             if (($refusal = $this->lockRefusal($rows)) !== null) return $refusal;
         }
+        // Whether this apply_id holds nothing yet: then every entry found after a failure is this batch's.
+        try { $fresh = $this->log->entries($apply) === []; } catch (Throwable $error) { $fresh = false; }
+        $this->inFlight = null;
         try {
             $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
@@ -2669,8 +2678,79 @@ final class Engine
             return $result;
         } catch (Throwable $error) {
             $this->batching = false;
-            return $this->err('batch_failed', $error->getMessage(), $verify ? ['errors' => ContractProblem::errorsOf($error)] : []);
+            $message = $error->getMessage();
+            $errors = $verify ? ContractProblem::errorsOf($error) : [];
+            $undo = $fresh ? $this->undoFailedBatch($apply) : null;
+            if ($undo === []) {
+                $message .= '; every write of this batch was taken back';
+            } elseif ($undo !== null) {
+                $left = 'Some writes of this batch stay on the site and could not be taken back (' . implode('; ', $undo) . '): apply.revert ' . $apply . ' finishes it';
+                $message .= '; ' . $left;
+                if ($verify) $errors[] = ContractProblem::plain('PARTIAL_APPLY', $left);
+            }
+            return $this->err('batch_failed', $message, $verify ? ['errors' => $errors] : []);
+        } finally {
+            $this->inFlight = null;
         }
+    }
+
+    /**
+     * Take back what a failed batch left on the site, after its transaction rolled back.
+     *
+     * 🔒 THE ROLLBACK DOES NOT HOLD A JOOMLA TABLE WRITE. Table::store() on an article or a module
+     * stores its `#__assets` row through Table\Nested::store(), which takes `LOCK TABLES #__assets
+     * WRITE`, and LOCK TABLES is an implicit COMMIT in MySQL and MariaDB: every write before it is
+     * committed, and every statement after it autocommits. Measured 08/10/2026 on a JA Podcast j6
+     * stand (TCH #1013, D3): a contract apply whose third write failed kept the first two, and the
+     * ROLLBACK at the end found nothing to roll back. Each write recorded its undo as it went, and
+     * those records were committed with it, so what the rollback missed is exactly what the log still
+     * holds for this apply_id. The write that failed comes first, if it landed before it threw.
+     *
+     * Returns null when nothing was left behind (the rollback held), [] when everything was taken
+     * back, or what could not be.
+     *
+     * @return list<string>|null
+     */
+    private function undoFailedBatch(string $apply): ?array
+    {
+        $inFlight = $this->inFlight;
+        $this->inFlight = null;
+        $left = [];
+        $undone = false;
+        if ($inFlight !== null) {
+            [$kind, $id, $before] = $inFlight;
+            try {
+                if ($this->writer->read($kind, $id) != $before) {
+                    $this->rollbackContent($kind, $id, $before);
+                    $undone = true;
+                }
+            } catch (Throwable $e) {
+                $left[] = "{$kind} {$id}: " . $e->getMessage();
+            }
+        }
+        try {
+            $entries = $this->log->entries($apply);
+        } catch (Throwable $e) {
+            return array_merge($left, ['the undo log: ' . $e->getMessage()]);
+        }
+        foreach (array_reverse($entries) as $entry) {
+            try {
+                $this->revertOne($entry);
+                $undone = true;
+            } catch (Throwable $e) {
+                $left[] = ($entry['op'] ?? '?') . ' ' . ($entry['kind'] ?? '') . ' ' . ($entry['id'] ?? '') . ': ' . $e->getMessage();
+            }
+        }
+        if (!$undone && $left === []) return null;
+        // A visitor may have been served the half-written site while the writes stood.
+        try { $this->writer->purgeCache(); } catch (Throwable $e) {}
+        if ($left === []) {
+            try { $this->log->clear($apply); }
+            catch (Throwable $e) { $left[] = 'the undo log could not be cleared: ' . $e->getMessage(); }
+        } else {
+            $this->stamped('content');
+        }
+        return $left;
     }
 
     private function contentUpdate(array $p): array
@@ -2750,6 +2830,7 @@ final class Engine
         if ($fields !== []) {
             try {
                 $before = $this->writer->read($kind, $id); // null => this is an insert, so its undo is a delete
+                if ($this->batching && $before !== null) $this->inFlight = [$kind, $id, $before];
                 $newId = $this->writer->write($kind, $id, $fields);
             } catch (Throwable $e) {
                 return $moveTo !== null
@@ -2759,8 +2840,10 @@ final class Engine
 
             try {
                 $this->log->record($applyId, ['op' => 'content', 'kind' => $kind, 'id' => $newId, 'before' => $before]);
+                $this->inFlight = null;
             } catch (Throwable $e) {
                 $this->rollbackContent($kind, $newId, $before);
+                $this->inFlight = null;
                 return $this->err('write_failed', 'change was rolled back: could not record its undo');
             }
         }
