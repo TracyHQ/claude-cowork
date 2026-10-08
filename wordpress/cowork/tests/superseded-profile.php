@@ -129,3 +129,30 @@ foreach (['tracy-business/wp7/1.1.0', 'tracy-business/wp7/1.2.0', 'tracy-busines
         check('the shipped ' . $shipped . ' loads with its superseded list', $e->getMessage(), 'loaded');
     }
 }
+
+// 7. A later version of a release keeps the editions and demo-trim profiles an earlier version shipped. Tracy Business
+//    wp7 1.3.4 shipped without them (plugin 0.18.1): multilingual.retire answered "no editions profile", all 41
+//    Polylang editions stayed live, and an unticked page was still reached through its translations (TracyHQ/tch#1013).
+foreach (glob(__DIR__ . '/../lib/contracts/*/wp*', GLOB_ONLYDIR) as $release) {
+    $versions = array_map('basename', glob($release . '/*', GLOB_ONLYDIR));
+    usort($versions, 'version_compare');
+    $carried = [];
+    foreach ($versions as $version) {
+        foreach (['editions.json', 'demo-trim-map.json'] as $file) {
+            $has = is_file($release . '/' . $version . '/' . $file);
+            if (isset($carried[$file]) && !$has) {
+                check(basename(dirname($release)) . '/' . basename($release) . '/' . $version . ' carries the ' . $file . ' that ' . $carried[$file] . ' carried', 'missing', 'present');
+            }
+            if ($has) {
+                $carried[$file] = $version;
+            }
+        }
+    }
+}
+$real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+try {
+    $real->preview('tracy-business/wp7/1.3.4');
+    check('the shipped tracy-business/wp7/1.3.4 loads with its editions profile', $real->editions() !== null, true);
+} catch (Throwable $e) {
+    check('the shipped tracy-business/wp7/1.3.4 loads with its editions profile', $e->getMessage(), 'loaded');
+}
