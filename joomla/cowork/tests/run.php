@@ -1885,6 +1885,7 @@ require __DIR__ . "/template-site-settings.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
+require __DIR__ . "/contract-atomic.php";
 require __DIR__ . "/content-addresses.php";
 require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";
