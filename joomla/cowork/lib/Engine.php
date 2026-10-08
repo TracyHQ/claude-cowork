@@ -1534,7 +1534,9 @@ final class Engine
             if (!$apply) throw new RuntimeException('apply_id required; it must start with "contract-"');
             if (strpos($apply,'contract-')!==0) throw new RuntimeException('apply_id must start with "contract-", got "'.substr($apply,0,60).'"');
             if (!is_string($request) || !$request) throw new RuntimeException('request_id required: any string, the same on a retry and new for a different change');
-            $hash=hash('sha256',json_encode([$p['changes']??null,$p['evidence']??[]]));
+            // The links to empty are part of what a request asks; named only when sent, so an apply without them
+            // hashes as it always did and a retry from before this field still replays.
+            $hash=hash('sha256',json_encode(array_key_exists('empty_links',$p)?[$p['changes']??null,$p['evidence']??[],$p['empty_links']]:[$p['changes']??null,$p['evidence']??[]]));
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {
                     if(!hash_equals($entry['hash'],$hash))throw new RuntimeException('request_id reused with different content');

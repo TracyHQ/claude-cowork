@@ -1,0 +1,124 @@
+{
+  "_comment": "Reviewed ACM layouts: which link fields a content.contract apply may empty (empty_links), and what the page draws in their place — 'hidden': the element is not drawn; 'plain': its words stay, unlinked. Keyed by the sha256 of the layout file, so an edited or different layout is never trusted. Every entry is read by hand in the file it names; the path says which file was read. Receiver data, not contract bytes: it does not change any pinned contract hash. TracyHQ/tch#1013.",
+  "layouts": {
+    "557618ab4efb94239c5ad2d294ad06760ea594832396701f3ed9fd99b6e3aa71": {
+      "path": "templates/tracy_business/acm/tb-button/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-button[link]": "hidden"
+      }
+    },
+    "fb3466a3a326a086c91b2d30ca70d9ac21099a0d6eb0cacf10e7e2834fa8d814": {
+      "path": "templates/tracy_business/acm/tb-hero/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-hero[btn-1-link]": "hidden",
+        "tb-hero[btn-2-link]": "hidden"
+      }
+    },
+    "e5d4c82d525d80cb53026cc4f6923e2c3b2bf478a45e52c48657cc228f51a4b7": {
+      "path": "templates/tracy_business/acm/tb-cta-band/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-cta-band[btn-link]": "hidden"
+      }
+    },
+    "42b36b4b63779a500159b8de2fa0fa9cea4980bb01c87aefdd5b1bfd265b1edf": {
+      "path": "templates/tracy_business/acm/tb-cta-box/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-cta-box[btn-link]": "hidden",
+        "tb-cta-box[alt-link]": "plain"
+      }
+    },
+    "65363dfda57f44883ca5f7976d34f18ea6c214f2578c107bab8314234f46b62c": {
+      "path": "templates/tracy_business/acm/tb-footer-contact/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-footer-contact[cta-link]": "hidden",
+        "tb-footer-contact[social-url]": "plain"
+      }
+    },
+    "231e4fe221160e8b58672dfa3873fd4a398ae462ce9a9a4169c0fff57c5fea46": {
+      "path": "templates/tracy_business/acm/tb-services/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-services[all-link]": "hidden",
+        "tb-services[item-link]": "plain"
+      }
+    },
+    "daa9421c2e9bac16ea96a13abdf6462a6f7dcec0286f0066f30a4a7924a2abdd": {
+      "path": "templates/tracy_business/acm/tb-sys-error/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-sys-error[back-link]": "hidden",
+        "tb-sys-error[row-link]": "plain"
+      }
+    },
+    "d78b298f85c62fd2af29e255c0697a178f5716f12fbf10047d60bdcd04012fcd": {
+      "path": "templates/tracy_business/acm/tb-kit-newsletter-top/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-kit-newsletter-top[btn-link]": "plain"
+      }
+    },
+    "ed5e2e42e0ab373fb713638ee9cfe56770c3327e51ecb200d4689a5f24da5944": {
+      "path": "templates/tracy_business/acm/tb-arrow-list/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-arrow-list[row-link]": "plain"
+      }
+    },
+    "3e37ec65c13fb81519d690c0274cf3c59cc4fe333cfdc08b2aae70e1272309ab": {
+      "path": "templates/tracy_business/acm/tb-sys-chips/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-sys-chips[link]": "plain"
+      }
+    },
+    "dd923b29325b67dba844cfac3342e0826d9ebd602b22fbd2e3bf1230565f17a7": {
+      "path": "templates/tracy_business/acm/tb-proj-sectors/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-proj-sectors[row-link]": "plain"
+      }
+    },
+    "91e3a9f8ba63363c1c3640a26d12253143ce7bcd9a445e3998d6b556e51b8e49": {
+      "path": "templates/tracy_business/acm/tb-page-datelist/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-page-datelist[row-link]": "plain"
+      }
+    },
+    "14cfd300ae3efc9f955d072f5f542dc8d01107c90e5630892fc110063f7e712d": {
+      "path": "templates/tracy_business/acm/tb-page-ir-ink/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-page-ir-ink[gov-link]": "plain"
+      }
+    },
+    "4bbc74302c28a05ef6ba91001230544efabc4d066ececbd8c9ebed77532d910a": {
+      "path": "templates/tracy_business/acm/tb-kit-assets/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-kit-assets[asset-link]": "plain"
+      }
+    },
+    "9df9f40e14af86983d0056e55e0df483fcc1fcb7e9b0a2a05186ac6db7efcba1": {
+      "path": "templates/tracy_business/acm/tb-kit-newsletter-body/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-kit-newsletter-body[item-link]": "plain",
+        "tb-kit-newsletter-body[unsub-link]": "plain",
+        "tb-kit-newsletter-body[prefs-link]": "plain"
+      }
+    },
+    "8135a2c6ef91935d6304a15ff12448f52e7a405bd15abbf9a1ddce308e1af7ec": {
+      "path": "templates/tracy_business/acm/tb-sys-social/tmpl/style-1.php",
+      "reviewed": "Tracy Business j6 1.2.1",
+      "fields": {
+        "tb-sys-social[url]": "plain"
+      }
+    }
+  }
+}

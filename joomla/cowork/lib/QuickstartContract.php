@@ -62,6 +62,16 @@ final class QuickstartContract
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
     private ?DemoTrimProfile $demoTrim = null;
+    /**
+     * The receiver's reviewed ACM layouts (`lib/link-layouts.json`): layout sha256 => link field => what an
+     * empty one renders ('hidden': the element is not drawn; 'plain': its words stay, unlinked). Null when
+     * this receiver carries no review, and then no link may be emptied.
+     *
+     * @var array<string,array<string,string>>|null
+     */
+    private ?array $linkLayouts = null;
+    /** sha256 of each layout file read by the current inspect: path => hash, or '' when it is not a plain file. */
+    private array $layoutHashes = [];
 
     /**
      * 🔒 THE DESIGN IS A BASELINE TO COMPARE, NOT A LOCK (Tracy ADR 0022, 26/09/2026). A site may
@@ -142,6 +152,7 @@ final class QuickstartContract
         // published before it keeps working, and a receiver carrying the code claims nothing for a
         // contract that ships no list of what its demo is.
         $this->syncSourceRelabel();
+        $this->linkLayouts = self::loadLinkLayouts(dirname($directory, 4) . '/link-layouts.json');
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
@@ -614,6 +625,7 @@ final class QuickstartContract
         if ($this->derivedMode) return $this->inspectDerived();
         $inspect=Timing::begin();
         $this->drift = [];
+        $this->layoutHashes = [];
         $this->files();
         $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
@@ -780,7 +792,12 @@ final class QuickstartContract
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $t=Timing::begin();
         $slots=[];
-        foreach($keys as $key=>$meta){$parsed=[];foreach($this->slotsOf($key,$meta) as $slot){$slot['current']=$this->currentValue($rows[$key],$slot,$parsed);$slots[]=$slot;}}
+        foreach($keys as $key=>$meta){$parsed=[];foreach($this->slotsOf($key,$meta) as $slot){
+            $slot['current']=$this->currentValue($rows[$key],$slot,$parsed);
+            $empty=$this->emptyLinkOf($rows[$key],$slot,$parsed);
+            if($empty!==null)$slot['emptyLink']=$empty;
+            $slots[]=$slot;
+        }}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
         Timing::end('slots',$t);
         $t=Timing::begin();$revision=$this->digest($revisionRows);Timing::end('digest',$t);
@@ -864,6 +881,56 @@ final class QuickstartContract
     }
 
     /**
+     * 🔒 A LINK IS EMPTIED ONLY WHERE ITS LAYOUT WAS READ TO DRAW NO DEAD LINK WITHOUT IT (TCH #1013, 08/10/2026).
+     * An empty ACM field is conditional markup, so emptying one changes what the page draws — which is
+     * exactly what taking a button to a page the customer unticked off has to do, and exactly why it is
+     * refused everywhere else: Tracy Business draws `tb-button` only with a link, but JA Phio's hero prints
+     * `<a href="">` whatever the link holds. So what may be emptied is decided in review, against the
+     * layout file's BYTES (`lib/link-layouts.json`, keyed by sha256), and read here from the file the
+     * module really renders: `templates/<template>/acm/<type>/tmpl/<style>.php`, named by the module's
+     * own `jatools-config`. A T3 `local/acm` copy of the same layout would render instead
+     * (mod_ja_acm's ModJAACMHelper::find), so its presence refuses too. A slot that is not an occupied
+     * ACM link, a layout not on the list, edited since, or missing, answers null: the link cannot be emptied.
+     *
+     * @return 'hidden'|'plain'|null what the page draws in the link's place
+     */
+    private function emptyLinkOf(array $row, array $slot, array &$parsed): ?string {
+        if($this->linkLayouts===null||($slot['type']??'')!=='url'||($slot['leaf']??null)!==null)return null;
+        $path=$slot['jsonPath']??null;
+        if(($slot['nestedJson']??null)!=='jatools-config'||!is_array($path)||count($path)<2||!is_string($path[0])||!is_string($path[1]))return null;
+        if(trim((string)($slot['sample']??''))==='')return null;
+        $column=$slot['column'];
+        $outer=$parsed['json'][$column] ??= json_decode((string)$row[$column],true);
+        if(!is_array($outer)||!is_string($outer['jatools-config']??null))return null;
+        $config=$parsed['nested'][$column]['jatools-config'] ??= json_decode($outer['jatools-config'],true);
+        if(!is_array($config)||!preg_match('/^([A-Za-z0-9_-]+):([A-Za-z0-9_-]+)$/D',(string)($config[':type']??''),$type))return null;
+        [, $template, $acm]=$type;
+        $style=$config[$acm]['jatools-layout-'.$acm]??null;
+        if($acm!==$path[0]||!is_string($style)||!preg_match('/^[A-Za-z0-9_-]+$/D',$style))return null;
+        $file='templates/'.$template.'/acm/'.$acm.'/tmpl/'.$style.'.php';
+        if(!isset($this->layoutHashes[$file])) {
+            $full=$this->root.'/'.$file;
+            $local=glob($this->root.'/templates/*/local/acm/'.$acm.'/tmpl/'.$style.'.php')?:[];
+            $this->layoutHashes[$file]=!$local&&is_file($full)&&!is_link($full)?(string)hash_file('sha256',$full):'';
+        }
+        return $this->linkLayouts[$this->layoutHashes[$file]][$path[1]]??null;
+    }
+
+    /** `lib/link-layouts.json` as {@see emptyLinkOf} reads it; null when absent or unreadable — then nothing is emptiable. */
+    private static function loadLinkLayouts(string $file): ?array {
+        if(!is_file($file))return null;
+        $data=json_decode((string)file_get_contents($file),true);
+        if(!is_array($data['layouts']??null))return null;
+        $out=[];
+        foreach($data['layouts'] as $hash=>$layout) {
+            if(!is_string($hash)||!preg_match('/^[a-f0-9]{64}$/D',$hash)||!is_array($layout['fields']??null))continue;
+            foreach($layout['fields'] as $field=>$renders)
+                if(is_string($field)&&in_array($renders,['hidden','plain'],true))$out[$hash][$field]=$renders;
+        }
+        return $out;
+    }
+
+    /**
      * A derived link: what LeafCodec reads as one (https://…, /path, index.php?…, mailto:, tel:, #anchor);
      * never protocol-relative, a backslash or a script. A derived picture: a file inside `images/`,
      * named with or without a leading slash and Joomla's `#joomlaImage://` suffix; any shape, since an
@@ -941,11 +1008,17 @@ final class QuickstartContract
                 $problems[]=new ContractProblem('REVISION_STALE','Content changed; inspect again',null,null,['current'=>$state['revision']]);
             if($current===null)throw new ContractProblem('CONTRACT_FAILED','Content revisions are unavailable on this site; send expected_revision from inspect');
         }
-        $changes=$params['changes']??null;
-        if(!is_array($changes)||!count($changes)||count($changes)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
+        // `empty_links`: link slots to empty, each one its layout draws no dead link without ({@see emptyLinkOf}).
+        $emptied=$params['empty_links']??[];
+        if(!is_array($emptied)||($emptied&&array_keys($emptied)!==range(0,count($emptied)-1))||array_filter($emptied,fn($key)=>!is_string($key)))
+            throw new ContractProblem('CHANGES_INVALID','empty_links must be a list of link slot keys');
+        $changes=$params['changes']??($emptied?[]:null);
+        if(!is_array($changes)||!(count($changes)+count($emptied))||count($changes)+count($emptied)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
+        foreach($emptied as $key)if(array_key_exists($key,$changes))throw new ContractProblem('CHANGES_INVALID','A slot is both changed and emptied: '.$key,$key);
         $allowed=array_column($state['slots'],null,'key');$values=[];
         $owners=$current['owners']??[];$checked=[];
-        foreach ($changes as $key => $value) {
+        $emptying=array_fill_keys($emptied,true);
+        foreach ($changes+array_fill_keys($emptied,'') as $key => $value) {
             $key=(string)$key;
             $slot=$allowed[$key]??null;
             $owner=$slot===null?null:($owners[$slot['entity']]??null);
@@ -959,6 +1032,11 @@ final class QuickstartContract
                 elseif(!isset($byContent[$owner]))$problems[]=new ContractProblem('REVISION_REQUIRED','Content revision required: '.$owner,$key,$owner);
                 elseif(!hash_equals($current['revisions'][$owner],$byContent[$owner]))
                     $problems[]=new ContractProblem('REVISION_STALE','Content changed; read it again: '.$owner,$key,$owner,['current'=>$current['revisions'][$owner]]);
+            }
+            if(isset($emptying[$key])) {
+                if(!isset($slot['emptyLink']))$problems[]=new ContractProblem('SLOT_LINK_NOT_EMPTIABLE','This link cannot be taken off: its layout is not known to draw nothing without it: '.$key,$key,$owner);
+                else $values[$key]='';
+                continue;
             }
             try { $this->checkValue($slot,$value,$params); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }

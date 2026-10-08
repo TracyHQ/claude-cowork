@@ -322,6 +322,17 @@ paths under `images/tracy-content/`. Admin/direct database or filesystem access 
 this API boundary; a difference from the quickstart's design is reported as a warning on the next
 contract request (Tracy ADR 0022), and refused only when the contract's own write made it.
 
+**Taking a link off (`empty_links`, 0.24.4).** An apply may name link slots to empty instead of change:
+`empty_links: ["module-430.1", …]`, alone or beside `changes`. An empty ACM field is conditional markup, so
+emptying one is refused everywhere (`SLOT_EMPTY_STATE`) except where the layout was read to draw no dead link
+without it: `lib/link-layouts.json` lists reviewed layouts by the sha256 of the file the module renders
+(`templates/<template>/acm/<type>/tmpl/<style>.php`, from its `jatools-config`) and, per link field, what the
+page then draws — `hidden` (the button is not drawn) or `plain` (its words stay, unlinked). Inspect marks
+such a slot `emptyLink: "hidden"|"plain"`; any other slot named is refused `SLOT_LINK_NOT_EMPTIABLE`. The
+slot stays bound and occupied in the contract (inspect reports no drift), `apply.revert` puts the link back,
+and writing a link into it later shows the button again. The review covers Tracy Business j6 1.2.1's
+layouts; a JoomlArt layout that prints `<a href="">` whatever its link holds (JA Phio's hero) is not on it.
+
 Release activation is separate from source availability: 0.14.0 has been tested as a local package,
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.

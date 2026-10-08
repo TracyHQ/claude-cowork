@@ -25,6 +25,9 @@ cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
 # engine rather than swept up by the contracts copy above. Named explicitly because a file the
 # package forgets is a receiver that reports every locale as unverified, with no error anywhere.
 cp lib/language-packs.json com_claudecowork/administrator/lib/
+# The reviewed ACM layouts whose links content.contract may empty (empty_links): receiver data like the
+# catalog above, not contract bytes. Without it a receiver empties no link at all, again with no error.
+cp lib/link-layouts.json com_claudecowork/administrator/lib/
 
 # The release manifest: every file the package puts on a site, by its webroot path, with its sha256
 # — read off the extension manifests the installer follows, after the engine copy above and before
