@@ -1632,6 +1632,7 @@ require_once __DIR__ . '/superseded-profile.php';
 // Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.
 require_once __DIR__ . '/multilingual.php';
 require_once __DIR__ . '/source-locale.php';
+require_once __DIR__ . '/unpublished-address.php';
 // The site's default language on a sealed multilingual site.
 require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/theme-style-variation.php';
