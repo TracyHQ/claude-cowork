@@ -1,8 +1,8 @@
 {
   "_comment": "What a WordPress site running the JA Morgan theme (wp-ja-morgan) asks for when it checks for updates. Read by wp-ja-morgan/inc/update.php over the update_themes_github.com filter, reached because its style.css declares `Update URI: https://github.com/TracyHQ/claude-cowork`. Written by `node scripts/release-wordpress-theme.mjs <version> --theme wp-ja-morgan`, which reads the version off the mirrored style.css. The mirror (TCH scripts/sync-cms-themes.mjs) leaves this file alone.",
-  "version": "1.1.11",
-  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-morgan-v1.1.11/wp-ja-morgan-1.1.11.zip",
-  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-morgan-v1.1.11",
+  "version": "1.1.13",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-morgan-v1.1.13/wp-ja-morgan-1.1.13.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-morgan-v1.1.13",
   "requires": "7.0",
   "requires_php": "8.1",
   "tested": "7.1"
