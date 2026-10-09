@@ -1633,6 +1633,8 @@ require_once __DIR__ . '/superseded-profile.php';
 require_once __DIR__ . '/multilingual.php';
 require_once __DIR__ . '/source-locale.php';
 require_once __DIR__ . '/unpublished-address.php';
+require_once __DIR__ . '/unpublished-term.php';
+require_once __DIR__ . '/retired-sitemaps.php';
 // The site's default language on a sealed multilingual site.
 require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/theme-style-variation.php';

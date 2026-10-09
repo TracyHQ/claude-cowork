@@ -149,6 +149,16 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
+  - While a retired set is on record, `lib/RetiredSitemaps.php` also keeps those languages out of
+    the sitemap: every provider is wrapped, so an index entry Polylang names for a retired language
+    (`<subtype>---pll-sep---<slug>`, its users sitemap included) is left out and a sitemap page asked
+    for in a retired language lists nothing, which WordPress answers with 404.
+  - A retire, a demo trim and their undo move `post_status` raw; each moved post's terms are counted
+    again afterwards (`QuickstartContract::setPostStatus`), so the core sitemap (`hide_empty`) and
+    Polylang's languages with content read the counts as they are now.
+  - On a bound site, `lib/UnpublishedTermHooks.php` answers 404 for a category, tag or taxonomy archive
+    (and its feed) that lists no published post: core answers 200 with an empty listing whenever the term
+    exists. A term that still lists a published post is served as before; an unbound site is untouched.
 - `content.update` and `content.delete` refuse (`bad_params`) the contract's own options:
   `_tracy_content_contract`, `claude_cowork_contract` and `claude_cowork_string_overrides`.
 - Warnings: `PRESENTATION_DRIFT` with `severity: warning` on `inspect`, `bind` and `apply` answers,
