@@ -184,7 +184,7 @@
   padding: 0;
   border: 1px solid var(--wp--preset--color--border, #d8d3c9);
   background: var(--wp--preset--color--surface, #fbfaf7);
-  color: var(--wp--preset--color--fg, #14171a);
+  color: var(--wp--preset--color--fg, var(--ds-c-fg, #14171a));
   box-shadow: 0 14px 30px rgb(20 23 26 / 22%);
   max-height: min(80vh, 620px);
   overflow: auto;
@@ -482,7 +482,7 @@
 
 .tracy .tracy-nav .wp-block-navigation-item__content:hover {
   background: transparent;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   border-bottom-color: var(--wp--preset--color--border);
 }
 
@@ -522,7 +522,7 @@
 
 .tracy .tracy-header__search .wp-block-search__button:hover {
   background: transparent;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   border-color: var(--wp--preset--color--accent);
 }
 
@@ -591,7 +591,7 @@
 
 .tracy .wp-block-button.is-style-outline .wp-block-button__link:hover,
 .tracy .tracy-btn--ghost .wp-block-button__link:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   border-color: var(--wp--preset--color--accent);
   background: transparent;
   box-shadow: none;
@@ -644,7 +644,7 @@
 
 .tracy-mega__trigger:hover,
 .tracy-mega.is-open > .tracy-mega__trigger {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   border-bottom-color: var(--wp--preset--color--border);
 }
 
@@ -748,7 +748,7 @@
 }
 
 .tracy-mega__links a:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .tracy-mega__note {
@@ -781,7 +781,7 @@
 }
 
 .tracy-mega__post .wp-block-post-title a:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .tracy-mega__post .wp-block-post-date {
@@ -803,7 +803,7 @@
 }
 
 .tracy-mega__all a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
   border-bottom: 1px solid var(--wp--preset--color--accent);
   padding-bottom: 2px;
@@ -833,7 +833,7 @@
 /* A crumb link is a plain link in the source: the link colour at the body weight, inside the
    band's 13.5px grey (parity 15/09, en-article "Engineering"). */
 .tracy-crumbs .wp-block-breadcrumbs a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-weight: 400;
   text-decoration: none;
 }
@@ -1035,7 +1035,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy-news-card__title a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -1072,7 +1072,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy-pagination a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -1248,7 +1248,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy .tracy-related .tracy-news-card__title a:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .tracy-404 .wp-block-buttons {
@@ -1587,7 +1587,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
    the light grey). */
 .tracy-aside__list a {
   flex: 1 1 auto;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -1616,7 +1616,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 
 .tracy-aside__filters-list a[aria-current] {
   font-weight: 600;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 /* Latest articles: a 64px square thumbnail, the title in the sans at 14.5/600, the date under it. */
@@ -1671,7 +1671,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy-aside__latest-title a:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .tracy-aside__latest-date {
@@ -1875,7 +1875,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
    hover — so the card says it opens the article (interaction lens, fast-5: ink serif, no arrow,
    no underline, nothing said so). */
 .tracy-featured-card__title a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -1964,7 +1964,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
    hover — the same default the featured news title took. Ink with no underline said nothing, while
    the sidebar filters of the SAME page were accent (full-5 N-cc3c8e, three axes). */
 .tracy-result__title a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -2083,7 +2083,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy .tracy-post-nav__link a:hover .post-navigation-link__title {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .tracy .tracy-post-nav__link--next {
@@ -2347,7 +2347,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 }
 
 .tracy-sitemap__list a:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 /* ---- tablet: the gutter narrows, the header row stays one line. ---- */
@@ -2537,7 +2537,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
    came out #14483a on #101214, 1.80:1 (measured 15/09, first dark run). */
 .tracy .tracy-prose a:not(.wp-block-button__link),
 .tracy .tracy-related a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 /* tracy.css underlines a bare anchor in running text. The anchors the source authored — tag
@@ -2707,7 +2707,7 @@ html[data-theme='dark'] .tracy.search .tracy-listing__search .wp-block-search__b
 .tracy .tracy-article__share-link:hover,
 .tracy .tracy-article__share-link.is-done {
   border-color: var(--wp--preset--color--accent);
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 /* D24.9: "Related articles" lives INSIDE the article column as on the source — a 2-column grid

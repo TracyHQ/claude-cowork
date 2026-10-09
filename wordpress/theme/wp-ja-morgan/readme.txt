@@ -41,3 +41,12 @@ Ionicons 4.4.7, Copyright (c) 2015-present Ionic (http://ionic.io/), MIT License
 
 Font Awesome 4.5.0 by Dave Gandy (http://fontawesome.io), the font licensed under the SIL Open
 Font License 1.1 (assets/fonts/font-awesome-OFL.txt).
+
+== Changelog ==
+
+= 1.1.12 =
+* The home style 4 footer's copyright column names the site instead of "© 2019 Morgan … Made by Morgan". Not
+  released on its own: ships with the next quickstart/ja-morgan/wp7 cut.
+
+= 1.1.11 =
+* The header shows the site's logo, or its name in Morgan's text style; the copyright lines name the site.

@@ -160,7 +160,7 @@ h6 {
   position: sticky;
   top: 0;
   z-index: 1030;
-  background: light-dark(#fbfcfa, #0a0d0c);
+  background: light-dark(var(--ds-c-bg, #fbfcfa), #0a0d0c);
   border-bottom: 1px solid var(--wp--preset--color--border);
 }
 
@@ -841,7 +841,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 
 /* Core's own overlay rules outrank the drawer rules above on three points, so they are restated
    here one step stronger (wp-includes/blocks/navigation/style.css, WordPress 7.1):
-   - `.wp-block-navigation:not(.has-background) .wp-block-navigation__responsive-container.is-menu-open:not(.disable-default-overlay) { background-color:#fff }`
+   - `.wp-block-navigation:not(.has-background) .wp-block-navigation__responsive-container.is-menu-open:not(.disable-default-overlay) { background-color:var(--ds-c-surface, #fff) }`
      — five classes against four: the panel painted white, not chrome-surface; its sibling rule
      `….is-menu-open:not(.disable-default-overlay) { color:#000 }` turned the close button black
      (source: `.js-offcanvas-close { color: chrome-text }`, css/template.css:20327-20335);

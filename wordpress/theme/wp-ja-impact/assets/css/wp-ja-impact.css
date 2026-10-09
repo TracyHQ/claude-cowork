@@ -14,20 +14,20 @@
  */
 
 :root {
-  --jim-primary: #1d3677;
+  --jim-primary: var(--ds-c-fg-2, #1d3677);
   --jim-success: #0cb76d;
-  --jim-warning: #f48a29;
+  --jim-warning: var(--ds-c-warn, #f48a29);
   --jim-info: #2970db;
-  --jim-heading: light-dark(#1d3677, #eef1f6);
-  --jim-text: light-dark(#495057, #c2c9d6);
-  --jim-muted: light-dark(#6c757d, #8c97a8);
-  --jim-surface: light-dark(#fbfbfb, #1e2a45);
+  --jim-heading: light-dark(var(--ds-c-fg-2, #1d3677), #eef1f6);
+  --jim-text: light-dark(var(--ds-c-fg, #495057), #c2c9d6);
+  --jim-muted: light-dark(var(--ds-c-muted, #6c757d), #8c97a8);
+  --jim-surface: light-dark(var(--ds-c-surface, #fbfbfb), #1e2a45);
   --jim-raised: light-dark(#ffffff, #1e2a45);
-  --jim-raised-2: light-dark(#f8f9fa, #28354f);
-  --jim-band: light-dark(#fff9ef, #141d33);
-  --jim-line: light-dark(#e9ecef, #33415e);
-  --jim-link: light-dark(#1d3677, #6f9bf0);
-  --jim-link-hover: #0cb76d;
+  --jim-raised-2: light-dark(var(--ds-c-surface, #f8f9fa), #28354f);
+  --jim-band: light-dark(var(--ds-c-surface-warm, #fff9ef), #141d33);
+  --jim-line: light-dark(var(--ds-c-border, #e9ecef), #33415e);
+  --jim-link: light-dark(var(--ds-c-fg-2, #1d3677), #6f9bf0);
+  --jim-link-hover: var(--ds-c-accent, #0cb76d);
   --jim-eyebrow: light-dark(#0cb76d, #2fd98a);
   --jim-on-band: #dee2e6;
   --jim-on-band-muted: #ced4da;
@@ -172,7 +172,7 @@ body.tracy .wp-block-button.btn .wp-block-button__link:focus {
   opacity: 0.85;
 }
 body.tracy .jim-btn--white .wp-block-button__link {
-  background: light-dark(#ffffff, #28354f);
+  background: light-dark(var(--ds-c-bg, #ffffff), #28354f);
   border-color: light-dark(#ffffff, #33415e);
   color: var(--jim-primary);
 }
@@ -239,7 +239,7 @@ body.tracy .jim-contact__item::before {
 body.tracy .jim-contact__item--address::before { content: '\f57d'; }
 body.tracy .jim-contact__item--mail::before { content: '\f0e0'; }
 body.tracy .jim-contact__item--phone::before { content: '\f095'; }
-body.tracy .jim-contact__sub { margin: 0 0 4px; font-size: 16px; line-height: 1.6; color: #adb5bd; }
+body.tracy .jim-contact__sub { margin: 0 0 4px; font-size: 16px; line-height: 1.6; color: var(--ds-c-meta, #adb5bd); }
 body.tracy .jim-contact__title { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.5; letter-spacing: -0.16px; color: #ffffff; }
 body.tracy .jim-contact__title a { color: #ffffff; }
 
@@ -321,7 +321,7 @@ body.tracy .jim-drawer__head { display: none; }
     background: transparent;
     cursor: pointer;
   }
-  body.tracy .jim-drawer-toggle span { display: block; height: 2px; background: #ffffff; }
+  body.tracy .jim-drawer-toggle span { display: block; height: 2px; background: var(--ds-c-bg, #ffffff); }
   body.tracy .jim-header__bar { border: 0; min-height: 0; }
   body.tracy .jim-header__bar .jim-header__row { min-height: 0; padding: 0; }
   body.tracy .jim-header__actions { display: none; }

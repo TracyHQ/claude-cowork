@@ -36,3 +36,14 @@ Font Awesome 4.7.0, (C) 2016 Dave Gandy, and Font Awesome 5.15.4 Free Solid, (C)
 the font files are licensed under the SIL Open Font License 1.1, https://fontawesome.com/license/free.
 The three text families are the Google Fonts builds the source loads, self-hosted in assets/fonts;
 the two Font Awesome files are byte-identical to the ones the source bundles.
+
+== Changelog ==
+
+= 1.1.10 =
+* The 404 template's own footer draws the brand like parts/footer.html (Site Logo pair beside the Site Title) and its
+  copyright line names the site instead of "Kinetic Labs, Inc.". Not released on its own: ships with the next
+  quickstart/ja-kinetic/wp7 cut.
+
+= 1.1.9 =
+* Header and footer brand: Site Logo pairs beside the Site Title instead of the inline glyph; the copyright line and
+  every browser tab name the site.
