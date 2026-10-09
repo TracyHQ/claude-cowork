@@ -14,21 +14,21 @@
  */
 
 :root {
-  --jn-heading: light-dark(#333333, #eef1f6);
+  --jn-heading: light-dark(var(--ds-c-fg-2, #333333), #eef1f6);
   --jn-text: light-dark(rgba(19, 21, 21, 0.7), #c2c9d2);
-  --jn-muted: light-dark(#6c757d, #8b94a0);
-  --jn-surface: light-dark(#f7f7f7, #1a1e25);
+  --jn-muted: light-dark(var(--ds-c-muted, #6c757d), #8b94a0);
+  --jn-surface: light-dark(var(--ds-c-surface, #f7f7f7), #1a1e25);
   --jn-raised: light-dark(#ffffff, #1e232b);
   --jn-raised-2: light-dark(#fafafa, #262c36);
   --jn-line: light-dark(rgba(0, 0, 0, 0.1), #2e353f);
-  --jn-line-2: light-dark(#e9ecef, #2e353f);
-  --jn-link: light-dark(#5e48db, #9d8cff);
-  --jn-link-hover: light-dark(#3014cc, #b6a9ff);
-  --jn-card-text: light-dark(#212529, #adb5bd);
+  --jn-line-2: light-dark(var(--ds-c-border-soft, #e9ecef), #2e353f);
+  --jn-link: light-dark(var(--ds-c-accent, #5e48db), #9d8cff);
+  --jn-link-hover: light-dark(var(--ds-c-accent-hover, #3014cc), #b6a9ff);
+  --jn-card-text: light-dark(var(--ds-c-fg, #212529), var(--ds-c-meta, #adb5bd));
   --jn-tint-purple: light-dark(#efedfc, #1a1e25);
   --jn-tint-green: light-dark(#e6f6f0, #1a1e25);
-  --jn-purple: #5e48db;
-  --jn-purple-text: light-dark(#5e48db, #9d8cff);
+  --jn-purple: var(--ds-c-accent, #5e48db);
+  --jn-purple-text: light-dark(var(--ds-c-accent, #5e48db), #9d8cff);
   --jn-green: #04ad68;
   --jn-red: #ef3867;
   --jn-yellow: #f8ab11;
@@ -151,7 +151,7 @@ body.tracy .jn-actions .wp-block-button .wp-block-button__link {
   text-decoration: none;
   transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
-body.tracy .wp-block-button.tracy-btn .wp-block-button__link:hover { background: #3014cc; border-color: #3014cc; color: #ffffff; }
+body.tracy .wp-block-button.tracy-btn .wp-block-button__link:hover { background: var(--ds-c-accent-hover, #3014cc); border-color: var(--ds-c-accent-hover, #3014cc); color: var(--ds-c-accent-on, #ffffff); }
 body.tracy .wp-block-button.tracy-btn--ghost .wp-block-button__link {
   background: light-dark(#fafafa, #262c36);
   border-color: light-dark(#fafafa, #2e353f);
@@ -211,11 +211,11 @@ body.tracy .jn-nav .wp-block-navigation-item__content {
   align-items: center;
   padding: 20px 16px;
   line-height: 80px;
-  color: light-dark(#333333, #c2c9d2);
+  color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2);
 }
 body.tracy .jn-nav .wp-block-navigation-item__content:hover,
 body.tracy .jn-nav .current-menu-item > .wp-block-navigation-item__content,
-body.tracy .jn-nav .current-menu-ancestor > .wp-block-navigation-item__content { color: light-dark(#371bd3, #9d8cff); }
+body.tracy .jn-nav .current-menu-ancestor > .wp-block-navigation-item__content { color: light-dark(var(--ds-c-accent-text-hover, #371bd3), #9d8cff); }
 body.tracy .jn-nav .wp-block-navigation__submenu-icon { width: 10px; height: 10px; margin-left: 6px; }
 /* The source caret is a 22px box between the title and the link's right padding. */
 body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation-item__content { padding-right: 0; }
@@ -238,9 +238,9 @@ body.tracy .jn-nav .wp-block-navigation__submenu-container {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) body.tracy .jn-nav .wp-block-navigation__submenu-container { box-shadow: 0 0 0 1px #2e353f, 0 8px 24px 0 rgba(0, 0, 0, 0.4); }
 }
-body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item > .wp-block-navigation-item__content { width: 100%; padding: 8px 0; font-size: 16px; line-height: 1.5; color: light-dark(#333333, #c2c9d2); }
+body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item > .wp-block-navigation-item__content { width: 100%; padding: 8px 0; font-size: 16px; line-height: 1.5; color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); }
 body.tracy .jn-nav .wp-block-navigation__submenu-container .wp-block-navigation-item { padding: 0; }
-body.tracy .jn-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content { color: light-dark(#371bd3, #9d8cff); }
+body.tracy .jn-nav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content { color: light-dark(var(--ds-c-accent-text, #371bd3), #9d8cff); }
 body.tracy .jn-header__menu .jn-nav > .wp-block-navigation__container > .wp-block-navigation-item { height: 120px; align-items: center; }
 
 body.tracy .jn-quick { display: flex; align-items: center; gap: 32px; margin-right: 0; }
@@ -270,7 +270,7 @@ body.tracy .jn-theme-toggle {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: light-dark(#333333, #c2c9d2);
+  color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2);
   cursor: pointer;
 }
 body.tracy .jn-theme-toggle:hover { background: var(--jn-line); }
@@ -318,7 +318,7 @@ body.tracy .jn-drawer-toggle { display: none; }
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    background: light-dark(#ffffff, #14171c);
+    background: light-dark(var(--ds-c-bg, #ffffff), #14171c);
     transform: translateX(100%);
     visibility: hidden;
     transition: transform 0.3s ease, visibility 0.3s;
@@ -341,7 +341,7 @@ body.tracy .jn-drawer-toggle { display: none; }
     justify-content: space-between;
     height: 56px;
     padding: 12px 16px;
-    background: light-dark(#e9ecef, #1e232b);
+    background: light-dark(var(--ds-c-surface-warm, #e9ecef), #1e232b);
     box-sizing: content-box;
     height: 32px;
   }
@@ -357,8 +357,8 @@ body.tracy .jn-drawer-toggle { display: none; }
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: #ffffff;
-    color: #666666;
+    background: var(--ds-c-bg, #ffffff);
+    color: var(--ds-c-fg, #666666);
     font-family: inherit;
     font-size: 24px;
     font-weight: 400;
@@ -382,11 +382,11 @@ body.tracy .jn-drawer-toggle { display: none; }
   body.tracy .jn-nav .wp-block-navigation-item__content { padding: 12px 0; line-height: 1.5; }
   /* The source drawer keeps its light item colour (#333) on its dark panel, unreadable; the port
      keeps the dark-mode item colour instead (SOURCE flag, D-06). */
-  body.tracy .jn-nav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content { color: light-dark(#333333, #c2c9d2); }
+  body.tracy .jn-nav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content { color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); }
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content { font-weight: 500; color: var(--jn-link-hover); }
   /* The source caret is drawn in its link's colour (item colour, purple on the current item and its ancestor), not the button default. */
-  body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { color: light-dark(#333333, #c2c9d2); }
+  body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); }
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation__submenu-icon,
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation__submenu-icon { color: var(--jn-link-hover); }
   body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon {
@@ -431,7 +431,7 @@ body.tracy .jn-drawer-toggle { display: none; }
     margin: 0;
     padding: 18px 24px 16px;
     border-radius: 0;
-    background: light-dark(#ffffff, #14171c) !important;
+    background: light-dark(var(--ds-c-bg, #ffffff), #14171c) !important;
     box-shadow: none;
     overflow: hidden auto;
     opacity: 1 !important;
@@ -454,7 +454,7 @@ body.tracy .jn-drawer-toggle { display: none; }
     padding: 0 0 8px;
     border: 0;
     background: transparent;
-    color: light-dark(#212529, #eef1f6);
+    color: light-dark(var(--ds-c-fg, #212529), #eef1f6);
     font: inherit;
     font-size: 16px;
     font-weight: 600;
@@ -563,7 +563,7 @@ body.tracy .jn-sec.bg-purple { background: var(--jn-purple); color: var(--jn-on-
 body.tracy .jn-sec.bg-yellow { background: var(--jn-yellow); color: var(--jn-on-band); }
 body.tracy .jn-sec.bg-purple-light { background: var(--jn-tint-purple); }
 body.tracy .jn-sec.bg-green-light { background: var(--jn-tint-green); }
-body.tracy .jn-sec.bg-light { background: light-dark(#f7f7f7, #1a1e25); }
+body.tracy .jn-sec.bg-light { background: light-dark(var(--ds-c-surface, #f7f7f7), #1a1e25); }
 body.tracy .jn-sec.bg-purple :where(h1, h2, h3, .jn-sec__title, .jn-feature__more-text),
 body.tracy .jn-sec.bg-yellow :where(h1, h2, h3, .jn-sec__title) { color: #ffffff; }
 
@@ -895,7 +895,7 @@ body.tracy .jn-teams__img a { display: block; line-height: 0; }
 body.tracy .jn-teams__img img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--jn-radius); }
 body.tracy .jn-teams__name { margin: 32px 0 8px; font-size: var(--jn-h4); }
 body.tracy .jn-sec .jn-teams__name a { color: var(--jn-heading); }
-body.tracy .jn-teams__role { margin: 0 0 16px; color: #6c757d; }
+body.tracy .jn-teams__role { margin: 0 0 16px; color: var(--ds-c-muted, #6c757d); }
 body.tracy .jn-teams .tracy-motion-prev,
 body.tracy .jn-teams .tracy-motion-next {
   position: absolute;
@@ -974,7 +974,7 @@ body.tracy .jn-pricing__tab {
   font-weight: 600;
   line-height: 1;
   background: var(--jn-raised);
-  color: light-dark(#333333, #c2c9d2);
+  color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2);
   cursor: pointer;
 }
 body.tracy .jn-pricing__tab.is-active,
@@ -1032,7 +1032,7 @@ body.tracy .jn-accordion__item {
   background: var(--jn-surface);
   color: var(--jn-card-text);
 }
-body.tracy .jn-faq .jn-accordion__item { background: light-dark(#f7f7f7, #1e232b); }
+body.tracy .jn-faq .jn-accordion__item { background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); }
 body.tracy .jn-accordion__header { margin: 0; font-size: 18px; color: var(--jn-heading); }
 body.tracy .jn-accordion__button {
   display: flex;
@@ -1128,7 +1128,7 @@ body.tracy .jn-play__button::before {
   width: 30px;
   height: 30px;
   margin: 45px auto;
-  background: #ffffff;
+  background: var(--ds-c-bg, #ffffff);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath d='M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath d='M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
@@ -1172,7 +1172,7 @@ body.tracy .jn-expertise__label[class*='cta-'] { color: var(--jn-text); }
 body.tracy .jn-expertise__title { margin: 0 0 8px; font-size: var(--jn-h3); }
 body.tracy .jn-expertise__desc { margin: 0 0 16px; color: var(--jn-text); }
 body.tracy .jn-expertise__list { display: flex; flex-wrap: wrap; gap: 8px; margin: 32px 0 0; padding: 32px 0 0; border-top: 1px solid var(--jn-line); list-style: none; }
-body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; background: light-dark(#f7f7f7, #1e232b); font-weight: 600; color: light-dark(#333333, #c2c9d2); }
+body.tracy .jn-expertise__list li { padding: 8px 16px; border-radius: 40px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); font-weight: 600; color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); }
 /* The source's pills carry 8 px above each (margin-top on the link) instead of a row gap, at every width; its list steps 32 -> 16 px below 992 px. */
 body.tracy .jn-expertise__list { gap: 0 8px; }
 body.tracy .jn-expertise__list li { margin-top: 8px; }
@@ -1408,7 +1408,7 @@ body.tracy .jn-service__menu .wp-block-navigation__container { gap: 16px; width:
 /* A word wider than the box overflows by a pixel in the source (225.4 px item in a 224 px column) instead
    of breaking mid-word, so "Cybersecurity" stays on one line. */
 body.tracy .jn-service__menu .wp-block-navigation-item { width: 100%; min-width: min-content; }
-body.tracy .jn-service__menu .wp-block-navigation-item__content { display: block; width: 100%; padding: 32px; font-size: var(--jn-h4); line-height: 1.5; border-radius: 16px; background: var(--jn-raised); color: light-dark(#333333, #c2c9d2); box-sizing: border-box; }
+body.tracy .jn-service__menu .wp-block-navigation-item__content { display: block; width: 100%; padding: 32px; font-size: var(--jn-h4); line-height: 1.5; border-radius: 16px; background: var(--jn-raised); color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); box-sizing: border-box; }
 body.tracy .jn-service__menu .current-menu-item > .wp-block-navigation-item__content { border: 1px solid var(--jn-purple); background: light-dark(#efedfc, #262c36); font-weight: 700; color: var(--jn-purple-text); }
 body.tracy .jn-service__title { max-width: 850px; margin-block: 0; font-size: var(--jn-service-h1, 32px); font-weight: 700; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-service__share { margin-top: 64px; margin-bottom: 32px; padding-top: 64px; border-top: 1px solid var(--jn-line); }
@@ -1446,17 +1446,17 @@ body.tracy .jn-auth #loginform p { margin: 0 0 32px; }
 body.tracy .jn-auth #loginform label { display: inline-block; margin-bottom: 15px; line-height: 16px; }
 body.tracy .jn-auth #loginform .login-username label::after,
 body.tracy .jn-auth #loginform .login-password label::after { content: " *"; color: var(--jn-red); }
-body.tracy .jn-auth #loginform .input { display: block; width: 100%; height: 64px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(#212529, #c2c9d2); box-sizing: border-box; }
-body.tracy .jn-auth #loginform .input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; color: light-dark(#212529, #eef1f6); }
+body.tracy .jn-auth #loginform .input { display: block; width: 100%; height: 64px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #c2c9d2); box-sizing: border-box; }
+body.tracy .jn-auth #loginform .input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline: 0; color: light-dark(var(--ds-c-fg, #212529), #eef1f6); }
 body.tracy .jn-auth #loginform .login-remember { display: flex; align-items: center; height: 24px; margin-top: -1px; }
 body.tracy .jn-auth #loginform .login-remember label { display: flex; align-items: center; gap: 12px; margin: 0; line-height: 1.5; }
-body.tracy .jn-auth #loginform .login-remember input { width: 16px; height: 16px; margin: 0; border-color: light-dark(#ced4da, #3c444f); background-color: light-dark(#ffffff, var(--jn-raised)); }
+body.tracy .jn-auth #loginform .login-remember input { width: 16px; height: 16px; margin: 0; border-color: light-dark(#ced4da, #3c444f); background-color: light-dark(var(--ds-c-bg, #ffffff), var(--jn-raised)); }
 body.tracy .jn-auth #loginform .login-submit { margin-bottom: 16px; }
 body.tracy .jn-auth #loginform #wp-submit { width: 100%; height: 64px; padding: 18px 32px; border: 1px solid var(--jn-purple); border-radius: 16px; background: var(--jn-purple); font: inherit; font-weight: 500; line-height: 26.08px; color: #ffffff; cursor: pointer; }
-body.tracy .jn-auth #loginform #wp-submit:hover { background: #3014cc; border-color: #3014cc; }
+body.tracy .jn-auth #loginform #wp-submit:hover { background: var(--ds-c-accent-hover, #3014cc); border-color: var(--ds-c-accent-hover, #3014cc); }
 body.tracy .jn-login__links { max-width: 400px; margin: 0 auto; padding: 0; list-style: none; line-height: 24px; text-align: center; }
 body.tracy .jn-login__links li { display: inline-block; padding: 0 8px; }
-body.tracy .jn-login__links a { font-size: 14px; line-height: 21px; color: #6c757d; }
+body.tracy .jn-login__links a { font-size: 14px; line-height: 21px; color: var(--ds-c-muted, #6c757d); }
 @media (max-width: 767.98px) {
   body.tracy .jn-auth #loginform #wp-submit { height: 60px; padding: 16px; }
 }
@@ -1465,10 +1465,10 @@ body.tracy .jn-login__links a { font-size: 14px; line-height: 21px; color: #6c75
 body.tracy .jn-page .jn-search { max-width: 1000px; margin: 0 auto 16px; }
 body.tracy .jn-page .jn-search .wp-block-search__label { display: inline-block; margin: 0 8px 16px 0; font-size: 22px; font-weight: 400; line-height: 33px; letter-spacing: -0.22px; color: var(--jn-heading); }
 body.tracy .jn-page .jn-search .wp-block-search__inside-wrapper { display: flex; flex-wrap: wrap; align-items: flex-start; width: 100%; padding: 0; border: 0; }
-body.tracy .jn-page .jn-search .wp-block-search__input { flex: 0 0 99%; width: 99%; min-width: 0; height: 64px; margin: 0 0 12px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(#212529, #c2c9d2); box-sizing: border-box; }
-body.tracy .jn-page .jn-search .wp-block-search__input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; color: light-dark(#212529, #eef1f6); }
+body.tracy .jn-page .jn-search .wp-block-search__input { flex: 0 0 99%; width: 99%; min-width: 0; height: 64px; margin: 0 0 12px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #c2c9d2); box-sizing: border-box; }
+body.tracy .jn-page .jn-search .wp-block-search__input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline: 0; color: light-dark(var(--ds-c-fg, #212529), #eef1f6); }
 body.tracy .jn-page .jn-search .wp-block-search__button { display: flex; align-items: center; justify-content: center; height: 60px; margin: 0 4px 0 3px; padding: 16px; border: 1px solid var(--jn-purple); border-radius: 16px; background: var(--jn-purple); font: inherit; font-weight: 500; line-height: 26.08px; color: #ffffff; cursor: pointer; box-sizing: border-box; }
-body.tracy .jn-page .jn-search .wp-block-search__button:hover { border-color: #3014cc; background: #3014cc; }
+body.tracy .jn-page .jn-search .wp-block-search__button:hover { border-color: var(--ds-c-accent-hover, #3014cc); background: var(--ds-c-accent-hover, #3014cc); }
 body.tracy .jn-page .jn-search .wp-block-search__button::before { content: ''; width: 16px; height: 16px; margin-right: 12px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M416 208c0 45.9-14.9 88.3-40 122.7l126.6 126.7c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0s208 93.1 208 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M416 208c0 45.9-14.9 88.3-40 122.7l126.6 126.7c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0s208 93.1 208 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z'/%3E%3C/svg%3E") center / contain no-repeat; }
 @media (min-width: 768px) {
   body.tracy .jn-page .jn-search .wp-block-search__label { font-size: 28px; line-height: 42px; letter-spacing: -0.28px; }
@@ -1480,7 +1480,7 @@ body.tracy .jn-page .jn-search .wp-block-search__button::before { content: ''; w
 /* ── Project tabs (pattern section-project-tabs: the source's Articles - Categories module, tabs layout; G18) ── */
 body.tracy .jn-ptabs .jn-sec__head { margin-bottom: 32px; }
 body.tracy .jn-ptabs__nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 0 0 32px; padding: 0; }
-body.tracy .jn-ptabs__tab .wp-block-button__link { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: calc(50% - 16px); min-width: 0; height: 50px; margin: 0 0 -1px; padding: 12px 16px; border: 0; border-radius: 16px; background: light-dark(#f7f7f7, #1e232b); font-size: 15px; font-weight: 500; line-height: 22.5px; text-decoration: none; color: light-dark(#333333, #c2c9d2); cursor: pointer; }
+body.tracy .jn-ptabs__tab .wp-block-button__link { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: calc(50% - 16px); min-width: 0; height: 50px; margin: 0 0 -1px; padding: 12px 16px; border: 0; border-radius: 16px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); font-size: 15px; font-weight: 500; line-height: 22.5px; text-decoration: none; color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); cursor: pointer; }
 body.tracy .jn-ptabs__tab { display: contents; }
 body.tracy .jn-ptabs__tab.is-active .wp-block-button__link { background: var(--jn-purple); color: #ffffff; }
 body.tracy .jn-ptabs.is-ready .jn-ptabs__panel:not(.is-active) { display: none; }
@@ -1497,7 +1497,7 @@ body.tracy .jn-ptabs__excerpt { margin: 0; }
 body.tracy .jn-ptabs__excerpt > p { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 body.tracy .jn-ptabs__pager { margin: 16px 0 16px; }
 body.tracy .jn-ptabs__pager ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 0; padding: 0; list-style: none; }
-body.tracy .jn-ptabs__pager button { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 48px; height: 48px; padding: 0 12px; border: 0; border-radius: 16px; background: light-dark(#f7f7f7, #1e232b); font: inherit; font-weight: 500; line-height: 1; color: light-dark(rgba(19, 21, 21, 0.7), #c2c9d2); cursor: pointer; }
+body.tracy .jn-ptabs__pager button { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 48px; height: 48px; padding: 0 12px; border: 0; border-radius: 16px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); font: inherit; font-weight: 500; line-height: 1; color: light-dark(rgba(19, 21, 21, 0.7), #c2c9d2); cursor: pointer; }
 body.tracy .jn-ptabs__pager button[aria-current="page"] { background: var(--jn-purple); color: #ffffff; }
 body.tracy .jn-ptabs__pager button[disabled] { cursor: default; }
 body.tracy .jn-ptabs__pager .jn-ptabs__step { font-size: 28px; }
@@ -1538,14 +1538,14 @@ body.tracy .jn-auth .jn-reg__group { margin: 0 0 32px; }
 body.tracy .jn-auth .jn-reg__note.jn-reg__group { margin-bottom: 8px; }
 body.tracy .jn-auth .jn-reg__group label { display: block; margin: 0 0 10px; line-height: 16px; }
 body.tracy .jn-auth .jn-reg__star { color: var(--jn-red); }
-body.tracy .jn-auth .jn-reg .input { display: block; width: 100%; height: 64px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(#212529, #c2c9d2); box-sizing: border-box; }
-body.tracy .jn-auth .jn-reg .input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; color: light-dark(#212529, #eef1f6); }
+body.tracy .jn-auth .jn-reg .input { display: block; width: 100%; height: 64px; padding: 18px 32px; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); border-radius: 16px; background: var(--jn-raised); font: inherit; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #c2c9d2); box-sizing: border-box; }
+body.tracy .jn-auth .jn-reg .input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline: 0; color: light-dark(var(--ds-c-fg, #212529), #eef1f6); }
 body.tracy .jn-auth .jn-reg__submit { margin: 0; line-height: 24px; }
 body.tracy .jn-auth .jn-reg__register,
 body.tracy .jn-auth .jn-reg__cancel { display: inline-block; height: 64px; padding: 18px 32px; border: 1px solid var(--jn-purple); border-radius: 16px; background: var(--jn-purple); font: inherit; font-weight: 500; line-height: 26.08px; text-align: center; text-decoration: none; color: #ffffff; cursor: pointer; box-sizing: border-box; vertical-align: middle; }
-body.tracy .jn-auth .jn-reg__register:hover { background: #3014cc; border-color: #3014cc; }
+body.tracy .jn-auth .jn-reg__register:hover { background: var(--ds-c-accent-hover, #3014cc); border-color: var(--ds-c-accent-hover, #3014cc); }
 body.tracy .jn-auth .jn-reg__register { margin-right: 4px; }
-body.tracy .jn-auth .jn-reg__cancel { border-color: #dc3545; background: #dc3545; }
+body.tracy .jn-auth .jn-reg__cancel { border-color: var(--ds-c-danger, #dc3545); background: var(--ds-c-danger, #dc3545); }
 body.tracy .jn-auth .jn-reg__cancel:hover { border-color: #b02a37; background: #b02a37; }
 @media (max-width: 767.98px) {
   body.tracy .jn-auth .jn-reg legend { font-size: 22px; line-height: 26.4px; letter-spacing: -0.22px; }
@@ -1609,8 +1609,8 @@ body.tracy.jn-parent-project .tracy-card__title a { color: var(--jn-heading); }
 body.tracy.jn-parent-project .tracy-card__title a:hover { color: var(--jn-link); }
 body.tracy.jn-parent-project .tracy-card .wp-block-post-excerpt__excerpt { margin: 0; color: var(--jn-text); }
 body.tracy.jn-parent-project .tracy-card .wp-block-post-excerpt__more-text { display: none; }
-body.tracy .jn-card-info { display: flex; margin-top: 32px; padding-top: 32px; border-top: 1px solid #e9ecef; }
-body.tracy .jn-card-info > .jn-card-info__client-name { flex: 0 0 50%; box-sizing: border-box; border-right: 1px solid #e9ecef; }
+body.tracy .jn-card-info { display: flex; margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--ds-c-border-soft, #e9ecef); }
+body.tracy .jn-card-info > .jn-card-info__client-name { flex: 0 0 50%; box-sizing: border-box; border-right: 1px solid var(--ds-c-border-soft, #e9ecef); }
 body.tracy .jn-card-info > div { flex: 1 1 0; }
 body.tracy .jn-card-info h5 { margin: 0 0 16px; font-size: 12px; font-weight: 500; text-transform: uppercase; color: var(--jn-purple-text); }
 body.tracy .jn-card-info p { margin: 0; font-size: 18px; font-weight: 500; color: var(--jn-heading); }
@@ -1725,7 +1725,7 @@ body.tracy .jn-project .jn-article__tags a { line-height: 22.96px; }
 }
 body.tracy .jn-project__fields { display: flex; flex-wrap: wrap; margin: 0 -32px 64px; }
 body.tracy .jn-project__fields > * { margin-block: 0; }
-body.tracy .jn-project__field { flex: 0 0 25%; padding: 0 32px; box-sizing: border-box; border-right: 1px solid light-dark(#e9ecef, var(--jn-line)); }
+body.tracy .jn-project__field { flex: 0 0 25%; padding: 0 32px; box-sizing: border-box; border-right: 1px solid light-dark(var(--ds-c-border-soft, #e9ecef), var(--jn-line)); }
 body.tracy .jn-project__field:last-child { border-right: 0; }
 body.tracy .jn-project__field > * { margin-block: 0; }
 body.tracy .jn-project__label { margin: 0 0 16px; font-size: 12px; font-weight: 500; text-transform: uppercase; color: var(--jn-link); }
@@ -1747,7 +1747,7 @@ body.tracy .jn-project__picture img { display: block; width: 100%; height: auto;
   body.tracy .jn-project__field { position: relative; flex-basis: 100%; padding: 0 16px 24px; border-right: 0; }
   body.tracy .jn-project__fields > .jn-project__field { margin-block: 0 24px; }
   body.tracy .jn-project__field:not(:last-child) { padding-bottom: 25px; }
-  body.tracy .jn-project__field:not(:last-child)::after { content: ''; position: absolute; right: 16px; bottom: 0; left: 16px; border-bottom: 1px solid light-dark(#e9ecef, var(--jn-line)); }
+  body.tracy .jn-project__field:not(:last-child)::after { content: ''; position: absolute; right: 16px; bottom: 0; left: 16px; border-bottom: 1px solid light-dark(var(--ds-c-border-soft, #e9ecef), var(--jn-line)); }
   body.tracy .jn-project__picture { margin-bottom: 32px; }
 }
 
@@ -1831,7 +1831,7 @@ body.tracy .jn-search-band__right > * { margin-block: 0; }
 body.tracy .jn-search-band .jn-search-band__title { margin: 0 0 32px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.2; color: var(--jn-heading); }
 body.tracy .jn-search-band__form .wp-block-search__inside-wrapper { position: relative; width: 100% !important; padding: 0; border: 0; }
 body.tracy .jn-search-band__form .wp-block-search__input { flex: 1 1 auto; width: 100%; min-width: 0; }
-body.tracy .jn-search-band__form .wp-block-search__input { height: 62px; margin: 0; padding: 18px 32px; border: 0; border-radius: 16px; background: var(--jn-raised); font-size: 16px; line-height: 26.08px; color: light-dark(#212529, #eef1f6); }
+body.tracy .jn-search-band__form .wp-block-search__input { height: 62px; margin: 0; padding: 18px 32px; border: 0; border-radius: 16px; background: var(--jn-raised); font-size: 16px; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #eef1f6); }
 body.tracy .jn-search-band__form .wp-block-search__button { position: absolute; top: 50%; right: 15px; width: 32px; height: 24px; margin: 0; padding: 0; border: 0; background: none; color: var(--jn-heading); transform: translateY(-50%); }
 body.tracy .jn-search-band__social { margin-top: 32px !important; }
 body.tracy .jn-search-band__social .wp-social-link-facebook { background: #1877f2; }
@@ -1862,7 +1862,7 @@ body.tracy .jn-featured .tracy-grid > li:first-child .tracy-card__media { margin
 body.tracy .jn-featured .tracy-grid > li:first-child .tracy-card__title { font-size: var(--jn-h3); }
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__excerpt { display: block; -webkit-line-clamp: none; overflow: visible; }
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-text { display: block; margin: 24px 0 0; }
-body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-link { display: inline-block; padding: 8px 24px; border: 1px solid transparent; border-radius: 16px; background: var(--jn-surface); font-weight: 500; line-height: 26.08px; color: light-dark(#212529, #eef1f6); text-decoration: none; }
+body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-link { display: inline-block; padding: 8px 24px; border: 1px solid transparent; border-radius: 16px; background: var(--jn-surface); font-weight: 500; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #eef1f6); text-decoration: none; }
 body.tracy .jn-featured .tracy-grid > li:first-child .wp-block-post-excerpt__more-link:hover { color: var(--jn-link); }
 @media (max-width: 991.98px) {
   body.tracy .jn-featured .tracy-grid > li:first-child .tracy-card { grid-template-columns: minmax(0, 1fr); gap: 32px; }
@@ -1899,7 +1899,7 @@ body.tracy .jn-pager-row .tracy-pager__list { flex-wrap: wrap; gap: 16px; margin
 body.tracy.jn-route-author-listting .jn-pager-row .tracy-pager__list { margin-bottom: 24px; }
 body.tracy.jn-route-author-listting .jn-pager-row { margin-bottom: 32px; }
 body.tracy .jn-pager-row .tracy-pager__item + .tracy-pager__item .tracy-pager__link { margin-inline-start: -1px; }
-body.tracy .jn-pager-row .tracy-pager__link { display: block; box-sizing: border-box; min-width: 64px; height: 64px; padding: 0 12px; border: 0; border-radius: 16px; background: light-dark(#f7f7f7, #1e232b); font-weight: 500; line-height: 64px; text-align: center; text-decoration: none; color: var(--jn-text); }
+body.tracy .jn-pager-row .tracy-pager__link { display: block; box-sizing: border-box; min-width: 64px; height: 64px; padding: 0 12px; border: 0; border-radius: 16px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); font-weight: 500; line-height: 64px; text-align: center; text-decoration: none; color: var(--jn-text); }
 body.tracy .jn-pager-row a.tracy-pager__link:hover { background: var(--jn-purple); color: #fff; }
 body.tracy .jn-pager-row .is-current .tracy-pager__link { background: var(--jn-purple); color: #fff; }
 @media (max-width: 767.98px) {
@@ -1930,7 +1930,7 @@ body.tracy .jn-contact-card--email::after { background-image: url('../img/ic-ema
 }
 body.tracy .jn-contact-card > p { margin: 0; }
 /* In dark the source paints all three card titles in its dark link purple. */
-body.tracy .jn-contact-card__title { padding-bottom: 16px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.21; color: light-dark(#333333, #9d8cff); }
+body.tracy .jn-contact-card__title { padding-bottom: 16px; font-size: var(--jn-h3); font-weight: 600; line-height: 1.21; color: light-dark(var(--ds-c-fg-2, #333333), #9d8cff); }
 body.tracy .jn-contact-card--phone .jn-contact-card__title { color: light-dark(#04ad68, #9d8cff); }
 body.tracy .jn-contact-card--email .jn-contact-card__title { color: var(--jn-purple-text); }
 body.tracy .jn-contact-card__text { color: var(--jn-heading); font-size: 18px; font-weight: 500; line-height: 1.5; }
@@ -1941,7 +1941,7 @@ body.tracy .jn-contact-info > * { max-width: 542px; }
 body.tracy .jn-contact-info__title { margin: 0 0 32px; color: var(--jn-heading); }
 body.tracy .jn-contact-info__accent { display: block; position: relative; color: var(--jn-green); }
 body.tracy .jn-contact-info__accent::after { content: ''; position: absolute; top: 0; width: 80px; height: 80px; margin-left: 12px; background: url('../img/ic-speaker.png') no-repeat 0 0 / contain; }
-body.tracy .jn-contact-misc { color: var(--jn-text); padding-bottom: 64px; margin: 0 0 64px; border-bottom: 1px solid #e9ecef; }
+body.tracy .jn-contact-misc { color: var(--jn-text); padding-bottom: 64px; margin: 0 0 64px; border-bottom: 1px solid var(--ds-c-border-soft, #e9ecef); }
 body.tracy .jn-contact-misc p { margin: 0; }
 body.tracy .jn-contact-misc__title { display: none; }
 body.tracy .jn-contact-follow { margin: 0 0 32px; color: var(--jn-heading); }
@@ -2016,7 +2016,7 @@ body.tracy .jn-tagged { margin-block-start: 32px; }
 body.tracy .jn-tagged__filters { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 0; margin: 0 0 16px; }
 body.tracy .jn-tagged__search { display: flex; min-width: 0; max-width: 100%; }
 body.tracy .jn-tagged__search input,
-body.tracy .jn-tagged__limit { box-sizing: border-box; min-height: 64px; margin: 0; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); background-color: var(--jn-raised); font: inherit; font-size: 16px; line-height: 26.08px; color: light-dark(#212529, #c2c9d2); }
+body.tracy .jn-tagged__limit { box-sizing: border-box; min-height: 64px; margin: 0; border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #3c444f); background-color: var(--jn-raised); font: inherit; font-size: 16px; line-height: 26.08px; color: light-dark(var(--ds-c-fg, #212529), #c2c9d2); }
 body.tracy .jn-tagged__search input { width: 240px; min-width: 0; flex: 0 1 auto; margin-inline-start: -1px; padding: 18px 32px; border-radius: 16px 0 0 16px; }
 body.tracy .jn-tagged__button { position: relative; flex: none; margin-inline-start: -1px; box-sizing: border-box; min-height: 64px; padding: 18px 32px; border: 1px solid #6c757d; border-radius: 0; background: #6c757d; color: #fff; font: inherit; font-weight: 500; line-height: 26.08px; cursor: pointer; }
 body.tracy .jn-tagged__button--search { width: 82px; }
@@ -2033,11 +2033,11 @@ body.tracy .jn-tagged__limit { width: 88px; padding: 16px 32px 16px 24px; border
   :root:not([data-theme]) body.tracy .jn-tagged__limit { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3E%3C/svg%3E"); }
 }
 body.tracy .jn-tagged__list { margin: 0; padding: 0; list-style: none; }
-body.tracy .jn-tagged__list > li { margin: 0; padding: 16px 0 0; border-bottom: 1px solid var(--jn-line-2); background: light-dark(#fff, transparent); }
+body.tracy .jn-tagged__list > li { margin: 0; padding: 16px 0 0; border-bottom: 1px solid var(--jn-line-2); background: light-dark(var(--ds-c-bg, #fff), transparent); }
 body.tracy .jn-tagged__list .jn-tagged__title { margin: 0 0 16px; font-size: 16px; font-weight: 500; color: var(--jn-heading); }
 /* The tag view's empty result: the source's info alert (Bootstrap alert-info, light and dark). */
 body.tracy .jn-tagged__empty { margin: 0 0 16px; padding: 16px; border: 1px solid light-dark(#9eeaf9, #087990); border-radius: 16px; background: light-dark(#cff4fc, #032830); color: light-dark(#055160, #6edff6); font-size: 16px; line-height: 24px; }
-body.tracy .jn-tagged__title a { color: light-dark(#212529, #eef1f6); text-decoration: none; }
+body.tracy .jn-tagged__title a { color: light-dark(var(--ds-c-fg, #212529), #eef1f6); text-decoration: none; }
 body.tracy .jn-tagged__title a:hover { color: var(--jn-link); }
 /* The tag view puts the counter before the links: left of them from 992 px, above them below. */
 body.tracy .jn-tagged .jn-pager-row { flex-direction: row-reverse; gap: 0 16px; margin-block: 48px 32px; }
@@ -2086,7 +2086,7 @@ body.tracy .screen-reader-text.jn-page-heading { position: absolute !important; 
 
 /* The search view's form (/smart-search): the source field is ringed by a 10% black rule on both
    themes and filled with the dark surface in dark; its button is set at 500 like every source button. */
-body.tracy .jn-search .wp-block-search__input { border-color: rgba(0, 0, 0, 0.1); background-color: light-dark(#ffffff, #1e232b); }
+body.tracy .jn-search .wp-block-search__input { border-color: rgba(0, 0, 0, 0.1); background-color: light-dark(var(--ds-c-bg, #ffffff), #1e232b); }
 body.tracy .wp-block-search__button { font-weight: 500; }
 body.tracy .jn-page-heading + * { margin-block-start: 0 !important; } /* the hidden h1 is a sibling: it must not add the block gap above the first block */
 body.tracy .jn-prose .mb-0 { margin-bottom: 0 !important; } /* the source spacing utility wins over the paragraph block margin */
@@ -2107,7 +2107,7 @@ body.tracy .jn-related--band .jn-sec__head { margin-bottom: 32px; }
   }
 }
 /* The source's author card: a rounded grey plate holding a 1 px block (measured on .author / .author-block). */
-body.tracy .jn-author { padding: 16px 16px 32px; border-radius: 16px; background: light-dark(#f7f7f7, #1a1e25); }
+body.tracy .jn-author { padding: 16px 16px 32px; border-radius: 16px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1a1e25); }
 body.tracy .jn-tagged__button--clear { border-left-color: rgba(225, 225, 225, 0.25); } /* the source's clear button: a faint left edge against the search button */
 /* Share glyphs are white on the network colour (core paints its own brand colour on the item and the link). */
 body.tracy .jn-share__links .wp-social-link,
@@ -2141,7 +2141,7 @@ body.tracy .jn-share__links .wp-social-link svg { color: #ffffff !important; fil
     border-right: 4.5px solid transparent;
     border-top: 4.5px solid currentColor;
   }
-  body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { color: light-dark(#333333, #c2c9d2); opacity: 1; }
+  body.tracy .jn-nav .wp-block-navigation__container > .has-child > .wp-block-navigation__submenu-icon { color: light-dark(var(--ds-c-fg-2, #333333), #c2c9d2); opacity: 1; }
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation__submenu-icon,
   body.tracy .jn-nav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation__submenu-icon { color: var(--jn-link-hover); }
 }
@@ -2196,9 +2196,9 @@ body.tracy .jn-auth .jn-passkey__status:empty { display: none; }
 body.tracy .jn-auth .jn-passkeys { margin-top: 48px; }
 body.tracy .jn-auth .jn-passkeys__list { margin: 0 0 24px; padding: 0; list-style: none; }
 body.tracy .jn-auth .jn-passkeys__list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--jn-line); }
-body.tracy .jn-auth .jn-passkeys__remove { padding: 4px 12px; border: 1px solid #dc3545; border-radius: 8px; background: transparent; color: #dc3545; font: inherit; cursor: pointer; }
+body.tracy .jn-auth .jn-passkeys__remove { padding: 4px 12px; border: 1px solid var(--ds-c-danger, #dc3545); border-radius: 8px; background: transparent; color: var(--ds-c-danger, #dc3545); font: inherit; cursor: pointer; }
 body.tracy .jn-auth .jn-reg__closed,
-body.tracy .jn-auth .jn-reg__done { margin: 0 0 24px; padding: 16px 24px; border-radius: 16px; background: light-dark(#e9ecef, #1e232b); color: var(--jn-heading); }
+body.tracy .jn-auth .jn-reg__done { margin: 0 0 24px; padding: 16px 24px; border-radius: 16px; background: light-dark(var(--ds-c-surface-warm, #e9ecef), #1e232b); color: var(--jn-heading); }
 @media (max-width: 767.98px) {
   body.tracy .jn-auth .jn-passkey__button { height: 60px; padding: 16px; }
 }
@@ -2214,7 +2214,7 @@ body.tracy .jn-page .jn-search .jn-search__advanced:hover { border-color: #5c636
 body.tracy .jn-page .jn-search .jn-search__advanced-icon { width: 16px; height: 16px; margin-right: 12px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23fff' d='M416 208c0 45.9-14.9 88.3-40 122.7l126.6 126.7c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0s208 93.1 208 208zm-176-48V112c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v48h-48c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h48v48c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-48h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16h-48z'/%3E%3C/svg%3E") center / contain no-repeat; }
 body.tracy .jn-page .jn-search .jn-search__panel { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
 body.tracy .jn-page .jn-search .jn-search__panel[hidden] { display: none; }
-body.tracy .jn-page .jn-search .jn-search__tips { margin: 0 0 16px; padding: 16px; border-radius: 16px; background: light-dark(#f7f7f7, #1e232b); color: light-dark(#212529, #adb5bd); }
+body.tracy .jn-page .jn-search .jn-search__tips { margin: 0 0 16px; padding: 16px; border-radius: 16px; background: light-dark(var(--ds-c-surface, #f7f7f7), #1e232b); color: light-dark(var(--ds-c-fg, #212529), var(--ds-c-meta, #adb5bd)); }
 body.tracy .jn-page .jn-search .jn-search__tips p { margin: 0 0 8px; }
 @media (min-width: 768px) {
   body.tracy .jn-page .jn-search .jn-search__advanced { height: 64px; margin-left: 8px; padding: 18px 32px; }
@@ -2224,7 +2224,7 @@ body.tracy .jn-page .jn-search .jn-search__tips p { margin: 0 0 8px; }
 /* ── Lens fixes 1.1.5 (checkpoint-115 notes) ────────────────────────────────────────────────── */
 
 /* The service FAQ band keeps the source's section rule (1px, #e9ecef light / #495057 dark). */
-body.tracy.page-template-page-service .jn-faq { border-top: 1px solid light-dark(#e9ecef, #495057); }
+body.tracy.page-template-page-service .jn-faq { border-top: 1px solid light-dark(var(--ds-c-border-soft, #e9ecef), #495057); }
 /* The search form's block margin and the empty results block's 8px are not in the source: the band under the form starts 128px below it. */
 body.tracy.search-no-results .jn-page form.wp-block-search { margin-bottom: 0; }
 body.tracy.search-no-results .jn-page .jn-search-results { margin-block: 0; }
@@ -2237,7 +2237,7 @@ body.tracy .jn-marquee.cta-1 .jn-marquee__track { flex-direction: row-reverse; }
 /* Password field: the input and its show-password button join into one group, square seam (source: radius 16px 0 0 16px). */
 body.tracy .jn-auth :is(#loginform, .jn-reg) .jn-input-group .input { border-radius: 16px 0 0 16px; }
 /* Remember me: the source's Bootstrap box (16px, 1px #ced4da border, dark fill in dark mode), purple when checked. */
-body.tracy .jn-auth #rememberme { appearance: none; -webkit-appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border: 1px solid #ced4da; border-radius: 4px; background: light-dark(#ffffff, #212529) center / 12px no-repeat; cursor: pointer; }
+body.tracy .jn-auth #rememberme { appearance: none; -webkit-appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border: 1px solid #ced4da; border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), #212529) center / 12px no-repeat; cursor: pointer; }
 body.tracy .jn-auth #rememberme:checked { border-color: var(--jn-purple); background-color: var(--jn-purple); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3E%3C/svg%3E"); }
 body.tracy .jn-auth #rememberme:focus-visible { outline: 2px solid var(--jn-purple); outline-offset: 2px; }
 /* The passkey button is a secondary action: a dark surface in dark mode instead of the bright grey block. */
@@ -2256,7 +2256,7 @@ body.tracy .jn-404__home.wp-block-button .wp-block-button__link { display: inlin
 /* ── Field focus (1.1.7): a select keeps the ring (the source's select draws one too). The source changes the border colour on focus and draws no halo; the shared focus ring is a
    box-shadow on every :focus-visible, so a text field drops it and carries the source's border instead. ── */
 body.tracy :is(input:not([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='range'], [type='color'], [type='file'], [type='hidden']), textarea):focus-visible { box-shadow: none; }
-body.tracy .jn-contact-form :is(input:not([type='submit']), textarea):focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; }
-body.tracy .jn-tagged__search input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline: 0; }
+body.tracy .jn-contact-form :is(input:not([type='submit']), textarea):focus { border-color: light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline: 0; }
+body.tracy .jn-tagged__search input:focus { border-color: light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline: 0; }
 /* The band's search field has no border in the source and shows nothing on focus; the lightest indicator that keeps a focused field visible is a 1 px inset line in the focus colour (DECISIONS D-33). */
-body.tracy .jn-search-band__form .wp-block-search__input:focus-visible { outline: 1px solid light-dark(rgba(0, 0, 0, 0.3), #5e48db); outline-offset: -1px; }
+body.tracy .jn-search-band__form .wp-block-search__input:focus-visible { outline: 1px solid light-dark(rgba(0, 0, 0, 0.3), var(--ds-c-accent, #5e48db)); outline-offset: -1px; }

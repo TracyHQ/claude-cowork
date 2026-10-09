@@ -38,8 +38,8 @@
   /* Rows the palette has none for, measured light → dark (css/darkmode.css --dm-raised, --dm-border). */
   --jv-raised: light-dark(#f5f7fa, #1d2530);
   --jv-line: light-dark(rgba(0, 0, 0, 0.1), #2a323d);
-  --jv-dash: light-dark(#e2e5ea, #2a323d);
-  --jv-card: light-dark(#ffffff, #161d28);
+  --jv-dash: light-dark(#e2e5ea, var(--ds-c-fg-2, #2a323d));
+  --jv-card: light-dark(var(--ds-c-bg, #ffffff), #161d28);
   /* The bands that are dark in both modes. */
   --jv-night: #121316;
   --jv-on-night: #ffffff;
@@ -246,7 +246,7 @@ body.tracy {
 }
 
 .jv-accent {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────────────────────────── */
@@ -502,7 +502,7 @@ body.tracy {
 }
 
 .jv-mega__links .wp-block-navigation-item__content:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
 }
 
 .jv-mega__cards {
@@ -912,7 +912,7 @@ body.tracy {
 
 .jv-card__link a,
 .jv-card__link.wp-block-read-more {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-weight: 500;
   text-decoration: none;
 }
@@ -982,7 +982,7 @@ body.tracy {
   font-size: 32px;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 /* ── Feature split (ACM features-intro style-2) ───────────────────────────────────────────────── */
@@ -1124,7 +1124,7 @@ body.tracy {
   border: 0;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.9);
-  color: #050505;
+  color: var(--ds-c-fg-2, #050505);
   font-size: 18px;
   text-decoration: none;
   box-shadow: none;
@@ -1554,7 +1554,7 @@ body.tracy {
 }
 
 .jv-article__category a {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-weight: 500;
   line-height: 1.2;
   text-decoration: none;
@@ -1672,7 +1672,7 @@ body.tracy {
   flex-direction: column;
   height: 100%;
   padding: 24px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 8px;
   background: transparent;
   /* The source theme's card ring (a 1 px #ced4da box-shadow) sat outside the measured border
@@ -1743,7 +1743,7 @@ body.tracy {
   padding: 8px;
   border-radius: 8px;
   background: light-dark(rgba(29, 78, 216, 0.1), rgba(59, 139, 255, 0.1));
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-family: var(--jv-font);
   font-size: 11.6px;
   font-weight: 500;
@@ -1979,7 +1979,7 @@ body.tracy {
   border-right: 0;
   border-radius: 8px 0 0 8px;
   background: var(--wp--preset--color--surface);
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   opacity: 0;
   pointer-events: none;
   /* Source `#back-to-top`: `transition: all 0.7s ease`. */
@@ -2417,7 +2417,7 @@ body.tracy {
   margin: 0;
   padding: 32px;
   border-radius: 8px;
-  background: light-dark(#fafafa, #1d2530);
+  background: light-dark(var(--ds-c-surface, #fafafa), #1d2530);
 }
 
 .tracy .jv-benefits__number {
@@ -2518,7 +2518,7 @@ body.tracy {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  color: #050505;
+  color: var(--ds-c-fg-2, #050505);
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,
@@ -2576,10 +2576,10 @@ body.tracy {
   animation: jv-spinner-grow 0.75s linear infinite;
 }
 
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-primary { color: var(--wp--preset--color--accent); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-primary { color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-secondary { color: #111112; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-success { color: #198754; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-danger { color: #dc3545; }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-success { color: var(--ds-c-success, #198754); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-danger { color: var(--ds-c-danger, #dc3545); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-warning { color: #f59e0b; }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-info { color: #0dcaf0; }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-light { color: #fafafa; }
@@ -2749,7 +2749,7 @@ body.tracy {
   max-width: 500px;
   margin-inline: auto;
   padding: 48px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 8px;
 }
 
@@ -2774,11 +2774,11 @@ body.tracy {
   width: 100%;
   height: 56px;
   padding: 15px 16px;
-  border: 1px solid light-dark(#ced4da, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border, #ced4da), #2a323d);
   border-radius: 8px;
   font: inherit;
   color: var(--wp--preset--color--fg-2);
-  background: light-dark(#ffffff, transparent);
+  background: light-dark(var(--ds-c-bg, #ffffff), transparent);
 }
 
 .tracy .wp-block-loginout .login-remember label {
@@ -2802,7 +2802,7 @@ body.tracy {
  * and pagination. Spinners are drawn above (G35). */
 .jv-prose .t4-typo-example {
   padding-block: 64px;
-  border-bottom: 2px solid light-dark(#e9ecef, #2a323d);
+  border-bottom: 2px solid light-dark(var(--ds-c-border-soft, #e9ecef), #2a323d);
 }
 
 .jv-prose .t4-typo-example.pt-0 { padding-top: 0; }
@@ -2950,7 +2950,7 @@ body.tracy {
 .jv-prose .btn-sm { padding: 4px 8px; border-radius: 4px; font-size: 14px; }
 .jv-prose .btn-lg { padding: 8px 16px; border-radius: 16px; font-size: 20px; }
 
-.jv-prose { --jv-bs-primary: #1d4ed8; --jv-bs-secondary: #111112; --jv-bs-success: #198754; --jv-bs-danger: #dc3545; --jv-bs-warning: #f59e0b; --jv-bs-info: #0dcaf0; --jv-bs-light: #fafafa; --jv-bs-dark: #121316; }
+.jv-prose { --jv-bs-primary: var(--ds-c-accent, #1d4ed8); --jv-bs-secondary: #111112; --jv-bs-success: var(--ds-c-success, #198754); --jv-bs-danger: var(--ds-c-danger, #dc3545); --jv-bs-warning: #f59e0b; --jv-bs-info: #0dcaf0; --jv-bs-light: var(--ds-c-surface, #fafafa); --jv-bs-dark: #121316; }
 .jv-prose .bg-primary, .jv-prose .btn-primary { background-color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
 .jv-prose .bg-secondary, .jv-prose .btn-secondary { background-color: var(--jv-bs-secondary); border-color: var(--jv-bs-secondary); }
 .jv-prose .bg-success, .jv-prose .btn-success { background-color: var(--jv-bs-success); border-color: var(--jv-bs-success); }
@@ -2981,7 +2981,7 @@ body.tracy {
   min-width: 0;
   border: 1px solid rgba(0, 0, 0, 0.125);
   border-radius: 8px;
-  background-color: light-dark(#ffffff, #161d28);
+  background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28);
   overflow: hidden;
 }
 
@@ -3000,7 +3000,7 @@ body.tracy {
   height: 16px;
   overflow: hidden;
   border-radius: 4px;
-  background-color: #e9ecef;
+  background-color: var(--ds-c-surface-warm, #e9ecef);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -3012,8 +3012,8 @@ body.tracy {
   overflow: hidden;
   text-align: center;
   white-space: nowrap;
-  color: #ffffff;
-  background-color: #0d6efd;
+  color: var(--ds-c-accent-on, #ffffff);
+  background-color: var(--ds-c-accent, #0d6efd);
 }
 /* M4d F11 (lens note, source measured light and dark): a bar with a variant keeps it, and .text-dark
  * its dark text — the plain bar rule above came later at the same weight and painted every bar #0d6efd. */
@@ -3047,14 +3047,14 @@ body.tracy {
   min-width: 40px;
   height: 42px;
   padding: 0 12px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 4px;
   font-size: 14px;
   line-height: 40px;
   text-align: center;
   text-decoration: none;
   color: var(--wp--preset--color--fg-2);
-  background-color: light-dark(#ffffff, transparent);
+  background-color: light-dark(var(--ds-c-bg, #ffffff), transparent);
 }
 
 .jv-prose .page-item.active .page-link { color: #ffffff; background-color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
@@ -3171,7 +3171,7 @@ body.tracy {
   font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -3329,7 +3329,7 @@ body.tracy {
 .jv-route-tagged-items .tracy-grid .tracy-card {
   padding: 16px 0;
   border: 0;
-  border-bottom: 1px solid light-dark(#e6e6e6, #2a323d);
+  border-bottom: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 0;
 }
 
@@ -3437,7 +3437,7 @@ body.tracy {
   inset-inline: 8px;
   margin: 0;
   background: rgba(255, 255, 255, 0.7);
-  color: #050505;
+  color: var(--ds-c-fg-2, #050505);
 }
 
 .tracy .jv-teams-grid .jv-member__name {
@@ -3666,7 +3666,7 @@ body.tracy {
   }
 
   html.jv-drawer-open .jv-header .jv-drawer-toggle span {
-    background: #fff;
+    background: var(--ds-c-bg, #fff);
   }
 
   html.jv-drawer-open .jv-header .jv-drawer-toggle span:nth-child(1) {
@@ -3695,11 +3695,11 @@ body.tracy {
 /* M4d F6 (source measured in dark, `.section-title span`): the pill's border is #8b94a3 and its dot
  * the accent #3b8bff; in light both follow the text colour, as before. */
 .jv-pill { border-color: light-dark(currentColor, #8b94a3); }
-.jv-pill::before { background: light-dark(currentColor, #3b8bff); }
+.jv-pill::before { background: light-dark(currentColor, var(--ds-c-accent-hover, #3b8bff)); }
 /* M4d F7 (source /login-form measured in dark): a text field is filled #1d2530 with #c7ccd4 text under
  * its #2a323d border; light is unchanged (white field). */
 .jv-main :where(input[type='text'], input[type='email'], input[type='password'], input[type='search'], input[type='tel'], textarea, select),
-.tracy .wp-block-loginout input.input.input { background-color: light-dark(#ffffff, #1d2530); color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); }
+.tracy .wp-block-loginout input.input.input { background-color: light-dark(var(--ds-c-bg, #ffffff), #1d2530); color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); }
 .jv-page .tracy-eyebrow,
 .jv-page .wp-block-post-terms.tracy-eyebrow a { background: rgba(29, 78, 216, 0.1); }
 .jv-page .wp-block-post-terms.tracy-eyebrow { background: transparent; }
@@ -3710,21 +3710,21 @@ body.tracy {
 .tracy .jv-benefits__number { color: light-dark(var(--wp--preset--color--fg), #5b9dff); }
 .tracy .jv-accordion__body,
 .jv-split__copy .jv-lead,
-.tracy .jv-point__desc { color: light-dark(var(--wp--preset--color--fg), #757575); }
+.tracy .jv-point__desc { color: light-dark(var(--wp--preset--color--fg), var(--ds-c-fg, #757575)); }
 .jv-member__role { background: light-dark(transparent, #161d28); }
 .tracy .jv-teams-grid .jv-member__name,
 .jv-teams-grid .jv-member__role { background: light-dark(rgba(255, 255, 255, 0.7), #161d28); }
-.tracy .jv-teams-grid .jv-member__name { color: light-dark(#050505, #f1f3f6); }
+.tracy .jv-teams-grid .jv-member__name { color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6); }
 /* M4d F2: `.tracy a { color: inherit }` (0,1,1) outranked these, so the dark branch never applied; the
  * source dark slide paints its category and "Learn More" #3b8bff and its title #f1f3f6 (dd-cp0). */
-.tracy :is(.jv-story__more, .jv-story__category a) { color: light-dark(var(--jv-on-night), #3b8bff); }
+.tracy :is(.jv-story__more, .jv-story__category a) { color: light-dark(var(--jv-on-night), var(--ds-c-accent-text-hover, #3b8bff)); }
 .tracy .jv-story__title a { color: light-dark(var(--jv-on-night), #f1f3f6); }
 .tracy .jv-prose .wp-block-quote { color: light-dark(#000000, #c7ccd4); }
 
 .jv-prose {
-  --jv-bs-primary: light-dark(#1d4ed8, #3b8bff);
+  --jv-bs-primary: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
   --jv-bs-secondary: #111112;
-  --jv-bs-light: light-dark(#fafafa, #161d28);
+  --jv-bs-light: light-dark(var(--ds-c-surface, #fafafa), #161d28);
 }
 .jv-prose .btn-light { color: light-dark(#000000, #c7ccd4); border-color: light-dark(#fafafa, #2a323d); }
 .jv-prose .btn-outline-secondary { color: light-dark(var(--jv-bs-secondary), #c7ccd4); border-color: light-dark(var(--jv-bs-secondary), #2a323d); }
@@ -3739,7 +3739,7 @@ body.tracy {
 .jv-prose .alert-light { color: light-dark(currentColor, #f8f9fa); background: light-dark(transparent, #343a40); border: 1px solid light-dark(transparent, #495057); }
 .jv-prose .alert-dark { color: light-dark(currentColor, #dee2e6); background: light-dark(transparent, #1a1d20); border: 1px solid light-dark(transparent, #343a40); }
 .jv-prose .alert > p { color: inherit; }
-.jv-prose .card:not([class*="bg-"]) { color: light-dark(currentColor, #dee2e6); background-color: light-dark(#ffffff, #161d28); border-color: light-dark(rgba(0, 0, 0, 0.176), #2a323d); }
+.jv-prose .card:not([class*="bg-"]) { color: light-dark(currentColor, #dee2e6); background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28); border-color: light-dark(rgba(0, 0, 0, 0.176), #2a323d); }
 .jv-prose .card-text { color: inherit; }
 
 /* Dark, second pass (dd-0 layout lens, source measured in dark): the line icons of the feature and
@@ -3757,29 +3757,29 @@ body.tracy {
   :root:not([data-theme]) .jv-prose .btn-close { filter: invert(1) grayscale(1) brightness(1.6); }
 }
 .jv-accordion__button::after {
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,
     light-dark(#f0f1f2, #1d2530);
 }
 .jv-accordion__item.is-open .jv-accordion__button::after {
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
-    light-dark(#1d4ed8, #3b8bff);
+    light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
 }
 /* M4d F14 (lens note f12 lr, source measured 390 and 1440): the light track is transparent; dark #343a40. */
 .jv-prose .progress { background-color: light-dark(transparent, #343a40); }
 .jv-prose mark { color: light-dark(currentColor, #dee2e6); background-color: light-dark(transparent, #664d03); }
-.jv-prose .badge.bg-secondary { color: light-dark(#ffffff, #8b94a3); background-color: light-dark(var(--jv-bs-secondary), #1d2530); }
+.jv-prose .badge.bg-secondary { color: light-dark(#ffffff, var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-secondary), #1d2530); }
 /* M4d F4 (dd-cp0, source measured in dark): the style guide's light badges are #8b94a3 text on no fill,
  * and a card title is the heading colour #f1f3f6 on every card, the coloured ones included. */
-.jv-prose .badge.bg-light.bg-light { color: light-dark(#121316, #8b94a3); background-color: light-dark(var(--jv-bs-light), transparent); }
+.jv-prose .badge.bg-light.bg-light { color: light-dark(#121316, var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-light), transparent); }
 /* M4d F11 (lens note dr-f10, source measured in dark): every coloured badge is #8b94a3 on #1d2530 in
  * dark, not only the secondary one; light mode keeps the variant fill and its text colour. */
-.jv-prose .badge:is(.bg-primary, .bg-success, .bg-danger, .bg-dark) { color: light-dark(#ffffff, #8b94a3); }
-.jv-prose .badge:is(.bg-warning, .bg-info) { color: light-dark(#121316, #8b94a3); }
+.jv-prose .badge:is(.bg-primary, .bg-success, .bg-danger, .bg-dark) { color: light-dark(#ffffff, var(--ds-c-muted, #8b94a3)); }
+.jv-prose .badge:is(.bg-warning, .bg-info) { color: light-dark(#121316, var(--ds-c-muted, #8b94a3)); }
 .jv-prose .badge.bg-primary { background-color: light-dark(var(--jv-bs-primary), #1d2530); }
 .jv-prose .badge.bg-success { background-color: light-dark(var(--jv-bs-success), #1d2530); }
 .jv-prose .badge.bg-danger { background-color: light-dark(var(--jv-bs-danger), #1d2530); }
@@ -3791,7 +3791,7 @@ body.tracy {
 /* Alerts in dark (dd-1 parity): the text paragraph carries the alert's fill (source `.alert` is the
  * paragraph's own box) and an alert link is the dark accent #3b8bff. */
 .jv-prose .alert > p { background-color: inherit; }
-.jv-prose .alert a { color: light-dark(currentColor, #3b8bff); }
+.jv-prose .alert a { color: light-dark(currentColor, var(--ds-c-accent-text-hover, #3b8bff)); }
 
 /* h4-level titles are 22/26.4 below 576 on the source (Bootstrap h4 RFS; dr-0 parity: the service
  * cards, the related posts, the stories and the blog list at 390). */
@@ -3820,8 +3820,8 @@ body.tracy {
 
 /* dr-1 parity (source in dark): the style guide's pagination #c7ccd4 on #161d28; the /about-us figure
  * captions keep the light grey #757575. */
-.jv-prose .page-link { color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); background-color: light-dark(#ffffff, #161d28); }
-.jv-why__caption { color: light-dark(var(--wp--preset--color--fg), #757575); }
+.jv-prose .page-link { color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28); }
+.jv-why__caption { color: light-dark(var(--wp--preset--color--fg), var(--ds-c-fg, #757575)); }
 
 /* ── M4d F9 (G44): the author view ─────────────────────────────────────────────────────────────
  * Source /author-listing (T4 author view): three columns from 992, two from 768, one below; 32 px
@@ -3837,7 +3837,7 @@ body.tracy {
 .jv-author {
   position: relative;
   border-radius: 8px;
-  background: light-dark(#ffffff, #161d28);
+  background: light-dark(var(--ds-c-bg, #ffffff), #161d28);
 }
 .jv-prose .jv-author > * { margin: 0; }
 .jv-author__photo img {
@@ -3863,13 +3863,13 @@ body.tracy {
   font-size: 24px;
   font-weight: 500;
   line-height: 24px;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 .tracy .jv-prose .jv-author__title {
   margin: 0;
   font-size: 16px;
   line-height: 24px;
-  color: light-dark(#757575, #8b94a3);
+  color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-muted, #8b94a3));
 }
 @media (max-width: 991px) {
   .jv-authors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3888,7 +3888,7 @@ body.tracy {
 .jv-prose .jv-tag-list > .wp-block-heading { margin: 0; }
 .tracy .jv-prose .jv-tag-list h3.jv-tag-list__title.jv-tag-list__title {
   padding: 16px 0;
-  border-bottom: 1px solid light-dark(#e6e6e6, #2a323d);
+  border-bottom: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   font-size: 16px;
   font-weight: 500;
   line-height: 1.2;
@@ -3911,16 +3911,16 @@ body.tracy {
   height: 42px;
   margin: 0;
   padding: 0 12px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 4px;
-  background-color: light-dark(#ffffff, #161d28);
-  color: light-dark(#050505, #c7ccd4);
+  background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28);
+  color: light-dark(var(--ds-c-fg-2, #050505), #c7ccd4);
   font-size: 16px;
   line-height: 40px;
   text-align: center;
   text-decoration: none;
 }
-.tracy :is(.tracy-pagination, .jv-pagination) .page-numbers.current { height: 40px; border: 0; background-color: light-dark(#1d4ed8, #3b8bff); color: #ffffff; }
+.tracy :is(.tracy-pagination, .jv-pagination) .page-numbers.current { height: 40px; border: 0; background-color: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); color: var(--ds-c-accent-on, #ffffff); }
 .tracy :is(.tracy-pagination, .jv-pagination) :is(.wp-block-query-pagination-previous-arrow, .wp-block-query-pagination-next-arrow) { margin: 0; }
 
 /* ── M4d F15 (G16): the contact view ────────────────────────────────────────────────────────────
@@ -3950,7 +3950,7 @@ body.tracy {
   box-sizing: border-box;
   padding: 48px;
   border-radius: 8px;
-  background: light-dark(#fafafa, #161d28);
+  background: light-dark(var(--ds-c-surface, #fafafa), #161d28);
 }
 .jv-prose .jv-contact__info > * { margin: 0; }
 .tracy .jv-prose .jv-contact__heading.jv-contact__heading {
@@ -3958,10 +3958,10 @@ body.tracy {
   font-size: 24px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 .tracy .jv-prose .jv-contact__heading--social.jv-contact__heading--social { margin: 8px 0 16px; }
-.tracy .jv-prose .jv-contact__misc { margin: 0 0 48px; font-size: 16px; line-height: 24px; color: #757575; }
+.tracy .jv-prose .jv-contact__misc { margin: 0 0 48px; font-size: 16px; line-height: 24px; color: var(--ds-c-fg, #757575); }
 .jv-prose .jv-contact__item {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr);
@@ -3976,7 +3976,7 @@ body.tracy {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: light-dark(#ffffff, #1d2530) no-repeat center / 30px 30px;
+  background: light-dark(var(--ds-c-bg, #ffffff), #1d2530) no-repeat center / 30px 30px;
 }
 /* Contact icons drawn for this theme (D-08: no template assets); shapes follow the source (handset + bubble, envelope + @, pin + ring) in its icon blue #3c72fc. */
 .jv-contact__item--phone::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath fill='%233c72fc' d='M4.2 7.6c.3-1.2 1.4-2.3 2.6-2.3h1c.6 0 1.1.4 1.3 1l1.3 4c.2.6 0 1.2-.5 1.5l-1.6 1.2c1.3 2.8 3.6 5.1 6.4 6.4l1.2-1.6c.4-.5 1-.7 1.5-.5l4 1.3c.6.2 1 .7 1 1.3v1c0 1.3-1.1 2.4-2.3 2.6-8.4 1-17-7.6-15.9-15.9z'/%3E%3Cpath fill='%233c72fc' d='M15 2.5h10.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5h-5.3l-3.2 2.6v-2.6h-2a2.5 2.5 0 0 1-2.5-2.5v-5A2.5 2.5 0 0 1 15 2.5z'/%3E%3Ccircle cx='16.8' cy='7.5' r='1.1' fill='%23fff'/%3E%3Ccircle cx='20.2' cy='7.5' r='1.1' fill='%23fff'/%3E%3Ccircle cx='23.6' cy='7.5' r='1.1' fill='%23fff'/%3E%3C/svg%3E"); }
@@ -3988,12 +3988,12 @@ body.tracy {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.21;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
-.tracy .jv-prose .jv-contact__value { font-size: 20px; line-height: 30px; color: light-dark(#757575, #c7ccd4); }
+.tracy .jv-prose .jv-contact__value { font-size: 20px; line-height: 30px; color: light-dark(var(--ds-c-fg, #757575), #c7ccd4); }
 .jv-prose .jv-contact__value a { color: inherit; text-decoration: none; }
 /* F15 re-check (dd/dr): the source e-mail row is a link in the body colour, #757575 in both modes. */
-.tracy .jv-prose .jv-contact__item--email .jv-contact__value { color: #757575; }
+.tracy .jv-prose .jv-contact__item--email .jv-contact__value { color: var(--ds-c-fg, #757575); }
 .tracy .jv-contact__social.wp-block-social-links { gap: 8px; margin: 0; padding: 0; }
 .tracy .jv-contact__social .wp-social-link { width: 36px; height: 36px; margin: 0; border-radius: 50%; color: #ffffff; }
 .tracy .jv-contact__social .wp-social-link a { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; }
@@ -4009,9 +4009,9 @@ body.tracy {
   font-size: 32px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
-.tracy .jv-prose .jv-contact__legend { margin: 0 0 24px; font-size: 16px; line-height: 24px; color: light-dark(#757575, #f1f3f6); background-color: light-dark(transparent, #0f141c); }
+.tracy .jv-prose .jv-contact__legend { margin: 0 0 24px; font-size: 16px; line-height: 24px; color: light-dark(var(--ds-c-fg, #757575), #f1f3f6); background-color: light-dark(transparent, #0f141c); }
 .jv-contact__form .wpcf7-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4021,11 +4021,11 @@ body.tracy {
 .jv-contact__form .wpcf7-form > :is(p, div, fieldset) { grid-column: 1 / -1; margin: 0; }
 .jv-contact__form .wpcf7-form > p:nth-of-type(-n + 2) { grid-column: auto; }
 .jv-contact__form .wpcf7-form > .hidden-fields-container { display: none; }
-.jv-contact__form .wtb-form__field { display: block; font-size: 16px; line-height: 24px; color: light-dark(#757575, #c7ccd4); }
+.jv-contact__form .wtb-form__field { display: block; font-size: 16px; line-height: 24px; color: light-dark(var(--ds-c-fg, #757575), #c7ccd4); }
 .jv-contact__form .wtb-form__field br { display: none; }
 /* The required mark the seeder writes as its own element (upstream #37, M6-11): the source's
  * `label.required .star` is #dc3545 in both colour schemes (measured 28/09, 1440 light and dark). */
-.jv-contact__form .wtb-form__required { color: #dc3545; }
+.jv-contact__form .wtb-form__required { color: var(--ds-c-danger, #dc3545); }
 .jv-contact__form .wpcf7-form-control-wrap { display: block; margin-top: 8px; }
 .tracy .jv-contact__form :is(input[type='text'], input[type='email'], textarea) {
   display: block;
@@ -4033,9 +4033,9 @@ body.tracy {
   width: 100%;
   height: 56px;
   padding: 15px 24px;
-  border: 1px solid light-dark(#ced4da, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border, #ced4da), #2a323d);
   border-radius: 8px;
-  background: light-dark(#ffffff, #1d2530);
+  background: light-dark(var(--ds-c-bg, #ffffff), #1d2530);
   color: light-dark(#242627, #c7ccd4);
   font: inherit;
   line-height: 24px;
@@ -4043,7 +4043,7 @@ body.tracy {
 /* F19 (own check at 1440): the field rule above is (0,3,1) through :is(input[type]); the message box needs its own weight. */
 .tracy .jv-contact__form textarea.wpcf7-textarea { height: 272px; }
 .jv-contact__form .wpcf7-form > .wtb-form__actions { margin-top: 32px; }
-.tracy .jv-contact__form .wpcf7-submit { padding: 15px 24px; border: 1px solid light-dark(#1d4ed8, #3b8bff); border-radius: 8px; background: light-dark(#1d4ed8, #3b8bff); color: #ffffff; font-weight: 500; line-height: 24px; }
+.tracy .jv-contact__form .wpcf7-submit { padding: 15px 24px; border: 1px solid light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); border-radius: 8px; background: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); color: var(--ds-c-accent-on, #ffffff); font-weight: 500; line-height: 24px; }
 /* F21/F24: the source button ends in an arrow (fa-arrow-right turned -45deg, 13 px, 4 px after the label; button 146 px wide). The CF7 submit is an input,
    so the arrow is a background drawn for this theme, not a template asset (D-08, D-32). */
 .tracy .jv-contact__form .wpcf7-submit { padding-right: 43px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath transform='rotate(-45 6 6)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M1.2 6h9.4M6.4 1.8 10.6 6l-4.2 4.2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 24px center; background-size: 12px 12px; }
@@ -4086,7 +4086,7 @@ body.tracy {
 :is(.jv-more__list, .tracy-more-articles .wp-block-post-template) { margin: 0; padding: 0; list-style: none; }
 :is(.jv-more__list, .tracy-more-articles .wp-block-post-template) > li + li { margin-top: 10px; }
 .tracy .jv-prose :is(.jv-more__title.jv-more__title, .tracy-more-articles .wp-block-post-title.wp-block-post-title) { margin: 0; padding: 2px 0; font-size: 16px; font-weight: 400; line-height: 24px; }
-.jv-prose :is(.jv-more__title, .tracy-more-articles .wp-block-post-title) a { display: block; color: light-dark(#050505, #3b8bff); text-decoration: none; }
+.jv-prose :is(.jv-more__title, .tracy-more-articles .wp-block-post-title) a { display: block; color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-accent-text-hover, #3b8bff)); text-decoration: none; }
 /* M6 round 5: the source's `.items-more li` is 2 px padded top and bottom (a 28 px row, 38 px apart), its link
  * a block the column wide, and `.pagination-wrap` sits 16 px under the list. On a category blog the list is
  * inside the cards query, before the pager (the seeder places it there since skill 8d320b5), so the pager follows
@@ -4094,7 +4094,7 @@ body.tracy {
 .jv-prose .jv-more .tracy-pagination { margin-top: 16px; }
 .tracy .tracy-query > :is(.jv-more, .tracy-more-articles) + .tracy-pagination.wp-block-query-pagination { margin-top: 16px; }
 .jv-prose .jv-aside__module + .jv-aside__module { margin-top: 40px; }
-.tracy .jv-prose h3.jv-aside__title.jv-aside__title.jv-aside__title { margin: 0 0 16px; font-size: 20px; font-weight: 500; line-height: 24px; color: light-dark(#050505, #f1f3f6); }
+.tracy .jv-prose h3.jv-aside__title.jv-aside__title.jv-aside__title { margin: 0 0 16px; font-size: 20px; font-weight: 500; line-height: 24px; color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6); }
 .tracy .jv-aside__search .wp-block-search__inside-wrapper { position: relative; padding: 0; border: 0; background: transparent; }
 .tracy .jv-aside__search .wp-block-search__input {
   box-sizing: border-box;
@@ -4102,9 +4102,9 @@ body.tracy {
   height: 56px;
   margin: 0;
   padding: 15px 40px 15px 24px;
-  border: 1px solid light-dark(#ced4da, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border, #ced4da), #2a323d);
   border-radius: 8px;
-  background: light-dark(#ffffff, #1d2530);
+  background: light-dark(var(--ds-c-bg, #ffffff), #1d2530);
   color: light-dark(#242627, #c7ccd4);
   font: inherit;
   line-height: 24px;
@@ -4124,17 +4124,17 @@ body.tracy {
 .jv-aside__search .wp-block-search__button svg { width: 22px; height: 22px; min-width: 22px; min-height: 22px; fill: currentColor; }
 /* F20: Latest News is a Blogs-only query (module #119, catid 8); same box as the source list. */
 .tracy .jv-latest .jv-latest__list { margin: 0; padding: 0; list-style: none; }
-.tracy .jv-latest .jv-latest__list > li { display: flex; align-items: center; gap: 16px; margin: 0; color: light-dark(#050505, #f1f3f6); font-weight: 500; line-height: 19.2px; }
+.tracy .jv-latest .jv-latest__list > li { display: flex; align-items: center; gap: 16px; margin: 0; color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6); font-weight: 500; line-height: 19.2px; }
 .jv-latest .jv-latest__list > li + li { margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(0, 0, 0, 0.1); }
 .tracy .jv-latest .jv-latest__image { flex: 0 0 80px; width: 80px; height: 80px; margin: 0; }
 .jv-latest .jv-latest__image img { display: block; width: 80px; height: 80px; max-width: none; object-fit: cover; border-radius: 8px; }
-.tracy .jv-latest .jv-latest__title { margin: 0; font-size: 16px; font-weight: 500; line-height: 19.2px; color: light-dark(#050505, #f1f3f6); }
+.tracy .jv-latest .jv-latest__title { margin: 0; font-size: 16px; font-weight: 500; line-height: 19.2px; color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6); }
 .tracy .jv-latest .jv-latest__title a { color: inherit; text-decoration: none; }
 /* jv-tag-cloud, not jv-tags: that class is the post's own tag row (templates/single.html). */
 .tracy .jv-prose ul.jv-tag-cloud { display: flex; flex-wrap: wrap; gap: 9px; margin: 0; padding: 0; list-style: none; }
-.tracy .jv-prose ul.jv-tag-cloud > li { margin: 0; padding: 0; border: 1px solid light-dark(#e6e6e6, #2a323d); border-radius: 4px; background: light-dark(#ffffff, #1d2530); }
+.tracy .jv-prose ul.jv-tag-cloud > li { margin: 0; padding: 0; border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d); border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), #1d2530); }
 .tracy .jv-prose ul.jv-tag-cloud > li::before { content: none; }
-.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: 0; background-color: transparent; font-size: 14px; line-height: 14px; color: light-dark(#757575, #c7ccd4); text-decoration: none; }
+.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: 0; background-color: transparent; font-size: 14px; line-height: 14px; color: light-dark(var(--ds-c-fg, #757575), #c7ccd4); text-decoration: none; }
 @media (max-width: 991px) {
   .jv-listing { grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
 }
@@ -4197,7 +4197,7 @@ body.tracy {
  * <date>" 14 px, 16 px under the picture; the title 16 px under that; a three-line intro. */
 .tracy .jv-related .jv-post-card {
   padding: 24px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 16px;
   background: var(--jv-card);
 }
@@ -4245,7 +4245,7 @@ body.tracy {
   font-weight: 400;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 .tracy .jv-related .jv-post-card__title {
@@ -4297,11 +4297,11 @@ body.tracy {
   flex: 0 0 auto;
   min-width: 60px;
   font-weight: 700;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .tracy .jv-portfolio-info .jv-portfolio-info__value {
-  color: light-dark(#757575, #c7ccd4);
+  color: light-dark(var(--ds-c-fg, #757575), #c7ccd4);
 }
 
 @media (max-width: 991px) {
@@ -4484,7 +4484,7 @@ body.tracy {
   font-size: 24px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .jv-prose :is(.jv-more__title, .tracy-more-articles .wp-block-post-title) a::before {
@@ -4671,7 +4671,7 @@ body.tracy {
   content: '';
   position: absolute;
   inset: 0 0 5px;
-  background: linear-gradient(to top, #fafafa 15%, transparent 150%);
+  background: linear-gradient(to top, var(--ds-c-surface, #fafafa) 15%, transparent 150%);
 }
 
 :root[data-theme='dark'] .tracy .jv-benefits__number::before {
@@ -4875,7 +4875,7 @@ body.tracy {
  * (p.login-username, p.login-password), both required to log in. */
 .tracy .wp-block-loginout :is(.login-username, .login-password) label::after {
   content: '\00a0*';
-  color: #dc3545;
+  color: var(--ds-c-danger, #dc3545);
 }
 
 /* M6c (lens, /featured-articles "Latest News"): source rows are 16 px apart above a 16 px padded
@@ -5067,7 +5067,7 @@ body.tracy {
 
 .tracy .jv-teams .jv-arrow .wp-block-button__link {
   background: light-dark(rgba(255, 255, 255, 0.9), #1d2530);
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 @media (max-width: 991px) {
@@ -5177,7 +5177,7 @@ body.tracy {
 }
 
 .tracy .jv-testimonials .jv-quote__figure {
-  border-top-color: light-dark(#e6e6e6, #2a323d);
+  border-top-color: light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
 }
 
 /* M6c (lens ld, A-home 7): source .vote-brand border-top is rgba(0, 0, 0, 0.1) in both themes, so on the
@@ -5914,10 +5914,10 @@ body.tracy {
   min-width: 40px;
   height: 42px;
   padding: 0 12px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 4px;
-  background-color: light-dark(#ffffff, #161d28);
-  color: light-dark(#050505, #c7ccd4);
+  background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28);
+  color: light-dark(var(--ds-c-fg-2, #050505), #c7ccd4);
   font-size: 16px;
   line-height: 40px;
   text-align: center;
@@ -5929,23 +5929,23 @@ body.tracy {
 }
 
 .tracy .tracy-pager a.tracy-pager__link:is(:hover, :focus-visible) {
-  border-color: light-dark(#e6e6e6, #2a323d);
+  border-color: light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
 }
 
 .tracy .tracy-pager .is-current .tracy-pager__link {
   height: 40px;
   border: 0;
-  background-color: light-dark(#1d4ed8, #3b8bff);
-  color: #ffffff;
+  background-color: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
+  color: var(--ds-c-accent-on, #ffffff);
 }
 
 .tracy :is(.jv-pager .jv-pager__counter, .tracy-pager .tracy-pager__counter) {
   margin: 0;
   padding: 8px 24px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 4px;
-  background-color: light-dark(#ffffff, #161d28);
-  color: light-dark(#050505, #f1f3f6);
+  background-color: light-dark(var(--ds-c-bg, #ffffff), #161d28);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
   font-size: 16px;
   line-height: 1.3;
 }
@@ -6125,12 +6125,12 @@ body.tracy {
 }
 
 .tracy .wp-block-loginout .login-remember input[type='checkbox']:checked {
-  background-color: #0d6efd;
+  background-color: var(--ds-c-accent, #0d6efd);
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
 }
 
 .tracy .wp-block-loginout .login-remember input[type='checkbox']:focus-visible {
-  outline: 2px solid #0d6efd;
+  outline: 2px solid var(--ds-c-accent, #0d6efd);
   outline-offset: 2px;
 }
 
@@ -6534,23 +6534,23 @@ body.tracy {
   font-weight: 400;
   line-height: 16.8px;
   vertical-align: top;
-  color: #757575;
+  color: var(--ds-c-fg, #757575);
 }
 
 :is(.jv-page .tracy-grid > li.category-blogs .tracy-card__meta, .tracy .jv-related .jv-post-card__meta) > .tracy-card__author {
   font-weight: 500;
-  color: light-dark(#242627, #8b94a3);
+  color: light-dark(#242627, var(--ds-c-muted, #8b94a3));
 }
 
 /* "By" is 400 in the text colour (dark: the muted #8b94a3 of `.article-info`); so is the card date (the related
  * card's date stays #f1f3f6 in dark, as the port draws it). */
 :is(.jv-page .tracy-grid > li.category-blogs .tracy-card__meta, .tracy .jv-related .jv-post-card__meta) > .tracy-card__author::before {
   font-weight: 400;
-  color: light-dark(#050505, #8b94a3);
+  color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-muted, #8b94a3));
 }
 
 .jv-page .tracy-grid > li.category-blogs .tracy-card__meta > .tracy-card__date {
-  color: light-dark(#050505, #8b94a3);
+  color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-muted, #8b94a3));
 }
 
 /* "Blogs" sits 4 px after its dash on the category blog and featured cards (`.category-name a`); the related
@@ -6594,11 +6594,11 @@ body.tracy {
   margin: 0 8px;
   font-size: 16px;
   line-height: 19.2px;
-  color: #757575;
+  color: var(--ds-c-fg, #757575);
 }
 
 .jv-article__head .jv-article__date {
-  color: light-dark(var(--wp--preset--color--fg-2), #8b94a3);
+  color: light-dark(var(--wp--preset--color--fg-2), var(--ds-c-muted, #8b94a3));
 }
 
 /* M6 Round-9c (lens r9c, source :8261 vs site :8262, light and dark). */
@@ -6672,7 +6672,7 @@ body.tracy {
 
   .jv-header .jv-nav .wp-block-navigation__container > :is(.current-menu-item, .current-menu-ancestor, .wp-block-navigation-item:has(> [aria-current='page']), .wp-block-navigation-item:hover, .wp-block-navigation-item:focus-within)::before,
   .jv-header .jv-mega:is(.is-current, .is-open, :hover, :focus-within)::before {
-    background: #ffffff;
+    background: var(--ds-c-bg, #ffffff);
   }
 
   .jv-header .jv-nav .current-menu-item > .wp-block-navigation-item__content,
@@ -6787,11 +6787,11 @@ body.tracy {
     padding: 8px 0;
     font-weight: 500;
     line-height: 24px;
-    color: light-dark(#050505, #c7ccd4);
+    color: light-dark(var(--ds-c-fg-2, #050505), #c7ccd4);
   }
 
   .jv-header .jv-mega__links .wp-block-navigation-item__content:hover {
-    color: var(--wp--preset--color--accent);
+    color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   }
 
   /* Source "Industry Focus" (a menu module, `.navbar-nav .nav-link`): its links sit 8 px in (x 1137 vs title 1129
@@ -6842,7 +6842,7 @@ body.tracy {
   }
 
   .jv-header .jv-mega__card:hover .jv-mega__card-title a {
-    color: var(--wp--preset--color--accent);
+    color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   }
 
   /* Source `.latestnews`: items 16 px apart with a 1 px dashed rgba(0,0,0,.1) rule between them; 80 x 80 image,
@@ -6890,11 +6890,11 @@ body.tracy {
   }
 
   .jv-header .jv-mega__project-title a {
-    color: light-dark(#050505, #c7ccd4);
+    color: light-dark(var(--ds-c-fg-2, #050505), #c7ccd4);
   }
 
   .jv-header .jv-mega__project-title a:hover {
-    color: var(--wp--preset--color--accent);
+    color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent));
   }
 
   .jv-header .jv-mega__project-date {
@@ -7025,7 +7025,7 @@ body.tracy {
   border: 0;
   border-radius: 0 8px 8px 0;
   background: transparent;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
   cursor: pointer;
 }
 
@@ -7049,7 +7049,7 @@ body.tracy {
 }
 
 .tracy .wp-block-loginout .jv-password__toggle:focus-visible {
-  outline: 2px solid #0d6efd;
+  outline: 2px solid var(--ds-c-accent, #0d6efd);
   outline-offset: -2px;
 }
 
@@ -7074,13 +7074,13 @@ body.tracy {
 .tracy .wp-block-loginout .jv-login-links a {
   font-size: 14px;
   line-height: 1.5;
-  color: light-dark(#757575, #3b8bff);
+  color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-accent-text-hover, #3b8bff));
   text-decoration: none;
   transition: color 0.2s ease-in-out;
 }
 
 .tracy .wp-block-loginout .jv-login-links a:hover {
-  color: light-dark(#1d4ed8, #5fa0ff);
+  color: light-dark(var(--ds-c-accent-text-hover, #1d4ed8), #5fa0ff);
 }
 
 /* (26) D-64: the Business Challenges icons of the Our Services mega panel are drawn `brightness(0) invert(.72)` in
@@ -7130,7 +7130,7 @@ body.tracy {
  * /portfolio/it-consultancy). */
 .jv-header .jv-mega__links .current-menu-item > .wp-block-navigation-item__content,
 .jv-header .jv-mega__links .wp-block-navigation-item__content[aria-current='page'] {
-  color: light-dark(#1d4ed8, #c7ccd4);
+  color: light-dark(var(--ds-c-accent-text, #1d4ed8), #c7ccd4);
 }
 
 /* (29) The phone menu is the source's T4 off-canvas (measured open at 390, light and dark: the same in both): the
@@ -7235,7 +7235,7 @@ body.tracy {
    * measured 1.1.9), on a touch screen the sticky hover look (primary fill, white bars: the 1.1.8 box, which only
    * matched the touch case); the real button is the panel's × above. */
   html.jv-drawer-open .jv-header .jv-header__right {
-    --jv-pushed-bars: light-dark(#757575, #c7ccd4);
+    --jv-pushed-bars: light-dark(#757575, var(--ds-c-border, #c7ccd4));
     --jv-pushed-fill: transparent;
     position: relative;
   }
@@ -7245,7 +7245,7 @@ body.tracy {
   @media (hover: none) {
     html.jv-drawer-open .jv-header .jv-header__right {
       --jv-pushed-bars: #fff;
-      --jv-pushed-fill: light-dark(#1d4ed8, #3b8bff);
+      --jv-pushed-fill: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
     }
   }
 
@@ -7645,7 +7645,7 @@ body.tracy {
   font-size: 32px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .tracy .jv-project__about > h4 {
@@ -7654,7 +7654,7 @@ body.tracy {
   font-size: 24px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .jv-project__about > p {
@@ -7680,7 +7680,7 @@ body.tracy {
 .jv-project__info {
   align-self: start;
   padding: 32px;
-  border: 1px solid light-dark(#e6e6e6, #2a323d);
+  border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
   border-radius: 8px;
 }
 
@@ -7726,7 +7726,7 @@ body.tracy {
 .jv-project__row + .jv-project__row {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px dashed light-dark(#e6e6e6, #2a323d);
+  border-top: 1px dashed light-dark(var(--ds-c-border-soft, #e6e6e6), #2a323d);
 }
 
 .tracy .jv-project__row p,
@@ -7741,7 +7741,7 @@ body.tracy {
   min-width: 100px;
   margin-right: 4px;
   font-weight: 600;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .jv-project__value {
@@ -7751,7 +7751,7 @@ body.tracy {
 .jv-project__value a,
 .jv-project__category a {
   font-weight: 500;
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   text-decoration: none;
 }
 
@@ -7813,7 +7813,7 @@ body.tracy {
   font-size: 32px;
   font-weight: 500;
   line-height: 1.2;
-  color: light-dark(#050505, #f1f3f6);
+  color: light-dark(var(--ds-c-fg-2, #050505), #f1f3f6);
 }
 
 .tracy .jv-project__cta-text {
@@ -7839,7 +7839,7 @@ body.tracy {
 .tracy .jv-page.jv-more-projects .tracy-card {
   border: 0;
   border-radius: 16px;
-  background: light-dark(#fff, #161d28);
+  background: light-dark(var(--ds-c-bg, #fff), #161d28);
 }
 
 .tracy .jv-page.jv-more-projects .tracy-card__media img {
@@ -8413,7 +8413,7 @@ body.tracy {
   height: 24px;
   margin-top: 3px;
   vertical-align: top;
-  color: light-dark(#000, #3b8bff);
+  color: light-dark(#000, var(--ds-c-accent-text-hover, #3b8bff));
   text-decoration: none;
 }
 
