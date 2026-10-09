@@ -41,3 +41,49 @@ check('switcher: a name with markup in it is written as text',
 check('switcher: nothing to name it, nothing changed',
     SourceLocaleHooks::switcherFor($item, 'en', 'English', 'en-US', '', 'vi', ''), $item);
 check('switcher: the written language\'s code from its locale', SourceLocaleHooks::codeOf('de_DE_formal'), 'de-DE');
+
+// Polylang 3.8.9 answers `PLL()->model->get_language()` through `__call`, so `method_exists` said no and the switcher
+// and hreflang stayed "English" / "en" on a site written in Vietnamese (measured 09/10/2026 on a Tracy Business wp7
+// 1.3.4 stand, plugin 0.18.4). The fake model has no such method, only `languages->get()`, as Polylang 3.8 itself.
+check('hreflang: the shortened code of a site left with one edition is announced too',
+    SourceLocaleHooks::hreflangFor(['en' => '/'], 'vi', 'en-US'), ['vi' => '/']);
+check('hreflang: another edition sharing the language is not taken for the source',
+    SourceLocaleHooks::hreflangFor(['en-US' => '/', 'en-GB' => '/gb/'], 'vi', 'en-US'), ['vi' => '/', 'en-GB' => '/gb/']);
+if (!function_exists('pll_default_language')) {
+    function pll_default_language($field = 'slug')
+    {
+        return WP_Fake::$polylang ? 'en' : false;
+    }
+}
+if (!defined('POLYLANG_DIR')) {
+    define('POLYLANG_DIR', __DIR__ . '/fixtures/polylang');
+}
+WP_Fake::reset();
+WP_Fake::$polylang = true;
+WP_Fake::$languages['en'] = ['slug' => 'en', 'name' => 'English', 'locale' => 'en_US'];
+WP_Fake::$options[SourceLocaleHooks::OPTION] = 'vi';
+$served = "\t<li class=\"lang-item lang-item-14 lang-item-en current-lang lang-item-first\"><a lang=\"en-US\" hreflang=\"en-US\" href=\"/\" aria-current=\"true\"><img src=\"data:image/png;base64,US\" alt=\"\" /><span style=\"margin-left:0.3em;\">English</span></a></li>\n";
+check('switcher: through Polylang 3.8\'s model, the source edition is named in the written language',
+    SourceLocaleHooks::filterSwitcher($served),
+    "\t<li class=\"lang-item lang-item-14 lang-item-en current-lang lang-item-first\"><a lang=\"vi\" hreflang=\"vi\" href=\"/\" aria-current=\"true\"><span style=\"margin-left:0.3em;\">Tiếng Việt</span></a></li>\n");
+check('hreflang: through Polylang 3.8\'s model', SourceLocaleHooks::filterHreflang(['en' => '/']), ['vi' => '/']);
+
+// The navigation-block switcher (`polylang/navigation-language-switcher`) builds core navigation links from the raw list,
+// so it is renamed on the inner block's attributes, before Polylang prints them.
+$navItem = ['label' => '%pll%', 'url' => '/', 'pll_show_flags' => true, 'pll_show_names' => true, 'lang' => 'en-US', 'hreflang' => 'en-US',
+    'pll_flag' => '<img src="data:image/png;base64,US" alt="" width="16" height="11" />', 'pll_name' => 'English', 'className' => 'lang-item lang-item-14 lang-item-en current-lang'];
+$renamed = $navItem;
+$renamed['pll_name'] = 'Tiếng Việt';
+$renamed['lang'] = 'vi';
+$renamed['hreflang'] = 'vi';
+$renamed['pll_flag'] = '<img src="VN" alt="" width="16" height="11" />';
+check('navigation block: the source edition\'s item takes the written language\'s name, code and flag',
+    SourceLocaleHooks::navigationItemFor($navItem, 'en', 'Tiếng Việt', 'vi', 'VN'), $renamed);
+$other = array_merge($navItem, ['className' => 'lang-item lang-item-15 lang-item-en-gb']);
+check('navigation block: another edition\'s item is left alone', SourceLocaleHooks::navigationItemFor($other, 'en', 'Tiếng Việt', 'vi', 'VN'), $other);
+check('navigation block: a link that is not a switcher item is left alone', SourceLocaleHooks::navigationItemFor(['label' => 'Home', 'className' => 'lang-item-en'], 'en', 'Tiếng Việt', 'vi', ''), ['label' => 'Home', 'className' => 'lang-item-en']);
+$instance = (object) ['attributes' => $navItem];
+SourceLocaleHooks::filterNavigationItem('<a>%pll%</a>', [], $instance);
+check('navigation block: through the render filter, before Polylang prints the label',
+    [$instance->attributes['pll_name'], $instance->attributes['lang'], strpos($instance->attributes['pll_flag'], '<img') === false], ['Tiếng Việt', 'vi', true]);
+WP_Fake::reset();

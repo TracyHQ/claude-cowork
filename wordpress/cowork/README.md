@@ -149,6 +149,11 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
+  - While `tracy_source_locale` names the language the source edition is written in
+    (`lib/SourceLocaleHooks.php`), every switcher kind names, codes and flags that edition in it:
+    Polylang's standard block, widget, template tag and dropdown (`pll_the_languages`), and its
+    navigation-block switcher (`render_block_core/navigation-link` / `-submenu`, before Polylang prints
+    the label); `hreflang` too, including the shortened code (`en`) Polylang prints when one edition is left.
   - While a retired set is on record, `lib/RetiredSitemaps.php` also keeps those languages out of
     the sitemap: every provider is wrapped, so an index entry Polylang names for a retired language
     (`<subtype>---pll-sep---<slug>`, its users sitemap included) is left out and a sitemap page asked
