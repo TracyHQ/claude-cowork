@@ -512,7 +512,7 @@ final class MultilingualApply
         if (!$filterId) throw new RuntimeException('Joomla Language Filter is not installed');
         ($this->write)('languageFilter', $filterId, [
             'enabled' => 1,
-            'params' => json_encode($this->profile->languageFilterParams()),
+            'params' => json_encode(self::filterParams($this->profile->languageFilterParams(), $filters[0]['params'] ?? null)),
         ]);
         // The rest of a taken edition — its topbar links, legal menu, off-canvas, kit pages — shown
         // again as the archive published it. Before the language row, which is what routes to it.
@@ -524,6 +524,23 @@ final class MultilingualApply
                 }
         ($this->write)('language', (int) $job['contentLanguage'], ['published' => 1]);
         return true;
+    }
+
+    /**
+     * The Language Filter params a language job writes: the profile's, except a default-language
+     * prefix the site already dropped (`remove_default_prefix` 1), which stays dropped. Tracy drops
+     * it after a build so the chosen language is served at `/` instead of `/en/` (TCH #1013, D8);
+     * adding a language later must not bring the prefix back and move every page of the site.
+     *
+     * @param array<string,mixed> $profile
+     * @param mixed $current the filter's params as the site holds them (JSON text)
+     * @return array<string,mixed>
+     */
+    public static function filterParams(array $profile, $current): array
+    {
+        $site = is_string($current) ? json_decode($current, true) : null;
+        if (is_array($site) && (string) ($site['remove_default_prefix'] ?? '0') === '1') $profile['remove_default_prefix'] = 1;
+        return $profile;
     }
 
     /** Module fields for the switcher, all of them fixed by the profile. */

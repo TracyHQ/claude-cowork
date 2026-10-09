@@ -294,6 +294,12 @@ and the narrowly scoped `languageFilter` plugin settings. Relations validate the
 existing targets; article/module writes use Joomla Tables. New menu items may supply a
 unique alias. All component mutations serialize on the site's database advisory lock.
 
+A caller drops the default language's URL prefix (`/en/`) by writing `languageFilter` `params`
+with `remove_default_prefix: 1` (read them first: `content.list` kind `languageFilter`, and write the
+whole object back). A language job (`multilingual.apply`) writes the contract profile's filter
+params, but keeps a prefix the site already dropped dropped (unreleased; TCH #1013, D8), so adding
+a language later does not move every page of the site back under `/en/`.
+
 `extension.install` accepts optional `sha256` and `bytes`; a pinned package is verified
 before extraction, including official language-pack download URLs with query strings.
 This version does not change the default template or publish an automatic update feed.
