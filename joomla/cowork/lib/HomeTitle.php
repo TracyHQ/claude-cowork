@@ -53,4 +53,30 @@ final class HomeTitle
         }
         return preg_match('/^' . $pattern . '$/Dsu', $title) === 1 ? $sitename : null;
     }
+
+    /**
+     * Whether a request is the home entry's own page, not another view reached under its Itemid.
+     *
+     * @param array $query   the home menu entry's query (`$active->query`), as the menu holds it
+     * @param array $request the request's raw `option`, `view`, `layout` and `id` (absent or '' when not set)
+     */
+    public static function isEntryPage(array $query, array $request): bool
+    {
+        foreach (['option', 'view', 'layout', 'id'] as $key) {
+            // Both sides read the same way: a template layout ("ja_essence:news") is the same value on
+            // the entry and in the request, and Joomla's cmd filter would drop its colon from one only.
+            $want = self::read($key, (string) ($query[$key] ?? ''));
+            $got = self::read($key, (string) ($request[$key] ?? ''));
+            if ($want !== '' && $got !== '' && $want !== $got) return false;
+            if ($want === '' && $got !== '' && in_array($key, ['view', 'id'], true)) return false;
+        }
+        return true;
+    }
+
+    /** A request key as compared: `id` as a number ("7:slug" is 7), the others as text, trimmed. */
+    private static function read(string $key, string $value): string
+    {
+        if ($key === 'id') return (string) ((int) $value ?: '');
+        return trim($value);
+    }
 }

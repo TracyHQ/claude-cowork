@@ -315,22 +315,21 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             if (!$active || (int) $active->home !== 1 || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
                 return;
             }
+            EngineFactory::loadHomeTitle();
+            // Raw, not getCmd: the cmd filter turns a template layout "ja_essence:news" into
+            // "ja_essencenews", which never equals the entry's own (TCH #1013, NAME-1 on JA Essence j6).
             $input = $app->getInput();
+            $request = [];
             foreach (['option', 'view', 'layout', 'id'] as $key) {
-                $want = (string) ($active->query[$key] ?? '');
-                $got = $key === 'id' ? (string) ($input->getInt('id') ?: '') : (string) $input->getCmd($key, '');
-                if ($want !== '' && $got !== '' && $want !== $got) {
-                    return;
-                }
-                if ($want === '' && $got !== '' && \in_array($key, ['view', 'id'], true)) {
-                    return;
-                }
+                $request[$key] = (string) $input->get($key, '', 'string');
+            }
+            if (!\HomeTitle::isEntryPage((array) $active->query, $request)) {
+                return;
             }
             $document = $app->getDocument();
             if (!$document || $document->getType() !== 'html') {
                 return;
             }
-            EngineFactory::loadHomeTitle();
             $title = \HomeTitle::of(
                 (string) $document->getTitle(),
                 (string) $app->get('sitename', ''),

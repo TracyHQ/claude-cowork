@@ -26,4 +26,22 @@ if (function_exists('check')) {
         [HomeTitle::of('Fresh bread every morning', $htName, 2, 2), HomeTitle::of('Home - Tamarind Bakery Ltd', $htName, 2, 2), HomeTitle::of(' - Tamarind Bakery', $htName, 2, 2)],
         [null, null, null]);
     check('an empty site name changes nothing', HomeTitle::of('Home - ', '', 2, 2), null);
+
+    // Whether the request is the home entry's own page. The router merges the entry's query into the
+    // request, so on "/" the request holds the entry's own values, raw.
+    $htEss = ['option' => 'com_content', 'view' => 'featured', 'layout' => 'ja_essence:news'];
+    check('the home page of an entry with a template layout (ja-essence j6 1.0.3, entry 134) is its own page',
+        HomeTitle::isEntryPage($htEss, $htEss), true);
+    check('the home page of an entry without a layout is its own page',
+        HomeTitle::isEntryPage(['option' => 'com_content', 'view' => 'featured'], ['option' => 'com_content', 'view' => 'featured']), true);
+    check('another layout under the entry is not its own page',
+        HomeTitle::isEntryPage($htEss, ['option' => 'com_content', 'view' => 'featured', 'layout' => 'ja_essence:other']), false);
+    check('another view under the entry is not its own page (the login page)',
+        HomeTitle::isEntryPage($htEss, ['option' => 'com_users', 'view' => 'login']), false);
+    check('an article reached under an entry with no id is not its own page',
+        HomeTitle::isEntryPage(['option' => 'com_content', 'view' => 'featured'], ['option' => 'com_content', 'view' => 'article', 'id' => '7:slug']), false);
+    check('an entry for one article is its own page with that id, "7:slug" read as 7',
+        [HomeTitle::isEntryPage(['option' => 'com_content', 'view' => 'article', 'id' => '7'], ['option' => 'com_content', 'view' => 'article', 'id' => '7:slug']),
+         HomeTitle::isEntryPage(['option' => 'com_content', 'view' => 'article', 'id' => '7'], ['option' => 'com_content', 'view' => 'article', 'id' => '8'])],
+        [true, false]);
 }
