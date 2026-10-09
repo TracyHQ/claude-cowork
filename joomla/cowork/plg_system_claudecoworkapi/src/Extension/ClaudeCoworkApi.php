@@ -71,6 +71,13 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * to a printed head that carries none, and a page with its own keeps it. Not `onAfterRender`: T4
  * prints the head inside its own `onAfterRender` (`onBeforeCompileHead` fires from there, measured
  * on JA Spa, Joomla 6), which runs after this plugin's. T4's favicon is its own setting.
+ *
+ * ## The home tab reads the site name alone
+ *
+ * Once Tracy has put the site name after every page title (`site.identity` `sitename_pagetitles` = 2),
+ * Joomla titles the home page "Home - Name" (or "Name - Name"); `onBeforeCompileHead` gives the home
+ * page the site name alone, on a site where Tracy set the switch (`lib/HomeTitle.php`). Every other
+ * page keeps "Page - Name". It costs one comparison on every other page.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -259,6 +266,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
      */
     public function onBeforeCompileHead(): void
     {
+        $this->homeTitleAlone();
         try {
             $app = $this->getApplication();
             if (!$app->isClient('site') || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
@@ -288,6 +296,54 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         } catch (\Throwable $e) {
             // A favicon is never worth a page: the page keeps Joomla's own.
             Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The home page's `<title>` as the site name alone (`HomeTitle::of`), on the site's home entry and
+     * nowhere else: the active menu entry is a home entry, and the request is that entry's own page,
+     * not another view reached under its Itemid.
+     */
+    private function homeTitleAlone(): void
+    {
+        try {
+            $app = $this->getApplication();
+            if (!$app->isClient('site') || (int) $app->get('sitename_pagetitles', 0) !== 2) {
+                return;
+            }
+            $active = $app->getMenu()->getActive();
+            if (!$active || (int) $active->home !== 1 || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+                return;
+            }
+            $input = $app->getInput();
+            foreach (['option', 'view', 'layout', 'id'] as $key) {
+                $want = (string) ($active->query[$key] ?? '');
+                $got = $key === 'id' ? (string) ($input->getInt('id') ?: '') : (string) $input->getCmd($key, '');
+                if ($want !== '' && $got !== '' && $want !== $got) {
+                    return;
+                }
+                if ($want === '' && $got !== '' && \in_array($key, ['view', 'id'], true)) {
+                    return;
+                }
+            }
+            $document = $app->getDocument();
+            if (!$document || $document->getType() !== 'html') {
+                return;
+            }
+            EngineFactory::loadHomeTitle();
+            $title = \HomeTitle::of(
+                (string) $document->getTitle(),
+                (string) $app->get('sitename', ''),
+                $app->get('sitename_pagetitles'),
+                $app->get(\HomeTitle::MARK),
+                \Joomla\CMS\Language\Text::_('JPAGETITLE')
+            );
+            if ($title !== null) {
+                $document->setTitle($title);
+            }
+        } catch (\Throwable $e) {
+            // A title is never worth a page: the page keeps Joomla's own.
+            Log::add('claudecoworkapi home title: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

@@ -444,9 +444,14 @@ site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitena
   same digit as a string, stored as the integer Joomla's own form stores (`filter="integer"`); any
   other value is `bad_params`, and a configuration without the key reads `0`, Joomla's default. A
   template ships `0`, so a site Tracy had named still showed the bare page title in every browser tab
-  and search result (TCH #1013, D1). With `2`, a page whose own title is already the site name (a home
-  menu item whose browser page title is the name) prints "Name - Name": the caller sets that page's
-  title along with it. A plugin older than this refuses a set naming the key with `unsupported` and
+  and search result (TCH #1013, D1). With `2` set through this door, the home page's tab reads the
+  site name alone: Joomla would print "Home - Name" (an empty browser page title falls back to the
+  entry's title) or "Name - Name", and the system plugin takes the page part off on the home entry's
+  own page, nowhere else (`lib/HomeTitle.php`; a title the owner wrote by hand is left). It does so
+  only while the switch is the one this door set: each set of the key also writes a mark of the
+  plugin's own in `configuration.php` (`tracy_sitename_pagetitles`), never read or written by a
+  caller, in the same undo step, so `apply.revert` takes the switch and the mark back together and a
+  switch the owner turned on in the administrator keeps Joomla's own titles. A plugin older than this refuses a set naming the key with `unsupported` and
   writes nothing of that set, so a caller sends it only to a plugin that has it.
 - **Undo.** What changed is recorded under the `apply_id` with its previous value, so `apply.revert`
   puts the site's own words back — together with the content writes of the same `apply_id`, if any. A

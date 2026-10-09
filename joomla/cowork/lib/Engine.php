@@ -3257,7 +3257,7 @@ final class Engine
                 $step['path'] = $entry['path'] ?? null;
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
-                $step['fields'] = array_keys(self::identityValues($entry['before'] ?? null));
+                $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
             } elseif ($op === 'siteSettings') {
                 // Which files, never their bytes; created when none of them existed before.
                 $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
@@ -3387,7 +3387,7 @@ final class Engine
                 }
             }
             try {
-                return $this->ok(['fields' => $this->siteIdentity->read(), 'writable' => $this->siteIdentity->writable()]);
+                return $this->ok(['fields' => self::identityShown($this->siteIdentity->read()), 'writable' => $this->siteIdentity->writable()]);
             } catch (Throwable $e) {
                 return $this->err('read_failed', $e->getMessage());
             }
@@ -3417,6 +3417,9 @@ final class Engine
             }
             $clean[$name] = $cleaned['value'];
         }
+        // Tracy's mark follows every set of the switch, in the same write and the same undo step, so the
+        // system plugin knows the switch is Tracy's (lib/HomeTitle.php) until `apply.revert` takes both back.
+        if (array_key_exists(SiteIdentity::PAGE_TITLES, $clean)) $clean[HomeTitle::MARK] = $clean[SiteIdentity::PAGE_TITLES];
         try {
             $before = $this->siteIdentity->read();
         } catch (Throwable $e) {
@@ -3427,7 +3430,7 @@ final class Engine
             if ($before[$name] !== $value) $changes[$name] = $value;
         }
         if ($changes === []) {
-            return $this->ok(['fields' => $before, 'changed' => [], 'unchanged' => true]);
+            return $this->ok(['fields' => self::identityShown($before), 'changed' => [], 'unchanged' => true]);
         }
         $previous = array_intersect_key($before, $changes);
         $t = Timing::begin();
@@ -3461,7 +3464,19 @@ final class Engine
             Timing::end('purge', $t);
         }
         $this->stamped('content');
-        return $this->ok(['fields' => array_merge($before, $changes), 'changed' => array_keys($changes)]);
+        return $this->ok(['fields' => self::identityShown(array_merge($before, $changes)), 'changed' => array_keys(self::identityShown($changes))]);
+    }
+
+    /**
+     * The door's keys of what the store holds, in their order: Tracy's mark is the store's own and never
+     * leaves the door.
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function identityShown(array $values): array
+    {
+        return array_intersect_key($values, array_flip(SiteIdentity::FIELDS));
     }
 
     /**
@@ -3620,6 +3635,9 @@ final class Engine
         foreach (SiteIdentity::FIELDS as $field) {
             if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = SiteIdentity::typed($field, $before[$field]);
         }
+        // The mark comes back as it was, absence included: null takes it out of the file.
+        if (array_key_exists(HomeTitle::MARK, $before) && ($before[HomeTitle::MARK] === null || is_scalar($before[HomeTitle::MARK])))
+            $out[HomeTitle::MARK] = SiteIdentity::typed(HomeTitle::MARK, $before[HomeTitle::MARK]);
         return $out;
     }
 

@@ -64,6 +64,12 @@ final class EngineFactory
         require_once self::libDir() . '/RenderStamps.php';
     }
 
+    /** Only the home-title rule, for the system plugin titling the home page by the site name alone. */
+    public static function loadHomeTitle(): void
+    {
+        require_once self::libDir() . '/HomeTitle.php';
+    }
+
     /** Only the site-settings rules, for the system plugin printing a non-T4 template's favicon. */
     public static function loadTemplateSiteSettings(): void
     {

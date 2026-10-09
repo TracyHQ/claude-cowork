@@ -13,6 +13,11 @@
  *   it (`filter="integer"`). A template keeps 0, so a site Tracy named still showed the bare page
  *   title in every browser tab and search result (TCH #1013, D1).
  *
+ * Beside them, the store keeps one key of its own, {@see HomeTitle::MARK}: the switch value Tracy
+ * last set, written and undone with the switch, so the system plugin prints the home tab as the site
+ * name alone only on a site where Tracy turned the name on ({@see HomeTitle}). No caller of the door
+ * reads or writes it.
+ *
  * Both used to be reachable only from the administrator. A site made from a template keeps the
  * template's own words there ("JA Vega - Modern Joomla Template…"), so after Tracy wrote every page
  * in the owner's words the home page still advertised the template (TCH ledger L24, 05/10/2026).
@@ -27,9 +32,14 @@
  */
 
 /** Where the engine reads and writes the site identity. */
+require_once __DIR__ . '/HomeTitle.php';
+
 interface SiteIdentityStore
 {
-    /** @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int} the values as the site holds them now */
+    /**
+     * @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int,tracy_sitename_pagetitles:?int} the values as
+     *   the site holds them now, and Tracy's mark ({@see HomeTitle::MARK}), null when absent
+     */
     public function read(): array;
 
     /** Whether a write would land now: the file can be written, or made writable the way Joomla does. */
@@ -38,7 +48,8 @@ interface SiteIdentityStore
     /**
      * Write some of the values; every other key of the configuration stays exactly as it was.
      *
-     * @param array<string,string|int> $values a subset of {@see SiteIdentity::FIELDS}, each of its type
+     * @param array<string,string|int|null> $values a subset of {@see SiteIdentity::STORED}, each of its type; the mark
+     *   may be null, which takes the key out of the file
      * @throws SiteIdentityUnwritable when the file cannot be written; nothing was changed
      */
     public function write(array $values): void;
@@ -54,6 +65,9 @@ final class SiteIdentity
 {
     /** Every key this door can read or write. Nothing outside this list ever leaves or enters. */
     public const FIELDS = ['sitename', 'MetaDesc', 'sitename_pagetitles'];
+
+    /** What the store reads and writes: the door's keys and Tracy's mark ({@see HomeTitle::MARK}), never a caller's. */
+    public const STORED = ['sitename', 'MetaDesc', 'sitename_pagetitles', HomeTitle::MARK];
 
     /** The integer key, and the values Joomla's form offers for it: 0 no, 1 before, 2 after. */
     public const PAGE_TITLES = 'sitename_pagetitles';
@@ -116,6 +130,9 @@ final class SiteIdentity
      */
     public static function typed(string $field, $value)
     {
+        // The mark: absent stays absent (null), anything else is the switch value it names, or absent.
+        if ($field === HomeTitle::MARK)
+            return is_numeric($value) && in_array((int) $value, self::PAGE_TITLE_VALUES, true) ? (int) $value : null;
         if ($field !== self::PAGE_TITLES) return is_scalar($value) ? (string) $value : '';
         $number = is_numeric($value) ? (int) $value : 0;
         return in_array($number, self::PAGE_TITLE_VALUES, true) ? $number : 0;
@@ -170,7 +187,7 @@ final class ConfigurationFile implements SiteIdentityStore
     {
         $all = $this->all();
         $out = [];
-        foreach (SiteIdentity::FIELDS as $field)
+        foreach (SiteIdentity::STORED as $field)
             $out[$field] = SiteIdentity::typed($field, isset($all[$field]) && is_scalar($all[$field]) ? $all[$field] : null);
         return $out;
     }
@@ -184,10 +201,13 @@ final class ConfigurationFile implements SiteIdentityStore
     public function write(array $values): void
     {
         foreach ($values as $field => $value)
-            if (!in_array($field, SiteIdentity::FIELDS, true) || ($field === SiteIdentity::PAGE_TITLES ? !is_int($value) : !is_string($value)))
+            if (!in_array($field, SiteIdentity::STORED, true) || ($field === SiteIdentity::PAGE_TITLES ? !is_int($value)
+                : ($field === HomeTitle::MARK ? !is_int($value) && $value !== null : !is_string($value))))
                 throw new InvalidArgumentException('Only sitename and MetaDesc (strings) and sitename_pagetitles (an integer) are written here');
-        // array_merge keeps every existing key in its place and only replaces the values named.
+        // array_merge keeps every existing key in its place and only replaces the values named; a mark of
+        // null leaves the file without one, as it was before Tracy first set the switch.
         $next = array_merge($this->all(), $values);
+        if (array_key_exists(HomeTitle::MARK, $values) && $values[HomeTitle::MARK] === null) unset($next[HomeTitle::MARK]);
         $text = ($this->format)($next);
         self::assertConfiguration($text);
         $this->put($text);

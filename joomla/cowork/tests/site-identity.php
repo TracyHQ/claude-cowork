@@ -219,10 +219,15 @@ if (function_exists('check')) {
     $siTitles = $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-titles', 'fields' => ['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => '2']]);
     check('a set turns on "Page - Site" with the name', [$siTitles['changed'], $siTitles['fields']['sitename_pagetitles']], [['sitename', 'sitename_pagetitles'], 2]);
     $siTitled = siLoad($siPath);
-    check('the file PHP loads holds it as an integer, every other key untouched', $siTitled,
-        array_merge($siConfig, ['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => 2]));
-    check('the undo step holds the integer it replaced', $siLog->entries('apply-titles'),
-        [['op' => 'siteIdentity', 'before' => ['sitename' => 'ja_vega', 'sitename_pagetitles' => 1]]]);
+    check('the file PHP loads holds it as an integer, and Tracy\'s mark beside it, every other key untouched', $siTitled,
+        array_merge($siConfig, ['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => 2, HomeTitle::MARK => 2]));
+    check('the undo step holds the integer it replaced, and that there was no mark', $siLog->entries('apply-titles'),
+        [['op' => 'siteIdentity', 'before' => ['sitename' => 'ja_vega', 'sitename_pagetitles' => 1, HomeTitle::MARK => null]]]);
+    check('the mark never leaves the door: not in the answer, not in a read, not in apply.list',
+        [array_keys($siTitles['fields']), array_keys($siCall($siEngine, [])['fields']),
+            $siEngine->handle(['token' => $siToken, 'action' => 'apply.list', 'params' => ['apply_id' => 'apply-titles']])['steps'][0]['fields']],
+        [SiteIdentity::FIELDS, SiteIdentity::FIELDS, ['sitename', 'sitename_pagetitles']]);
+    check('a caller cannot write the mark', $siSet([HomeTitle::MARK => 2], 'apply-mark')['error'], 'unsupported');
     check('the same setting again writes nothing', $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-titles', 'fields' => ['sitename_pagetitles' => 2]])['unchanged'] ?? null, true);
     $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-titles']]);
     check('its revert puts the integer back, same type', siLoad($siPath), $siConfig);
@@ -234,6 +239,18 @@ if (function_exists('check')) {
     unset($siBare['sitename_pagetitles']);
     [, $siBareStore] = siSite($siDir, 'configuration-bare.php', $siBare);
     check('a configuration without the key reads as Joomla\'s default, 0', $siBareStore->read()['sitename_pagetitles'], 0);
+    check('every set of the switch leaves the mark of what Tracy set', siLoad($siPath)[HomeTitle::MARK] ?? null, 1);
+    $siLog->record('apply-unmark', ['op' => 'siteIdentity', 'before' => [HomeTitle::MARK => null]]);
+    $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-unmark']]);
+    check('an undo row holding no mark takes the key out of the file', siLoad($siPath), $siConfig);
+
+    // A template that already ships "after": Tracy's set changes nothing Joomla reads, but marks the switch as Tracy's.
+    [$siAfterPath, $siAfterStore] = siSite($siDir, 'configuration-after.php', array_merge($siConfig, ['sitename_pagetitles' => 2]));
+    $siAfterEngine = (new Engine($siToken, [], null, null, null, null, null, null, $siLog))->siteIdentity($siAfterStore);
+    $siAfter = $siCall($siAfterEngine, ['operation' => 'set', 'apply_id' => 'apply-after', 'fields' => ['sitename_pagetitles' => 2]]);
+    check('a switch already on is marked, the answer naming no change', [$siAfter['changed'], siLoad($siAfterPath)[HomeTitle::MARK] ?? null], [[], 2]);
+    $siAfterEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-after']]);
+    check('and its revert takes only the mark away', siLoad($siAfterPath), array_merge($siConfig, ['sitename_pagetitles' => 2]));
 
     // The same apply_id as the content writes of an Apply: one revert takes back both.
     $siWriter->store['article'][7] = ['title' => 'Template article'];
