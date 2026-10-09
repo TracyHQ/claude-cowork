@@ -406,8 +406,8 @@ final class EngineFactory
      * configuration.php for `site.identity`, read and written as Joomla's own Global Configuration
      * save does (`ApplicationModel::save()` / `writeConfigFile()`): the configuration Joomla loaded
      * (`new JConfig()`, through `ArrayHelper::fromObject`), and Joomla's `Registry` formatting it back
-     * as the `JConfig` class without a closing tag. `ConfigurationFile` merges only `sitename` and
-     * `MetaDesc` over it and does the write. Null leaves `site.identity` answering 'unavailable'.
+     * as the `JConfig` class without a closing tag. `ConfigurationFile` merges only the `site.identity` keys
+     * (`SiteIdentity::FIELDS`) over it and does the write. Null leaves `site.identity` answering 'unavailable'.
      */
     private static function buildSiteIdentity(): ?\SiteIdentityStore
     {

@@ -3353,13 +3353,15 @@ final class Engine
     }
 
     /**
-     * `site.identity` — Global Configuration's site name (`sitename`) and site description
-     * (`MetaDesc`), and nothing else of configuration.php (lib/SiteIdentity.php).
+     * `site.identity` — Global Configuration's site name (`sitename`), site description (`MetaDesc`)
+     * and whether page titles carry the site name (`sitename_pagetitles`), and nothing else of
+     * configuration.php (lib/SiteIdentity.php).
      *
-     * - `operation: read` (the default): `{fields: {sitename, MetaDesc}, writable}` — the two values
-     *   as the site holds them, and whether a `set` would land now.
-     * - `operation: set`, `apply_id`, `fields`: one or both of the two. Each value is a string,
-     *   cleaned as Joomla's own form cleans it (tags removed, one line) and refused past its length.
+     * - `operation: read` (the default): `{fields: {sitename, MetaDesc, sitename_pagetitles}, writable}`
+     *   — the values as the site holds them, and whether a `set` would land now.
+     * - `operation: set`, `apply_id`, `fields`: any of the three. The two texts are strings, cleaned
+     *   as Joomla's own form cleans them (tags removed, one line) and refused past their length;
+     *   `sitename_pagetitles` is 0, 1 or 2 (no, before, after), stored as an integer.
      *   A field already holding that value is not written; when none changes, nothing is written or
      *   recorded (`unchanged: true`), so a retry after a lost reply adds no second undo step. What
      *   changes is recorded under the `apply_id` with its previous value, so `apply.revert` puts the
@@ -3381,7 +3383,7 @@ final class Engine
             if (array_key_exists('fields', $p)) {
                 $asked = $p['fields'];
                 if (!is_array($asked) || array_diff(array_map(static fn($name) => is_string($name) ? $name : '', $asked), SiteIdentity::FIELDS) !== []) {
-                    return $this->err('unsupported', 'Only sitename and MetaDesc can be read through site.identity');
+                    return $this->err('unsupported', 'Only ' . self::identityList() . ' can be read through site.identity');
                 }
             }
             try {
@@ -3402,12 +3404,12 @@ final class Engine
         }
         $fields = $p['fields'] ?? null;
         if (!is_array($fields) || $fields === [] || array_keys($fields) === range(0, count($fields) - 1)) {
-            return $this->err('bad_params', 'fields required: an object with sitename, MetaDesc or both');
+            return $this->err('bad_params', 'fields required: an object with any of ' . self::identityList());
         }
         $clean = [];
         foreach ($fields as $name => $value) {
             if (!in_array($name, SiteIdentity::FIELDS, true)) {
-                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only sitename and MetaDesc can. Nothing was written');
+                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only ' . self::identityList() . ' can. Nothing was written');
             }
             $cleaned = SiteIdentity::clean($name, $value);
             if (isset($cleaned['error'])) {
@@ -3599,19 +3601,27 @@ final class Engine
     }
 
     /**
-     * The two identity values an undo entry holds, and only those, as strings: a log row is data,
+     * The identity values an undo entry holds, and only those, each in its type: a log row is data,
      * and whatever else it might carry never reaches configuration.php.
      *
-     * @return array<string,string>
+     * @return array<string,string|int>
      */
     private static function identityValues($before): array
     {
         $out = [];
         if (!is_array($before)) return $out;
         foreach (SiteIdentity::FIELDS as $field) {
-            if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = (string) $before[$field];
+            if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = SiteIdentity::typed($field, $before[$field]);
         }
         return $out;
+    }
+
+    /** The identity keys as a refusal names them: "sitename, MetaDesc and sitename_pagetitles". */
+    private static function identityList(): string
+    {
+        $fields = SiteIdentity::FIELDS;
+        $last = array_pop($fields);
+        return implode(', ', $fields) . ' and ' . $last;
     }
 
     /** @param array<string,?scalar>|null $before */

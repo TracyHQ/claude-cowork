@@ -1,6 +1,7 @@
 <?php
-// Loaded by run.php: `site.identity` reads and writes Global Configuration's site name (`sitename`)
-// and site description (`MetaDesc`) — and no other key of configuration.php, which also holds the
+// Loaded by run.php: `site.identity` reads and writes Global Configuration's site name (`sitename`),
+// site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`)
+// — and no other key of configuration.php, which also holds the
 // database password, the site secret and the mail credentials (TCH ledger L24).
 //
 // What is real here: ConfigurationFile writing a real file on disk, read back by a fresh PHP that
@@ -138,6 +139,13 @@ if (function_exists('check')) {
     check('an empty sitename is refused, as Joomla\'s form refuses it', SiteIdentity::clean('sitename', ' <b></b> '), ['error' => 'sitename cannot be empty: Joomla requires a site name']);
     check('an empty MetaDesc is allowed: no site description', SiteIdentity::clean('MetaDesc', ''), ['value' => '']);
     check('no other key is a site identity field', SiteIdentity::clean('password', 'x'), ['error' => 'password is not a site identity field']);
+    check('sitename_pagetitles takes 0, 1 or 2, as Joomla\'s form offers them, and stores an integer',
+        [SiteIdentity::clean('sitename_pagetitles', 0), SiteIdentity::clean('sitename_pagetitles', 2), SiteIdentity::clean('sitename_pagetitles', '1')],
+        [['value' => 0], ['value' => 2], ['value' => 1]]);
+    $siFlagError = ['error' => 'sitename_pagetitles must be 0 (no site name in page titles), 1 (before) or 2 (after)'];
+    check('any other value of sitename_pagetitles is refused',
+        [SiteIdentity::clean('sitename_pagetitles', 3), SiteIdentity::clean('sitename_pagetitles', '2 '), SiteIdentity::clean('sitename_pagetitles', true), SiteIdentity::clean('sitename_pagetitles', 2.0), SiteIdentity::clean('sitename_pagetitles', null)],
+        [$siFlagError, $siFlagError, $siFlagError, $siFlagError, $siFlagError]);
 
     // ---- read: exactly two keys ----------------------------------------------------------------
     $siConfig = siFixture();
@@ -150,12 +158,12 @@ if (function_exists('check')) {
     $siEngine = (new Engine($siToken, [], null, null, null, null, $siWriter, null, $siLog))->siteIdentity($siStore);
 
     $siRead = $siCall($siEngine, []);
-    check('read answers the two values and whether a set would land', $siRead,
-        ['ok' => true, 'fields' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc']], 'writable' => true]);
+    check('read answers the three values and whether a set would land', $siRead,
+        ['ok' => true, 'fields' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc'], 'sitename_pagetitles' => 1], 'writable' => true]);
     check('operation read is the default', $siCall($siEngine, ['operation' => 'read']), $siRead);
     check('no secret is in a read', $siLeaks($siRead), false);
     check('asking to read another key is refused, not answered', [$siCall($siEngine, ['fields' => ['password']])['error'], $siCall($siEngine, ['fields' => ['sitename', 'secret']])['error']], ['unsupported', 'unsupported']);
-    check('asking for the two keys is a read', $siCall($siEngine, ['fields' => ['sitename', 'MetaDesc']])['fields'], $siRead['fields']);
+    check('asking for the identity keys is a read', $siCall($siEngine, ['fields' => ['sitename', 'MetaDesc', 'sitename_pagetitles']])['fields'], $siRead['fields']);
     check('a read takes no write lock', $siWriter->serialized, []);
 
     // ---- set: refusals -------------------------------------------------------------------------
@@ -167,7 +175,8 @@ if (function_exists('check')) {
         ['bad_params', 'bad_params', 'bad_params']);
     $siOther = $siSet(['sitename' => 'Hanoi Roofing', 'password' => 'mine']);
     check('any other key is refused whole, naming the boundary', [$siOther['error'], $siOther['message']],
-        ['unsupported', 'password cannot be written through site.identity: only sitename and MetaDesc can. Nothing was written']);
+        ['unsupported', 'password cannot be written through site.identity: only sitename, MetaDesc and sitename_pagetitles can. Nothing was written']);
+    check('a page-title setting Joomla does not offer is refused', $siSet(['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => 5])['error'], 'bad_params');
     check('a value that is not a string is refused', $siSet(['sitename' => ['Hanoi']])['error'], 'bad_params');
     check('a description past Joomla\'s limit is refused', $siSet(['MetaDesc' => str_repeat('a', 301)])['error'], 'bad_params');
     check('a refused set wrote nothing and recorded nothing', [file_get_contents($siPath) === $siBytes, $siLog->entries('apply-identity')], [true, []]);
@@ -176,7 +185,7 @@ if (function_exists('check')) {
     $siWriter->serialized = [];
     $siDone = $siSet(['sitename' => 'Hanoi <i>Roofing</i>', 'MetaDesc' => "Roof repairs in Hanoi,\nsince 1998."]);
     check('a set writes both and answers them as stored', $siDone,
-        ['ok' => true, 'fields' => ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.'], 'changed' => ['sitename', 'MetaDesc']]);
+        ['ok' => true, 'fields' => ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1], 'changed' => ['sitename', 'MetaDesc']]);
     check('a set takes the write lock, naming itself', $siWriter->serialized, [['action' => 'site.identity', 'operation' => 'set', 'applyId' => 'apply-identity']]);
     $siLoaded = siLoad($siPath);
     check('the file PHP loads holds the new values', [$siLoaded['sitename'] ?? null, $siLoaded['MetaDesc'] ?? null], ['Hanoi Roofing', 'Roof repairs in Hanoi, since 1998.']);
@@ -184,7 +193,7 @@ if (function_exists('check')) {
     check('every other key is untouched: same value, same type, same order', $siLoaded, $siExpected);
     clearstatcache();
     check('the file keeps its mode', fileperms($siPath) & 07777, 0640);
-    check('a read afterwards sees the new values', $siCall($siEngine, [])['fields'], ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.']);
+    check('a read afterwards sees the new values', $siCall($siEngine, [])['fields'], ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1]);
     check('one undo step, holding only what was there', $siLog->entries('apply-identity'), [['op' => 'siteIdentity', 'before' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc']]]]);
     check('the cache is purged: a cached page still has the old <title>', $siWriter->purges, 1);
     check('no secret is in a set\'s answer', $siLeaks($siDone), false);
@@ -205,6 +214,26 @@ if (function_exists('check')) {
     check('and records only that field', $siLog->entries('apply-desc'), [['op' => 'siteIdentity', 'before' => ['MetaDesc' => $siConfig['MetaDesc']]]]);
     $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-desc']]);
     check('its revert restores it', siLoad($siPath), $siConfig);
+
+    // The page-title setting: an integer in the file, as Joomla's own form writes it, and back.
+    $siTitles = $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-titles', 'fields' => ['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => '2']]);
+    check('a set turns on "Page - Site" with the name', [$siTitles['changed'], $siTitles['fields']['sitename_pagetitles']], [['sitename', 'sitename_pagetitles'], 2]);
+    $siTitled = siLoad($siPath);
+    check('the file PHP loads holds it as an integer, every other key untouched', $siTitled,
+        array_merge($siConfig, ['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => 2]));
+    check('the undo step holds the integer it replaced', $siLog->entries('apply-titles'),
+        [['op' => 'siteIdentity', 'before' => ['sitename' => 'ja_vega', 'sitename_pagetitles' => 1]]]);
+    check('the same setting again writes nothing', $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-titles', 'fields' => ['sitename_pagetitles' => 2]])['unchanged'] ?? null, true);
+    $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-titles']]);
+    check('its revert puts the integer back, same type', siLoad($siPath), $siConfig);
+    $siLog->record('apply-forged-titles', ['op' => 'siteIdentity', 'before' => ['sitename_pagetitles' => '9']]);
+    $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-forged-titles']]);
+    check('an undo row holding a value Joomla does not offer writes Joomla\'s default, 0', siLoad($siPath)['sitename_pagetitles'] ?? null, 0);
+    $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-tidy-titles', 'fields' => ['sitename_pagetitles' => 1]]);
+    $siBare = siFixture();
+    unset($siBare['sitename_pagetitles']);
+    [, $siBareStore] = siSite($siDir, 'configuration-bare.php', $siBare);
+    check('a configuration without the key reads as Joomla\'s default, 0', $siBareStore->read()['sitename_pagetitles'], 0);
 
     // The same apply_id as the content writes of an Apply: one revert takes back both.
     $siWriter->store['article'][7] = ['title' => 'Template article'];

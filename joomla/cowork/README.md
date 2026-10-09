@@ -21,7 +21,7 @@ an empty token refuses every request.
 | `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
-| `site.identity` (unreleased) | Global Configuration's site name (`sitename`) and site description (`MetaDesc`) — read, and set under an `apply_id` so `apply.revert` takes it back. Those two keys of `configuration.php` and no other. See "The site name and description" below. |
+| `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
@@ -418,18 +418,27 @@ with no description of its own prints as its meta description). No other door re
 say "JA Vega - Modern Joomla Template…" (TCH ledger L24, 05/10/2026).
 
 ```
-site.identity {}                                   → {ok, fields: {sitename, MetaDesc}, writable}
-site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?}}
-                                                   → {ok, fields: {sitename, MetaDesc}, changed: [...]}
+site.identity {}                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, writable}
+site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitename_pagetitles?}}
+                                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, changed: [...]}
 ```
 
-- **Two keys, both ways.** A read answers exactly those two (`fields` on a read may name only them);
-  a set takes one or both. Any other key is refused with `unsupported`, never ignored: the same file
+- **Three keys, both ways.** A read answers exactly those (`fields` on a read may name only them);
+  a set takes any of them. Any other key is refused with `unsupported`, never ignored: the same file
   holds the database password and the site secret. Nothing else of the file is ever returned.
 - **Values.** Strings only, cleaned as Joomla's own Global Configuration form cleans them
   (`filter="string"`: entities decoded, tags removed), and made one line. `MetaDesc` holds Joomla's
   300 characters and may be empty; `sitename` holds 200 and may not (Joomla requires one). Anything
   else is `bad_params`. The answer carries the values as stored.
+- **Page titles (unreleased).** `sitename_pagetitles` is Global Configuration › Site Name in Page Titles:
+  `0` no, `1` before the page title ("Site - Page"), `2` after it ("Page - Site"). An integer, or the
+  same digit as a string, stored as the integer Joomla's own form stores (`filter="integer"`); any
+  other value is `bad_params`, and a configuration without the key reads `0`, Joomla's default. A
+  template ships `0`, so a site Tracy had named still showed the bare page title in every browser tab
+  and search result (TCH #1013, D1). With `2`, a page whose own title is already the site name (a home
+  menu item whose browser page title is the name) prints "Name - Name": the caller sets that page's
+  title along with it. A plugin older than this refuses a set naming the key with `unsupported` and
+  writes nothing of that set, so a caller sends it only to a plugin that has it.
 - **Undo.** What changed is recorded under the `apply_id` with its previous value, so `apply.revert`
   puts the site's own words back — together with the content writes of the same `apply_id`, if any. A
   value already in place is not written; when nothing changes the answer is `unchanged: true` and no

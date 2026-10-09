@@ -1,6 +1,6 @@
 <?php
 /**
- * SiteIdentity — the two Global Configuration values that name a Joomla site to its visitors, and
+ * SiteIdentity — the Global Configuration values that name a Joomla site to its visitors, and
  * nothing else of `configuration.php`.
  *
  * - `sitename`: the site name (Global Configuration › Site Name) — a page's `<title>` when the page
@@ -8,14 +8,18 @@
  *   named in the mail Joomla writes. The mail's sender name is another key (`fromname`), not this one.
  * - `MetaDesc`: the site meta description, which every page without a description of its own falls
  *   back to (a menu item whose `menu-meta_description` is empty prints this one).
+ * - `sitename_pagetitles`: whether every page's `<title>` carries the site name — 0 no, 1 before the
+ *   page title ("Site - Page"), 2 after it ("Page - Site"). An integer, as Joomla's own form stores
+ *   it (`filter="integer"`). A template keeps 0, so a site Tracy named still showed the bare page
+ *   title in every browser tab and search result (TCH #1013, D1).
  *
  * Both used to be reachable only from the administrator. A site made from a template keeps the
  * template's own words there ("JA Vega - Modern Joomla Template…"), so after Tracy wrote every page
  * in the owner's words the home page still advertised the template (TCH ledger L24, 05/10/2026).
  *
- * 🔒 TWO KEYS, BY NAME, BOTH WAYS. `configuration.php` also holds the database password, the site
+ * 🔒 THREE KEYS, BY NAME, BOTH WAYS. `configuration.php` also holds the database password, the site
  * secret, mail credentials and server paths. Nothing here reads, returns or writes any key outside
- * `FIELDS`: a read answers exactly those two, and a write copies every other key through untouched.
+ * `FIELDS`: a read answers exactly those, and a write copies every other key through untouched.
  *
  * No Joomla dependency, like the rest of `lib/`: the component hands {@see ConfigurationFile} what
  * Joomla holds (`JConfig`) and how Joomla formats it (`Registry`), so the tests can do the same with
@@ -25,16 +29,16 @@
 /** Where the engine reads and writes the site identity. */
 interface SiteIdentityStore
 {
-    /** @return array{sitename:string,MetaDesc:string} the two values as the site holds them now */
+    /** @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int} the values as the site holds them now */
     public function read(): array;
 
     /** Whether a write would land now: the file can be written, or made writable the way Joomla does. */
     public function writable(): bool;
 
     /**
-     * Write some of the two values; every other key of the configuration stays exactly as it was.
+     * Write some of the values; every other key of the configuration stays exactly as it was.
      *
-     * @param array<string,string> $values a subset of {@see SiteIdentity::FIELDS}
+     * @param array<string,string|int> $values a subset of {@see SiteIdentity::FIELDS}, each of its type
      * @throws SiteIdentityUnwritable when the file cannot be written; nothing was changed
      */
     public function write(array $values): void;
@@ -45,11 +49,15 @@ final class SiteIdentityUnwritable extends RuntimeException
 {
 }
 
-/** What the door accepts as a site name or a site description. */
+/** What the door accepts as a site name, a site description or where page titles carry the name. */
 final class SiteIdentity
 {
     /** Every key this door can read or write. Nothing outside this list ever leaves or enters. */
-    public const FIELDS = ['sitename', 'MetaDesc'];
+    public const FIELDS = ['sitename', 'MetaDesc', 'sitename_pagetitles'];
+
+    /** The integer key, and the values Joomla's form offers for it: 0 no, 1 before, 2 after. */
+    public const PAGE_TITLES = 'sitename_pagetitles';
+    public const PAGE_TITLE_VALUES = [0, 1, 2];
 
     /**
      * Characters after cleaning. `MetaDesc` is Joomla's own limit (the Global Configuration form's
@@ -69,12 +77,21 @@ final class SiteIdentity
      * empty after that is refused, as Joomla's form refuses it (`required="true"`); an empty
      * `MetaDesc` is allowed and means "no site description".
      *
+     * `sitename_pagetitles` is 0, 1 or 2, as an integer or the same digit as a string, and is stored
+     * as the integer.
+     *
      * @param mixed $value
-     * @return array{value:string}|array{error:string}
+     * @return array{value:string|int}|array{error:string}
      */
     public static function clean(string $field, $value): array
     {
         if (!in_array($field, self::FIELDS, true)) return ['error' => $field . ' is not a site identity field'];
+        if ($field === self::PAGE_TITLES) {
+            if (is_string($value) && preg_match('/^[0-9]$/D', $value)) $value = (int) $value;
+            if (!is_int($value) || !in_array($value, self::PAGE_TITLE_VALUES, true))
+                return ['error' => 'sitename_pagetitles must be 0 (no site name in page titles), 1 (before) or 2 (after)'];
+            return ['value' => $value];
+        }
         if (!is_string($value)) return ['error' => $field . ' must be a string'];
         if (strlen($value) > self::MAX_BYTES) return ['error' => $field . ' is longer than ' . self::MAX_BYTES . ' bytes'];
         if (preg_match('//u', $value) !== 1) return ['error' => $field . ' is not valid UTF-8'];
@@ -87,6 +104,21 @@ final class SiteIdentity
             return ['error' => $field . ' is longer than ' . self::MAX_CHARACTERS[$field] . ' characters (' . $length . ' after cleaning)'];
         if ($field === 'sitename' && $text === '') return ['error' => 'sitename cannot be empty: Joomla requires a site name'];
         return ['value' => $text];
+    }
+
+    /**
+     * One stored value in this door's type, whatever the configuration or an undo row holds: the
+     * flag as an integer (a value Joomla would not offer reads as 0, Joomla's own default), the two
+     * texts as strings.
+     *
+     * @param scalar|null $value
+     * @return string|int
+     */
+    public static function typed(string $field, $value)
+    {
+        if ($field !== self::PAGE_TITLES) return is_scalar($value) ? (string) $value : '';
+        $number = is_numeric($value) ? (int) $value : 0;
+        return in_array($number, self::PAGE_TITLE_VALUES, true) ? $number : 0;
     }
 }
 
@@ -139,7 +171,7 @@ final class ConfigurationFile implements SiteIdentityStore
         $all = $this->all();
         $out = [];
         foreach (SiteIdentity::FIELDS as $field)
-            $out[$field] = isset($all[$field]) && is_scalar($all[$field]) ? (string) $all[$field] : '';
+            $out[$field] = SiteIdentity::typed($field, isset($all[$field]) && is_scalar($all[$field]) ? $all[$field] : null);
         return $out;
     }
 
@@ -152,8 +184,8 @@ final class ConfigurationFile implements SiteIdentityStore
     public function write(array $values): void
     {
         foreach ($values as $field => $value)
-            if (!in_array($field, SiteIdentity::FIELDS, true) || !is_string($value))
-                throw new InvalidArgumentException('Only sitename and MetaDesc are written here, as strings');
+            if (!in_array($field, SiteIdentity::FIELDS, true) || ($field === SiteIdentity::PAGE_TITLES ? !is_int($value) : !is_string($value)))
+                throw new InvalidArgumentException('Only sitename and MetaDesc (strings) and sitename_pagetitles (an integer) are written here');
         // array_merge keeps every existing key in its place and only replaces the values named.
         $next = array_merge($this->all(), $values);
         $text = ($this->format)($next);
