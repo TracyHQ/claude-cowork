@@ -55,6 +55,10 @@ StringOverrides::register();
 // post meta, lib/SeoFields.php). Prints nothing while an SEO plugin runs, or on a page holding neither.
 require_once __DIR__ . '/lib/SeoFields.php';
 SeoFields::register();
+// A shared link's preview (Open Graph): the customer's logo (`tracy_share_image`), the page title and description.
+// Prints nothing without that option, while an SEO plugin runs, or where the theme shares a picture of its own.
+require_once __DIR__ . '/lib/SharePreview.php';
+SharePreview::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.

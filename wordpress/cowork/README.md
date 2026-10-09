@@ -507,6 +507,22 @@ Writing one page's title, undone on its own by `apply.revert`:
 - **Read back:** every row of `content.list` carries `seo` as the site prints it — the running plugin's
   keys, or this plugin's own — and `content.get {kind: "postmeta", id, key}` reads one value.
 
+## A shared link's preview: `tracy_share_image` (unreleased)
+
+WordPress prints no Open Graph tags, and no Tracy theme does, so Facebook, Zalo or X picked any
+picture off a shared page. Option `tracy_share_image` (an attachment id; Tracy writes the uploaded
+logo's) names the preview picture. While it names an image, every front-end page gets, at the end of
+`wp_head` (`lib/SharePreview.php`): `og:type`, `og:site_name` (`blogname`), `og:title` (the page's
+`<title>`), `og:description` (the page's `_claude_cowork_seo_description`, else `blogdescription`),
+`og:url`, `og:image` with its width and height, and `twitter:card` `summary`. Nothing is printed
+without the option, while an SEO plugin runs, or when the head already holds an `og:image` /
+`twitter:image` of the theme's own. Written and taken back like any option:
+
+```
+{"action": "content.update", "params": {"apply_id": "…", "kind": "option", "id": 0,
+ "key": "tracy_share_image", "fields": {"value": 461}}}
+```
+
 ## Layout
 
 | Path | What |
