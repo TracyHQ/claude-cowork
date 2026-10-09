@@ -451,6 +451,7 @@ foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja
 // ja-kinetic's demo is 240 blog posts about a company that does not exist; without this file every
 // customer site built on it shows them, and nothing anywhere reports that.
 checkTrue('the package carries the ja-kinetic demo-trim map',in_array('ja-kinetic/j6/1.0.0',$trimmed,true));
+checkTrue('the package carries the ja-kinetic 1.0.4 demo-trim map',in_array('ja-kinetic/j6/1.0.4',$trimmed,true));
 // 1.1.0 is the 43-language archive, and its lock was captured from THAT archive: an ACL chain for
 // every one of its 6,144 entities. The 1.0.0 lock's 322 refused bind on every Business site with
 // "Access-level or ACL definition changed: entityRules(categories.1000 …)" (measured 2026-09-21).
