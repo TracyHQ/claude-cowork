@@ -2170,6 +2170,12 @@ final class QuickstartContract
      * One column, raw. Not `wp_update_post()`: that runs every save hook, mints a revision and
      * re-saves fields a demo post may not survive — and a demo trim changes nothing but whether
      * the post is served.
+     *
+     * Its terms are counted again afterwards (`recountTerms`): WordPress counts only published posts
+     * in a term, and every reader of that count — the core sitemap (`hide_empty`), Polylang's list of
+     * languages with content — trusted the count from before the move. Measured 09/10/2026 on a
+     * Tracy Business wp7 1.3.4 site retired to its source edition: the sitemap still listed the
+     * categories of all 40 retired languages, each archive empty.
      */
     public static function setPostStatus(int $id, string $status): void
     {
@@ -2184,6 +2190,40 @@ final class QuickstartContract
         }
         if (function_exists('clean_post_cache')) {
             clean_post_cache($id);
+        }
+        self::recountTerms($id);
+    }
+
+    /**
+     * Count again every term one post is in, taxonomy by taxonomy, the way WordPress does after a
+     * status change made through `wp_update_post()`. Read straight from the relationship table: a
+     * term query would be narrowed by Polylang to the request's language. Without WordPress's
+     * counter (a test), nothing happens.
+     */
+    public static function recountTerms(int $id): void
+    {
+        $db = $GLOBALS['wpdb'] ?? null;
+        if ($id <= 0 || !function_exists('wp_update_term_count_now') || !is_object($db) || !method_exists($db, 'get_results')) {
+            return;
+        }
+        $prefix = (string) ($db->prefix ?? 'wp_');
+        $relationships = isset($db->term_relationships) ? (string) $db->term_relationships : $prefix . 'term_relationships';
+        $taxonomies = isset($db->term_taxonomy) ? (string) $db->term_taxonomy : $prefix . 'term_taxonomy';
+        $rows = $db->get_results($db->prepare(
+            "SELECT tt.term_taxonomy_id AS id, tt.taxonomy AS taxonomy FROM {$relationships} tr"
+            . " INNER JOIN {$taxonomies} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d",
+            $id
+        ), 'ARRAY_A');
+        $byTaxonomy = [];
+        foreach ((array) $rows as $row) {
+            $row = (array) $row;
+            $taxonomy = (string) ($row['taxonomy'] ?? '');
+            if ($taxonomy !== '' && (int) ($row['id'] ?? 0) > 0) {
+                $byTaxonomy[$taxonomy][] = (int) $row['id'];
+            }
+        }
+        foreach ($byTaxonomy as $taxonomy => $ids) {
+            wp_update_term_count_now($ids, $taxonomy);
         }
     }
 
