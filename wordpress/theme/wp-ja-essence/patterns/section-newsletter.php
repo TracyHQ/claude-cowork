@@ -15,10 +15,10 @@
 <!-- wp:group {"className":"je-sec je-side je-side--news","layout":{"type":"default"}} -->
 <div class="wp-block-group je-sec je-side je-side--news">
 <!-- wp:heading {"level":2,"className":"je-sec__title","metadata":{"role":"content","name":"newsletter.title"}} -->
-<h2 class="wp-block-heading je-sec__title">Newsletter</h2>
+<h2 class="wp-block-heading je-sec__title"><?php echo esc_html__( 'Newsletter', 'wp-ja-essence' ); ?></h2>
 <!-- /wp:heading -->
 <!-- wp:paragraph {"className":"je-side__intro","metadata":{"role":"content","name":"newsletter.introtext"}} -->
-<p class="je-side__intro">Join 70,000 subscribers!</p>
+<p class="je-side__intro"><?php echo esc_html__( 'Join 70,000 subscribers!', 'wp-ja-essence' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- wp:shortcode -->
 [contact-form-7 title="Newsletter" html_class="je-nl"]

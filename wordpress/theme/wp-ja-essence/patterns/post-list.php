@@ -42,10 +42,10 @@
 <!-- /wp:post-template -->
 <!-- wp:query-no-results {"className":"je-noresults"} -->
 <!-- wp:heading {"level":2} -->
-<h2 class="wp-block-heading">No Results Found</h2>
+<h2 class="wp-block-heading"><?php echo esc_html__( 'No Results Found', 'wp-ja-essence' ); ?></h2>
 <!-- /wp:heading -->
 <!-- wp:paragraph -->
-<p>Nothing matched your search. Try different words.</p>
+<p><?php echo esc_html__( 'Nothing matched your search. Try different words.', 'wp-ja-essence' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- /wp:query-no-results -->
 <!-- wp:query-pagination {"paginationArrow":"chevron","showLabel":false,"className":"je-pager","layout":{"type":"flex","justifyContent":"center"}} -->

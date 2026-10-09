@@ -38,3 +38,22 @@ Noto Serif, Copyright 2022 The Noto Project Authors (https://github.com/notofont
 are licensed under the SIL Open Font License 1.1 (https://openfontlicense.org/). The woff2 files in
 assets/fonts are the latin builds of the Google Fonts families the source template loads,
 self-hosted.
+
+== Changelog ==
+
+= 1.0.10 =
+* The footer Site Logo blocks carry shouldSyncIcon:false, so saving the footer in the editor never overwrites the
+  site icon with the logo. Not released on its own: ships with the next quickstart/ja-essence/wp7 cut.
+* Interface words go through the theme's text domain: the error page (its card is the pattern page-404 now, and its
+  browser tab), the no-results lines of the post list, the Newsletter, Follow me and Trending cards, and the final
+  call to action of the section library.
+* The identity tokens the theme fills are listed in inc/identity.php (one: {site.title}, the site name).
+* The footer tagline, its "Become a subscriber" button and the note under it carry no block name, so a site build
+  rewrites them with the page's other words.
+* The Follow me buttons and the gallery's Instagram button lead to the networks (RSS to the site's feed) instead of #.
+* "Author's latest articles" on a page is a Query Loop (author and count in the block's query) that prints the same
+  cards, so the page says in data which articles it lists.
+
+= 1.0.9 =
+* The footer logo is a light/dark pair of Site Logo blocks instead of an inverted picture; the copyright line and
+  every browser tab name the site.
