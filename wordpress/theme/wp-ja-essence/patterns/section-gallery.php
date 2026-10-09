@@ -30,7 +30,7 @@
 <!-- wp:buttons {"className":"je-gallery__more","layout":{"type":"flex","justifyContent":"center"}} -->
 <div class="wp-block-buttons je-gallery__more">
 <!-- wp:button {"className":"je-btn-primary","metadata":{"name":"gallery.title"}} -->
-<div class="wp-block-button je-btn-primary"><a class="wp-block-button__link wp-element-button" href="https://www.instagram.com/">@Grazia on instagram</a></div>
+<div class="wp-block-button je-btn-primary"><a class="wp-block-button__link wp-element-button" href="#">@Grazia on instagram</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:buttons -->

@@ -22,7 +22,7 @@
 <!-- wp:group {"className":"je-social__item","metadata":{"name":"social.item.1"},"layout":{"type":"default"}} -->
 <div class="wp-block-group je-social__item">
 <!-- wp:button {"className":"je-social__link je-icon-facebook","metadata":{"name":"social.link.1"}} -->
-<div class="wp-block-button je-social__link je-icon-facebook"><a class="wp-block-button__link wp-element-button" href="https://www.facebook.com/">Facebook</a></div>
+<div class="wp-block-button je-social__link je-icon-facebook"><a class="wp-block-button__link wp-element-button" href="#">Facebook</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:group -->

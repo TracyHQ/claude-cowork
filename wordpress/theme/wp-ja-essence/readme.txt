@@ -50,7 +50,8 @@ self-hosted.
 * The identity tokens the theme fills are listed in inc/identity.php (one: {site.title}, the site name).
 * The footer tagline, its "Become a subscriber" button and the note under it carry no block name, so a site build
   rewrites them with the page's other words.
-* The Follow me buttons and the gallery's Instagram button lead to the networks (RSS to the site's feed) instead of #.
+* The Follow me card's RSS button leads to the site's feed instead of #. The social network buttons keep the demo's
+  # links, as the template has them: the owner fills their own profile addresses.
 * "Author's latest articles" on a page is a Query Loop (author and count in the block's query) that prints the same
   cards, so the page says in data which articles it lists.
 

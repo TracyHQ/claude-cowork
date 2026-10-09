@@ -21,21 +21,21 @@
 <!-- wp:group {"className":"je-social__item","layout":{"type":"default"}} -->
 <div class="wp-block-group je-social__item">
 <!-- wp:button {"className":"je-social__link je-icon-facebook"} -->
-<div class="wp-block-button je-social__link je-icon-facebook"><a class="wp-block-button__link wp-element-button" href="https://www.facebook.com/">Facebook</a></div>
+<div class="wp-block-button je-social__link je-icon-facebook"><a class="wp-block-button__link wp-element-button" href="#">Facebook</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"je-social__item","layout":{"type":"default"}} -->
 <div class="wp-block-group je-social__item">
 <!-- wp:button {"className":"je-social__link je-icon-twitter"} -->
-<div class="wp-block-button je-social__link je-icon-twitter"><a class="wp-block-button__link wp-element-button" href="https://x.com/">Twitter</a></div>
+<div class="wp-block-button je-social__link je-icon-twitter"><a class="wp-block-button__link wp-element-button" href="#">Twitter</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"je-social__item","layout":{"type":"default"}} -->
 <div class="wp-block-group je-social__item">
 <!-- wp:button {"className":"je-social__link je-icon-instagram"} -->
-<div class="wp-block-button je-social__link je-icon-instagram"><a class="wp-block-button__link wp-element-button" href="https://www.instagram.com/">Instagram</a></div>
+<div class="wp-block-button je-social__link je-icon-instagram"><a class="wp-block-button__link wp-element-button" href="#">Instagram</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:group -->
