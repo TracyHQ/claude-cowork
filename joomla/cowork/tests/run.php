@@ -1921,6 +1921,8 @@ require __DIR__ . "/source-language.php";
 require __DIR__ . "/written-source-language.php";
 // site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
 require __DIR__ . "/site-identity.php";
+// The home tab reads the site name alone (lib/HomeTitle.php).
+require __DIR__ . "/home-title.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
 require __DIR__ . "/template-site-settings.php";
 require __DIR__ . "/multilingual-contracts.php";

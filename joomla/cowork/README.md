@@ -21,7 +21,7 @@ an empty token refuses every request.
 | `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
-| `site.identity` (unreleased) | Global Configuration's site name (`sitename`) and site description (`MetaDesc`) — read, and set under an `apply_id` so `apply.revert` takes it back. Those two keys of `configuration.php` and no other. See "The site name and description" below. |
+| `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
@@ -53,6 +53,9 @@ edit the copy — that is how the two silently diverge.
 ./build.sh                                    # → dist/pkg_claudecowork.zip + dist/tracy-release.json (needs node)
 node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
+tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
+tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
+T4_QUICKSTART=<folder> tests/e2e/share-image.sh  # and on a T4 quickstart restored over it, only where a page has none
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
@@ -294,6 +297,12 @@ and the narrowly scoped `languageFilter` plugin settings. Relations validate the
 existing targets; article/module writes use Joomla Tables. New menu items may supply a
 unique alias. All component mutations serialize on the site's database advisory lock.
 
+A caller drops the default language's URL prefix (`/en/`) by writing `languageFilter` `params`
+with `remove_default_prefix: 1` (read them first: `content.list` kind `languageFilter`, and write the
+whole object back). A language job (`multilingual.apply`) writes the contract profile's filter
+params, but keeps a prefix the site already dropped dropped (unreleased; TCH #1013, D8), so adding
+a language later does not move every page of the site back under `/en/`.
+
 `extension.install` accepts optional `sha256` and `bytes`; a pinned package is verified
 before extraction, including official language-pack download URLs with query strings.
 This version does not change the default template or publish an automatic update feed.
@@ -418,18 +427,32 @@ with no description of its own prints as its meta description). No other door re
 say "JA Vega - Modern Joomla Template…" (TCH ledger L24, 05/10/2026).
 
 ```
-site.identity {}                                   → {ok, fields: {sitename, MetaDesc}, writable}
-site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?}}
-                                                   → {ok, fields: {sitename, MetaDesc}, changed: [...]}
+site.identity {}                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, writable}
+site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitename_pagetitles?}}
+                                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, changed: [...]}
 ```
 
-- **Two keys, both ways.** A read answers exactly those two (`fields` on a read may name only them);
-  a set takes one or both. Any other key is refused with `unsupported`, never ignored: the same file
+- **Three keys, both ways.** A read answers exactly those (`fields` on a read may name only them);
+  a set takes any of them. Any other key is refused with `unsupported`, never ignored: the same file
   holds the database password and the site secret. Nothing else of the file is ever returned.
 - **Values.** Strings only, cleaned as Joomla's own Global Configuration form cleans them
   (`filter="string"`: entities decoded, tags removed), and made one line. `MetaDesc` holds Joomla's
   300 characters and may be empty; `sitename` holds 200 and may not (Joomla requires one). Anything
   else is `bad_params`. The answer carries the values as stored.
+- **Page titles (unreleased).** `sitename_pagetitles` is Global Configuration › Site Name in Page Titles:
+  `0` no, `1` before the page title ("Site - Page"), `2` after it ("Page - Site"). An integer, or the
+  same digit as a string, stored as the integer Joomla's own form stores (`filter="integer"`); any
+  other value is `bad_params`, and a configuration without the key reads `0`, Joomla's default. A
+  template ships `0`, so a site Tracy had named still showed the bare page title in every browser tab
+  and search result (TCH #1013, D1). With `2` set through this door, the home page's tab reads the
+  site name alone: Joomla would print "Home - Name" (an empty browser page title falls back to the
+  entry's title) or "Name - Name", and the system plugin takes the page part off on the home entry's
+  own page, nowhere else (`lib/HomeTitle.php`; a title the owner wrote by hand is left). It does so
+  only while the switch is the one this door set: each set of the key also writes a mark of the
+  plugin's own in `configuration.php` (`tracy_sitename_pagetitles`), never read or written by a
+  caller, in the same undo step, so `apply.revert` takes the switch and the mark back together and a
+  switch the owner turned on in the administrator keeps Joomla's own titles. A plugin older than this refuses a set naming the key with `unsupported` and
+  writes nothing of that set, so a caller sends it only to a plugin that has it.
 - **Undo.** What changed is recorded under the `apply_id` with its previous value, so `apply.revert`
   puts the site's own words back — together with the content writes of the same `apply_id`, if any. A
   value already in place is not written; when nothing changes the answer is `unchanged: true` and no
@@ -460,16 +483,17 @@ template, or any other, has no favicon setting at all: Joomla prints `templates/
 
 ```
 template.siteSettings {template}
-  T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing}
-  other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile"], settings: {other_faviconFile}}
+  T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing, settings: {other_shareImage}}
+  other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile", "other_shareImage"], settings: {other_faviconFile, other_shareImage}}
 template.siteSettings {operation: "set", apply_id, template, fields?: {...}, profiles?: {<name>: {...}}}
         → {ok, template, framework, keys, changed: [<paths>], cleared, profiles | settings, skipped?}
 ```
 
-- **Eight keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
-  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`. On any
-  other template: `other_faviconFile` only (its logo is a template style param, written with
-  `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
+- **Nine keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
+  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`, and
+  `other_shareImage` (unreleased; in `fields` only, one for the whole site, see below). On any
+  other template: `other_faviconFile` and `other_shareImage` (unreleased; its logo is a template
+  style param, written with `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
   ignored, and nothing is written.
 - **Which profiles.** `fields` go into every profile a site style of the template uses (`default`
   always among them); `profiles: {name: {...}}` into that one, its values over `fields` (JA Spa:
@@ -505,6 +529,25 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   `image/vnd.microsoft.icon` (its MetasRenderer fallback), so `onAfterRender` also takes every other
   icon `<link>` out of the printed `<head>`: the page carries the customer's favicon and no other.
   A template without the file costs one `is_file` per page.
+- **A share image without T4 (unreleased).** A T3 or Gavick template prints no `og:image`, so a
+  link shared to Facebook or Zalo showed whatever picture the network picked off the page (TCH
+  #1013, D5). `other_shareImage` goes to the same `tracy-favicon.json`; it must be a png, jpg, webp
+  or gif (social networks draw no SVG, ICO or AVIF share image, so one is `bad_params`). The system
+  plugin sets it as `og:image` on every page of the site, by its absolute URL (`Uri::root()`), and
+  `onAfterRender` takes every other `og:image` (and its `og:image:*` details) out of the printed
+  `<head>`, so a demo picture a template or an extension prints does not win the preview. Other `og:`
+  and `twitter:` tags are left as printed. Proven on a real Joomla 6 (Cassiopeia, a template
+  without T4) by `tests/e2e/share-image.sh`.
+- **A share image on T4 (unreleased): a fallback.** T4 prints Open Graph only when its
+  `system_opengraph` (`etc/global.json`) is on, and then from a menu item's `og_img` or an
+  article's own picture; off, as on most quickstarts, no page shares a picture. `other_shareImage`
+  is accepted in `fields` (a profile carrying it is `unsupported`: it is not a profile setting) and
+  kept in the same `tracy-favicon.json`, which on T4 holds that key alone; the profiles are not
+  touched by it. The system plugin adds it as `og:image` to a printed `<head>` that carries no
+  `og:image` of its own, and a page that prints its own (T4's, or an extension's) keeps it. It does
+  so at `onBeforeRespond`, not `onAfterRender`: T4 prints the head inside its own `onAfterRender`,
+  after this plugin's (measured on JA Spa, Joomla 6). `apply.revert` takes it back. Proven on JA Spa
+  j6 1.0.1 by `T4_QUICKSTART=<folder> tests/e2e/share-image.sh`, T4's Open Graph off and on.
 - A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
 
 ## Finding a row by its title: `content.list` `search` (unreleased)

@@ -2,7 +2,7 @@
 /**
  * TemplateSiteSettings — the rules of `template.siteSettings`: which keys of a template's site
  * settings it writes, what a value may be, how one JSON file is edited without touching any other
- * byte, which files are the door's own, and the favicon a template without T4 is given.
+ * byte, which files are the door's own, and the favicon and share image a template without T4 is given.
  *
  * A T4 template keeps its logo, its name and slogan and its favicon in a FILE, not in the database:
  * `etc/site/<profile>.json`, read local-first (`templates/<t>/local/` → `templates/<t>/` → the T4
@@ -11,23 +11,37 @@
  * the keys it was given (TCH #1013, T18; research "logo-name-joomla" §0.3, §1.1).
  *
  * A T3 template (and any other non-T4 one) has no favicon setting at all: Joomla prints
- * `templates/<t>/favicon.ico`. The door keeps that one setting in a file of the same folder
- * ({@see FAVICON_FILE}) and the system plugin prints it ({@see faviconLink}).
+ * `templates/<t>/favicon.ico`. The door keeps that setting in a file of the same folder
+ * ({@see FAVICON_FILE}) and the system plugin prints it ({@see faviconLink}). Nor does such a
+ * template print a share image (`og:image`), so a link shared to Facebook or Zalo showed whatever
+ * picture the network picked off the page; the same file keeps one, the customer's logo, and the
+ * system plugin prints it ({@see shareImageUrl}; TCH #1013, D5).
+ *
+ * A T4 template takes the share image too, in the same file: T4 prints Open Graph only when its
+ * `system_opengraph` is on, only for a menu item given an og image, and never on an article, so most
+ * pages of a T4 site share no picture either. There the customer's picture is a fallback: a page
+ * whose head already carries an `og:image` keeps its own ({@see withShareImageFallback}).
  *
  * No Joomla dependency, like the rest of `lib/`. The disk side is {@see TemplateSiteFiles}.
  */
 final class TemplateSiteSettings
 {
+    /** The site's share image: one per site, never per profile, kept in {@see FAVICON_FILE} on every framework. */
+    public const SHARE_KEY = 'other_shareImage';
+
     /** Every key a T4 profile write may carry. Nothing outside this list is ever written. */
     public const T4_KEYS = ['site_logo', 'site_logo_small', 'site_logo_dark', 'site_logo_dark_small', 'site_logo_2', 'site_name', 'site_slogan', 'other_faviconFile'];
 
-    /** The one key a template without T4 has: its favicon. Its logo is a style param (`templateStyle`). */
-    public const OTHER_KEYS = ['other_faviconFile'];
+    /** The keys a template without T4 has: its favicon and its share image. Its logo is a style param (`templateStyle`). */
+    public const OTHER_KEYS = ['other_faviconFile', 'other_shareImage'];
+
+    /** Picture types a share image may have: the ones Facebook, Zalo and LinkedIn draw (no SVG, ICO or AVIF). */
+    private const SHARE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
 
     /** Keys holding words, not a picture. */
     private const TEXT_KEYS = ['site_name', 'site_slogan'];
 
-    /** A non-T4 template's favicon setting, beside the T4 profiles in `templates/<t>/local/etc/site/`. */
+    /** A non-T4 template's settings (favicon, share image), beside the T4 profiles in `templates/<t>/local/etc/site/`. */
     public const FAVICON_FILE = 'tracy-favicon.json';
 
     /** Characters a name or slogan may hold after cleaning, and bytes any value may hold before. */
@@ -43,6 +57,39 @@ final class TemplateSiteSettings
 
     /** A profile name: T4 lets an administrator type one, spaces included, but never a path. */
     public const PROFILE = '~^[A-Za-z0-9_-][A-Za-z0-9 _.-]{0,99}$~D';
+
+    /**
+     * The keys a `template.siteSettings` set may carry on a template of this framework: on T4 its
+     * profile keys and the share image, on any other {@see OTHER_KEYS}.
+     *
+     * @return list<string>
+     */
+    public static function keysFor(string $framework): array
+    {
+        return $framework === 't4' ? array_merge(self::T4_KEYS, [self::SHARE_KEY]) : self::OTHER_KEYS;
+    }
+
+    /**
+     * 't4', 't3' or 'joomla' (any other template), from the template's own manifest; null when no
+     * site template of that name is installed (or its manifest is not a plain, readable file).
+     */
+    public static function frameworkOf(string $root, string $template): ?string
+    {
+        $manifest = self::manifestOf($root, $template);
+        if ($manifest === null) return null;
+        if (preg_match('~<t4\b~', $manifest)) return 't4';
+        return preg_match('~<t3\b~', $manifest) ? 't3' : 'joomla';
+    }
+
+    /** A site template's `templateDetails.xml` text, or null. */
+    public static function manifestOf(string $root, string $template): ?string
+    {
+        if (!preg_match(self::TEMPLATE, $template)) return null;
+        $file = rtrim($root, '/') . '/templates/' . $template . '/templateDetails.xml';
+        if (!is_file($file) || is_link($file) || filesize($file) > 1048576) return null;
+        $text = @file_get_contents($file);
+        return $text === false ? null : $text;
+    }
 
     /**
      * Whether a site-relative path is a file this door writes: a JSON file directly in a template's
@@ -70,7 +117,7 @@ final class TemplateSiteSettings
      */
     public static function clean(string $key, $value, string $root): array
     {
-        if (!in_array($key, self::T4_KEYS, true)) return ['error' => $key . ' is not a site setting this door writes'];
+        if (!in_array($key, self::T4_KEYS, true) && !in_array($key, self::OTHER_KEYS, true)) return ['error' => $key . ' is not a site setting this door writes'];
         if (!is_string($value)) return ['error' => $key . ' must be a string'];
         if (strlen($value) > self::MAX_BYTES) return ['error' => $key . ' is longer than ' . self::MAX_BYTES . ' bytes'];
         if (preg_match('//u', $value) !== 1) return ['error' => $key . ' is not valid UTF-8'];
@@ -85,8 +132,11 @@ final class TemplateSiteSettings
         }
         $path = ltrim(trim($value), '/');
         if ($path === '') return ['value' => ''];
-        if (self::picturePath($path) === null)
+        $extension = self::picturePath($path);
+        if ($extension === null)
             return ['error' => $key . ' must be a picture under images/ (png, jpg, webp, gif, svg, avif or ico), named by a path relative to the site root'];
+        if ($key === 'other_shareImage' && !in_array($extension, self::SHARE_EXTENSIONS, true))
+            return ['error' => 'other_shareImage must be a png, jpg, webp or gif: social networks do not draw a ' . $extension . ' share image'];
         $file = rtrim($root, '/') . '/' . $path;
         if (!is_file($file) || is_link($file)) return ['error' => $key . ': ' . $path . ' is not a file on this site; upload it first (media.upload)'];
         return ['value' => $path];
@@ -222,6 +272,63 @@ final class TemplateSiteSettings
         $extension = $path === '' ? null : self::picturePath($path);
         if ($extension === null || !is_file(rtrim($root, '/') . '/' . $path)) return null;
         return ['href' => rtrim($rootUri, '/') . '/' . $path, 'type' => self::TYPES[$extension]];
+    }
+
+    /**
+     * The share image a non-T4 template was given through the door, as the absolute URL `og:image`
+     * needs, or null to print none. Read from {@see FAVICON_FILE}, and only a picture of a type a
+     * social network draws that is on the site now — the file is data, like the favicon's.
+     *
+     * @param string $rootUrl the site's absolute root URL (`Uri::root()`), e.g. https://example.com/sub/
+     */
+    public static function shareImageUrl(string $root, string $rootUrl, string $template): ?string
+    {
+        if (!preg_match(self::TEMPLATE, $template) || !preg_match('~^https?://~i', $rootUrl)) return null;
+        $file = rtrim($root, '/') . '/templates/' . $template . '/local/etc/site/' . self::FAVICON_FILE;
+        if (!is_file($file) || is_link($file) || filesize($file) > self::MAX_BYTES) return null;
+        $settings = self::settingsOf((string) file_get_contents($file), self::OTHER_KEYS);
+        $path = ltrim((string) ($settings['other_shareImage'] ?? ''), '/');
+        $extension = $path === '' ? null : self::picturePath($path);
+        if ($extension === null || !in_array($extension, self::SHARE_EXTENSIONS, true) || !is_file(rtrim($root, '/') . '/' . $path)) return null;
+        return rtrim($rootUrl, '/') . '/' . $path;
+    }
+
+    /**
+     * A printed page whose `<head>` carries one share image: the customer's (`$keepUrl`). Every other
+     * `og:image` meta tag (and its `og:image:*` details, which describe that other picture) goes, with
+     * the white space after it, so a template or extension printing a demo picture does not win the
+     * preview. Only the head is read; a page without `</head>` is returned as it is.
+     */
+    public static function withoutOtherShareImageTags(string $html, string $keepUrl): string
+    {
+        $end = stripos($html, '</head>');
+        if ($end === false) return $html;
+        $head = preg_replace_callback('~<meta\b[^>]*>\s*~i', static function (array $m) use ($keepUrl): string {
+            $name = strtolower(trim((string) (self::attributeOf($m[0], 'property') ?? self::attributeOf($m[0], 'name') ?? '')));
+            if (!preg_match('~^og:image(:[a-z_]+)?$~D', $name)) return $m[0];
+            if ($name === 'og:image' && self::attributeOf($m[0], 'content') === $keepUrl) return $m[0];
+            return '';
+        }, substr($html, 0, $end));
+        return $head === null ? $html : $head . substr($html, $end);
+    }
+
+    /**
+     * A printed page whose `<head>` carries a share image: its own when it has one (any `og:image`
+     * meta tag, by `property` or `name`), otherwise the customer's (`$url`), added just before
+     * `</head>`. This is how a T4 page is given one: a menu item T4 prints an og image for keeps
+     * it. Only the head is read; a page without `</head>` is returned as it is.
+     */
+    public static function withShareImageFallback(string $html, string $url): string
+    {
+        $end = stripos($html, '</head>');
+        if ($end === false) return $html;
+        $head = substr($html, 0, $end);
+        if (preg_match_all('~<meta\b[^>]*>~i', $head, $tags)) foreach ($tags[0] as $tag) {
+            $name = strtolower(trim((string) (self::attributeOf($tag, 'property') ?? self::attributeOf($tag, 'name') ?? '')));
+            if ($name === 'og:image') return $html;
+        }
+        $tag = '<meta property="og:image" content="' . htmlspecialchars($url, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">' . "\n";
+        return $head . $tag . substr($html, $end);
     }
 
     /**

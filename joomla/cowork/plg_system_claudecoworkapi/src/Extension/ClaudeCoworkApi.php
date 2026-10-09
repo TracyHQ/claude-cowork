@@ -55,6 +55,29 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * favicon for those in `templates/<t>/local/etc/site/tracy-favicon.json`; `onBeforeCompileHead`
  * swaps the head's favicon links for it, and `onAfterRender` takes out the template icon Joomla
  * adds after that event. A template without that file costs one `is_file`.
+ *
+ * ## A share image for a template without T4
+ *
+ * The same file may name the customer's logo as the site's share image (`other_shareImage`):
+ * `onBeforeCompileHead` prints it as `og:image` on every page, and `onAfterRender` takes out any
+ * other `og:image` the template or an extension printed, so a link shared to Facebook or Zalo shows
+ * the customer's logo instead of a demo picture (TCH #1013, D5).
+ *
+ * ## A share image for a T4 template
+ *
+ * A T4 template keeps the share image in the same file, and only that key: T4 prints its own
+ * Open Graph only when `system_opengraph` is on, for a menu item given an og image, and never on an
+ * article. So there the customer's picture is a fallback: `onBeforeRespond` adds it as `og:image`
+ * to a printed head that carries none, and a page with its own keeps it. Not `onAfterRender`: T4
+ * prints the head inside its own `onAfterRender` (`onBeforeCompileHead` fires from there, measured
+ * on JA Spa, Joomla 6), which runs after this plugin's. T4's favicon is its own setting.
+ *
+ * ## The home tab reads the site name alone
+ *
+ * Once Tracy has put the site name after every page title (`site.identity` `sitename_pagetitles` = 2),
+ * Joomla titles the home page "Home - Name" (or "Name - Name"); `onBeforeCompileHead` gives the home
+ * page the site name alone, on a site where Tracy set the switch (`lib/HomeTitle.php`). Every other
+ * page keeps "Page - Name". It costs one comparison on every other page.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -63,6 +86,12 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
     /** The customer's favicon as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
     private ?string $faviconHref = null;
+
+    /** The customer's share image as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
+    private ?string $shareImage = null;
+
+    /** Whether that share image only fills a head without one (T4), instead of replacing every other. */
+    private bool $shareImageFallback = false;
 
     public static function getSubscribedEvents(): array
     {
@@ -75,6 +104,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             'onContentBeforeDisplay' => 'onContentBeforeDisplay',
             'onAfterRender' => 'onAfterRender',
             'onBeforeCompileHead' => 'onBeforeCompileHead',
+            'onBeforeRespond' => 'onBeforeRespond',
         ];
     }
 
@@ -219,6 +249,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     public function onAfterRender(): void
     {
         $this->keepOnlyCustomerFavicon();
+        $this->keepOnlyCustomerShareImage();
         if (!$this->stamping) {
             return;
         }
@@ -228,12 +259,14 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     }
 
     /**
-     * The customer's favicon on a page of a template without T4 (see the class comment): every
-     * favicon link Joomla or the template added goes, and the one `template.siteSettings` set is
-     * added. A page whose template has no setting is left exactly as it was.
+     * The customer's favicon and share image on a page of a template without T4 (see the class
+     * comment): every favicon link Joomla or the template added goes, and the one
+     * `template.siteSettings` set is added; the share image is set as `og:image`. A page whose
+     * template has no setting is left exactly as it was.
      */
     public function onBeforeCompileHead(): void
     {
+        $this->homeTitleAlone();
         try {
             $app = $this->getApplication();
             if (!$app->isClient('site') || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
@@ -248,6 +281,11 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
                 return;
             }
             EngineFactory::loadTemplateSiteSettings();
+            $t4 = \TemplateSiteSettings::frameworkOf(JPATH_ROOT, $template) === 't4';
+            $this->printShareImage($document, $template, $t4);
+            if ($t4) {
+                return;
+            }
             $link = \TemplateSiteSettings::faviconLink(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(true), $template);
             if ($link === null) {
                 return;
@@ -258,6 +296,112 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         } catch (\Throwable $e) {
             // A favicon is never worth a page: the page keeps Joomla's own.
             Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The home page's `<title>` as the site name alone (`HomeTitle::of`), on the site's home entry and
+     * nowhere else: the active menu entry is a home entry, and the request is that entry's own page,
+     * not another view reached under its Itemid.
+     */
+    private function homeTitleAlone(): void
+    {
+        try {
+            $app = $this->getApplication();
+            if (!$app->isClient('site') || (int) $app->get('sitename_pagetitles', 0) !== 2) {
+                return;
+            }
+            $active = $app->getMenu()->getActive();
+            if (!$active || (int) $active->home !== 1 || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+                return;
+            }
+            EngineFactory::loadHomeTitle();
+            // Raw, not getCmd: the cmd filter turns a template layout "ja_essence:news" into
+            // "ja_essencenews", which never equals the entry's own (TCH #1013, NAME-1 on JA Essence j6).
+            $input = $app->getInput();
+            $request = [];
+            foreach (['option', 'view', 'layout', 'id'] as $key) {
+                $request[$key] = (string) $input->get($key, '', 'string');
+            }
+            if (!\HomeTitle::isEntryPage((array) $active->query, $request)) {
+                return;
+            }
+            $document = $app->getDocument();
+            if (!$document || $document->getType() !== 'html') {
+                return;
+            }
+            $title = \HomeTitle::of(
+                (string) $document->getTitle(),
+                (string) $app->get('sitename', ''),
+                $app->get('sitename_pagetitles'),
+                $app->get(\HomeTitle::MARK),
+                \Joomla\CMS\Language\Text::_('JPAGETITLE')
+            );
+            if ($title !== null) {
+                $document->setTitle($title);
+            }
+        } catch (\Throwable $e) {
+            // A title is never worth a page: the page keeps Joomla's own.
+            Log::add('claudecoworkapi home title: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * `og:image` from the template's settings file, when it names a share image on the site. On T4
+     * it is only noted here: `onBeforeRespond` adds it to a printed head that has none, because T4
+     * may still print its own og tags after this event.
+     */
+    private function printShareImage($document, string $template, bool $fallback): void
+    {
+        try {
+            $url = \TemplateSiteSettings::shareImageUrl(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(), $template);
+            if ($url === null) {
+                return;
+            }
+            $this->shareImage = $url;
+            $this->shareImageFallback = $fallback;
+            if (!$fallback) {
+                $document->setMetaData('og:image', $url, 'property');
+            }
+        } catch (\Throwable $e) {
+            // A share image is never worth a page: the page keeps what it had.
+            Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /** The page as printed keeps only the share image `onBeforeCompileHead` set (`TemplateSiteSettings::withoutOtherShareImageTags`). */
+    private function keepOnlyCustomerShareImage(): void
+    {
+        if ($this->shareImage === null || $this->shareImageFallback) {
+            return;
+        }
+        $this->rewriteBody(fn(string $body): string => \TemplateSiteSettings::withoutOtherShareImageTags($body, (string) $this->shareImage));
+    }
+
+    /**
+     * A T4 page, every plugin's `onAfterRender` done: its own og:image when it printed one, else the
+     * customer's (`TemplateSiteSettings::withShareImageFallback`). Any other page is left as it is.
+     */
+    public function onBeforeRespond(): void
+    {
+        if ($this->shareImage === null || !$this->shareImageFallback) {
+            return;
+        }
+        $this->rewriteBody(fn(string $body): string => \TemplateSiteSettings::withShareImageFallback($body, (string) $this->shareImage));
+    }
+
+    /** The response body passed through `$edit`, set back only when it changed; a failure leaves the page as it was. */
+    private function rewriteBody(callable $edit): void
+    {
+        try {
+            $app = $this->getApplication();
+            $body = (string) $app->getBody();
+            $clean = $edit($body);
+            if ($clean !== $body) {
+                $app->setBody($clean);
+            }
+        } catch (\Throwable $e) {
+            Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

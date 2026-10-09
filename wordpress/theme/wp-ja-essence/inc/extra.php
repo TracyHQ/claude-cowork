@@ -9,6 +9,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// The identity tokens the pages and parts carry, and their filling.
+require_once __DIR__ . '/identity.php';
+
 /** The assets; design pages (fixture, artifact) bring their own stylesheet and take none of these. */
 function wp_ja_essence_enqueue_assets(): void {
 	if ( in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
@@ -786,25 +789,24 @@ function wp_ja_essence_render_article_footer( array $attributes, string $content
 }
 
 /**
- * The source's "Author's latest articles": the first two articles the author wrote (creation time, then Joomla id), whichever
- * they are, the one being read included, as the source's helper returns them. An author with no article shows nothing.
+ * The source's "Author's latest articles": the first articles the author wrote (creation time, then Joomla id), whichever
+ * they are, the one being read included, as the source's helper returns them. Published ones only, so an article Tracy
+ * takes off the site (a page the customer unticked) is never linked from here.
  *
- * @param array    $attributes Block attributes.
- * @param string   $content    Inner content (none).
- * @param WP_Block $block      The block.
- * @return string
+ * @param int[] $authors The authors whose articles are listed.
+ * @param int   $limit   How many (1 to 6).
+ * @return int[] Post ids, in print order.
  */
-function wp_ja_essence_render_author_latest( array $attributes, string $content, $block ): string {
-	$post_id = isset( $block->context['postId'] ) ? (int) $block->context['postId'] : (int) get_the_ID();
-	$author  = $post_id ? (int) get_post_field( 'post_author', $post_id ) : 0;
-	if ( ! $author ) {
-		return '';
+function wp_ja_essence_author_latest_ids( array $authors, int $limit ): array {
+	$authors = array_values( array_filter( array_map( 'intval', $authors ) ) );
+	if ( ! $authors ) {
+		return array();
 	}
 	$ids = get_posts(
 		array(
 			'post_type'           => array( 'post', 'page' ),
 			'post_status'         => 'publish',
-			'author'              => $author,
+			'author__in'          => $authors,
 			'posts_per_page'      => -1,
 			'fields'              => 'ids',
 			'no_found_rows'       => true,
@@ -814,13 +816,23 @@ function wp_ja_essence_render_author_latest( array $attributes, string $content,
 		)
 	);
 	$key = static fn( int $id ): array => array( (int) get_post_meta( $id, 'je_created', true ), (int) get_post_meta( $id, 'je_src_id', true ) );
+	$ids = array_map( 'intval', $ids );
 	usort( $ids, static fn( int $a, int $b ): int => $key( $a ) <=> $key( $b ) );
-	$limit = max( 1, min( 6, (int) ( $attributes['limit'] ?? 2 ) ) );
-	$ids   = array_slice( array_map( 'intval', $ids ), 0, $limit );
+	return array_slice( $ids, 0, max( 1, min( 6, $limit ) ) );
+}
+
+/**
+ * The block of "Author's latest articles" for these articles: two cards, or (variant list) a short list.
+ *
+ * @param int[]  $ids     Post ids, in print order.
+ * @param string $variant `cards` or `list`.
+ * @return string
+ */
+function wp_ja_essence_author_latest_html( array $ids, string $variant ): string {
 	if ( ! $ids ) {
 		return '';
 	}
-	if ( 'list' === ( $attributes['variant'] ?? 'cards' ) ) {
+	if ( 'list' === $variant ) {
 		$rows = '';
 		foreach ( $ids as $id ) {
 			$link  = esc_url( (string) get_permalink( $id ) );
@@ -840,9 +852,9 @@ function wp_ja_essence_render_author_latest( array $attributes, string $content,
 	}
 	$items = '';
 	foreach ( $ids as $id ) {
-		$link = esc_url( (string) get_permalink( $id ) );
-		$cat  = wp_ja_essence_article_category( $id );
-		$hits = get_post_meta( $id, 'je_hits', true );
+		$link  = esc_url( (string) get_permalink( $id ) );
+		$cat   = wp_ja_essence_article_category( $id );
+		$hits  = get_post_meta( $id, 'je_hits', true );
 		$thumb = get_the_post_thumbnail( $id, 'large', array( 'alt' => '', 'loading' => 'eager' ) );
 		$items .= '<li class="je-authorlatest__item"><div class="je-authorlatest__inner">';
 		if ( '' !== $thumb ) {
@@ -860,6 +872,43 @@ function wp_ja_essence_render_author_latest( array $attributes, string $content,
 	}
 	return '<section class="je-authorlatest wp-block-wp-ja-essence-author-latest"><h2 class="je-authorlatest__title">' . esc_html__( 'Author\'s latest articles', 'wp-ja-essence' ) . '</h2><ul class="je-authorlatest__list">' . $items . '</ul></section>';
 }
+
+/**
+ * The `wp-ja-essence/author-latest` block (the single article template): the articles of the author of the article
+ * being read.
+ *
+ * @param array    $attributes Block attributes.
+ * @param string   $content    Inner content (none).
+ * @param WP_Block $block      The block.
+ * @return string
+ */
+function wp_ja_essence_render_author_latest( array $attributes, string $content, $block ): string {
+	$post_id = isset( $block->context['postId'] ) ? (int) $block->context['postId'] : (int) get_the_ID();
+	$author  = $post_id ? (int) get_post_field( 'post_author', $post_id ) : 0;
+	$ids     = wp_ja_essence_author_latest_ids( array( $author ), (int) ( $attributes['limit'] ?? 2 ) );
+	return wp_ja_essence_author_latest_html( $ids, 'list' === ( $attributes['variant'] ?? 'cards' ) ? 'list' : 'cards' );
+}
+
+/**
+ * The same list on a page, written as a Query Loop so the page says in data which articles it lists: the query's
+ * `author` (the page's author) and `perPage`, and `wpJaEssenceAuthorLatest` (`cards` or `list`) naming the look. The
+ * Query Loop's own markup is only the editor's preview; the page prints the source's cards from the same author and count.
+ *
+ * @param string $content The Query Loop as drawn.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_essence_author_latest_query( string $content, array $block ): string {
+	$query   = $block['attrs']['query'] ?? array();
+	$variant = is_array( $query ) ? (string) ( $query['wpJaEssenceAuthorLatest'] ?? '' ) : '';
+	if ( '' === $variant ) {
+		return $content;
+	}
+	$authors = array_map( 'intval', explode( ',', (string) ( $query['author'] ?? '' ) ) );
+	$ids     = wp_ja_essence_author_latest_ids( $authors, (int) ( $query['perPage'] ?? 2 ) );
+	return wp_ja_essence_author_latest_html( $ids, 'list' === $variant ? 'list' : 'cards' );
+}
+add_filter( 'render_block_core/query', 'wp_ja_essence_author_latest_query', 10, 2 );
 
 /**
  * The site's Instagram section as the pages print it: the seeder keeps it as blocks inside a page, so the page that holds it
@@ -1278,7 +1327,7 @@ function wp_ja_essence_title_fixed( $title ) {
 		return esc_html( get_bloginfo( 'name' ) );
 	}
 	if ( is_404() ) {
-		return esc_html( 'Page not found ' . apply_filters( 'document_title_separator', '–' ) . ' ' . get_bloginfo( 'name' ) );
+		return esc_html( __( 'Page not found', 'wp-ja-essence' ) . ' ' . apply_filters( 'document_title_separator', '–' ) . ' ' . get_bloginfo( 'name' ) );
 	}
 	return $title;
 }

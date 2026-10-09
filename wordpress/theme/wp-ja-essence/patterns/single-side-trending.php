@@ -17,7 +17,7 @@
 <!-- wp:group {"className":"je-sec__head je-sec__head--side","layout":{"type":"default"}} -->
 <div class="wp-block-group je-sec__head je-sec__head--side">
 <!-- wp:heading {"level":2,"className":"je-sec__title","metadata":{"role":"content","name":"articles-category.main-section"}} -->
-<h2 class="wp-block-heading je-sec__title">Trending</h2>
+<h2 class="wp-block-heading je-sec__title"><?php echo esc_html__( 'Trending', 'wp-ja-essence' ); ?></h2>
 <!-- /wp:heading -->
 </div>
 <!-- /wp:group -->

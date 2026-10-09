@@ -3257,7 +3257,7 @@ final class Engine
                 $step['path'] = $entry['path'] ?? null;
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
-                $step['fields'] = array_keys(self::identityValues($entry['before'] ?? null));
+                $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
             } elseif ($op === 'siteSettings') {
                 // Which files, never their bytes; created when none of them existed before.
                 $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
@@ -3353,13 +3353,15 @@ final class Engine
     }
 
     /**
-     * `site.identity` — Global Configuration's site name (`sitename`) and site description
-     * (`MetaDesc`), and nothing else of configuration.php (lib/SiteIdentity.php).
+     * `site.identity` — Global Configuration's site name (`sitename`), site description (`MetaDesc`)
+     * and whether page titles carry the site name (`sitename_pagetitles`), and nothing else of
+     * configuration.php (lib/SiteIdentity.php).
      *
-     * - `operation: read` (the default): `{fields: {sitename, MetaDesc}, writable}` — the two values
-     *   as the site holds them, and whether a `set` would land now.
-     * - `operation: set`, `apply_id`, `fields`: one or both of the two. Each value is a string,
-     *   cleaned as Joomla's own form cleans it (tags removed, one line) and refused past its length.
+     * - `operation: read` (the default): `{fields: {sitename, MetaDesc, sitename_pagetitles}, writable}`
+     *   — the values as the site holds them, and whether a `set` would land now.
+     * - `operation: set`, `apply_id`, `fields`: any of the three. The two texts are strings, cleaned
+     *   as Joomla's own form cleans them (tags removed, one line) and refused past their length;
+     *   `sitename_pagetitles` is 0, 1 or 2 (no, before, after), stored as an integer.
      *   A field already holding that value is not written; when none changes, nothing is written or
      *   recorded (`unchanged: true`), so a retry after a lost reply adds no second undo step. What
      *   changes is recorded under the `apply_id` with its previous value, so `apply.revert` puts the
@@ -3381,11 +3383,11 @@ final class Engine
             if (array_key_exists('fields', $p)) {
                 $asked = $p['fields'];
                 if (!is_array($asked) || array_diff(array_map(static fn($name) => is_string($name) ? $name : '', $asked), SiteIdentity::FIELDS) !== []) {
-                    return $this->err('unsupported', 'Only sitename and MetaDesc can be read through site.identity');
+                    return $this->err('unsupported', 'Only ' . self::identityList() . ' can be read through site.identity');
                 }
             }
             try {
-                return $this->ok(['fields' => $this->siteIdentity->read(), 'writable' => $this->siteIdentity->writable()]);
+                return $this->ok(['fields' => self::identityShown($this->siteIdentity->read()), 'writable' => $this->siteIdentity->writable()]);
             } catch (Throwable $e) {
                 return $this->err('read_failed', $e->getMessage());
             }
@@ -3402,12 +3404,12 @@ final class Engine
         }
         $fields = $p['fields'] ?? null;
         if (!is_array($fields) || $fields === [] || array_keys($fields) === range(0, count($fields) - 1)) {
-            return $this->err('bad_params', 'fields required: an object with sitename, MetaDesc or both');
+            return $this->err('bad_params', 'fields required: an object with any of ' . self::identityList());
         }
         $clean = [];
         foreach ($fields as $name => $value) {
             if (!in_array($name, SiteIdentity::FIELDS, true)) {
-                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only sitename and MetaDesc can. Nothing was written');
+                return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only ' . self::identityList() . ' can. Nothing was written');
             }
             $cleaned = SiteIdentity::clean($name, $value);
             if (isset($cleaned['error'])) {
@@ -3415,6 +3417,9 @@ final class Engine
             }
             $clean[$name] = $cleaned['value'];
         }
+        // Tracy's mark follows every set of the switch, in the same write and the same undo step, so the
+        // system plugin knows the switch is Tracy's (lib/HomeTitle.php) until `apply.revert` takes both back.
+        if (array_key_exists(SiteIdentity::PAGE_TITLES, $clean)) $clean[HomeTitle::MARK] = $clean[SiteIdentity::PAGE_TITLES];
         try {
             $before = $this->siteIdentity->read();
         } catch (Throwable $e) {
@@ -3425,7 +3430,7 @@ final class Engine
             if ($before[$name] !== $value) $changes[$name] = $value;
         }
         if ($changes === []) {
-            return $this->ok(['fields' => $before, 'changed' => [], 'unchanged' => true]);
+            return $this->ok(['fields' => self::identityShown($before), 'changed' => [], 'unchanged' => true]);
         }
         $previous = array_intersect_key($before, $changes);
         $t = Timing::begin();
@@ -3459,7 +3464,19 @@ final class Engine
             Timing::end('purge', $t);
         }
         $this->stamped('content');
-        return $this->ok(['fields' => array_merge($before, $changes), 'changed' => array_keys($changes)]);
+        return $this->ok(['fields' => self::identityShown(array_merge($before, $changes)), 'changed' => array_keys(self::identityShown($changes))]);
+    }
+
+    /**
+     * The door's keys of what the store holds, in their order: Tracy's mark is the store's own and never
+     * leaves the door.
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function identityShown(array $values): array
+    {
+        return array_intersect_key($values, array_flip(SiteIdentity::FIELDS));
     }
 
     /**
@@ -3467,13 +3484,17 @@ final class Engine
      * lib/TemplateSiteSettings.php, lib/TemplateSiteFiles.php).
      *
      * - `operation: read` (the default), `template`: for a T4 template each site profile a style
-     *   uses (`profiles: {name: {source, settings}}`, `missing`); for any other `settings` with its
-     *   favicon. `framework` says which, `keys` what a set may write.
+     *   uses (`profiles: {name: {source, settings}}`, `missing`) and `settings` with its share
+     *   image; for any other `settings` with its favicon and share image. `framework` says which, `keys` what a set may write.
      * - `operation: set`, `apply_id`, `template`, `fields` and/or `profiles`: on T4, `fields` go into
      *   every profile a style uses and `profiles: {name: {...}}` into one (its values win). Each
      *   profile is copied from where T4 reads it and only those keys change, written to
-     *   `templates/<t>/local/etc/site/<profile>.json`. On any other template the one key is
-     *   `other_faviconFile`, printed by the system plugin. A picture must already be on the site.
+     *   `templates/<t>/local/etc/site/<profile>.json`. `other_shareImage` (png, jpg, webp or gif)
+     *   is one for the whole site, in `fields` only, and kept in `tracy-favicon.json` beside the
+     *   profiles: the system plugin prints it as `og:image`, on T4 only on a page without one of its
+     *   own. On any other template the keys are `other_faviconFile` and `other_shareImage`, both
+     *   printed by the system plugin (there the share image replaces any other). A picture must
+     *   already be on the site.
      *   The files' previous state is recorded under the `apply_id` as one step, so `apply.revert`
      *   puts them back — deleting what did not exist, `local/` included. T4's optimize cache is
      *   emptied after the write and after the revert. Nothing changes → nothing is written or
@@ -3499,7 +3520,7 @@ final class Engine
         if ($framework === null) {
             return $this->err('not_found', 'No site template ' . $template . ' is installed');
         }
-        $keys = $framework === 't4' ? TemplateSiteSettings::T4_KEYS : TemplateSiteSettings::OTHER_KEYS;
+        $keys = TemplateSiteSettings::keysFor($framework);
         $head = ['template' => $template, 'framework' => $framework, 'keys' => $keys];
         $operation = $p['operation'] ?? 'read';
         if ($operation === 'read') {
@@ -3534,7 +3555,10 @@ final class Engine
             if (!$isObject($values)) return $this->err('bad_params', 'profiles.' . substr((string) $profile, 0, 60) . ' must be an object of settings');
             $groups[(string) $profile] = $values;
         }
-        foreach ($groups as $values) foreach (array_keys($values) as $name) {
+        foreach ($groups as $group => $values) foreach (array_keys($values) as $name) {
+            if ($group !== '' && $name === TemplateSiteSettings::SHARE_KEY) {
+                return $this->err('unsupported', TemplateSiteSettings::SHARE_KEY . ' is one share image for the whole site: send it in fields, not in a profile. Nothing was written');
+            }
             if (!in_array($name, $keys, true)) {
                 $what = $framework === 't4' ? '' : ' on a template without T4 (its logo is a template style param: templateStyle)';
                 return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through template.siteSettings' . $what . ': only ' . implode(', ', $keys) . ' can. Nothing was written');
@@ -3599,19 +3623,30 @@ final class Engine
     }
 
     /**
-     * The two identity values an undo entry holds, and only those, as strings: a log row is data,
+     * The identity values an undo entry holds, and only those, each in its type: a log row is data,
      * and whatever else it might carry never reaches configuration.php.
      *
-     * @return array<string,string>
+     * @return array<string,string|int>
      */
     private static function identityValues($before): array
     {
         $out = [];
         if (!is_array($before)) return $out;
         foreach (SiteIdentity::FIELDS as $field) {
-            if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = (string) $before[$field];
+            if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = SiteIdentity::typed($field, $before[$field]);
         }
+        // The mark comes back as it was, absence included: null takes it out of the file.
+        if (array_key_exists(HomeTitle::MARK, $before) && ($before[HomeTitle::MARK] === null || is_scalar($before[HomeTitle::MARK])))
+            $out[HomeTitle::MARK] = SiteIdentity::typed(HomeTitle::MARK, $before[HomeTitle::MARK]);
         return $out;
+    }
+
+    /** The identity keys as a refusal names them: "sitename, MetaDesc and sitename_pagetitles". */
+    private static function identityList(): string
+    {
+        $fields = SiteIdentity::FIELDS;
+        $last = array_pop($fields);
+        return implode(', ', $fields) . ' and ' . $last;
     }
 
     /** @param array<string,?scalar>|null $before */

@@ -64,6 +64,12 @@ final class EngineFactory
         require_once self::libDir() . '/RenderStamps.php';
     }
 
+    /** Only the home-title rule, for the system plugin titling the home page by the site name alone. */
+    public static function loadHomeTitle(): void
+    {
+        require_once self::libDir() . '/HomeTitle.php';
+    }
+
     /** Only the site-settings rules, for the system plugin printing a non-T4 template's favicon. */
     public static function loadTemplateSiteSettings(): void
     {
@@ -406,8 +412,8 @@ final class EngineFactory
      * configuration.php for `site.identity`, read and written as Joomla's own Global Configuration
      * save does (`ApplicationModel::save()` / `writeConfigFile()`): the configuration Joomla loaded
      * (`new JConfig()`, through `ArrayHelper::fromObject`), and Joomla's `Registry` formatting it back
-     * as the `JConfig` class without a closing tag. `ConfigurationFile` merges only `sitename` and
-     * `MetaDesc` over it and does the write. Null leaves `site.identity` answering 'unavailable'.
+     * as the `JConfig` class without a closing tag. `ConfigurationFile` merges only the `site.identity` keys
+     * (`SiteIdentity::FIELDS`) over it and does the write. Null leaves `site.identity` answering 'unavailable'.
      */
     private static function buildSiteIdentity(): ?\SiteIdentityStore
     {

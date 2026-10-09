@@ -36,24 +36,21 @@ final class TemplateSiteFiles
      */
     public function framework(string $template): ?string
     {
-        $manifest = $this->manifest($template);
-        if ($manifest === null) return null;
-        if (preg_match('~<t4\b~', $manifest)) return 't4';
-        return preg_match('~<t3\b~', $manifest) ? 't3' : 'joomla';
+        return TemplateSiteSettings::frameworkOf($this->root, $template);
     }
 
     /**
      * What the template holds now. T4: each profile a style uses, where it is read from and its
      * whitelisted keys; `missing`, the profiles a style names that no file holds (T4 shows `default`
-     * for those). Any other template: its favicon setting.
+     * for those); `settings`, its share image. Any other template: its favicon and share image settings.
      */
     public function read(string $template, string $framework): array
     {
-        if ($framework !== 't4') {
-            $current = $this->bytes($this->faviconPath($template));
-            $settings = $current === null ? [] : (TemplateSiteSettings::settingsOf($current, TemplateSiteSettings::OTHER_KEYS) ?? []);
-            return ['settings' => ['other_faviconFile' => $settings['other_faviconFile'] ?? '']];
-        }
+        $current = $this->bytes($this->faviconPath($template));
+        $settings = $current === null ? [] : (TemplateSiteSettings::settingsOf($current, TemplateSiteSettings::OTHER_KEYS) ?? []);
+        $own = [];
+        foreach ($framework === 't4' ? [TemplateSiteSettings::SHARE_KEY] : TemplateSiteSettings::OTHER_KEYS as $key) $own[$key] = $settings[$key] ?? '';
+        if ($framework !== 't4') return ['settings' => $own];
         $profiles = [];
         $missing = [];
         foreach ($this->usedProfiles($template) as $profile) {
@@ -61,13 +58,14 @@ final class TemplateSiteFiles
             if ($source === null) { $missing[] = $profile; continue; }
             $profiles[$profile] = ['source' => $source, 'settings' => TemplateSiteSettings::settingsOf((string) $this->bytes($source), TemplateSiteSettings::T4_KEYS) ?? []];
         }
-        return ['profiles' => $profiles, 'missing' => $missing];
+        return ['profiles' => $profiles, 'missing' => $missing, 'settings' => $own];
     }
 
     /**
      * The files a set would write: for a T4 template, every profile a style uses when `$fields` is
-     * given, plus each profile `$byProfile` names (its values over `$fields`); for any other template,
-     * the favicon setting. A file whose bytes would not change is left out. Values are clean already.
+     * given, plus each profile `$byProfile` names (its values over `$fields`), and the share image
+     * in the template's settings file, never in a profile; for any other template, its settings file
+     * (favicon, share image). A file whose bytes would not change is left out. Values are clean already.
      *
      * @param array<string,string> $fields
      * @param array<string,array<string,string>> $byProfile
@@ -75,13 +73,13 @@ final class TemplateSiteFiles
      */
     public function plan(string $template, string $framework, array $fields, array $byProfile): array
     {
-        if ($framework !== 't4') {
-            $path = $this->faviconPath($template);
-            $before = $this->bytes($path);
-            if ($before === null && ($fields['other_faviconFile'] ?? '') === '') return ['changes' => [], 'skipped' => []];
-            $after = TemplateSiteSettings::withValues($before ?? '{}', $fields);
-            if ($after === null) return ['error' => 'read_failed', 'message' => $path . ' is not a JSON object; nothing was written'];
-            return ['changes' => $after === $before ? [] : [['path' => $path, 'before' => $before, 'after' => $after]], 'skipped' => []];
+        if ($framework !== 't4') return $this->planSettingsFile($template, $fields);
+        $changes = [];
+        if (array_key_exists(TemplateSiteSettings::SHARE_KEY, $fields)) {
+            $share = $this->planSettingsFile($template, [TemplateSiteSettings::SHARE_KEY => $fields[TemplateSiteSettings::SHARE_KEY]]);
+            if (isset($share['error'])) return $share;
+            $changes = $share['changes'];
+            unset($fields[TemplateSiteSettings::SHARE_KEY]);
         }
         $used = $this->usedProfiles($template);
         $targets = $fields === [] ? [] : $used;
@@ -91,7 +89,6 @@ final class TemplateSiteFiles
                 return ['error' => 'bad_params', 'message' => 'Profile ' . substr($profile, 0, 60) . ' has no etc/site file in template ' . $template . '; nothing was written'];
             if (!in_array($profile, $targets, true)) $targets[] = $profile;
         }
-        $changes = [];
         $skipped = [];
         foreach ($targets as $profile) {
             $source = $this->source($template, $profile);
@@ -104,6 +101,23 @@ final class TemplateSiteFiles
             if ($after !== $from) $changes[] = ['path' => $path, 'before' => $before, 'after' => $after];
         }
         return ['changes' => $changes, 'skipped' => $skipped];
+    }
+
+    /**
+     * The change to a template's own settings file ({@see TemplateSiteSettings::FAVICON_FILE}): these
+     * values set in it, every other byte kept. Nothing when no file exists and every value is empty.
+     *
+     * @param array<string,string> $values
+     * @return array{changes:list<array{path:string,before:?string,after:string}>,skipped:list<never>}|array{error:string,message:string}
+     */
+    private function planSettingsFile(string $template, array $values): array
+    {
+        $path = $this->faviconPath($template);
+        $before = $this->bytes($path);
+        if ($before === null && implode('', $values) === '') return ['changes' => [], 'skipped' => []];
+        $after = TemplateSiteSettings::withValues($before ?? '{}', $values);
+        if ($after === null) return ['error' => 'read_failed', 'message' => $path . ' is not a JSON object; nothing was written'];
+        return ['changes' => $after === $before ? [] : [['path' => $path, 'before' => $before, 'after' => $after]], 'skipped' => []];
     }
 
     /**
@@ -196,11 +210,7 @@ final class TemplateSiteFiles
     /** The template's manifest text, or null when no site template of that name is installed. */
     private function manifest(string $template): ?string
     {
-        if (!preg_match(TemplateSiteSettings::TEMPLATE, $template)) return null;
-        $file = $this->root . '/templates/' . $template . '/templateDetails.xml';
-        if (!is_file($file) || filesize($file) > 1048576) return null;
-        $text = @file_get_contents($file);
-        return $text === false ? null : $text;
+        return TemplateSiteSettings::manifestOf($this->root, $template);
     }
 
     /** Each distinct profile the template's site styles name, `default` first and always present. */

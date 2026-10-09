@@ -75,6 +75,10 @@ final class WP_Fake
     public static $queried = null;
     /** Whether the page being rendered is page 2 or later of a listing (`is_paged()`). */
     public static bool $paged = false;
+    /** @var array<int,array<int,array{0:int,1:string}>> post id => [[term_taxonomy_id, taxonomy], …] it is in */
+    public static array $relations = [];
+    /** @var array<int,array{0:int[],1:string}> every `wp_update_term_count_now` call, in order */
+    public static array $recounts = [];
 
     public static function reset(): void
     {
@@ -82,6 +86,8 @@ final class WP_Fake
         self::$patterns = [];
         self::$queried = null;
         self::$paged = false;
+        self::$relations = [];
+        self::$recounts = [];
         self::$users = [];
         self::$filters = [];
         self::$polylang = false;
@@ -290,6 +296,12 @@ function delete_option(string $key): bool
 function clean_post_cache(int $id): void
 {
     WP_Fake::$cleaned[$id] = $id;
+}
+
+function wp_update_term_count_now($terms, $taxonomy): bool
+{
+    WP_Fake::$recounts[] = [array_map('intval', (array) $terms), (string) $taxonomy];
+    return true;
 }
 
 function wp_cache_delete(string $key, string $group = ''): bool
@@ -696,6 +708,20 @@ final class WP_Fake_Db
             return $this->lockAnswer;
         }
         return 1;
+    }
+
+    /** The terms one post is in (`QuickstartContract::recountTerms`), from `WP_Fake::$relations`. */
+    public function get_results(string $query, $output = 'OBJECT'): array
+    {
+        $this->queries[] = $query;
+        if (strpos($query, 'term_relationships') === false || !preg_match('/object_id = (\d+)/', $query, $m)) {
+            return [];
+        }
+        $out = [];
+        foreach (WP_Fake::$relations[(int) $m[1]] ?? [] as [$tt, $taxonomy]) {
+            $out[] = ['id' => (string) $tt, 'taxonomy' => $taxonomy];
+        }
+        return $out;
     }
 
     public function update(string $table, array $data, array $where, $format = null, $whereFormat = null)

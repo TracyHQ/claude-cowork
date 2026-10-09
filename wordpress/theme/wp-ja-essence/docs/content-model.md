@@ -41,16 +41,20 @@ assigned in `_wp_page_template` on the build stand; "none" means the page falls 
   name and date, content, previous/next links and the post's tags.
 - Named blocks the PHP or the seeder looks for by `metadata.name`: `page.title` (heading
   override, in `page.html` and `single.html`), `nav.mainmenu` (header, drawer), `nav.category`
-  (footer), plus the editable words `header.subscribe`, `header.social`, `footer.tagline`,
-  `footer.cta`, `footer.note`, `footer.copyright`. Do not rename them in a template or a part.
+  (footer), plus the editable words `header.subscribe`, `header.social`, `footer.copyright`. Do not
+  rename them in a template or a part. The footer tagline, its "Become a subscriber" button and the
+  note under it carry no name since 1.0.10: a named block is the content contract's, and no slot
+  named them, so nothing rewrote them; unnamed, Tracy's site build rewrites them with the other
+  words of the page, in the site's language.
 - Page heading: post meta `tracy_page_heading` replaces the page title in the `page.title` block
   when it is not empty (the detail pages carry the article title there, since their menu title is
   "Layout 1" and so on).
 - The footer holds words as the source prints them: tagline "A super modern theme following the
   latest trends with premium membership", button "Become a subscriber", the copyright line
   (docs/content-rules.md, D-04 and the Joomla line). They are rows in the `footer` template part.
-- The 404 template carries its own words ("404", "Page not found", "An error has occurred while
-  processing your request.", a "Home Page" button) and has no header or footer. The draft page
+- The 404 template prints the pattern `page-404` ("404", "Page not found", "An error has occurred
+  while processing your request.", a "Home Page" button), whose words go through the theme's text
+  domain (1.0.10), and has no header or footer. The draft page
   `page-not-found` (content "Not found") and option `wp_ja_essence_404_page` (its id) exist but
   nothing in the theme reads them: edit the template in the Site Editor to change the 404 words.
 

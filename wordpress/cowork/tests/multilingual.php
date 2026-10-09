@@ -99,7 +99,13 @@ check('and nothing was logged', $m['log']->log, []);
 
 // ── retire: keep en-us and vi on the 41-edition profile ─────────────────────────────────────
 
+// One retired page sits in two categories and its Polylang language: the raw move must count them again, or the
+// sitemap and Polylang keep trusting the counts from before (measured 09/10/2026, Tracy Business wp7 1.3.4).
+$dePage = $m['rows']['de'][0];
+WP_Fake::$relations[$dePage] = [[501, 'category'], [502, 'category'], [777, 'language']];
+WP_Fake::$recounts = [];
 $first = $mdoor($M, 'multilingual.retire', ['apply_id' => 'mlang-1', 'request_id' => 'm1', 'keep' => ['en-us', 'vi']]);
+check('a drafted page\'s categories and language are counted again', WP_Fake::$recounts, [[[501, 502], 'category'], [[777], 'language']]);
 check('the first call moves a batch and says it is not done', [$first['ok'], $first['status'], $first['moved'], $first['restored'], $first['remaining']], [true, 'running', 300, 0, 12]);
 check('39 editions are retired', count($first['retired']), 39);
 check('the source and vi are live', $first['live'], ['en', 'vi']);

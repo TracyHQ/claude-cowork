@@ -277,6 +277,10 @@ foreach ($gateContracts as $profileFile) {
     };
 
     if (!$step('bind', $call(['operation' => 'bind']))) continue;
+    // Every other contract starts from a site whose default-language prefix was dropped (D8): a
+    // language job must keep it dropped, and on the others write the profile's own setting.
+    $prefixDropped = (($gateRun = ($gateRun ?? 0) + 1) % 2) === 1;
+    if ($prefixDropped) $gw->store['languageFilter'][1]['params'] = '{"remove_default_prefix":1}';
 
     // The customer writes American English: the source edition is CALLED en-US before anything else
     // happens, and every step after it must hold with the source under its new tag.
@@ -326,6 +330,11 @@ foreach ($gateContracts as $profileFile) {
     }
     if (!$step('derive vi-VN', $a)) continue;
     check("$id: vi-VN completes", $a['status'] ?? null, 'completed');
+    $filterNow = json_decode((string) $gw->store['languageFilter'][1]['params'], true);
+    $filterProfile = json_decode(file_get_contents($dir . '/multilingual-map.json'), true)['languageFilter']['params'];
+    check("$id: the language filter gets every key of the profile's params", array_keys($filterNow ?? []), array_keys($filterProfile));
+    check("$id: a dropped default-language prefix stays dropped, else the profile's setting", $filterNow['remove_default_prefix'] ?? null,
+        $prefixDropped ? 1 : $filterProfile['remove_default_prefix']);
     if (!$step('verify vi-VN', $call(['operation' => 'multilingual.verify', 'locale' => 'vi-VN']))) continue;
     $switchers = array_filter($gw->store['module'] ?? [], fn ($m) => ($m['module'] ?? '') === 'mod_languages' && (string) ($m['published'] ?? '1') === '1');
     check("$id: one language switcher", count($switchers), 1);

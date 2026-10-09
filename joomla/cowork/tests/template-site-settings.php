@@ -23,7 +23,7 @@ if (function_exists('check')) {
     $tsPut('templates/ja_spa/etc/site/logo-light.json', $tsSpaLight);
     $tsPut('templates/ja_mood/templateDetails.xml', "<?xml version=\"1.0\"?>\n<extension type=\"template\" client=\"site\">\n\t<name>ja_mood</name>\n\t<t3>\n\t\t<base>base-bs3</base>\n\t</t3>\n</extension>\n");
     $tsPut('templates/ja_mood/favicon.ico', 'template icon');
-    foreach (['images/tracy-brand/1111aaaa.png', 'images/tracy-brand/2222bbbb.png', 'images/tracy-brand/3333cccc.png', 'images/tracy-brand/4444dddd.ico', 'images/tracy-brand/5555eeee.png'] as $tsImage)
+    foreach (['images/tracy-brand/1111aaaa.png', 'images/tracy-brand/2222bbbb.png', 'images/tracy-brand/3333cccc.png', 'images/tracy-brand/4444dddd.ico', 'images/tracy-brand/5555eeee.png', 'images/tracy-brand/6666ffff.svg', 'images/tracy-brand/7777aaaa.jpg'] as $tsImage)
         $tsPut($tsImage, 'picture ' . $tsImage);
     $tsOptimize = static function () use ($tsPut): void {
         $tsPut('media/t4/optimize/css/' . str_repeat('a', 32) . '.css', 'combined css with content:url(/images/joomlart/logo/logo-dark.png)');
@@ -79,7 +79,8 @@ if (function_exists('check')) {
     // ---- read ------------------------------------------------------------------------------------
     $tsRead = $tsCall($tsEngine, ['template' => 'ja_spa']);
     check('read names the framework, the keys, and each profile a style uses', [$tsRead['ok'], $tsRead['framework'], $tsRead['keys'], array_keys($tsRead['profiles'])],
-        [true, 't4', TemplateSiteSettings::T4_KEYS, ['default', 'logo-light']]);
+        [true, 't4', array_merge(TemplateSiteSettings::T4_KEYS, ['other_shareImage']), ['default', 'logo-light']]);
+    check('and its share image, none yet', $tsRead['settings'], ['other_shareImage' => '']);
     check('a profile answers where it is read from and its keys of the whitelist only', $tsRead['profiles']['logo-light'],
         ['source' => 'templates/ja_spa/etc/site/logo-light.json', 'settings' => ['site_name' => '', 'site_slogan' => '', 'site_logo' => 'images/joomlart/logo/logo-light.png', 'site_logo_2' => 'images/joomlart/logo/logo-light.png', 'site_logo_small' => '', 'other_faviconFile' => '']]);
     check('read takes no write lock', $tsWriter->serialized, []);
@@ -90,7 +91,7 @@ if (function_exists('check')) {
     // ---- set: refusals ----------------------------------------------------------------------------
     $tsOther = $tsSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png', 'body_font_family' => 'Arial']]);
     check('a key outside the whitelist is refused whole, naming the boundary', [$tsOther['error'], $tsOther['message']],
-        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile can. Nothing was written']);
+        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile, other_shareImage can. Nothing was written']);
     check('the same inside a profile', $tsSet(['profiles' => ['default' => ['other_backToTop' => true]]])['error'], 'unsupported');
     check('a set needs an apply_id', $tsCall($tsEngine, ['operation' => 'set', 'template' => 'ja_spa', 'fields' => ['site_name' => 'A']])['error'], 'bad_params');
     check('a set needs fields or profiles', [$tsSet([])['error'], $tsSet(['fields' => []])['error'], $tsSet(['fields' => ['A']])['error']], ['bad_params', 'bad_params', 'bad_params']);
@@ -207,14 +208,15 @@ if (function_exists('check')) {
 
     // ---- T3: the favicon is the one setting, printed by this plugin ------------------------------
     $tsMood = $tsCall($tsEngine, ['template' => 'ja_mood']);
-    check('a T3 template reads its favicon setting only', [$tsMood['framework'], $tsMood['keys'], $tsMood['settings']], ['t3', ['other_faviconFile'], ['other_faviconFile' => '']]);
+    check('a T3 template reads its favicon and share image settings only', [$tsMood['framework'], $tsMood['keys'], $tsMood['settings']],
+        ['t3', ['other_faviconFile', 'other_shareImage'], ['other_faviconFile' => '', 'other_shareImage' => '']]);
     $tsMoodSet = static fn(array $params, string $apply = 'apply-mood') => $tsCall($tsEngine, ['operation' => 'set', 'apply_id' => $apply, 'template' => 'ja_mood'] + $params);
     check('a T3 template refuses the T4 profile keys: its logo is a style param (templateStyle)', $tsMoodSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png']])['error'], 'unsupported');
     check('and refuses profiles', $tsMoodSet(['profiles' => ['default' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]])['error'], 'unsupported');
     check('an empty favicon on a T3 template with none set changes nothing', $tsMoodSet(['fields' => ['other_faviconFile' => '']])['unchanged'] ?? null, true);
     $tsMoodDone = $tsMoodSet(['fields' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]);
     check('a T3 favicon is written to the template\'s local settings file', [$tsMoodDone['changed'], $tsMoodDone['settings']],
-        [['templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]);
+        [['templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => '']]);
     check('the page points at the customer\'s file', TemplateSiteSettings::faviconLink($tsRoot, '/sub', 'ja_mood'), ['href' => '/sub/images/tracy-brand/5555eeee.png', 'type' => 'image/png']);
     check('a template with no setting prints Joomla\'s own favicon', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_spa'), null);
     $tsLinks = ['/sub/templates/ja_mood/favicon.ico' => ['relation' => 'shortcut icon', 'relType' => 'rel', 'attribs' => ['type' => 'image/vnd.microsoft.icon']],
@@ -242,6 +244,69 @@ if (function_exists('check')) {
         . "</head><body><link href=\"/sub/body.ico\" rel=\"icon\"><p>icon</p></body></html>");
     check('a page with no head is left as it is', TemplateSiteSettings::withoutOtherFaviconTags('{"ok":true}', $tsKeep), '{"ok":true}');
     check('a page without other favicons is left byte for byte', TemplateSiteSettings::withoutOtherFaviconTags($tsClean, $tsKeep), $tsClean);
+
+    // ---- T3: the share image (og:image), the customer's logo (D5) --------------------------------
+    // ---- T4: the share image is a fallback for a page without its own og:image (D5) -------------
+    check('a T4 share image is one for the site: refused inside a profile', $tsSet(['profiles' => ['default' => ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']]], 'apply-share-t4'),
+        ['ok' => false, 'error' => 'unsupported', 'message' => 'other_shareImage is one share image for the whole site: send it in fields, not in a profile. Nothing was written']);
+    check('a T4 share image must be a picture social networks draw too', $tsSet(['fields' => ['other_shareImage' => 'images/tracy-brand/6666ffff.svg']], 'apply-share-t4')['error'], 'bad_params');
+    $tsT4Share = $tsSet(['fields' => ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']], 'apply-share-t4');
+    check('a T4 share image alone writes the settings file only, no profile', [$tsT4Share['ok'], $tsT4Share['changed'], $tsT4Share['settings'], $tsLocal('default')],
+        [true, ['templates/ja_spa/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg'], null]);
+    check('the file holds that key only', $tsLocal('tracy-favicon'), '{"other_shareImage":"images\/tracy-brand\/7777aaaa.jpg"}');
+    check('T4 pages print it by its absolute URL', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_spa'), 'https://example.test/images/tracy-brand/7777aaaa.jpg');
+    check('no favicon comes of it: T4 prints its own', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_spa'), null);
+    $tsT4Both = $tsSet(['fields' => ['site_name' => 'Hanoi Roofing', 'other_shareImage' => 'images/tracy-brand/1111aaaa.png']], 'apply-share-t4-2');
+    check('beside profile keys it goes to the settings file, they to the profiles', [$tsT4Both['changed'], array_key_exists('other_shareImage', json_decode((string) $tsLocal('default'), true))],
+        [['templates/ja_spa/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE, 'templates/ja_spa/local/etc/site/default.json', 'templates/ja_spa/local/etc/site/logo-light.json'], false]);
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-share-t4-2']]);
+    check('its revert puts the first share image back and the profiles away', [TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_spa'), $tsLocal('default')],
+        ['https://example.test/images/tracy-brand/7777aaaa.jpg', null]);
+    $tsT4Url = 'https://example.test/images/tracy-brand/7777aaaa.jpg';
+    $tsT4Page = "<html><head>\n\t<meta charset=\"utf-8\">\n\t<meta property=\"og:title\" content=\"Spa\">\n</head><body><meta property=\"og:image\" content=\"/body.png\"></body></html>";
+    check('a T4 page without an og:image of its own is given the customer\'s, before </head>', TemplateSiteSettings::withShareImageFallback($tsT4Page, $tsT4Url),
+        "<html><head>\n\t<meta charset=\"utf-8\">\n\t<meta property=\"og:title\" content=\"Spa\">\n<meta property=\"og:image\" content=\"" . $tsT4Url . "\">\n</head><body><meta property=\"og:image\" content=\"/body.png\"></body></html>");
+    // T4's own tag, as T4\Helper\Metadata::renderTag prints it for a menu item given an og image.
+    $tsT4Own = "<html><head>\n\t<meta property=\"og:image\" content=\"https://example.test/images/joomlart/hero.jpg\" />\n</head><body></body></html>";
+    check('a T4 page with its own og:image keeps it, byte for byte', TemplateSiteSettings::withShareImageFallback($tsT4Own, $tsT4Url), $tsT4Own);
+    check('so does one naming it by name=', TemplateSiteSettings::withShareImageFallback("<head><meta name='OG:image' content='/x.png'></head>", $tsT4Url), "<head><meta name='OG:image' content='/x.png'></head>");
+    check('og:image:width alone is not an og:image', substr_count(TemplateSiteSettings::withShareImageFallback('<head><meta property="og:image:width" content="1"></head>', $tsT4Url), 'property="og:image" content'), 1);
+    check('the URL is escaped in the tag', TemplateSiteSettings::withShareImageFallback('<head></head>', 'https://e.test/a.png?x="1"&y'), "<head><meta property=\"og:image\" content=\"https://e.test/a.png?x=&quot;1&quot;&amp;y\">\n</head>");
+    check('a page with no head is left as it is', TemplateSiteSettings::withShareImageFallback('{"ok":true}', $tsT4Url), '{"ok":true}');
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-share-t4']]);
+    check('the T4 revert removes the settings file and the local/ folder it made', [TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_spa'), is_dir($tsRoot . '/templates/ja_spa/local')], [null, false]);
+
+    // ---- T3: the share image replaces any other ---------------------------------------------------
+    check('a share image must be a picture social networks draw', $tsMoodSet(['fields' => ['other_shareImage' => 'images/tracy-brand/6666ffff.svg']], 'apply-share'),
+        ['ok' => false, 'error' => 'bad_params', 'message' => 'other_shareImage must be a png, jpg, webp or gif: social networks do not draw a svg share image']);
+    check('and a file on the site', $tsMoodSet(['fields' => ['other_shareImage' => 'images/tracy-brand/none.png']], 'apply-share')['error'], 'bad_params');
+    check('no share image is printed before one is set', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/sub/', 'ja_mood'), null);
+    $tsShare = $tsMoodSet(['fields' => ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']], 'apply-share');
+    check('a T3 share image is written beside the favicon, which stays', $tsShare['settings'], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']);
+    check('every page prints it as an absolute URL', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/sub/', 'ja_mood'), 'https://example.test/sub/images/tracy-brand/7777aaaa.jpg');
+    check('a root URL that is not absolute prints nothing: og:image must be', TemplateSiteSettings::shareImageUrl($tsRoot, '/sub', 'ja_mood'), null);
+    check('the favicon is still the customer\'s', TemplateSiteSettings::faviconLink($tsRoot, '/sub', 'ja_mood')['href'] ?? null, '/sub/images/tracy-brand/5555eeee.png');
+    $tsShareKeep = 'https://example.test/sub/images/tracy-brand/7777aaaa.jpg';
+    $tsSharePage = "<html><head>\n\t<meta property=\"og:image\" content=\"https://example.test/sub/images/demo/hero.jpg\">\n"
+        . "\t<meta property=\"og:image:width\" content=\"1200\" />\n"
+        . "\t<meta property=\"og:image\" content=\"" . $tsShareKeep . "\">\n"
+        . "\t<meta name='og:image' content='/demo.png'>\n"
+        . "\t<meta property=\"og:title\" content=\"Hanoi Roofing\">\n"
+        . "\t<meta name=\"twitter:image\" content=\"/demo.png\">\n"
+        . "</head><body><meta property=\"og:image\" content=\"/body.png\"></body></html>";
+    $tsShareClean = TemplateSiteSettings::withoutOtherShareImageTags($tsSharePage, $tsShareKeep);
+    check('the printed head keeps only the customer\'s og:image, and every other og tag', $tsShareClean,
+        "<html><head>\n\t<meta property=\"og:image\" content=\"" . $tsShareKeep . "\">\n"
+        . "\t<meta property=\"og:title\" content=\"Hanoi Roofing\">\n"
+        . "\t<meta name=\"twitter:image\" content=\"/demo.png\">\n"
+        . "</head><body><meta property=\"og:image\" content=\"/body.png\"></body></html>");
+    check('a page with only the customer\'s share image is left byte for byte', TemplateSiteSettings::withoutOtherShareImageTags($tsShareClean, $tsShareKeep), $tsShareClean);
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-share']]);
+    check('its revert takes the share image back and keeps the favicon', [TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_mood'), TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_mood')['href'] ?? null],
+        [null, '/images/tracy-brand/5555eeee.png']);
+    $tsPut('templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE, '{"other_faviconFile":"images/tracy-brand/5555eeee.png","other_shareImage":"images/tracy-brand/6666ffff.svg"}');
+    check('a settings file naming an SVG share image prints none', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_mood'), null);
+
     $tsPut('templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE, '{"other_faviconFile":"../configuration.php"}');
     check('a setting file naming something else prints nothing', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_mood'), null);
     $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-mood']]);

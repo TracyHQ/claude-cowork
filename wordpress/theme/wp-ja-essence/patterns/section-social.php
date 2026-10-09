@@ -15,7 +15,7 @@
 <!-- wp:group {"tagName":"section","className":"je-sec je-side je-side--social je-social-sec","metadata":{"name":"social.root"},"layout":{"type":"default"}} -->
 <section class="wp-block-group je-sec je-side je-side--social je-social-sec">
 <!-- wp:heading {"level":2,"className":"je-sec__title je-social-sec__title","metadata":{"name":"social.title"}} -->
-<h2 class="wp-block-heading je-sec__title je-social-sec__title">Follow me</h2>
+<h2 class="wp-block-heading je-sec__title je-social-sec__title"><?php echo esc_html__( 'Follow me', 'wp-ja-essence' ); ?></h2>
 <!-- /wp:heading -->
 <!-- wp:buttons {"className":"je-social","layout":{"type":"flex"}} -->
 <div class="wp-block-buttons je-social">

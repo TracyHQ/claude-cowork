@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Edits to posts and media are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.4
+ * Version:     0.18.5
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -32,6 +32,12 @@ SourceLocaleHooks::register();
 // WordPress's 404 guess would otherwise send /news/ to a published /newsletter/.
 require_once __DIR__ . '/lib/UnpublishedAddressHooks.php';
 UnpublishedAddressHooks::register();
+// The archive of a category or tag whose posts were all taken off answers 404, not an empty listing.
+require_once __DIR__ . '/lib/UnpublishedTermHooks.php';
+UnpublishedTermHooks::register();
+// A retired edition leaves the sitemap: its per-language index entries go, its sitemap pages answer 404.
+require_once __DIR__ . '/lib/RetiredSitemaps.php';
+RetiredSitemaps::register();
 // Content API identity: a new row gets its content uid when WordPress inserts it, on a site that
 // opted in with `content.identity`. One small file, no engine.
 require_once __DIR__ . '/lib/ContentIdentity.php';
@@ -49,6 +55,10 @@ StringOverrides::register();
 // post meta, lib/SeoFields.php). Prints nothing while an SEO plugin runs, or on a page holding neither.
 require_once __DIR__ . '/lib/SeoFields.php';
 SeoFields::register();
+// A shared link's preview (Open Graph): the customer's logo (`tracy_share_image`), the page title and description.
+// Prints nothing without that option, while an SEO plugin runs, or where the theme shares a picture of its own.
+require_once __DIR__ . '/lib/SharePreview.php';
+SharePreview::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.
