@@ -45,14 +45,16 @@ final class TemplateSiteFiles
     /**
      * What the template holds now. T4: each profile a style uses, where it is read from and its
      * whitelisted keys; `missing`, the profiles a style names that no file holds (T4 shows `default`
-     * for those). Any other template: its favicon setting.
+     * for those). Any other template: its favicon and share image settings.
      */
     public function read(string $template, string $framework): array
     {
         if ($framework !== 't4') {
             $current = $this->bytes($this->faviconPath($template));
             $settings = $current === null ? [] : (TemplateSiteSettings::settingsOf($current, TemplateSiteSettings::OTHER_KEYS) ?? []);
-            return ['settings' => ['other_faviconFile' => $settings['other_faviconFile'] ?? '']];
+            $out = [];
+            foreach (TemplateSiteSettings::OTHER_KEYS as $key) $out[$key] = $settings[$key] ?? '';
+            return ['settings' => $out];
         }
         $profiles = [];
         $missing = [];
@@ -67,7 +69,7 @@ final class TemplateSiteFiles
     /**
      * The files a set would write: for a T4 template, every profile a style uses when `$fields` is
      * given, plus each profile `$byProfile` names (its values over `$fields`); for any other template,
-     * the favicon setting. A file whose bytes would not change is left out. Values are clean already.
+     * its settings file (favicon, share image). A file whose bytes would not change is left out. Values are clean already.
      *
      * @param array<string,string> $fields
      * @param array<string,array<string,string>> $byProfile
@@ -78,7 +80,7 @@ final class TemplateSiteFiles
         if ($framework !== 't4') {
             $path = $this->faviconPath($template);
             $before = $this->bytes($path);
-            if ($before === null && ($fields['other_faviconFile'] ?? '') === '') return ['changes' => [], 'skipped' => []];
+            if ($before === null && implode('', $fields) === '') return ['changes' => [], 'skipped' => []];
             $after = TemplateSiteSettings::withValues($before ?? '{}', $fields);
             if ($after === null) return ['error' => 'read_failed', 'message' => $path . ' is not a JSON object; nothing was written'];
             return ['changes' => $after === $before ? [] : [['path' => $path, 'before' => $before, 'after' => $after]], 'skipped' => []];

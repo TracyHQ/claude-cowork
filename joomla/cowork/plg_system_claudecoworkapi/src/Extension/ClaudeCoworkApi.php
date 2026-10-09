@@ -55,6 +55,13 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * favicon for those in `templates/<t>/local/etc/site/tracy-favicon.json`; `onBeforeCompileHead`
  * swaps the head's favicon links for it, and `onAfterRender` takes out the template icon Joomla
  * adds after that event. A template without that file costs one `is_file`.
+ *
+ * ## A share image for a template without T4
+ *
+ * The same file may name the customer's logo as the site's share image (`other_shareImage`):
+ * `onBeforeCompileHead` prints it as `og:image` on every page, and `onAfterRender` takes out any
+ * other `og:image` the template or an extension printed, so a link shared to Facebook or Zalo shows
+ * the customer's logo instead of a demo picture (TCH #1013, D5).
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -63,6 +70,9 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
     /** The customer's favicon as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
     private ?string $faviconHref = null;
+
+    /** The customer's share image as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
+    private ?string $shareImage = null;
 
     public static function getSubscribedEvents(): array
     {
@@ -219,6 +229,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     public function onAfterRender(): void
     {
         $this->keepOnlyCustomerFavicon();
+        $this->keepOnlyCustomerShareImage();
         if (!$this->stamping) {
             return;
         }
@@ -228,9 +239,10 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     }
 
     /**
-     * The customer's favicon on a page of a template without T4 (see the class comment): every
-     * favicon link Joomla or the template added goes, and the one `template.siteSettings` set is
-     * added. A page whose template has no setting is left exactly as it was.
+     * The customer's favicon and share image on a page of a template without T4 (see the class
+     * comment): every favicon link Joomla or the template added goes, and the one
+     * `template.siteSettings` set is added; the share image is set as `og:image`. A page whose
+     * template has no setting is left exactly as it was.
      */
     public function onBeforeCompileHead(): void
     {
@@ -248,6 +260,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
                 return;
             }
             EngineFactory::loadTemplateSiteSettings();
+            $this->printShareImage($document, $template);
             $link = \TemplateSiteSettings::faviconLink(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(true), $template);
             if ($link === null) {
                 return;
@@ -258,6 +271,40 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         } catch (\Throwable $e) {
             // A favicon is never worth a page: the page keeps Joomla's own.
             Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /** `og:image` from the template's settings file, when it names a share image on the site. */
+    private function printShareImage($document, string $template): void
+    {
+        try {
+            $url = \TemplateSiteSettings::shareImageUrl(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(), $template);
+            if ($url === null) {
+                return;
+            }
+            $document->setMetaData('og:image', $url, 'property');
+            $this->shareImage = $url;
+        } catch (\Throwable $e) {
+            // A share image is never worth a page: the page keeps what it had.
+            Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /** The page as printed keeps only the share image `onBeforeCompileHead` set (`TemplateSiteSettings::withoutOtherShareImageTags`). */
+    private function keepOnlyCustomerShareImage(): void
+    {
+        if ($this->shareImage === null) {
+            return;
+        }
+        try {
+            $app = $this->getApplication();
+            $body = (string) $app->getBody();
+            $clean = \TemplateSiteSettings::withoutOtherShareImageTags($body, $this->shareImage);
+            if ($clean !== $body) {
+                $app->setBody($clean);
+            }
+        } catch (\Throwable $e) {
+            Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

@@ -3474,8 +3474,9 @@ final class Engine
      * - `operation: set`, `apply_id`, `template`, `fields` and/or `profiles`: on T4, `fields` go into
      *   every profile a style uses and `profiles: {name: {...}}` into one (its values win). Each
      *   profile is copied from where T4 reads it and only those keys change, written to
-     *   `templates/<t>/local/etc/site/<profile>.json`. On any other template the one key is
-     *   `other_faviconFile`, printed by the system plugin. A picture must already be on the site.
+     *   `templates/<t>/local/etc/site/<profile>.json`. On any other template the keys are
+     *   `other_faviconFile` and `other_shareImage` (the `og:image` of every page: png, jpg, webp or
+     *   gif), both printed by the system plugin. A picture must already be on the site.
      *   The files' previous state is recorded under the `apply_id` as one step, so `apply.revert`
      *   puts them back — deleting what did not exist, `local/` included. T4's optimize cache is
      *   emptied after the write and after the revert. Nothing changes → nothing is written or

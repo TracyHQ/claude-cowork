@@ -54,6 +54,7 @@ edit the copy — that is how the two silently diverge.
 node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
 tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
+tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
@@ -477,15 +478,15 @@ template, or any other, has no favicon setting at all: Joomla prints `templates/
 ```
 template.siteSettings {template}
   T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing}
-  other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile"], settings: {other_faviconFile}}
+  other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile", "other_shareImage"], settings: {other_faviconFile, other_shareImage}}
 template.siteSettings {operation: "set", apply_id, template, fields?: {...}, profiles?: {<name>: {...}}}
         → {ok, template, framework, keys, changed: [<paths>], cleared, profiles | settings, skipped?}
 ```
 
 - **Eight keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
   `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`. On any
-  other template: `other_faviconFile` only (its logo is a template style param, written with
-  `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
+  other template: `other_faviconFile` and `other_shareImage` (unreleased; its logo is a template
+  style param, written with `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
   ignored, and nothing is written.
 - **Which profiles.** `fields` go into every profile a site style of the template uses (`default`
   always among them); `profiles: {name: {...}}` into that one, its values over `fields` (JA Spa:
@@ -521,6 +522,16 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   `image/vnd.microsoft.icon` (its MetasRenderer fallback), so `onAfterRender` also takes every other
   icon `<link>` out of the printed `<head>`: the page carries the customer's favicon and no other.
   A template without the file costs one `is_file` per page.
+- **A share image without T4 (unreleased).** A T3 or Gavick template prints no `og:image`, so a
+  link shared to Facebook or Zalo showed whatever picture the network picked off the page (TCH
+  #1013, D5). `other_shareImage` goes to the same `tracy-favicon.json`; it must be a png, jpg, webp
+  or gif (social networks draw no SVG, ICO or AVIF share image, so one is `bad_params`). The system
+  plugin sets it as `og:image` on every page of the site, by its absolute URL (`Uri::root()`), and
+  `onAfterRender` takes every other `og:image` (and its `og:image:*` details) out of the printed
+  `<head>`, so a demo picture a template or an extension prints does not win the preview. Other `og:`
+  and `twitter:` tags are left as printed. A T4 template refuses the key: T4 has its own og
+  settings (the template style's `system_opengraph` and each menu item's `og_img`). Proven on a real
+  Joomla 6 (Cassiopeia, a template without T4) by `tests/e2e/share-image.sh`.
 - A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
 
 ## Finding a row by its title: `content.list` `search` (unreleased)
