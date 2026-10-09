@@ -21,10 +21,10 @@
 <!-- wp:buttons {"className":"tracy-actions justify-center"} -->
 <div class="wp-block-buttons tracy-actions justify-center">
 <!-- wp:button {"className":"tracy-btn tracy-btn--inverse"} -->
-<div class="wp-block-button tracy-btn tracy-btn--inverse"><a class="wp-block-button__link wp-element-button" href="#"><?php echo esc_html__( 'Get started', 'wp-ja-essence' ); ?></a></div>
+<div class="wp-block-button tracy-btn tracy-btn--inverse"><a class="wp-block-button__link wp-element-button" href="/contact"><?php echo esc_html__( 'Get started', 'wp-ja-essence' ); ?></a></div>
 <!-- /wp:button -->
 <!-- wp:button {"className":"is-style-outline tracy-btn tracy-btn--ghost"} -->
-<div class="wp-block-button is-style-outline tracy-btn tracy-btn--ghost"><a class="wp-block-button__link wp-element-button" href="#"><?php echo esc_html__( 'Talk to us', 'wp-ja-essence' ); ?></a></div>
+<div class="wp-block-button is-style-outline tracy-btn tracy-btn--ghost"><a class="wp-block-button__link wp-element-button" href="/contact"><?php echo esc_html__( 'Talk to us', 'wp-ja-essence' ); ?></a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:buttons -->
