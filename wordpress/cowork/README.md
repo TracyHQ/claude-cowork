@@ -149,6 +149,21 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     `pll_the_language_link` (Polylang 3.8.9 returns the raw list before any output filter) —
     and out of `hreflang` through `pll_rel_hreflang_attributes`. `pll_languages_list()` is not
     changed: the language still exists, it is just not live.
+  - While `tracy_source_locale` names the language the source edition is written in
+    (`lib/SourceLocaleHooks.php`), every switcher kind names, codes and flags that edition in it:
+    Polylang's standard block, widget, template tag and dropdown (`pll_the_languages`), and its
+    navigation-block switcher (`render_block_core/navigation-link` / `-submenu`, before Polylang prints
+    the label); `hreflang` too, including the shortened code (`en`) Polylang prints when one edition is left.
+  - While a retired set is on record, `lib/RetiredSitemaps.php` also keeps those languages out of
+    the sitemap: every provider is wrapped, so an index entry Polylang names for a retired language
+    (`<subtype>---pll-sep---<slug>`, its users sitemap included) is left out and a sitemap page asked
+    for in a retired language lists nothing, which WordPress answers with 404.
+  - A retire, a demo trim and their undo move `post_status` raw; each moved post's terms are counted
+    again afterwards (`QuickstartContract::setPostStatus`), so the core sitemap (`hide_empty`) and
+    Polylang's languages with content read the counts as they are now.
+  - On a bound site, `lib/UnpublishedTermHooks.php` answers 404 for a category, tag or taxonomy archive
+    (and its feed) that lists no published post: core answers 200 with an empty listing whenever the term
+    exists. A term that still lists a published post is served as before; an unbound site is untouched.
 - `content.update` and `content.delete` refuse (`bad_params`) the contract's own options:
   `_tracy_content_contract`, `claude_cowork_contract` and `claude_cowork_string_overrides`.
 - Warnings: `PRESENTATION_DRIFT` with `severity: warning` on `inspect`, `bind` and `apply` answers,
@@ -491,6 +506,22 @@ Writing one page's title, undone on its own by `apply.revert`:
   object of those two text fields, or when it is the only field (the refusal names the `postmeta` call).
 - **Read back:** every row of `content.list` carries `seo` as the site prints it — the running plugin's
   keys, or this plugin's own — and `content.get {kind: "postmeta", id, key}` reads one value.
+
+## A shared link's preview: `tracy_share_image` (unreleased)
+
+WordPress prints no Open Graph tags, and no Tracy theme does, so Facebook, Zalo or X picked any
+picture off a shared page. Option `tracy_share_image` (an attachment id; Tracy writes the uploaded
+logo's) names the preview picture. While it names an image, every front-end page gets, at the end of
+`wp_head` (`lib/SharePreview.php`): `og:type`, `og:site_name` (`blogname`), `og:title` (the page's
+`<title>`), `og:description` (the page's `_claude_cowork_seo_description`, else `blogdescription`),
+`og:url`, `og:image` with its width and height, and `twitter:card` `summary`. Nothing is printed
+without the option, while an SEO plugin runs, or when the head already holds an `og:image` /
+`twitter:image` of the theme's own. Written and taken back like any option:
+
+```
+{"action": "content.update", "params": {"apply_id": "…", "kind": "option", "id": 0,
+ "key": "tracy_share_image", "fields": {"value": 461}}}
+```
 
 ## Layout
 

@@ -31,6 +31,9 @@ final class SourceLocaleHooks
         add_filter('locale', [self::class, 'filterLocale'], PHP_INT_MAX);
         add_filter('pll_rel_hreflang_attributes', [self::class, 'filterHreflang'], PHP_INT_MAX);
         add_filter('pll_the_languages', [self::class, 'filterSwitcher'], PHP_INT_MAX);
+        // Before Polylang (10) prints the navigation-block switcher's label from these attributes.
+        add_filter('render_block_core/navigation-link', [self::class, 'filterNavigationItem'], 9, 3);
+        add_filter('render_block_core/navigation-submenu', [self::class, 'filterNavigationItem'], 9, 3);
     }
 
     /** The option, or '' when unset or not a locale. */
@@ -94,14 +97,18 @@ final class SourceLocaleHooks
      */
     public static function hreflangFor($hreflangs, string $written, string $sourceCode)
     {
-        if (!is_array($hreflangs) || $written === '' || $sourceCode === '' || !isset($hreflangs[$sourceCode])) {
+        // Polylang shortens a code to its language (`en-US` → `en`) when no other language shares it, which is what a
+        // site retired to its source edition prints (measured 09/10/2026, Tracy Business wp7 1.3.4: hreflang="en").
+        $primary = explode('-', $sourceCode, 2)[0];
+        $key = isset($hreflangs[$sourceCode]) ? $sourceCode : (isset($hreflangs[$primary]) ? $primary : null);
+        if (!is_array($hreflangs) || $written === '' || $sourceCode === '' || $key === null) {
             return $hreflangs;
         }
         // `de_DE_formal` is announced as `de-DE`: a variant has no hreflang code of its own.
         $code = self::codeOf($written);
         $out = [];
-        foreach ($hreflangs as $key => $url) {
-            $out[$key === $sourceCode ? $code : $key] = $url;
+        foreach ($hreflangs as $at => $url) {
+            $out[$at === $key ? $code : $at] = $url;
         }
         return $out;
     }
@@ -110,13 +117,8 @@ final class SourceLocaleHooks
     public static function filterHreflang($hreflangs)
     {
         $written = self::written();
-        if ($written === '' || !function_exists('PLL') || !is_object(PLL()) || !isset(PLL()->model)) {
-            return $hreflangs;
-        }
-        $source = function_exists('pll_default_language') ? pll_default_language('slug') : null;
-        $language = is_string($source) && method_exists(PLL()->model, 'get_language') ? PLL()->model->get_language($source) : null;
-        $code = is_object($language) && isset($language->locale) ? str_replace('_', '-', (string) $language->locale) : '';
-        return self::hreflangFor($hreflangs, $written, $code);
+        $source = $written === '' ? null : self::source();
+        return $source === null ? $hreflangs : self::hreflangFor($hreflangs, $written, str_replace('_', '-', $source[2]));
     }
 
     /** A locale's hreflang code: `de_DE_formal` is `de-DE`, a variant has no code of its own. Pure. */
@@ -193,20 +195,44 @@ final class SourceLocaleHooks
         return ['', ''];
     }
 
-    /** `pll_the_languages`: the switcher names the source edition in the language it is written in. */
-    public static function filterSwitcher($html)
+    /**
+     * Polylang's source edition (its default language) as [slug, name, locale]; null without Polylang or without one.
+     *
+     * Polylang 3.7+ answers `PLL()->model->get_language()` through `__call`, which `method_exists` cannot see: the
+     * switcher and hreflang were left in English on every site (measured 09/10/2026, Polylang 3.8.9, plugin 0.18.4).
+     * @return array{0:string,1:string,2:string}|null
+     */
+    private static function source(): ?array
     {
-        if (!is_string($html) || $html === '') {
-            return $html;
+        $pll = function_exists('PLL') ? PLL() : null;
+        $model = is_object($pll) && isset($pll->model) && is_object($pll->model) ? $pll->model : null;
+        $slug = function_exists('pll_default_language') ? pll_default_language('slug') : null;
+        if ($model === null || !is_string($slug) || $slug === '') {
+            return null;
         }
+        $language = null;
+        if (isset($model->languages) && is_object($model->languages) && method_exists($model->languages, 'get')) {
+            $language = $model->languages->get($slug);
+        } elseif (is_callable([$model, 'get_language'])) {
+            $language = $model->get_language($slug);
+        }
+        if (!is_object($language) || !isset($language->locale, $language->name)) {
+            return null;
+        }
+        return [$slug, (string) $language->name, (string) $language->locale];
+    }
+
+    /**
+     * What the switcher should say for the source edition: [source slug, its name, its code, written name, written code,
+     * written flag src]; null when nothing is to change (no option, no Polylang, or the edition already speaks it).
+     * @return array{0:string,1:string,2:string,3:string,4:string,5:string}|null
+     */
+    private static function relabel(): ?array
+    {
         $written = self::written();
-        if ($written === '' || !function_exists('PLL') || !is_object(PLL()) || !isset(PLL()->model)) {
-            return $html;
-        }
-        $source = function_exists('pll_default_language') ? pll_default_language('slug') : null;
-        $language = is_string($source) && method_exists(PLL()->model, 'get_language') ? PLL()->model->get_language($source) : null;
-        if (!is_object($language) || !isset($language->locale, $language->name) || $language->locale === $written) {
-            return $html;
+        $source = $written === '' ? null : self::source();
+        if ($source === null || $source[2] === $written) {
+            return null;
         }
         [$name, $flag] = self::known($written);
         $flagSrc = '';
@@ -214,14 +240,56 @@ final class SourceLocaleHooks
             $info = PLL_Language::get_flag_information($flag);
             $flagSrc = is_array($info) ? (string) ($info['src'] ?? ($info['url'] ?? '')) : '';
         }
-        return self::switcherFor(
-            $html,
-            (string) $source,
-            (string) $language->name,
-            str_replace('_', '-', (string) $language->locale),
-            $name,
-            self::codeOf($written),
-            $flagSrc
-        );
+        return [$source[0], $source[1], str_replace('_', '-', $source[2]), $name, self::codeOf($written), $flagSrc];
+    }
+
+    /** `pll_the_languages`: the switcher names the source edition in the language it is written in. */
+    public static function filterSwitcher($html)
+    {
+        if (!is_string($html) || $html === '') {
+            return $html;
+        }
+        $relabel = self::relabel();
+        return $relabel === null ? $html : self::switcherFor($html, ...$relabel);
+    }
+
+    /**
+     * One item of Polylang's navigation-block switcher (`polylang/navigation-language-switcher`), before Polylang prints
+     * its label: the source edition's item takes the written language's name, code and flag. Pure.
+     *
+     * That block builds `core/navigation-link` (or `-submenu`) blocks from Polylang's raw list, which no switcher filter
+     * reaches; Polylang then prints `pll_name` and `pll_flag` and sets `lang` / `hreflang` from these attributes.
+     * @param array<string,mixed> $attrs the inner block's attributes
+     * @return array<string,mixed>
+     */
+    public static function navigationItemFor(array $attrs, string $sourceSlug, string $name, string $code, string $flagSrc): array
+    {
+        $classes = preg_split('/\s+/', (string) ($attrs['className'] ?? '')) ?: [];
+        if ($name === '' || $code === '' || !isset($attrs['pll_name']) || !in_array('lang-item-' . $sourceSlug, $classes, true)) {
+            return $attrs;
+        }
+        $esc = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        $attrs['pll_name'] = $esc($name);
+        $attrs['lang'] = $code;
+        $attrs['hreflang'] = $code;
+        if (isset($attrs['pll_flag']) && is_string($attrs['pll_flag'])) {
+            $attrs['pll_flag'] = $flagSrc === ''
+                ? (string) preg_replace('/<img\b[^>]*>/', '', $attrs['pll_flag'], 1)
+                : (string) preg_replace('/(<img\b[^>]*\bsrc=")[^"]*(")/', '${1}' . str_replace(['\\', '$'], ['\\\\', '\\$'], $esc($flagSrc)) . '${2}', $attrs['pll_flag'], 1);
+        }
+        return $attrs;
+    }
+
+    /** `render_block_core/navigation-link` and `-submenu`: the navigation-block switcher names the source edition too. */
+    public static function filterNavigationItem($content, $block = null, $instance = null)
+    {
+        if (!is_object($instance) || !isset($instance->attributes) || !is_array($instance->attributes) || !isset($instance->attributes['pll_name'])) {
+            return $content;
+        }
+        $relabel = self::relabel();
+        if ($relabel !== null) {
+            $instance->attributes = self::navigationItemFor($instance->attributes, $relabel[0], $relabel[3], $relabel[4], $relabel[5]);
+        }
+        return $content;
     }
 }
