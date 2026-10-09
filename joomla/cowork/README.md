@@ -53,6 +53,7 @@ edit the copy — that is how the two silently diverge.
 ./build.sh                                    # → dist/pkg_claudecowork.zip + dist/tracy-release.json (needs node)
 node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
+tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
