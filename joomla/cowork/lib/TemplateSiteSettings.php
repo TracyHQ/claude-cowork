@@ -17,10 +17,18 @@
  * picture the network picked off the page; the same file keeps one, the customer's logo, and the
  * system plugin prints it ({@see shareImageUrl}; TCH #1013, D5).
  *
+ * A T4 template takes the share image too, in the same file: T4 prints Open Graph only when its
+ * `system_opengraph` is on, only for a menu item given an og image, and never on an article, so most
+ * pages of a T4 site share no picture either. There the customer's picture is a fallback: a page
+ * whose head already carries an `og:image` keeps its own ({@see withShareImageFallback}).
+ *
  * No Joomla dependency, like the rest of `lib/`. The disk side is {@see TemplateSiteFiles}.
  */
 final class TemplateSiteSettings
 {
+    /** The site's share image: one per site, never per profile, kept in {@see FAVICON_FILE} on every framework. */
+    public const SHARE_KEY = 'other_shareImage';
+
     /** Every key a T4 profile write may carry. Nothing outside this list is ever written. */
     public const T4_KEYS = ['site_logo', 'site_logo_small', 'site_logo_dark', 'site_logo_dark_small', 'site_logo_2', 'site_name', 'site_slogan', 'other_faviconFile'];
 
@@ -49,6 +57,39 @@ final class TemplateSiteSettings
 
     /** A profile name: T4 lets an administrator type one, spaces included, but never a path. */
     public const PROFILE = '~^[A-Za-z0-9_-][A-Za-z0-9 _.-]{0,99}$~D';
+
+    /**
+     * The keys a `template.siteSettings` set may carry on a template of this framework: on T4 its
+     * profile keys and the share image, on any other {@see OTHER_KEYS}.
+     *
+     * @return list<string>
+     */
+    public static function keysFor(string $framework): array
+    {
+        return $framework === 't4' ? array_merge(self::T4_KEYS, [self::SHARE_KEY]) : self::OTHER_KEYS;
+    }
+
+    /**
+     * 't4', 't3' or 'joomla' (any other template), from the template's own manifest; null when no
+     * site template of that name is installed (or its manifest is not a plain, readable file).
+     */
+    public static function frameworkOf(string $root, string $template): ?string
+    {
+        $manifest = self::manifestOf($root, $template);
+        if ($manifest === null) return null;
+        if (preg_match('~<t4\b~', $manifest)) return 't4';
+        return preg_match('~<t3\b~', $manifest) ? 't3' : 'joomla';
+    }
+
+    /** A site template's `templateDetails.xml` text, or null. */
+    public static function manifestOf(string $root, string $template): ?string
+    {
+        if (!preg_match(self::TEMPLATE, $template)) return null;
+        $file = rtrim($root, '/') . '/templates/' . $template . '/templateDetails.xml';
+        if (!is_file($file) || is_link($file) || filesize($file) > 1048576) return null;
+        $text = @file_get_contents($file);
+        return $text === false ? null : $text;
+    }
 
     /**
      * Whether a site-relative path is a file this door writes: a JSON file directly in a template's
@@ -269,6 +310,25 @@ final class TemplateSiteSettings
             return '';
         }, substr($html, 0, $end));
         return $head === null ? $html : $head . substr($html, $end);
+    }
+
+    /**
+     * A printed page whose `<head>` carries a share image: its own when it has one (any `og:image`
+     * meta tag, by `property` or `name`), otherwise the customer's (`$url`), added just before
+     * `</head>`. This is how a T4 page is given one: a menu item T4 prints an og image for keeps
+     * it. Only the head is read; a page without `</head>` is returned as it is.
+     */
+    public static function withShareImageFallback(string $html, string $url): string
+    {
+        $end = stripos($html, '</head>');
+        if ($end === false) return $html;
+        $head = substr($html, 0, $end);
+        if (preg_match_all('~<meta\b[^>]*>~i', $head, $tags)) foreach ($tags[0] as $tag) {
+            $name = strtolower(trim((string) (self::attributeOf($tag, 'property') ?? self::attributeOf($tag, 'name') ?? '')));
+            if ($name === 'og:image') return $html;
+        }
+        $tag = '<meta property="og:image" content="' . htmlspecialchars($url, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">' . "\n";
+        return $head . $tag . substr($html, $end);
     }
 
     /**

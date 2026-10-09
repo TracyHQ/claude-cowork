@@ -3469,14 +3469,17 @@ final class Engine
      * lib/TemplateSiteSettings.php, lib/TemplateSiteFiles.php).
      *
      * - `operation: read` (the default), `template`: for a T4 template each site profile a style
-     *   uses (`profiles: {name: {source, settings}}`, `missing`); for any other `settings` with its
-     *   favicon. `framework` says which, `keys` what a set may write.
+     *   uses (`profiles: {name: {source, settings}}`, `missing`) and `settings` with its share
+     *   image; for any other `settings` with its favicon and share image. `framework` says which, `keys` what a set may write.
      * - `operation: set`, `apply_id`, `template`, `fields` and/or `profiles`: on T4, `fields` go into
      *   every profile a style uses and `profiles: {name: {...}}` into one (its values win). Each
      *   profile is copied from where T4 reads it and only those keys change, written to
-     *   `templates/<t>/local/etc/site/<profile>.json`. On any other template the keys are
-     *   `other_faviconFile` and `other_shareImage` (the `og:image` of every page: png, jpg, webp or
-     *   gif), both printed by the system plugin. A picture must already be on the site.
+     *   `templates/<t>/local/etc/site/<profile>.json`. `other_shareImage` (png, jpg, webp or gif)
+     *   is one for the whole site, in `fields` only, and kept in `tracy-favicon.json` beside the
+     *   profiles: the system plugin prints it as `og:image`, on T4 only on a page without one of its
+     *   own. On any other template the keys are `other_faviconFile` and `other_shareImage`, both
+     *   printed by the system plugin (there the share image replaces any other). A picture must
+     *   already be on the site.
      *   The files' previous state is recorded under the `apply_id` as one step, so `apply.revert`
      *   puts them back — deleting what did not exist, `local/` included. T4's optimize cache is
      *   emptied after the write and after the revert. Nothing changes → nothing is written or
@@ -3502,7 +3505,7 @@ final class Engine
         if ($framework === null) {
             return $this->err('not_found', 'No site template ' . $template . ' is installed');
         }
-        $keys = $framework === 't4' ? TemplateSiteSettings::T4_KEYS : TemplateSiteSettings::OTHER_KEYS;
+        $keys = TemplateSiteSettings::keysFor($framework);
         $head = ['template' => $template, 'framework' => $framework, 'keys' => $keys];
         $operation = $p['operation'] ?? 'read';
         if ($operation === 'read') {
@@ -3537,7 +3540,10 @@ final class Engine
             if (!$isObject($values)) return $this->err('bad_params', 'profiles.' . substr((string) $profile, 0, 60) . ' must be an object of settings');
             $groups[(string) $profile] = $values;
         }
-        foreach ($groups as $values) foreach (array_keys($values) as $name) {
+        foreach ($groups as $group => $values) foreach (array_keys($values) as $name) {
+            if ($group !== '' && $name === TemplateSiteSettings::SHARE_KEY) {
+                return $this->err('unsupported', TemplateSiteSettings::SHARE_KEY . ' is one share image for the whole site: send it in fields, not in a profile. Nothing was written');
+            }
             if (!in_array($name, $keys, true)) {
                 $what = $framework === 't4' ? '' : ' on a template without T4 (its logo is a template style param: templateStyle)';
                 return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through template.siteSettings' . $what . ': only ' . implode(', ', $keys) . ' can. Nothing was written');

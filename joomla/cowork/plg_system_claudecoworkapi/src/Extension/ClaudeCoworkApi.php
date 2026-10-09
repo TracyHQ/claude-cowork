@@ -62,6 +62,15 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * `onBeforeCompileHead` prints it as `og:image` on every page, and `onAfterRender` takes out any
  * other `og:image` the template or an extension printed, so a link shared to Facebook or Zalo shows
  * the customer's logo instead of a demo picture (TCH #1013, D5).
+ *
+ * ## A share image for a T4 template
+ *
+ * A T4 template keeps the share image in the same file, and only that key: T4 prints its own
+ * Open Graph only when `system_opengraph` is on, for a menu item given an og image, and never on an
+ * article. So there the customer's picture is a fallback: `onBeforeRespond` adds it as `og:image`
+ * to a printed head that carries none, and a page with its own keeps it. Not `onAfterRender`: T4
+ * prints the head inside its own `onAfterRender` (`onBeforeCompileHead` fires from there, measured
+ * on JA Spa, Joomla 6), which runs after this plugin's. T4's favicon is its own setting.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -74,6 +83,9 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     /** The customer's share image as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
     private ?string $shareImage = null;
 
+    /** Whether that share image only fills a head without one (T4), instead of replacing every other. */
+    private bool $shareImageFallback = false;
+
     public static function getSubscribedEvents(): array
     {
         return [
@@ -85,6 +97,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             'onContentBeforeDisplay' => 'onContentBeforeDisplay',
             'onAfterRender' => 'onAfterRender',
             'onBeforeCompileHead' => 'onBeforeCompileHead',
+            'onBeforeRespond' => 'onBeforeRespond',
         ];
     }
 
@@ -260,7 +273,11 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
                 return;
             }
             EngineFactory::loadTemplateSiteSettings();
-            $this->printShareImage($document, $template);
+            $t4 = \TemplateSiteSettings::frameworkOf(JPATH_ROOT, $template) === 't4';
+            $this->printShareImage($document, $template, $t4);
+            if ($t4) {
+                return;
+            }
             $link = \TemplateSiteSettings::faviconLink(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(true), $template);
             if ($link === null) {
                 return;
@@ -274,16 +291,23 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         }
     }
 
-    /** `og:image` from the template's settings file, when it names a share image on the site. */
-    private function printShareImage($document, string $template): void
+    /**
+     * `og:image` from the template's settings file, when it names a share image on the site. On T4
+     * it is only noted here: `onBeforeRespond` adds it to a printed head that has none, because T4
+     * may still print its own og tags after this event.
+     */
+    private function printShareImage($document, string $template, bool $fallback): void
     {
         try {
             $url = \TemplateSiteSettings::shareImageUrl(JPATH_ROOT, \Joomla\CMS\Uri\Uri::root(), $template);
             if ($url === null) {
                 return;
             }
-            $document->setMetaData('og:image', $url, 'property');
             $this->shareImage = $url;
+            $this->shareImageFallback = $fallback;
+            if (!$fallback) {
+                $document->setMetaData('og:image', $url, 'property');
+            }
         } catch (\Throwable $e) {
             // A share image is never worth a page: the page keeps what it had.
             Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
@@ -293,13 +317,31 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     /** The page as printed keeps only the share image `onBeforeCompileHead` set (`TemplateSiteSettings::withoutOtherShareImageTags`). */
     private function keepOnlyCustomerShareImage(): void
     {
-        if ($this->shareImage === null) {
+        if ($this->shareImage === null || $this->shareImageFallback) {
             return;
         }
+        $this->rewriteBody(fn(string $body): string => \TemplateSiteSettings::withoutOtherShareImageTags($body, (string) $this->shareImage));
+    }
+
+    /**
+     * A T4 page, every plugin's `onAfterRender` done: its own og:image when it printed one, else the
+     * customer's (`TemplateSiteSettings::withShareImageFallback`). Any other page is left as it is.
+     */
+    public function onBeforeRespond(): void
+    {
+        if ($this->shareImage === null || !$this->shareImageFallback) {
+            return;
+        }
+        $this->rewriteBody(fn(string $body): string => \TemplateSiteSettings::withShareImageFallback($body, (string) $this->shareImage));
+    }
+
+    /** The response body passed through `$edit`, set back only when it changed; a failure leaves the page as it was. */
+    private function rewriteBody(callable $edit): void
+    {
         try {
             $app = $this->getApplication();
             $body = (string) $app->getBody();
-            $clean = \TemplateSiteSettings::withoutOtherShareImageTags($body, $this->shareImage);
+            $clean = $edit($body);
             if ($clean !== $body) {
                 $app->setBody($clean);
             }

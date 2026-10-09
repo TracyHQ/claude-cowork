@@ -55,6 +55,7 @@ node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
 tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
 tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
+T4_QUICKSTART=<folder> tests/e2e/share-image.sh  # and on a T4 quickstart restored over it, only where a page has none
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 docker run --rm -e COWORK_TEST_READS=paged -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
 ```
@@ -477,14 +478,15 @@ template, or any other, has no favicon setting at all: Joomla prints `templates/
 
 ```
 template.siteSettings {template}
-  T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing}
+  T4    → {ok, template, framework: "t4", keys, profiles: {<name>: {source, settings}}, missing, settings: {other_shareImage}}
   other → {ok, template, framework: "t3"|"joomla", keys: ["other_faviconFile", "other_shareImage"], settings: {other_faviconFile, other_shareImage}}
 template.siteSettings {operation: "set", apply_id, template, fields?: {...}, profiles?: {<name>: {...}}}
         → {ok, template, framework, keys, changed: [<paths>], cleared, profiles | settings, skipped?}
 ```
 
-- **Eight keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
-  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`. On any
+- **Nine keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
+  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`, and
+  `other_shareImage` (unreleased; in `fields` only, one for the whole site, see below). On any
   other template: `other_faviconFile` and `other_shareImage` (unreleased; its logo is a template
   style param, written with `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
   ignored, and nothing is written.
@@ -529,9 +531,18 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   plugin sets it as `og:image` on every page of the site, by its absolute URL (`Uri::root()`), and
   `onAfterRender` takes every other `og:image` (and its `og:image:*` details) out of the printed
   `<head>`, so a demo picture a template or an extension prints does not win the preview. Other `og:`
-  and `twitter:` tags are left as printed. A T4 template refuses the key: T4 has its own og
-  settings (the template style's `system_opengraph` and each menu item's `og_img`). Proven on a real
-  Joomla 6 (Cassiopeia, a template without T4) by `tests/e2e/share-image.sh`.
+  and `twitter:` tags are left as printed. Proven on a real Joomla 6 (Cassiopeia, a template
+  without T4) by `tests/e2e/share-image.sh`.
+- **A share image on T4 (unreleased): a fallback.** T4 prints Open Graph only when its
+  `system_opengraph` (`etc/global.json`) is on, and then from a menu item's `og_img` or an
+  article's own picture; off, as on most quickstarts, no page shares a picture. `other_shareImage`
+  is accepted in `fields` (a profile carrying it is `unsupported`: it is not a profile setting) and
+  kept in the same `tracy-favicon.json`, which on T4 holds that key alone; the profiles are not
+  touched by it. The system plugin adds it as `og:image` to a printed `<head>` that carries no
+  `og:image` of its own, and a page that prints its own (T4's, or an extension's) keeps it. It does
+  so at `onBeforeRespond`, not `onAfterRender`: T4 prints the head inside its own `onAfterRender`,
+  after this plugin's (measured on JA Spa, Joomla 6). `apply.revert` takes it back. Proven on JA Spa
+  j6 1.0.1 by `T4_QUICKSTART=<folder> tests/e2e/share-image.sh`, T4's Open Graph off and on.
 - A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
 
 ## Finding a row by its title: `content.list` `search` (unreleased)
