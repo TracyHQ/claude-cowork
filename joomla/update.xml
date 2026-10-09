@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>0.24.5 plus: carries the contracts of the next JA quickstart versions whose stylesheets read a worn design system — ja-voyara/j6/1.0.5, ja-kinetic/j6/1.0.4, ja-impact/j6/1.0.1, ja-donate/j6/1.0.2, ja-morgan/j6/1.0.3, ja-phio/j6/1.0.4, ja-podcast/j6/1.0.2 (TracyHQ/tch#1087)</description>
+        <description>0.24.5 plus: carries the contracts of the next JA quickstart versions whose stylesheets read a worn design system — ja-voyara/j6/1.0.5, ja-kinetic/j6/1.0.4, ja-donate/j6/1.0.2, ja-phio/j6/1.0.4 (TracyHQ/tch#1087)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.6</version>
