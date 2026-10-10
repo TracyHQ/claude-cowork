@@ -25,6 +25,7 @@ require_once __DIR__ . '/ContentUndo.php';
 require_once __DIR__ . '/QuickstartContract.php';
 require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/StringOverrides.php';
+require_once __DIR__ . '/DateFormats.php';
 
 final class Engine
 {
@@ -2911,6 +2912,9 @@ final class Engine
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
 
+        // The site language moves what WordPress keeps per site in the old one, under the same apply id.
+        $follow = $kind === 'option' && $key === 'WPLANG' ? $this->followSiteLocale($applyId, $p['fields']['value'] ?? '') : null;
+
         try {
             $this->writer->purgeCache();
         } catch (Throwable $e) {
@@ -2924,7 +2928,121 @@ final class Engine
             'id' => $newId,
             'key' => $key === '' ? null : $key,
             'created' => $before === null,
-        ] + self::bodyRevision($kind, $after));
+        ] + self::bodyRevision($kind, $after) + ($follow === null ? [] : ['follow' => $follow]));
+    }
+
+    /** What decides the date and time formats of a locale: DateFormats::ofLocale, or a stand-in under test. */
+    private $localeFormats = null;
+
+    /** @param callable(string):?array{date:string,time:string} $resolver */
+    public function localeFormats(callable $resolver): self
+    {
+        $this->localeFormats = $resolver;
+        return $this;
+    }
+
+    /**
+     * 🔒 THE LANGUAGE STEP IS MORE THAN WPLANG (TracyHQ/tch#1013, measured 10/10/2026 on dev g59-ess-wp-full, JA
+     * Essence WP 1.0.12, vi): after WPLANG = vi the site still printed
+     *   - "Send a copy to yourself", `lang="en-US"` and every message of a Contact Form 7 form in English: CF7 6.1
+     *     renders a form inside `wpcf7_switch_locale($form->locale())`, and each form keeps the locale it was saved
+     *     under (`_locale` = en_US in 7 of the 8 published quickstarts);
+     *   - "Tháng 6 9, 2023": `date_format` stays the English install's `F j, Y` in all 8.
+     * So setting WPLANG also sets every form's `_locale` to the site locale, and `date_format` / `time_format` to the
+     * locale's own (DateFormats::ofLocale) when the site still has the English default or an English-order date. Each
+     * write is its own undo step under `$applyId`, so `apply.revert` takes the language step back whole. A write that
+     * fails is named in `failed`, never dropped; the WPLANG write stands either way.
+     *
+     * @param mixed $value the WPLANG written: a locale, '' for en_US
+     * @return array<string,mixed> forms changed, the formats written, and anything that did not follow
+     */
+    private function followSiteLocale(string $applyId, $value): array
+    {
+        $locale = is_string($value) && trim($value) !== '' ? trim($value) : 'en_US';
+        $out = ['forms' => 0];
+        if (!preg_match('/^[a-z]{2,3}(?:_[A-Z]{2})?(?:_[a-z0-9]+)?$/D', $locale)) {
+            return $out + ['formats' => 'not a WordPress locale: ' . substr($locale, 0, 40)];
+        }
+        $failed = [];
+        foreach (self::contactForms() as $id) {
+            try {
+                if ($this->followWrite($applyId, 'postmeta', $id, '_locale', $locale)) {
+                    $out['forms']++;
+                }
+            } catch (Throwable $e) {
+                $failed[] = 'form ' . $id . ': ' . $e->getMessage();
+            }
+        }
+        if ($locale !== 'en_US') {
+            $formats = ($this->localeFormats ?? [DateFormats::class, 'ofLocale'])($locale);
+            if (!is_array($formats) || !is_string($formats['date'] ?? null) || $formats['date'] === '') {
+                $out['formats'] = 'the ' . $locale . ' translation of WordPress names no date format of its own';
+            } else {
+                $date = (string) (($this->writer->read('option', 0, 'date_format') ?? ['value' => ''])['value'] ?? '');
+                $time = (string) (($this->writer->read('option', 0, 'time_format') ?? ['value' => ''])['value'] ?? '');
+                $wants = [];
+                if ($date === DateFormats::ENGLISH_DATE || DateFormats::monthBeforeDay($date)) {
+                    $wants['date_format'] = $formats['date'];
+                }
+                if ($time === DateFormats::ENGLISH_TIME && is_string($formats['time'] ?? null) && $formats['time'] !== '') {
+                    $wants['time_format'] = $formats['time'];
+                }
+                foreach ($wants as $option => $format) {
+                    try {
+                        if ($this->followWrite($applyId, 'option', 0, $option, $format)) {
+                            $out[$option] = $format;
+                        }
+                    } catch (Throwable $e) {
+                        $failed[] = $option . ': ' . $e->getMessage();
+                    }
+                }
+            }
+        }
+        return $out + ($failed === [] ? [] : ['failed' => $failed]);
+    }
+
+    /** Every Contact Form 7 form on the site, any status, any language: ids. */
+    private static function contactForms(): array
+    {
+        if (!function_exists('get_posts')) {
+            return [];
+        }
+        $ids = [];
+        foreach ((array) get_posts(['post_type' => 'wpcf7_contact_form', 'post_status' => 'any', 'numberposts' => -1,
+            'no_found_rows' => true, 'suppress_filters' => true, 'lang' => '', 'orderby' => 'ID', 'order' => 'ASC']) as $post) {
+            $id = (int) (is_object($post) ? $post->ID : ($post['ID'] ?? 0));
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return $ids;
+    }
+
+    /** One value written as its own undo step under `$applyId`; false when it already held it. */
+    private function followWrite(string $applyId, string $kind, int $id, string $key, string $value): bool
+    {
+        $before = $this->writer->read($kind, $id, $key);
+        if ($before !== null && ($before['value'] ?? null) === $value) {
+            return false;
+        }
+        $this->writer->write($kind, $id, ['value' => $value], $key);
+        $step = ['op' => 'content', 'kind' => $kind, 'id' => $id, 'key' => $key, 'before' => $before];
+        try {
+            $changes = ContentUndo::record($before, $this->writer->read($kind, $id, $key), ['value']);
+        } catch (Throwable $e) {
+            $changes = null;
+        }
+        if ($changes !== null) {
+            $step['undo'] = 'span';
+            $step['changes'] = $changes;
+        }
+        try {
+            $this->log->record($applyId, $step);
+        } catch (Throwable $e) {
+            $this->rollbackContent($kind, $id, $key, $before);
+            throw new RuntimeException('rolled back: its undo could not be recorded');
+        }
+        return true;
     }
 
     /**
