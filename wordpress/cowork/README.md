@@ -256,6 +256,32 @@ and attributes the msgid itself uses, no entity in an attribute and no link but 
 `gettext`, `gettext_with_context`, `ngettext` and `ngettext_with_context` filters (priority 20) only
 when the option holds an override; a plural's forms are overridden as two msgids.
 
+### Block attribute words
+
+Some words a visitor reads live in a block's attributes, not its text (`moreText` of a post excerpt,
+`content` of a read-more, a search's `label`/`placeholder`/`buttonText`, an author name's `prefix`).
+`lib/BlockWords.php` filters `render_block_data` for a reviewed list of block/attribute pairs
+(`BlockWords::PAIRS`): the site's own map wins, else WordPress's core translation of the words, else
+they stay. On a non-English site a `core/post-date` / `core/comment-date` whose own `format` puts the
+month word before the day drops it, so the site's `date_format` applies.
+
+- `blockWords.read {locale}`: `pairs`, `found` (`[{source, pairs, count, core}]` from the site's
+  posts, templates, parts, patterns, navigation and the active theme's files; `core` is what
+  WordPress prints without a map entry, or null) and `words` (the map for that locale).
+- `blockWords.set {apply_id (not contract-), locale, words: {source: words}}`: merged into option
+  `claude_cowork_block_words` (`{"<locale>":{"<source>":"<words>"}}`; `''` removes one), written as a
+  content write under the `apply_id`, so `apply.revert` takes it back. One line of plain text, at
+  most 200 characters; `content.update` cannot reach the option.
+
+### The site language (`WPLANG`)
+
+`content.update {kind:'option', key:'WPLANG'}` also, under the same `apply_id` and each as its own
+undo step: sets every Contact Form 7 form's `_locale` to the site locale (CF7 renders a form in the
+locale it was saved under), and sets `date_format` / `time_format` to what WordPress installs under
+that locale when the site still has the English default or an English-order date. The answer's
+`follow` says what moved (`forms`, `date_format`, `time_format`) and what could not (`formats`,
+`failed`).
+
 ## Content API (`/content.json`)
 
 `GET <home>/content.json` with `Authorization: Bearer <token>` answers the site's live content in

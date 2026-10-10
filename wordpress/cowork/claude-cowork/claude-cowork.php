@@ -51,6 +51,11 @@ ProvenanceStamps::register();
 // Adds no filter at all unless the site holds an override (lib/StringOverrides.php).
 require_once __DIR__ . '/lib/StringOverrides.php';
 StringOverrides::register();
+// The words blocks keep in their attributes ("Read more", "Search", "By "), and a date block's English-order format, in
+// the site's language: the site's own map (`content.contract {operation:'blockWords.set'}`), else WordPress's own
+// translation (lib/BlockWords.php).
+require_once __DIR__ . '/lib/BlockWords.php';
+BlockWords::register();
 // A page's own search title and meta description on a site with no SEO plugin (`_claude_cowork_seo_*`
 // post meta, lib/SeoFields.php). Prints nothing while an SEO plugin runs, or on a page holding neither.
 require_once __DIR__ . '/lib/SeoFields.php';

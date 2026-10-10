@@ -26,6 +26,7 @@ require_once __DIR__ . '/QuickstartContract.php';
 require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/StringOverrides.php';
 require_once __DIR__ . '/DateFormats.php';
+require_once __DIR__ . '/BlockWords.php';
 
 final class Engine
 {
@@ -63,7 +64,7 @@ final class Engine
     /** Pages the render check after a derived apply may fetch: it runs under the write lock. */
     private const RENDER_CHECK_PAGES = 3;
     /** Options a content.update or content.delete may never touch: the contract's own records. */
-    private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION];
+    private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION, BlockWords::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
     /** `content.list {kind: "pattern"}`: rows a page holds when the caller names no `limit`, and the most it may name. */
@@ -348,6 +349,9 @@ final class Engine
         if ($operation === 'string') {
             return $this->stringOverride($p);
         }
+        if ($operation === 'blockWords.read' || $operation === 'blockWords.set') {
+            return $this->blockWords($p, substr($operation, strlen('blockWords.')));
+        }
         try {
             if ($operation === 'inspect') {
                 return $this->inspectAnswer($this->contract->inspect($requested));
@@ -618,6 +622,94 @@ final class Engine
             return $this->ok(['apply_id' => $apply, 'written' => [['kind' => 'option', 'id' => 0, 'key' => StringOverrides::OPTION]], 'override' => $override]);
         } catch (Throwable $e) {
             return $this->err('contract_failed', 'The string override was not written: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * `content.contract {operation:'blockWords.read'|'blockWords.set'}` — the words blocks keep in their attributes
+     * ("Read more", "Search", "By "), in the site's language (lib/BlockWords.php, TracyHQ/tch#1013).
+     *
+     * - read, `locale`: `pairs` (the reviewed block => attributes), `found` (every source words those attributes hold
+     *   in the site's posts, templates, parts, patterns and navigation, and in the active theme's templates, parts and
+     *   patterns: `{source, pairs, count, core}`, `core` being WordPress's own translation in that locale, which the
+     *   site prints when the map has none, or null), `words` (the site's map for that locale).
+     * - set, `apply_id` (not a contract- one), `locale`, `words: {source: words}` ('' removes one): merged into the
+     *   map; the option's previous value is recorded under the apply id, so apply.revert takes it back.
+     */
+    private function blockWords(array $p, string $operation): array
+    {
+        if ($operation === 'read') {
+            $locale = $p['locale'] ?? null;
+            if (!is_string($locale) || !preg_match('/^[a-z]{2,3}(?:_[A-Z]{2})?(?:_[a-z0-9]+)?$/D', $locale)) {
+                return $this->err('bad_params', 'locale required: a WordPress locale such as vi or de_DE');
+            }
+            try {
+                $found = [];
+                foreach (BlockWords::found(self::blockMarkups()) as $row) {
+                    $found[] = $row + ['core' => BlockWords::core($locale, $row['source'])];
+                }
+                $map = BlockWords::decode(($this->writer->read('option', 0, BlockWords::OPTION) ?? ['value' => ''])['value'] ?? '');
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+            return $this->ok(['locale' => $locale, 'pairs' => BlockWords::PAIRS, 'found' => $found, 'words' => $map[$locale] ?? (object) []]);
+        }
+        $apply = $this->applyId($p);
+        if ($apply === null || strpos($apply, 'contract-') === 0) {
+            return $this->err('bad_params', 'apply_id required, and not a contract- one (those receipt content.contract apply)');
+        }
+        $why = BlockWords::refusal($p);
+        if ($why !== null) {
+            return $this->err('bad_params', $why);
+        }
+        try {
+            $before = $this->writer->read('option', 0, BlockWords::OPTION);
+            $map = BlockWords::decode($before['value'] ?? '');
+            $next = BlockWords::with($map, $p['locale'], $p['words']);
+            if ($next === $map) {
+                return $this->ok(['unchanged' => true, 'locale' => $p['locale'], 'words' => $map[$p['locale']] ?? (object) []]);
+            }
+            $this->writer->write('option', 0, ['value' => BlockWords::encode($next)], BlockWords::OPTION);
+            try {
+                $this->log->record($apply, ['op' => 'content', 'kind' => 'option', 'id' => 0, 'key' => BlockWords::OPTION, 'before' => $before]);
+            } catch (Throwable $e) {
+                $this->rollbackContent('option', 0, BlockWords::OPTION, $before);
+                throw $e;
+            }
+            BlockWords::forget();
+            try {
+                $this->writer->purgeCache();
+            } catch (Throwable $ignored) {
+            }
+            $this->stamped('content');
+            return $this->ok(['apply_id' => $apply, 'locale' => $p['locale'], 'words' => $next[$p['locale']] ?? (object) [],
+                'written' => [['kind' => 'option', 'id' => 0, 'key' => BlockWords::OPTION]]]);
+        } catch (Throwable $e) {
+            return $this->err('contract_failed', 'The block words were not written: ' . $e->getMessage());
+        }
+    }
+
+    /** The block markup a site renders: its posts of the block kinds, and the active theme's template files. */
+    private static function blockMarkups(): iterable
+    {
+        if (function_exists('get_posts')) {
+            foreach (['post', 'page', 'wp_template', 'wp_template_part', 'wp_block', 'wp_navigation'] as $type) {
+                foreach ((array) get_posts(['post_type' => $type, 'post_status' => 'publish', 'numberposts' => -1, 'no_found_rows' => true,
+                    'suppress_filters' => true, 'lang' => '', 'orderby' => 'ID', 'order' => 'ASC']) as $post) {
+                    yield (string) (is_object($post) ? $post->post_content : ($post['post_content'] ?? ''));
+                }
+            }
+        }
+        $theme = function_exists('get_stylesheet_directory') ? (string) get_stylesheet_directory() : '';
+        if ($theme === '' || !is_dir($theme)) {
+            return;
+        }
+        foreach (['templates', 'parts', 'patterns', 'block-templates', 'block-template-parts'] as $folder) {
+            foreach (glob($theme . '/' . $folder . '/*.{html,php}', GLOB_BRACE) ?: [] as $file) {
+                if (is_file($file) && !is_link($file) && filesize($file) <= 1048576) {
+                    yield (string) @file_get_contents($file);
+                }
+            }
         }
     }
 
