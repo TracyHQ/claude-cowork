@@ -571,10 +571,12 @@ add_filter( 'render_block_core/search', 'wp_ja_essence_search_not_required', 11 
  * @param string   $label   The accessible name of the navigation.
  * @return string
  */
-function wp_ja_essence_pager( int $current, int $pages, callable $url, string $label = 'Pagination', string $variant = '' ): string {
+function wp_ja_essence_pager( int $current, int $pages, callable $url, string $label = '', string $variant = '' ): string {
 	if ( $pages < 2 ) {
 		return '';
 	}
+	// The accessible name is a visitor's word too: in the site's language (LANG-2, TracyHQ/tch#1013).
+	$label = '' !== $label ? $label : __( 'Pagination', 'wp-ja-essence' );
 	$current = min( max( 1, $current ), $pages );
 	$icon    = static function ( string $name ): string {
 		$shapes = array(
@@ -1604,7 +1606,7 @@ function wp_ja_essence_render_register(): string {
 	}
 	$html .= '<form class="je-acct__form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" novalidate>';
 	$html .= '<input type="hidden" name="action" value="je_register">' . wp_nonce_field( 'je_register', 'je_nonce', true, false );
-	$html .= '<p class="je-acct__trap" aria-hidden="true"><label>Leave this empty <input type="text" name="je_hp" tabindex="-1" autocomplete="off"></label></p>';
+	$html .= '<p class="je-acct__trap" aria-hidden="true"><label>' . esc_html__( 'Leave this empty', 'wp-ja-essence' ) . ' <input type="text" name="je_hp" tabindex="-1" autocomplete="off"></label></p>';
 	$html .= '<fieldset class="je-acct__set"><legend>' . esc_html__( 'User Registration', 'wp-ja-essence' ) . '</legend>';
 	$html .= '<p class="je-acct__required"><span class="je-acct__star">*</span> ' . esc_html__( 'Required field', 'wp-ja-essence' ) . '</p>';
 	$html .= wp_ja_essence_account_field( 'je_name', __( 'Name', 'wp-ja-essence' ), 'text', true, $v( 'je_name' ), 'autocomplete="name" maxlength="100"', '', $e['je_name'] ?? '' );
@@ -1885,7 +1887,7 @@ add_action( 'init', 'wp_ja_essence_register_listing_blocks' );
  * @return string
  */
 function wp_ja_essence_listing_pager( string $arg, int $current, int $pages, string $variant = '' ): string {
-	return wp_ja_essence_pager( $current, $pages, static fn( int $n ): string => (string) add_query_arg( $arg, $n > 1 ? $n : false ), 'Pagination', $variant );
+	return wp_ja_essence_pager( $current, $pages, static fn( int $n ): string => (string) add_query_arg( $arg, $n > 1 ? $n : false ), '', $variant );
 }
 
 /**
