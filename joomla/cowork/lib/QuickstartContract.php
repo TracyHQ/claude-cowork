@@ -1440,6 +1440,14 @@ final class QuickstartContract
         'mod_finder' => ['alt_label'],
         'mod_jaquickcontact' => ['intro_text', 'thank_msg', 'sender_label', 'email_label', 'message_label'],
     ];
+    /**
+     * The words T4 and T3 let ANY module carry in its params, printed by the template's module chrome around it: a
+     * description ("Articles of the day" above JA Essence's module 129, a mod_articles_category), a sub-heading, a main
+     * heading, a button title, an intro (the templates' own module forms, TPL_MOD_DESC_LABEL, TPL_SUB_HEADING_LABEL,
+     * TPL_MAIN_HEADING_LABEL, TPL_BTN_TITLE_SECTIONS_LABEL, TPL_MODULE_INTRO_LABEL). Measured in the published
+     * contracts 10/10/2026: sub-heading 84 modules, title-btn 29, main-heading 27, module-intro 14, mod-desc 1.
+     */
+    public const WRITTEN_CHROME_TEXTS = ['mod-desc', 'sub-heading', 'main-heading', 'title-btn', 'module-intro'];
 
     /**
      * Those words on this site: every base module bound here, front end, published, in the source language or in
@@ -1454,14 +1462,15 @@ final class QuickstartContract
         $out=[];
         foreach($binding['presentation'] as $key=>$fields) {
             if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key]))continue;
-            $names=self::WRITTEN_MODULE_TEXTS[(string)($fields['module']??'')]??null;
-            if($names===null||!is_array($fields['params']??null))continue;
+            $names=array_merge(self::WRITTEN_MODULE_TEXTS[(string)($fields['module']??'')]??[],self::WRITTEN_CHROME_TEXTS);
+            if(!is_array($fields['params']??null))continue;
             if((string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
             if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
             $texts=[];
             foreach($names as $name) {
                 $value=$fields['params'][$name]??null;
-                if(is_string($value)&&trim($value)!==''&&preg_match('/\p{L}/u',$value)&&!preg_match('/[<>]/',$value))$texts[$name]=$value;
+                // Plain words only: markup, or a {loadposition}-style tag, is left as it is.
+                if(is_string($value)&&trim($value)!==''&&preg_match('/\p{L}/u',$value)&&!preg_match('/[<>]|\{[a-z]/i',$value))$texts[$name]=$value;
             }
             if($texts!==[])$out[$key]=['id'=>(int)$binding['ids'][$key],'texts'=>$texts];
         }

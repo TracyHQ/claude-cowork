@@ -11,9 +11,11 @@ $sltStore = new TestContractStore();
 $sltLog = new FakeApplyLog();
 $sltWriter = new ContractTestWriter($sltLog, $sltStore);
 $sltHero = ['title' => 'Home hero', 'module' => 'mod_custom', 'position' => 'masthead', 'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0',
-    'showtitle' => '0', 'content' => '<h1>Demo title</h1>', 'params' => '{"style":"0"}'];
+    'showtitle' => '0', 'content' => '<h1>Demo title</h1>', 'params' => '{"style":"0","sub-heading":"<span>New</span> arrivals","module-intro":"Fresh from the oven"}'];
 $sltTags = ['title' => 'Tags cloud', 'module' => 'mod_tags_popular', 'position' => 'sidebar', 'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0',
-    'showtitle' => '1', 'content' => '', 'params' => '{}'];
+    'showtitle' => '1', 'content' => '', 'params' => '{"mod-desc":"Articles of the day","main-heading":"{loadposition x}","title-btn":"","module_tag":"div"}'];
+// T4 and T3 give any module a description, sub-heading or button title in its params ("Articles of the day" above
+// JA Essence's module 129, a mod_articles_category); a value with markup is left alone.
 // An AcyMailing form's words live in its params, not in a language file (JA Essence 1.0.4, module 115): "Join 70,000
 // subscribers!" and its "Sign up" button stayed English on g58-ess-j-full after the headings were given.
 $sltNews = ['title' => 'Newsletter', 'module' => 'mod_acym', 'position' => 'sidebar', 'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0',
@@ -50,9 +52,12 @@ $plan = $sltCall(['operation' => 'siteLanguage.plan', 'locale' => 'vi-VN']);
 check('a site-language plan names the headings shown and the module words a visitor reads, and only those', $plan['titles'] ?? null, [
     ['key' => 'news.title', 'source' => 'Newsletter', 'maxCharacters' => 100],
     ['key' => 'tags.title', 'source' => 'Tags cloud', 'maxCharacters' => 100],
+    ['key' => 'hero.params.module-intro', 'source' => 'Fresh from the oven', 'maxCharacters' => 400],
     ['key' => 'news.params.introtext', 'source' => 'Join 70,000 subscribers!', 'maxCharacters' => 400],
     ['key' => 'news.params.subtext', 'source' => 'Sign up', 'maxCharacters' => 400],
+    ['key' => 'tags.params.mod-desc', 'source' => 'Articles of the day', 'maxCharacters' => 400],
 ]);
+check('a template chrome value with markup or a load tag is not offered', array_values(array_filter(array_column($plan['titles'] ?? [], 'key'), fn($k) => in_array($k, ['hero.params.sub-heading', 'tags.params.main-heading'], true))), []);
 $set = fn(array $extra = []) => $sltCall($extra + ['operation' => 'siteLanguage.set', 'locale' => 'vi-VN', 'apply_id' => 'slang-t', 'request_id' => 't1']);
 check('a heading the plan does not name is refused', $set(['titles' => ['hero.title' => 'Anh hùng']])['error'] ?? null, 'bad_params');
 check('a heading with markup is refused', $set(['titles' => ['tags.title' => '<b>Thẻ</b>']])['error'] ?? null, 'bad_params');
@@ -60,17 +65,21 @@ check('a module word the plan does not name is refused', $set(['titles' => ['new
 check('a module word with markup is refused', $set(['titles' => ['news.params.introtext' => '<i>Tham gia</i>']])['error'] ?? null, 'bad_params');
 check('nothing was written by a refusal', [$sltWriter->store['languageDefaults']['site'], $sltWriter->store['module'][114]['title'], $sltWriter->store['module'][115]['params']],
     ['en-GB', 'Tags cloud', $sltNews['params']]);
-$done = $set(['titles' => ['tags.title' => 'Đám mây thẻ', 'news.title' => 'Bản tin', 'news.params.introtext' => 'Nhận tin mới mỗi tuần!', 'news.params.subtext' => 'Đăng ký']]);
+$done = $set(['titles' => ['tags.title' => 'Đám mây thẻ', 'news.title' => 'Bản tin', 'news.params.introtext' => 'Nhận tin mới mỗi tuần!', 'news.params.subtext' => 'Đăng ký', 'tags.params.mod-desc' => 'Bài viết trong ngày']]);
+$tagsParams = json_decode((string) $sltWriter->store['module'][114]['params'], true);
+check('a template chrome text is written with the language, its other params kept', [$tagsParams['mod-desc'] ?? null, $tagsParams['main-heading'] ?? null, $tagsParams['module_tag'] ?? null],
+    ['Bài viết trong ngày', '{loadposition x}', 'div']);
 $newsParams = json_decode((string) $sltWriter->store['module'][115]['params'], true);
 check('the language, the headings and the module words are set together', [$done['ok'] ?? null, $done['titles'] ?? null, $sltWriter->store['languageDefaults']['site'],
     $sltWriter->store['module'][114]['title'], $newsParams['introtext'] ?? null, $newsParams['subtext'] ?? null],
-    [true, 4, 'vi-VN', 'Đám mây thẻ', 'Nhận tin mới mỗi tuần!', 'Đăng ký']);
+    [true, 5, 'vi-VN', 'Đám mây thẻ', 'Nhận tin mới mỗi tuần!', 'Đăng ký']);
 check('the other params of the module are untouched', [$newsParams['mode'] ?? null, $newsParams['moduleclass_sfx'] ?? null, $newsParams['unsubtext'] ?? null], ['vertical', ' acymailing-module', '<b>Bye</b>']);
 check('the old heading and words are on record', [$sltStore->binding['siteLanguage']['titles'] ?? null, $sltStore->binding['siteLanguage']['texts'] ?? null],
-    [['tags' => 'Tags cloud', 'news' => 'Newsletter'], ['news' => ['introtext' => 'Join 70,000 subscribers!', 'subtext' => 'Sign up']]]);
+    [['tags' => 'Tags cloud', 'news' => 'Newsletter'], ['news' => ['introtext' => 'Join 70,000 subscribers!', 'subtext' => 'Sign up'], 'tags' => ['mod-desc' => 'Articles of the day']]]);
 check('and the site still inspects clean with it', $sltContract->inspect()['contract'], 'slt/j6/1.0.0');
 $back = $sltCall(['operation' => 'siteLanguage.revert', 'apply_id' => 'slang-tu', 'request_id' => 'tu1']);
 $newsParams = json_decode((string) $sltWriter->store['module'][115]['params'], true);
 check('revert gives the heading and the words back with the language', [$back['ok'] ?? null, $sltWriter->store['languageDefaults']['site'],
     $sltWriter->store['module'][114]['title'], $newsParams['introtext'] ?? null, $newsParams['subtext'] ?? null], [true, 'en-GB', 'Tags cloud', 'Join 70,000 subscribers!', 'Sign up']);
+check('revert gives the template chrome text back', json_decode((string) $sltWriter->store['module'][114]['params'], true)['mod-desc'] ?? null, 'Articles of the day');
 check('the reverted site inspects clean', $sltContract->inspect()['contract'], 'slt/j6/1.0.0');
