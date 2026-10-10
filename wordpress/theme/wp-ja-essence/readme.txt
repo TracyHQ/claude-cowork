@@ -49,6 +49,8 @@ self-hosted.
   newsletter, account and search cards read in the site's language instead of English.
 * A category tile of home 2 whose page is not published (unticked when the site was made) opens the category itself,
   never the hidden page's plain address, which answered 404; the profile pages' sign-in redirect does the same.
+* Every Site Logo's alternative text is the site name: the footer's dark logo picture carried "JA Essence" as its own
+  alternative text, so a renamed site still read the demo's name on it while the light logo read the new one.
 
 = 1.0.10 =
 * The footer Site Logo blocks carry shouldSyncIcon:false, so saving the footer in the editor never overwrites the

@@ -16,7 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>0.24.8 plus: a module written through content.update ends with the ordering the call names, 0 included, on create and update (Tracy's design-system module asked for 0 and was stored at 2, then 3); a row the quickstart never shipped is held to the ACL it inherits, so a module or page added to the site is no longer reported as "Access-level or ACL definition changed"; Tracy's own design-system module (marked &lt;style id="tracy-ds-slot"&gt;) is not counted as a row the site gained, so it no longer reports "Quickstart inventory changed" while any other added row still does, and a baseline saved while it still counted is moved by the next content apply instead of refusing it (TracyHQ/tch design-system slot)</description>
+        <description>0.24.9 plus: a module written through content.update ends with the ordering the call names, 0 included, on create and update (Tracy's design-system module asked for 0 and was stored at 2, then 3); a row the quickstart never shipped is held to the ACL it inherits, so a module or page added to the site is no longer reported as "Access-level or ACL definition changed"; Tracy's own design-system module (marked &lt;style id="tracy-ds-slot"&gt;) is not counted as a row the site gained, so it no longer reports "Quickstart inventory changed" while any other added row still does, and a baseline saved while it still counted is moved by the next content apply instead of refusing it (TracyHQ/tch design-system slot)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.10</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.10</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.10/pkg_claudecowork-0.24.10.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>0.24.8 plus: carries the contract of the next JA Essence quickstart, ja-essence/j6/1.0.4 (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.9</version>
