@@ -41,6 +41,15 @@ self-hosted.
 
 == Changelog ==
 
+= 1.0.11 =
+* The theme's own stylesheet reads its palette through the design-system slot: each palette colour is
+  var(--ds-c-<role>, <that colour>), undefined until a design system is worn, so the theme looks exactly as before.
+* The theme ships its words in every language a Tracy site can be made in (languages/<locale>.l10n.php for de_DE,
+  es_ES, fr_FR, it_IT, nl_NL, vi, zh_CN, zh_TW, loaded by load_theme_textdomain): the error page, the pager, the
+  newsletter, account and search cards read in the site's language instead of English.
+* A category tile of home 2 whose page is not published (unticked when the site was made) opens the category itself,
+  never the hidden page's plain address, which answered 404; the profile pages' sign-in redirect does the same.
+
 = 1.0.10 =
 * The footer Site Logo blocks carry shouldSyncIcon:false, so saving the footer in the editor never overwrites the
   site icon with the logo. Not released on its own: ships with the next quickstart/ja-essence/wp7 cut.

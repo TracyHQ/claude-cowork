@@ -17,7 +17,7 @@
 .je-main { padding-bottom: 72px; }
 body { font-family: var(--wp--preset--font-family--body, "Noto Serif", serif); background: var(--wp--preset--color--bg); color: var(--wp--preset--color--fg); }
 h1, h2, h3, h4, h5, h6 { font-family: var(--wp--preset--font-family--display, Jost, sans-serif); font-weight: 400; line-height: 1.3; color: var(--wp--preset--color--fg-2); }
-a { color: var(--wp--preset--color--accent); }
+a { color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); }
 
 /* header */
 .je-header__inner { max-width: 1164px; margin-inline: auto; padding-inline: 18px; box-sizing: border-box; }
@@ -30,7 +30,7 @@ a { color: var(--wp--preset--color--accent); }
 .je-header__tools { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .je-header__bottom .je-nav { flex: 1 1 auto; }
 .je-nav a { font-family: Jost, sans-serif; font-size: 18px; color: var(--wp--preset--color--fg-2); text-decoration: none; padding: 8px 20px; }
-.je-nav a:hover, .je-nav .current-menu-item > a { color: var(--wp--preset--color--accent-hover); }
+.je-nav a:hover, .je-nav .current-menu-item > a { color: var(--ds-c-accent-text-hover, var(--wp--preset--color--accent-hover)); }
 .je-drawer-toggle, .je-theme-toggle, .je-drawer-close { background: none; border: 0; cursor: pointer; color: var(--wp--preset--color--fg-2); width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; }
 .je-drawer-toggle { flex-direction: column; gap: 4px; }
 .je-drawer-toggle span { display: block; width: 20px; height: 2px; background: currentColor; }
@@ -186,7 +186,7 @@ a { color: var(--wp--preset--color--accent); }
 .je-articlecard .je-page__hero { margin: 0 0 18px; }
 .je-articlecard .je-page__title { margin: 12px 0 8px; font-size: 32px; line-height: 1.3; }
 .je-badge-static { display: inline-block; font-family: Jost, sans-serif; margin: 0; padding: 0 8px; border-radius: 8px; background: var(--wp--preset--color--bg); font-size: 16px; line-height: 24px; color: var(--wp--preset--color--fg); }
-.je-badge-static::before { content: "•"; color: var(--wp--preset--color--accent); margin-right: 4px; }
+.je-badge-static::before { content: "•"; color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); margin-right: 4px; }
 .je-page--article { padding-top: 36px; }
 
 /* g1 chrome: flow-layout block gaps must not leak into the flex rows; source rows measured at 1440 (top row 36 padding, nav row 72 high, nav centred) */
@@ -279,14 +279,14 @@ a { color: var(--wp--preset--color--accent); }
 :root[data-theme="dark"] .je-nav .wp-block-navigation__submenu-container > .has-child > .wp-block-navigation-item__content, :root[data-theme="dark"] .je-nav .wp-block-navigation__submenu-container > .has-child > .wp-block-navigation-item__content .wp-block-navigation-item__label { color: #eef1f6; }
 
 /* dark: the lead-slider chips stay light, as on the source */
-:root[data-theme="dark"] .je-lead__card .je-badge a { background: #f8f8ff; color: #212529; }
+:root[data-theme="dark"] .je-lead__card .je-badge a { background: var(--ds-c-bg, #f8f8ff); color: var(--ds-c-fg, #212529); }
 
 /* off-canvas drawer, as the source draws it: 300px panel from the right edge, a 56px band with the blue
    "Sidebar Menu" label and a round close button, a Jost "Menu" heading, bold serif items on a 40px pitch with
    the chevron in a 30px chip (measured on the source at 390). margin 0 beats the flow gap that pushed it 36px down. */
 .je-drawer { inset: 0 0 0 auto; margin: 0 !important; background: light-dark(var(--wp--preset--color--surface), var(--wp--preset--color--bg)); width: 300px; max-width: none; padding: 0; transform: translateX(100%); }
 .je-drawer__head { height: 56px; padding: 0 22px 0 36px; background: var(--wp--preset--color--bg); }
-.je-drawer__title { margin: 0; font-size: 16px; line-height: 24px; color: var(--wp--preset--color--accent); }
+.je-drawer__title { margin: 0; font-size: 16px; line-height: 24px; color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); }
 .je-drawer-close { width: 32px; height: 32px; background: light-dark(rgba(33,37,41,.08), rgba(238,241,246,.12)); font-size: 22px; }
 .je-drawer__menu { margin: 36px 0 0 !important; padding: 0 36px; font-family: Jost, sans-serif; font-size: 24px; line-height: 31.2px; color: var(--wp--preset--color--fg-2); }
 .je-drawer-nav { padding: 6px 36px 36px; }

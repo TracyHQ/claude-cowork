@@ -44,6 +44,14 @@ Font License 1.1 (assets/fonts/font-awesome-OFL.txt).
 
 == Changelog ==
 
+= 1.1.14 =
+* No change to the theme's behaviour or look: this release carries the 1.1.13 entry below, which the 1.1.13
+  package shipped without.
+
+= 1.1.13 =
+* The theme's own stylesheet reads its palette through the design-system slot: each palette colour is
+  var(--ds-c-<role>, <that colour>), undefined until a design system is worn, so the theme looks exactly as before.
+
 = 1.1.12 =
 * The home style 4 footer's copyright column names the site instead of "© 2019 Morgan … Made by Morgan". Not
   released on its own: ships with the next quickstart/ja-morgan/wp7 cut.

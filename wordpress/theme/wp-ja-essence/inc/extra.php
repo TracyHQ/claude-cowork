@@ -12,6 +12,18 @@ defined( 'ABSPATH' ) || exit;
 // The identity tokens the pages and parts carry, and their filling.
 require_once __DIR__ . '/identity.php';
 
+/**
+ * The theme's own translations, `languages/<locale>.l10n.php` (WordPress's PHP translation format, read by load_textdomain()
+ * without a `.mo` beside it), one per language the site question offers. Every word the theme prints goes through the
+ * `wp-ja-essence` domain, so a site made in one of those languages reads them in it: the error page, the newsletter and
+ * account cards, the pager (LANG-2, measured 10/10/2026 on dev: a Vietnamese site printed "Page not found" and "An error
+ * has occurred while processing your request."). A locale with no file stays English.
+ */
+function wp_ja_essence_textdomain(): void {
+	load_theme_textdomain( 'wp-ja-essence', get_template_directory() . '/languages' );
+}
+add_action( 'after_setup_theme', 'wp_ja_essence_textdomain' );
+
 /** The assets; design pages (fixture, artifact) bring their own stylesheet and take none of these. */
 function wp_ja_essence_enqueue_assets(): void {
 	if ( in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
@@ -1404,7 +1416,7 @@ add_action(
 		if ( ! in_array( $request, array( 'pages/user/user-profile', 'pages/user/edit-user-profile' ), true ) ) {
 			return;
 		}
-		$login = get_page_by_path( 'pages/user/login-form' );
+		$login = wp_ja_essence_live_page( 'pages/user/login-form' );
 		if ( $login ) {
 			wp_safe_redirect( get_permalink( $login ), 303 );
 			exit;
@@ -2023,6 +2035,20 @@ function wp_ja_essence_login_failed(): void {
 add_action( 'wp_login_failed', 'wp_ja_essence_login_failed' );
 
 /**
+ * A page of the site by its path, only while visitors can open it. get_page_by_path() finds a page whatever its status, and
+ * WordPress gives a page that is not published its plain address (`/?page_id=N`), which answers 404 to a visitor: a page the
+ * customer unticked when the site was made is drafted, so a link the theme draws to it by path must fall back instead (PAGE-4,
+ * measured 10/10/2026 on dev: the Health tile of home 2 opened the drafted Category Style 1).
+ *
+ * @param string $path The page path, as get_page_by_path() takes it.
+ * @return WP_Post|null
+ */
+function wp_ja_essence_live_page( string $path ) {
+	$page = get_page_by_path( $path );
+	return $page && 'publish' === get_post_status( $page ) ? $page : null;
+}
+
+/**
  * The category pictures row of the front page (home 2): the source paints one picture tile per sub-category with its name and post
  * count over the picture's corner, in a row of five. WordPress categories carry no picture, so the five pictures ship with the theme
  * (`assets/img/category-N.jpg`, the source's own) and the tiles are drawn here from the Categories block's list (class `je-cattiles`).
@@ -2038,7 +2064,8 @@ function wp_ja_essence_category_tiles( string $content, array $block ): string {
 	if ( ! preg_match_all( '#<li class="[^"]*">\s*<a href="([^"]*)"[^>]*>([^<]*)</a>\s*\(?(\d+)\)?#s', $content, $found, PREG_SET_ORDER ) ) {
 		return $content;
 	}
-	// The source's order and the picture each tile carries; the page each tile opens.
+	// The source's order and the picture each tile carries; the page each tile opens, or the category itself while that page
+	// is not published (unticked when the site was made).
 	$order = array(
 		'health'    => array( 1, 'category/category-style-1' ),
 		'design'    => array( 2, 'category/category-style-2' ),
@@ -2056,7 +2083,7 @@ function wp_ja_essence_category_tiles( string $content, array $block ): string {
 			continue;
 		}
 		$row  = $by_slug[ $slug ];
-		$page = get_page_by_path( $spec[1] );
+		$page = wp_ja_essence_live_page( $spec[1] );
 		$href = $page ? get_permalink( $page ) : html_entity_decode( $row[1] );
 		$img  = get_theme_file_uri( 'assets/img/category-' . $spec[0] . '.jpg' );
 		$name = trim( html_entity_decode( $row[2] ) );
