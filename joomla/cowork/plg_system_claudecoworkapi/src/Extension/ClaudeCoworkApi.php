@@ -283,6 +283,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             EngineFactory::loadTemplateSiteSettings();
             $t4 = \TemplateSiteSettings::frameworkOf(JPATH_ROOT, $template) === 't4';
             $this->printShareImage($document, $template, $t4);
+            $this->printGlyphFaces($document, $template);
             if ($t4) {
                 return;
             }
@@ -366,6 +367,23 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         } catch (\Throwable $e) {
             // A share image is never worth a page: the page keeps what it had.
             Log::add('claudecoworkapi share image: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The faces that draw the letters of the site's language its template's fonts cannot (`TemplateSiteSettings::glyphCss`),
+     * as a style declaration: Joomla prints declarations after the linked stylesheets, so they follow the template's faces.
+     */
+    private function printGlyphFaces($document, string $template): void
+    {
+        try {
+            $css = \TemplateSiteSettings::glyphCss(JPATH_ROOT, $template);
+            if ($css !== '' && method_exists($document, 'addStyleDeclaration')) {
+                $document->addStyleDeclaration($css);
+            }
+        } catch (\Throwable $e) {
+            // Faces are never worth a page: the page keeps the template's own.
+            Log::add('claudecoworkapi glyph faces: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

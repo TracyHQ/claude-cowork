@@ -3702,8 +3702,9 @@ final class Engine
             $groups[(string) $profile] = $values;
         }
         foreach ($groups as $group => $values) foreach (array_keys($values) as $name) {
-            if ($group !== '' && $name === TemplateSiteSettings::SHARE_KEY) {
-                return $this->err('unsupported', TemplateSiteSettings::SHARE_KEY . ' is one share image for the whole site: send it in fields, not in a profile. Nothing was written');
+            if ($group !== '' && in_array($name, TemplateSiteSettings::SITE_KEYS, true)) {
+                $what = $name === TemplateSiteSettings::SHARE_KEY ? 'one share image' : 'one set of faces';
+                return $this->err('unsupported', $name . ' is ' . $what . ' for the whole site: send it in fields, not in a profile. Nothing was written');
             }
             if (!in_array($name, $keys, true)) {
                 $what = $framework === 't4' ? '' : ' on a template without T4 (its logo is a template style param: templateStyle)';

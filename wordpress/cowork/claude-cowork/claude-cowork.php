@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Edits to posts and media are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.8
+ * Version:     0.18.9
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -64,6 +64,10 @@ SeoFields::register();
 // Prints nothing without that option, while an SEO plugin runs, or where the theme shares a picture of its own.
 require_once __DIR__ . '/lib/SharePreview.php';
 SharePreview::register();
+// The letters of the site's language its theme's fonts cannot draw, drawn from a font that can (`tracy_glyph_fallback`,
+// lib/GlyphFallback.php). Prints nothing without that option.
+require_once __DIR__ . '/lib/GlyphFallback.php';
+GlyphFallback::register();
 
 /**
  * The whole HTTP surface, and deliberately the only WordPress-aware file of any size.

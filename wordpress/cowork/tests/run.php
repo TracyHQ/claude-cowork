@@ -1690,6 +1690,7 @@ require __DIR__ . '/revert-span.php';
 // A page's search title and meta description: the SEO plugin's keys, or with none the plugin's own meta it prints.
 require __DIR__ . '/seo-fields.php';
 require __DIR__ . '/share-preview.php';
+require __DIR__ . '/glyph-fallback.php';
 // content.list search: the words of a title or slug, the real engine and writer over a $wpdb that reads its SQL.
 // Last, because it defines file-scope stand-ins that the tests above rely on being absent: the class Normalizer
 // (only where intl is not loaded), get_post_types, get_permalink (when no test above defined it), and part-way
