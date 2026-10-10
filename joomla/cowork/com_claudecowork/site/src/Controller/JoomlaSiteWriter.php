@@ -212,6 +212,13 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             'columns' => ['name', 'email', 'block'],
             'create'  => false,
         ],
+        // An author's visitor-facing profile field, named by \UserProfileKey (user_id, profile_key packed). Only its value is
+        // ever written, and never a new one: which author carries which field is the profile form's.
+        'userProfile' => [
+            'table'   => '#__user_profiles',
+            'columns' => ['value'],
+            'create'  => false,
+        ],
         'extensionParams' => [
             'table'   => '#__extensions',
             // The one column com_config really edits per extension. Enable/disable stays with
@@ -383,6 +390,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return (new JoomlaRelations($this->db))->read($kind, $id);
         if ($kind === 'fieldValue') return $this->readFieldValue($id);
+        if ($kind === 'userProfile') return $this->readUserProfile($id);
         $table = $this->tableFor($kind);
         if ($id <= 0) {
             return null;
@@ -403,7 +411,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
      */
     public function readAll(string $kind, int $limit): array
     {
-        if (in_array($kind, self::RELATION_KINDS, true) || $kind === 'languageFilter' || $kind === 'fieldValue') throw new \RuntimeException("{$kind} cannot be read whole");
+        if (in_array($kind, self::RELATION_KINDS, true) || in_array($kind, ['languageFilter', 'fieldValue', 'userProfile'], true)) throw new \RuntimeException("{$kind} cannot be read whole");
         $pk = $this->pkFor($kind);
         $query = $this->db->getQuery(true)
             ->select('*')
@@ -420,9 +428,9 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
         if (in_array($kind, self::RELATION_KINDS, true)) return (new JoomlaRelations($this->db))->readMany($kind, $ids);
-        if ($kind === 'fieldValue') {
+        if ($kind === 'fieldValue' || $kind === 'userProfile') {
             $out = [];
-            foreach ($ids as $id) if (($row = $this->readFieldValue($id)) !== null) $out[$id] = $row;
+            foreach ($ids as $id) if (($row = $this->read($kind, $id)) !== null) $out[$id] = $row;
             return $out;
         }
         $table = $this->tableFor($kind);
@@ -486,6 +494,74 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $this->db->setQuery($query)->execute();
         $this->lastKind = 'fieldValue';
         return $id;
+    }
+
+    /** One author's profile field by its packed key, as `{value}` (the words, decoded), or null when the author has none. */
+    private function readUserProfile(int $id): ?array
+    {
+        try {
+            [$userId, $profileKey] = \UserProfileKey::decode($id);
+        } catch (\RuntimeException $e) {
+            return null;
+        }
+        $query = $this->db->getQuery(true)
+            ->select($this->db->quoteName('profile_value'))
+            ->from($this->db->quoteName('#__user_profiles'))
+            ->where($this->db->quoteName('user_id') . ' = :user')
+            ->where($this->db->quoteName('profile_key') . ' = :key')
+            ->bind(':user', $userId, ParameterType::INTEGER)
+            ->bind(':key', $profileKey, ParameterType::STRING);
+        $stored = $this->db->setQuery($query, 0, 1)->loadResult();
+        return $stored === null ? null : ['value' => \UserProfileKey::words((string) $stored)];
+    }
+
+    /** Set one existing author profile field to plain words, stored as the profile plugin stores them. Never a new one. */
+    private function writeUserProfile(int $id, array $fields): int
+    {
+        if ($id <= 0 || $this->readUserProfile($id) === null) throw new \RuntimeException('target does not exist in this scope');
+        if (!array_key_exists('value', $fields) || !is_string($fields['value'])) throw new \RuntimeException('kind userProfile takes one field: value, a string');
+        [$userId, $profileKey] = \UserProfileKey::decode($id);
+        $stored = \UserProfileKey::stored($fields['value']);
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName('#__user_profiles'))
+            ->set($this->db->quoteName('profile_value') . ' = :value')
+            ->where($this->db->quoteName('user_id') . ' = :user')
+            ->where($this->db->quoteName('profile_key') . ' = :key')
+            ->bind(':value', $stored, ParameterType::STRING)
+            ->bind(':user', $userId, ParameterType::INTEGER)
+            ->bind(':key', $profileKey, ParameterType::STRING);
+        $this->db->setQuery($query)->execute();
+        $this->lastKind = 'userProfile';
+        return $id;
+    }
+
+    /**
+     * Every author profile field a visitor reads that holds words, by user then field: `{id, user_id, name, field, value}`.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function listUserProfiles(int $offset, int $limit): array
+    {
+        $keys = implode(',', array_map(fn (string $k): string => $this->db->quote($k), \UserProfileKey::FIELDS));
+        $query = $this->db->getQuery(true)
+            ->select(['p.user_id', 'p.profile_key', 'p.profile_value', 'u.name'])
+            ->from($this->db->quoteName('#__user_profiles', 'p'))
+            ->join('INNER', $this->db->quoteName('#__users', 'u') . ' ON u.id = p.user_id')
+            ->where('p.profile_key IN (' . $keys . ')')
+            ->order(['p.user_id ASC', 'p.profile_key ASC']);
+        $out = [];
+        foreach ($this->db->setQuery($query, $offset, $limit)->loadAssocList() ?: [] as $row) {
+            $words = \UserProfileKey::words(isset($row['profile_value']) ? (string) $row['profile_value'] : null);
+            if (trim($words) === '') continue;
+            $out[] = [
+                'id' => \UserProfileKey::encode((int) $row['user_id'], (string) $row['profile_key']),
+                'user_id' => (int) $row['user_id'],
+                'name' => (string) ($row['name'] ?? ''),
+                'field' => substr((string) $row['profile_key'], strlen('profile.')),
+                'value' => $words,
+            ];
+        }
+        return $out;
     }
 
     /** The only column per kind setVisibility() may touch. */
@@ -768,6 +844,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         if ($kind === 'fieldValue') {
             if ($id <= 0) throw new \RuntimeException('kind fieldValue cannot be created through Apply');
             return $this->writeFieldValue($id, $fields);
+        }
+        if ($kind === 'userProfile') {
+            if ($id <= 0) throw new \RuntimeException('kind userProfile cannot be created through Apply');
+            return $this->writeUserProfile($id, $fields);
         }
         if ($id > 0 && !$this->read($kind, $id)) throw new \RuntimeException('target does not exist in this scope');
         if ($kind === 'templateStyle' && isset($fields['template'])) {
@@ -1199,6 +1279,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     public function list(string $kind, int $offset, int $limit): array
     {
         if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment', 'fieldValue'], true)) return [];
+        if ($kind === 'userProfile') return $this->listUserProfiles($offset, $limit);
         if ($kind === 'languageFilter') return $this->db->setQuery("SELECT extension_id AS id, enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssocList();
         return $this->rows($kind, $offset, $limit, null);
     }
@@ -1565,7 +1646,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     public function delete(string $kind, int $id): void
     {
         $table = $this->tableFor($kind);
-        if ($kind === 'fieldValue') throw new \RuntimeException('kind fieldValue cannot be deleted through Apply');
+        if ($kind === 'fieldValue' || $kind === 'userProfile') throw new \RuntimeException("kind {$kind} cannot be deleted through Apply");
         if ($id <= 0) {
             return;
         }

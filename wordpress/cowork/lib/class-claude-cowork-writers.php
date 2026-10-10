@@ -18,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 // Where a post's search title and description go, and the refusal when nothing would print them.
 require_once __DIR__ . '/SeoFields.php';
+require_once __DIR__ . '/AuthorMeta.php';
 
 /**
  * Posts, post meta and options — the three things an Apply may edit on a WordPress site.
@@ -131,6 +132,14 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 				return null;
 			}
 			return array( 'value' => get_post_meta( $id, $key, true ) );
+		}
+
+		if ( 'usermeta' === $kind ) {
+			// Only the fields a visitor reads (AuthorMeta): any other key of a person's account is not this door's.
+			if ( $id <= 0 || ! AuthorMeta::visitorKey( $key ) || ! metadata_exists( 'user', $id, $key ) ) {
+				return null;
+			}
+			return array( 'value' => get_user_meta( $id, $key, true ) );
 		}
 
 		if ( 'option' === $kind ) {
@@ -732,6 +741,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'postmeta' === $kind ) {
 			return $this->write_postmeta( $id, $fields, $key );
 		}
+		if ( 'usermeta' === $kind ) {
+			return $this->write_usermeta( $id, $fields, $key );
+		}
 		if ( 'option' === $kind ) {
 			return $this->write_option( $fields, $key );
 		}
@@ -760,6 +772,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			if ( $id > 0 && '' !== $key ) {
 				delete_post_meta( $id, $key );
 				$this->touched[ $id ] = $id;
+			}
+			return;
+		}
+		if ( 'usermeta' === $kind ) {
+			if ( $id > 0 && AuthorMeta::visitorKey( $key ) ) {
+				delete_user_meta( $id, $key );
 			}
 			return;
 		}
@@ -1704,6 +1722,42 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	/**
 	 * @param array<string,mixed> $fields
 	 */
+	/**
+	 * One field of an author a visitor reads (AuthorMeta), as plain text: the bio or a theme's job title. Any other key of a
+	 * person's account is refused, and so is a user that does not exist.
+	 */
+	private function write_usermeta( int $id, array $fields, string $key ): int {
+		if ( $id <= 0 || false === get_userdata( $id ) ) {
+			throw new RuntimeException( "no such user: {$id}" );
+		}
+		if ( ! AuthorMeta::visitorKey( $key ) ) {
+			throw new RuntimeException( "usermeta writes only the fields a visitor reads (description, a theme's job title or tagline), not {$key}" );
+		}
+		if ( ! array_key_exists( 'value', $fields ) || ! is_string( $fields['value'] ) ) {
+			throw new RuntimeException( 'usermeta takes one field: value, a string' );
+		}
+		update_user_meta( $id, $key, wp_slash( $fields['value'] ) );
+		return $id;
+	}
+
+	/**
+	 * The site's authors and the fields of theirs a visitor reads (AuthorMeta), for `content.list` kind `usermeta`: every user
+	 * that holds one with words, up to 200, by id.
+	 *
+	 * @return list<array{id:int,name:string,meta:array<string,string>}>
+	 */
+	public function listAuthorMeta(): array {
+		$out = array();
+		foreach ( get_users( array( 'number' => 200, 'orderby' => 'ID', 'order' => 'ASC', 'fields' => array( 'ID', 'display_name' ) ) ) as $user ) {
+			$id   = (int) $user->ID;
+			$meta = AuthorMeta::fields( (array) get_user_meta( $id ) );
+			if ( array() !== $meta ) {
+				$out[] = array( 'id' => $id, 'name' => (string) $user->display_name, 'meta' => $meta );
+			}
+		}
+		return $out;
+	}
+
 	private function write_postmeta( int $id, array $fields, string $key ): int {
 		if ( $id <= 0 ) {
 			throw new RuntimeException( 'postmeta needs the id of the post it hangs off' );

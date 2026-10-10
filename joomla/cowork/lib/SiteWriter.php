@@ -89,6 +89,48 @@ final class FieldValueKey
     }
 }
 
+/**
+ * `#__user_profiles` has no id column either: a profile field is named by (user_id, profile_key). Only the fields a visitor
+ * reads on an author's page are this door's (`FIELDS`: the bio Joomla's own profile plugin keeps, the job title and tagline
+ * T4 templates print; TracyHQ/tch#1013, "Collaborator & Editor" on 17 pages of dev g60-ess-j-full), so the pair is packed
+ * as user_id × SPAN + the field's place in that list. A person's account (password, groups, other profile keys) is never one.
+ */
+final class UserProfileKey
+{
+    public const SPAN = 100;
+    /** The profile keys a visitor reads, in the order their place in a key names them. Append only. */
+    public const FIELDS = ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline'];
+
+    public static function encode(int $userId, string $profileKey): int
+    {
+        $at = array_search($profileKey, self::FIELDS, true);
+        if ($userId < 1 || $at === false) throw new RuntimeException('not an author field a visitor reads: ' . substr($profileKey, 0, 60));
+        return $userId * self::SPAN + (int) $at;
+    }
+
+    /** @return array{0:int,1:string} [user_id, profile_key] */
+    public static function decode(int $id): array
+    {
+        $field = self::FIELDS[$id % self::SPAN] ?? null;
+        if ($id < self::SPAN || $field === null) throw new RuntimeException('not an author field a visitor reads');
+        return [intdiv($id, self::SPAN), $field];
+    }
+
+    /** A stored value as the words it holds: Joomla's profile plugin keeps each one JSON-encoded, T4 decodes it the same way. */
+    public static function words(?string $stored): string
+    {
+        if ($stored === null) return '';
+        $decoded = json_decode($stored, true);
+        return is_string($decoded) ? $decoded : $stored;
+    }
+
+    /** Words as Joomla's profile plugin stores them. */
+    public static function stored(string $words): string
+    {
+        return (string) json_encode($words, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+
 interface SiteWriter
 {
     /**
@@ -114,6 +156,8 @@ interface SiteWriter
         'module', 'templateStyle',
         // site — identity and configuration
         'user', 'extensionParams',
+        // An author's words a visitor reads (`#__user_profiles`, named by UserProfileKey): the bio, the job title, the tagline.
+        'userProfile',
     ];
 
     /**
