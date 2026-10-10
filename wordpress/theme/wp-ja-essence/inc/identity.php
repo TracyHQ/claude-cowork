@@ -42,3 +42,20 @@ function wp_ja_essence_identity_fill( $content ): string {
 }
 add_filter( 'render_block_core/paragraph', 'wp_ja_essence_identity_fill', 9, 1 );
 add_filter( 'render_block_core/html', 'wp_ja_essence_identity_fill', 9, 1 );
+
+/**
+ * A Site Logo's alternative text is the site name, whichever picture it draws. Core uses a picture's own alternative text when
+ * it has one and the site name only when it has none, so the footer's two logos disagreed once the site was renamed: the
+ * release's dark logo picture (option `tracy_logo_dark`) carries "JA Essence" and the light one nothing (measured 11/10/2026
+ * on dev, g56-ess-wp-blank: alt "Tamarind Bakery" on the light logo, "JA Essence" on the dark one, 31 pages). A logo is the
+ * site's name drawn, so its text follows the name the customer gave, like `{site.title}`.
+ *
+ * @param array $attributes The logo image's attributes, as core passes them to wp_get_attachment_image().
+ * @return array
+ */
+function wp_ja_essence_logo_alt( $attributes ): array {
+	$attributes        = is_array( $attributes ) ? $attributes : array();
+	$attributes['alt'] = get_bloginfo( 'name', 'display' );
+	return $attributes;
+}
+add_filter( 'get_custom_logo_image_attributes', 'wp_ja_essence_logo_alt', 10, 1 );
