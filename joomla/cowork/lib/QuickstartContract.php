@@ -1270,10 +1270,12 @@ final class QuickstartContract
     /* ------------------------------------------------------------ site language */
 
     /** The baseline with the site's one language on record — or with none, when $record is null. */
-    public function bindingWithSiteLanguage(?array $record): array {
+    public function bindingWithSiteLanguage(?array $record, array $titles = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A site language needs a bound site');
         if($record===null)unset($binding['siteLanguage']);else $binding['siteLanguage']=$record;
+        // The headings a site language writes (writtenTitles) are what is protected from then on.
+        foreach($titles as $key=>$title)if(isset($binding['presentation'][$key]))$binding['presentation'][$key]['title']=(string)$title;
         return $binding;
     }
 

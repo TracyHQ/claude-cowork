@@ -1919,6 +1919,7 @@ require __DIR__ . "/multilingual.php";
 require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 require __DIR__ . "/site-language.php";
+require __DIR__ . "/site-language-titles.php";
 require __DIR__ . "/source-language.php";
 require __DIR__ . "/written-source-language.php";
 // site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
@@ -1927,6 +1928,8 @@ require __DIR__ . "/site-identity.php";
 require __DIR__ . "/home-title.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
 require __DIR__ . "/template-site-settings.php";
+// template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.
+require __DIR__ . "/language-overrides.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";

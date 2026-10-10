@@ -33,6 +33,7 @@ require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/SiteIdentity.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
+require_once __DIR__ . '/LanguageOverrides.php';
 
 final class Engine
 {
@@ -269,6 +270,16 @@ final class Engine
         return $this;
     }
 
+    /** The site's language override files (`template.languageOverrides`); null answers 'unavailable'. */
+    private ?LanguageOverrides $overrides = null;
+
+    /** Let `template.languageOverrides` read and write the site's language overrides (lib/LanguageOverrides.php). */
+    public function languageOverrides(?LanguageOverrides $overrides): self
+    {
+        $this->overrides = $overrides;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -324,7 +335,7 @@ final class Engine
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
-            || (in_array($action, ['site.identity', 'template.siteSettings'], true) && ($params['operation'] ?? null) === 'set');
+            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
                 'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
@@ -453,6 +464,8 @@ final class Engine
                 return $this->siteIdentityDoor($params);
             case 'template.siteSettings':
                 return $this->templateSiteSettingsDoor($params);
+            case 'template.languageOverrides':
+                return $this->languageOverridesDoor($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -1906,11 +1919,17 @@ final class Engine
             if ($operation === 'plan') {
                 if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $locale)) return $this->err('bad_params', 'Not a Joomla language tag: ' . $locale);
                 $pack = $this->contract->languagePackage($locale, $major);
+                // The headings the contract has no slot for, which a site written in `$locale` gives in it with `set`.
+                $titles = [];
+                if ($this->contract->binding() !== null)
+                    foreach ($this->contract->writtenTitles() as $key => $row)
+                        $titles[] = ['key' => $key . '.title', 'source' => $row['title'], 'maxCharacters' => self::WRITTEN_TITLE_MAX];
                 return $this->ok([
                     'locale' => $locale, 'current' => $this->writer->readLanguageDefaults(),
                     'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
                     'installed' => $pack === null || $this->languagePackPresent($locale),
                     'onRecord' => $this->contract->binding()['siteLanguage'] ?? null,
+                    'titles' => $titles,
                 ]);
             }
             if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown siteLanguage operation');
@@ -1926,11 +1945,18 @@ final class Engine
             if ($operation === 'revert') {
                 if ($onRecord === null) return $this->err('contract_failed', 'This site has no language set by this door to take back');
                 $previous = $onRecord['previous'];
-                $this->writer->transaction(function () use ($apply, $previous) {
+                // The headings it gave go back to what they were.
+                $titlesBack = is_array($onRecord['titles'] ?? null) ? $onRecord['titles'] : [];
+                $idsBack = [];
+                foreach ($titlesBack as $key => $title)
+                    if (isset($binding['ids'][$key])) $idsBack[(int) $binding['ids'][$key]] = (string) $title;
+                if ($idsBack !== []) $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_keys($idsBack)));
+                $this->writer->transaction(function () use ($apply, $previous, $idsBack, $titlesBack) {
                     $before = $this->writer->readLanguageDefaults();
                     $this->writer->writeLanguageDefaults((string) $previous['site'], (string) $previous['administrator']);
+                    if ($idsBack !== []) $this->writer->writeModuleTitles($idsBack);
                     $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
-                    $this->contract->rebind($this->contract->bindingWithSiteLanguage(null));
+                    $this->contract->rebind($this->contract->bindingWithSiteLanguage(null, $titlesBack));
                     $this->contract->rebind($this->contract->inspect()['snapshot']);
                     return [];
                 });
@@ -1943,6 +1969,8 @@ final class Engine
                 if ($onRecord['locale'] === $locale) return $this->ok(['status' => 'completed', 'locale' => $locale, 'alreadySet' => true]);
                 return $this->err('conflict', 'This site is already set to ' . $onRecord['locale'] . '; take that back with siteLanguage.revert before choosing another');
             }
+            $titles = $p['titles'] ?? [];
+            if (!is_array($titles)) return $this->err('bad_params', 'titles must map a heading key to its words');
             $pack = $this->contract->languagePackage($locale, $major);
             if ($pack !== null && !$this->languagePackPresent($locale)) {
                 if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -1956,21 +1984,35 @@ final class Engine
                 $this->contract->bind($this->contract->inspect()['snapshot']);
                 return [];
             });
-            $this->writer->transaction(function () use ($apply, $request, $locale, $pack) {
-                $before = $this->writer->readLanguageDefaults();
+            // 🔒 THE HEADINGS FOLLOW THE LANGUAGE (TCH #1013, LANG-2): a module that shows its title ("Newsletter", "Tags
+            // cloud", "Follow me" on JA Essence) has no slot, so a one-edition site written in another language gives them
+            // here, as a written source relabel does. A heading left out keeps its title; the old ones are kept for revert.
+            $headings = $this->contract->writtenTitles();
+            $byId = []; $before = []; $after = [];
+            foreach ($titles as $slot => $title) {
+                $key = is_string($slot) && substr($slot, -6) === '.title' ? substr($slot, 0, -6) : '';
+                if (!isset($headings[$key])) return $this->err('bad_params', 'Not a heading of this site: ' . $slot . ' (siteLanguage.plan lists them)');
+                if (!is_string($title) || trim($title) === '' || mb_strlen($title) > self::WRITTEN_TITLE_MAX || preg_match('/[<>]/', $title))
+                    return $this->err('bad_params', 'A heading is plain text of 1 to ' . self::WRITTEN_TITLE_MAX . ' characters: ' . $slot);
+                $byId[$headings[$key]['id']] = $title; $before[$key] = $headings[$key]['title']; $after[$key] = $title;
+            }
+            if ($byId !== []) $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_keys($byId)));
+            $this->writer->transaction(function () use ($apply, $request, $locale, $pack, $byId, $before, $after) {
+                $defaults = $this->writer->readLanguageDefaults();
                 $this->writer->writeLanguageDefaults($locale, $locale);
-                $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
+                if ($byId !== []) $this->writer->writeModuleTitles($byId);
+                $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $defaults]);
                 $this->contract->rebind($this->contract->bindingWithSiteLanguage([
-                    'locale' => $locale, 'previous' => $before, 'applyId' => $apply, 'requestId' => $request,
+                    'locale' => $locale, 'previous' => $defaults, 'applyId' => $apply, 'requestId' => $request,
                     'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
-                ]));
+                ] + ($before !== [] ? ['titles' => $before] : []), $after));
                 // Proven, then stored — the same two steps every other sealed write ends with.
                 $this->contract->rebind($this->contract->inspect()['snapshot']);
                 return [];
             });
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
             $this->stamped('content');
-            return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null]);
+            return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null, 'titles' => count($byId)]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
@@ -3258,7 +3300,7 @@ final class Engine
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
                 $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
-            } elseif ($op === 'siteSettings') {
+            } elseif ($op === 'siteSettings' || $op === 'languageOverrides') {
                 // Which files, never their bytes; created when none of them existed before.
                 $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
                 $step['created'] = $files !== [] && array_filter($files, static fn($f) => !is_array($f) || ($f['before'] ?? null) !== null) === [];
@@ -3338,6 +3380,13 @@ final class Engine
                 throw new RuntimeException('site identity store not wired');
             }
             $this->siteIdentity->write(self::identityValues($entry['before'] ?? null));
+            return;
+        }
+        if ($op === 'languageOverrides') {
+            if ($this->overrides === null) {
+                throw new RuntimeException('language overrides not wired');
+            }
+            $this->overrides->restore(is_array($entry['files'] ?? null) ? $entry['files'] : []);
             return;
         }
         if ($op === 'siteSettings') {
@@ -3620,6 +3669,85 @@ final class Engine
         }
         unset($now['missing']);
         return $this->ok($answer(['changed' => array_column($plan['changes'], 'path'), 'cleared' => $cleared] + $now));
+    }
+
+    /**
+     * `template.languageOverrides` — the site's front-end language strings that still read in en-GB for one language,
+     * and its language override file for that language (TCH #1013; lib/LanguageOverrides.php).
+     *
+     * - `operation: read` (the default), `template`, `locale`: `strings`, each `{key, source, reason, file}` (reason
+     *   `missing`, `untranslated` or `suspect`), the template's own first; `overrides`, what the override file holds now;
+     *   `truncated` when more were found than one plan offers.
+     * - `operation: set`, `apply_id`, `template`, `locale`, `strings: {KEY: words}`: each key one the read offers, each
+     *   value one line of plain text with the en-GB words' placeholders. A key or value that is not is left out and
+     *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
+     *   puts them back (deleting a file that did not exist). Nothing changes → nothing is written (`unchanged: true`).
+     *
+     * Not part of a `content.batch`: a file is not inside the database's transaction.
+     */
+    private function languageOverridesDoor(array $p): array
+    {
+        if ($this->overrides === null) return $this->err('unavailable', 'language overrides not wired');
+        $template = $p['template'] ?? null;
+        $locale = $p['locale'] ?? null;
+        if (!is_string($template) || !preg_match(LanguageOverrides::TEMPLATE, $template))
+            return $this->err('bad_params', 'template required: the folder name of a site template, e.g. ja_essence');
+        if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
+            return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
+        if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
+        try {
+            $plan = $this->overrides->plan($template, $locale);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') return $this->ok($head + $plan);
+        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
+        if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $strings = $p['strings'] ?? null;
+        if (!is_array($strings) || $strings === [] || array_keys($strings) === range(0, count($strings) - 1))
+            return $this->err('bad_params', 'strings required: an object of language keys to their words');
+        $offered = [];
+        foreach ($plan['strings'] as $row) $offered[$row['key']] = $row['source'];
+        $values = [];
+        $refused = [];
+        foreach ($strings as $key => $value) {
+            $key = strtoupper((string) $key);
+            if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => 'not a string this site shows in en-GB']; continue; }
+            $why = LanguageOverrides::refusal($offered[$key], $value);
+            if ($why !== null) { $refused[] = ['key' => $key, 'reason' => $why]; continue; }
+            $values[$key] = trim($value);
+        }
+        $answer = static fn(array $extra): array => $head + $extra + ($refused !== [] ? ['refused' => $refused] : []);
+        $change = $values === [] ? null : $this->overrides->change($locale, $values);
+        if ($change === null) return $this->ok($answer(['written' => 0, 'unchanged' => true]));
+        try {
+            $files = $this->overrides->write($change);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage(), ['code' => 'LANGUAGE_NOT_WRITABLE']);
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'languageOverrides', 'locale' => $locale, 'files' => $files]);
+        } catch (Throwable $e) {
+            try {
+                $this->overrides->restore($files);
+            } catch (Throwable $undo) {
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        if ($this->writer !== null) {
+            try {
+                if (!$this->batching) $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+        $this->stamped('content');
+        return $this->ok($answer(['written' => count($values)]));
     }
 
     /**
