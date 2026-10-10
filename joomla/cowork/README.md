@@ -54,6 +54,7 @@ edit the copy — that is how the two silently diverge.
 node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
 tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
+tests/e2e/module-ordering.sh                  # a module ends with the ordering a write names, 0 included, on a real Joomla (docker)
 tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
 T4_QUICKSTART=<folder> tests/e2e/share-image.sh  # and on a T4 quickstart restored over it, only where a page has none
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php

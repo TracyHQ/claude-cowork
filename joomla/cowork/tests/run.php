@@ -1910,6 +1910,8 @@ check('batch undo succeeds', $undo['ok'], true);
 check('batch undo restores and removes its create', $batchWriter->store['article'], [1 => ['title' => 'Original']]);
 
 require __DIR__ . "/contracts.php";
+// A row the quickstart never shipped is held to the ACL it inherits, through the real ContractAccess.
+require __DIR__ . "/contract-new-rows.php";
 require __DIR__ . "/content-reader.php";
 require __DIR__ . "/content-budget.php";
 require __DIR__ . "/content-batch.php";

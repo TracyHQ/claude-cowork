@@ -20,6 +20,9 @@ require_once __DIR__ . '/inc/variations.php';
 // A theme stylesheet's `ver` carries its file's modification time, so a look change that rewrites the
 // file reaches every browser at once instead of after its cache gives up: inc/asset-version.php.
 require_once __DIR__ . '/inc/asset-version.php';
+// The customer's logo for dark backgrounds (option tracy_logo_dark), the site name as text where no logo
+// fits, and {site.title}/{year} in a copyright line: inc/brand-logo.php.
+require_once __DIR__ . '/inc/brand-logo.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );
@@ -429,8 +432,8 @@ add_action(
  * submits (only `search` and `post-comments-form`), so where Joomla lets a template override
  * `com_contact` and keeps the sending, the theme has to do the sending itself. It does it the
  * WordPress way: the form posts to `admin-post.php`, the theme answers on `admin_post_nopriv_*`,
- * `wp_mail()` sends to the site's admin address, and the visitor comes back to the page they were
- * on with `?contact=sent` (or `failed`, or `invalid`).
+ * `wp_mail()` sends to the recipient the site was given, and the visitor comes back to the page
+ * they were on with `?contact=sent` (or `failed`, or `invalid`).
  *
  * The markup is the section library's, so both CMS show the same form; the theme only fills in
  * what a live form needs — the action, the nonce, a honeypot, the page to return to — into any
@@ -531,21 +534,31 @@ function tracy_contact_submit(): void {
 	}
 	/**
 	 * Where the message goes: the address the customer gave when the site was built (the seeder
-	 * writes it into `tracy_contact_to`), else the site's admin address.
+	 * writes it into `tracy_contact_to`), or the one a `tracy_contact_to` filter names. There is no
+	 * fallback to the site's admin address: on a site Tracy built that is Tracy's own mailbox, not
+	 * the customer's, so a form with no recipient says the message could not be sent.
 	 */
 	$to = get_option( 'tracy_contact_to' );
-	$to = apply_filters( 'tracy_contact_to', is_email( $to ) ? $to : get_option( 'admin_email' ) );
-	$sent = wp_mail(
-		$to,
-		sprintf(
-			/* translators: 1: the site's name, 2: the subject the visitor wrote */
-			__( '[%1$s] %2$s', 'tracy' ),
-			get_bloginfo( 'name' ),
-			'' !== $subject ? $subject : __( 'Message from the contact form', 'tracy' )
-		),
-		sprintf( "%s\n\n— %s <%s>", $message, $name, $email ),
-		array( 'Reply-To: ' . $name . ' <' . $email . '>' )
-	);
+	$to = apply_filters( 'tracy_contact_to', is_string( $to ) && is_email( $to ) ? $to : '' );
+	if ( ! is_string( $to ) || ! is_email( $to ) ) {
+		$go( 'failed' );
+	}
+	try {
+		$sent = wp_mail(
+			$to,
+			sprintf(
+				/* translators: 1: the site's name, 2: the subject the visitor wrote */
+				__( '[%1$s] %2$s', 'tracy' ),
+				get_bloginfo( 'name' ),
+				'' !== $subject ? $subject : __( 'Message from the contact form', 'tracy' )
+			),
+			sprintf( "%s\n\n— %s <%s>", $message, $name, $email ),
+			array( 'Reply-To: ' . $name . ' <' . $email . '>' )
+		);
+	} catch ( \Throwable $e ) {
+		// A mailer that throws has not sent anything.
+		$sent = false;
+	}
 	$go( $sent ? 'sent' : 'failed' );
 }
 

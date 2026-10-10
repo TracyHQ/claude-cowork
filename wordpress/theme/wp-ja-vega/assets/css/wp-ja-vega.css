@@ -2518,7 +2518,7 @@ body.tracy {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  color: var(--ds-c-fg-2, #050505);
+  color: #050505;
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,

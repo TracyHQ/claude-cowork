@@ -39,6 +39,14 @@ the two Font Awesome files are byte-identical to the ones the source bundles.
 
 == Changelog ==
 
+= 1.1.12 =
+* No change to the theme's behaviour or look: this release carries the 1.1.11 entry below, which the 1.1.11
+  package shipped without.
+
+= 1.1.11 =
+* The theme's own stylesheet reads its palette through the design-system slot: each palette colour is
+  var(--ds-c-<role>, <that colour>), undefined until a design system is worn, so the theme looks exactly as before.
+
 = 1.1.10 =
 * The 404 template's own footer draws the brand like parts/footer.html (Site Logo pair beside the Site Title) and its
   copyright line names the site instead of "Kinetic Labs, Inc.". Not released on its own: ships with the next

@@ -821,7 +821,14 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             // module whose ordering is 0 the next free one, so writing words into it moved it, and the
             // contract's verify refused the whole apply as presentation drift ("module-92 — ordering
             // [want 0 got 1]") — measured 08/10/2026 on a JA Podcast j6 site, whose brief never landed.
-            $ordering = $id > 0 && !array_key_exists('ordering', $data) ? ($row->ordering ?? null) : null;
+            // 🔒 AND AN ORDERING THE CALL NAMES IS THE ONE THE ROW ENDS WITH, 0 INCLUDED, ON CREATE AND
+            // UPDATE. The same store() turned a named 0 into the next free slot: Tracy's design-system
+            // module, created and then updated with `ordering: 0` in `header-r`, was stored at 2 and
+            // then 3 (measured 10/10/2026 on dskeepjo, tracy-base j6). A revert writing a 0 back moved
+            // the row the same way.
+            $ordering = array_key_exists('ordering', $data)
+                ? (is_numeric($data['ordering']) ? (int) $data['ordering'] : null)
+                : ($id > 0 ? ($row->ordering ?? null) : null);
             // 🔒 AN ARTICLE UPDATE THAT DOES NOT NAME TAGS KEEPS THEM. Joomla's Taggable behaviour reads a
             // Content store with no `newTags` as "every tag removed" and deletes the article's
             // #__contentitem_tag_map and #__ucm_content rows — measured 08/10/2026 on a JA Podcast j6 site,
