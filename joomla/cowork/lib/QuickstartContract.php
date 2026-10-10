@@ -530,8 +530,19 @@ final class QuickstartContract
      * Derived rather than remembered on purpose. A copy inheriting a different asset chain is a copy
      * a different audience can read — the exact mistake a stored snapshot would bless forever, and
      * the one a label like "Public" does not reveal.
+     *
+     * 🔒 A ROW THE QUICKSTART NEVER SHIPPED IS HELD TO WHAT IT INHERITS. It has no captured rules to
+     * keep, so the baseline it is compared to is its component's own chain (`componentRules`): what
+     * a row with no asset reads, and what the asset Joomla mints for a new module (under com_modules)
+     * or a new article (under a category with no rules of its own) also gives. Without this, every
+     * row added to a site — Tracy's design-system module, a page the customer made — was reported as
+     * "Access-level or ACL definition changed: entityRules(modules.255)" although nobody's access had
+     * moved (measured 10/10/2026 on dskeepjo, tracy-base j6: the warning stayed the same with module
+     * 255's asset and without it). A new row whose rules DO differ — rules of its own, or an asset
+     * hung under the root that skips the component — is still reported here; that a row is new at
+     * all is what "Quickstart inventory changed" says.
      */
-    private function expectedAccess(array $keys, array $ids): array {
+    private function expectedAccess(array $keys, array $ids, array $actual = []): array {
         $expected = $this->lock['access'];
         // A capture with no per-entity rules has nothing to extend; every real one has them, and
         // the tests deliberately run a minimal ACL to prove the base path is untouched.
@@ -546,6 +557,15 @@ final class QuickstartContract
             $from = $name.'.'.$ids[$source];
             if (!isset($expected['entityRules'][$from])) throw new RuntimeException('No baseline ACL for '.$source);
             $expected['entityRules'][$name.'.'.$ids[$key]] = $expected['entityRules'][$from];
+            $added = true;
+        }
+        // The same component per table as ContractAccess::snapshot() gives an asset-less row.
+        $component = ['modules'=>'com_modules','content'=>'com_content','categories'=>'com_content'];
+        foreach ($actual['entityRules'] ?? [] as $entity => $chain) {
+            if (array_key_exists($entity, $expected['entityRules'])) continue;
+            $inherited = $expected['componentRules'][$component[strstr((string) $entity, '.', true)] ?? ''] ?? null;
+            if ($inherited === null || $chain != $inherited) continue;
+            $expected['entityRules'][$entity] = $inherited;
             $added = true;
         }
         if ($added) ksort($expected['entityRules']);
@@ -751,7 +771,7 @@ final class QuickstartContract
         }
         Timing::end('assignments',$t);
         $t=Timing::begin();
-        $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids);
+        $actualAccess=$this->store->access();$expectedAccess=$this->expectedAccess($keys,$ids,$actualAccess);
         if($actualAccess != $expectedAccess) {
             // Say WHICH audience moved. "Access-level or ACL definition changed" is true of a
             // view level, a user group, a component rule and any one of a few hundred entity
