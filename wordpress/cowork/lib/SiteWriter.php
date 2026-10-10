@@ -55,8 +55,11 @@ interface SiteWriter
      * menu as a row; WordPress keeps both in taxonomies, and a plugin that only wrote posts and
      * options could rename neither. A WordPress menu is a `nav_menu` term with `nav_menu_item`
      * posts hanging off it — two shapes, so two kinds, rather than one kind pretending.
+     *
+     * `usermeta` is an author's words a visitor reads, and nothing else of a user: the bio WordPress keeps and a theme's job
+     * title or tagline (`AuthorMeta::visitorKey`), keyed by the user's id and the meta key. A person's account stays theirs.
      */
-    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'template', 'term', 'menuItem'];
+    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'template', 'term', 'menuItem', 'usermeta'];
 
     /**
      * The current state of one target, or null when nothing is there.

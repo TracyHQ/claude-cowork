@@ -41,6 +41,10 @@ self-hosted.
 
 == Changelog ==
 
+= 1.0.14 =
+* The registration form's hidden "Leave this empty" field and the pagers' accessible name ("Pagination") go through the
+  theme's text domain, so a site made in another language no longer reads them in English (TracyHQ/tch#1013).
+
 = 1.0.13 =
 * The word before an author's name on the post cards is no longer written in the style sheet: je-detail.css prints
   var(--wp-ja-essence-by), set from the theme's "By " in the site's language (inc/words.php), so a site made in another

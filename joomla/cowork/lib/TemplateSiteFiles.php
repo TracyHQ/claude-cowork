@@ -49,7 +49,7 @@ final class TemplateSiteFiles
         $current = $this->bytes($this->faviconPath($template));
         $settings = $current === null ? [] : (TemplateSiteSettings::settingsOf($current, TemplateSiteSettings::OTHER_KEYS) ?? []);
         $own = [];
-        foreach ($framework === 't4' ? [TemplateSiteSettings::SHARE_KEY] : TemplateSiteSettings::OTHER_KEYS as $key) $own[$key] = $settings[$key] ?? '';
+        foreach ($framework === 't4' ? TemplateSiteSettings::SITE_KEYS : TemplateSiteSettings::OTHER_KEYS as $key) $own[$key] = $settings[$key] ?? '';
         if ($framework !== 't4') return ['settings' => $own];
         $profiles = [];
         $missing = [];
@@ -75,11 +75,13 @@ final class TemplateSiteFiles
     {
         if ($framework !== 't4') return $this->planSettingsFile($template, $fields);
         $changes = [];
-        if (array_key_exists(TemplateSiteSettings::SHARE_KEY, $fields)) {
-            $share = $this->planSettingsFile($template, [TemplateSiteSettings::SHARE_KEY => $fields[TemplateSiteSettings::SHARE_KEY]]);
+        // The share image and the glyph faces are one value for the whole site, kept in the template's own settings file.
+        $own = array_intersect_key($fields, array_flip(TemplateSiteSettings::SITE_KEYS));
+        if ($own !== []) {
+            $share = $this->planSettingsFile($template, $own);
             if (isset($share['error'])) return $share;
             $changes = $share['changes'];
-            unset($fields[TemplateSiteSettings::SHARE_KEY]);
+            $fields = array_diff_key($fields, $own);
         }
         $used = $this->usedProfiles($template);
         $targets = $fields === [] ? [] : $used;

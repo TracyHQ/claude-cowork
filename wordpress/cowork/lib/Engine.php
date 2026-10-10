@@ -2365,6 +2365,17 @@ final class Engine
         if ($kind === 'pattern') {
             return $this->patternList($p);
         }
+        // The authors and the fields of theirs a visitor reads (lib/AuthorMeta.php): a bio, a theme's job title.
+        if ($kind === 'usermeta' && method_exists($this->writer, 'listAuthorMeta')) {
+            if (array_key_exists('search', $p)) {
+                return $this->err('bad_params', 'content.list cannot search kind "usermeta": the list of authors is short enough to read whole. Drop "search".');
+            }
+            try {
+                return $this->ok(['kind' => 'usermeta', 'items' => $this->writer->listAuthorMeta()]);
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
         if ($kind !== 'post') {
             return $this->err(
                 'bad_params',

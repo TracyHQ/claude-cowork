@@ -79,8 +79,8 @@ if (function_exists('check')) {
     // ---- read ------------------------------------------------------------------------------------
     $tsRead = $tsCall($tsEngine, ['template' => 'ja_spa']);
     check('read names the framework, the keys, and each profile a style uses', [$tsRead['ok'], $tsRead['framework'], $tsRead['keys'], array_keys($tsRead['profiles'])],
-        [true, 't4', array_merge(TemplateSiteSettings::T4_KEYS, ['other_shareImage']), ['default', 'logo-light']]);
-    check('and its share image, none yet', $tsRead['settings'], ['other_shareImage' => '']);
+        [true, 't4', array_merge(TemplateSiteSettings::T4_KEYS, ['other_shareImage', 'other_glyphFaces']), ['default', 'logo-light']]);
+    check('and its share image and glyph faces, none yet', $tsRead['settings'], ['other_shareImage' => '', 'other_glyphFaces' => '']);
     check('a profile answers where it is read from and its keys of the whitelist only', $tsRead['profiles']['logo-light'],
         ['source' => 'templates/ja_spa/etc/site/logo-light.json', 'settings' => ['site_name' => '', 'site_slogan' => '', 'site_logo' => 'images/joomlart/logo/logo-light.png', 'site_logo_2' => 'images/joomlart/logo/logo-light.png', 'site_logo_small' => '', 'other_faviconFile' => '']]);
     check('read takes no write lock', $tsWriter->serialized, []);
@@ -91,7 +91,7 @@ if (function_exists('check')) {
     // ---- set: refusals ----------------------------------------------------------------------------
     $tsOther = $tsSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png', 'body_font_family' => 'Arial']]);
     check('a key outside the whitelist is refused whole, naming the boundary', [$tsOther['error'], $tsOther['message']],
-        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile, other_shareImage can. Nothing was written']);
+        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile, other_shareImage, other_glyphFaces can. Nothing was written']);
     check('the same inside a profile', $tsSet(['profiles' => ['default' => ['other_backToTop' => true]]])['error'], 'unsupported');
     check('a set needs an apply_id', $tsCall($tsEngine, ['operation' => 'set', 'template' => 'ja_spa', 'fields' => ['site_name' => 'A']])['error'], 'bad_params');
     check('a set needs fields or profiles', [$tsSet([])['error'], $tsSet(['fields' => []])['error'], $tsSet(['fields' => ['A']])['error']], ['bad_params', 'bad_params', 'bad_params']);
@@ -209,14 +209,14 @@ if (function_exists('check')) {
     // ---- T3: the favicon is the one setting, printed by this plugin ------------------------------
     $tsMood = $tsCall($tsEngine, ['template' => 'ja_mood']);
     check('a T3 template reads its favicon and share image settings only', [$tsMood['framework'], $tsMood['keys'], $tsMood['settings']],
-        ['t3', ['other_faviconFile', 'other_shareImage'], ['other_faviconFile' => '', 'other_shareImage' => '']]);
+        ['t3', ['other_faviconFile', 'other_shareImage', 'other_glyphFaces'], ['other_faviconFile' => '', 'other_shareImage' => '', 'other_glyphFaces' => '']]);
     $tsMoodSet = static fn(array $params, string $apply = 'apply-mood') => $tsCall($tsEngine, ['operation' => 'set', 'apply_id' => $apply, 'template' => 'ja_mood'] + $params);
     check('a T3 template refuses the T4 profile keys: its logo is a style param (templateStyle)', $tsMoodSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png']])['error'], 'unsupported');
     check('and refuses profiles', $tsMoodSet(['profiles' => ['default' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]])['error'], 'unsupported');
     check('an empty favicon on a T3 template with none set changes nothing', $tsMoodSet(['fields' => ['other_faviconFile' => '']])['unchanged'] ?? null, true);
     $tsMoodDone = $tsMoodSet(['fields' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]);
     check('a T3 favicon is written to the template\'s local settings file', [$tsMoodDone['changed'], $tsMoodDone['settings']],
-        [['templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => '']]);
+        [['templates/ja_mood/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => '', 'other_glyphFaces' => '']]);
     check('the page points at the customer\'s file', TemplateSiteSettings::faviconLink($tsRoot, '/sub', 'ja_mood'), ['href' => '/sub/images/tracy-brand/5555eeee.png', 'type' => 'image/png']);
     check('a template with no setting prints Joomla\'s own favicon', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_spa'), null);
     $tsLinks = ['/sub/templates/ja_mood/favicon.ico' => ['relation' => 'shortcut icon', 'relType' => 'rel', 'attribs' => ['type' => 'image/vnd.microsoft.icon']],
@@ -252,7 +252,7 @@ if (function_exists('check')) {
     check('a T4 share image must be a picture social networks draw too', $tsSet(['fields' => ['other_shareImage' => 'images/tracy-brand/6666ffff.svg']], 'apply-share-t4')['error'], 'bad_params');
     $tsT4Share = $tsSet(['fields' => ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']], 'apply-share-t4');
     check('a T4 share image alone writes the settings file only, no profile', [$tsT4Share['ok'], $tsT4Share['changed'], $tsT4Share['settings'], $tsLocal('default')],
-        [true, ['templates/ja_spa/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg'], null]);
+        [true, ['templates/ja_spa/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg', 'other_glyphFaces' => ''], null]);
     check('the file holds that key only', $tsLocal('tracy-favicon'), '{"other_shareImage":"images\/tracy-brand\/7777aaaa.jpg"}');
     check('T4 pages print it by its absolute URL', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/', 'ja_spa'), 'https://example.test/images/tracy-brand/7777aaaa.jpg');
     check('no favicon comes of it: T4 prints its own', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_spa'), null);
@@ -282,7 +282,7 @@ if (function_exists('check')) {
     check('and a file on the site', $tsMoodSet(['fields' => ['other_shareImage' => 'images/tracy-brand/none.png']], 'apply-share')['error'], 'bad_params');
     check('no share image is printed before one is set', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/sub/', 'ja_mood'), null);
     $tsShare = $tsMoodSet(['fields' => ['other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']], 'apply-share');
-    check('a T3 share image is written beside the favicon, which stays', $tsShare['settings'], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => 'images/tracy-brand/7777aaaa.jpg']);
+    check('a T3 share image is written beside the favicon, which stays', $tsShare['settings'], ['other_faviconFile' => 'images/tracy-brand/5555eeee.png', 'other_shareImage' => 'images/tracy-brand/7777aaaa.jpg', 'other_glyphFaces' => '']);
     check('every page prints it as an absolute URL', TemplateSiteSettings::shareImageUrl($tsRoot, 'https://example.test/sub/', 'ja_mood'), 'https://example.test/sub/images/tracy-brand/7777aaaa.jpg');
     check('a root URL that is not absolute prints nothing: og:image must be', TemplateSiteSettings::shareImageUrl($tsRoot, '/sub', 'ja_mood'), null);
     check('the favicon is still the customer\'s', TemplateSiteSettings::faviconLink($tsRoot, '/sub', 'ja_mood')['href'] ?? null, '/sub/images/tracy-brand/5555eeee.png');
@@ -311,6 +311,26 @@ if (function_exists('check')) {
     check('a setting file naming something else prints nothing', TemplateSiteSettings::faviconLink($tsRoot, '', 'ja_mood'), null);
     $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-mood']]);
     check('the T3 revert removes the setting and the folder it made', is_dir($tsRoot . '/templates/ja_mood/local'), false);
+
+    // ---- glyph faces: the letters of the site's language its template's fonts cannot draw (TracyHQ/tch#1013) ----------
+    // Measured 10/10/2026 on dev g60-ess-j-full (JA Essence, T4, vi-VN): Jost (Google Fonts, no Vietnamese) drew "đề" as
+    // "đê" with a loose accent. The faces are one value for the site, in the template's own settings file, like the share image.
+    $tsFace = ['family' => 'Jost', 'weight' => '400', 'style' => 'normal', 'subset' => 'vietnamese',
+        'src' => 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_HRUBX8YYbAiah8.woff2'];
+    $tsFaces = json_encode(['faces' => [$tsFace, array_merge($tsFace, ['weight' => '700'])]]);
+    check('g60: faces are one set for the site, refused inside a T4 profile', $tsSet(['profiles' => ['default' => ['other_glyphFaces' => $tsFaces]]], 'apply-glyphs')['message'] ?? null,
+        'other_glyphFaces is one set of faces for the whole site: send it in fields, not in a profile. Nothing was written');
+    check('a face that is not plainly one refuses the whole set, nothing written', $tsSet(['fields' => ['other_glyphFaces' => json_encode(['faces' => [$tsFace, array_merge($tsFace, ['src' => 'https://evil.example/x.woff2'])]])]], 'apply-glyphs')['error'] ?? null, 'bad_params');
+    $tsGlyphs = $tsSet(['fields' => ['other_glyphFaces' => $tsFaces]], 'apply-glyphs');
+    check('g60: a T4 template keeps the faces in its settings file, no profile touched', [$tsGlyphs['ok'] ?? null, $tsGlyphs['changed'] ?? null, $tsLocal('default')],
+        [true, ['templates/ja_spa/local/etc/site/' . TemplateSiteSettings::FAVICON_FILE], null]);
+    check('g60: every page prints them as @font-face of the template\'s family, the Vietnamese letters only', substr_count(TemplateSiteSettings::glyphCss($tsRoot, 'ja_spa'), '@font-face{font-family:"Jost"'), 2);
+    check('limited to the subset\'s range', strpos(TemplateSiteSettings::glyphCss($tsRoot, 'ja_spa'), 'unicode-range:U+0102-0103') !== false, true);
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-glyphs']]);
+    check('the revert takes them back', TemplateSiteSettings::glyphCss($tsRoot, 'ja_spa'), '');
+    $tsMoodGlyphs = $tsMoodSet(['fields' => ['other_glyphFaces' => $tsFaces]], 'apply-glyphs-t3');
+    check('a T3 template keeps them beside its favicon and share image', [$tsMoodGlyphs['ok'] ?? null, substr_count(TemplateSiteSettings::glyphCss($tsRoot, 'ja_mood'), '@font-face')], [true, 2]);
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-glyphs-t3']]);
 
     // Clean up the site root.
     $tsItems = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tsRoot, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);

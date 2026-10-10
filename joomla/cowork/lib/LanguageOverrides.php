@@ -18,7 +18,26 @@
  *     as "Banner được lưu thành công.", the translation of another string).
  * Values holding markup are never offered (a translator cannot be trusted to keep it), nor `.sys.ini` strings
  * (administrator only). The file it writes is that one file; its previous bytes are what undoes it.
+ *
+ * Two more kinds are offered (TracyHQ/tch#1013, measured 10/10/2026 on dev g60-ess-j-full, vi-VN):
+ *   - a plugin's strings that a visitor reads ("Page Navigation" over every article's Previous/Next, the registration
+ *     form's "Postal / ZIP Code"): Joomla keeps them in `administrator/language/<tag>/plg_*.ini` and reads them there on
+ *     the site too. Only the keys a plugin's front-end layout (`tmpl/`) or a visitor's form (`forms/` of a user, content
+ *     or captcha plugin, the privacy consent) names are offered; the rest of those files are its settings.
+ *   - a date format a front-end layout passes through Text::_ as a literal (`Text::_('F j, Y')`, JA Essence and 26 other
+ *     JoomlArt and Gavick templates) with the month before the day: Text::_ looks it up upper-cased ("F J, Y"), finds no
+ *     key, and prints the English order ("Tháng sáu 9, 2023" beside the pack's "09 Tháng sáu 2023"). It is offered with
+ *     `reason: date-format` and the language's own format as `value` (DATE_FORMAT_LC3, its month width and year kept as
+ *     the literal has them), and a set writes that format or nothing: a date format is not words to translate.
+ *
+ * And one more (TracyHQ/tch#1013, dev g60-ess-j-full 11/10/2026): words a front-end layout prints as a literal, with no key at
+ * all (Joomla 6.1's mod_finder `aria-label="search"`, JA Essence's `<span class="sr-only">Watch the video</span>`), offered
+ * under `PageLiterals::keyOf()` with `reason: literal`; the system plugin's output filter prints the override's words in
+ * their place (lib/PageLiterals.php). Read from the template, the shared layouts and every `tmpl/` folder of a site
+ * component, module or plugin, never from an `admin` folder.
  */
+require_once __DIR__ . '/PageLiterals.php';
+
 final class LanguageOverrides
 {
     public const TEMPLATE = '/^[A-Za-z0-9_-]{1,60}$/D';
@@ -40,6 +59,17 @@ final class LanguageOverrides
     private const MAX_CODE_FILES = 20000;
     private const MAX_CODE_BYTES = 1048576;
     private const SOURCE = 'en-GB';
+    /** Where Joomla keeps a plugin's language files, the site's included. */
+    private const PLUGIN_LANGUAGE = 'administrator/language/';
+    /** The plugin groups whose forms a visitor fills in (registration, profile, contact, captcha); others are settings. */
+    private const VISITOR_FORM_GROUPS = ['user', 'content', 'captcha'];
+    /** A PHP date format with nothing but format letters and separators. */
+    private const DATE_LITERAL = '~^[dDjlNSwzWFmMntLoYyaABgGhHisuv][dDjlNSwzWFmMntLoYyaABgGhHisuv\s,./:-]{0,38}$~D';
+    /** A front-end call that passes a literal through Text::_ (or JText::_), the literal captured. */
+    private const TEXT_LITERAL = '~\bJ?Text::_\(\s*([\'"])([^\'"\r\n]{1,40})\1\s*[,)]~';
+
+    /** @var array<string,array{keys:array<string,true>,formats:array<string,string>,literals:array<string,string>}> the front-end code's keys, date literals and page literals, by template, read once */
+    private array $front = [];
 
     private string $root;
 
@@ -122,8 +152,69 @@ final class LanguageOverrides
                     'sort' => [self::RANKS[$rank], $class === 'other' ? 1 : 0, $order++]];
             }
         }
+        // A plugin's strings a visitor reads, from where Joomla keeps them (administrator/language), ranked as used.
+        $visitor = $this->pluginKeys();
+        foreach ($this->pluginFiles() as $file => $counterparts) {
+            $english = self::parse((string) $this->bytes($file));
+            $own = [];
+            foreach ($counterparts as $candidate) {
+                $bytes = $this->bytes(str_replace('%LOCALE%', $locale, $candidate));
+                if ($bytes !== null) { $own = self::parse($bytes); break; }
+            }
+            foreach ($english as $key => $source) {
+                if (isset($rows[$key]) || !isset($visitor[$key]) || !preg_match(self::KEY, $key) || !self::worded($source)) continue;
+                $reason = !array_key_exists($key, $own) ? 'missing'
+                    : (trim($own[$key]) === trim($source) ? 'untranslated' : (self::suspect($source, $own[$key]) ? 'suspect' : null));
+                if ($reason === null) continue;
+                $rows[$key] = ['row' => ['key' => $key, 'source' => $source, 'reason' => $reason, 'file' => $file, 'rank' => 'used'],
+                    'sort' => [self::RANKS['used'], 0, $order++]];
+            }
+        }
+        // The date formats the layouts pass through Text::_ in English order, each with the language's own.
+        $format = $this->dateFormat($locale);
+        if ($format !== null)
+            foreach ($this->front($template)['formats'] as $literal => $file) {
+                $key = strtoupper($literal);
+                $value = self::languageOrder($literal, $format);
+                if (isset($rows[$key]) || $value === null) continue;
+                $rows[$key] = ['row' => ['key' => $key, 'source' => $literal, 'reason' => 'date-format', 'file' => $file, 'rank' => 'used', 'value' => $value],
+                    'sort' => [self::RANKS['used'], 0, $order++]];
+            }
+        // The words a layout prints as a literal, each under a key of its own (lib/PageLiterals.php).
+        foreach ($this->front($template)['literals'] as $literal => $file) {
+            $key = PageLiterals::keyOf($literal);
+            if ($key === null || isset($rows[$key])) continue;
+            $rows[$key] = ['row' => ['key' => $key, 'source' => $literal, 'reason' => 'literal', 'file' => $file, 'rank' => 'used'],
+                'sort' => [self::RANKS['used'], 0, $order++]];
+        }
         uasort($rows, static fn(array $a, array $b): int => $a['sort'] <=> $b['sort']);
         return array_values(array_map(static fn(array $r): array => $r['row'], $rows));
+    }
+
+    /**
+     * Whether a literal is a date format that puts the month's name before the day (`F j, Y`, `M d, Y`): the English order a
+     * language's own format replaces. A format with the day first, or with no month name or no day, is left as it is.
+     */
+    public static function englishOrder(string $literal): bool
+    {
+        if (!preg_match(self::DATE_LITERAL, $literal)) return false;
+        $month = strcspn($literal, 'FM');
+        $day = strcspn($literal, 'dj');
+        return $month < strlen($literal) && $day < strlen($literal) && $month < $day;
+    }
+
+    /**
+     * The language's own format (`$format`, its DATE_FORMAT_LC3) in the shape of `$literal`: a short month name when the
+     * literal has one (`M`), no year when it has none, its day of the week in front when it starts with one. Null when that
+     * is the literal itself.
+     */
+    public static function languageOrder(string $literal, string $format): ?string
+    {
+        $out = $format;
+        if (strpos($literal, 'F') === false && strpos($literal, 'M') !== false) $out = str_replace('F', 'M', $out);
+        if (strcspn($literal, 'Yy') === strlen($literal)) $out = trim((string) preg_replace('~[\s,./-]*[Yy][\s,./-]*~', ' ', $out));
+        if (preg_match('/^[lD]/', $literal) && strcspn($out, 'lD') === strlen($out)) $out = $literal[0] . ', ' . $out;
+        return trim($out) === '' || $out === $literal ? null : $out;
     }
 
     /**
@@ -253,7 +344,8 @@ final class LanguageOverrides
         $lines = $before === '' ? [] : preg_split('/\r\n|\n|\r/', rtrim($before, "\r\n"));
         $left = $values;
         foreach ($lines as $i => $line) {
-            if (!preg_match('/^\s*([A-Za-z0-9_.\-]+)\s*=/', $line, $m)) continue;
+            // A key is what stands before `=`: a language key, or the literal of a date format (`F J, Y`).
+            if (!preg_match('/^\s*([^;=\s"\[][^="]*?)\s*=/', $line, $m)) continue;
             $key = strtoupper($m[1]);
             if (!array_key_exists($key, $left)) continue;
             $lines[$i] = self::line($key, $left[$key]);
@@ -336,11 +428,96 @@ final class LanguageOverrides
      */
     private function usedKeys(string $template): array
     {
+        return $this->front($template)['keys'];
+    }
+
+    /**
+     * The site's en-GB plugin language files where Joomla keeps them (`administrator/language/en-GB/plg_*.ini`, the
+     * `.sys.ini` ones left out), each with where its `$locale` copy would be.
+     *
+     * @return array<string,list<string>>
+     */
+    private function pluginFiles(): array
+    {
+        $out = [];
+        $dir = $this->root . '/' . self::PLUGIN_LANGUAGE . self::SOURCE;
+        if (!is_dir($dir) || is_link($dir)) return $out;
+        $names = @scandir($dir) ?: [];
+        sort($names);
+        foreach ($names as $name) {
+            if (!preg_match('/^(?:en-GB\.)?(plg_[a-z0-9_.\-]+)\.ini$/i', $name, $m) || preg_match('/\.sys\.ini$/i', $name)) continue;
+            $file = self::PLUGIN_LANGUAGE . self::SOURCE . '/' . $name;
+            if (is_link($this->root . '/' . $file) || !is_file($this->root . '/' . $file)) continue;
+            $out[$file] = [self::PLUGIN_LANGUAGE . '%LOCALE%/' . $m[1] . '.ini', self::PLUGIN_LANGUAGE . '%LOCALE%/%LOCALE%.' . $m[1] . '.ini'];
+        }
+        return $out;
+    }
+
+    /**
+     * The keys a visitor reads from a plugin: named in a plugin's front-end layouts (`plugins/<group>/<name>/tmpl/`) or in the
+     * forms a visitor fills in (`forms/` of a user, content or captcha plugin, and of the privacy consent). A plugin's
+     * manifest and its other forms are its settings, an administrator's words.
+     *
+     * @return array<string,true>
+     */
+    private function pluginKeys(): array
+    {
+        $keys = [];
+        foreach (@scandir($this->root . '/plugins') ?: [] as $group) {
+            if ($group === '.' || $group === '..' || !is_dir($this->root . '/plugins/' . $group)) continue;
+            foreach (@scandir($this->root . '/plugins/' . $group) ?: [] as $plugin) {
+                if ($plugin === '.' || $plugin === '..') continue;
+                $base = 'plugins/' . $group . '/' . $plugin;
+                $folders = [$base . '/tmpl' => 'php'];
+                if (in_array($group, self::VISITOR_FORM_GROUPS, true) || $base === 'plugins/system/privacyconsent') $folders[$base . '/forms'] = 'xml';
+                foreach ($folders as $folder => $extension)
+                    foreach ($this->codeFiles($folder, $extension) as $bytes)
+                        if (preg_match_all('/[\'"]([A-Z][A-Z0-9_]{2,119})[\'"]/', $bytes, $m))
+                            foreach ($m[1] as $key) $keys[$key] = true;
+            }
+        }
+        return $keys;
+    }
+
+    /**
+     * The bytes of the `$extension` files under a site folder, links, vendor trees and tests left out, at most MAX_CODE_FILES
+     * files of at most MAX_CODE_BYTES each.
+     *
+     * @return iterable<string>
+     */
+    private function codeFiles(string $folder, string $extension): iterable
+    {
+        $dir = $this->root . '/' . $folder;
+        if (!is_dir($dir) || is_link($dir)) return;
+        $walk = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            static fn(SplFileInfo $f): bool => !$f->isLink() && !($f->isDir() && in_array($f->getFilename(), ['vendor', 'node_modules', 'tests'], true))
+        ));
+        $files = 0;
+        foreach ($walk as $file) {
+            if (!$file->isFile() || strtolower($file->getExtension()) !== $extension || $file->getSize() > self::MAX_CODE_BYTES) continue;
+            if (++$files > self::MAX_CODE_FILES) return;
+            $bytes = @file_get_contents($file->getPathname());
+            if ($bytes !== false) yield $bytes;
+        }
+    }
+
+    /**
+     * The front-end code's language keys ({@see usedKeys()}) and the date formats it passes through Text::_ in English order
+     * ({@see englishOrder()}), each format with the first file that names it. Read once.
+     *
+     * @return array{keys:array<string,true>,formats:array<string,string>,literals:array<string,string>}
+     */
+    private function front(string $template): array
+    {
+        if (isset($this->front[$template])) return $this->front[$template];
         $folders = ['templates/' . $template, 'layouts', 'components', 'modules', 'plugins'];
         foreach (@scandir($this->root . '/modules') ?: [] as $module)
             if (preg_match('/^mod_([a-z0-9_]+)$/i', $module, $m))
                 foreach (['partial', 'Partial', 'layouts'] as $shared) $folders[] = 'administrator/components/com_' . $m[1] . '/' . $shared;
         $keys = [];
+        $formats = [];
+        $literals = [];
         $files = 0;
         foreach ($folders as $folder) {
             $dir = $this->root . '/' . $folder;
@@ -351,13 +528,24 @@ final class LanguageOverrides
             ));
             foreach ($walk as $file) {
                 if (!$file->isFile() || strtolower($file->getExtension()) !== 'php' || $file->getSize() > self::MAX_CODE_BYTES) continue;
-                if (++$files > self::MAX_CODE_FILES) return $keys;
+                if (++$files > self::MAX_CODE_FILES) return $this->front[$template] = ['keys' => $keys, 'formats' => $formats, 'literals' => $literals];
                 $bytes = @file_get_contents($file->getPathname());
-                if ($bytes === false || !preg_match_all('/[\'"]([A-Z][A-Z0-9_]{2,119})[\'"]/', $bytes, $m)) continue;
+                if ($bytes === false) continue;
+                $relative = substr($file->getPathname(), strlen($this->root) + 1);
+                // A visitor's layout: the template's own, the shared layouts, a `tmpl/` folder of the site; never an `admin` one.
+                if ((strpos($relative, 'templates/') === 0 || strpos($relative, 'layouts/') === 0 || strpos($relative, '/tmpl/') !== false)
+                    && preg_match('~(^|/)admin(istrator)?/~', $relative) !== 1)
+                    foreach (PageLiterals::inCode($bytes) as $literal)
+                        if (!isset($literals[$literal])) $literals[$literal] = $relative;
+                if (preg_match_all(self::TEXT_LITERAL, $bytes, $t))
+                    foreach ($t[2] as $literal)
+                        if (!isset($formats[$literal]) && self::englishOrder($literal))
+                            $formats[$literal] = substr($file->getPathname(), strlen($this->root) + 1);
+                if (!preg_match_all('/[\'"]([A-Z][A-Z0-9_]{2,119})[\'"]/', $bytes, $m)) continue;
                 foreach ($m[1] as $key) $keys[$key] = true;
             }
         }
-        return $keys;
+        return $this->front[$template] = ['keys' => $keys, 'formats' => $formats, 'literals' => $literals];
     }
 
     /** A site-relative file's bytes, or null when it is not a plain file. */
