@@ -444,7 +444,7 @@ a.je-pagination__link:focus-visible { outline: 2px solid var(--wp--preset--color
 .je-gallery .je-gallery__more .wp-block-button__link { box-sizing: border-box; padding: 12.8px 18px; border: 1px solid var(--wp--preset--color--accent); font-size: 18px; line-height: 20.7px; }
 .je-single.je-main { padding-bottom: 72px; }
 .je-single > .je-container { margin-bottom: 72px; }
-.je-articlecard .je-meta .wp-block-post-author-name::before { content: "By"; margin-right: 4px; font-weight: 400; }
+.je-articlecard .je-meta .wp-block-post-author-name::before { content: var(--wp-ja-essence-by); margin-right: 4px; font-weight: 400; }
 .je-articlecard .je-meta .wp-block-post-author-name { font-weight: 700; color: var(--wp--preset--color--fg-2); }
 .je-articlecard .je-meta .wp-block-post-author-name::before { color: var(--wp--preset--color--fg); }
 .je-articlecard .je-meta > * { min-height: 24px; }
@@ -724,7 +724,7 @@ a[href*="/lifestyle"], .je-cat--lifestyle { --je-cat: #dc3545; }
 .je-list .je-card .je-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 !important; margin: 0 0 16px !important; font-size: 14px; line-height: 21px; color: var(--wp--preset--color--fg); }
 .je-list .je-card .je-meta > * { display: flex; align-items: center; margin: 0 0 8px !important; min-height: 24px; white-space: nowrap; font-size: 14px; line-height: 21px; font-weight: 400; color: inherit; }
 .je-list .je-card .je-meta > * + *::before { content: "-"; font-size: 16px; margin: 0 8px; }
-.je-meta .wp-block-post-author-name::before { content: "By"; margin-right: 4px; font-weight: 400; color: var(--wp--preset--color--fg); }
+.je-meta .wp-block-post-author-name::before { content: var(--wp-ja-essence-by); margin-right: 4px; font-weight: 400; color: var(--wp--preset--color--fg); }
 .je-meta .wp-block-post-author-name { font-weight: 700; color: var(--wp--preset--color--fg-2); }
 .je-list .je-card__excerpt { margin: 0 !important; }
 .je-list .je-card__excerpt p { margin: 0 !important; font-size: 16px; line-height: 24px; color: var(--wp--preset--color--fg); }
@@ -1220,7 +1220,7 @@ body.je-hdr-two .je-header__top .je-subscribe .wp-block-button__link { min-width
 .je-meta__avatar-img { display: block; width: 32px !important; height: 32px !important; border-radius: 50%; object-fit: cover; }
 .je-list .je-card .je-meta > .je-meta__avatar + *::before { content: none; }
 .je-list .je-card .je-meta > .je-meta__avatar { min-height: 32px; }
-.je-list .je-card .je-meta > .je-meta__avatar + .wp-block-post-author-name::before { content: "By"; }
+.je-list .je-card .je-meta > .je-meta__avatar + .wp-block-post-author-name::before { content: var(--wp-ja-essence-by); }
 .je-list .je-card .je-meta > .wp-block-post-author-name { font-weight: 700; color: var(--wp--preset--color--fg-2); }
 .je-list .je-card .je-meta > .wp-block-post-author-name::before { font-weight: 400; color: var(--wp--preset--color--fg); }
 .wp-block-post-content .je-sec--choice > .je-sec__head > h2.je-sec__title { font-size: 32px; line-height: 41.6px; }

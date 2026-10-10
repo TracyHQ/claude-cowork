@@ -41,6 +41,13 @@ self-hosted.
 
 == Changelog ==
 
+= 1.0.13 =
+* The word before an author's name on the post cards is no longer written in the style sheet: je-detail.css prints
+  var(--wp-ja-essence-by), set from the theme's "By " in the site's language (inc/words.php), so a site made in another
+  language no longer reads "By" before every author.
+* The block words are translated in every spelling the release's pages carry them ("Read more", "Read More…",
+  "Read more...", a prefix "By" with no space), each keeping its own ending.
+
 = 1.0.12 =
 * The category tiles of home 2 are found by each category's slug, read from its link, never by its name: a site made in
   another language renames the categories, no tile matched, and the row printed the plain category list with no picture.
