@@ -1,8 +1,8 @@
 {
   "_comment": "What a WordPress site running the JA Nova theme (wp-ja-nova) asks for when it checks for updates. Read by wp-ja-nova/inc/update.php over the update_themes_github.com filter, reached because its style.css declares `Update URI: https://github.com/TracyHQ/claude-cowork`. Written by `node scripts/release-wordpress-theme.mjs <version> --theme wp-ja-nova`, which reads the version off the mirrored style.css. The mirror (TCH scripts/sync-cms-themes.mjs) leaves this file alone.",
-  "version": "1.1.11",
-  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-nova-v1.1.11/wp-ja-nova-1.1.11.zip",
-  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-nova-v1.1.11",
+  "version": "1.1.12",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-nova-v1.1.12/wp-ja-nova-1.1.12.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-nova-v1.1.12",
   "requires": "7.0",
   "requires_php": "8.1",
   "tested": "7.1"
