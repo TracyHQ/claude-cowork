@@ -1942,6 +1942,7 @@ require __DIR__ . "/template-site-settings.php";
 require __DIR__ . "/language-overrides.php";
 require __DIR__ . "/language-overrides-ranking.php";
 require __DIR__ . "/language-overrides-plugins-dates.php";
+require __DIR__ . "/language-overrides-literals.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";

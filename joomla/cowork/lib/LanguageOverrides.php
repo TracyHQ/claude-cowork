@@ -29,7 +29,15 @@
  *     key, and prints the English order ("Tháng sáu 9, 2023" beside the pack's "09 Tháng sáu 2023"). It is offered with
  *     `reason: date-format` and the language's own format as `value` (DATE_FORMAT_LC3, its month width and year kept as
  *     the literal has them), and a set writes that format or nothing: a date format is not words to translate.
+ *
+ * And one more (TracyHQ/tch#1013, dev g60-ess-j-full 11/10/2026): words a front-end layout prints as a literal, with no key at
+ * all (Joomla 6.1's mod_finder `aria-label="search"`, JA Essence's `<span class="sr-only">Watch the video</span>`), offered
+ * under `PageLiterals::keyOf()` with `reason: literal`; the system plugin's output filter prints the override's words in
+ * their place (lib/PageLiterals.php). Read from the template, the shared layouts and every `tmpl/` folder of a site
+ * component, module or plugin, never from an `admin` folder.
  */
+require_once __DIR__ . '/PageLiterals.php';
+
 final class LanguageOverrides
 {
     public const TEMPLATE = '/^[A-Za-z0-9_-]{1,60}$/D';
@@ -60,7 +68,7 @@ final class LanguageOverrides
     /** A front-end call that passes a literal through Text::_ (or JText::_), the literal captured. */
     private const TEXT_LITERAL = '~\bJ?Text::_\(\s*([\'"])([^\'"\r\n]{1,40})\1\s*[,)]~';
 
-    /** @var array<string,array{keys:array<string,true>,formats:array<string,string>}> the front-end code's keys and date literals, by template, read once */
+    /** @var array<string,array{keys:array<string,true>,formats:array<string,string>,literals:array<string,string>}> the front-end code's keys, date literals and page literals, by template, read once */
     private array $front = [];
 
     private string $root;
@@ -172,6 +180,13 @@ final class LanguageOverrides
                 $rows[$key] = ['row' => ['key' => $key, 'source' => $literal, 'reason' => 'date-format', 'file' => $file, 'rank' => 'used', 'value' => $value],
                     'sort' => [self::RANKS['used'], 0, $order++]];
             }
+        // The words a layout prints as a literal, each under a key of its own (lib/PageLiterals.php).
+        foreach ($this->front($template)['literals'] as $literal => $file) {
+            $key = PageLiterals::keyOf($literal);
+            if ($key === null || isset($rows[$key])) continue;
+            $rows[$key] = ['row' => ['key' => $key, 'source' => $literal, 'reason' => 'literal', 'file' => $file, 'rank' => 'used'],
+                'sort' => [self::RANKS['used'], 0, $order++]];
+        }
         uasort($rows, static fn(array $a, array $b): int => $a['sort'] <=> $b['sort']);
         return array_values(array_map(static fn(array $r): array => $r['row'], $rows));
     }
@@ -491,7 +506,7 @@ final class LanguageOverrides
      * The front-end code's language keys ({@see usedKeys()}) and the date formats it passes through Text::_ in English order
      * ({@see englishOrder()}), each format with the first file that names it. Read once.
      *
-     * @return array{keys:array<string,true>,formats:array<string,string>}
+     * @return array{keys:array<string,true>,formats:array<string,string>,literals:array<string,string>}
      */
     private function front(string $template): array
     {
@@ -502,6 +517,7 @@ final class LanguageOverrides
                 foreach (['partial', 'Partial', 'layouts'] as $shared) $folders[] = 'administrator/components/com_' . $m[1] . '/' . $shared;
         $keys = [];
         $formats = [];
+        $literals = [];
         $files = 0;
         foreach ($folders as $folder) {
             $dir = $this->root . '/' . $folder;
@@ -512,9 +528,15 @@ final class LanguageOverrides
             ));
             foreach ($walk as $file) {
                 if (!$file->isFile() || strtolower($file->getExtension()) !== 'php' || $file->getSize() > self::MAX_CODE_BYTES) continue;
-                if (++$files > self::MAX_CODE_FILES) return $this->front[$template] = ['keys' => $keys, 'formats' => $formats];
+                if (++$files > self::MAX_CODE_FILES) return $this->front[$template] = ['keys' => $keys, 'formats' => $formats, 'literals' => $literals];
                 $bytes = @file_get_contents($file->getPathname());
                 if ($bytes === false) continue;
+                $relative = substr($file->getPathname(), strlen($this->root) + 1);
+                // A visitor's layout: the template's own, the shared layouts, a `tmpl/` folder of the site; never an `admin` one.
+                if ((strpos($relative, 'templates/') === 0 || strpos($relative, 'layouts/') === 0 || strpos($relative, '/tmpl/') !== false)
+                    && preg_match('~(^|/)admin(istrator)?/~', $relative) !== 1)
+                    foreach (PageLiterals::inCode($bytes) as $literal)
+                        if (!isset($literals[$literal])) $literals[$literal] = $relative;
                 if (preg_match_all(self::TEXT_LITERAL, $bytes, $t))
                     foreach ($t[2] as $literal)
                         if (!isset($formats[$literal]) && self::englishOrder($literal))
@@ -523,7 +545,7 @@ final class LanguageOverrides
                 foreach ($m[1] as $key) $keys[$key] = true;
             }
         }
-        return $this->front[$template] = ['keys' => $keys, 'formats' => $formats];
+        return $this->front[$template] = ['keys' => $keys, 'formats' => $formats, 'literals' => $literals];
     }
 
     /** A site-relative file's bytes, or null when it is not a plain file. */
