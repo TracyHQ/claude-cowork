@@ -1477,6 +1477,50 @@ final class QuickstartContract
         ksort($out);
         return $out;
     }
+    /**
+     * The params in which a module keeps a date format of its own (mod_articles_category `show_date_format`, "M d, Y" in
+     * 32 modules of the published contracts; `date_format` of the older list modules). Printed with a language's month
+     * names but in this order, a vi-VN site read "Jun 09, 2023" (JA Essence 1.0.4, 10/10/2026): dates are visitor
+     * words (LANG-2, Akemi 10/10/2026), so the language step gives these the language's own format.
+     */
+    public const WRITTEN_DATE_FORMATS = ['show_date_format', 'date_format'];
+
+    /**
+     * Whether a PHP date format names the month in words before the day, with a year: English order ("M d, Y",
+     * "F j, Y"). A day-first, numeric, month-and-year or year-less format is left as the template has it.
+     */
+    public static function monthBeforeDay(string $format): bool {
+        $plain=(string)preg_replace('/\\\\./s','',$format);
+        $month=strcspn($plain,'MF');
+        $day=strcspn($plain,'dj');
+        return $month<strlen($plain)&&$day<strlen($plain)&&$month<$day&&strcspn($plain,'Yy')<strlen($plain);
+    }
+
+    /**
+     * The module date formats in English order on this site (see WRITTEN_DATE_FORMATS): bound, front end, published,
+     * in the source language or in every language.
+     *
+     * @return array<string,array{id:int,formats:array<string,string>}> base key => bound id and param => current format
+     */
+    public function writtenDateFormats(): array {
+        $this->ready();
+        $binding=$this->store->load();
+        if(!$binding)return [];
+        $out=[];
+        foreach($binding['presentation'] as $key=>$fields) {
+            if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key])||!is_array($fields['params']??null))continue;
+            if((string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
+            if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
+            $formats=[];
+            foreach(self::WRITTEN_DATE_FORMATS as $name) {
+                $value=$fields['params'][$name]??null;
+                if(is_string($value)&&self::monthBeforeDay($value))$formats[$name]=$value;
+            }
+            if($formats!==[])$out[$key]=['id'=>(int)$binding['ids'][$key],'formats'=>$formats];
+        }
+        ksort($out);
+        return $out;
+    }
     /** A locked row's language as this site names it: the published source tag reads as the relabelled one. */
     private function lockedLanguage(string $key): string {
         $language=(string)($this->lock['entities'][$key]['language']??'*');

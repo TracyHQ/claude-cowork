@@ -1927,6 +1927,7 @@ final class Engine
                     'installed' => $pack === null || $this->languagePackPresent($locale),
                     'onRecord' => $this->contract->binding()['siteLanguage'] ?? null,
                     'titles' => $titles,
+                    'dates' => $this->contract->binding() !== null ? $this->languageDatesPlan($locale) : [],
                 ]);
             }
             if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown siteLanguage operation');
@@ -1987,6 +1988,8 @@ final class Engine
             // here, as a written source relabel does. One left out keeps its words; the old ones are kept for revert.
             $words = $this->writtenWords($titles, 'siteLanguage.plan');
             if (is_string($words)) return $this->err('bad_params', $words);
+            // The dates too, in the language's own order: read from the pack, so after it is installed.
+            [$words, $dates] = $this->withLanguageDates($words, $locale);
             ['titlesById' => $byId, 'textsById' => $textsById, 'titlesBefore' => $before, 'titlesAfter' => $after, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
             $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($byId), array_keys($textsById)))));
             $this->writer->transaction(function () use ($apply, $request, $locale, $pack, $byId, $before, $after, $textsById, $textsBefore, $textsAfter) {
@@ -2006,7 +2009,7 @@ final class Engine
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
             $this->stamped('content');
             return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null,
-                'titles' => count($byId) + array_sum(array_map('count', $textsById))]);
+                'titles' => count($byId) + array_sum(array_map('count', $textsById)) - $dates, 'dates' => $dates]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
@@ -2120,6 +2123,43 @@ final class Engine
             foreach ($row['texts'] as $name => $text)
                 $out[] = ['key' => $key . '.params.' . $name, 'source' => $text, 'maxCharacters' => self::WRITTEN_TEXT_MAX];
         return $out;
+    }
+
+    /**
+     * The module date formats in English order (QuickstartContract::writtenDateFormats) and the format each would get:
+     * the language's own (LanguageOverrides::dateFormat), null while its pack is not installed.
+     */
+    private function languageDatesPlan(string $locale): array
+    {
+        $format = $this->overrides !== null ? $this->overrides->dateFormat($locale) : null;
+        $out = [];
+        foreach ($this->contract->writtenDateFormats() as $key => $row)
+            foreach ($row['formats'] as $name => $source)
+                $out[] = ['key' => $key . '.params.' . $name, 'source' => $source, 'format' => $format];
+        return $out;
+    }
+
+    /**
+     * `$words` (writtenWords) with every module date format in English order set to the language's own, recorded as
+     * module words are (`texts`), so a revert gives each its format back. Nothing is added when the language has no
+     * format of its own on this site. Answers the words and how many formats were added.
+     *
+     * @return array{0:array,1:int}
+     */
+    private function withLanguageDates(array $words, string $locale): array
+    {
+        $format = $this->overrides !== null ? $this->overrides->dateFormat($locale) : null;
+        if ($format === null) return [$words, 0];
+        $count = 0;
+        foreach ($this->contract->writtenDateFormats() as $key => $row)
+            foreach ($row['formats'] as $name => $source) {
+                if ($source === $format) continue;
+                $words['textsById'][$row['id']][$name] = $format;
+                $words['textsBefore'][$key][$name] = $source;
+                $words['textsAfter'][$key][$name] = $format;
+                $count++;
+            }
+        return [$words, $count];
     }
 
     /**
@@ -2246,12 +2286,16 @@ final class Engine
             $this->contract->bind($this->contract->inspect()['snapshot']);
             return [];
         });
+        // The dates in the language's own order, read from the pack now that it is there.
+        [$words, $dates] = $this->withLanguageDates($words, $locale);
+        $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_keys($words['textsById'])));
+        ['textsById' => $textsById, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
         $swapped = $this->writtenRelabel($apply, $current, $locale, null, $byId, $after, [
             'from' => $current, 'to' => $locale, 'written' => true, 'titles' => $before, 'applyId' => $apply, 'requestId' => $request,
             'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
         ] + ($textsBefore !== [] ? ['texts' => $textsBefore] : []), $textsById, $textsAfter);
         return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'swapped' => $swapped,
-            'titles' => count($byId) + array_sum(array_map('count', $textsById)), 'packVersion' => $pack['version'] ?? null]);
+            'titles' => count($byId) + array_sum(array_map('count', $textsById)) - $dates, 'dates' => $dates, 'packVersion' => $pack['version'] ?? null]);
     }
 
     /** A written relabel taken back: the tags swapped back, the headings and the defaults as they were. */

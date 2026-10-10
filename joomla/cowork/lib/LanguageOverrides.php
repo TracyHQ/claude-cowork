@@ -127,6 +127,21 @@ final class LanguageOverrides
     }
 
     /**
+     * A language's own date format, the one its pack prints an article's date with (DATE_FORMAT_LC3: "d F Y" in
+     * vi-VN 4.2.2.1): the site's override for it first, then the pack (`joomla.ini`, or `<tag>.ini` before Joomla 4).
+     * Null when neither has one that names a day and a month.
+     */
+    public function dateFormat(string $locale): ?string
+    {
+        if (!preg_match(self::LOCALE, $locale)) return null;
+        foreach ([self::path($locale), 'language/' . $locale . '/joomla.ini', 'language/' . $locale . '/' . $locale . '.ini'] as $file) {
+            $format = self::parse((string) $this->bytes($file))['DATE_FORMAT_LC3'] ?? null;
+            if (is_string($format) && trim($format) !== '' && strcspn($format, 'dj') < strlen($format) && strcspn($format, 'mnMF') < strlen($format)) return trim($format);
+        }
+        return null;
+    }
+
+    /**
      * The file a set would write: `$values` set in the language's override file, every other line kept. Null when
      * the bytes would not change.
      *
