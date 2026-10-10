@@ -3776,7 +3776,10 @@ final class Engine
      *   page of `strings`, each `{key, source, reason, file, rank}` (reason `missing`, `untranslated` or `suspect`;
      *   rank `template`, `used`, `core`, `other`, in that order: the words a visitor reads first); `overrides`, what the
      *   override file holds now; `total`, every string offered; `truncated` and `nextOffset` when more follow.
-     *   `DATE_FORMAT_*` keys are never offered: a format is configuration, not words.
+     *   `DATE_FORMAT_*` keys are never offered: a format is configuration, not words. A date format a layout passes through
+     *   Text::_ in English order (`Text::_('F j, Y')`) is offered under its upper-cased literal with `reason: date-format`
+     *   and `value`, the language's own format; a set writes that value for it or refuses it. Plugin strings a visitor reads
+     *   (`administrator/language/en-GB/plg_*.ini`, the keys of a plugin's `tmpl/` or of a visitor's form) are offered too.
      * - `operation: set`, `apply_id`, `template`, `locale`, `strings: {KEY: words}`: each key one the read offers, each
      *   value one line of plain text with the en-GB words' placeholders. A key or value that is not is left out and
      *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
@@ -3822,12 +3825,18 @@ final class Engine
         if (!is_array($strings) || $strings === [] || array_keys($strings) === range(0, count($strings) - 1))
             return $this->err('bad_params', 'strings required: an object of language keys to their words');
         $offered = [];
-        foreach ($plan['strings'] as $row) $offered[$row['key']] = $row['source'];
+        $formats = [];
+        foreach ($plan['strings'] as $row) {
+            $offered[$row['key']] = $row['source'];
+            if (($row['reason'] ?? null) === 'date-format') $formats[$row['key']] = $row['value'];
+        }
         $values = [];
         $refused = [];
         foreach ($strings as $key => $value) {
             $key = strtoupper((string) $key);
             if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => 'not a string this site shows in en-GB']; continue; }
+            // A date format is the language's own, never words: the read named it, and nothing else is written.
+            if (isset($formats[$key]) && (!is_string($value) || trim($value) !== $formats[$key])) { $refused[] = ['key' => $key, 'reason' => 'a date format takes the language\'s own (' . $formats[$key] . ')']; continue; }
             $why = LanguageOverrides::refusal($offered[$key], $value);
             if ($why !== null) { $refused[] = ['key' => $key, 'reason' => $why]; continue; }
             $values[$key] = trim($value);
