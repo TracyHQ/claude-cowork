@@ -24,7 +24,7 @@ $wsStore = new TestContractStore();
 $wsLog = new FakeApplyLog();
 $wsWriter = new ContractTestWriter($wsLog, $wsStore);
 $wsHero = ['title' => 'Home hero', 'module' => 'mod_custom', 'position' => 'masthead', 'published' => '1', 'access' => '1', 'language' => 'en-GB', 'client_id' => '0',
-    'showtitle' => '0', 'content' => '<h1>Demo title</h1>', 'params' => '{"style":"0"}'];
+    'showtitle' => '0', 'content' => '<h1>Demo title</h1>', 'params' => '{"style":"0","show_date_format":"F j, Y"}'];
 $wsColumn = ['title' => 'Services', 'module' => 'mod_menu', 'position' => 'footer-b', 'published' => '1', 'access' => '1', 'language' => 'en-GB', 'client_id' => '0',
     'showtitle' => '1', 'content' => '', 'params' => '{"menutype":"footer-en"}'];
 $wsEverywhere = ['title' => 'Search', 'module' => 'mod_finder', 'position' => 'sidebar', 'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0',
@@ -60,7 +60,13 @@ file_put_contents($wsRoot . '/lib/language-packs.json', json_encode([
 ]));
 
 $wsContract = new QuickstartContract($wsWriter, $wsStore, $wsDir, $wsDir);
-$wsEngine = new Engine($WTOKEN, ['joomla' => '6.1.2'], null, null, null, new WrittenTestExtensions(), $wsWriter, null, $wsLog, null, null, null, $wsContract);
+// The vi-VN pack's own date format (4.2.2.1), and a site override that wins over it.
+mkdir($wsRoot . '/site/language/vi-VN', 0777, true);
+mkdir($wsRoot . '/site/language/overrides', 0777, true);
+file_put_contents($wsRoot . '/site/language/vi-VN/joomla.ini', "DATE_FORMAT_LC3=\"d F Y\"\n");
+file_put_contents($wsRoot . '/site/language/overrides/vi-VN.override.ini', "DATE_FORMAT_LC3=\"j F, Y\"\n");
+$wsEngine = (new Engine($WTOKEN, ['joomla' => '6.1.2'], null, null, null, new WrittenTestExtensions(), $wsWriter, null, $wsLog, null, null, null, $wsContract))
+    ->languageOverrides(new LanguageOverrides($wsRoot . '/site'));
 $wsCall = fn(array $params) => $wsEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
 $wsWriter->transaction(function () use ($wsContract) { $wsContract->bind($wsContract->inspect()['snapshot']); return []; });
 
@@ -86,6 +92,7 @@ $wsWriter->store['language'][43]['published'] = '0';
 $wsFields = fn (array $row, array $names) => array_map(fn ($name) => $row[$name] ?? null, array_combine($names, $names));
 $done = $set(['titles' => ['column.title' => 'Dịch vụ', 'search.title' => 'Tìm kiếm']]);
 check('the written relabel completes', [$done['ok'] ?? null, $done['source'] ?? null, $done['swapped'] ?? null], [true, 'vi-VN', true]);
+check('the module date takes the language\'s own format, the site\'s override of it first', [$done['dates'] ?? null, $done['titles'] ?? null, json_decode($wsWriter->store['module'][110]['params'], true)['show_date_format'] ?? null], [1, 2, 'j F, Y']);
 check('the source rows carry vi-VN; the everywhere row stays everywhere; the hidden edition takes en-GB',
     [$wsWriter->store['module'][110]['language'], $wsWriter->store['module'][111]['language'], $wsWriter->store['module'][112]['language'], $wsWriter->store['module'][210]['language'], $wsWriter->store['module'][210]['published']],
     ['vi-VN', 'vi-VN', '*', 'en-GB', '0']);
@@ -112,4 +119,5 @@ check('revert swaps the tags back', [$back['ok'] ?? null, $wsWriter->store['modu
     [true, 'en-GB', 'vi-VN', 'en-GB', 'vi-VN']);
 check('and the headings and the defaults', [$wsWriter->store['module'][111]['title'], $wsWriter->store['module'][112]['title'], $wsWriter->store['languageDefaults']],
     ['Services', 'Search', ['site' => 'en-GB', 'administrator' => 'en-GB']]);
+check('and the module date format', json_decode($wsWriter->store['module'][110]['params'], true)['show_date_format'] ?? null, 'F j, Y');
 check('the reverted site inspects clean, under its published tag', [$wsContract->sourceLanguage(), $wsContract->inspect()['contract'], isset($wsStore->binding['sourceRelabel'])], ['en-GB', 'ws/j6/1.0.0', false]);

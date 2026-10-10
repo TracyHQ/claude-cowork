@@ -3204,7 +3204,7 @@ body.tracy {
 }
 
 .jv-page .tracy-card__author::before {
-  content: 'By ';
+  content: var(--wp-ja-vega-by);
 }
 
 .jv-page .tracy-card__meta > * + *::before {
@@ -4163,7 +4163,7 @@ body.tracy {
 }
 
 .tracy-card__meta > .tracy-card__avatar + .tracy-card__author::before {
-  content: 'By ';
+  content: var(--wp-ja-vega-by);
   margin: 0;
   color: inherit;
 }
@@ -4218,7 +4218,7 @@ body.tracy {
 }
 
 .jv-related .jv-post-card__meta .tracy-card__author::before {
-  content: 'By ';
+  content: var(--wp-ja-vega-by);
 }
 
 .jv-related .jv-post-card__meta > * + *::before {
@@ -4228,7 +4228,7 @@ body.tracy {
 }
 
 .jv-related .jv-post-card__meta > .tracy-card__avatar + .tracy-card__author::before {
-  content: 'By ';
+  content: var(--wp-ja-vega-by);
   margin: 0;
   color: inherit;
 }

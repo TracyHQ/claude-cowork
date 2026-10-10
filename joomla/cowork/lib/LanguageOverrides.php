@@ -26,8 +26,19 @@ final class LanguageOverrides
     public const KEY = '/^[A-Z0-9_][A-Z0-9_.\-]{0,119}$/D';
     /** The longest value written. */
     public const MAX_VALUE = 2000;
-    /** The most strings one plan offers: the template's first. */
+    /** The most strings one page of a plan offers. */
     public const MAX_STRINGS = 1500;
+    /** A date or time format: configuration a translator must not touch (the language step sets dates itself). */
+    private const FORMAT_KEY = '/^DATE_FORMAT_/';
+    /** A month or day name: every date the front end prints reads one, and no code names it as a literal. */
+    private const DATE_WORD = '/^(?:(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)(?:_SHORT)?|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY|MON|TUE|WED|THU|FRI|SAT|SUN)$/';
+    private const RANKS = ['template' => 0, 'used' => 1, 'core' => 2, 'other' => 3];
+    /** Joomla's own front-end language files besides joomla.ini, lib_joomla.ini and every mod_*.ini. */
+    private const CORE_FILES = ['joomla', 'lib_joomla', 'com_ajax', 'com_banners', 'com_config', 'com_contact', 'com_content', 'com_fields',
+        'com_finder', 'com_mailto', 'com_media', 'com_newsfeeds', 'com_privacy', 'com_search', 'com_tags', 'com_users', 'com_wrapper'];
+    /** The front-end code read for the keys it names: at most this many PHP files, each at most MAX_CODE_BYTES. */
+    private const MAX_CODE_FILES = 20000;
+    private const MAX_CODE_BYTES = 1048576;
     private const SOURCE = 'en-GB';
 
     private string $root;
@@ -51,15 +62,47 @@ final class LanguageOverrides
     }
 
     /**
-     * The strings that read in en-GB on the front end in `$locale`, and the overrides the site holds for it now.
+     * The strings that read in en-GB on the front end in `$locale`, one page of them, the ones a visitor reads first,
+     * and the overrides the site holds for it now.
      *
-     * @return array{strings:list<array{key:string,source:string,reason:string,file:string}>,overrides:array<string,string>,truncated:bool}
+     * 🔒 RANKED BY USE, NEVER CUT SILENTLY (TCH #1013, measured 10/10/2026 on g59-ess-j-full): walked in file order,
+     * AcyMailing's 2,861 mostly administrator strings came before joomla.ini and every mod_*.ini, and a cap of 1500
+     * cut inside them, so "All Rights Reserved", "Remember me", "Advanced Search", "Jun" and "Details" were never
+     * offered. The order is now (`rank`):
+     *   1. `template`: the template's own front-end file;
+     *   2. `used`: a key the site's front-end code names (the template, layouts, site components, modules, plugins, and
+     *      the shared partials of a component whose module is installed) or a month or day name (dates print them),
+     *      Joomla's own files before third-party ones;
+     *   3. `core`: the rest of Joomla's front-end files and of every module's file;
+     *   4. `other`: the rest of third-party files.
+     * A page is `limit` strings (at most MAX_STRINGS) from `offset`; `total` counts them all, `truncated` says more
+     * follow and `nextOffset` is where (null on the last page).
+     *
+     * @return array{strings:list<array{key:string,source:string,reason:string,file:string,rank:string}>,overrides:array<string,string>,truncated:bool,total:int,offset:int,nextOffset:?int}
      */
-    public function plan(string $template, string $locale): array
+    public function plan(string $template, string $locale, int $offset = 0, int $limit = self::MAX_STRINGS): array
     {
-        $current = self::parse((string) $this->bytes(self::path($locale)));
-        $offered = [];
-        $truncated = false;
+        $all = $this->offered($template, $locale);
+        $limit = max(1, min(self::MAX_STRINGS, $limit));
+        $offset = max(0, $offset);
+        $page = array_slice($all, $offset, $limit);
+        $next = $offset + count($page) < count($all) ? $offset + count($page) : null;
+        return [
+            'strings' => $page, 'overrides' => self::parse((string) $this->bytes(self::path($locale))),
+            'truncated' => $next !== null, 'total' => count($all), 'offset' => $offset, 'nextOffset' => $next,
+        ];
+    }
+
+    /**
+     * Every string the site shows in en-GB in `$locale`, ranked (see {@see plan()}): what a set may write.
+     *
+     * @return list<array{key:string,source:string,reason:string,file:string,rank:string}>
+     */
+    public function offered(string $template, string $locale): array
+    {
+        $used = $this->usedKeys($template);
+        $rows = [];
+        $order = 0;
         foreach ($this->sourceFiles($template) as $file => $counterparts) {
             $english = self::parse((string) $this->bytes($file));
             $own = [];
@@ -67,17 +110,35 @@ final class LanguageOverrides
                 $bytes = $this->bytes(str_replace('%LOCALE%', $locale, $candidate));
                 if ($bytes !== null) { $own = self::parse($bytes); break; }
             }
+            $class = self::fileClass($file, $template);
             foreach ($english as $key => $source) {
-                if (isset($offered[$key]) || !preg_match(self::KEY, $key)) continue;
+                if (isset($rows[$key]) || !preg_match(self::KEY, $key) || preg_match(self::FORMAT_KEY, $key)) continue;
                 if (!self::worded($source)) continue;
                 $reason = !array_key_exists($key, $own) ? 'missing'
                     : (trim($own[$key]) === trim($source) ? 'untranslated' : (self::suspect($source, $own[$key]) ? 'suspect' : null));
                 if ($reason === null) continue;
-                if (count($offered) >= self::MAX_STRINGS) { $truncated = true; break 2; }
-                $offered[$key] = ['key' => $key, 'source' => $source, 'reason' => $reason, 'file' => $file];
+                $rank = $class === 'template' ? 'template' : (isset($used[$key]) || preg_match(self::DATE_WORD, $key) ? 'used' : $class);
+                $rows[$key] = ['row' => ['key' => $key, 'source' => $source, 'reason' => $reason, 'file' => $file, 'rank' => $rank],
+                    'sort' => [self::RANKS[$rank], $class === 'other' ? 1 : 0, $order++]];
             }
         }
-        return ['strings' => array_values($offered), 'overrides' => $current, 'truncated' => $truncated];
+        uasort($rows, static fn(array $a, array $b): int => $a['sort'] <=> $b['sort']);
+        return array_values(array_map(static fn(array $r): array => $r['row'], $rows));
+    }
+
+    /**
+     * A language's own date format, the one its pack prints an article's date with (DATE_FORMAT_LC3: "d F Y" in
+     * vi-VN 4.2.2.1): the site's override for it first, then the pack (`joomla.ini`, or `<tag>.ini` before Joomla 4).
+     * Null when neither has one that names a day and a month.
+     */
+    public function dateFormat(string $locale): ?string
+    {
+        if (!preg_match(self::LOCALE, $locale)) return null;
+        foreach ([self::path($locale), 'language/' . $locale . '/joomla.ini', 'language/' . $locale . '/' . $locale . '.ini'] as $file) {
+            $format = self::parse((string) $this->bytes($file))['DATE_FORMAT_LC3'] ?? null;
+            if (is_string($format) && trim($format) !== '' && strcspn($format, 'dj') < strlen($format) && strcspn($format, 'mnMF') < strlen($format)) return trim($format);
+        }
+        return null;
     }
 
     /**
@@ -255,6 +316,48 @@ final class LanguageOverrides
             }
         }
         return $own + $other;
+    }
+
+    /** A language file's class: the template's own, Joomla's (or a module's), or a third party's. */
+    private static function fileClass(string $file, string $template): string
+    {
+        $extension = strtolower((string) preg_replace('/^(?:[a-z]{2,3}-[A-Z]{2,4}\.)?(.+)\.ini$/i', '$1', basename($file)));
+        if ($extension === strtolower('tpl_' . $template)) return 'template';
+        return in_array($extension, self::CORE_FILES, true) || strpos($extension, 'mod_') === 0 ? 'core' : 'other';
+    }
+
+    /**
+     * The language keys the site's front-end code names as literals (`Text::_('JDETAILS')`): the template, the shared
+     * layouts, the site components, the modules, the plugins (the T4 and T3 base themes live there), and the shared
+     * partials of a component whose module is installed (AcyMailing's form renders `com_acym/partial/forms/*` from
+     * mod_acym). Administrator views are not read: they name every key a component has.
+     *
+     * @return array<string,true>
+     */
+    private function usedKeys(string $template): array
+    {
+        $folders = ['templates/' . $template, 'layouts', 'components', 'modules', 'plugins'];
+        foreach (@scandir($this->root . '/modules') ?: [] as $module)
+            if (preg_match('/^mod_([a-z0-9_]+)$/i', $module, $m))
+                foreach (['partial', 'Partial', 'layouts'] as $shared) $folders[] = 'administrator/components/com_' . $m[1] . '/' . $shared;
+        $keys = [];
+        $files = 0;
+        foreach ($folders as $folder) {
+            $dir = $this->root . '/' . $folder;
+            if (!is_dir($dir) || is_link($dir)) continue;
+            $walk = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+                static fn(SplFileInfo $f): bool => !$f->isLink() && !($f->isDir() && in_array($f->getFilename(), ['vendor', 'node_modules', 'tests'], true))
+            ));
+            foreach ($walk as $file) {
+                if (!$file->isFile() || strtolower($file->getExtension()) !== 'php' || $file->getSize() > self::MAX_CODE_BYTES) continue;
+                if (++$files > self::MAX_CODE_FILES) return $keys;
+                $bytes = @file_get_contents($file->getPathname());
+                if ($bytes === false || !preg_match_all('/[\'"]([A-Z][A-Z0-9_]{2,119})[\'"]/', $bytes, $m)) continue;
+                foreach ($m[1] as $key) $keys[$key] = true;
+            }
+        }
+        return $keys;
     }
 
     /** A site-relative file's bytes, or null when it is not a plain file. */

@@ -62,7 +62,46 @@ function wp_ja_essence_word( string $text ): string {
 }
 
 /**
- * The attributes of a block that still read the theme's English, in the site's language, before the block is drawn.
+ * A word as its spellings are compared: one case, one spacing, no trailing dots or ellipsis.
+ *
+ * @param string $text The text.
+ * @return string
+ */
+function wp_ja_essence_spelling( string $text ): string {
+	$text = preg_replace( '/(?:\s*(?:\.{2,}|…))+\s*$/u', '', $text );
+	return strtolower( trim( preg_replace( '/\s+/u', ' ', $text ) ) );
+}
+
+/**
+ * One of the theme's English words in the site's language, in the spelling the block carries it: "Read more", "Read more…"
+ * and "Read more ..." are one word, and the translation keeps the block's own ending (no dots, an ellipsis, three dots) and
+ * its trailing space. Null when the text is not that word.
+ *
+ * 🔒 Measured 10/10/2026 on dev g59-ess-wp-full (1.0.12, Vietnamese): the release's pages carry `moreText:"Read more"` eight
+ * times, and only the exact "Read more ..." was translated, so nine pages printed "Read more".
+ *
+ * @param string $text    The text a block carries.
+ * @param string $english The theme's English word.
+ * @return string|null
+ */
+function wp_ja_essence_spelt_word( string $text, string $english ): ?string {
+	if ( '' === trim( $text ) || wp_ja_essence_spelling( $text ) !== wp_ja_essence_spelling( $english ) ) {
+		return null;
+	}
+	if ( $text === $english ) {
+		return wp_ja_essence_word( $english );
+	}
+	$said = wp_ja_essence_word( $english );
+	$bare = rtrim( preg_replace( '/(?:\s*(?:\.{2,}|…))+\s*$/u', '', $said ) );
+	if ( preg_match( '/(\s*(?:\.{2,}|…))\s*$/u', $text, $end ) ) {
+		$bare .= $end[1];
+	}
+	return preg_match( '/\s$/u', $text ) ? $bare . ' ' : $bare;
+}
+
+/**
+ * The attributes of a block that still read the theme's English, in any spelling of it, in the site's language, before the
+ * block is drawn.
  *
  * @param array $block The parsed block.
  * @return array
@@ -73,8 +112,10 @@ function wp_ja_essence_block_words( array $block ): array {
 		return $block;
 	}
 	foreach ( $words as $attribute => $english ) {
-		if ( ( $block['attrs'][ $attribute ] ?? null ) === $english ) {
-			$block['attrs'][ $attribute ] = wp_ja_essence_word( $english );
+		$value = $block['attrs'][ $attribute ] ?? null;
+		$said  = is_string( $value ) ? wp_ja_essence_spelt_word( $value, $english ) : null;
+		if ( null !== $said ) {
+			$block['attrs'][ $attribute ] = $said;
 		}
 	}
 	return $block;
@@ -135,3 +176,27 @@ function wp_ja_essence_dark_words(): void {
 	wp_add_inline_script( 'wp-ja-essence-dark', 'window.wpJaEssenceWords=' . wp_json_encode( $words ) . ';', 'before' );
 }
 add_action( 'wp_enqueue_scripts', 'wp_ja_essence_dark_words', 12 );
+
+/**
+ * A text as a CSS string: quoted, with its quotes and backslashes escaped and no character that could end the style sheet.
+ *
+ * @param string $text The text.
+ * @return string
+ */
+function wp_ja_essence_css_string( string $text ): string {
+	$text = preg_replace( '/[<>\\r\\n]+/', ' ', $text );
+	return '"' . addcslashes( $text, '"\\' ) . '"';
+}
+
+/**
+ * The words the theme's style sheets print before an author's name, as CSS variables in the site's language.
+ *
+ * 🔒 A STYLE SHEET CARRIES NO VISITOR WORD (LANG-2, measured 10/10/2026 on dev g59-ess-wp-full, 1.0.12, Vietnamese): the post
+ * cards read "By Woodrow Ortega" because `je-detail.css` printed the word in `content:`, which no translation reaches. The
+ * rules print `var(--wp-ja-essence-by)`, and the word is set here through the theme's domain.
+ */
+function wp_ja_essence_css_words(): void {
+	$by = trim( wp_ja_essence_word( 'By ' ) );
+	wp_add_inline_style( 'wp-ja-essence', ':root{--wp-ja-essence-by:' . wp_ja_essence_css_string( $by ) . ';}' );
+}
+add_action( 'wp_enqueue_scripts', 'wp_ja_essence_css_words', 12 );

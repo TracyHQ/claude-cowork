@@ -1440,6 +1440,14 @@ final class QuickstartContract
         'mod_finder' => ['alt_label'],
         'mod_jaquickcontact' => ['intro_text', 'thank_msg', 'sender_label', 'email_label', 'message_label'],
     ];
+    /**
+     * The words T4 and T3 let ANY module carry in its params, printed by the template's module chrome around it: a
+     * description ("Articles of the day" above JA Essence's module 129, a mod_articles_category), a sub-heading, a main
+     * heading, a button title, an intro (the templates' own module forms, TPL_MOD_DESC_LABEL, TPL_SUB_HEADING_LABEL,
+     * TPL_MAIN_HEADING_LABEL, TPL_BTN_TITLE_SECTIONS_LABEL, TPL_MODULE_INTRO_LABEL). Measured in the published
+     * contracts 10/10/2026: sub-heading 84 modules, title-btn 29, main-heading 27, module-intro 14, mod-desc 1.
+     */
+    public const WRITTEN_CHROME_TEXTS = ['mod-desc', 'sub-heading', 'main-heading', 'title-btn', 'module-intro'];
 
     /**
      * Those words on this site: every base module bound here, front end, published, in the source language or in
@@ -1454,16 +1462,61 @@ final class QuickstartContract
         $out=[];
         foreach($binding['presentation'] as $key=>$fields) {
             if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key]))continue;
-            $names=self::WRITTEN_MODULE_TEXTS[(string)($fields['module']??'')]??null;
-            if($names===null||!is_array($fields['params']??null))continue;
+            $names=array_merge(self::WRITTEN_MODULE_TEXTS[(string)($fields['module']??'')]??[],self::WRITTEN_CHROME_TEXTS);
+            if(!is_array($fields['params']??null))continue;
             if((string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
             if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
             $texts=[];
             foreach($names as $name) {
                 $value=$fields['params'][$name]??null;
-                if(is_string($value)&&trim($value)!==''&&preg_match('/\p{L}/u',$value)&&!preg_match('/[<>]/',$value))$texts[$name]=$value;
+                // Plain words only: markup, or a {loadposition}-style tag, is left as it is.
+                if(is_string($value)&&trim($value)!==''&&preg_match('/\p{L}/u',$value)&&!preg_match('/[<>]|\{[a-z]/i',$value))$texts[$name]=$value;
             }
             if($texts!==[])$out[$key]=['id'=>(int)$binding['ids'][$key],'texts'=>$texts];
+        }
+        ksort($out);
+        return $out;
+    }
+    /**
+     * The params in which a module keeps a date format of its own (mod_articles_category `show_date_format`, "M d, Y" in
+     * 32 modules of the published contracts; `date_format` of the older list modules). Printed with a language's month
+     * names but in this order, a vi-VN site read "Jun 09, 2023" (JA Essence 1.0.4, 10/10/2026): dates are visitor
+     * words (LANG-2, Akemi 10/10/2026), so the language step gives these the language's own format.
+     */
+    public const WRITTEN_DATE_FORMATS = ['show_date_format', 'date_format'];
+
+    /**
+     * Whether a PHP date format names the month in words before the day, with a year: English order ("M d, Y",
+     * "F j, Y"). A day-first, numeric, month-and-year or year-less format is left as the template has it.
+     */
+    public static function monthBeforeDay(string $format): bool {
+        $plain=(string)preg_replace('/\\\\./s','',$format);
+        $month=strcspn($plain,'MF');
+        $day=strcspn($plain,'dj');
+        return $month<strlen($plain)&&$day<strlen($plain)&&$month<$day&&strcspn($plain,'Yy')<strlen($plain);
+    }
+
+    /**
+     * The module date formats in English order on this site (see WRITTEN_DATE_FORMATS): bound, front end, published,
+     * in the source language or in every language.
+     *
+     * @return array<string,array{id:int,formats:array<string,string>}> base key => bound id and param => current format
+     */
+    public function writtenDateFormats(): array {
+        $this->ready();
+        $binding=$this->store->load();
+        if(!$binding)return [];
+        $out=[];
+        foreach($binding['presentation'] as $key=>$fields) {
+            if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key])||!is_array($fields['params']??null))continue;
+            if((string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
+            if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
+            $formats=[];
+            foreach(self::WRITTEN_DATE_FORMATS as $name) {
+                $value=$fields['params'][$name]??null;
+                if(is_string($value)&&self::monthBeforeDay($value))$formats[$name]=$value;
+            }
+            if($formats!==[])$out[$key]=['id'=>(int)$binding['ids'][$key],'formats'=>$formats];
         }
         ksort($out);
         return $out;

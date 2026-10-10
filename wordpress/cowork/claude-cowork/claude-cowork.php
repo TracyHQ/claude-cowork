@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Edits to posts and media are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.7
+ * Version:     0.18.8
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -51,6 +51,11 @@ ProvenanceStamps::register();
 // Adds no filter at all unless the site holds an override (lib/StringOverrides.php).
 require_once __DIR__ . '/lib/StringOverrides.php';
 StringOverrides::register();
+// The words blocks keep in their attributes ("Read more", "Search", "By "), and a date block's English-order format, in
+// the site's language: the site's own map (`content.contract {operation:'blockWords.set'}`), else WordPress's own
+// translation (lib/BlockWords.php).
+require_once __DIR__ . '/lib/BlockWords.php';
+BlockWords::register();
 // A page's own search title and meta description on a site with no SEO plugin (`_claude_cowork_seo_*`
 // post meta, lib/SeoFields.php). Prints nothing while an SEO plugin runs, or on a page holding neither.
 require_once __DIR__ . '/lib/SeoFields.php';

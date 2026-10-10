@@ -1333,7 +1333,7 @@ body.tracy .jn-news__items > li:first-child .jn-news__title { font-size: var(--j
 body.tracy .jn-sec .jn-news__title a { color: #ffffff; }
 body.tracy .jn-news__info { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; font-weight: 500; text-transform: uppercase; }
 body.tracy .jn-news__author { font-weight: 700; color: #ffffff; }
-body.tracy .jn-news__author::before { content: 'By '; font-weight: 500; color: var(--jn-on-band); }
+body.tracy .jn-news__author::before { content: var(--wp-ja-nova-by); font-weight: 500; color: var(--jn-on-band); }
 body.tracy .jn-news__cat a { color: #ffffff; }
 body.tracy .jn-news__cat::before { content: '–'; margin-right: 8px; color: var(--jn-on-band); }
 body.tracy .jn-news__excerpt { margin: 0 0 16px; }

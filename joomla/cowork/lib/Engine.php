@@ -1927,6 +1927,7 @@ final class Engine
                     'installed' => $pack === null || $this->languagePackPresent($locale),
                     'onRecord' => $this->contract->binding()['siteLanguage'] ?? null,
                     'titles' => $titles,
+                    'dates' => $this->contract->binding() !== null ? $this->languageDatesPlan($locale) : [],
                 ]);
             }
             if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown siteLanguage operation');
@@ -1987,6 +1988,8 @@ final class Engine
             // here, as a written source relabel does. One left out keeps its words; the old ones are kept for revert.
             $words = $this->writtenWords($titles, 'siteLanguage.plan');
             if (is_string($words)) return $this->err('bad_params', $words);
+            // The dates too, in the language's own order: read from the pack, so after it is installed.
+            [$words, $dates] = $this->withLanguageDates($words, $locale);
             ['titlesById' => $byId, 'textsById' => $textsById, 'titlesBefore' => $before, 'titlesAfter' => $after, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
             $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($byId), array_keys($textsById)))));
             $this->writer->transaction(function () use ($apply, $request, $locale, $pack, $byId, $before, $after, $textsById, $textsBefore, $textsAfter) {
@@ -2006,7 +2009,7 @@ final class Engine
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
             $this->stamped('content');
             return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null,
-                'titles' => count($byId) + array_sum(array_map('count', $textsById))]);
+                'titles' => count($byId) + array_sum(array_map('count', $textsById)) - $dates, 'dates' => $dates]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
@@ -2120,6 +2123,43 @@ final class Engine
             foreach ($row['texts'] as $name => $text)
                 $out[] = ['key' => $key . '.params.' . $name, 'source' => $text, 'maxCharacters' => self::WRITTEN_TEXT_MAX];
         return $out;
+    }
+
+    /**
+     * The module date formats in English order (QuickstartContract::writtenDateFormats) and the format each would get:
+     * the language's own (LanguageOverrides::dateFormat), null while its pack is not installed.
+     */
+    private function languageDatesPlan(string $locale): array
+    {
+        $format = $this->overrides !== null ? $this->overrides->dateFormat($locale) : null;
+        $out = [];
+        foreach ($this->contract->writtenDateFormats() as $key => $row)
+            foreach ($row['formats'] as $name => $source)
+                $out[] = ['key' => $key . '.params.' . $name, 'source' => $source, 'format' => $format];
+        return $out;
+    }
+
+    /**
+     * `$words` (writtenWords) with every module date format in English order set to the language's own, recorded as
+     * module words are (`texts`), so a revert gives each its format back. Nothing is added when the language has no
+     * format of its own on this site. Answers the words and how many formats were added.
+     *
+     * @return array{0:array,1:int}
+     */
+    private function withLanguageDates(array $words, string $locale): array
+    {
+        $format = $this->overrides !== null ? $this->overrides->dateFormat($locale) : null;
+        if ($format === null) return [$words, 0];
+        $count = 0;
+        foreach ($this->contract->writtenDateFormats() as $key => $row)
+            foreach ($row['formats'] as $name => $source) {
+                if ($source === $format) continue;
+                $words['textsById'][$row['id']][$name] = $format;
+                $words['textsBefore'][$key][$name] = $source;
+                $words['textsAfter'][$key][$name] = $format;
+                $count++;
+            }
+        return [$words, $count];
     }
 
     /**
@@ -2246,12 +2286,16 @@ final class Engine
             $this->contract->bind($this->contract->inspect()['snapshot']);
             return [];
         });
+        // The dates in the language's own order, read from the pack now that it is there.
+        [$words, $dates] = $this->withLanguageDates($words, $locale);
+        $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_keys($words['textsById'])));
+        ['textsById' => $textsById, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
         $swapped = $this->writtenRelabel($apply, $current, $locale, null, $byId, $after, [
             'from' => $current, 'to' => $locale, 'written' => true, 'titles' => $before, 'applyId' => $apply, 'requestId' => $request,
             'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
         ] + ($textsBefore !== [] ? ['texts' => $textsBefore] : []), $textsById, $textsAfter);
         return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'swapped' => $swapped,
-            'titles' => count($byId) + array_sum(array_map('count', $textsById)), 'packVersion' => $pack['version'] ?? null]);
+            'titles' => count($byId) + array_sum(array_map('count', $textsById)) - $dates, 'dates' => $dates, 'packVersion' => $pack['version'] ?? null]);
     }
 
     /** A written relabel taken back: the tags swapped back, the headings and the defaults as they were. */
@@ -3728,9 +3772,11 @@ final class Engine
      * `template.languageOverrides` — the site's front-end language strings that still read in en-GB for one language,
      * and its language override file for that language (TCH #1013; lib/LanguageOverrides.php).
      *
-     * - `operation: read` (the default), `template`, `locale`: `strings`, each `{key, source, reason, file}` (reason
-     *   `missing`, `untranslated` or `suspect`), the template's own first; `overrides`, what the override file holds now;
-     *   `truncated` when more were found than one plan offers.
+     * - `operation: read` (the default), `template`, `locale`, optional `offset` (0) and `limit` (1..1500, 1500): one
+     *   page of `strings`, each `{key, source, reason, file, rank}` (reason `missing`, `untranslated` or `suspect`;
+     *   rank `template`, `used`, `core`, `other`, in that order: the words a visitor reads first); `overrides`, what the
+     *   override file holds now; `total`, every string offered; `truncated` and `nextOffset` when more follow.
+     *   `DATE_FORMAT_*` keys are never offered: a format is configuration, not words.
      * - `operation: set`, `apply_id`, `template`, `locale`, `strings: {KEY: words}`: each key one the read offers, each
      *   value one line of plain text with the en-GB words' placeholders. A key or value that is not is left out and
      *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
@@ -3748,15 +3794,27 @@ final class Engine
         if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
             return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
         if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
+        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') {
+            $offset = $p['offset'] ?? 0;
+            $limit = $p['limit'] ?? LanguageOverrides::MAX_STRINGS;
+            if (!is_int($offset) || $offset < 0) return $this->err('bad_params', 'offset is a whole number from 0: the nextOffset of the page before');
+            if (!is_int($limit) || $limit < 1 || $limit > LanguageOverrides::MAX_STRINGS)
+                return $this->err('bad_params', 'limit is a whole number from 1 to ' . LanguageOverrides::MAX_STRINGS);
+            try {
+                return $this->ok($head + $this->overrides->plan($template, $locale, $offset, $limit));
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
+        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
         try {
-            $plan = $this->overrides->plan($template, $locale);
+            // Every page's strings, not one page's: a key read on a later page is as writable as one on the first.
+            $plan = ['strings' => $this->overrides->offered($template, $locale)];
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
-        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
-        $operation = $p['operation'] ?? 'read';
-        if ($operation === 'read') return $this->ok($head + $plan);
-        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
         if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
         $applyId = $this->applyId($p);
         if ($applyId === null) return $this->err('bad_params', 'apply_id required');

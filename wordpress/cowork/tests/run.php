@@ -1637,6 +1637,7 @@ require_once __DIR__ . '/unpublished-term.php';
 require_once __DIR__ . '/retired-sitemaps.php';
 // The site's default language on a sealed multilingual site.
 require_once __DIR__ . '/site-language.php';
+require_once __DIR__ . '/site-locale-follow.php';
 require_once __DIR__ . '/theme-style-variation.php';
 require_once __DIR__ . '/global-styles-kses.php';
 require_once __DIR__ . '/string-translations.php';
@@ -1683,6 +1684,7 @@ require __DIR__ . '/derived-contract.php';
 require __DIR__ . '/derived-scale.php';
 // String overrides: gettext words replaced per locale, through content.contract string and apply.revert.
 require __DIR__ . '/string-overrides.php';
+require __DIR__ . '/block-words.php';
 // apply.revert takes back one receipt: the span its write changed, never the whole row.
 require __DIR__ . '/revert-span.php';
 // A page's search title and meta description: the SEO plugin's keys, or with none the plugin's own meta it prints.

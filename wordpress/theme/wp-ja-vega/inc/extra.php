@@ -98,6 +98,21 @@ function wp_ja_vega_enqueue_assets(): void {
 add_action( 'wp_enqueue_scripts', 'wp_ja_vega_enqueue_assets', 11 );
 
 /**
+ * The word the theme's style sheet prints before an author's name, as a CSS variable in the site's language.
+ *
+ * 🔒 A STYLE SHEET CARRIES NO VISITOR WORD (LANG-2, measured 10/10/2026 on dev g59-ess-wp-full, JA Essence WordPress 1.0.12,
+ * Vietnamese): post cards read "By <author>" because the style sheet printed the word in `content:`, which no translation
+ * reaches. The rules print `var(--wp-ja-vega-by)`; the word is WordPress's own "By %s" (the core translation every site
+ * language ships), so a site in any language reads it in that language.
+ */
+function wp_ja_vega_css_words(): void {
+	$by = preg_replace( '/[<>"\\\\\r\n]+/', ' ', str_replace( '%s', '', _x( 'By %s', 'theme author', 'default' ) ) );
+	$by = trim( $by );
+	wp_add_inline_style( 'wp-ja-vega', ':root{--wp-ja-vega-by:"' . $by . ' ";}' );
+}
+add_action( 'wp_enqueue_scripts', 'wp_ja_vega_css_words', 12 );
+
+/**
  * `?theme=dark|light` decides by its FIRST value (assets/js/wp-ja-vega-dark.js). WordPress's canonical
  * redirect rebuilds the query from a parsed copy in which a repeated key keeps its LAST value, so
  * `?theme=dark&theme=light` would be sent to `?theme=light` before any script runs. Cancelled only when normalising the repeated key changes the
