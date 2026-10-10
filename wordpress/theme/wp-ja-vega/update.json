@@ -1,8 +1,8 @@
 {
   "_comment": "What a WordPress site running the JA Vega theme (wp-ja-vega) asks for when it checks for updates. Read by wp-ja-vega/inc/update.php over the update_themes_github.com filter, reached because its style.css declares `Update URI: https://github.com/TracyHQ/claude-cowork`. Written by `node scripts/release-wordpress-theme.mjs <version> --theme wp-ja-vega`, which reads the version off the mirrored style.css. The mirror (TCH scripts/sync-cms-themes.mjs) leaves this file alone.",
-  "version": "1.1.13",
-  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-vega-v1.1.13/wp-ja-vega-1.1.13.zip",
-  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-vega-v1.1.13",
+  "version": "1.1.14",
+  "package": "https://github.com/TracyHQ/claude-cowork/releases/download/wordpress-theme-wp-ja-vega-v1.1.14/wp-ja-vega-1.1.14.zip",
+  "url": "https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-theme-wp-ja-vega-v1.1.14",
   "requires": "7.0",
   "requires_php": "8.1",
   "tested": "7.1"
