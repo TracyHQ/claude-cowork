@@ -572,6 +572,16 @@ final class QuickstartContract
         return $expected;
     }
 
+    /** The mark Tracy's design-system slot writes into the one module it owns (TCH packages/design/tracy-ds-slot). */
+    public const DESIGN_SYSTEM_MARK = '<style id="tracy-ds-slot"';
+
+    /** Whether a `#__modules` row is Tracy's design-system module: a site mod_custom carrying its mark. */
+    public static function designSystemModule(array $row): bool {
+        return (string) ($row['module'] ?? '') === 'mod_custom'
+            && (string) ($row['client_id'] ?? '0') === '0'
+            && strpos((string) ($row['content'] ?? ''), self::DESIGN_SYSTEM_MARK) !== false;
+    }
+
     /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
     private function resolveRows(ContractRows $source, array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
         $ids=[];$rows=[];$lists=[];$missing=[];
@@ -791,6 +801,17 @@ final class QuickstartContract
         Timing::end('access',$t);
         $t=Timing::begin();
         $counts=array_map('count',$lists);
+        // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
+        // design-system slot puts a system on a site as one mod_custom it writes through content.update
+        // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart
+        // inventory changed" for that module alone (dskeepjo, tracy-base j6). It is not counted, unless
+        // the contract governs the row itself. Any other added row — a page the customer made, a module
+        // someone added — still is.
+        if(isset($counts['module'])) {
+            $governed=[];
+            foreach($keys as $key=>$meta)if($meta['kind']==='module' && isset($ids[$key]))$governed[(int)$ids[$key]]=true;
+            foreach($lists['module'] as $id=>$row)if(!isset($governed[(int)$id]) && self::designSystemModule($row))$counts['module']--;
+        }
         $expectedCounts=$this->lock['inventoryCounts'];
         foreach($languages as $locale=>$state) {
             // A taken edition's rows were already in the archive's count; only a copy adds one.
@@ -1307,11 +1328,26 @@ final class QuickstartContract
      * no structure — unless this request began on a site that already differs from its baseline
      * (changed through Joomla itself, Tracy ADR 0022): the baseline then moves to where the site
      * stands, and the check after the write still refuses any difference the write itself made.
+     *
+     * 🔒 A BASELINE WHOSE ROW COUNTS ALONE DIFFER IS MOVED, NOT REFUSED. Nothing is compared with a
+     * baseline's `counts` — the expected numbers are the lock's — so they only record what the site
+     * had when it was saved. A site whose counts came back to the quickstart's while its baseline
+     * still held the larger ones (a row someone added and removed again; Tracy's design-system
+     * module, counted until 0.24.9) was refused "Cannot replace a bound baseline" by every content
+     * apply after it.
      */
     public function bind(array $snapshot): void {
         $this->ready();
-        if ($this->tolerated) $this->store->replace($snapshot); else $this->store->save($snapshot);
+        if ($this->tolerated || $this->onlyCountsMoved($snapshot)) $this->store->replace($snapshot); else $this->store->save($snapshot);
         $this->syncSourceRelabel();
+    }
+
+    /** Whether the stored baseline differs from this one in nothing but its row counts. */
+    private function onlyCountsMoved(array $snapshot): bool {
+        $stored = $this->store->load();
+        if ($stored === null || !isset($stored['counts'], $snapshot['counts'])) return false;
+        unset($stored['counts'], $snapshot['counts']);
+        return $stored == $snapshot;
     }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
     public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->syncSourceRelabel(); }

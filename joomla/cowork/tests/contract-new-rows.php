@@ -6,7 +6,9 @@
 // warned "Access-level or ACL definition changed: entityRules(modules.255)" (10/10/2026, dskeepjo,
 // tracy-base j6), although the module's chain was com_modules' own: the check compared the site's
 // whole entityRules against the lock's, so any row the lock did not name was a difference. Its
-// newness is "Quickstart inventory changed", which stays.
+// newness is "Quickstart inventory changed", which stays for every added row but one: Tracy's own
+// design-system module, marked `<style id="tracy-ds-slot"`, is not counted (David, 10/10/2026), and a
+// baseline saved while it still counted is moved by the next content apply, not refused.
 
 /** The access half of a contract store, read through the real ContractAccess::snapshot(). */
 final class NewRowsContractStore implements ContractStore {
@@ -15,7 +17,11 @@ final class NewRowsContractStore implements ContractStore {
     /** `#__viewlevels`, `#__usergroups`, `#__assets`, `#__modules`, `#__content`, `#__categories` as rows. */
     public array $inventory = [];
     public function load(): ?array { return $this->binding; }
-    public function save(array $value): void { $this->binding = $value; }
+    /** As JoomlaContractStore::save(): a stored baseline is only ever re-saved identical. */
+    public function save(array $value): void {
+        if ($this->binding !== null) { if ($this->binding != $value) throw new RuntimeException('Cannot replace a bound baseline'); return; }
+        $this->binding = $value;
+    }
     public function replace(array $value): void { $this->binding = $value; }
     public function job(): ?array { return $this->job; }
     public function saveJob(?array $job): void { $this->job = $job; }
@@ -111,3 +117,43 @@ $nrGot = $nrAcl($nrWarnings());
 checkTrue('new rows: a component whose rules change is still an ACL change', count($nrGot) === 1 && strpos($nrGot[0], 'componentRules') !== false);
 $nrStore->inventory['assets'][2]['rules'] = '{"core.admin":{"7":1}}';
 check('new rows: and the site is back to only being bigger', $nrWarnings(), ['Quickstart inventory changed']);
+
+// ---------------------------------------------- Tracy's design-system module is not counted
+// What tch's design-system slot writes (packages/design/tracy-ds-slot/src/joomla.mjs): a fonts link,
+// then the marked <style>. Module 255 above carried plain words, so it counted; now it is Tracy's.
+$nrDsContent = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter"><style id="tracy-ds-slot">/* tracy-ds-slot: test */ :root{--ds-c-accent:#123456}</style>';
+$nrWriter->store['module'][255]['content'] = $nrDsContent;
+check('design system: Tracy\'s own module is not a row the site gained', $nrWarnings(), []);
+$nrWriter->store['module'][256] = ['id' => '256', 'title' => 'Summer sale', 'position' => 'header-r', 'content' => '<p>Sale</p>'] + $nrModule;
+check('design system: a module someone added beside it still is', $nrWarnings(), ['Quickstart inventory changed']);
+unset($nrWriter->store['module'][256]);
+$nrWriter->store['module'][255]['module'] = 'mod_ja_acm';
+check('design system: the mark on another kind of module does not make it Tracy\'s', $nrWarnings(), ['Quickstart inventory changed']);
+$nrWriter->store['module'][255]['module'] = 'mod_custom';
+$nrWriter->store['module'][255]['client_id'] = '1';
+check('design system: nor does it on an administrator module', $nrWarnings(), ['Quickstart inventory changed']);
+$nrWriter->store['module'][255]['client_id'] = '0';
+$nrWriter->store['module'][255]['content'] = '<style>:root{--ds-c-accent:#123456}</style>';
+check('design system: a mod_custom with a <style> but not the mark is counted', $nrWarnings(), ['Quickstart inventory changed']);
+$nrWriter->store['module'][255]['content'] = $nrDsContent;
+
+// A baseline saved while the module still counted — 0.24.8 moved it to two modules on the first
+// contract apply after the slot — must not refuse the next content apply now that it does not.
+// Nothing is compared with a baseline's counts (the lock's are), so a difference there alone moves it.
+$nrBind = function (array $stored) use ($nrWriter, $nrStore, $nrDir): string {
+    $contract = new QuickstartContract($nrWriter, $nrStore, $nrDir, $nrDir);
+    $nrStore->binding = $stored;
+    $contract->newRequest();
+    try { $contract->bind($contract->inspect()['snapshot']); return 'bound'; }
+    catch (Throwable $error) { return 'refused: ' . $error->getMessage(); }
+    finally { $contract->endRequest(); }
+};
+$nrStore->binding = null;
+$nrNow = (new QuickstartContract($nrWriter, $nrStore, $nrDir, $nrDir))->inspect()['snapshot'];
+check('design system: the baseline counts the quickstart\'s one module', $nrNow['counts'], ['module' => 1]);
+$nrStale = $nrNow; $nrStale['counts']['module'] = 2;
+check('design system: a baseline that counted Tracy\'s module is moved, not refused', [$nrBind($nrStale), $nrStore->binding['counts']], ['bound', ['module' => 1]]);
+check('design system: an identical baseline is re-saved as before', [$nrBind($nrNow), $nrStore->binding], ['bound', $nrNow]);
+$nrOther = $nrStale; $nrOther['assignments']['hero'] = [5];
+check('design system: a baseline that differs in more than its counts is still refused', $nrBind($nrOther), 'refused: Cannot replace a bound baseline');
+$nrStore->binding = null;
