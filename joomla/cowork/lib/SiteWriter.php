@@ -215,6 +215,15 @@ interface SiteWriter
     public function writeModuleTitles(array $titles): void;
 
     /**
+     * Set named params of front-end modules to plain words, by id, every other param left as it is — the words a
+     * module keeps in its params (an AcyMailing form's intro line and button), which the contract has no slot for
+     * (QuickstartContract::WRITTEN_MODULE_TEXTS).
+     *
+     * @param array<int,array<string,string>> $texts module id => param name => words
+     */
+    public function writeModuleParams(array $texts): void;
+
+    /**
      * The site's default languages, as Joomla keeps them in com_languages' params.
      *
      * @return array{site:string,administrator:string}

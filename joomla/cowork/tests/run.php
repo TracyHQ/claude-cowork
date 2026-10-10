@@ -967,6 +967,16 @@ class FakeSiteWriterBase implements SiteWriter
             $this->store['module'][(int) $id]['title'] = (string) $title;
         }
     }
+    public function writeModuleParams(array $texts): void
+    {
+        foreach ($texts as $id => $params) {
+            if (!isset($this->store['module'][(int) $id])) throw new RuntimeException('target does not exist in this scope');
+            $decoded = json_decode((string) ($this->store['module'][(int) $id]['params'] ?? '{}'), true);
+            if (!is_array($decoded)) throw new RuntimeException('module params are not a JSON object');
+            foreach ($params as $name => $text) $decoded[(string) $name] = (string) $text;
+            $this->store['module'][(int) $id]['params'] = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');

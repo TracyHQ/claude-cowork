@@ -902,6 +902,7 @@ $w = __WRITER__ ? new class implements SiteWriter, SearchableSiteWriter {
     public function relabelLanguage(string $from, string $to, ?array $label = null): array { return []; }
     public function swapLanguage(string $from, string $to, ?array $label = null): array { return []; }
     public function writeModuleTitles(array $titles): void {}
+    public function writeModuleParams(array $texts): void {}
     public function readLanguageDefaults(): array { return []; }
     public function writeLanguageDefaults(string $site, string $administrator): void {}
     public function read(string $kind, int $id): ?array { return null; }
