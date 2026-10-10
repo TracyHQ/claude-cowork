@@ -11,6 +11,8 @@ defined( 'ABSPATH' ) || exit;
 
 // The identity tokens the pages and parts carry, and their filling.
 require_once __DIR__ . '/identity.php';
+// The interface words the theme's blocks carry as attributes or markup, in the site's language.
+require_once __DIR__ . '/words.php';
 
 /**
  * The theme's own translations, `languages/<locale>.l10n.php` (WordPress's PHP translation format, read by load_textdomain()
@@ -2073,9 +2075,16 @@ function wp_ja_essence_category_tiles( string $content, array $block ): string {
 		'resources' => array( 5, 'resources' ),
 		'lifestyle' => array( 4, 'lifestyle' ),
 	);
+	// Each tile is found by its category's slug, read from the link (`/topic/blog/blog-health/` is the health tile), never by
+	// its name: a site made in another language renames the categories ("Sức khỏe"), and matching by name then found no tile
+	// and printed the plain list with no picture (1.0.12, measured 11/10/2026 on dev g58-ess-wp-full). The name is the fallback
+	// for a link that names no slug.
 	$by_slug = array();
 	foreach ( $found as $row ) {
-		$by_slug[ sanitize_title( html_entity_decode( $row[2] ) ) ] = $row;
+		$path = trim( (string) wp_parse_url( html_entity_decode( $row[1] ), PHP_URL_PATH ), '/' );
+		$last = '' === $path ? '' : preg_replace( '/^blog-/', '', basename( $path ) );
+		$key  = isset( $order[ $last ] ) ? $last : sanitize_title( html_entity_decode( $row[2] ) );
+		$by_slug[ $key ] = $row;
 	}
 	$items = '';
 	foreach ( $order as $slug => $spec ) {

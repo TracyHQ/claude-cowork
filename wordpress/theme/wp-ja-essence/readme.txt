@@ -41,6 +41,13 @@ self-hosted.
 
 == Changelog ==
 
+= 1.0.12 =
+* The category tiles of home 2 are found by each category's slug, read from its link, never by its name: a site made in
+  another language renames the categories, no tile matched, and the row printed the plain category list with no picture.
+* The theme's interface words that its blocks carry as attributes or markup ("By ", "Read more ...", the search label,
+  the drawer's "Menu", the header buttons' labels, the dark switch's words and the contact form's copy box) read in the
+  site's language (inc/words.php), only while they still read the theme's English; the copy box keeps its value.
+
 = 1.0.11 =
 * The theme's own stylesheet reads its palette through the design-system slot: each palette colour is
   var(--ds-c-<role>, <that colour>), undefined until a design system is worn, so the theme looks exactly as before.

@@ -32,8 +32,12 @@
       return 'light'
     }
   }
+  // The theme writes these in the site's language (`inc/words.php`); without them the button reads English.
+  const words = (typeof window.wpJaEssenceWords === 'object' && window.wpJaEssenceWords) || {}
   const label = (state) =>
-    shown(state) === 'dark' ? 'Theme: dark. Switch to light' : 'Theme: light. Switch to dark'
+    shown(state) === 'dark'
+      ? words.dark || 'Theme: dark. Switch to light'
+      : words.light || 'Theme: light. Switch to dark'
 
   const read = () => {
     const match = document.cookie.match(/(?:^|;\s*)tracy_theme=(light|dark|auto)(?:;|$)/)
