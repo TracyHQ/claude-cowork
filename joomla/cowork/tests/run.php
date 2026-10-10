@@ -1940,6 +1940,7 @@ require __DIR__ . "/home-title.php";
 require __DIR__ . "/template-site-settings.php";
 // template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.
 require __DIR__ . "/language-overrides.php";
+require __DIR__ . "/language-overrides-ranking.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";

@@ -3728,9 +3728,11 @@ final class Engine
      * `template.languageOverrides` — the site's front-end language strings that still read in en-GB for one language,
      * and its language override file for that language (TCH #1013; lib/LanguageOverrides.php).
      *
-     * - `operation: read` (the default), `template`, `locale`: `strings`, each `{key, source, reason, file}` (reason
-     *   `missing`, `untranslated` or `suspect`), the template's own first; `overrides`, what the override file holds now;
-     *   `truncated` when more were found than one plan offers.
+     * - `operation: read` (the default), `template`, `locale`, optional `offset` (0) and `limit` (1..1500, 1500): one
+     *   page of `strings`, each `{key, source, reason, file, rank}` (reason `missing`, `untranslated` or `suspect`;
+     *   rank `template`, `used`, `core`, `other`, in that order: the words a visitor reads first); `overrides`, what the
+     *   override file holds now; `total`, every string offered; `truncated` and `nextOffset` when more follow.
+     *   `DATE_FORMAT_*` keys are never offered: a format is configuration, not words.
      * - `operation: set`, `apply_id`, `template`, `locale`, `strings: {KEY: words}`: each key one the read offers, each
      *   value one line of plain text with the en-GB words' placeholders. A key or value that is not is left out and
      *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
@@ -3748,15 +3750,27 @@ final class Engine
         if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
             return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
         if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
+        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') {
+            $offset = $p['offset'] ?? 0;
+            $limit = $p['limit'] ?? LanguageOverrides::MAX_STRINGS;
+            if (!is_int($offset) || $offset < 0) return $this->err('bad_params', 'offset is a whole number from 0: the nextOffset of the page before');
+            if (!is_int($limit) || $limit < 1 || $limit > LanguageOverrides::MAX_STRINGS)
+                return $this->err('bad_params', 'limit is a whole number from 1 to ' . LanguageOverrides::MAX_STRINGS);
+            try {
+                return $this->ok($head + $this->overrides->plan($template, $locale, $offset, $limit));
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+        }
+        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
         try {
-            $plan = $this->overrides->plan($template, $locale);
+            // Every page's strings, not one page's: a key read on a later page is as writable as one on the first.
+            $plan = ['strings' => $this->overrides->offered($template, $locale)];
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
-        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
-        $operation = $p['operation'] ?? 'read';
-        if ($operation === 'read') return $this->ok($head + $plan);
-        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
         if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
         $applyId = $this->applyId($p);
         if ($applyId === null) return $this->err('bad_params', 'apply_id required');
