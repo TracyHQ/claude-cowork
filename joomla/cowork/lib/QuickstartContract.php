@@ -1270,10 +1270,20 @@ final class QuickstartContract
     /* ------------------------------------------------------------ site language */
 
     /** The baseline with the site's one language on record — or with none, when $record is null. */
-    public function bindingWithSiteLanguage(?array $record): array {
+    public function bindingWithSiteLanguage(?array $record, array $titles = [], array $texts = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A site language needs a bound site');
         if($record===null)unset($binding['siteLanguage']);else $binding['siteLanguage']=$record;
+        // The headings a site language writes (writtenTitles) are what is protected from then on.
+        foreach($titles as $key=>$title)if(isset($binding['presentation'][$key]))$binding['presentation'][$key]['title']=(string)$title;
+        return $this->withModuleTexts($binding,$texts);
+    }
+
+    /** The baseline with the module words a written language gave (writtenModuleTexts), base key => param => text. */
+    private function withModuleTexts(array $binding, array $texts): array {
+        foreach($texts as $key=>$params)
+            if(is_array($params)&&is_array($binding['presentation'][$key]['params']??null))
+                foreach($params as $name=>$text)$binding['presentation'][$key]['params'][(string)$name]=(string)$text;
         return $binding;
     }
 
@@ -1376,7 +1386,7 @@ final class QuickstartContract
      * when $record is null. Every recorded row that carried the old tag carries the new one; nothing
      * else moves, because a relabel moves nothing else.
      */
-    public function bindingWithSourceRelabel(?array $record, array $titles = []): array {
+    public function bindingWithSourceRelabel(?array $record, array $titles = [], array $texts = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A source relabel needs a bound site');
         $from=$this->sourceLanguage();
@@ -1388,7 +1398,7 @@ final class QuickstartContract
         foreach($titles as $key=>$title)if(isset($binding['presentation'][$key]))$binding['presentation'][$key]['title']=(string)$title;
         if(isset($binding['multilingual']['source']))$binding['multilingual']['source']=$to;
         if($record===null)unset($binding['sourceRelabel']);else $binding['sourceRelabel']=$record;
-        return $binding;
+        return $this->withModuleTexts($binding,$texts);
     }
 
     /**
@@ -1410,6 +1420,50 @@ final class QuickstartContract
             if((string)($fields['showtitle']??'0')!=='1'||(string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
             if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
             $out[$key]=['id'=>(int)$binding['ids'][$key],'title'=>(string)($fields['title']??'')];
+        }
+        ksort($out);
+        return $out;
+    }
+    /**
+     * The visitor-facing words some modules keep in their params instead of a language file or their content: an
+     * AcyMailing form's intro line and button ("Join 70,000 subscribers!", "Sign up" on JA Essence 1.0.4), a login
+     * module's text, a search label. The contract has no slot for them (a capture only reads an ACM's jatools-config),
+     * so a site written in another language gives them in it beside the headings (TCH #1013, LANG-2).
+     *
+     * 🔒 A REVIEWED LIST, PER MODULE TYPE. A params value is configuration far more often than words (a CSS class, a
+     * layout, an ordering), so only the names below, read from the extensions' own forms, are ever offered; a value with
+     * markup is left alone, as a heading with markup is refused.
+     */
+    public const WRITTEN_MODULE_TEXTS = [
+        'mod_acym' => ['introtext', 'posttext', 'subtext', 'subtextlogged', 'unsubtext', 'confirmation_message'],
+        'mod_login' => ['pretext', 'posttext'],
+        'mod_finder' => ['alt_label'],
+        'mod_jaquickcontact' => ['intro_text', 'thank_msg', 'sender_label', 'email_label', 'message_label'],
+    ];
+
+    /**
+     * Those words on this site: every base module bound here, front end, published, in the source language or in
+     * every language, whose type is listed, with each listed param that holds plain words.
+     *
+     * @return array<string,array{id:int,texts:array<string,string>}> base key => bound id and param => current words
+     */
+    public function writtenModuleTexts(): array {
+        $this->ready();
+        $binding=$this->store->load();
+        if(!$binding)return [];
+        $out=[];
+        foreach($binding['presentation'] as $key=>$fields) {
+            if(($this->baseEntities()[$key]['kind']??null)!=='module'||!isset($binding['ids'][$key]))continue;
+            $names=self::WRITTEN_MODULE_TEXTS[(string)($fields['module']??'')]??null;
+            if($names===null||!is_array($fields['params']??null))continue;
+            if((string)($fields['client_id']??'0')!=='0'||(string)($fields['published']??'0')!=='1')continue;
+            if(!in_array((string)($fields['language']??''),['*',$this->sourceLanguage()],true))continue;
+            $texts=[];
+            foreach($names as $name) {
+                $value=$fields['params'][$name]??null;
+                if(is_string($value)&&trim($value)!==''&&preg_match('/\p{L}/u',$value)&&!preg_match('/[<>]/',$value))$texts[$name]=$value;
+            }
+            if($texts!==[])$out[$key]=['id'=>(int)$binding['ids'][$key],'texts'=>$texts];
         }
         ksort($out);
         return $out;

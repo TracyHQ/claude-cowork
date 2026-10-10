@@ -685,6 +685,21 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         }
     }
 
+    public function writeModuleParams(array $texts): void
+    {
+        $db = $this->db;
+        foreach ($texts as $id => $params) {
+            $raw = $db->setQuery('SELECT ' . $db->quoteName('params') . ' FROM ' . $db->quoteName('#__modules') . ' WHERE ' . $db->quoteName('id') . ' = ' . (int) $id
+                . ' AND ' . $db->quoteName('client_id') . ' = 0')->loadResult();
+            if ($raw === null) throw new \RuntimeException('target does not exist in this scope');
+            $decoded = json_decode((string) $raw, true);
+            if (!is_array($decoded)) throw new \RuntimeException('module params are not a JSON object');
+            foreach ($params as $name => $text) $decoded[(string) $name] = (string) $text;
+            $db->setQuery('UPDATE ' . $db->quoteName('#__modules') . ' SET ' . $db->quoteName('params') . ' = '
+                . $db->quote(json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . ' WHERE ' . $db->quoteName('id') . ' = ' . (int) $id)->execute();
+        }
+    }
+
     /** A content language's label from its installed pack, the way Joomla's installer names one. */
     private function languageLabel(string $tag): array
     {

@@ -33,6 +33,7 @@ require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/SiteIdentity.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
+require_once __DIR__ . '/LanguageOverrides.php';
 
 final class Engine
 {
@@ -269,6 +270,16 @@ final class Engine
         return $this;
     }
 
+    /** The site's language override files (`template.languageOverrides`); null answers 'unavailable'. */
+    private ?LanguageOverrides $overrides = null;
+
+    /** Let `template.languageOverrides` read and write the site's language overrides (lib/LanguageOverrides.php). */
+    public function languageOverrides(?LanguageOverrides $overrides): self
+    {
+        $this->overrides = $overrides;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -324,7 +335,7 @@ final class Engine
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
-            || (in_array($action, ['site.identity', 'template.siteSettings'], true) && ($params['operation'] ?? null) === 'set');
+            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
                 'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
@@ -453,6 +464,8 @@ final class Engine
                 return $this->siteIdentityDoor($params);
             case 'template.siteSettings':
                 return $this->templateSiteSettingsDoor($params);
+            case 'template.languageOverrides':
+                return $this->languageOverridesDoor($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -1906,11 +1919,14 @@ final class Engine
             if ($operation === 'plan') {
                 if (!preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $locale)) return $this->err('bad_params', 'Not a Joomla language tag: ' . $locale);
                 $pack = $this->contract->languagePackage($locale, $major);
+                // The headings the contract has no slot for, which a site written in `$locale` gives in it with `set`.
+                $titles = $this->contract->binding() !== null ? $this->writtenWordsPlan() : [];
                 return $this->ok([
                     'locale' => $locale, 'current' => $this->writer->readLanguageDefaults(),
                     'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
                     'installed' => $pack === null || $this->languagePackPresent($locale),
                     'onRecord' => $this->contract->binding()['siteLanguage'] ?? null,
+                    'titles' => $titles,
                 ]);
             }
             if ($operation !== 'set' && $operation !== 'revert') return $this->err('bad_params', 'Unknown siteLanguage operation');
@@ -1926,11 +1942,18 @@ final class Engine
             if ($operation === 'revert') {
                 if ($onRecord === null) return $this->err('contract_failed', 'This site has no language set by this door to take back');
                 $previous = $onRecord['previous'];
-                $this->writer->transaction(function () use ($apply, $previous) {
+                // The headings it gave go back to what they were.
+                $titlesBack = is_array($onRecord['titles'] ?? null) ? $onRecord['titles'] : [];
+                $textsBack = is_array($onRecord['texts'] ?? null) ? $onRecord['texts'] : [];
+                [$idsBack, $textIdsBack] = self::wordsById($binding, $titlesBack, $textsBack);
+                $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($idsBack), array_keys($textIdsBack)))));
+                $this->writer->transaction(function () use ($apply, $previous, $idsBack, $titlesBack, $textIdsBack, $textsBack) {
                     $before = $this->writer->readLanguageDefaults();
                     $this->writer->writeLanguageDefaults((string) $previous['site'], (string) $previous['administrator']);
+                    if ($idsBack !== []) $this->writer->writeModuleTitles($idsBack);
+                    if ($textIdsBack !== []) $this->writer->writeModuleParams($textIdsBack);
                     $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
-                    $this->contract->rebind($this->contract->bindingWithSiteLanguage(null));
+                    $this->contract->rebind($this->contract->bindingWithSiteLanguage(null, $titlesBack, $textsBack));
                     $this->contract->rebind($this->contract->inspect()['snapshot']);
                     return [];
                 });
@@ -1943,6 +1966,8 @@ final class Engine
                 if ($onRecord['locale'] === $locale) return $this->ok(['status' => 'completed', 'locale' => $locale, 'alreadySet' => true]);
                 return $this->err('conflict', 'This site is already set to ' . $onRecord['locale'] . '; take that back with siteLanguage.revert before choosing another');
             }
+            $titles = $p['titles'] ?? [];
+            if (!is_array($titles)) return $this->err('bad_params', 'titles must map a heading key to its words');
             $pack = $this->contract->languagePackage($locale, $major);
             if ($pack !== null && !$this->languagePackPresent($locale)) {
                 if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -1956,21 +1981,32 @@ final class Engine
                 $this->contract->bind($this->contract->inspect()['snapshot']);
                 return [];
             });
-            $this->writer->transaction(function () use ($apply, $request, $locale, $pack) {
-                $before = $this->writer->readLanguageDefaults();
+            // 🔒 THE HEADINGS AND THE MODULE WORDS FOLLOW THE LANGUAGE (TCH #1013, LANG-2): a module that shows its title
+            // ("Newsletter", "Tags cloud", "Follow me" on JA Essence) has no slot, nor do the words a module keeps in its
+            // params ("Join 70,000 subscribers!", "Sign up"), so a one-edition site written in another language gives them
+            // here, as a written source relabel does. One left out keeps its words; the old ones are kept for revert.
+            $words = $this->writtenWords($titles, 'siteLanguage.plan');
+            if (is_string($words)) return $this->err('bad_params', $words);
+            ['titlesById' => $byId, 'textsById' => $textsById, 'titlesBefore' => $before, 'titlesAfter' => $after, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
+            $this->refuseLocked(array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($byId), array_keys($textsById)))));
+            $this->writer->transaction(function () use ($apply, $request, $locale, $pack, $byId, $before, $after, $textsById, $textsBefore, $textsAfter) {
+                $defaults = $this->writer->readLanguageDefaults();
                 $this->writer->writeLanguageDefaults($locale, $locale);
-                $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
+                if ($byId !== []) $this->writer->writeModuleTitles($byId);
+                if ($textsById !== []) $this->writer->writeModuleParams($textsById);
+                $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $defaults]);
                 $this->contract->rebind($this->contract->bindingWithSiteLanguage([
-                    'locale' => $locale, 'previous' => $before, 'applyId' => $apply, 'requestId' => $request,
+                    'locale' => $locale, 'previous' => $defaults, 'applyId' => $apply, 'requestId' => $request,
                     'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
-                ]));
+                ] + ($before !== [] ? ['titles' => $before] : []) + ($textsBefore !== [] ? ['texts' => $textsBefore] : []), $after, $textsAfter));
                 // Proven, then stored — the same two steps every other sealed write ends with.
                 $this->contract->rebind($this->contract->inspect()['snapshot']);
                 return [];
             });
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
             $this->stamped('content');
-            return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null]);
+            return $this->ok(['status' => 'completed', 'locale' => $locale, 'packVersion' => $pack['version'] ?? null,
+                'titles' => count($byId) + array_sum(array_map('count', $textsById))]);
         } catch (Throwable $error) {
             return $this->contractFailed($error);
         }
@@ -2068,6 +2104,71 @@ final class Engine
 
     /** The longest heading a written relabel takes: a module title is a VARCHAR(100). */
     private const WRITTEN_TITLE_MAX = 100;
+    /** The longest module words a written language takes (an AcyMailing intro line, a login module's text). */
+    private const WRITTEN_TEXT_MAX = 400;
+
+    /**
+     * What a site written in another language gives in it: the headings it shows (`<key>.title`) and the words modules
+     * keep in their params (`<key>.params.<name>`, QuickstartContract::writtenModuleTexts), with their words and limit.
+     */
+    private function writtenWordsPlan(): array
+    {
+        $out = [];
+        foreach ($this->contract->writtenTitles() as $key => $row)
+            $out[] = ['key' => $key . '.title', 'source' => $row['title'], 'maxCharacters' => self::WRITTEN_TITLE_MAX];
+        foreach ($this->contract->writtenModuleTexts() as $key => $row)
+            foreach ($row['texts'] as $name => $text)
+                $out[] = ['key' => $key . '.params.' . $name, 'source' => $text, 'maxCharacters' => self::WRITTEN_TEXT_MAX];
+        return $out;
+    }
+
+    /**
+     * The words a `titles` map gives, each checked against what the plan lists: by module id to write, and by base key
+     * what they were and become. A string is the refusal to answer with; nothing has been written then.
+     *
+     * @param mixed $titles
+     * @return array{titlesById:array<int,string>,textsById:array<int,array<string,string>>,titlesBefore:array<string,string>,titlesAfter:array<string,string>,textsBefore:array<string,array<string,string>>,textsAfter:array<string,array<string,string>>}|string
+     */
+    private function writtenWords($titles, string $lister)
+    {
+        if (!is_array($titles)) return 'titles must map a heading key to its words';
+        $headings = $this->contract->writtenTitles();
+        $modules = $this->contract->writtenModuleTexts();
+        $w = ['titlesById' => [], 'textsById' => [], 'titlesBefore' => [], 'titlesAfter' => [], 'textsBefore' => [], 'textsAfter' => []];
+        $plain = fn ($words, int $max) => is_string($words) && trim($words) !== '' && mb_strlen($words) <= $max && !preg_match('/[<>]/', $words);
+        foreach ($titles as $slot => $words) {
+            $slot = (string) $slot;
+            if (preg_match('/^(.+)\.title$/D', $slot, $m) && isset($headings[$m[1]])) {
+                if (!$plain($words, self::WRITTEN_TITLE_MAX)) return 'A heading is plain text of 1 to ' . self::WRITTEN_TITLE_MAX . ' characters: ' . $slot;
+                $key = $m[1];
+                $w['titlesById'][$headings[$key]['id']] = $words; $w['titlesBefore'][$key] = $headings[$key]['title']; $w['titlesAfter'][$key] = $words;
+            } elseif (preg_match('/^(.+)\.params\.([A-Za-z0-9_-]+)$/D', $slot, $m) && isset($modules[$m[1]]['texts'][$m[2]])) {
+                if (!$plain($words, self::WRITTEN_TEXT_MAX)) return 'Module words are plain text of 1 to ' . self::WRITTEN_TEXT_MAX . ' characters: ' . $slot;
+                [, $key, $name] = $m;
+                $w['textsById'][$modules[$key]['id']][$name] = $words;
+                $w['textsBefore'][$key][$name] = $modules[$key]['texts'][$name];
+                $w['textsAfter'][$key][$name] = $words;
+            } else return 'Not a heading of this site: ' . $slot . ' (' . $lister . ' lists them)';
+        }
+        return $w;
+    }
+
+    /**
+     * Recorded words (base key => title, base key => param => words) by the module ids the binding names: what a revert
+     * writes back. A key the binding no longer names is skipped.
+     *
+     * @return array{0:array<int,string>,1:array<int,array<string,string>>}
+     */
+    private static function wordsById(?array $binding, array $titles, array $texts): array
+    {
+        $titlesById = []; $textsById = [];
+        foreach ($titles as $key => $title)
+            if (isset($binding['ids'][$key])) $titlesById[(int) $binding['ids'][$key]] = (string) $title;
+        foreach ($texts as $key => $params)
+            if (isset($binding['ids'][$key]) && is_array($params))
+                foreach ($params as $name => $words) $textsById[(int) $binding['ids'][$key]][(string) $name] = (string) $words;
+        return [$titlesById, $textsById];
+    }
 
     /** Whether `$locale` is a tag of another language than the published source's: what `written` is for. */
     private static function otherLanguage(string $locale, string $published): bool
@@ -2085,9 +2186,7 @@ final class Engine
         if (!self::otherLanguage($locale, $published))
             return $this->err('bad_params', ($locale ?: 'That') . ' is not another language than ' . $published . '; a variant of it is a plain relabel, without `written`');
         $pack = $this->contract->languagePackage($locale, $major);
-        $titles = [];
-        foreach ($this->contract->writtenTitles() as $key => $row)
-            $titles[] = ['key' => $key . '.title', 'source' => $row['title'], 'maxCharacters' => self::WRITTEN_TITLE_MAX];
+        $titles = $this->writtenWordsPlan();
         return $this->ok([
             'published' => $published, 'current' => $current, 'locale' => $locale, 'written' => true,
             'package' => $pack === null ? null : ['tag' => $pack['tag'], 'version' => $pack['version'], 'bytes' => $pack['bytes']],
@@ -2129,19 +2228,12 @@ final class Engine
         foreach ($binding['presentation'] ?? [] as $key => $fields)
             if (($fields['language'] ?? null) === $locale)
                 return $this->err('conflict', 'The contract governs this site’s own ' . $locale . ' edition (' . $key . '); its source cannot take that tag. Nothing has been written.');
-        $headings = $this->contract->writtenTitles();
-        $titles = $p['titles'] ?? [];
-        if (!is_array($titles)) return $this->err('bad_params', 'titles must map a heading key to its words');
-        $byId = []; $before = []; $after = [];
-        foreach ($titles as $slot => $title) {
-            $key = is_string($slot) && substr($slot, -6) === '.title' ? substr($slot, 0, -6) : '';
-            if (!isset($headings[$key])) return $this->err('bad_params', 'Not a heading of this source edition: ' . $slot . ' (sourceLanguage.plan with `written` lists them)');
-            if (!is_string($title) || trim($title) === '' || mb_strlen($title) > self::WRITTEN_TITLE_MAX || preg_match('/[<>]/', $title))
-                return $this->err('bad_params', 'A heading is plain text of 1 to ' . self::WRITTEN_TITLE_MAX . ' characters: ' . $slot);
-            $byId[$headings[$key]['id']] = $title; $before[$key] = $headings[$key]['title']; $after[$key] = $title;
-        }
+        $words = $this->writtenWords($p['titles'] ?? [], 'sourceLanguage.plan with `written`');
+        if (is_string($words)) return $this->err('bad_params', $words);
+        ['titlesById' => $byId, 'textsById' => $textsById, 'titlesBefore' => $before, 'titlesAfter' => $after, 'textsBefore' => $textsBefore, 'textsAfter' => $textsAfter] = $words;
         // Before the pack too: an installer is a write, and a relabel refused afterwards would leave it behind for nothing.
-        $this->refuseLocked(array_merge($this->rowsInLanguage($current), array_map(fn (int $id) => ['module', $id], array_keys($byId))));
+        $this->refuseLocked(array_merge($this->rowsInLanguage($current),
+            array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($byId), array_keys($textsById))))));
         $pack = $this->contract->languagePackage($locale, $major);
         if ($pack !== null && !$this->languagePackPresent($locale)) {
             if ($this->extensions === null || !method_exists($this->extensions, 'installVerifiedFromUrl')) return $this->err('unavailable', 'verified installer not installed');
@@ -2157,37 +2249,40 @@ final class Engine
         $swapped = $this->writtenRelabel($apply, $current, $locale, null, $byId, $after, [
             'from' => $current, 'to' => $locale, 'written' => true, 'titles' => $before, 'applyId' => $apply, 'requestId' => $request,
             'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
-        ]);
-        return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'swapped' => $swapped, 'titles' => count($byId), 'packVersion' => $pack['version'] ?? null]);
+        ] + ($textsBefore !== [] ? ['texts' => $textsBefore] : []), $textsById, $textsAfter);
+        return $this->ok(['status' => 'completed', 'source' => $locale, 'written' => true, 'swapped' => $swapped,
+            'titles' => count($byId) + array_sum(array_map('count', $textsById)), 'packVersion' => $pack['version'] ?? null]);
     }
 
     /** A written relabel taken back: the tags swapped back, the headings and the defaults as they were. */
     private function writtenSourceRevert(string $apply, array $onRecord, string $published): array
     {
         $binding = $this->contract->binding() ?? [];
-        $byId = [];
-        foreach ($onRecord['titles'] ?? [] as $key => $title)
-            if (isset($binding['ids'][$key])) $byId[(int) $binding['ids'][$key]] = (string) $title;
-        $this->refuseLocked(array_merge($this->rowsInLanguage((string) $onRecord['to']), array_map(fn (int $id) => ['module', $id], array_keys($byId))));
-        $this->writtenRelabel($apply, (string) $onRecord['to'], $published, $onRecord['label'] ?? null, $byId, $onRecord['titles'] ?? [], null);
+        $textsBack = is_array($onRecord['texts'] ?? null) ? $onRecord['texts'] : [];
+        [$byId, $textsById] = self::wordsById($binding, $onRecord['titles'] ?? [], $textsBack);
+        $this->refuseLocked(array_merge($this->rowsInLanguage((string) $onRecord['to']),
+            array_map(fn (int $id) => ['module', $id], array_unique(array_merge(array_keys($byId), array_keys($textsById))))));
+        $this->writtenRelabel($apply, (string) $onRecord['to'], $published, $onRecord['label'] ?? null, $byId, $onRecord['titles'] ?? [], null, $textsById, $textsBack);
         return $this->ok(['status' => 'reverted', 'source' => $published]);
     }
 
     /** One written relabel or its undo, logged, recorded and proven in a single transaction; $record null takes it back. */
-    private function writtenRelabel(string $apply, string $from, string $to, ?array $label, array $titlesById, array $titlesByKey, ?array $record): bool
+    private function writtenRelabel(string $apply, string $from, string $to, ?array $label, array $titlesById, array $titlesByKey, ?array $record,
+        array $textsById = [], array $textsByKey = []): bool
     {
-        $swapped = $this->writer->transaction(function () use ($apply, $from, $to, $label, $titlesById, $titlesByKey, $record) {
+        $swapped = $this->writer->transaction(function () use ($apply, $from, $to, $label, $titlesById, $titlesByKey, $record, $textsById, $textsByKey) {
             $defaults = $this->writer->readLanguageDefaults();
             $moved = $this->writer->swapLanguage($from, $to, $label);
             if ($titlesById !== []) $this->writer->writeModuleTitles($titlesById);
+            if ($textsById !== []) $this->writer->writeModuleParams($textsById);
             $this->writer->writeLanguageDefaults(
                 $defaults['site'] === $from ? $to : $defaults['site'],
                 $defaults['administrator'] === $from ? $to : $defaults['administrator']
             );
             if ($record !== null) $record += ['label' => $moved['previous'], 'swapped' => $moved['swapped']];
             $this->log->record($apply, ['op' => 'relabel', 'from' => $from, 'to' => $to, 'written' => true, 'swapped' => $moved['swapped'],
-                'label' => $moved['previous'], 'titles' => $titlesByKey, 'defaults' => $defaults]);
-            $this->contract->rebind($this->contract->bindingWithSourceRelabel($record, $titlesByKey));
+                'label' => $moved['previous'], 'titles' => $titlesByKey, 'texts' => $textsByKey, 'defaults' => $defaults]);
+            $this->contract->rebind($this->contract->bindingWithSourceRelabel($record, $titlesByKey, $textsByKey));
             // Proven, then stored — the same two steps every other sealed write ends with.
             $this->contract->rebind($this->contract->inspect()['snapshot']);
             return ['swapped' => $moved['swapped']];
@@ -3258,7 +3353,7 @@ final class Engine
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
                 $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
-            } elseif ($op === 'siteSettings') {
+            } elseif ($op === 'siteSettings' || $op === 'languageOverrides') {
                 // Which files, never their bytes; created when none of them existed before.
                 $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
                 $step['created'] = $files !== [] && array_filter($files, static fn($f) => !is_array($f) || ($f['before'] ?? null) !== null) === [];
@@ -3338,6 +3433,13 @@ final class Engine
                 throw new RuntimeException('site identity store not wired');
             }
             $this->siteIdentity->write(self::identityValues($entry['before'] ?? null));
+            return;
+        }
+        if ($op === 'languageOverrides') {
+            if ($this->overrides === null) {
+                throw new RuntimeException('language overrides not wired');
+            }
+            $this->overrides->restore(is_array($entry['files'] ?? null) ? $entry['files'] : []);
             return;
         }
         if ($op === 'siteSettings') {
@@ -3620,6 +3722,85 @@ final class Engine
         }
         unset($now['missing']);
         return $this->ok($answer(['changed' => array_column($plan['changes'], 'path'), 'cleared' => $cleared] + $now));
+    }
+
+    /**
+     * `template.languageOverrides` — the site's front-end language strings that still read in en-GB for one language,
+     * and its language override file for that language (TCH #1013; lib/LanguageOverrides.php).
+     *
+     * - `operation: read` (the default), `template`, `locale`: `strings`, each `{key, source, reason, file}` (reason
+     *   `missing`, `untranslated` or `suspect`), the template's own first; `overrides`, what the override file holds now;
+     *   `truncated` when more were found than one plan offers.
+     * - `operation: set`, `apply_id`, `template`, `locale`, `strings: {KEY: words}`: each key one the read offers, each
+     *   value one line of plain text with the en-GB words' placeholders. A key or value that is not is left out and
+     *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
+     *   puts them back (deleting a file that did not exist). Nothing changes → nothing is written (`unchanged: true`).
+     *
+     * Not part of a `content.batch`: a file is not inside the database's transaction.
+     */
+    private function languageOverridesDoor(array $p): array
+    {
+        if ($this->overrides === null) return $this->err('unavailable', 'language overrides not wired');
+        $template = $p['template'] ?? null;
+        $locale = $p['locale'] ?? null;
+        if (!is_string($template) || !preg_match(LanguageOverrides::TEMPLATE, $template))
+            return $this->err('bad_params', 'template required: the folder name of a site template, e.g. ja_essence');
+        if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
+            return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
+        if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
+        try {
+            $plan = $this->overrides->plan($template, $locale);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
+        $operation = $p['operation'] ?? 'read';
+        if ($operation === 'read') return $this->ok($head + $plan);
+        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
+        if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $strings = $p['strings'] ?? null;
+        if (!is_array($strings) || $strings === [] || array_keys($strings) === range(0, count($strings) - 1))
+            return $this->err('bad_params', 'strings required: an object of language keys to their words');
+        $offered = [];
+        foreach ($plan['strings'] as $row) $offered[$row['key']] = $row['source'];
+        $values = [];
+        $refused = [];
+        foreach ($strings as $key => $value) {
+            $key = strtoupper((string) $key);
+            if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => 'not a string this site shows in en-GB']; continue; }
+            $why = LanguageOverrides::refusal($offered[$key], $value);
+            if ($why !== null) { $refused[] = ['key' => $key, 'reason' => $why]; continue; }
+            $values[$key] = trim($value);
+        }
+        $answer = static fn(array $extra): array => $head + $extra + ($refused !== [] ? ['refused' => $refused] : []);
+        $change = $values === [] ? null : $this->overrides->change($locale, $values);
+        if ($change === null) return $this->ok($answer(['written' => 0, 'unchanged' => true]));
+        try {
+            $files = $this->overrides->write($change);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $e->getMessage(), ['code' => 'LANGUAGE_NOT_WRITABLE']);
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'languageOverrides', 'locale' => $locale, 'files' => $files]);
+        } catch (Throwable $e) {
+            try {
+                $this->overrides->restore($files);
+            } catch (Throwable $undo) {
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        if ($this->writer !== null) {
+            try {
+                if (!$this->batching) $this->writer->purgeCache();
+            } catch (Throwable $e) {
+                // Best-effort by contract.
+            }
+        }
+        $this->stamped('content');
+        return $this->ok($answer(['written' => count($values)]));
     }
 
     /**

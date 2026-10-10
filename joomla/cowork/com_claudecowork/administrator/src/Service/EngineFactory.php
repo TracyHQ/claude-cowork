@@ -253,6 +253,8 @@ final class EngineFactory
         $engine->siteIdentity(self::buildSiteIdentity());
         // `template.siteSettings`: a template's logo, name, slogan and favicon, in its etc/site profiles.
         $engine->templateSiteSettings(self::buildTemplateSiteSettings());
+        // `template.languageOverrides`: the site's language override files, for the strings that read in en-GB.
+        $engine->languageOverrides(new \LanguageOverrides(JPATH_ROOT));
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $quickstart = $contract !== '';
         $baseline = self::constructionBaseline();
