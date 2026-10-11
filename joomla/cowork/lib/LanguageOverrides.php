@@ -70,6 +70,8 @@ final class LanguageOverrides
 
     /** @var array<string,array{keys:array<string,true>,formats:array<string,string>,literals:array<string,string>}> the front-end code's keys, date literals and page literals, by template, read once */
     private array $front = [];
+    /** @var array<string,true>|null the words of the site's en-GB strings, lower-cased, read once ({@see vocabulary()}) */
+    private ?array $vocabulary = null;
 
     private string $root;
 
@@ -144,8 +146,7 @@ final class LanguageOverrides
             foreach ($english as $key => $source) {
                 if (isset($rows[$key]) || !preg_match(self::KEY, $key) || preg_match(self::FORMAT_KEY, $key)) continue;
                 if (!self::worded($source)) continue;
-                $reason = !array_key_exists($key, $own) ? 'missing'
-                    : (trim($own[$key]) === trim($source) ? 'untranslated' : (self::suspect($source, $own[$key]) ? 'suspect' : null));
+                $reason = $this->reasonOf($source, $own, $key, $locale);
                 if ($reason === null) continue;
                 $rank = $class === 'template' ? 'template' : (isset($used[$key]) || preg_match(self::DATE_WORD, $key) ? 'used' : $class);
                 $rows[$key] = ['row' => ['key' => $key, 'source' => $source, 'reason' => $reason, 'file' => $file, 'rank' => $rank],
@@ -163,8 +164,7 @@ final class LanguageOverrides
             }
             foreach ($english as $key => $source) {
                 if (isset($rows[$key]) || !isset($visitor[$key]) || !preg_match(self::KEY, $key) || !self::worded($source)) continue;
-                $reason = !array_key_exists($key, $own) ? 'missing'
-                    : (trim($own[$key]) === trim($source) ? 'untranslated' : (self::suspect($source, $own[$key]) ? 'suspect' : null));
+                $reason = $this->reasonOf($source, $own, $key, $locale);
                 if ($reason === null) continue;
                 $rows[$key] = ['row' => ['key' => $key, 'source' => $source, 'reason' => $reason, 'file' => $file, 'rank' => 'used'],
                     'sort' => [self::RANKS['used'], 0, $order++]];
@@ -360,6 +360,102 @@ final class LanguageOverrides
         return $key . '="' . str_replace('"', '\"', str_replace('\"', '"', $value)) . '"';
     }
 
+    /**
+     * Why a string is offered for `$locale`, or null when its value there is the language's own: `missing`, `untranslated`
+     * (the en-GB words, or English words reworded), `suspect` (another string's translation).
+     *
+     * 🔒 A PACK'S ENGLISH IS UNTRANSLATED, HOWEVER IT IS WORDED (TracyHQ/tch#1013, dev g61-ess-j-full 11/10/2026): the vi-VN 4.2.2
+     * pack holds PLG_USER_PROFILE_SLIDER_LABEL as "Show Profile" (en-GB: "User Profile") and the postal code label as
+     * "Postal / ZIP Code" (en-GB: "Postal/ZIP Code"), so a byte comparison took both for translations and the registration form
+     * stayed English. A value of plain ASCII whose every word is an English word of the site's en-GB files is English. Never
+     * for an English locale (en-US, en-AU): its own words are English.
+     *
+     * @param array<string,string> $own the locale's strings of the same file
+     */
+    private function reasonOf(string $source, array $own, string $key, string $locale): ?string
+    {
+        if (!array_key_exists($key, $own)) return 'missing';
+        $value = trim($own[$key]);
+        if ($value === trim($source)) return 'untranslated';
+        if (self::suspect($source, $value)) return 'suspect';
+        return strpos($locale, 'en-') !== 0 && $this->english($value) ? 'untranslated' : null;
+    }
+
+    /** Whether words are English: plain ASCII, and every word of two letters or more one the site's en-GB strings use. */
+    private function english(string $value): bool
+    {
+        if (preg_match('/^[\x20-\x7E]+$/D', $value) !== 1 || !preg_match_all('/[A-Za-z]{2,}/', $value, $m)) return false;
+        $vocabulary = $this->vocabulary();
+        foreach ($m[0] as $word) if (!isset($vocabulary[strtolower($word)])) return false;
+        return true;
+    }
+
+    /**
+     * Every word of two letters or more in the site's en-GB front-end and plugin language files, lower-cased. Read once.
+     *
+     * @return array<string,true>
+     */
+    private function vocabulary(): array
+    {
+        if ($this->vocabulary !== null) return $this->vocabulary;
+        $words = [];
+        $folders = ['language/' . self::SOURCE, self::PLUGIN_LANGUAGE . self::SOURCE];
+        foreach (@scandir($this->root . '/templates') ?: [] as $template)
+            if ($template !== '.' && $template !== '..') $folders[] = 'templates/' . $template . '/language/' . self::SOURCE;
+        foreach ($folders as $folder) {
+            $dir = $this->root . '/' . $folder;
+            if (!is_dir($dir) || is_link($dir)) continue;
+            foreach (@scandir($dir) ?: [] as $name) {
+                if (!preg_match('/\.ini$/i', $name)) continue;
+                foreach (self::parse((string) $this->bytes($folder . '/' . $name)) as $text)
+                    if (preg_match_all('/[A-Za-z]{2,}/', $text, $m)) foreach ($m[0] as $word) $words[strtolower($word)] = true;
+            }
+        }
+        return $this->vocabulary = $words;
+    }
+
+    /**
+     * The words a T4 mega menu prints raw (TracyHQ/tch#1013, dev g61-ess-j-full 11/10/2026: "User", "J!Pages", "J! Content" over
+     * every page): each column title and each item caption of the template's navigation profiles
+     * (`templates/<template>/local/etc/navigation/*.json`, then `etc/navigation/*.json`, their `mega_settings`, a JSON object or
+     * a JSON string of one). T4's `mega_sub.php` echoes them with no key, so they are page literals: offered under
+     * `PageLiterals::keyOf()` and printed in the override's words by the output filter. Each with the first file that holds it.
+     *
+     * @return array<string,string> literal => site-relative file
+     */
+    private function megamenuLiterals(string $template): array
+    {
+        $out = [];
+        foreach (['templates/' . $template . '/local/etc/navigation', 'templates/' . $template . '/etc/navigation'] as $folder) {
+            $dir = $this->root . '/' . $folder;
+            if (!is_dir($dir) || is_link($dir)) continue;
+            $names = @scandir($dir) ?: [];
+            sort($names);
+            foreach ($names as $name) {
+                if (!preg_match('/^[A-Za-z0-9_. -]+\.json$/D', $name)) continue;
+                $body = json_decode((string) $this->bytes($folder . '/' . $name), true);
+                $settings = is_array($body) ? ($body['mega_settings'] ?? null) : null;
+                if (is_string($settings)) $settings = json_decode($settings, true);
+                if (!is_array($settings)) continue;
+                foreach ($settings as $items) {
+                    if (!is_array($items)) continue;
+                    foreach ($items as $item) {
+                        if (!is_array($item)) continue;
+                        $words = [$item['caption'] ?? null];
+                        foreach (is_array($item['settings'] ?? null) ? $item['settings'] : [] as $row)
+                            foreach (is_array($row['contents'] ?? null) ? $row['contents'] : [] as $column)
+                                if (is_array($column)) $words[] = $column['title'] ?? null;
+                        foreach ($words as $word) {
+                            $word = is_string($word) ? trim((string) preg_replace('/\s+/', ' ', $word)) : '';
+                            if ($word !== '' && PageLiterals::keyOf($word) !== null && !isset($out[$word])) $out[$word] = $folder . '/' . $name;
+                        }
+                    }
+                }
+            }
+        }
+        return $out;
+    }
+
     /** Words a visitor reads: a letter, and no markup a translator could break. */
     private static function worded(string $source): bool
     {
@@ -545,6 +641,7 @@ final class LanguageOverrides
                 foreach ($m[1] as $key) $keys[$key] = true;
             }
         }
+        foreach ($this->megamenuLiterals($template) as $literal => $file) if (!isset($literals[$literal])) $literals[$literal] = $file;
         return $this->front[$template] = ['keys' => $keys, 'formats' => $formats, 'literals' => $literals];
     }
 
