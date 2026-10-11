@@ -24,16 +24,27 @@
  *
  * No Joomla dependency, like the rest of `lib/`. The disk side is {@see TemplateSiteFiles}.
  */
+require_once __DIR__ . '/GlyphFallback.php';
+
 final class TemplateSiteSettings
 {
     /** The site's share image: one per site, never per profile, kept in {@see FAVICON_FILE} on every framework. */
     public const SHARE_KEY = 'other_shareImage';
 
+    /**
+     * The faces that draw the letters of the site's language its template's fonts cannot ({@see GlyphFallback}): one set per
+     * site, never per profile, kept in {@see FAVICON_FILE} on every framework like the share image.
+     */
+    public const GLYPH_KEY = 'other_glyphFaces';
+
+    /** The keys kept in the template's own settings file whatever its framework: one value for the whole site. */
+    public const SITE_KEYS = [self::SHARE_KEY, self::GLYPH_KEY];
+
     /** Every key a T4 profile write may carry. Nothing outside this list is ever written. */
     public const T4_KEYS = ['site_logo', 'site_logo_small', 'site_logo_dark', 'site_logo_dark_small', 'site_logo_2', 'site_name', 'site_slogan', 'other_faviconFile'];
 
     /** The keys a template without T4 has: its favicon and its share image. Its logo is a style param (`templateStyle`). */
-    public const OTHER_KEYS = ['other_faviconFile', 'other_shareImage'];
+    public const OTHER_KEYS = ['other_faviconFile', 'other_shareImage', 'other_glyphFaces'];
 
     /** Picture types a share image may have: the ones Facebook, Zalo and LinkedIn draw (no SVG, ICO or AVIF). */
     private const SHARE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
@@ -66,7 +77,7 @@ final class TemplateSiteSettings
      */
     public static function keysFor(string $framework): array
     {
-        return $framework === 't4' ? array_merge(self::T4_KEYS, [self::SHARE_KEY]) : self::OTHER_KEYS;
+        return $framework === 't4' ? array_merge(self::T4_KEYS, self::SITE_KEYS) : self::OTHER_KEYS;
     }
 
     /**
@@ -121,6 +132,16 @@ final class TemplateSiteSettings
         if (!is_string($value)) return ['error' => $key . ' must be a string'];
         if (strlen($value) > self::MAX_BYTES) return ['error' => $key . ' is longer than ' . self::MAX_BYTES . ' bytes'];
         if (preg_match('//u', $value) !== 1) return ['error' => $key . ' is not valid UTF-8'];
+        if ($key === self::GLYPH_KEY) {
+            // Faces are data the page prints: every one must be a face GlyphFallback prints, or nothing is written.
+            if (trim($value) === '') return ['value' => ''];
+            $faces = json_decode($value, true);
+            $count = is_array($faces) && is_array($faces['faces'] ?? null) ? count($faces['faces']) : 0;
+            $printed = substr_count(GlyphFallback::css($value), '@font-face');
+            if ($count === 0 || $printed !== $count || $count > GlyphFallback::MAX_FACES)
+                return ['error' => $key . ' must be {"faces":[…]} of at most ' . GlyphFallback::MAX_FACES . ' faces, each a plain family, a weight, a style, a WOFF2 on fonts.gstatic.com and a known subset'];
+            return ['value' => $value];
+        }
         if (in_array($key, self::TEXT_KEYS, true)) {
             $text = strip_tags(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
             $text = (string) preg_replace('/[\r\n\t\x{0085}\x{2028}\x{2029}]+/u', ' ', $text);
@@ -291,6 +312,19 @@ final class TemplateSiteSettings
         $extension = $path === '' ? null : self::picturePath($path);
         if ($extension === null || !in_array($extension, self::SHARE_EXTENSIONS, true) || !is_file(rtrim($root, '/') . '/' . $path)) return null;
         return rtrim($rootUrl, '/') . '/' . $path;
+    }
+
+    /**
+     * The `@font-face` rules of the faces a template was given through the door ({@see GLYPH_KEY}), or '' to print none.
+     * Read from {@see FAVICON_FILE}; the value is data and goes through {@see GlyphFallback::css()} again.
+     */
+    public static function glyphCss(string $root, string $template): string
+    {
+        if (!preg_match(self::TEMPLATE, $template)) return '';
+        $file = rtrim($root, '/') . '/templates/' . $template . '/local/etc/site/' . self::FAVICON_FILE;
+        if (!is_file($file) || is_link($file) || filesize($file) > self::MAX_BYTES * 2) return '';
+        $settings = self::settingsOf((string) file_get_contents($file), self::OTHER_KEYS);
+        return GlyphFallback::css((string) ($settings[self::GLYPH_KEY] ?? ''));
     }
 
     /**

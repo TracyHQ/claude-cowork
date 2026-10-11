@@ -78,6 +78,15 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * Joomla titles the home page "Home - Name" (or "Name - Name"); `onBeforeCompileHead` gives the home
  * page the site name alone, on a site where Tracy set the switch (`lib/HomeTitle.php`). Every other
  * page keeps "Page - Name". It costs one comparison on every other page.
+ *
+ * ## A layout's literal words in the site's language
+ *
+ * Words a front-end layout writes as a literal, with no language key (Joomla's own mod_finder
+ * `aria-label="search"`, a template's `<span class="sr-only">Watch the video</span>`), are said in the
+ * page's language: `onBeforeRespond`, after every `onAfterRender` (T4's included), replaces each one
+ * the language's override file translates under a `TRACY_LITERAL_` key (`lib/PageLiterals.php`;
+ * `template.languageOverrides` offers and writes them). A site page in en-GB, or a language with no
+ * such key, is left exactly as it was; the cost is one `is_file`.
  */
 final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
@@ -283,6 +292,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             EngineFactory::loadTemplateSiteSettings();
             $t4 = \TemplateSiteSettings::frameworkOf(JPATH_ROOT, $template) === 't4';
             $this->printShareImage($document, $template, $t4);
+            $this->printGlyphFaces($document, $template);
             if ($t4) {
                 return;
             }
@@ -369,6 +379,23 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         }
     }
 
+    /**
+     * The faces that draw the letters of the site's language its template's fonts cannot (`TemplateSiteSettings::glyphCss`),
+     * as a style declaration: Joomla prints declarations after the linked stylesheets, so they follow the template's faces.
+     */
+    private function printGlyphFaces($document, string $template): void
+    {
+        try {
+            $css = \TemplateSiteSettings::glyphCss(JPATH_ROOT, $template);
+            if ($css !== '' && method_exists($document, 'addStyleDeclaration')) {
+                $document->addStyleDeclaration($css);
+            }
+        } catch (\Throwable $e) {
+            // Faces are never worth a page: the page keeps the template's own.
+            Log::add('claudecoworkapi glyph faces: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
     /** The page as printed keeps only the share image `onBeforeCompileHead` set (`TemplateSiteSettings::withoutOtherShareImageTags`). */
     private function keepOnlyCustomerShareImage(): void
     {
@@ -384,10 +411,46 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
      */
     public function onBeforeRespond(): void
     {
+        $this->translatePageLiterals();
         if ($this->shareImage === null || !$this->shareImageFallback) {
             return;
         }
         $this->rewriteBody(fn(string $body): string => \TemplateSiteSettings::withShareImageFallback($body, (string) $this->shareImage));
+    }
+
+    /**
+     * A site HTML page in a language other than en-GB: its layouts' literal words that the language's override file
+     * translates, said in that language (`PageLiterals::translate`). Any failure leaves the page as it was.
+     */
+    private function translatePageLiterals(): void
+    {
+        try {
+            $app = $this->getApplication();
+            if (!$app->isClient('site') || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+                return;
+            }
+            $document = $app->getDocument();
+            if (!$document || $document->getType() !== 'html') {
+                return;
+            }
+            $tag = (string) $app->getLanguage()->getTag();
+            if ($tag === '' || $tag === 'en-GB' || preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag) !== 1) {
+                return;
+            }
+            $file = JPATH_ROOT . '/language/overrides/' . $tag . '.override.ini';
+            if (!is_file($file) || is_link($file)) {
+                return;
+            }
+            EngineFactory::loadPageLiterals();
+            $words = \PageLiterals::fromOverrides(\LanguageOverrides::parse((string) file_get_contents($file)));
+            if ($words === []) {
+                return;
+            }
+            $this->rewriteBody(fn(string $body): string => \PageLiterals::translate($body, $words));
+        } catch (\Throwable $e) {
+            // Words are never worth a page: the page keeps the layout's own.
+            Log::add('claudecoworkapi page literals: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
     }
 
     /** The response body passed through `$edit`, set back only when it changed; a failure leaves the page as it was. */

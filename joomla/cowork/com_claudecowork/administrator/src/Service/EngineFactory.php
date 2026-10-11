@@ -70,6 +70,12 @@ final class EngineFactory
         require_once self::libDir() . '/HomeTitle.php';
     }
 
+    /** Only the page-literal rules and the override file reader, for the system plugin saying a layout's literals. */
+    public static function loadPageLiterals(): void
+    {
+        require_once self::libDir() . '/LanguageOverrides.php';
+    }
+
     /** Only the site-settings rules, for the system plugin printing a non-T4 template's favicon. */
     public static function loadTemplateSiteSettings(): void
     {

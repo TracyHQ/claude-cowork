@@ -67,6 +67,8 @@ final class WP_Fake
     public static array $strings = [];
     /** @var array<int,array{display_name:string}> user id => the columns an editor lock's holder is named by */
     public static array $users = [];
+    /** @var array<int,array<string,mixed>> user id => meta key => value, what `get_user_meta` answers */
+    public static array $userMeta = [];
     /** @var array<string,callable> hook => the one callback `apply_filters` runs for it */
     public static array $filters = [];
     /** @var array<string,array<string,mixed>> pattern name => what the block pattern registry holds for it */
@@ -89,6 +91,7 @@ final class WP_Fake
         self::$relations = [];
         self::$recounts = [];
         self::$users = [];
+        self::$userMeta = [];
         self::$filters = [];
         self::$polylang = false;
         self::$languages = [];
@@ -219,7 +222,40 @@ function wp_delete_post(int $id, bool $force = false): void
 
 function metadata_exists(string $type, int $id, string $key): bool
 {
+    if ($type === 'user') {
+        return array_key_exists($key, WP_Fake::$userMeta[$id] ?? []);
+    }
     return array_key_exists($id . ':' . $key, WP_Fake::$meta);
+}
+
+/** One user's meta: a key's value (`$single`), or every key with its values in a list, as WordPress answers. */
+function get_user_meta(int $id, string $key = '', bool $single = false)
+{
+    if ($key === '') {
+        return array_map(static fn ($v) => [$v], WP_Fake::$userMeta[$id] ?? []);
+    }
+    $value = WP_Fake::$userMeta[$id][$key] ?? null;
+    return $single ? ($value ?? '') : ($value === null ? [] : [$value]);
+}
+
+function update_user_meta(int $id, string $key, $value): bool
+{
+    WP_Fake::$userMeta[$id][$key] = $value;
+    return true;
+}
+
+function delete_user_meta(int $id, string $key): bool
+{
+    unset(WP_Fake::$userMeta[$id][$key]);
+    return true;
+}
+
+/** The users, by id, with the columns `fields` names (`ID`, `display_name`). */
+function get_users(array $args = []): array
+{
+    $ids = array_keys(WP_Fake::$users);
+    sort($ids);
+    return array_map(static fn (int $id) => (object) ['ID' => $id, 'display_name' => WP_Fake::$users[$id]['display_name'] ?? ''], array_slice($ids, 0, (int) ($args['number'] ?? 200)));
 }
 
 function get_post_meta(int $id, string $key, bool $single = false)

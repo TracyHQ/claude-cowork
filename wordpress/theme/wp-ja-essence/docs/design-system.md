@@ -26,7 +26,7 @@ accent `#ffffff` (4.32:1, kept for parity: D-03). The dark half is the source's 
 back as computed style.
 
 Type: Jost (400, 500, 600, 700) for headings and interface, Noto Serif (400, 700) for body text,
-both self-hosted as woff2 in `assets/fonts/`. Body 16 px on a 24 px line; headings h1 to h6 are
+both self-hosted as woff2 in `assets/fonts/`. A page in Vietnamese (`html:lang(vi)`) draws everything set in Jost in Be Vietnam Pro instead (400, 600, 700, self-hosted): Jost has no Vietnamese letters. Every Jost rule reads the slot `var(--je-font-display, Jost)` or the display preset, and the `html:lang(vi)` rule in `wp-ja-essence.css` sets both; a new rule that names Jost directly would miss it (the theme test refuses one). Noto Serif adds its vietnamese cut by `unicode-range`. Body 16 px on a 24 px line; headings h1 to h6 are
 40/32/24/18/16/14 px at desktop and step down with the viewport (h1 28/32/38/40, h2 24/28/32 across
 the Bootstrap breakpoints; D-01, slice 11 of the build). The `theme.json` size presets run 12, 14,
 16, 16, 18, 24, 32, 40 px. Container 1164 px with 18 px gutters, Bootstrap 5 steps 540/720/960/1164

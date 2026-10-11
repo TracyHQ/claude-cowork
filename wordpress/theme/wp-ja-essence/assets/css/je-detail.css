@@ -86,18 +86,18 @@
 .t4-typo-example .alert p > a, .t4-typo-example .alert-link { white-space: nowrap; }
 /* s9: detail article title and quote as measured on the source detail pages (h1 40/48, quote Jost 32/38.4 in the accent) */
 .je-articlecard .je-page__title { font-size: 40px; line-height: 1.2; }
-.je-articlecard .area-blockquote .blockquote { margin: 0; font-family: Jost, sans-serif; font-size: 32px; line-height: 1.2; color: var(--wp--preset--color--accent); }
+.je-articlecard .area-blockquote .blockquote { margin: 0; font-family: var(--je-font-display, Jost), sans-serif; font-size: 32px; line-height: 1.2; color: var(--wp--preset--color--accent); }
 .je-articlecard .area-blockquote .blockquote p { margin: 0; }
 .je-articlecard .je-meta__author { font-weight: 400; font-size: 14px; line-height: 1.5; color: var(--wp--preset--color--fg); }
-.je-articlecard .area-blockquote figcaption { margin: 24px 0 0; font-family: Jost, sans-serif; font-size: 18px; line-height: 1.5; color: var(--wp--preset--color--fg-2); }
+.je-articlecard .area-blockquote figcaption { margin: 24px 0 0; font-family: var(--je-font-display, Jost), sans-serif; font-size: 18px; line-height: 1.5; color: var(--wp--preset--color--fg-2); }
 @media (max-width: 767px) { .je-articlecard .je-page__title { font-size: 24px; line-height: 1.2; } .je-articlecard .area-blockquote .blockquote { font-size: 24px; } }
 /* s9: Bootstrap type specimen values read from the source typography page (computed, 1440) */
-.t4-typo-example p.h1 { font-family: Jost; font-size: 40px; line-height: 52px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
-.t4-typo-example p.h2 { font-family: Jost; font-size: 32px; line-height: 41.6px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
-.t4-typo-example p.h3 { font-family: Jost; font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
-.t4-typo-example p.h4 { font-family: Jost; font-size: 18px; line-height: 23.4px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
-.t4-typo-example p.h5 { font-family: Jost; font-size: 16px; line-height: 20.8px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
-.t4-typo-example p.h6 { font-family: Jost; font-size: 14px; line-height: 18.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h1 { font-family: var(--je-font-display, Jost); font-size: 40px; line-height: 52px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h2 { font-family: var(--je-font-display, Jost); font-size: 32px; line-height: 41.6px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h3 { font-family: var(--je-font-display, Jost); font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h4 { font-family: var(--je-font-display, Jost); font-size: 18px; line-height: 23.4px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h5 { font-family: var(--je-font-display, Jost); font-size: 16px; line-height: 20.8px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example p.h6 { font-family: var(--je-font-display, Jost); font-size: 14px; line-height: 18.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
 .t4-typo-example p.lead { font-family: "Noto Serif"; font-size: 20px; line-height: 30px; font-weight: 300; color: var(--wp--preset--color--fg); }
 .t4-typo-example .card-text { font-family: "Noto Serif"; font-size: 16px; line-height: 24px; font-weight: 400; color: inherit; }
 .t4-typo-example .card:not([class*="text-"]) { color: light-dark(rgb(33, 37, 41), rgb(194, 201, 214)); }
@@ -128,11 +128,11 @@
 .t4-typo-example button.btn.btn-lg.btn-primary { font-size: 20px; line-height: 23px; color: rgb(255, 255, 255); padding-top: 8px; padding-left: 16px; }
 .t4-typo-example a.btn.btn-dark.w-100 { font-size: 18px; line-height: 20.7px; color: rgb(255, 255, 255); padding-top: 12.8px; padding-left: 18px; }
 .t4-typo-example a.page-link { font-size: 14px; line-height: 48px; color: light-dark(rgb(0, 0, 0), rgb(194, 201, 214)); padding-top: 0px; padding-left: 12px; }
-.t4-typo-example h3 { font-family: Jost; font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
+.t4-typo-example h3 { font-family: var(--je-font-display, Jost); font-size: 24px; line-height: 31.2px; font-weight: 400; color: var(--wp--preset--color--fg-2); }
 
 /* s11: links inside alerts take the alert colour in bold (source .alert-link); search-page button as the source .btn (Jost 18/20.7, 48px) */
 .t4-typo-example .alert a { color: inherit; font-weight: 700; }
-.je-search-form .wp-block-search__button.wp-element-button:not(.has-icon) { padding: 14px 34px; box-sizing: border-box; font-family: Jost, sans-serif; font-size: 18px; line-height: 20.7px; font-weight: 400; min-height: 48px; }
+.je-search-form .wp-block-search__button.wp-element-button:not(.has-icon) { padding: 14px 34px; box-sizing: border-box; font-family: var(--je-font-display, Jost), sans-serif; font-size: 18px; line-height: 20.7px; font-weight: 400; min-height: 48px; }
 
 /* s11: the source steps headings and display sizes down with the viewport (Bootstrap bands: h1 28/32/38/40, h2 24/28/32, h3 22/24, display calc(rfs + vw)) */
 .je-page:has(.t4-typo-example) .je-page__title { font-size: 32px; line-height: 41.6px; }
@@ -191,10 +191,10 @@
 /* article footer (D-67): Prev/Next, Share article, Tags in */
 .je-artfoot { margin-top: 48px; }
 .je-pagenav { display: flex; justify-content: space-between; margin: 24px 0 0; }
-.je-pagenav a { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; background: light-dark(#f8f8ff, #222a3b); color: inherit; font-family: Jost, sans-serif; font-size: 18px; line-height: 20.7px; text-decoration: none; }
+.je-pagenav a { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; background: light-dark(#f8f8ff, #222a3b); color: inherit; font-family: var(--je-font-display, Jost), sans-serif; font-size: 18px; line-height: 20.7px; text-decoration: none; }
 .je-pagenav__next { margin-left: auto; }
 .je-artfoot__row { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-top: 48px; padding-top: 48px; }
-.je-artfoot h6 { margin: 0 0 24px; font-family: Jost, sans-serif; font-size: 18px; font-weight: 400; line-height: 1.3; color: var(--wp--preset--color--fg); }
+.je-artfoot h6 { margin: 0 0 24px; font-family: var(--je-font-display, Jost), sans-serif; font-size: 18px; font-weight: 400; line-height: 1.3; color: var(--wp--preset--color--fg); }
 .je-share { display: flex; gap: 8px; }
 .je-share a { position: relative; display: block; width: 36px; height: 36px; border-radius: 50%; font-size: 0; line-height: 0; overflow: hidden; }
 .je-share a::after { content: ""; position: absolute; inset: 9px; background: #fff; -webkit-mask: var(--je-ico) center / contain no-repeat; mask: var(--je-ico) center / contain no-repeat; }

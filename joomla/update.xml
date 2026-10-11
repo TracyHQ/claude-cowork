@@ -16,7 +16,41 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>0.24.12 plus: carries the contracts of the next versions of ja-directory, ja-prodex, ja-rent, ja-resume, ja-sensei, ja-seven, ja-tour, ja-conf, ja-essence, ja-vital, ja-symphony and ja-resort, whose stylesheets read a worn design system (TracyHQ/tch#1134)</description>
+        <description>0.24.14 plus: carries the contracts of the next versions of ja-directory, ja-prodex, ja-rent, ja-resume, ja-sensei, ja-seven, ja-tour, ja-conf, ja-essence, ja-vital, ja-symphony and ja-resort, whose stylesheets read a worn design system (TracyHQ/tch#1134)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.15</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.15</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.15/pkg_claudecowork-0.24.15.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>0.24.13 plus: template.languageOverrides offers a language pack's values that are still English reworded (vi-VN 4.2.2 "Show Profile" for en-GB "User Profile") and the column titles and captions of a T4 mega menu (etc/navigation/*.json), printed raw by T4, as page literals the output filter replaces (TracyHQ/tch#1013)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.14</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.14</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.14/pkg_claudecowork-0.24.14.zip</downloadurl>
+        </downloads>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>0.24.12 plus: template.languageOverrides offers the plugin strings a visitor reads (administrator/language plg_*.ini keys a plugin's tmpl/ or a visitor's form names) and the English-order date formats layouts pass through Text::_ (written as the language's own DATE_FORMAT_LC3); template.siteSettings keeps other_glyphFaces, the faces that draw the letters of the site's language its template's fonts cannot, printed in every page's head (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.13</version>

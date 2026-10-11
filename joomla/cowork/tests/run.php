@@ -1941,6 +1941,9 @@ require __DIR__ . "/template-site-settings.php";
 // template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.
 require __DIR__ . "/language-overrides.php";
 require __DIR__ . "/language-overrides-ranking.php";
+require __DIR__ . "/language-overrides-plugins-dates.php";
+require __DIR__ . "/language-overrides-literals.php";
+require __DIR__ . "/language-overrides-english-pack.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
@@ -1958,6 +1961,8 @@ require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";
+// userProfile: an author's bio and job title, the real writer over SQLite and the engine's undo (TracyHQ/tch#1013).
+require __DIR__ . "/author-profile.php";
 // Derived contract core: leaf paths, rendered-page calibration, DB rows -> content map. Plain PHP, no CMS.
 require __DIR__ . "/leaf-codec.php";
 // Fixtures of RAW values in the storage format of popular Joomla builders (JA ACM, Cassiopeia,
