@@ -5,7 +5,7 @@
 
 /* the listing is as wide as the source's container, the heading block is centred */
 .je-narrow:has(.je-prose > .tracy-query) { max-width: 1164px; }
-.je-prose:has(> .tracy-query) > .tracy-eyebrow { text-align: center; font-family: Jost, sans-serif; font-size: 40px; line-height: 52px; font-weight: 400; text-transform: none; letter-spacing: 0; color: light-dark(rgb(33, 37, 41), rgb(238, 241, 246)); margin: 36px 0 12px; }
+.je-prose:has(> .tracy-query) > .tracy-eyebrow { text-align: center; font-family: var(--je-font-display, Jost), sans-serif; font-size: 40px; line-height: 52px; font-weight: 400; text-transform: none; letter-spacing: 0; color: light-dark(rgb(33, 37, 41), rgb(238, 241, 246)); margin: 36px 0 12px; }
 @media (max-width: 767px) { .je-prose:has(> .tracy-query) > .tracy-eyebrow { font-size: 28px; line-height: 36.4px; } }
 /* 1.0.8 pass 3: the source category title steps 36.4 / 42 / 49 / 52px line height at 320 / 576 / 768 / 1400 */
 @media (min-width: 576px) and (max-width: 767px) { .je-prose:has(> .tracy-query) > .tracy-eyebrow { font-size: 32.3px; line-height: 42px; } }
@@ -32,10 +32,10 @@
 /* the Joomla pager: round numbered buttons, "Page N of M" chip above them */
 .tracy-query .tracy-joomla-pager { display: flex; flex-direction: column-reverse; align-items: center; gap: 12px; margin: 48px 0; }
 .tracy-joomla-pager .tracy-pager__list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; list-style: none; margin: 0; padding: 0; }
-.tracy-joomla-pager .tracy-pager__link { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--wp--preset--color--border, #e5e5ea); color: var(--wp--preset--color--fg-2); font-family: Jost, sans-serif; font-size: 14px; text-decoration: none; }
+.tracy-joomla-pager .tracy-pager__link { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--wp--preset--color--border, #e5e5ea); color: var(--wp--preset--color--fg-2); font-family: var(--je-font-display, Jost), sans-serif; font-size: 14px; text-decoration: none; }
 .tracy-joomla-pager .is-current .tracy-pager__link { background: var(--wp--preset--color--accent); color: var(--wp--preset--color--accent-on); }
 .tracy-joomla-pager .is-disabled .tracy-pager__link { opacity: 0.5; }
-.tracy-joomla-pager .tracy-pager__counter { margin: 0; padding: 6px 14px; border-radius: 8px; background: rgba(0, 0, 0, 0.1); font-family: Jost, sans-serif; font-size: 16px; line-height: 24px; color: light-dark(#000, rgb(140, 151, 168)); }
+.tracy-joomla-pager .tracy-pager__counter { margin: 0; padding: 6px 14px; border-radius: 8px; background: rgba(0, 0, 0, 0.1); font-family: var(--je-font-display, Jost), sans-serif; font-size: 16px; line-height: 24px; color: light-dark(#000, rgb(140, 151, 168)); }
 
 /* tag cloud (tagged items): chips as in the module */
 .je-prose .wp-block-tag-cloud { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 36px; }
@@ -76,7 +76,7 @@
 :is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query .je-card__intro { margin: 0; font-size: 14px; line-height: 21px; color: var(--wp--preset--color--fg-2); }
 :is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query .je-card__intro p { margin: 0; }
 :is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query .je-card__tags a { display: inline-block; margin-right: 12px; font-size: 12px; text-decoration: none; color: var(--wp--preset--color--fg-2); }
-:is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query a.je-card__more { font: 400 18px/20.7px Jost, sans-serif; text-decoration: none; color: light-dark(rgba(37, 36, 36, 0.7), rgb(194, 201, 214)); }
+:is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query a.je-card__more { font: 400 18px/20.7px var(--je-font-display, Jost), sans-serif; text-decoration: none; color: light-dark(rgba(37, 36, 36, 0.7), rgb(194, 201, 214)); }
 :is(.je-slug-category-blog, .je-slug-category-style-4) .tracy-query .je-card__intro .wp-block-post-excerpt__more-link { display: none; }
 
 /* 1.0.1 — Author listing (the `wp-ja-essence/authors` block): photo, name, job title and bio on white cards, three to a row. */

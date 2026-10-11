@@ -37,9 +37,19 @@ Jost, Copyright 2020 The Jost Project Authors (https://github.com/indestructible
 Noto Serif, Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic),
 are licensed under the SIL Open Font License 1.1 (https://openfontlicense.org/). The woff2 files in
 assets/fonts are the latin builds of the Google Fonts families the source template loads,
-self-hosted.
+self-hosted, plus the vietnamese build of Noto Serif.
+
+Be Vietnam Pro, Copyright 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro),
+is licensed under the SIL Open Font License 1.1 (https://openfontlicense.org/). The theme ships it cut to
+latin, latin-ext and vietnamese, as the heading font of pages in Vietnamese, which Jost cannot draw.
 
 == Changelog ==
+
+= 1.0.16 =
+* A page in Vietnamese draws every heading, menu item, button and label in Be Vietnam Pro, a font close to Jost that
+  has the Vietnamese letters, and its body text in Noto Serif with its Vietnamese letters: Jost has none (no ă, đ, ơ,
+  ư, ề…), so headings were drawn with letters from another font or a loose accent. The theme declares both fonts itself
+  and switches on the page language (html lang="vi"), so it works on any host (Akemi's decision 6, 12/10/2026).
 
 = 1.0.15 =
 * The smart-search tips give their example words ("this and that", "this -that") in the site's language in every
