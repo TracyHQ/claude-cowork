@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>0.24.19 plus: carries the contracts of ja-essence 1.0.6, ja-restaurant 1.0.4, rebuilt so their template stylesheets read a worn design system (TracyHQ/tch#1180)</description>
+        <description>0.24.19 plus: carries the contracts of ja-essence 1.0.6, ja-restaurant 1.0.4, ja-resume 1.0.2, ja-sensei 1.0.2, rebuilt so their template stylesheets read a worn design system (TracyHQ/tch#1180)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.20</version>
