@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>0.24.12 plus: carries the contracts of the next versions of ja-directory, ja-prodex, ja-rent, ja-resume, ja-sensei, ja-seven, ja-tour, ja-conf and ja-essence, whose stylesheets read a worn design system (TracyHQ/tch#1134)</description>
+        <description>0.24.12 plus: carries the contracts of the next versions of ja-directory, ja-prodex, ja-rent, ja-resume, ja-sensei, ja-seven, ja-tour, ja-conf, ja-essence, ja-vital, ja-symphony and ja-resort, whose stylesheets read a worn design system (TracyHQ/tch#1134)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.13</version>
