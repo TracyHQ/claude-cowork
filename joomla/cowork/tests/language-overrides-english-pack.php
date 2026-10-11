@@ -90,13 +90,13 @@ if (function_exists('check')) {
     ]);
     // The output filter then prints the override's words where T4 printed the title.
     $epSet = $epCall(['operation' => 'set', 'apply_id' => 'ep-1', 'template' => 'ja_essence', 'locale' => 'vi-VN', 'strings' => [
-        'TRACY_LITERAL_J_PAGES' => 'Trang', 'TRACY_LITERAL_USER' => 'Người dùng', 'PLG_USER_PROFILE_SLIDER_LABEL' => 'Hồ sơ người dùng',
+        'TRACY_LITERAL_J_PAGES' => 'Trang', 'TRACY_LITERAL_USER' => "Ng\u{01B0}\u{1EDD}i d\u{00F9}ng", 'PLG_USER_PROFILE_SLIDER_LABEL' => "H\u{1ED3} s\u{01A1} ng\u{01B0}\u{1EDD}i d\u{00F9}ng",
     ]]);
     check('a set writes the column titles and the reworded strings', $epSet['written'] ?? null, 3);
     $epWords = PageLiterals::fromOverrides(LanguageOverrides::parse((string) file_get_contents($epRoot . '/language/overrides/vi-VN.override.ini')));
     check('the mega column titles print in the site\'s language', PageLiterals::translate(
         '<h3 class="mega-col-title"><span>User</span></h3><h3 class="mega-col-title"><span>J!Pages</span></h3>', $epWords),
-        '<h3 class="mega-col-title"><span>Người dùng</span></h3><h3 class="mega-col-title"><span>Trang</span></h3>');
+        "<h3 class=\"mega-col-title\"><span>Ng\u{01B0}\u{1EDD}i d\u{00F9}ng</span></h3><h3 class=\"mega-col-title\"><span>Trang</span></h3>");
 
     // An English site's own pack is English: none of it is taken for an untranslated string.
     $epPut('administrator/language/en-US/plg_user_profile.ini', "PLG_USER_PROFILE_SLIDER_LABEL=\"Show Profile\"\n");
