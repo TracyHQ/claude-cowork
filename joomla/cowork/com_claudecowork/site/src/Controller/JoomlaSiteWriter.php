@@ -910,7 +910,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             $data = get_object_vars($object);
             if ($id <= 0) {
                 $data += ['access' => 1, 'language' => '*'];
-                if ($kind === 'article') $data += ['created' => Factory::getDate()->toSql(), 'images' => '{}', 'urls' => '{}', 'attribs' => '{}', 'metadata' => '{}', 'metakey' => '', 'metadesc' => ''];
+                if ($kind === 'article') $data = self::articleCreateDefaults($data, Factory::getDate()->toSql(), $this->articleAuthorId($this->currentUserId()));
             }
             // 🔒 AN UPDATE KEEPS THE ROW'S ORDERING UNLESS IT NAMES ONE. Joomla's Module::store() gives a
             // module whose ordering is 0 the next free one, so writing words into it moved it, and the
@@ -1060,6 +1060,56 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
                 return ['created_time' => $now, 'modified_time' => $now, 'created_user_id' => $userId];
         }
         return [];
+    }
+
+    /**
+     * A new article as com_content's own ArticleModel would have saved it, for every column the call
+     * did not name. 🔒 NEVER BY USER 0: this door runs as a guest, and Table\Content::store() takes
+     * the signed-in user as the author, so an article created here was stored with created_by = 0
+     * — and T4's AuthorModel::getAuthor(0) falls through to implode(',', null): every page listing
+     * that article answered 500 (dev e2ef-jo, JA Impact j6, 04/10/2026; TracyHQ/tch#1182, J5.8).
+     * `publish_up` is now for a published article (ArticleModel::prepareTable()); an empty JSON
+     * column is `{}` (Table\Content::check() only fills an unset one). An array is left to bind().
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    public static function articleCreateDefaults(array $data, string $now, int $authorId): array
+    {
+        foreach (['images', 'urls', 'attribs', 'metadata'] as $column) {
+            if (!isset($data[$column]) || (is_string($data[$column]) && trim($data[$column]) === '')) $data[$column] = '{}';
+        }
+        if (empty($data['created_by']) && $authorId > 0) $data['created_by'] = $authorId;
+        if (empty($data['modified_by']) && !empty($data['created_by'])) $data['modified_by'] = $data['created_by'];
+        $data += ['access' => 1, 'language' => '*', 'created' => $now, 'modified' => $now, 'metakey' => '', 'metadesc' => '', 'version' => 1];
+        if ((int) ($data['state'] ?? 0) === 1 && empty($data['publish_up'])) $data['publish_up'] = $now;
+        return $data;
+    }
+
+    /**
+     * Who a new article is by: the signed-in user when there is one; else the first active user of a
+     * group the site's root asset gives `core.admin` (a Super User), else the first active user.
+     * 0 only on a site with no active user at all.
+     */
+    public function articleAuthorId(int $signedIn): int
+    {
+        if ($signedIn > 0) return $signedIn;
+        $rules = json_decode((string) $this->db->setQuery($this->db->getQuery(true)->select($this->db->quoteName('rules'))
+            ->from($this->db->quoteName('#__assets'))->where($this->db->quoteName('id') . ' = 1'))->loadResult(), true);
+        $admins = [];
+        foreach ((array) ($rules['core.admin'] ?? []) as $group => $allowed) {
+            if ((int) $allowed === 1) $admins[] = (int) $group;
+        }
+        $first = function (?array $groups): int {
+            $query = $this->db->getQuery(true)->select($this->db->quoteName('u.id'))->from($this->db->quoteName('#__users', 'u'))
+                ->where($this->db->quoteName('u.block') . ' = 0')->order($this->db->quoteName('u.id') . ' ASC');
+            if ($groups !== null) {
+                $query->join('INNER', $this->db->quoteName('#__user_usergroup_map', 'm') . ' ON ' . $this->db->quoteName('m.user_id') . ' = ' . $this->db->quoteName('u.id'))
+                    ->where($this->db->quoteName('m.group_id') . ' IN (' . implode(',', $groups) . ')');
+            }
+            return (int) $this->db->setQuery($query, 0, 1)->loadResult();
+        };
+        return ($admins === [] ? 0 : $first($admins)) ?: $first(null);
     }
 
     private function currentUserId(): int

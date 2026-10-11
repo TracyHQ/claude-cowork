@@ -1963,6 +1963,8 @@ require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";
 // userProfile: an author's bio and job title, the real writer over SQLite and the engine's undo (TracyHQ/tch#1013).
 require __DIR__ . "/author-profile.php";
+// A new article: its author (never user 0) and the defaults com_content saves (TracyHQ/tch#1182, J5.8).
+require __DIR__ . "/article-create-defaults.php";
 // Derived contract core: leaf paths, rendered-page calibration, DB rows -> content map. Plain PHP, no CMS.
 require __DIR__ . "/leaf-codec.php";
 // Fixtures of RAW values in the storage format of popular Joomla builders (JA ACM, Cassiopeia,
