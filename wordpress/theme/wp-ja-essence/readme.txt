@@ -41,6 +41,10 @@ self-hosted.
 
 == Changelog ==
 
+= 1.0.15 =
+* The smart-search tips give their example words ("this and that", "this -that") in the site's language in every
+  language the theme ships, not in English inside a translated sentence (TracyHQ/tch#1013).
+
 = 1.0.14 =
 * The registration form's hidden "Leave this empty" field and the pagers' accessible name ("Pagination") go through the
   theme's text domain, so a site made in another language no longer reads them in English (TracyHQ/tch#1013).
