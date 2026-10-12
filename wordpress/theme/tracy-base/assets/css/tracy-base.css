@@ -469,6 +469,20 @@
 }
 
 @media (max-width: 781px) {
+  /* A customer's site name must share the row with the actions and menu button. */
+  .tracy-header__brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .tracy-header__brand .tracy-brand {
+    min-width: 0;
+  }
+
+  .tracy-header__brand .tracy-brand a {
+    overflow-wrap: anywhere;
+  }
+
   /* Two classes: the block's own layout class (.is-layout-flex) also says display, at one class. */
   .tracy-header__menu .tracy-header__links {
     display: none;
