@@ -233,6 +233,38 @@ foreach(['36-sub.css.php','evil.css','36-sub.js'] as $name) {
     contractDrifts('the subpage exception does not admit '.$name,$contract,fn()=>$contract->inspect());
     unlink($contractDir.'/media/t4/css/'.$name);
 }
+// A main style compiled after a clean restore is not an authored change. Pinned files still are.
+$styleDir=sys_get_temp_dir().'/cowork-style-cache-'.bin2hex(random_bytes(6));
+mkdir($styleDir.'/media/t4/css',0777,true);
+$styleData=$data;
+$styleRow=['title'=>'QA style','template'=>'qa_template','client_id'=>'0'];
+$styleData['content-map']['entities'][]=['key'=>'qa-style','kind'=>'templateStyle','sourceId'=>9,'identity'=>$styleRow];
+$styleData['presentation-lock']['entities']['qa-style']=$styleRow;
+$styleData['presentation-lock']['fileRoots']=['media'];
+$styleData['presentation-lock']['files']=[];
+foreach($styleData as $name=>$body)file_put_contents($styleDir.'/'.$name.'.json',json_encode($body));
+$styleWriter=clone $cw;$styleWriter->store['templateStyle'][9]=['id'=>'9']+$styleRow;
+$styleStore=new TestContractStore();
+$styleContract=new QuickstartContract($styleWriter,$styleStore,$styleDir,$styleDir);
+file_put_contents($styleDir.'/media/t4/css/9.css','compiled known style');
+$styleContract->inspect();
+checkTrue('first render of a known unlisted T4 style is not reported as a user edit',!str_contains(implode(' ', $styleContract->driftWarnings()),'9.css'));
+file_put_contents($styleDir.'/media/t4/css/999.css','unknown style');
+$styleContract->inspect();
+checkTrue('a numeric CSS file of an unknown style is still reported',str_contains(implode(' ', $styleContract->driftWarnings()),'Unexpected presentation file: media/t4/css/999.css'));
+unlink($styleDir.'/media/t4/css/999.css');unlink($styleDir.'/media/t4/css/9.css');
+symlink($contractDir.'/assets/demo.css',$styleDir.'/media/t4/css/9.css');
+$styleContract->inspect();
+checkTrue('a known style name never exempts a symlink',str_contains(implode(' ', $styleContract->driftWarnings()),'Unexpected presentation file: media/t4/css/9.css'));
+unlink($styleDir.'/media/t4/css/9.css');file_put_contents($styleDir.'/media/t4/css/9.css','pinned style');
+$styleData['presentation-lock']['files']['media/t4/css/9.css']=hash_file('sha256',$styleDir.'/media/t4/css/9.css');
+file_put_contents($styleDir.'/presentation-lock.json',json_encode($styleData['presentation-lock']));
+$styleContract=new QuickstartContract($styleWriter,$styleStore,$styleDir,$styleDir);
+file_put_contents($styleDir.'/media/t4/css/9.css','changed pinned style');
+$styleContract->inspect();
+checkTrue('an explicitly pinned numeric style keeps its hash check',str_contains(implode(' ', $styleContract->driftWarnings()),'Presentation asset changed: media/t4/css/9.css'));
+unlink($styleDir.'/media/t4/css/9.css');rmdir($styleDir.'/media/t4/css');rmdir($styleDir.'/media/t4');rmdir($styleDir.'/media');
+foreach(array_keys($styleData) as $name)unlink($styleDir.'/'.$name.'.json');rmdir($styleDir);
 unlink($contractDir.'/media/t4/css/36-sub.css');rmdir($contractDir.'/media/t4/css');
 foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
     $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;
@@ -446,7 +478,7 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
     }catch(Throwable $e){$loaded=$e->getMessage();}
     check("$id multilingual map is one this receiver can load",$loaded,true);
 }
-foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2','tracy-base/j6/1.0.2','ja-social-ii/j6/1.0.1','ja-donate/j6/1.0.1','ja-rent/j6/1.0.1','ja-essence/j6/1.0.2','ja-vogue/j6/1.0.3','tracy-business/j6/1.2.1','ja-essence/j6/1.0.3','ja-voyara/j6/1.0.5','ja-kinetic/j6/1.0.4','ja-impact/j6/1.0.1','ja-donate/j6/1.0.2','ja-morgan/j6/1.0.3','ja-phio/j6/1.0.4','ja-podcast/j6/1.0.2','ja-trip/j6/1.0.4','ja-mood/j6/1.0.1','ja-nova/j6/1.0.5','ja-space/j6/1.0.3','ja-vega/j6/1.0.4','ja-smallbiz/j6/1.0.1','ja-social-ii/j6/1.0.2','ja-spa/j6/1.0.2','ja-morgan/j6/1.0.4','ja-vogue/j6/1.0.4','ja-essence/j6/1.0.4','ja-essence/j6/1.0.5','ja-voyara/j6/1.0.6','ja-spa/j6/1.0.3','ja-spa/j6/1.0.4','ja-restaurant/j6/1.0.3','ja-directory/j6/1.0.1','ja-prodex/j6/1.0.1','ja-rent/j6/1.0.2','ja-resume/j6/1.0.1','ja-sensei/j6/1.0.1','ja-seven/j6/1.0.1','ja-tour/j6/1.0.1','ja-conf/j6/1.0.2','ja-vital/j6/1.0.3','ja-symphony/j6/1.0.1','ja-resort/j6/1.0.2','ja-essence/j6/1.0.6','ja-restaurant/j6/1.0.4','ja-resume/j6/1.0.2','ja-sensei/j6/1.0.2','ja-directory/j6/1.0.2','ja-donate/j6/1.0.3','ja-essence/j6/1.0.7','ja-impact/j6/1.0.2','ja-kinetic/j6/1.0.5','ja-mood/j6/1.0.2','ja-morgan/j6/1.0.5','ja-nova/j6/1.0.6','ja-phio/j6/1.0.5','ja-podcast/j6/1.0.3','ja-prodex/j6/1.0.2','ja-rent/j6/1.0.3','ja-resort/j6/1.0.3','ja-resume/j6/1.0.3','ja-sensei/j6/1.0.3','ja-seven/j6/1.0.2','ja-smallbiz/j6/1.0.2','ja-social-ii/j6/1.0.3','ja-spa/j6/1.0.5','ja-space/j6/1.0.4','ja-symphony/j6/1.0.2','ja-tour/j6/1.0.2','ja-trip/j6/1.0.5','ja-vega/j6/1.0.5','ja-vital/j6/1.0.4','ja-vogue/j6/1.0.5','ja-voyara/j6/1.0.7','tracy-base/j6/1.0.3','tracy-business/j6/1.2.2','ja-resort/j6/1.0.4'] as $id)
+foreach(['tracy-apple/j6/1.2.0','tracy-airbnb/j6/1.1.0','ja-voyara/j6/1.0.2','ja-voyara/j6/1.0.3','tracy-base/j6/1.0.1','ja-kinetic/j6/1.0.0','tracy-business/j6/1.0.0','tracy-business/j6/1.1.0','ja-spa/j6/1.0.1','ja-trip/j6/1.0.2','ja-space/j6/1.0.2','ja-essence/j6/1.0.1','ja-vital/j6/1.0.2','ja-vogue/j6/1.0.2','ja-phio/j6/1.0.3','ja-trip/j6/1.0.3','ja-kinetic/j6/1.0.3','ja-voyara/j6/1.0.4','ja-morgan/j6/1.0.2','tracy-base/j6/1.0.2','ja-social-ii/j6/1.0.1','ja-donate/j6/1.0.1','ja-rent/j6/1.0.1','ja-essence/j6/1.0.2','ja-vogue/j6/1.0.3','tracy-business/j6/1.2.1','ja-essence/j6/1.0.3','ja-voyara/j6/1.0.5','ja-kinetic/j6/1.0.4','ja-impact/j6/1.0.1','ja-donate/j6/1.0.2','ja-morgan/j6/1.0.3','ja-phio/j6/1.0.4','ja-podcast/j6/1.0.2','ja-trip/j6/1.0.4','ja-mood/j6/1.0.1','ja-nova/j6/1.0.5','ja-space/j6/1.0.3','ja-vega/j6/1.0.4','ja-smallbiz/j6/1.0.1','ja-social-ii/j6/1.0.2','ja-spa/j6/1.0.2','ja-morgan/j6/1.0.4','ja-vogue/j6/1.0.4','ja-essence/j6/1.0.4','ja-essence/j6/1.0.5','ja-voyara/j6/1.0.6','ja-spa/j6/1.0.3','ja-spa/j6/1.0.4','ja-restaurant/j6/1.0.3','ja-directory/j6/1.0.1','ja-prodex/j6/1.0.1','ja-rent/j6/1.0.2','ja-resume/j6/1.0.1','ja-sensei/j6/1.0.1','ja-seven/j6/1.0.1','ja-tour/j6/1.0.1','ja-conf/j6/1.0.2','ja-vital/j6/1.0.3','ja-symphony/j6/1.0.1','ja-resort/j6/1.0.2','ja-essence/j6/1.0.6','ja-restaurant/j6/1.0.4','ja-resume/j6/1.0.2','ja-sensei/j6/1.0.2','ja-directory/j6/1.0.2','ja-donate/j6/1.0.3','ja-essence/j6/1.0.7','ja-impact/j6/1.0.2','ja-kinetic/j6/1.0.5','ja-mood/j6/1.0.2','ja-morgan/j6/1.0.5','ja-nova/j6/1.0.6','ja-phio/j6/1.0.5','ja-podcast/j6/1.0.3','ja-prodex/j6/1.0.2','ja-rent/j6/1.0.3','ja-resort/j6/1.0.3','ja-resume/j6/1.0.3','ja-sensei/j6/1.0.3','ja-seven/j6/1.0.2','ja-smallbiz/j6/1.0.2','ja-social-ii/j6/1.0.3','ja-spa/j6/1.0.5','ja-space/j6/1.0.4','ja-symphony/j6/1.0.2','ja-tour/j6/1.0.2','ja-trip/j6/1.0.5','ja-vega/j6/1.0.5','ja-vital/j6/1.0.4','ja-vogue/j6/1.0.5','ja-voyara/j6/1.0.7','tracy-base/j6/1.0.3','tracy-business/j6/1.2.2','ja-resort/j6/1.0.4','ja-resort/j6/1.0.5'] as $id)
     checkTrue("the package carries $id",in_array($id,$bundled,true));
 // ja-kinetic's demo is 240 blog posts about a company that does not exist; without this file every
 // customer site built on it shows them, and nothing anywhere reports that.

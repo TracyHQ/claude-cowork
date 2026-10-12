@@ -455,6 +455,17 @@ final class QuickstartContract
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
+    private function unlistedStyleCache(string $path): bool {
+        // A fresh T4 site compiles its main style CSS on first view too (JA Resort: 9.css, 10.css).
+        // Keep every explicitly pinned file checked; only an unlisted, known style's derivative
+        // is exempt from the unexpected-file warning. Unknown styles and links remain reported.
+        if(isset($this->lock['files'][$path]) || !preg_match('~^media/t4/css/([0-9]+)\.css$~D',$path,$match))return false;
+        $id=(int)$match[1];$binding=$this->store->load();
+        foreach($this->baseEntities() as $key=>$entity)if($entity['kind']==='templateStyle') {
+            if((int)$entity['sourceId']===$id || (int)($binding['ids'][$key]??0)===$id)return true;
+        }
+        return false;
+    }
     /**
      * Whether this door call has already proved the locked files: null outside one, where every
      * inspect hashes them all; false until the first inspect inside one has; then true.
@@ -514,7 +525,7 @@ final class QuickstartContract
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
             foreach($iterator as $file)if($file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
-                if($this->generatedCache($relative) && !$file->isLink())continue;
+                if(($this->generatedCache($relative) || $this->unlistedStyleCache($relative)) && !$file->isLink())continue;
                 if(TemplateSiteSettings::isDoorFile($relative) && !$file->isLink())continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
