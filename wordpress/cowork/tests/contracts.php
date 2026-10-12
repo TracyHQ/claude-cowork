@@ -131,6 +131,11 @@ check('the shipped Tracy Base profile loads', $base->id(), 'tracy-base/wp7/1.1.0
 check('with its seven entities', count($base->entities()), 7);
 check('and its ten slots', count($base->slots()), 10);
 
+$mobileBase = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+$mobileBase->preview('tracy-base/wp7/1.1.5');
+check('the mobile navigation release ships its own bindable profile', $mobileBase->id(), 'tracy-base/wp7/1.1.5');
+check('the mobile release preserves the published content slots', count($mobileBase->slots()), count(json_decode((string) file_get_contents(__DIR__ . '/../lib/contracts/tracy-base/wp7/1.1.4/content-map.json'), true)['slots']));
+
 // ── unbound: nothing changes ────────────────────────────────────────────────────────────────
 
 $s = contractSite($SITE, $FIXTURES);
