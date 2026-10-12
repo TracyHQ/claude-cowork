@@ -433,6 +433,9 @@ function wp_ja_impact_page_heading( string $content, array $block ): string {
 }
 add_filter( 'render_block_core/post-title', 'wp_ja_impact_page_heading', 10, 2 );
 
+// The identity tokens the pages and parts carry, and their filling.
+require_once __DIR__ . '/identity.php';
+
 // Page-group code (inc/groups/*.php): one file per group of pages, so groups never edit the same file.
 foreach ( (array) glob( __DIR__ . '/groups/*.php' ) as $wp_ja_impact_group_file ) {
 	require_once $wp_ja_impact_group_file;

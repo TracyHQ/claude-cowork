@@ -36,7 +36,7 @@ if ( 'eyebrow' === $wp_ja_kinetic_part ) {
 
 // `meta`: the source drops the author and its separator together when there is no author.
 $wp_ja_kinetic_author = wp_ja_kinetic_post_author_name( $wp_ja_kinetic_id );
-$wp_ja_kinetic_date   = esc_html( get_the_date( 'M j', $wp_ja_kinetic_id ) );
+$wp_ja_kinetic_date   = esc_html( get_the_date( '', $wp_ja_kinetic_id ) );
 $wp_ja_kinetic_meta   = '' === $wp_ja_kinetic_author ? $wp_ja_kinetic_date : esc_html( $wp_ja_kinetic_author ) . ' &middot; ' . $wp_ja_kinetic_date;
 ?>
 <span class="hxcat-row__meta"><?php echo $wp_ja_kinetic_meta; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- both parts esc_html'd above. ?></span>

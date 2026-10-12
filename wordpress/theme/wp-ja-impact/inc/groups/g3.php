@@ -122,14 +122,14 @@ function wp_ja_impact_g3_binding( array $args, $block ) {
 			return wp_ja_impact_g3_percent( $post_id ) . '%';
 		case 'created':
 			$time = strtotime( $meta( 'created-date' ) );
-			return $time ? gmdate( 'M d, Y', $time ) : get_the_date( 'M d, Y', $post_id );
+			return $time ? wp_date( (string) get_option( 'date_format' ), $time, new DateTimeZone( 'UTC' ) ) : get_the_date( '', $post_id );
 		case 'event-day':
 		case 'event-month':
 			$time = strtotime( $meta( 'start-date' ) );
 			if ( ! $time ) {
 				return '';
 			}
-			return 'event-day' === $field ? gmdate( 'd', $time ) : gmdate( 'F', $time );
+			return 'event-day' === $field ? gmdate( 'd', $time ) : wp_date( 'F', $time, new DateTimeZone( 'UTC' ) );
 		case 'event-location':
 			/* translators: the label before an event's place. */
 			return '' === $meta( 'event-location' ) ? '' : __( 'Location:', 'wp-ja-impact' ) . ' ' . $meta( 'event-location' );

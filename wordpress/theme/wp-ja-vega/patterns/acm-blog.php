@@ -43,7 +43,7 @@
 <div class="wp-block-group jv-post__body">
 <!-- wp:group {"className":"jv-post__meta","layout":{"type":"default"}} -->
 <div class="wp-block-group jv-post__meta">
-<!-- wp:post-date {"format":"M d, Y","className":"jv-post__date"} /-->
+<!-- wp:post-date {"className":"jv-post__date"} /-->
 <!-- wp:post-terms {"term":"post_tag","separator":"","className":"jv-tags"} /-->
 </div>
 <!-- /wp:group -->

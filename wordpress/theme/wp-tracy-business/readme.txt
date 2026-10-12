@@ -26,3 +26,13 @@ https://github.com/nexu-io/open-design
 Archivo, (C) 2015 Omnibus-Type, and Newsreader, (C) 2020 Production Type, are both
 licensed under the SIL Open Font License 1.1, https://openfontlicense.org/ — the files in
 assets/fonts are the Google Fonts builds (latin and latin-ext subsets), unmodified.
+
+== Changelog ==
+
+= 1.1.8 =
+* The fixed words of the article, news and search sidebars, the error page, the news index and category
+  pages, the article's share links and "Related articles" heading, and the empty-listing and no-results
+  lines are printed through the theme's translations (theme patterns) instead of being typed into the
+  template files, so a site in another language shows them in it with no swap afterwards.
+* The final call to action and the card listing are carried by the theme with their words translatable;
+  the final call to action's two buttons lead to the Contact page instead of nowhere.

@@ -5,8 +5,9 @@
  * Categories: query
  * Block Types: core/query
  * Description: The listing: a query loop of cards — image, kind (excerpt), name (title). Used by the blog and archive templates.
+ * As tracy-base ships it: the empty-state line goes through the theme text domain, so a site in another language shows it in it.
  *
- * @package tracy
+ * @package tracy-base
  */
 ?>
 <!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"className":"tracy-query","layout":{"type":"default"}} -->
@@ -27,7 +28,7 @@
 <!-- /wp:post-template -->
 <!-- wp:query-no-results -->
 <!-- wp:paragraph {"className":"tracy-muted"} -->
-<p class="tracy-muted">Nothing here yet.</p>
+<p class="tracy-muted"><?php echo esc_html__( 'Nothing here yet.', 'tracy-base' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- /wp:query-no-results -->
 <!-- wp:query-pagination {"className":"tracy-pagination","layout":{"type":"flex"}} -->

@@ -34,7 +34,7 @@
 <!-- wp:group {"className":"je-meta je-meta--center","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"center"}} -->
 <div class="wp-block-group je-meta je-meta--center">
 <!-- wp:post-author-name {"isLink":false,"prefix":"By ","className":"je-meta__author"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"je-meta__date"} /-->
+<!-- wp:post-date {"className":"je-meta__date"} /-->
 </div>
 <!-- /wp:group -->
 </div></div>

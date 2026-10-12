@@ -62,7 +62,7 @@ if ( '' !== $wp_ja_kinetic_m_var && strlen( $wp_ja_kinetic_m_var ) >= 6 ) {
 		$wp_ja_kinetic_active = ( $wp_ja_kinetic_y === $wp_ja_kinetic_cur_year && $wp_ja_kinetic_m === $wp_ja_kinetic_cur_month );
 		?>
 		<a class="hx-monthrow<?php echo $wp_ja_kinetic_active ? ' is-active' : ''; ?>" href="<?php echo esc_url( get_month_link( $wp_ja_kinetic_y, $wp_ja_kinetic_m ) ); ?>">
-			<span class="hx-monthrow__m"><?php echo esc_html( gmdate( 'F Y', mktime( 0, 0, 0, $wp_ja_kinetic_m, 1, $wp_ja_kinetic_y ) ) ); ?></span>
+			<span class="hx-monthrow__m"><?php echo esc_html( wp_date( 'F Y', gmmktime( 0, 0, 0, $wp_ja_kinetic_m, 1, $wp_ja_kinetic_y ), new DateTimeZone( 'UTC' ) ) ); ?></span>
 			<span class="hx-monthrow__c"><?php echo esc_html( (string) $wp_ja_kinetic_row->c ); ?></span>
 		</a>
 	<?php endforeach; ?>

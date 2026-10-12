@@ -44,6 +44,14 @@ require get_theme_file_path( 'inc/owner-text.php' );
 // item-ids.php above.
 require get_theme_file_path( 'inc/contact.php' );
 
+// The identity tokens a page or part may carry (`{site.title}` in the footer's copyright line), filled from the
+// site's own name. Its own file: it is the one list of tokens the theme answers for.
+require get_theme_file_path( 'inc/identity.php' );
+
+// Links the theme's templates write to the site's own pages, drawn only while that page is published, and the
+// error page's newsletter link. Its own file for the same reason as item-ids.php above.
+require get_theme_file_path( 'inc/page-links.php' );
+
 /**
  * The chrome assets. The design pages (fixture, artifact) render a design system's own markup
  * under its own stylesheet and dequeue the theme's; nothing here belongs on them either.

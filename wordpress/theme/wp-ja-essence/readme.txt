@@ -45,6 +45,11 @@ latin, latin-ext and vietnamese, as the heading font of pages in Vietnamese, whi
 
 == Changelog ==
 
+= 1.0.17 =
+* Post dates no longer carry a format of their own ("M d, Y", "F j, Y" in English word order): every date block
+  and the trending, author list and author latest dates print with the site's date format, so a site in another
+  language reads its dates in that language's own order (TracyHQ/tch#1013, LANG-6).
+
 = 1.0.16 =
 * A page in Vietnamese draws every heading, menu item, button and label in Be Vietnam Pro, a font close to Jost that
   has the Vietnamese letters, and its body text in Noto Serif with its Vietnamese letters: Jost has none (no ă, đ, ơ,

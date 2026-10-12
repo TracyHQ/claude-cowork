@@ -31,7 +31,7 @@
 <!-- wp:post-featured-image {"isLink":true,"className":"jn-news__image"} /-->
 <!-- wp:group {"className":"jn-news__content","layout":{"type":"default"}} -->
 <div class="wp-block-group jn-news__content">
-<!-- wp:post-date {"format":"F d, Y","className":"jn-news__date"} /-->
+<!-- wp:post-date {"className":"jn-news__date"} /-->
 <!-- wp:post-title {"level":3,"isLink":true,"className":"jn-news__title"} /-->
 <!-- wp:group {"className":"jn-news__info","layout":{"type":"default"}} -->
 <div class="wp-block-group jn-news__info">

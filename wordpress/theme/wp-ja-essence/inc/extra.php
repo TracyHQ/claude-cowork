@@ -520,7 +520,7 @@ function wp_ja_essence_grid_trending( string $content, array $block, $instance =
 	}
 	$items = '';
 	foreach ( $query->posts as $trending ) {
-		$items .= '<li class="je-trend__item"><a class="je-trend__img" href="' . esc_url( get_permalink( $trending ) ) . '" tabindex="-1" aria-hidden="true">' . get_the_post_thumbnail( $trending, 'medium' ) . '</a><div class="je-trend__body"><a class="je-trend__link" href="' . esc_url( get_permalink( $trending ) ) . '">' . esc_html( wp_ja_essence_display_title( $trending ) ) . '</a><div class="je-trend__meta"><span class="je-trend__date">' . esc_html( get_the_date( 'M d, Y', $trending ) ) . '</span>' . wp_ja_essence_render_hits( array(), '', (object) array( 'context' => array( 'postId' => (int) $trending->ID ) ) ) . '</div></div></li>';
+		$items .= '<li class="je-trend__item"><a class="je-trend__img" href="' . esc_url( get_permalink( $trending ) ) . '" tabindex="-1" aria-hidden="true">' . get_the_post_thumbnail( $trending, 'medium' ) . '</a><div class="je-trend__body"><a class="je-trend__link" href="' . esc_url( get_permalink( $trending ) ) . '">' . esc_html( wp_ja_essence_display_title( $trending ) ) . '</a><div class="je-trend__meta"><span class="je-trend__date">' . esc_html( get_the_date( '', $trending ) ) . '</span>' . wp_ja_essence_render_hits( array(), '', (object) array( 'context' => array( 'postId' => (int) $trending->ID ) ) ) . '</div></div></li>';
 	}
 	$card  = '<li class="wp-block-post je-trend-cell"><div class="je-trend"><h3 class="je-trend__title">' . esc_html__( 'Trending', 'wp-ja-essence' ) . '</h3><ul class="je-trend__items">' . $items . '</ul></div></li>';
 	$parts = explode( '</li>', $content );
@@ -858,7 +858,7 @@ function wp_ja_essence_author_latest_html( array $ids, string $variant ): string
 			if ( '' !== $thumb ) {
 				$rows .= '<a class="je-authorlist__img" href="' . $link . '" tabindex="-1" aria-hidden="true">' . $thumb . '</a>';
 			}
-			$rows .= '<div class="je-authorlist__info"><h3 class="je-authorlist__name"><a href="' . $link . '">' . esc_html( wp_ja_essence_display_title( $id ) ) . '</a></h3><div class="je-authorlist__meta"><span>' . esc_html( get_the_date( 'F j, Y', $id ) ) . '</span>';
+			$rows .= '<div class="je-authorlist__info"><h3 class="je-authorlist__name"><a href="' . $link . '">' . esc_html( wp_ja_essence_display_title( $id ) ) . '</a></h3><div class="je-authorlist__meta"><span>' . esc_html( get_the_date( '', $id ) ) . '</span>';
 			if ( is_numeric( $hits ) ) {
 				$rows .= wp_ja_essence_render_hits( array(), '', (object) array( 'context' => array( 'postId' => $id ) ) );
 			}
@@ -880,7 +880,7 @@ function wp_ja_essence_author_latest_html( array $ids, string $variant ): string
 		if ( $cat instanceof WP_Term ) {
 			$items .= '<div class="je-authorlatest__cat"><a href="' . esc_url( (string) get_term_link( $cat ) ) . '" rel="tag">' . esc_html( $cat->name ) . '</a></div>';
 		}
-		$items .= '<h3 class="je-authorlatest__name"><a href="' . $link . '">' . esc_html( wp_ja_essence_display_title( $id ) ) . '</a></h3><div class="je-authorlatest__meta"><span>' . esc_html( get_the_date( 'F j, Y', $id ) ) . '</span>';
+		$items .= '<h3 class="je-authorlatest__name"><a href="' . $link . '">' . esc_html( wp_ja_essence_display_title( $id ) ) . '</a></h3><div class="je-authorlatest__meta"><span>' . esc_html( get_the_date( '', $id ) ) . '</span>';
 		if ( is_numeric( $hits ) ) {
 			$items .= wp_ja_essence_render_hits( array(), '', (object) array( 'context' => array( 'postId' => $id ) ) );
 		}

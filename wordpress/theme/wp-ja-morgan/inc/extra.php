@@ -13,6 +13,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// The identity tokens the pages, parts and patterns carry, and their filling.
+require_once __DIR__ . '/identity.php';
+
 /**
  * The motion the source runs, as the motion library's settings (the default of the `tracy_motion`
  * option; a site owner who saves `{"effects":[]}` turns it off). JA Morgan runs no scroll reveal

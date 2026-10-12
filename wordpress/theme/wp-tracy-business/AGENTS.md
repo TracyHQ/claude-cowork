@@ -66,7 +66,7 @@ Measured from this tree, not from another theme's:
 |---|---|
 | templates | **20** (`front-page` · `home` · `page` · `single` · `archive` · `category` · `search` · `404` · `index` · `landing` · `pricing` · `artifact` · `fixture` · plus seven `page-*`: contact, email, form, newsletter, sitemap, slide, style-guide) |
 | template parts | **5** — `header`, `footer`, and three sidebars (`article`, `news`, `search`) |
-| patterns | **28** |
+| patterns | **39** (eleven of them hold the fixed words of the sidebars and templates, printed through the text domain) |
 | style variations | **1** — `styles/wp-tracy-business.json`, title *Tracy Business* |
 | custom blocks | **1** — `blocks/mega-menu` |
 | `inc/` | `extra.php` (Polylang + Contact Form 7, the words in the page language, the per-language links and menus, the Sitemap), `identity.php` (the site identity, below), `motion-head.php` (the motion partial), `update.php` (the self-update channel) |

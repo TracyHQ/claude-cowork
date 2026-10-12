@@ -4,9 +4,9 @@
  * Slug: tracy/cards
  * Categories: query
  * Block Types: core/query
- * Description: The listing: a query loop of cards — image, kind (excerpt), name (title). Used by the blog and archive templates.
+ * Description: The listing: a query loop of cards — image, kind (excerpt), name (title). Used by the blog and archive templates. As wp-ja-kinetic ships it, its empty-list line goes through the theme's text domain.
  *
- * @package tracy
+ * @package wp-ja-kinetic
  */
 ?>
 <!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":true},"className":"tracy-query","layout":{"type":"default"}} -->
@@ -27,7 +27,7 @@
 <!-- /wp:post-template -->
 <!-- wp:query-no-results -->
 <!-- wp:paragraph {"className":"tracy-muted"} -->
-<p class="tracy-muted">Nothing here yet.</p>
+<p class="tracy-muted"><?php echo esc_html__( 'Nothing here yet.', 'wp-ja-kinetic' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- /wp:query-no-results -->
 <!-- wp:query-pagination {"className":"tracy-pagination","layout":{"type":"flex"}} -->

@@ -31,7 +31,7 @@
 <div class="wp-block-group je-meta">
 <!-- wp:wp-ja-essence/author-avatar /-->
 <!-- wp:post-author-name {"isLink":false,"prefix":"By ","className":"je-meta__author"} /-->
-<!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:post-date {"className":"je-meta__date"} /-->
 <!-- wp:wp-ja-essence/hits {"label":true} /-->
 </div>
 <!-- /wp:group -->

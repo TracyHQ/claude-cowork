@@ -87,7 +87,7 @@ function wp_ja_impact_gb_binding( array $args, $block ) {
 			/* translators: %s: an author's name. */
 			return '' === $name ? '' : sprintf( __( 'Written by: %s', 'wp-ja-impact' ), $name );
 		case 'published':
-			return get_the_date( 'M d, Y', $post_id );
+			return get_the_date( '', $post_id );
 		case 'byline':
 			$author = (int) get_post_field( 'post_author', $post_id );
 			$name   = get_the_author_meta( 'display_name', $author );

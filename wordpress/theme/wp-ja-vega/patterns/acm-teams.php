@@ -34,17 +34,17 @@
 <!-- wp:buttons {"className":"jv-arrows tracy-motion-reveal tracy-motion-delay-1"} -->
 <div class="wp-block-buttons jv-arrows tracy-motion-reveal tracy-motion-delay-1">
 <!-- wp:button {"className":"jv-arrow jv-arrow--prev tracy-motion-prev"} -->
-<div class="wp-block-button jv-arrow jv-arrow--prev tracy-motion-prev"><a class="wp-block-button__link wp-element-button" href="#">←</a></div>
+<div class="wp-block-button jv-arrow jv-arrow--prev tracy-motion-prev"><a class="wp-block-button__link wp-element-button" href="#jv-team-slider">←</a></div>
 <!-- /wp:button -->
 <!-- wp:button {"className":"jv-arrow jv-arrow--next tracy-motion-next"} -->
-<div class="wp-block-button jv-arrow jv-arrow--next tracy-motion-next"><a class="wp-block-button__link wp-element-button" href="#">→</a></div>
+<div class="wp-block-button jv-arrow jv-arrow--next tracy-motion-next"><a class="wp-block-button__link wp-element-button" href="#jv-team-slider">→</a></div>
 <!-- /wp:button -->
 </div>
 <!-- /wp:buttons -->
 </div>
 <!-- /wp:group -->
-<!-- wp:group {"className":"jv-teams__slider tracy-motion-reveal tracy-motion-delay-1","layout":{"type":"default"}} -->
-<div class="wp-block-group jv-teams__slider tracy-motion-reveal tracy-motion-delay-1">
+<!-- wp:group {"anchor":"jv-team-slider","className":"jv-teams__slider tracy-motion-reveal tracy-motion-delay-1","layout":{"type":"default"}} -->
+<div class="wp-block-group jv-teams__slider tracy-motion-reveal tracy-motion-delay-1" id="jv-team-slider">
 <!-- wp:group {"className":"tracy-motion-carousel jv-carousel acm-teams--cols-4","metadata":{"name":"teams.carousel"},"layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-motion-carousel jv-carousel acm-teams--cols-4">
 <!-- wp:group {"className":"tracy-motion-track","layout":{"type":"default"}} -->

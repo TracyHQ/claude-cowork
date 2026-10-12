@@ -33,7 +33,7 @@
 <!-- wp:group {"className":"je-mini__body","layout":{"type":"default"}} -->
 <div class="wp-block-group je-mini__body">
 <!-- wp:post-title {"level":4,"isLink":true,"className":"je-mini__title"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"je-meta__date"} /-->
+<!-- wp:post-date {"className":"je-meta__date"} /-->
 </div>
 <!-- /wp:group -->
 </div>

@@ -47,3 +47,16 @@ chevrons and the check marks were drawn for this theme.
 The pictures in assets/img named icon-decor-*.png and ic-*.png (heading decorations, the contact
 page's location, phone, email and speaker icons) are images of the JoomlArt JA Nova template,
 (C) J.O.O.M Solutions Co., Ltd., GNU General Public License, shipped as the template ships them.
+
+Be Vietnam Pro, Copyright 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro),
+is licensed under the SIL Open Font License 1.1 (https://openfontlicense.org/). The theme ships it cut to
+latin, latin-ext and vietnamese, as the font of pages in Vietnamese, which Golos Text cannot draw.
+
+== Changelog ==
+
+= 1.1.13 =
+* A page in Vietnamese draws its text, headings, menu and buttons in Be Vietnam Pro, a font the theme ships, because Golos Text has no Vietnamese letters.
+* Dates follow the site's own date format and language instead of a fixed English order ("June 9, 2023").
+* The share box, the "Nothing here yet." line, the services menu heading, the project fields, the error page's theme switch and the call-to-action band now show their words in the site's language.
+* The footer's copyright line fills the site name through the theme's own list of identity tokens, and a logo's alternative text is always the site name.
+* The call-to-action band's buttons lead to the contact page.

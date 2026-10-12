@@ -251,6 +251,7 @@ body.tracy .acm-features.style-3 .tracy-motion-nav-buttons .wp-block-button__lin
   color: var(--jim-link);
   font-size: 0;
   pointer-events: auto;
+  cursor: pointer; /* since 1.0.9 the demo's two controls are buttons, not links to # */
 }
 body.tracy .acm-features.style-3 .tracy-motion-nav-buttons .wp-block-button__link::before {
   position: absolute;

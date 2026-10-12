@@ -34,8 +34,8 @@ Sixteen token values the source did not provide are taken from its "apple" desig
 
 Inter Tight, Copyright 2022 The Inter Project Authors (https://github.com/rsms/inter-tight),
 licensed under the SIL Open Font License 1.1 (assets/fonts/inter-tight-OFL.txt,
-https://openfontlicense.org/). The two files in assets/fonts are the Google Fonts builds the
-source loads, self-hosted.
+https://openfontlicense.org/). The latin and latin-ext files in assets/fonts are the Google Fonts builds the
+source loads, self-hosted; the vietnamese file is the same Google Fonts build, cut to Vietnamese.
 
 The close icon of alert boxes in assets/css/wp-ja-vega.css is the path of Bootstrap's .btn-close
 icon, (C) The Bootstrap Authors, MIT License, https://github.com/twbs/bootstrap/blob/main/LICENSE.
@@ -47,3 +47,31 @@ except two: the Twitter mark under an article quote is the `twitter` glyph of Fo
 Brands, Copyright Fonticons, Inc., icons licensed CC BY 4.0 (https://fontawesome.com/license/free),
 converted to an SVG path; the sun of the header's theme switch is the Feather sun icon, Copyright
 Cole Bemis, MIT License (https://github.com/feathericons/feather/blob/main/LICENSE).
+
+== Changelog ==
+
+= 1.1.16 =
+* The header and phone menu logos are the dark-background logo the site owner gives (the header is black in both
+  modes), shown as the site name when there is none, never a recoloured light logo.
+* The fixed words of the theme's pages (the error page, the search title, "Nothing here yet.", the headings above
+  other services, other projects and related posts, the project details labels, the pricing call to action) go
+  through the theme's text domain, so a site in another language shows them in it. The call to action's buttons
+  lead to the Contact page.
+* Post dates no longer carry a format of their own ("M d, Y", "F j, Y"): they print in the site's date format, so a
+  site in another language reads its dates in that language's own order.
+* Inter Tight ships its Vietnamese cut, so a site in Vietnamese draws every letter in the theme's font.
+* The site name in the footer's copyright line is filled from the theme's own list of identity tokens (inc/identity.php).
+* The partner and project client logos are dimmed in dark mode only while they are the demo's pictures.
+* The team carousel arrows link to the carousel they move (#jv-team-slider) instead of an empty "#".
+
+= 1.1.15 =
+* No visitor word is written in the style sheet.
+
+= 1.1.14 =
+* The style sheet reads the design system's colours through tokens.
+
+= 1.1.13 =
+* Accent text uses the readable accent of the design system.
+
+= 1.1.12 =
+* A site without a logo shows its name in the header, and the copyright line names the site.

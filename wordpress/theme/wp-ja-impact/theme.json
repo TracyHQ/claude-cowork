@@ -426,11 +426,6 @@
       "name": "footer",
       "title": "Footer",
       "area": "footer"
-    },
-    {
-      "name": "contact",
-      "title": "Contact band",
-      "area": "uncategorized"
     }
   ]
 }

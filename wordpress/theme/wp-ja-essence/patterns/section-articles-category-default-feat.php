@@ -34,7 +34,7 @@
 <!-- wp:post-title {"level":4,"isLink":true,"className":"je-mini__title"} /-->
 <!-- wp:group {"className":"je-mini__meta","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <div class="wp-block-group je-mini__meta">
-<!-- wp:post-date {"format":"F j, Y","className":"je-meta__date"} /-->
+<!-- wp:post-date {"className":"je-meta__date"} /-->
 <!-- wp:wp-ja-essence/hits /-->
 </div>
 <!-- /wp:group -->
