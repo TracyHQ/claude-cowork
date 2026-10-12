@@ -39,6 +39,26 @@ the two Font Awesome files are byte-identical to the ones the source bundles.
 
 == Changelog ==
 
+= 1.1.13 =
+* A site in another language reads every word of the theme's own pages in it: the blog, category, tag, author and
+  archive lists, the article breadcrumb, the sign-in, register, password and account pages, the search page and the
+  error page draw their headings, labels and empty-list lines through the theme's text domain (each template's body is
+  now a pattern, patterns/template-*.php), as do the base call to action and listing card patterns (TracyHQ/tch#1013,
+  LANG-2).
+* Vietnamese letters (ă, đ, ơ, ư and the tone marks) are drawn in the theme's own three fonts: IBM Plex Sans,
+  JetBrains Mono and Space Grotesk each gain Google's vietnamese cut beside their latin file, so a page in Vietnamese
+  no longer borrows those letters from another font. A page in English looks exactly as before.
+* Post dates carry no English-order format of their own ("M j, Y", "M j Y", "M j"): the blog lists, the tag and
+  archive lists, the category cards and the featured note print the site's date format, and the archive's month
+  rows name the month in the site's language (LANG-6).
+* The error page wears the site's footer (its menus, brand, social links and copyright line are the owner's); only
+  its newsletter band stays the source's copy and Subscribe link. Its Contact support button and quick links, and the
+  Engineering category's breadcrumb, link a page only while the site publishes it, so a page the owner took away
+  never leads back to the error page (PAGE-4). The search page's heading and the account page's line name the site,
+  not "Kinetic" (HIDDEN-1).
+* The base call to action's two buttons lead to the Contact page instead of "#" (PAGE-5).
+* The footer's {site.title} token is filled by the theme's own list of identity tokens, inc/identity.php (STAB-7).
+
 = 1.1.12 =
 * No change to the theme's behaviour or look: this release carries the 1.1.11 entry below, which the 1.1.11
   package shipped without.

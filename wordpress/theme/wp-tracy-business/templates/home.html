@@ -16,22 +16,13 @@
 <div class="wp-block-query tracy-query tracy-news">
 <!-- wp:group {"className":"tracy-listing__head","layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-listing__head">
-<!-- wp:heading {"level":1,"className":"tracy-display","metadata":{"name":"home.title"}} -->
-<h1 class="wp-block-heading tracy-display">News</h1>
-<!-- /wp:heading -->
-<!-- wp:group {"className":"tracy-listing__intro","layout":{"type":"flex","justifyContent":"space-between","verticalAlignment":"bottom","flexWrap":"wrap"}} -->
-<div class="wp-block-group tracy-listing__intro">
-<!-- wp:paragraph {"className":"tracy-lead","metadata":{"name":"home.lead"}} -->
-<p class="tracy-lead">Updates and notes from the team.</p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-tracy-business/news-index-head"} /-->
 <!-- wp:query-total {"displayType":"total-results","className":"tracy-listing__count tracy-listing__intro-count"} /-->
 </div>
 <!-- /wp:group -->
 <!-- wp:group {"className":"tracy-chips-row","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <div class="wp-block-group tracy-chips-row">
-<!-- wp:paragraph {"className":"tracy-chips__all"} -->
-<p class="tracy-chips__all"><a href="/news/" aria-current="page">All</a></p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-tracy-business/news-chip-all-current"} /-->
 <!-- wp:categories {"className":"tracy-chips","showOnlyTopLevel":false} /-->
 </div>
 <!-- /wp:group -->
@@ -78,9 +69,7 @@
 <!-- /wp:group -->
 <!-- /wp:post-template -->
 <!-- wp:query-no-results -->
-<!-- wp:paragraph {"className":"tracy-muted"} -->
-<p class="tracy-muted">Nothing here yet.</p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-tracy-business/empty-listing"} /-->
 <!-- /wp:query-no-results -->
 <!-- wp:group {"className":"tracy-listing__foot","layout":{"type":"flex","justifyContent":"space-between","flexWrap":"wrap"}} -->
 <div class="wp-block-group tracy-listing__foot">

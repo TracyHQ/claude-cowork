@@ -28,10 +28,7 @@
 <!-- wp:post-author {"avatarSize":48,"showAvatar":true,"showBio":true,"byline":"","className":"tracy-article__author"} /-->
 <!-- wp:post-date {"format":"j M Y"} /-->
 <!-- wp:post-time-to-read /-->
-<!-- wp:html -->
-<div class="tracy-article__share" data-tracy-share><a class="tracy-article__share-link" href="https://www.linkedin.com/sharing/share-offsite/?url=" data-share="linkedin" target="_blank" rel="noopener" aria-label="Share on LinkedIn">in</a><a class="tracy-article__share-link" href="https://www.facebook.com/sharer/sharer.php?u=" data-share="facebook" target="_blank" rel="noopener" aria-label="Share on Facebook">f</a><button type="button" class="tracy-article__share-link" data-share="copy" aria-label="Copy link">&#x2398;</button></div>
-<script>(function(){var page=location.href.split('#')[0];document.querySelectorAll('[data-tracy-share]').forEach(function(group){group.querySelectorAll('a[data-share]').forEach(function(a){a.href+=encodeURIComponent(page)});var copy=group.querySelector('[data-share="copy"]');if(!copy||!navigator.clipboard){if(copy)copy.hidden=true;return}copy.addEventListener('click',function(){navigator.clipboard.writeText(page).then(function(){copy.classList.add('is-done');setTimeout(function(){copy.classList.remove('is-done')},1500)})})})})();</script>
-<!-- /wp:html -->
+<!-- wp:pattern {"slug":"wp-tracy-business/single-share"} /-->
 </div>
 <!-- /wp:group -->
 </div>
@@ -47,9 +44,7 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"tracy-related","layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-related">
-<!-- wp:heading {"level":2,"className":"tracy-related__title"} -->
-<h2 class="wp-block-heading tracy-related__title">Related articles</h2>
-<!-- /wp:heading -->
+<!-- wp:pattern {"slug":"wp-tracy-business/single-related-title"} /-->
 <!-- wp:query {"queryId":2,"query":{"perPage":3,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","inherit":false,"sticky":"exclude"},"className":"tracy-query tracy-news tracy-related__query","layout":{"type":"default"}} -->
 <div class="wp-block-query tracy-query tracy-news tracy-related__query">
 <!-- wp:post-template {"className":"tracy-news__grid","layout":{"type":"grid","columnCount":2}} -->

@@ -15,6 +15,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// The identity tokens the pages and parts carry, and their filling.
+require_once __DIR__ . '/identity.php';
+
 /**
  * The motion the source runs, as the motion library's settings: the default of the `tracy_motion`
  * option, so a site that never saved the option wears the design's motion, and a site owner who
@@ -1793,7 +1796,7 @@ function wp_ja_nova_card_date( string $content, array $parsed, $block ): string 
 	return sprintf(
 		'<div class="jn-card-date"><time datetime="%s">%s</time></div>',
 		esc_attr( (string) get_the_date( 'c', $post ) ),
-		esc_html( (string) get_the_date( 'F j, Y', $post ) )
+		esc_html( (string) get_the_date( '', $post ) )
 	);
 }
 add_filter( 'render_block_core/post-terms', 'wp_ja_nova_card_date', 10, 3 );

@@ -31,7 +31,7 @@
 <!-- wp:post-featured-image {"className":"jn-latest__image"} /-->
 <!-- wp:group {"className":"jn-latest__content","layout":{"type":"default"}} -->
 <div class="wp-block-group jn-latest__content">
-<!-- wp:post-date {"format":"F j, Y","className":"jn-latest__date"} /-->
+<!-- wp:post-date {"className":"jn-latest__date"} /-->
 <!-- wp:post-title {"level":4,"isLink":true,"className":"jn-latest__title"} /-->
 <!-- wp:post-excerpt {"excerptLength":30,"className":"jn-latest__excerpt","moreText":""} /-->
 </div>

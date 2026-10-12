@@ -44,7 +44,7 @@
 <!-- wp:post-featured-image {"isLink":false,"sizeSlug":"large","className":"intro-image"} /-->
 <!-- wp:group {"className":"article-content","layout":{"type":"default"}} -->
 <div class="wp-block-group article-content">
-<!-- wp:post-date {"format":"M d, Y","className":"date-create"} /-->
+<!-- wp:post-date {"className":"date-create"} /-->
 <!-- wp:post-title {"level":3,"isLink":true,"className":"heading-link"} /-->
 <!-- wp:post-excerpt {"moreText":"","excerptLength":20,"className":"articles-introtext jm-latest-excerpt"} /-->
 </div>

@@ -12,6 +12,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// The identity tokens this theme renders ({site.title} in the footer's copyright line).
+require_once __DIR__ . '/identity.php';
+
 /**
  * The chrome assets. The design pages (fixture, artifact) render a design system's own markup
  * under its own stylesheet and dequeue the theme's; nothing here belongs on them either.

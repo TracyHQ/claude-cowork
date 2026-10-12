@@ -27,7 +27,7 @@ if ( '' !== $wp_ja_kinetic_excerpt ) {
 	$wp_ja_kinetic_excerpt = wp_ja_kinetic_joomla_truncate( $wp_ja_kinetic_excerpt, 180 );
 }
 $wp_ja_kinetic_author = wp_ja_kinetic_post_author_name( $wp_ja_kinetic_post );
-$wp_ja_kinetic_date    = get_the_date( 'M j, Y', $wp_ja_kinetic_post );
+$wp_ja_kinetic_date    = get_the_date( '', $wp_ja_kinetic_post );
 $wp_ja_kinetic_read    = wp_ja_kinetic_readtime( $wp_ja_kinetic_post->post_content );
 $wp_ja_kinetic_has_img = has_post_thumbnail( $wp_ja_kinetic_post );
 ?>

@@ -1,3 +1,7 @@
+defined( 'ABSPATH' ) || exit;
+
+// The identity tokens the pages and parts carry, and their filling.
+require_once __DIR__ . '/identity.php';
 <?php
 /**
  * wp-ja-vega — what this target adds on top of the source theme: the JA Vega stylesheet and its
@@ -14,6 +18,9 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+// The identity tokens the pages and parts carry, and their filling.
+require_once __DIR__ . '/identity.php';
 
 /**
  * The motion the source runs, as the motion library's settings: the default of the `tracy_motion`

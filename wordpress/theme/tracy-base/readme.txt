@@ -22,3 +22,13 @@ Tracy Base is distributed under the terms of the GNU GPL v2 or later.
 Design tokens are derived from the OpenDesign design-system library,
 (C) the OpenDesign contributors, Apache License 2.0,
 https://github.com/nexu-io/open-design
+
+== Changelog ==
+
+= 1.1.6 =
+* The error page, the blog heading, the left sidebar's headings, the empty listing line and the final call to action
+  print their words through the theme's text domain, so a site in another language shows them in that language.
+* The error page's button reads "Back to home" instead of naming the demo company.
+* Both buttons of the final call to action lead to the Contact us page instead of nowhere.
+* The footer's {site.title} token is listed in the theme's own identity file (inc/identity.php), which fills it with
+  the site's name.

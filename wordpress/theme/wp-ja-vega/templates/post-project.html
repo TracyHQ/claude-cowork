@@ -6,16 +6,7 @@
 <section class="wp-block-group jv-section jv-page jv-more-projects">
 <!-- wp:group {"className":"jv-container","layout":{"type":"default"}} -->
 <div class="wp-block-group jv-container">
-<!-- wp:group {"className":"jv-head","layout":{"type":"default"}} -->
-<div class="wp-block-group jv-head">
-<!-- wp:heading {"level":3,"className":"jv-pill tracy-motion-reveal"} -->
-<h3 class="wp-block-heading jv-pill tracy-motion-reveal">Portfolio</h3>
-<!-- /wp:heading -->
-<!-- wp:paragraph {"className":"jv-main-title tracy-motion-reveal tracy-motion-delay-1"} -->
-<p class="jv-main-title tracy-motion-reveal tracy-motion-delay-1">More our projects</p>
-<!-- /wp:paragraph -->
-</div>
-<!-- /wp:group -->
+<!-- wp:pattern {"slug":"wp-ja-vega/head-more-projects"} /-->
 <!-- wp:query {"queryId":51,"query":{"perPage":3,"pages":0,"offset":0,"postType":"post","order":"asc","orderBy":"title","author":"","search":"","exclude":[],"sticky":"","inherit":false,"wpJaVegaCategory":"database-security"},"className":"tracy-query"} -->
 <div class="wp-block-query tracy-query">
 <!-- wp:post-template {"className":"tracy-grid","layout":{"type":"grid","columnCount":3}} -->
@@ -30,7 +21,7 @@
 <!-- wp:avatar {"size":24,"className":"tracy-card__avatar"} /-->
 <!-- wp:post-author-name {"className":"tracy-card__author"} /-->
 <!-- wp:post-terms {"term":"category","className":"tracy-eyebrow"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"tracy-card__date"} /-->
+<!-- wp:post-date {"className":"tracy-card__date"} /-->
 </div>
 <!-- /wp:group -->
 <!-- wp:post-excerpt {"excerptLength":200,"className":"tracy-card__text jv-excerpt-100","moreText":"Read more"} /-->
@@ -38,9 +29,7 @@
 <div class="wp-block-group jv-portfolio-info">
 <!-- wp:group {"className":"jv-portfolio-info__row","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group jv-portfolio-info__row">
-<!-- wp:paragraph {"className":"jv-portfolio-info__label"} -->
-<p class="jv-portfolio-info__label">Client:</p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-ja-vega/project-label-client"} /-->
 <!-- wp:paragraph {"className":"jv-portfolio-info__value","metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"jv_client"}}}}} -->
 <p class="jv-portfolio-info__value"></p>
 <!-- /wp:paragraph -->
@@ -48,9 +37,7 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"jv-portfolio-info__row","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group jv-portfolio-info__row">
-<!-- wp:paragraph {"className":"jv-portfolio-info__label"} -->
-<p class="jv-portfolio-info__label">Date:</p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-ja-vega/project-label-date"} /-->
 <!-- wp:paragraph {"className":"jv-portfolio-info__value","metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"jv_date"}}}}} -->
 <p class="jv-portfolio-info__value"></p>
 <!-- /wp:paragraph -->
@@ -58,9 +45,7 @@
 <!-- /wp:group -->
 <!-- wp:group {"className":"jv-portfolio-info__row","layout":{"type":"flex","flexWrap":"nowrap"}} -->
 <div class="wp-block-group jv-portfolio-info__row">
-<!-- wp:paragraph {"className":"jv-portfolio-info__label"} -->
-<p class="jv-portfolio-info__label">Type:</p>
-<!-- /wp:paragraph -->
+<!-- wp:pattern {"slug":"wp-ja-vega/project-label-type"} /-->
 <!-- wp:paragraph {"className":"jv-portfolio-info__value","metadata":{"bindings":{"content":{"source":"core/post-meta","args":{"key":"jv_type"}}}}} -->
 <p class="jv-portfolio-info__value"></p>
 <!-- /wp:paragraph -->

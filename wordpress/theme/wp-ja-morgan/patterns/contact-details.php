@@ -36,7 +36,7 @@
 <p class="title"><?php esc_html_e( 'Address', 'wp-ja-morgan' ); ?></p>
 <!-- /wp:paragraph -->
 <!-- wp:paragraph {"className":"content"} -->
-<p class="content">621 Bungalow Road Clatonia, NE 68328</p>
+<p class="content"><?php esc_html_e( '621 Bungalow Road Clatonia, NE 68328', 'wp-ja-morgan' ); ?></p>
 <!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->

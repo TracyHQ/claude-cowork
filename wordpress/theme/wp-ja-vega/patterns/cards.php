@@ -32,7 +32,7 @@
 <!-- wp:avatar {"size":24,"className":"tracy-card__avatar"} /-->
 <!-- wp:post-author-name {"className":"tracy-card__author"} /-->
 <!-- wp:post-terms {"term":"category","className":"tracy-eyebrow"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"tracy-card__date"} /-->
+<!-- wp:post-date {"className":"tracy-card__date"} /-->
 </div>
 <!-- /wp:group -->
 <!-- wp:post-excerpt {"excerptLength":24,"className":"tracy-card__text"} /-->

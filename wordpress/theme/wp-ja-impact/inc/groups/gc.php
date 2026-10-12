@@ -82,7 +82,7 @@ function wp_ja_impact_gc_binding( array $args, $block ) {
 	switch ( $field ) {
 		case 'created':
 			$time = strtotime( $meta( 'created-date' ) );
-			return $time ? gmdate( 'M j, Y', $time ) : get_the_date( 'M j, Y', $post_id );
+			return $time ? wp_date( (string) get_option( 'date_format' ), $time, new DateTimeZone( 'UTC' ) ) : get_the_date( '', $post_id );
 		case 'location':
 			return $meta( 'location' );
 		case 'raise':

@@ -23,7 +23,7 @@
 <!-- wp:group {"className":"article-info","layout":{"type":"flex","flexWrap":"wrap"}} -->
 <div class="wp-block-group article-info">
 <!-- wp:post-author-name {"className":"createdby"} /-->
-<!-- wp:post-date {"format":"M d, Y","className":"published"} /-->
+<!-- wp:post-date {"className":"published"} /-->
 <!-- wp:paragraph {"className":"hits"} -->
 <p class="hits">Hits: {jm-hits}</p>
 <!-- /wp:paragraph -->

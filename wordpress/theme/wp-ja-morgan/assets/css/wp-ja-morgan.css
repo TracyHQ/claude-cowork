@@ -28,6 +28,30 @@
 	font-style: normal;
 	font-display: swap;
 }
+/* Vietnamese: PT Root UI has none of its letters (no ă, đ, ơ, ư, ề…), so a page in Vietnamese
+   (html lang="vi") draws its text in Be Vietnam Pro (SIL OFL 1.1), a sans close to PT Root UI that
+   has them. Medium (500) is drawn by the 600 face. */
+@font-face {
+	font-family: "Be Vietnam Pro";
+	src: url("../fonts/be-vietnam-pro-400.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Be Vietnam Pro";
+	src: url("../fonts/be-vietnam-pro-600.woff2") format("woff2");
+	font-weight: 500 600;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Be Vietnam Pro";
+	src: url("../fonts/be-vietnam-pro-700.woff2") format("woff2");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
 @font-face {
 	font-family: "Ionicons";
 	src: url("../fonts/ionicons.woff2") format("woff2");
@@ -59,6 +83,12 @@
 	--jm-red: #d93030;
 	--jm-lead: light-dark(var(--ds-c-fg, #777777), #f2f4f8);
 	--jm-gutter: 15px;
+}
+html:lang(vi),
+html:lang(vi) body {
+	--jm-font: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
+	--wp--preset--font-family--display: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
+	--wp--preset--font-family--body: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
 }
 
 /* ---- Base ---- */

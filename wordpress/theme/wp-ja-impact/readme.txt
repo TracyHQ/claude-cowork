@@ -34,8 +34,8 @@ Twenty-five token values the source did not provide are taken from its "apple" d
 
 Readex Pro, Copyright 2022 The Readex Pro Project Authors
 (https://github.com/ThomasJockin/readexpro), licensed under the SIL Open Font License 1.1
-(assets/fonts/readex-pro-OFL.txt, https://openfontlicense.org/). The latin and latin-ext files in
-assets/fonts are the Google Fonts builds the source loads, self-hosted.
+(assets/fonts/readex-pro-OFL.txt, https://openfontlicense.org/). The latin, latin-ext and vietnamese files in
+assets/fonts are the Google Fonts builds (the source loads the first two), self-hosted.
 
 Font Awesome Free 6.7.1 (assets/fonts/fa-solid-900.woff2, fa-brands-400.woff2), Copyright Fonticons,
 Inc.: the fonts are licensed under the SIL Open Font License 1.1, the icons they draw under CC BY 4.0,
@@ -43,3 +43,20 @@ the code under MIT (assets/fonts/font-awesome-LICENSE.txt, https://fontawesome.c
 
 The theme's pictures live in the WordPress media library, not in this theme; the logo and photographs
 are the JoomlArt JA Impact template's, (C) J.O.O.M Solutions Co., Ltd., GNU General Public License.
+
+== Changelog ==
+
+= 1.0.9 =
+* The header, drawer and footer logos sit on the navy bar in both modes, so each is now the dark-background logo
+  spot: it shows the logo uploaded for a dark background, and the site name in white when there is none.
+* The contact band above the footer (its heading, e-mail, address and phone) is part of the footer, so a site's own
+  words replace the demo's there like everywhere else in the footer.
+* Dates print in the site's own date format and month names in the site's language (blog, donation and event cards
+  and pages), never in English word order.
+* The error page, the search page, the event and donation pages, the blog title and the empty listing print their
+  words through the theme's translations, so a site in another language shows them in it.
+* Pages in Vietnamese draw every letter in Readex Pro: the theme now ships its vietnamese letters too.
+* The copyright line's site name is filled by the theme's own identity list (inc/identity.php), and a logo's
+  alternative text is the site's name.
+* The event page's Get a quote button and the final call to action's buttons lead to the contact page, and the
+  event's Register button to the registration form when the event names none.

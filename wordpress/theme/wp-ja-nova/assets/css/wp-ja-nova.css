@@ -68,6 +68,15 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Vietnamese (decision 6, 12/10/2026): Golos Text has no Vietnamese letters (no ă, đ, ơ, ư, ề…), so the browser drew
+   them from another font or built them from a base letter and a loose accent. A page in Vietnamese therefore draws its
+   body, headings, menu and buttons in Be Vietnam Pro, a sans close to Golos Text that has them (SIL OFL 1.1, cut to
+   latin, latin-ext and vietnamese, shipped with the theme, so it holds with or without Tracy). */
+@font-face { font-family: "Be Vietnam Pro"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/be-vietnam-pro-400.woff2") format("woff2"); }
+@font-face { font-family: "Be Vietnam Pro"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/be-vietnam-pro-600.woff2") format("woff2"); }
+@font-face { font-family: "Be Vietnam Pro"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/be-vietnam-pro-700.woff2") format("woff2"); }
+html:lang(vi), html:lang(vi) body { --jn-font: "Be Vietnam Pro"; --wp--preset--font-family--display: "Be Vietnam Pro", sans-serif; --wp--preset--font-family--body: "Be Vietnam Pro", sans-serif; }
+
 /* ── Base ─────────────────────────────────────────────────────────────────────────────────────── */
 
 /* Source typography (ja_nova 1.2.4 etc/site): body 16 px / 1.5, headings 1.2, menu 1.5 (inherited). */
@@ -1351,7 +1360,7 @@ body.tracy .jn-sec.bg-yellow :where(.jn-feature__desc, .jn-feature__item-desc) {
 
 /* ── Not found (the source's error.php: its own page, no header or footer) ──────────────────────── */
 
-body.tracy.error404 { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; text-align: center; font-family: 'Golos Text', sans-serif; line-height: 25.6px; }
+body.tracy.error404 { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; text-align: center; font-family: var(--jn-font), sans-serif; line-height: 25.6px; }
 /* A flex item sized by its content, as the source's .error-page-wrap: the 160 px "404" (296 px) may be
    wider than a 320 px screen's padded box and then overhangs both sides evenly, as in the source. */
 body.tracy.error404 .wp-site-blocks { max-width: 1000px; }

@@ -44,6 +44,17 @@ Font License 1.1 (assets/fonts/font-awesome-OFL.txt).
 
 == Changelog ==
 
+= 1.1.15 =
+* Every word the theme itself prints is in the site's language: the Home Style 3 and 4 footers, the sidebar headings
+  (Login, News & Update, Categories, Tags), the search page's title, description, form and tips, the Blog and Contact
+  Form headings and the contact page's address now go through the theme's text domain (they were fixed English).
+  The Home Style 4 footer's office column reads "Office." instead of the demo company's "Morgan Office.".
+* Article dates follow the site's own date format instead of the fixed English "Oct 12, 2026" order.
+* A page in Vietnamese draws its text in Be Vietnam Pro, which has the Vietnamese letters PT Root UI lacks.
+* The final call to action's two buttons lead to the Contact Us page instead of nowhere, and its words are translated.
+* The site name in the header logo text, the footers and the copyright lines is filled by the theme's own closed token
+  list (inc/identity.php): only {site.title}, and {year} beside it.
+
 = 1.1.14 =
 * No change to the theme's behaviour or look: this release carries the 1.1.13 entry below, which the 1.1.13
   package shipped without.
