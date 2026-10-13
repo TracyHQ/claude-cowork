@@ -266,10 +266,83 @@ function wp_tracy_business_identity_dark_logo(): string {
  *
  * @return array<string,string>
  */
+/**
+ * The brand mark from a name: up to three initials, the first two words and the last, skipping the
+ * words a mark skips. The same rule as the seeder's `initialsOf` (`chrome-slots.mjs`) and the EmDash
+ * template's, so one customer wears one mark on every CMS.
+ */
+function wp_tracy_business_identity_initials( string $name ): string {
+	$stop  = array( 'and', 'the', 'of', '&', 'co', 'ltd', 'llc', 'jsc', 'inc', 'gmbh', 'và', 'công', 'ty' );
+	$words = array();
+	foreach ( preg_split( '/\s+/u', trim( $name ) ) ?: array() as $word ) {
+		if ( '' !== $word && ! in_array( mb_strtolower( $word, 'UTF-8' ), $stop, true ) ) {
+			$words[] = $word;
+		}
+	}
+	$first = static function ( string $word, int $count = 1 ): string {
+		return mb_strtoupper( mb_substr( $word, 0, $count, 'UTF-8' ), 'UTF-8' );
+	};
+	if ( 0 === count( $words ) ) {
+		return $first( trim( $name ), 2 );
+	}
+	if ( 1 === count( $words ) ) {
+		return $first( $words[0], 2 );
+	}
+	$letters = array_map( $first, $words );
+	if ( count( $letters ) <= 3 ) {
+		return implode( '', $letters );
+	}
+	return $letters[0] . $letters[1] . $letters[ count( $letters ) - 1 ];
+}
+
+/**
+ * The identity with the site's own facts standing in for what the option lacks: the site title for
+ * the name, its initials for the mark, the uploaded site logo for the logo. A release database
+ * carries no identity option (tracy-business/wp7 1.3.5 and 1.3.6 measured 13/10/2026), and a site that
+ * never went through the brand step rendered an empty 40 px square where its mark should be. Demo
+ * literals never stand in: an empty site title gives an empty mark, and the stylesheet hides it.
+ *
+ *  array<string,string> $vars what the option gave (`wp_tracy_business_identity_vars_of`)
+ *  string               $blogname the site title (`get_bloginfo( 'name' )`)
+ *  string               $logo the site logo as a media path, or ''
+ *  array<string,string>
+ */
+function wp_tracy_business_identity_with_defaults( array $vars, string $blogname, string $logo ): array {
+	$blogname = trim( $blogname );
+	if ( empty( $vars['site.name'] ) && '' !== $blogname ) {
+		$vars['site.name'] = $blogname;
+	}
+	if ( empty( $vars['site.monogram'] ) && ! empty( $vars['site.name'] ) ) {
+		$vars['site.monogram'] = wp_tracy_business_identity_initials( $vars['site.name'] );
+	}
+	if ( empty( $vars['site.logo'] ) && '' !== $logo ) {
+		$vars['site.logo'] = $logo;
+	}
+	return $vars;
+}
+
+/** The uploaded site logo (`site_logo`, else `custom_logo`) as a media path, or ''. */
+function wp_tracy_business_identity_site_logo(): string {
+	$id = (int) get_option( 'site_logo', 0 );
+	if ( $id <= 0 && function_exists( 'get_theme_mod' ) ) {
+		$id = (int) get_theme_mod( 'custom_logo', 0 );
+	}
+	if ( $id <= 0 || ! function_exists( 'wp_attachment_is_image' ) || ! wp_attachment_is_image( $id ) ) {
+		return '';
+	}
+	$file = (string) get_post_meta( $id, '_wp_attached_file', true );
+	return '' === $file ? '' : 'wp-content/uploads/' . ltrim( $file, '/' );
+}
+
 function wp_tracy_business_identity(): array {
 	static $vars = null;
 	if ( null === $vars ) {
 		$vars = wp_tracy_business_identity_vars_of( get_option( WP_TRACY_BUSINESS_IDENTITY_OPTION ) );
+		$vars = wp_tracy_business_identity_with_defaults(
+			$vars,
+			function_exists( 'get_bloginfo' ) ? (string) get_bloginfo( 'name' ) : '',
+			wp_tracy_business_identity_site_logo()
+		);
 		$dark = wp_tracy_business_identity_dark_logo();
 		if ( '' !== $dark ) {
 			$vars['site.logoDark'] = $dark;
