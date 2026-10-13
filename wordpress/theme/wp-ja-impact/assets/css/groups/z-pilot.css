@@ -138,7 +138,7 @@ body.tracy .jim-nav .wp-block-navigation__submenu-container > .wp-block-navigati
   body.tracy .jim-drawer__logo { margin: 0; }
   body.tracy .jim-drawer__logo a { display: block; line-height: 0; }
   body.tracy .jim-drawer__logo img { width: 110.8px; height: 32px; max-width: none; }
-  body.tracy .jim-drawer-close { width: 32px; height: 32px; margin: 0; border-radius: 50%; padding: 0; background: light-dark(#ffffff, #28354f); color: #666666; font-size: 24px; line-height: 28px; }
+  body.tracy .jim-drawer-close { width: 32px; height: 32px; margin: 0; border-radius: 50%; padding: 0; background: light-dark(var(--ds-c-bg, #ffffff), #28354f); color: var(--ds-c-fg, #666666); font-size: 24px; line-height: 28px; }
   body.tracy .jim-header__menu nav.jim-nav { margin: 0; padding: 16px 0; }
   body.tracy .jim-header__menu ul.jim-nav { padding: 0; }
   body.tracy .jim-nav .wp-block-navigation-item__content { color: var(--jim-text); }
@@ -167,7 +167,7 @@ html[data-theme='dark'] body.tracy .jim-nav .wp-block-navigation-item__content {
 
 /* The pager's counter, moved out of the navigation landmark (inc/groups/ga.php): same look as inside it. */
 body.tracy .jim-pager-host { display: flex; flex-direction: column; align-items: center; }
-body.tracy .jim-pager-host__counter { margin: 0 0 16px; color: #6c757d; }
+body.tracy .jim-pager-host__counter { margin: 0 0 16px; color: var(--ds-c-muted, #6c757d); }
 
 /* Dark: the Pages panel links read #d7deea; the drawer's items keep the body text colour (#c2c9d6). */
 html[data-theme='dark'] body.tracy .jim-nav .wp-block-navigation__submenu-container .wp-block-navigation-link .wp-block-navigation-item__content { color: #d7deea; }
@@ -179,10 +179,10 @@ html[data-theme='dark'] body.tracy .jim-nav .wp-block-navigation__submenu-contai
   html[data-theme='dark'] body.tracy .jim-header__menu .jim-nav .current-menu-item > .wp-block-navigation-item__content { color: var(--jim-success); }
 }
 /* Tagged items: card titles keep the dark text colour of the source's light cards. */
-body.tracy .jim-gb-tagged__title, body.tracy .jim-gb-tagged__title a { color: #212529; }
+body.tracy .jim-gb-tagged__title, body.tracy .jim-gb-tagged__title a { color: var(--ds-c-fg, #212529); }
 
 /* Registration "Cancel": the source draws a danger button. */
-body.tracy .jim-form__cancel { display: inline-block; padding: 17px 32px; border: 1px solid #dc3545; border-radius: var(--jim-radius); background: #dc3545; color: #ffffff; font-weight: 500; line-height: 20px; text-decoration: none; }
+body.tracy .jim-form__cancel { display: inline-block; padding: 17px 32px; border: 1px solid var(--ds-c-danger, #dc3545); border-radius: var(--jim-radius); background: var(--ds-c-danger, #dc3545); color: #ffffff; font-weight: 500; line-height: 20px; text-decoration: none; }
 
 /* Cards and text on colour keep the source's light grey (#e9ecef) for body text. */
 body.tracy .card[class*='bg-']:not(.bg-light):not(.bg-white) .card-text, body.tracy .card.text-light .card-text, body.tracy .text-light { color: #e9ecef; }
@@ -238,7 +238,7 @@ html[data-theme='dark'] body.tracy .acm-related-items .jim-rel__title a { color:
     margin: 8px 0 0 auto;
     border-radius: 50%;
     background: light-dark(#f2f4f6, #28354f);
-    color: light-dark(#adb5bd, #eef1f6);
+    color: light-dark(var(--ds-c-meta, #adb5bd), #eef1f6);
     text-align: center;
     cursor: pointer;
   }

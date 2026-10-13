@@ -34,13 +34,13 @@ body.tracy .jim-account.jim-account--password .control-group:last-child { margin
 body.tracy .jim-account.jim-account--password .control-label { padding-top: 5px; margin-bottom: 8px; }
 body.tracy .jim-account .control-group { margin: 0 0 18px; }
 body.tracy .jim-account label { display: inline-block; margin: 0 0 4px; color: var(--jim-text); font-weight: 400; }
-body.tracy .jim-account .star, body.tracy .jim-account .red { color: #dc3545; }
+body.tracy .jim-account .star, body.tracy .jim-account .red { color: var(--ds-c-danger, #dc3545); }
 body.tracy .jim-account .star { display: inline-block; }
 body.tracy .jim-account .form-control {
   display: block; width: 100%; box-sizing: border-box; padding: 14px; border: 1px solid light-dark(var(--jim-surface), rgba(255, 255, 255, 0.18)); border-radius: var(--jim-radius);
   background: var(--jim-surface); color: var(--jim-text); font: inherit; line-height: 25.6px;
 }
-body.tracy .jim-account--login input[type='text'].form-control { color: light-dark(#212529, #c2c9d6); }
+body.tracy .jim-account--login input[type='text'].form-control { color: light-dark(var(--ds-c-fg, #212529), #c2c9d6); }
 body.tracy .jim-account .form-control:focus { border-color: light-dark(var(--jim-success), #6f9bf0); outline: 0; }
 body.tracy .jim-account .input-group { display: flex; width: 100%; }
 body.tracy .jim-account .input-group .form-control { flex: 1 1 auto; width: 1%; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -50,7 +50,7 @@ body.tracy .jim-account .icon-eye::before { content: '\f06e'; font-family: 'Font
 body.tracy .jim-account .input-password-toggle.is-shown .icon-eye::before { content: '\f070'; }
 body.tracy .jim-account .form-check { margin: 0 0 16px; padding: 0 0 0 24px; }
 body.tracy .jim-account .form-check-input {
-  float: left; width: 16px; height: 16px; margin: 4px 4px 0 -24px; border: 1px solid light-dark(var(--jim-line), rgba(255, 255, 255, 0.3)); border-radius: 4px; background: light-dark(#ffffff, #28354f);
+  float: left; width: 16px; height: 16px; margin: 4px 4px 0 -24px; border: 1px solid light-dark(var(--jim-line), rgba(255, 255, 255, 0.3)); border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), #28354f);
   appearance: none; -webkit-appearance: none; vertical-align: top; cursor: pointer; font-size: 16px; line-height: 25.6px;
 }
 body.tracy .jim-account .form-check-input:checked { border-color: var(--jim-primary); background: var(--jim-primary) url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") center / contain no-repeat; }
@@ -186,8 +186,8 @@ body.tracy .alert-success { background: light-dark(#d1e7dd, #0e2a1e); border-col
 body.tracy .alert-danger { background: light-dark(#f8d7da, #2c1316); border-color: light-dark(#f1aeb5, #5c2329); color: light-dark(#58151c, #ea868f); }
 body.tracy .alert-warning { background: light-dark(#fff3cd, #332701); border-color: light-dark(#ffe69c, #664d03); color: light-dark(#664d03, #ffda6a); }
 body.tracy .alert-info { background: light-dark(#2970db, #032830); border-color: light-dark(#2970db, #055160); color: light-dark(#ffffff, #6edff6); }
-body.tracy .alert-light { background: light-dark(#fcfcfd, #1a2233); border-color: light-dark(#e9ecef, #2c3a52); color: light-dark(#495057, #c2c9d6); }
-body.tracy .alert-dark { background: light-dark(#ced4da, #1a2233); border-color: light-dark(#adb5bd, #2c3a52); color: light-dark(#495057, #c2c9d6); }
+body.tracy .alert-light { background: light-dark(#fcfcfd, #1a2233); border-color: light-dark(var(--ds-c-border, #e9ecef), #2c3a52); color: light-dark(var(--ds-c-fg, #495057), #c2c9d6); }
+body.tracy .alert-dark { background: light-dark(#ced4da, #1a2233); border-color: light-dark(#adb5bd, #2c3a52); color: light-dark(var(--ds-c-fg, #495057), #c2c9d6); }
 body.tracy .alert .btn-close { position: absolute; top: 0; right: 0; width: 48px; height: 56px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 0; }
 body.tracy .alert .btn-close::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 14px; color: currentColor; }
 body.tracy .alert-link { font-weight: 700; }
@@ -197,17 +197,17 @@ body.tracy .rounded-pill { border-radius: 800px; }
 body.tracy .bg-primary { background-color: var(--jim-primary); color: #ffffff; }
 body.tracy .bg-secondary { background-color: #6c757d; color: #ffffff; }
 body.tracy .bg-success { background-color: var(--jim-success); color: #ffffff; }
-body.tracy .bg-danger { background-color: #dc3545; color: #ffffff; }
+body.tracy .bg-danger { background-color: var(--ds-c-danger, #dc3545); color: #ffffff; }
 body.tracy .bg-warning { background-color: var(--jim-warning); }
 body.tracy .bg-info { background-color: var(--jim-info); color: #ffffff; }
 body.tracy .bg-light { background-color: var(--jim-band); }
 body.tracy .bg-dark { background-color: #212529; color: #ffffff; }
-body.tracy .text-dark { color: #212529; }
+body.tracy .text-dark { color: var(--ds-c-fg, #212529); }
 body.tracy .text-light { color: #ffffff; }
-body.tracy .text-muted, body.tracy .text-secondary { color: #6c757d; }
+body.tracy .text-muted, body.tracy .text-secondary { color: var(--ds-c-muted, #6c757d); }
 body.tracy .text-primary { color: var(--jim-link); }
 body.tracy .text-success { color: var(--jim-eyebrow); }
-body.tracy .text-danger { color: #dc3545; }
+body.tracy .text-danger { color: var(--ds-c-danger, #dc3545); }
 body.tracy .text-warning { color: var(--jim-warning); }
 body.tracy .text-info { color: var(--jim-info); }
 
@@ -218,20 +218,20 @@ body.tracy .btn-lg { padding: 18.5px 32px; font-size: 20px; line-height: 25px; }
 body.tracy .btn-primary { background: var(--jim-primary); border-color: var(--jim-primary); color: #ffffff; }
 body.tracy .btn-secondary { background: #6c757d; border-color: #6c757d; color: #ffffff; }
 body.tracy .btn-success { background: var(--jim-success); border-color: var(--jim-success); color: #ffffff; }
-body.tracy .btn-danger { background: #dc3545; border-color: #dc3545; color: #ffffff; }
+body.tracy .btn-danger { background: var(--ds-c-danger, #dc3545); border-color: var(--ds-c-danger, #dc3545); color: #ffffff; }
 body.tracy .btn-warning { background: var(--jim-warning); border-color: var(--jim-warning); color: #ffffff; }
 body.tracy .btn-info { background: var(--jim-info); border-color: var(--jim-info); color: #ffffff; }
 body.tracy .btn-light { background: var(--jim-band); border-color: var(--jim-band); color: light-dark(#000000, #eef1f6); }
 body.tracy .btn-dark { background: #212529; border-color: #212529; color: #ffffff; }
-body.tracy .btn-link { color: #0d6efd; font-weight: 400; }
+body.tracy .btn-link { color: var(--ds-c-accent-text, #0d6efd); font-weight: 400; }
 body.tracy .btn-outline-primary { border-color: var(--jim-primary); color: var(--jim-link); }
-body.tracy .btn-outline-secondary { border-color: #6c757d; color: #6c757d; }
+body.tracy .btn-outline-secondary { border-color: #6c757d; color: var(--ds-c-muted, #6c757d); }
 body.tracy .btn-outline-success { border-color: var(--jim-success); color: var(--jim-success); }
-body.tracy .btn-outline-danger { border-color: #dc3545; color: #dc3545; }
+body.tracy .btn-outline-danger { border-color: var(--ds-c-danger, #dc3545); color: var(--ds-c-danger, #dc3545); }
 body.tracy .btn-outline-warning { border-color: var(--jim-warning); color: var(--jim-warning); }
 body.tracy .btn-outline-info { border-color: var(--jim-info); color: var(--jim-info); }
 body.tracy .btn-outline-light { border-color: light-dark(var(--jim-band), #33415e); color: light-dark(#fff9ef, var(--jim-text)); }
-body.tracy .btn-outline-dark { border-color: light-dark(#212529, #33415e); color: light-dark(#212529, var(--jim-text)); }
+body.tracy .btn-outline-dark { border-color: light-dark(#212529, #33415e); color: light-dark(var(--ds-c-fg, #212529), var(--jim-text)); }
 
 body.tracy .card { display: flex; flex-direction: column; min-width: 0; margin: 0 0 16px; border: 1px solid var(--jim-line); border-radius: var(--jim-radius); background: var(--jim-raised); color: var(--jim-text); }
 body.tracy .card-body { flex: 1 1 auto; padding: 16px 24px; }
@@ -242,9 +242,9 @@ body.tracy .card-text:last-child { margin-bottom: 0; }
 body.tracy .progress { display: flex; height: 16px; margin: 0 0 16px; overflow: hidden; border-radius: var(--jim-radius); background: var(--jim-line); font-size: 12px; }
 body.tracy .progress-bar { display: flex; font-size: 16px; line-height: 25.6px; flex-direction: column; justify-content: center; margin: 0; overflow: hidden; background: var(--jim-success); color: #ffffff; text-align: center; white-space: nowrap; }
 body.tracy .progress-bar.bg-warning { background: var(--jim-warning); }
-body.tracy .progress-bar.text-dark { color: #212529; }
+body.tracy .progress-bar.text-dark { color: var(--ds-c-fg, #212529); }
 body.tracy .progress-bar.bg-info { background: var(--jim-info); }
-body.tracy .progress-bar.bg-danger { background: #dc3545; }
+body.tracy .progress-bar.bg-danger { background: var(--ds-c-danger, #dc3545); }
 body.tracy .w-25 { width: 25%; } body.tracy .w-50 { width: 50%; } body.tracy .w-75 { width: 75%; } body.tracy .w-100 { width: 100%; }
 
 body.tracy :is(.spinner-border, .spinner-grow) { display: inline-block; width: 32px; height: 32px; margin: 0 4px; vertical-align: text-bottom; color: var(--jim-link); }
@@ -256,7 +256,7 @@ body.tracy .spinner-grow { border-radius: 50%; background: currentColor; opacity
 body.tracy .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 body.tracy .pagination { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 16px; padding: 0; list-style: none; }
-body.tracy .page-link { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; box-sizing: border-box; border: 1px solid light-dark(#f8f9fa, #33415e); border-radius: var(--jim-radius); background: light-dark(#f8f9fa, #1e2a45); color: var(--jim-link); font-size: 14px; font-weight: 500; line-height: 17.5px; letter-spacing: -0.16px; text-decoration: none; }
+body.tracy .page-link { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; box-sizing: border-box; border: 1px solid light-dark(#f8f9fa, #33415e); border-radius: var(--jim-radius); background: light-dark(var(--ds-c-surface, #f8f9fa), #1e2a45); color: var(--jim-link); font-size: 14px; font-weight: 500; line-height: 17.5px; letter-spacing: -0.16px; text-decoration: none; }
 body.tracy .page-item.active .page-link { border-color: var(--jim-success); background: var(--jim-success); color: #ffffff; }
 body.tracy .page-item.disabled .page-link { color: light-dark(var(--jim-link), #8c97a8); opacity: 0.6; pointer-events: none; }
 body.tracy .page-item.disabled { display: none; }
@@ -273,8 +273,8 @@ body.tracy .jim-social--side .wp-social-link { background: transparent; color: v
 
 body.tracy small { font-size: 0.875em; line-height: 1.6; }
 
-body.tracy .badge.bg-light, body.tracy .badge.bg-light.text-dark { background-color: light-dark(var(--jim-band), #28354f); color: light-dark(#212529, #eef1f6); }
-body.tracy .card .col-md-5 { color: light-dark(#212529, var(--jim-text)); }
+body.tracy .badge.bg-light, body.tracy .badge.bg-light.text-dark { background-color: light-dark(var(--jim-band), #28354f); color: light-dark(var(--ds-c-fg, #212529), #eef1f6); }
+body.tracy .card .col-md-5 { color: light-dark(var(--ds-c-fg, #212529), var(--jim-text)); }
 
 /* WordPress scales a social link on hover; the source's icons stay put (hover-jump scan). */
 body.tracy .wp-social-link:hover { transform: none; }
@@ -292,7 +292,7 @@ body.tracy .jim-account-side .input-group { display: flex; margin: 0 0 16px; }
 body.tracy .jim-account-side .form-control { flex: 1 1 auto; width: 1%; min-width: 0; box-sizing: border-box; height: 56px; padding: 14px; border: 1px solid var(--jim-surface); border-radius: var(--jim-radius) 0 0 var(--jim-radius); background: var(--jim-surface); color: var(--jim-text); font: inherit; }
 body.tracy .jim-account-side .input-group-text { display: flex; align-items: center; justify-content: center; width: 48px; border-radius: 0 var(--jim-radius) var(--jim-radius) 0; background: var(--jim-primary); color: #ffffff; font-size: 14px; }
 body.tracy .jim-account-side .form-check { margin: 0 0 16px; padding: 0 0 0 24px; }
-body.tracy .jim-account-side .form-check-input { float: left; width: 16px; height: 16px; margin: 4px 4px 0 -24px; border: 1px solid var(--jim-line); border-radius: 4px; background: light-dark(#ffffff, #28354f); appearance: none; -webkit-appearance: none; }
+body.tracy .jim-account-side .form-check-input { float: left; width: 16px; height: 16px; margin: 4px 4px 0 -24px; border: 1px solid var(--jim-line); border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), #28354f); appearance: none; -webkit-appearance: none; }
 body.tracy .jim-account-side .btn { margin: 0 0 16px; }
 body.tracy .jim-account-side__links { margin: 0; padding: 0; list-style: none; }
 body.tracy .jim-account-side__links li { margin: 0 0 8px; }
@@ -323,7 +323,7 @@ body.tracy .jim-contactpage__main .wpcf7-form :is(input:not([type='checkbox']), 
 body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) .wpcf7-list-item { margin: 0; }
 body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) label { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-weight: 400; color: var(--jim-text); }
 body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) input[type='checkbox'] {
-  flex: none; width: 16px; height: 16px; margin: 4px 0 0; border: 1px solid var(--jim-line); border-radius: 4px; background: light-dark(#ffffff, #28354f);
+  flex: none; width: 16px; height: 16px; margin: 4px 0 0; border: 1px solid var(--jim-line); border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), #28354f);
   appearance: none; -webkit-appearance: none; cursor: pointer;
 }
 body.tracy .jim-contactpage__main :is(.wpcf7-acceptance, .wpcf7-checkbox) input[type='checkbox']:checked { border-color: var(--jim-primary); background: var(--jim-primary) url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") center / contain no-repeat; }

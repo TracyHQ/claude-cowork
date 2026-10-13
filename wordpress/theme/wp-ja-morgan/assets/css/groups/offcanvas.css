@@ -18,11 +18,11 @@ body.jm-parent-joomlart-content .t3-off-canvas .jm-off-canvas-nav .wp-block-navi
 /* home-style-2 sidebar: grey links and group labels in light, the style's green on Registration. */
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item > .wp-block-navigation-item__content,
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
-	color: light-dark(#777777, #cdd4e0);
+	color: light-dark(var(--ds-c-fg, #777777), #cdd4e0);
 }
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
-	color: light-dark(#777777, #a7b0c2);
+	color: light-dark(var(--ds-c-fg, #777777), #a7b0c2);
 }
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item > a[href*="registration"],
 body.jm-route-home-style-2 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item > a[href*="registration"] .wp-block-navigation-item__label {
@@ -38,7 +38,7 @@ html body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-styl
 @media (max-width: 991px) {
 	body.jm-route-home-style-2 .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
 	body.jm-route-home-style-3 .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
-		color: #777777;
+		color: var(--ds-c-fg, #777777);
 	}
 	body.jm-route-home-style-4 .t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
 		color: #aaaaaa;

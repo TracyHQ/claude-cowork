@@ -17,7 +17,7 @@ body.tracy .jim-gb-pager-host .tracy-pager {
   margin: 64px 0 0;
   text-align: center;
 }
-body.tracy .jim-gb__pager .tracy-pager__counter { margin: 0 0 16px; color: #6c757d; }
+body.tracy .jim-gb__pager .tracy-pager__counter { margin: 0 0 16px; color: var(--ds-c-muted, #6c757d); }
 body.tracy .jim-gb__pager .tracy-pager__list { display: flex; justify-content: center; gap: 16px; margin: 0; padding: 0; list-style: none; }
 body.tracy .jim-gb__pager .tracy-pager__item { margin: 0; }
 body.tracy .jim-gb__pager .tracy-pager__item.is-disabled { display: none; }
@@ -140,7 +140,7 @@ body.tracy .jim-gb-table__title,
 body.tracy .jim-gb-table__author,
 body.tracy .jim-gb-table__hits { margin: 0; padding: 8px; font-size: 16px; line-height: 25.6px; letter-spacing: 0; }
 body.tracy .jim-gb-table__th { font-weight: 700; color: var(--jim-link); }
-body.tracy .jim-gb-table__author { color: light-dark(#212529, #c2c9d6); }
+body.tracy .jim-gb-table__author { color: light-dark(var(--ds-c-fg, #212529), #c2c9d6); }
 /* The source colours the author cell of the odd rows (cat-list-row0) black and the even ones #212529 (measured). */
 body.tracy .wp-block-post-template > li:nth-child(odd) .jim-gb-table__author { color: light-dark(#000000, #eef1f6); }
 body.tracy .jim-gb-table__title { font-weight: 400; color: var(--jim-text); }
@@ -184,7 +184,7 @@ body.tracy .jim-gb--tagged .jim-gb-filter .wp-block-search__button {
 }
 body.tracy .jim-gb-tagged__list { margin: 0; padding: 0; overflow: hidden; border-radius: var(--jim-radius); list-style: none; }
 /* The source's list-group items are white rows with a dark text in both themes (measured in dark). */
-body.tracy .jim-gb-tagged__list > li { display: flow-root; margin: 0; padding: 16px 0 0; border-bottom: 1px solid #e9ecef; background: #ffffff; color: #212529; }
+body.tracy .jim-gb-tagged__list > li { display: flow-root; margin: 0; padding: 16px 0 0; border-bottom: 1px solid var(--ds-c-border, #e9ecef); background: var(--ds-c-bg, #ffffff); color: var(--ds-c-fg, #212529); }
 body.tracy .jim-gb-tagged__title { margin: 0 0 16px; font-size: 16px; font-weight: 500; line-height: 19.2px; letter-spacing: -0.28px; }
 body.tracy .jim-gb-tagged__title a { color: var(--jim-heading); }
 body.tracy .jim-gb-tagged__title a:hover { color: var(--jim-success); }

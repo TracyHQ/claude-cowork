@@ -103,7 +103,7 @@
 	border-left-width: 0;
 	border-radius: 0;
 	background: var(--jm-card);
-	color: light-dark(#333333, #cdd4e0);
+	color: light-dark(var(--ds-c-fg-2, #333333), #cdd4e0);
 	font-size: 16px;
 	font-weight: 600;
 	line-height: 18.08px;
@@ -314,7 +314,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	color: #999999;
 }
 .t3-content .text-primary {
-	color: #d93030;
+	color: var(--ds-c-accent-text, #d93030);
 }
 .t3-content .text-warning {
 	color: #c09853;
@@ -367,18 +367,18 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	padding: 20px 30px;
 	border: 1px solid var(--bt-border, var(--jm-line));
 	border-radius: 4px;
-	background: var(--bt-bg, light-dark(#ffffff, #20283c));
-	color: var(--bt-fg, light-dark(#333333, #cdd4e0));
+	background: var(--bt-bg, light-dark(var(--ds-c-bg, #ffffff), #20283c));
+	color: var(--bt-fg, light-dark(var(--ds-c-fg-2, #333333), #cdd4e0));
 	font-size: 16px;
 	font-weight: 600;
 	line-height: 18.08px;
 	text-align: center;
-	--bt-border: light-dark(#eaeaea, #2a3247);
+	--bt-border: light-dark(var(--ds-c-border, #eaeaea), #2a3247);
 }
 .t3-content .btn-primary,
 .t3-content .btn-danger {
-	--bt-bg: #d93030;
-	--bt-border: #d93030;
+	--bt-bg: var(--ds-c-accent, #d93030);
+	--bt-border: var(--ds-c-accent, #d93030);
 	--bt-fg: #ffffff;
 }
 .t3-content .btn-success {
@@ -427,23 +427,23 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	margin-right: 25px;
 	padding: 0;
 	border-radius: 4px 4px 0 0;
-	color: #777777;
+	color: var(--ds-c-fg, #777777);
 	font-weight: 500;
 }
 /* Only the tab's link is painted, as in the source; the list item stays transparent (a painted item 68 px wide behind a 43 px link
    showed on any band that is not white). */
 .t3-content ul.nav-tabs > li.active > a {
-	background: light-dark(#ffffff, transparent);
+	background: light-dark(var(--ds-c-bg, #ffffff), transparent);
 }
 .t3-content ul.nav-tabs > li.active > a {
-	color: #d93030;
+	color: var(--ds-c-accent-text, #d93030);
 }
 .t3-content ul.nav-tabs > li.disabled > a {
 	color: #999999;
 }
 .t3-content ul.nav-pills > li > a {
 	border-radius: 4px;
-	color: #d93030;
+	color: var(--ds-c-accent-text, #d93030);
 }
 .t3-content ul.nav-pills > li.active > a {
 	background: #c42424;
@@ -471,7 +471,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 .t3-content ul.nav .dropdown-menu > li > a {
 	display: block;
 	padding: 5px 20px;
-	color: light-dark(#333333, #cdd4e0);
+	color: light-dark(var(--ds-c-fg-2, #333333), #cdd4e0);
 }
 
 /* Tags as labels */
@@ -502,7 +502,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 }
 .t3-content span.label-primary,
 .t3-content span.label-danger {
-	background: #d93030;
+	background: var(--ds-c-accent, #d93030);
 }
 .t3-content span.label-success {
 	background: #5cb85c;
@@ -537,7 +537,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	display: block;
 	padding: 10px 15px;
 	border: 1px solid light-dark(#dddddd, #2a3247);
-	background: light-dark(#ffffff, #1a2032);
+	background: light-dark(var(--ds-c-bg, #ffffff), #1a2032);
 	color: var(--jm-text);
 }
 /* The source overlaps neighbouring borders with a -1px margin; dropping the top border of every item but the first draws the same single line. */
@@ -559,14 +559,14 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	color: light-dark(#555555, #a7b0c2);
 }
 .t3-content .list-group-item.active {
-	border-color: #d93030;
-	background: #d93030;
-	color: #ffffff;
+	border-color: var(--ds-c-accent, #d93030);
+	background: var(--ds-c-accent, #d93030);
+	color: var(--ds-c-accent-on, #ffffff);
 }
 .t3-content .list-group-item.active .badge,
 .t3-content ul.nav-pills > li.active .badge {
-	background: #ffffff;
-	color: #d93030;
+	background: var(--ds-c-bg, #ffffff);
+	color: var(--ds-c-accent-text, #d93030);
 }
 .t3-content .list-group-item-heading {
 	margin: 0 0 5px;
@@ -580,11 +580,11 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 .t3-content .panel {
 	--pn-border: light-dark(#dddddd, #2a3247);
 	--pn-head-bg: light-dark(#f5f5f5, #20283c);
-	--pn-head-fg: light-dark(#333333, #f2f4f8);
+	--pn-head-fg: light-dark(var(--ds-c-fg-2, #333333), #f2f4f8);
 	margin: 0 0 25px;
 	border: 1px solid var(--pn-border);
 	border-radius: 4px;
-	background: light-dark(#ffffff, #1a2032);
+	background: light-dark(var(--ds-c-bg, #ffffff), #1a2032);
 	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
 .t3-content .panel-heading {
@@ -605,8 +605,8 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	padding: 15px;
 }
 .t3-content .panel-primary {
-	--pn-border: #d93030;
-	--pn-head-bg: #d93030;
+	--pn-border: var(--ds-c-accent, #d93030);
+	--pn-head-bg: var(--ds-c-accent, #d93030);
 	--pn-head-fg: #ffffff;
 }
 .t3-content .panel-success {
@@ -760,7 +760,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 
 /* Colour swatches: 100 px tall, 123 px from 1200 px (the source's step) */
 .t3-content .swatch-item {
-	--sw-bg: #d93030;
+	--sw-bg: var(--ds-c-accent, #d93030);
 	--sw-fg: #ffffff;
 	position: relative;
 	min-height: 100px;
@@ -796,7 +796,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	--sw-bg: #ffbb22;
 }
 .t3-content .color-brand-danger {
-	--sw-bg: #d93030;
+	--sw-bg: var(--ds-c-accent, #d93030);
 }
 .t3-content .color-brand-info {
 	--sw-bg: #5bc0de;
@@ -815,16 +815,16 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 }
 .t3-content .color-gray-light {
 	--sw-bg: #999999;
-	--sw-fg: #333333;
+	--sw-fg: var(--ds-c-fg-2, #333333);
 }
 .t3-content .color-gray-lighter {
 	--sw-bg: #eeeeee;
-	--sw-fg: #333333;
+	--sw-fg: var(--ds-c-fg-2, #333333);
 }
 
 /* Form states */
 .t3-content .form-group {
-	--fg-state: #777777;
+	--fg-state: var(--ds-c-fg, #777777);
 	margin: 0 0 25px;
 }
 .t3-content .has-success {
@@ -850,7 +850,7 @@ body.jm-route-offline-page .ja-masthead-title.wp-block-post-title {
 	padding: 20px 30px;
 	border: 1px solid var(--fg-state, var(--jm-line));
 	border-radius: 4px;
-	background: light-dark(#ffffff, #20283c);
+	background: light-dark(var(--ds-c-bg, #ffffff), #20283c);
 	color: light-dark(#555555, #cdd4e0);
 	font: inherit;
 	box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);

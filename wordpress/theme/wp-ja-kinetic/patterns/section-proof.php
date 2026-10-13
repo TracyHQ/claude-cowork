@@ -88,7 +88,7 @@
 <div class="wp-block-group tracy-card p-6">
 <!-- wp:quote {"className":"tracy-quote"} -->
 <blockquote class="wp-block-quote tracy-quote"><!-- wp:paragraph {"className":"text-lg text-fg"} -->
-<p class="text-lg text-fg">"Eleven client sites, one desk. I had not opened a WordPress admin in a month."</p>
+<p class="text-lg text-fg">"Claude Design, but for CMS."</p>
 <!-- /wp:paragraph --><cite>Daniel, freelancer</cite></blockquote>
 <!-- /wp:quote -->
 </div>

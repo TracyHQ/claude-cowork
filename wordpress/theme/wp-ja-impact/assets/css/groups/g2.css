@@ -10,15 +10,15 @@
   --g2-black: #000000;
   --g2-on-card: #e9ecef;
   --g2-secondary: #6c757d;
-  --g2-placeholder: #adb5bd;
+  --g2-placeholder: var(--ds-c-meta, #adb5bd);
   --g2-facebook: #1674ea;
   --g2-twitter: #1c9cea;
   --g2-tiktok: #000000;
   --g2-pinterest: #cf3431;
   /* The section picture behind the icon cards is veiled in dark (the source's .bg-overlay inset shadow). */
   --g2-veil: light-dark(transparent, rgba(17, 26, 44, 0.94));
-  --g2-btn-white-bg: light-dark(#ffffff, #28354f);
-  --g2-btn-white-fg: light-dark(#1d3677, #eef1f6);
+  --g2-btn-white-bg: light-dark(var(--ds-c-bg, #ffffff), #28354f);
+  --g2-btn-white-fg: light-dark(var(--ds-c-fg-2, #1d3677), #eef1f6);
   --g2-btn-white-line: light-dark(#ffffff, #33415e);
   --g2-lift: light-dark(rgba(100, 100, 111, 0.2), rgba(0, 0, 0, 0.55));
 }

@@ -9,7 +9,7 @@
   --jim-g1-on-dark-muted: light-dark(#ced4da, #ced4da);
   --jim-g1-panel: light-dark(#2e4c99, #2e4c99);
   --jim-g1-track: light-dark(#e9ecef, #141d33);
-  --jim-g1-count: light-dark(#dee2e6, #dee2e6);
+  --jim-g1-count: light-dark(var(--ds-c-border, #dee2e6), var(--ds-c-border, #dee2e6));
 }
 
 /* ── Container ─────────────────────────────────────────────────────────────────────────────────
