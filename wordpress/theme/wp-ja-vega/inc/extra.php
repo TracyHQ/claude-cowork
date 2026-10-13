@@ -1,7 +1,3 @@
-defined( 'ABSPATH' ) || exit;
-
-// The identity tokens the pages and parts carry, and their filling.
-require_once __DIR__ . '/identity.php';
 <?php
 /**
  * wp-ja-vega — what this target adds on top of the source theme: the JA Vega stylesheet and its
