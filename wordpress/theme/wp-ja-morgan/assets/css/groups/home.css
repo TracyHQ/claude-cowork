@@ -31,7 +31,7 @@ body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, 
 	font-size: 36px;
 	line-height: 45px;
 	letter-spacing: -0.6px;
-	color: var(--wp--preset--color--fg-2, #333333);
+	color: var(--wp--preset--color--fg-2, var(--ds-c-fg-2, #333333));
 }
 body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, .jm-route-about-us, .jm-route-services-page) .jm-acm.mod-bg-secondary h3.jm-module-title {
 	color: #ffffff;
@@ -221,7 +221,7 @@ body.jm-route-services-page .acm-features.style-4 .col:nth-child(3) .features-it
 	font-weight: 400;
 	line-height: 45px;
 	letter-spacing: -0.6px;
-	color: var(--wp--preset--color--fg-2, #333333);
+	color: var(--wp--preset--color--fg-2, var(--ds-c-fg-2, #333333));
 }
 .acm-features.style-5 .lead,
 .acm-features.style-6 .lead {
@@ -393,8 +393,8 @@ body:is(.jm-route-home-style-2, .jm-route-home-style-3, .jm-route-home-style-4, 
 
 /* ---- Hero call-to-action band on home-style-3 keeps the brand red although the page palette is sand ---- */
 body.jm-route-home-style-3 .acm-hero.t3-section .wp-block-button__link {
-	background: #d93030;
-	border-color: #d93030;
+	background: var(--ds-c-accent, #d93030);
+	border-color: var(--ds-c-accent, #d93030);
 }
 
 /* ---- features-intro style-1 with slide=0 (home-style-4, about-us): a 2 x 2 grid of icon items, not a carousel ---- */
@@ -471,9 +471,9 @@ body.jm-route-about-us .t3-section:has(.acm-teams) {
 	padding: 0;
 	background: none;
 	border: 0;
-	border-bottom: 1px solid #eaeaea;
+	border-bottom: 1px solid var(--ds-c-border, #eaeaea);
 	border-radius: 0;
-	color: #333333;
+	color: var(--ds-c-fg-2, #333333);
 	font-size: 16px;
 	font-weight: 700;
 	line-height: 25px;
@@ -546,7 +546,7 @@ body.jm-route-about-us .t3-section:has(.acm-teams) {
 	display: inline;
 	font-size: 20px;
 	line-height: 23px;
-	color: #333333;
+	color: var(--ds-c-fg-2, #333333);
 	text-decoration: none;
 }
 .latest-news .articles-introtext {
@@ -577,8 +577,8 @@ body.jm-route-about-us .t3-section:has(.acm-teams) {
 
 /* The closing call to action of the team section in the danger colour (its "color-link" parameter). */
 .jm-link-danger .teams-action .wp-block-button__link {
-	background: #d93030;
-	border-color: #d93030;
+	background: var(--ds-c-accent, #d93030);
+	border-color: var(--ds-c-accent, #d93030);
 }
 
 /* The lead of a features section may be two paragraphs (the source: a <p> and a bare text line). */

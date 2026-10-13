@@ -225,7 +225,7 @@ body.tracy .style-funds .jim-fund__pct {
   text-align: center;
   color: #ffffff;
 }
-body.tracy .style-funds .jim-fund__track { height: 10px; margin: 0 0 16px; border-radius: var(--jim-radius); background: light-dark(#e9ecef, #1e2a45); overflow: hidden; }
+body.tracy .style-funds .jim-fund__track { height: 10px; margin: 0 0 16px; border-radius: var(--jim-radius); background: light-dark(var(--ds-c-surface-warm, #e9ecef), #1e2a45); overflow: hidden; }
 body.tracy .style-funds .jim-fund__fill { height: 100%; border-radius: var(--jim-radius); background: var(--jim-success); }
 body.tracy .style-funds .jim-fund__campaign { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #ffffff; }
 body.tracy .style-funds .jim-fund__figure { display: flex; align-items: center; gap: 8px; }
@@ -309,7 +309,7 @@ body.tracy .style-events .jim-evt__date {
   height: 92px;
   padding: 16px;
   border-radius: var(--jim-radius);
-  background: #ffffff;
+  background: var(--ds-c-bg, #ffffff);
   text-align: center;
 }
 body.tracy .style-events .jim-evt__day,
@@ -422,7 +422,7 @@ body.tracy .style-news .jim-news__content--primary { background: var(--jim-prima
 body.tracy .style-news .jim-news__content--warning { background: var(--jim-warning); }
 body.tracy .style-news .jim-news__content--info { background: var(--jim-info); }
 body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) :is(.jim-news__date, .jim-news__by, .jim-news__author, .jim-news__title a) { color: #ffffff; }
-body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) .jim-news__date::after { background: #ffffff; }
+body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) .jim-news__date::after { background: var(--ds-c-bg, #ffffff); }
 @media (min-width: 768px) {
   body.tracy .style-news .jim-news-grid { grid-template-columns: repeat(2, 1fr); }
 }

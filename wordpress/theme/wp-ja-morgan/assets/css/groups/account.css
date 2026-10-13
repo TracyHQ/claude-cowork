@@ -47,7 +47,7 @@
 	font-weight: 300;
 }
 .jm-form .login label {
-	color: light-dark(#777777, #cdd4e0);
+	color: light-dark(var(--ds-c-fg, #777777), #cdd4e0);
 }
 .jm-form .star {
 	color: #ffcc00;
@@ -75,7 +75,7 @@
 	padding: 20px 30px;
 	border: 1px solid var(--jm-line);
 	border-radius: 4px;
-	background: light-dark(#ffffff, #1a2032);
+	background: light-dark(var(--ds-c-bg, #ffffff), #1a2032);
 	color: light-dark(#555555, #e6e9ef);
 	font: inherit;
 	line-height: 25px;
@@ -133,8 +133,8 @@
 .jm-form .btn-default {
 	margin: 5px 12.5px 0 0;
 	border-color: var(--jm-line);
-	background: light-dark(#ffffff, #20283c);
-	color: light-dark(#333333, #cdd4e0);
+	background: light-dark(var(--ds-c-bg, #ffffff), #20283c);
+	color: light-dark(var(--ds-c-fg-2, #333333), #cdd4e0);
 }
 
 /* Password and date fields: the input joined to a grey button */
@@ -155,7 +155,7 @@
 	border: 1px solid transparent;
 	border-radius: 0 4px 4px 0;
 	background: light-dark(#efefef, #20283c);
-	color: light-dark(#777777, #cdd4e0);
+	color: light-dark(var(--ds-c-fg, #777777), #cdd4e0);
 }
 .jm-form .icon-eye,
 .jm-form .icon-calendar {
@@ -245,7 +245,7 @@
 	text-decoration: none;
 }
 .jm-form .other-links a:hover {
-	color: var(--ja-accent, #d93030);
+	color: var(--ja-accent, var(--ds-c-accent-text-hover, #d93030));
 }
 
 /* ---- Registration ---- */
@@ -264,7 +264,7 @@
 	margin-top: 30px;
 }
 .jm-form .field-spacer .red {
-	color: #d93030;
+	color: var(--ds-c-accent-text, #d93030);
 }
 .jm-form .small {
 	font-size: 13.6px;
@@ -285,7 +285,7 @@
 	padding-top: 8.33px;
 }
 .jm-form .form-text {
-	color: #777777;
+	color: var(--ds-c-fg, #777777);
 	font-size: 13.6px;
 }
 .jm-form .form-actions {
@@ -335,7 +335,7 @@
 	font-weight: 500;
 	line-height: 50px;
 	letter-spacing: -0.6px;
-	color: light-dark(#333333, #f2f4f8);
+	color: light-dark(var(--ds-c-fg-2, #333333), #f2f4f8);
 }
 .jm-contact-page .contact-info {
 	display: grid;
@@ -379,11 +379,11 @@
 	font-size: 20px;
 	font-weight: 500;
 	line-height: 31.25px;
-	color: light-dark(#333333, #f2f4f8);
+	color: light-dark(var(--ds-c-fg-2, #333333), #f2f4f8);
 }
 .jm-contact-page .address-detail .content {
 	margin: 0;
-	color: light-dark(#777777, #e6e9ef);
+	color: light-dark(var(--ds-c-fg, #777777), #e6e9ef);
 }
 .jm-contact-page .address-detail a {
 	color: inherit;
@@ -746,7 +746,7 @@
 		font-size: 16px;
 		font-weight: 500;
 		line-height: 21px;
-		color: var(--jm-text-strong, #333333);
+		color: var(--jm-text-strong, var(--ds-c-fg-2, #333333));
 	}
 }
 @media (min-width: 992px) {
@@ -759,14 +759,14 @@
 		height: 42px;
 		background: var(--jm-bg);
 		color: #aaaaaa;
-		border: 1px solid #eaeaea;
+		border: 1px solid var(--ds-c-border, #eaeaea);
 	}
 	body.jm-route-home-style-2 .t3-topbar > .container {
 		height: 40px;
 	}
 	body.jm-route-home-style-2 .t3-topbar .topbar-left li,
 	body.jm-route-home-style-2 .t3-topbar .wp-block-social-links .wp-social-link {
-		border-color: #eaeaea;
+		border-color: var(--ds-c-border, #eaeaea);
 		color: #aaaaaa;
 	}
 	body.jm-route-home-style-2 .t3-header {

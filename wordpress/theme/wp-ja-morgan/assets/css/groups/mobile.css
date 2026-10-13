@@ -98,13 +98,13 @@
 		height: 42px;
 		background: var(--jm-bg);
 		color: #aaaaaa;
-		border: 1px solid #eaeaea;
+		border: 1px solid var(--ds-c-border, #eaeaea);
 	}
 	body.jm-route-home-style-2 .t3-topbar > .container {
 		height: 40px;
 	}
 	body.jm-route-home-style-2 .t3-topbar .wp-block-social-links .wp-social-link {
-		border-color: #eaeaea;
+		border-color: var(--ds-c-border, #eaeaea);
 		color: #aaaaaa;
 	}
 	body.jm-route-home-style-2 .t3-header {

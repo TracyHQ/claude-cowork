@@ -2844,7 +2844,7 @@ body.item-231 .com-tags__masthead {
   border-bottom: 1px solid var(--border);
   text-align: center;
   background:
-    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, #F2F5EE 55%),
+    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--ds-c-surface-warm, #F2F5EE) 55%),
     linear-gradient(rgba(16, 20, 15, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(16, 20, 15, 0.04) 1px, transparent 1px);
   background-size: auto, 30px 30px, 30px 30px;
@@ -2947,15 +2947,15 @@ body.item-231 .kinetic-tags-pill {
   gap: 8px;
   padding: 10px 18px;
   border-radius: 9999px;
-  background: #FFFFFF;
-  border: 1px solid #E4E8E0;
+  background: var(--ds-c-surface, #FFFFFF);
+  border: 1px solid var(--ds-c-border, #E4E8E0);
   text-decoration: none;
   transition: border-color .15s ease, background-color .15s ease;
 }
 body.item-231 .kinetic-tags-pill:hover,
 body.item-231 .kinetic-tags-pill:focus-visible {
   border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 8%, #FFFFFF);
+  background: color-mix(in srgb, var(--primary) 8%, var(--ds-c-surface, #FFFFFF));
   text-decoration: none;
   outline: none;
 }
@@ -3310,9 +3310,9 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
   padding: 0.375rem 0.75rem;
   margin-left: -1px;
   font-size: 1rem;
-  color: #0d6efd;
-  background-color: #fff;
-  border: 1px solid #dee2e6;
+  color: var(--ds-c-accent-text, #0d6efd);
+  background-color: var(--ds-c-surface, #fff);
+  border: 1px solid var(--ds-c-border, #dee2e6);
   border-radius: 0.25rem;
   text-decoration: none;
 }
@@ -3322,16 +3322,16 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
 .com-tags .page-link:hover {
   z-index: 2;
   color: rgb(10.4, 88, 202.4);
-  background-color: #e9ecef;
+  background-color: var(--ds-c-surface-warm, #e9ecef);
 }
 .com-tags .active > .page-link {
   z-index: 3;
-  color: #fff;
-  background-color: #0d6efd;
-  border-color: #0d6efd;
+  color: var(--ds-c-accent-on, #fff);
+  background-color: var(--ds-c-accent, #0d6efd);
+  border-color: var(--ds-c-accent, #0d6efd);
 }
 .com-tags .disabled > .page-link {
-  color: #6c757d;
+  color: var(--ds-c-muted, #6c757d);
   pointer-events: none;
 }
 /* source `img, svg { vertical-align: middle; }` (template.css); the parent theme's

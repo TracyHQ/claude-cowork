@@ -471,9 +471,9 @@ body.item-232 .kinetic-finder .page-link {
   display: block;
   padding: 0.375rem 0.75rem;
   font-size: 1rem;
-  color: #0d6efd;
-  background-color: #fff;
-  border: 1px solid #dee2e6;
+  color: var(--ds-c-accent-text, #0d6efd);
+  background-color: var(--ds-c-surface, #fff);
+  border: 1px solid var(--ds-c-border, #dee2e6);
   border-radius: 0;
   text-decoration: none;
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
@@ -508,30 +508,30 @@ body.item-232 .kinetic-finder .page-item.active {
 body.item-232 .kinetic-finder .page-link:hover {
   z-index: 2;
   color: rgb(10.4, 88, 202.4);
-  background-color: #e9ecef;
-  border-color: #dee2e6;
+  background-color: var(--ds-c-surface-warm, #e9ecef);
+  border-color: var(--ds-c-border, #dee2e6);
 }
 
 body.item-232 .kinetic-finder .page-link:focus {
   z-index: 3;
   color: rgb(10.4, 88, 202.4);
-  background-color: #e9ecef;
+  background-color: var(--ds-c-surface-warm, #e9ecef);
   outline: 0;
   box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 body.item-232 .kinetic-finder .page-item.active .page-link {
   z-index: 3;
-  color: #fff;
-  background-color: #0d6efd;
-  border-color: #0d6efd;
+  color: var(--ds-c-accent-on, #fff);
+  background-color: var(--ds-c-accent, #0d6efd);
+  border-color: var(--ds-c-accent, #0d6efd);
 }
 
 body.item-232 .kinetic-finder .page-item.disabled .page-link {
-  color: #6c757d;
+  color: var(--ds-c-muted, #6c757d);
   pointer-events: none;
-  background-color: #fff;
-  border-color: #dee2e6;
+  background-color: var(--ds-c-surface, #fff);
+  border-color: var(--ds-c-border, #dee2e6);
 }
 
 /* source page-232.css §21 dark-mode re-colouring, verbatim except the dark hook
@@ -779,7 +779,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
    Company-row sibling fields use the same `.star` class and colour token elsewhere in this port):
    rgb(229,72,77) (AU-146/147/221/222/297/298). */
 .kinetic-auth .star {
-  color: #e5484d;
+  color: var(--ds-c-danger, #e5484d);
 }
 
 /* ---- screen-reader-only utility — the source's own `.visually-hidden` (the show-password label,
@@ -813,7 +813,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
    the label, anchored to the `position:relative` `.control-label`, plus the two-border down arrow
    drawn by `::before`/`::after`) — no box-shadow (AU-008/190-192/245-250). ---- */
 .kinetic-auth .controls.has-danger input.form-control {
-  border-color: #e5484d;
+  border-color: var(--ds-c-danger, #e5484d);
 }
 
 .kinetic-auth .control-label label.invalid .form-control-feedback {
@@ -830,9 +830,9 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   padding: 16px;
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 4.8px;
-  background-color: #fff;
+  background-color: var(--ds-c-surface, #fff);
   background-clip: padding-box;
-  color: #212529;
+  color: var(--ds-c-fg, #212529);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   font-size: 14px;
   font-weight: 400;
@@ -1065,7 +1065,7 @@ body.item-237 .kinetic-auth .star {
   z-index: 2;
   border-left-width: 1px;
   border-radius: 0 8px 8px 0;
-  background-color: #fff;
+  background-color: var(--ds-c-surface, #fff);
   vertical-align: middle;
 }
 
@@ -1876,8 +1876,8 @@ body.item-235 .profile-edit.kinetic-auth {
 }
 
 .com-users-profile__edit .btn-success {
-  background-color: #30a46c;
-  border-color: #30a46c;
+  background-color: var(--ds-c-success, #30a46c);
+  border-color: var(--ds-c-success, #30a46c);
   color: #fff;
 }
 
@@ -1962,9 +1962,9 @@ body.item-235 .profile-edit.kinetic-auth {
   max-width: none;
   padding: 0.5em;
   margin: 0.5em;
-  color: #000;
+  color: var(--ds-c-fg, #000);
   text-align: start;
-  background: #fff;
+  background: var(--ds-c-surface, #fff);
   border: 1px solid #6d757e;
   border-radius: 0.25rem;
 }
@@ -1995,7 +1995,7 @@ body.item-235 .profile-edit.kinetic-auth {
 
 .com-users-profile__edit .table > :not(caption) > * > * {
   padding: 0.5rem;
-  color: #212529;
+  color: var(--ds-c-fg, #212529);
   background-color: transparent;
   border-bottom-width: 1px;
   box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.04);
@@ -2239,7 +2239,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
   width: var(--choices-width,100%);
   padding: var(--choices-dropdown-item-padding,10px);
   border-bottom: var(--choices-base-border,1px solid) var(--choices-keyline-color,#ddd);
-  background-color: var(--choices-bg-color-dropdown,#fff);
+  background-color: var(--choices-bg-color-dropdown,var(--ds-c-surface, #fff));
   margin: 0;
   display: block;
 }
@@ -2423,7 +2423,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 .choices__list[aria-expanded] {
   z-index: var(--choices-z-index,1);
   width: var(--choices-width,100%);
-  background-color: var(--choices-bg-color-dropdown,#fff);
+  background-color: var(--choices-bg-color-dropdown,var(--ds-c-surface, #fff));
   border: var(--choices-base-border,1px solid) var(--choices-keyline-color,#ddd);
   border-bottom-left-radius: var(--choices-border-radius,2.5px);
   border-bottom-right-radius: var(--choices-border-radius,2.5px);

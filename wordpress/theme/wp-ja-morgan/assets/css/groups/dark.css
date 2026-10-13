@@ -105,8 +105,8 @@
 }
 :root[data-theme="dark"] .t3-content .label-primary,
 :root[data-theme="dark"] .t3-content .label-danger {
-	background: #d93030;
-	color: #ffffff;
+	background: var(--ds-c-accent, #d93030);
+	color: var(--ds-c-accent-on, #ffffff);
 }
 :root[data-theme="dark"] .t3-content .label-success {
 	background: #5cb85c;
@@ -147,8 +147,8 @@
 	color: #ffffff;
 }
 :root[data-theme="dark"] .t3-content ul.nav-pills > li.active .badge {
-	background: #ffffff;
-	color: #d93030;
+	background: var(--ds-c-bg, #ffffff);
+	color: var(--ds-c-accent-text, #d93030);
 }
 :root[data-theme="dark"] .t3-content .list-group-item.active {
 	border-color: #2a3247;
@@ -269,8 +269,8 @@
 	}
 	:root:not([data-theme="light"]) .t3-content .label-primary,
 	:root:not([data-theme="light"]) .t3-content .label-danger {
-		background: #d93030;
-		color: #ffffff;
+		background: var(--ds-c-accent, #d93030);
+		color: var(--ds-c-accent-on, #ffffff);
 	}
 	:root:not([data-theme="light"]) .t3-content .label-success {
 		background: #5cb85c;
@@ -311,8 +311,8 @@
 		color: #ffffff;
 	}
 	:root:not([data-theme="light"]) .t3-content ul.nav-pills > li.active .badge {
-		background: #ffffff;
-		color: #d93030;
+		background: var(--ds-c-bg, #ffffff);
+		color: var(--ds-c-accent-text, #d93030);
 	}
 	:root:not([data-theme="light"]) .t3-content .list-group-item.active {
 		border-color: #2a3247;
