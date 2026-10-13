@@ -216,7 +216,7 @@ h6 {
   position: sticky;
   top: 0;
   z-index: 1030;
-  background: light-dark(var(--ds-c-bg, #fbfcfa), #0a0d0c);
+  background: light-dark(var(--ds-c-bg, #fbfcfa), var(--ds-c-bg, #0a0d0c));
   border-bottom: 1px solid var(--wp--preset--color--border);
 }
 

@@ -7152,7 +7152,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    ========================================================================== */
 html[data-style="blueprint"] {
   --wp--preset--color--bg: light-dark(#FAFAFB, #0B0D14);
-  --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), #12141E);
+  --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), var(--ds-c-surface, #12141E));
   --wp--preset--color--surface-warm: light-dark(#F3F4F8, #161925);
   --wp--preset--color--fg: light-dark(#57606E, #9AA1B3);
   --wp--preset--color--fg-2: light-dark(#0F1117, #EEF0F6);
@@ -7173,7 +7173,7 @@ html[data-style="blueprint"] {
 }
 html[data-style="signal"] {
   --wp--preset--color--bg: light-dark(#F7FAFC, #0A0F1A);
-  --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), #0F1626);
+  --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), var(--ds-c-surface, #0F1626));
   --wp--preset--color--surface-warm: light-dark(#EDF3F8, #121A2C);
   --wp--preset--color--fg: light-dark(#41506A, #93A0B8);
   --wp--preset--color--fg-2: light-dark(#06121F, #EAF1FB);
@@ -7208,12 +7208,12 @@ html[data-style="signal"][data-theme="dark"] {
 }
 html[data-style="blueprint"],
 html[data-style="signal"] {
-  --chrome-bg: light-dark(var(--ds-c-bg, #FBFCFA), #0A0D0C);
-  --chrome-surface: light-dark(var(--ds-c-surface, #FFFFFF), #121614);
-  --chrome-elevated: light-dark(var(--ds-c-surface-warm, #F2F5EE), #161B18);
-  --chrome-border: light-dark(var(--ds-c-border, #E4E8E0), #232A27);
-  --chrome-text: light-dark(var(--ds-c-fg, #46514B), #9AA6A1);
-  --chrome-heading: light-dark(var(--ds-c-fg-2, #10140F), #F2F5F3);
+  --chrome-bg: light-dark(var(--ds-c-bg, #FBFCFA), var(--ds-c-bg, #0A0D0C));
+  --chrome-surface: light-dark(var(--ds-c-surface, #FFFFFF), var(--ds-c-surface, #121614));
+  --chrome-elevated: light-dark(var(--ds-c-surface-warm, #F2F5EE), var(--ds-c-surface-warm, #161B18));
+  --chrome-border: light-dark(var(--ds-c-border, #E4E8E0), var(--ds-c-border, #232A27));
+  --chrome-text: light-dark(var(--ds-c-fg, #46514B), var(--ds-c-fg, #9AA6A1));
+  --chrome-heading: light-dark(var(--ds-c-fg-2, #10140F), var(--ds-c-fg-2, #F2F5F3));
   --chrome-muted: light-dark(#646F68, #7F8B86);
 }
 /* The source's per-page overlays for the two direction pages (css/page-215.css, page-216.css): the

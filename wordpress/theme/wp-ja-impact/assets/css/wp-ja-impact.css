@@ -18,15 +18,15 @@
   --jim-success: #0cb76d;
   --jim-warning: var(--ds-c-warn, #f48a29);
   --jim-info: #2970db;
-  --jim-heading: light-dark(var(--ds-c-fg-2, #1d3677), #eef1f6);
-  --jim-text: light-dark(var(--ds-c-fg, #495057), #c2c9d6);
-  --jim-muted: light-dark(var(--ds-c-muted, #6c757d), #8c97a8);
-  --jim-surface: light-dark(var(--ds-c-surface, #fbfbfb), #1e2a45);
+  --jim-heading: light-dark(var(--ds-c-fg-2, #1d3677), var(--ds-c-fg-2, #eef1f6));
+  --jim-text: light-dark(var(--ds-c-fg, #495057), var(--ds-c-fg, #c2c9d6));
+  --jim-muted: light-dark(var(--ds-c-muted, #6c757d), var(--ds-c-muted, #8c97a8));
+  --jim-surface: light-dark(var(--ds-c-surface, #fbfbfb), var(--ds-c-surface, #1e2a45));
   --jim-raised: light-dark(#ffffff, #1e2a45);
-  --jim-raised-2: light-dark(var(--ds-c-surface, #f8f9fa), #28354f);
-  --jim-band: light-dark(var(--ds-c-surface-warm, #fff9ef), #141d33);
-  --jim-line: light-dark(var(--ds-c-border, #e9ecef), #33415e);
-  --jim-link: light-dark(var(--ds-c-fg-2, #1d3677), #6f9bf0);
+  --jim-raised-2: light-dark(var(--ds-c-surface, #f8f9fa), var(--ds-c-surface, #28354f));
+  --jim-band: light-dark(var(--ds-c-surface-warm, #fff9ef), var(--ds-c-surface-warm, #141d33));
+  --jim-line: light-dark(var(--ds-c-border, #e9ecef), var(--ds-c-border, #33415e));
+  --jim-link: light-dark(var(--ds-c-fg-2, #1d3677), var(--ds-c-fg-2, #6f9bf0));
   --jim-link-hover: var(--ds-c-accent, #0cb76d);
   --jim-eyebrow: light-dark(#0cb76d, #2fd98a);
   --jim-on-band: #dee2e6;
@@ -181,7 +181,7 @@ body.tracy .wp-block-button.btn .wp-block-button__link:focus {
   opacity: 0.85;
 }
 body.tracy .jim-btn--white .wp-block-button__link {
-  background: light-dark(var(--ds-c-bg, #ffffff), #28354f);
+  background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #28354f));
   border-color: light-dark(#ffffff, #33415e);
   color: var(--jim-primary);
 }
