@@ -398,6 +398,12 @@
   display: none;
 }
 
+/* A mark with no letters (no site title at all) draws nothing: never an empty filled square. Stronger
+   than the theme rules below that show the mark again (the dark header, the missing light logo). */
+html .tracy-brand__mark:empty {
+  display: none !important;
+}
+
 /* The identity logo (`<img data-tracy-identity="site.logo">`, inc/identity.php): a void element is
    always :empty, so it takes the `[hidden]` the renderer sets when the site has no logo instead —
    drawn when it has a src, and then the mark beside it steps back, as for the site-logo block. */
