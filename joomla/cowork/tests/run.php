@@ -1561,6 +1561,9 @@ check('and points at that version\'s release asset',
     trim((string) $upd->update->downloads->downloadurl),
     "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
 check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
+// The self-updater (0.24.28 on) and Joomla's own updater both refuse a download whose sha256 differs
+// from the one announced. Written after the zip is built, from that zip: `shasum -a 256 dist/…`.
+checkTrue('update.xml carries the sha256 of the newest release asset', (bool) preg_match('/^[0-9a-f]{64}$/', trim((string) $upd->update->sha256)));
 
 // ── the self-updater ────────────────────────────────────────────────────────────────────────
 // Joomla notifies about an extension update and then waits; this plugin is what installs it, so a
@@ -1596,7 +1599,8 @@ checkTrue('and it switches itself on when installed', str_contains(
     file_get_contents(__DIR__ . '/../plg_system_claudecoworkupdate/script.php'),
     "'enabled') . ' = 1'"
 ));
-// After the response, never before it: a visitor must not wait behind a download.
+// After the response, never before it; and since 0.24.28 that is only the claim and the knock, the
+// download runs in a request of its own (tests/updater-out-of-request.php).
 checkTrue('it works after the page has gone to the browser', str_contains($updaterSrc, "'onAfterRespond' => 'onAfterRespond'"));
 // A quarter hour: a release reaches a site the next time somebody opens it, not six hours later.
 checkTrue('it looks every quarter hour', str_contains($updaterSrc, 'private const EVERY = 900;'));
@@ -2083,6 +2087,9 @@ require __DIR__ . "/engine-factory-unbound.php";
 // recording driver, the engine's answers, and the loading production does. Last: it defines a
 // Normalizer stand-in when the PHP has none, and nothing after it should run beside that.
 require __DIR__ . "/update-receipt.php";
+// The self-updater claims and knocks in a visitor's request and downloads in its own, a block at a
+// time (0.24.28). Plugin cases run against Joomla stand-ins in their own PHP processes.
+require __DIR__ . "/updater-out-of-request.php";
 require __DIR__ . "/content-search.php";
 // EngineFactory's catches log what they answer for. Each case runs in its own PHP process, so the
 // Joomla stand-ins it needs never meet the ones defined above.

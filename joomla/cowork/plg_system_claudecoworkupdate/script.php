@@ -15,8 +15,8 @@ use Joomla\CMS\Factory;
  * never runs — the exact failure it exists to end, wearing a different hat. So on every install and
  * update: enabled.
  *
- * Ordering is left alone, unlike the API door beside it. This one acts at `onAfterRespond`, after
- * the page has already gone to the browser, so nothing is racing it for a turn.
+ * Ordering is left alone, unlike the API door beside it. On a visitor's request this one only acts
+ * at `onAfterRespond`, and its worker answers a request of its own, so nothing is racing it for a turn.
  */
 class plgSystemClaudeCoworkUpdateInstallerScript
 {

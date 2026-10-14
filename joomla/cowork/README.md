@@ -105,11 +105,20 @@ updates it once by hand. That first update is the price of adding this late; eve
 is taken without one.
 
 **The site takes a release by itself, within a quarter hour of the next visit.**
-`plg_system_claudecoworkupdate` reads `joomla/update.xml` after a response has gone to the browser,
-at most once every 15 minutes, and installs the package (and `tpl_tracy`) when a newer version is
-announced. Its `autoupdate` switch turns that off. What it did is written to
-`administrator/logs/plg_system_claudecoworkupdate.php` (since 0.21.0; before it `Log::add` had no
-logger registered for its category, so every line went nowhere).
+`plg_system_claudecoworkupdate` claims a run after a response has gone to the browser, at most once
+every 15 minutes, and knocks on the site's own front door over the loopback with a one-time key
+(`index.php?claudecoworkupdate=run&key=…`). That second request — never the visitor's — reads
+`joomla/update.xml`, downloads a newer package straight to a file (verified against the `<sha256>`
+the entry announces) and installs it (and `tpl_tracy`). A version that fails waits 1 h, 2 h, 4 h …
+at most a day before it is tried again. Before 0.24.28 the download ran in the visitor's own request
+and read the whole ~42 MB package into memory; at `memory_limit` 128M that was a fatal error whose
+"500 Whoops" page Joomla appended to the visitor's page. Its `autoupdate` switch turns all of it
+off. What it did is written to `administrator/logs/plg_system_claudecoworkupdate.php` (since 0.21.0;
+before it `Log::add` had no logger registered for its category, so every line went nowhere).
+
+A release therefore also writes the zip's sha256 into its `update.xml` entry, after `build.sh` and
+from the zip that is uploaded (`shasum -a 256 dist/pkg_claudecowork.zip`); `tests/run.php` fails
+without it.
 
 ## What a release puts on a site, and who put it there (since 0.21.0)
 
