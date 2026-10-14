@@ -20,6 +20,7 @@ an empty token refuses every request.
 | `content.list`, `content.get` | The read half of the content mirror (ADR 0071): paged summaries with checksums, then full rows — the same bytes an apply will compare against. |
 | `content.list` with `search` (unreleased) | Finds rows by title instead of paging to them: a substring of the title (or name) and of the alias where the kind has one, for thirteen kinds, ignoring case in both. The answer carries `search` back — the echo is how a caller knows this plugin read the request — and `matched`, the count over all pages. Any other kind is refused, never answered unfiltered. See "Finding a row by its title" below. |
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
+| `media.delete` (unreleased) | Delete one image beneath `images/`; dry-run reports its size and references, and `apply.revert` restores its bytes. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
@@ -35,6 +36,16 @@ installed" from "installed in another version" without guessing.
 
 There is no shell, no arbitrary file write, and no action that is not named and bounded above.
 (`template.siteSettings` writes JSON files, but only one shape of path and only eight named keys.)
+
+## Deleting an image: `media.delete` (unreleased)
+
+`media.delete {apply_id, path}` takes a path relative to `images/` and accepts image files only.
+It refuses traversal, absolute paths, symlink escapes, directories and paths outside `images/`.
+Use `dry_run: true` first to see the file size, whether its undo copy fits the 8 MiB cap, and
+`usedIn` matches in articles, modules, template styles and menu items. A successful delete reports
+`storageDeleted`, `filesLeft`, the search scope and a CDN/browser cache note. The Apply log holds
+the original bytes; `apply.revert {apply_id}` restores the file. A file over the cap is refused
+without changing the site.
 
 ## Layout
 

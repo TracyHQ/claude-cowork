@@ -81,11 +81,11 @@ final class Engine
      */
     private const BODY_FIELDS = ['post' => 'post_content', 'templatePart' => 'content', 'template' => 'content'];
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
-    private const CONTRACT_RULED = ['media.upload', 'apply.revert', 'content.contract'];
+    private const CONTRACT_RULED = ['media.upload', 'media.delete', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
     private const SERIALIZED = [
         'content.contract', 'content.update', 'content.delete', 'content.language',
-        'media.upload', 'apply.revert', 'db.cleanup', 'db.restore', 'db.purge',
+        'media.upload', 'media.delete', 'apply.revert', 'db.cleanup', 'db.restore', 'db.purge',
     ];
     /** The only path an image may take onto a sealed site: content-addressed, under one folder. */
     private const CONTRACT_MEDIA_PATH = '~^wp-content/uploads/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D';
@@ -291,6 +291,8 @@ final class Engine
                 return $this->dbPurge($params);
             case 'media.upload':
                 return $this->mediaUpload($params);
+            case 'media.delete':
+                return $this->mediaDelete($params);
             case 'apply.revert':
                 return $this->applyRevert($params);
             case 'apply.list':
@@ -3481,6 +3483,71 @@ final class Engine
         ]);
     }
 
+    /** Hard-delete one Media Library attachment with a byte-for-byte Apply undo. */
+    private function mediaDelete(array $p): array
+    {
+        if ($this->media === null || $this->log === null || !method_exists($this->media, 'snapshotForDelete')) {
+            return $this->err('unavailable', 'media delete writer not wired');
+        }
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $id = isset($p['id']) ? (int) $p['id'] : 0;
+        $url = isset($p['url']) && is_string($p['url']) ? trim($p['url']) : '';
+        if ($id < 1 && $url !== '' && method_exists($this->media, 'attachmentIdForUrl')) $id = (int) ($this->media->attachmentIdForUrl($url) ?? 0);
+        if ($id < 1) return $this->err($url !== '' ? 'not_found' : 'bad_params', $url !== '' ? 'url did not resolve to one attachment' : 'id required');
+        try {
+            $snapshot = $this->media->snapshotForDelete($id);
+            if (!is_array($snapshot)) return $this->err('not_found', "no attachment with id {$id}");
+            $files = (array) ($snapshot['files'] ?? []);
+            if ($this->contract !== null && $this->contract->bound()) {
+                $state = $this->contract->inspect();
+                $imageSlots = is_array($state['imageSlots'] ?? null) ? $state['imageSlots'] : [];
+                $slots = is_array($state['slots'] ?? null) ? $state['slots'] : [];
+                foreach (array_keys($imageSlots) as $slotKey) {
+                    $current = (string) ($slots[$slotKey] ?? '');
+                    $currentId = method_exists($this->media, 'attachmentIdForUrl') ? $this->media->attachmentIdForUrl($current) : null;
+                    $currentPath = $this->contract->normalizeImagePath($current);
+                    $samePath = false;
+                    foreach ($files as $file) if ($currentPath !== null && $currentPath === (string) ($file['path'] ?? '')) $samePath = true;
+                    if ((int) $currentId === $id || $samePath) return $this->err('bad_params', 'This picture is the current value of an image slot; change the slot through content.contract first');
+                }
+            }
+            $total = array_sum(array_map(static fn($f) => (int) ($f['size'] ?? strlen((string) ($f['bytes'] ?? ''))), $files));
+            $used = $this->media->attachmentUsage($id, $files);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', 'could not make and verify the undo copy; nothing was deleted: ' . $e->getMessage());
+        }
+        $shown = array_map(static fn($f) => ['path' => $f['path'] ?? '', 'size' => (int) ($f['size'] ?? 0), 'sha256' => $f['sha256'] ?? ''], $files);
+        $underCap = $total <= self::MAX_MEDIA_BYTES;
+        if (!empty($p['dry_run'])) return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'totalBytes' => $total, 'undoCopyUnderCap' => $underCap, 'usedIn' => $used, 'usedInScope' => 'post/page post_content URL or wp-image-ID, _thumbnail_id, site_logo and site_icon']);
+        if (!$underCap) return $this->err('too_large', 'this picture and its sizes are too large to keep an undo copy; nothing was deleted', ['totalBytes' => $total]);
+        try {
+            foreach ($files as $file) {
+                $bytes = (string) ($file['bytes'] ?? '');
+                if (strlen($bytes) !== (int) ($file['size'] ?? -1) || !hash_equals((string) ($file['sha256'] ?? ''), hash('sha256', $bytes))) {
+                    return $this->err('write_failed', 'an attachment file could not be verified; nothing was deleted');
+                }
+            }
+            $this->media->deleteAttachment($id);
+            $left = [];
+            foreach ($files as $file) if ($this->media->deletedAttachmentPathExists((string) $file['path'])) $left[] = (string) $file['path'];
+        } catch (Throwable $e) {
+            try { $this->media->restoreDeletedAttachment($snapshot, true); } catch (Throwable $undo) {}
+            return $this->err('write_failed', 'could not delete the attachment: ' . $e->getMessage());
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'media.delete', 'id' => $id, 'snapshot' => $snapshot]);
+        } catch (Throwable $e) {
+            try { $this->media->restoreDeletedAttachment($snapshot, true); } catch (Throwable $undo) {
+                return $this->err('write_failed', 'undo could not be recorded and the attachment could not be fully restored: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        try { if ($this->writer !== null) $this->writer->purgeCache(); } catch (Throwable $e) {}
+        $this->stamped('media');
+        return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'storageDeleted' => $left === [], 'filesLeft' => $left, 'usedIn' => $used, 'usedInScope' => 'post/page post_content URL or wp-image-ID, _thumbnail_id, site_logo and site_icon', 'undo' => 'apply.revert ' . $applyId, 'cdnCache' => 'a CDN or browser may still serve a cached copy of the old URL for a while']);
+    }
+
     /**
      * Undo every step of one Apply, newest first. A step whose before-state was null was a create,
      * so it is removed; otherwise the recorded before-state is written back.
@@ -3584,6 +3651,10 @@ final class Engine
                 $step['undo'] = ($entry['undo'] ?? '') === 'span' ? 'span' : 'row';
             } elseif ($op === 'media') {
                 $step['path'] = $entry['path'] ?? null;
+            } elseif ($op === 'media.delete') {
+                $step['created'] = false;
+                $step['id'] = $entry['id'] ?? null;
+                $step['files'] = array_map(static fn($f) => $f['path'] ?? null, (array) ($entry['snapshot']['files'] ?? []));
             } elseif ($op === 'contract') {
                 // The receipt of a content-contract apply: not a change of its own, so never
                 // "created"; what it carries is which request it answered and the revision after.
@@ -3675,6 +3746,11 @@ final class Engine
             );
             return;
         }
+        if ($op === 'media.delete') {
+            if ($this->media === null || !method_exists($this->media, 'restoreDeletedAttachment')) throw new RuntimeException('media delete writer not wired');
+            $this->media->restoreDeletedAttachment(is_array($entry['snapshot'] ?? null) ? $entry['snapshot'] : []);
+            return;
+        }
         if ($op === 'contract') {
             // A receipt records that an apply happened; the content entries beside it are what
             // is undone. Nothing to put back here.
@@ -3713,6 +3789,15 @@ final class Engine
     {
         if ($this->writer === null) {
             return null;
+        }
+        foreach (array_reverse($entries) as $entry) {
+            if (($entry['op'] ?? '') !== 'media.delete' || !is_array($entry['snapshot'] ?? null)) continue;
+            $id = (int) ($entry['id'] ?? 0);
+            if (function_exists('get_post') && get_post($id)) return $this->conflict('Attachment id ' . $id . ' is now in use; it was not overwritten', 'Remove the conflicting attachment, then apply.revert again.', $entry, ['reason' => 'id_taken', 'id' => $id]);
+            foreach ((array) ($entry['snapshot']['files'] ?? []) as $file) {
+                $path = (string) ($file['path'] ?? '');
+                if ($this->media !== null && method_exists($this->media, 'deletedAttachmentPathExists') && $this->media->deletedAttachmentPathExists($path)) return $this->conflict('Attachment file path ' . $path . ' now exists; it was not overwritten', 'Move the conflicting file, then apply.revert again.', $entry, ['reason' => 'path_exists', 'path' => $path]);
+            }
         }
         /** @var array<string,array<string,mixed>|null> $rows the row each target will hold, as the revert walks */
         $rows = [];

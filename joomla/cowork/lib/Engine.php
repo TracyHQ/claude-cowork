@@ -334,7 +334,7 @@ final class Engine
         }
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
-            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
+            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'media.delete', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
             || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
@@ -452,6 +452,8 @@ final class Engine
                 return $this->contentDelete($params);
             case 'media.upload':
                 return $this->mediaUpload($params);
+            case 'media.delete':
+                return $this->mediaDelete($params);
             case 'apply.revert':
                 return $this->applyRevert($params);
             case 'apply.list':
@@ -3285,6 +3287,49 @@ final class Engine
         return $this->ok(['path' => $path, 'bytes' => strlen($bytes), 'created' => $before === null]);
     }
 
+    /** Delete one image under images/, keeping its exact bytes in the ordinary Apply log. */
+    private function mediaDelete(array $p): array
+    {
+        if ($this->media === null || $this->log === null || !method_exists($this->media, 'snapshotForDelete')) return $this->err('unavailable', 'media delete writer not wired');
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $path = isset($p['path']) && is_string($p['path']) ? $p['path'] : '';
+        if ($path === '' || strpos($path, 'images/') !== 0 || !self::safeMediaPath($path)) return $this->err('bad_params', 'path must be a safe relative file beneath images/');
+        if (!in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'ico'], true)) return $this->err('bad_params', 'media.delete accepts image files only');
+        try {
+            $snapshot = $this->media->snapshotForDelete($path);
+            $usage = $this->writer !== null && method_exists($this->writer, 'mediaUsage') ? $this->writer->mediaUsage($path) : [];
+        } catch (Throwable $e) {
+            return $this->err('write_failed', 'could not make and verify the undo copy; nothing was deleted: ' . $e->getMessage());
+        }
+        $total = (int) ($snapshot['size'] ?? strlen((string) ($snapshot['bytes'] ?? '')));
+        $shown = [['path' => $path, 'size' => $total, 'sha256' => (string) ($snapshot['sha256'] ?? '')]];
+        $underCap = $total <= self::MAX_MEDIA_BYTES;
+        $scope = 'articles introtext/fulltext/images JSON, modules content/params, template style params and menu item params';
+        if (!empty($p['dry_run'])) return $this->ok(['deleted' => ['path' => $path, 'files' => $shown], 'totalBytes' => $total, 'undoCopyUnderCap' => $underCap, 'usedIn' => $usage, 'usedInScope' => $scope]);
+        if (!$underCap) return $this->err('too_large', 'this picture and its sizes are too large to keep an undo copy; nothing was deleted', ['totalBytes' => $total]);
+        $bytes = (string) ($snapshot['bytes'] ?? '');
+        if (strlen($bytes) !== $total || !hash_equals((string) ($snapshot['sha256'] ?? ''), hash('sha256', $bytes))) return $this->err('write_failed', 'image bytes failed verification; nothing was deleted');
+        try {
+            $this->media->delete($path);
+            $left = $this->media->deletedFilePathExists($path) ? [$path] : [];
+        } catch (Throwable $e) {
+            try { $this->media->restoreDeletedFile($snapshot, true); } catch (Throwable $undo) {}
+            return $this->err('write_failed', 'could not delete the image: ' . $e->getMessage());
+        }
+        try {
+            $this->log->record($applyId, ['op' => 'media.delete', 'path' => $path, 'snapshot' => $snapshot]);
+        } catch (Throwable $e) {
+            try { $this->media->restoreDeletedFile($snapshot, true); } catch (Throwable $undo) {
+                return $this->err('write_failed', 'undo could not be recorded and the image could not be fully restored: ' . $undo->getMessage());
+            }
+            return $this->err('write_failed', 'change was rolled back: could not record its undo');
+        }
+        try { if (!$this->batching) $this->writer?->purgeCache(); } catch (Throwable $e) {}
+        if (!$this->batching) $this->stamped('media');
+        return $this->ok(['deleted' => ['path' => $path, 'files' => $shown], 'storageDeleted' => $left === [], 'filesLeft' => $left, 'usedIn' => $usage, 'usedInScope' => $scope, 'undo' => 'apply.revert ' . $applyId, 'cdnCache' => 'a CDN or browser may still serve a cached copy of the old URL for a while']);
+    }
+
     /**
      * Undo every step of one Apply, newest first. A step whose before-state was null was an
      * insert, so it is deleted; otherwise the recorded before-state is written back.
@@ -3306,6 +3351,14 @@ final class Engine
             $entries = $this->log->entries($applyId);
         } catch (Throwable $e) {
             return $this->err('revert_failed', $e->getMessage());
+        }
+        foreach (array_reverse($entries) as $entry) {
+            if (($entry['op'] ?? '') !== 'media.delete') continue;
+            $path = (string) ($entry['path'] ?? '');
+            if ($this->media !== null && method_exists($this->media, 'deletedFilePathExists') && $this->media->deletedFilePathExists($path)) {
+                $message = 'File path ' . $path . ' exists now; it was not overwritten.';
+                return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)], 'next' => 'Move the conflicting file, then apply.revert again.']);
+            }
         }
         // Taking a change back is a write too: not under an open editor, and not half of it.
         if (($refusal = $this->lockRefusal($this->undoRows($entries))) !== null) return $refusal;
@@ -3394,6 +3447,10 @@ final class Engine
                 $step['id'] = $entry['id'] ?? null;
             } elseif ($op === 'media') {
                 $step['path'] = $entry['path'] ?? null;
+            } elseif ($op === 'media.delete') {
+                $step['created'] = false;
+                $step['path'] = $entry['path'] ?? null;
+                $step['files'] = [$entry['path'] ?? null];
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
                 $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
@@ -3470,6 +3527,11 @@ final class Engine
                 throw new RuntimeException('media writer not wired');
             }
             $this->rollbackMedia((string) ($entry['path'] ?? ''), $entry['before'] ?? null);
+            return;
+        }
+        if ($op === 'media.delete') {
+            if ($this->media === null || !method_exists($this->media, 'restoreDeletedFile')) throw new RuntimeException('media delete writer not wired');
+            $this->media->restoreDeletedFile(is_array($entry['snapshot'] ?? null) ? $entry['snapshot'] : []);
             return;
         }
         if ($op === 'siteIdentity') {
@@ -3944,7 +4006,7 @@ final class Engine
         if (preg_match('#^[A-Za-z]:#', $path) === 1) {
             return false;
         }
-        if (preg_match('#^[\w\-./]+$#', $path) !== 1) {
+        if (strpos($path, '\\') !== false || preg_match('/[\x00-\x1F\x7F]/', $path) === 1 || preg_match('//u', $path) !== 1) {
             return false;
         }
         foreach (self::MEDIA_ROOTS as $root) {

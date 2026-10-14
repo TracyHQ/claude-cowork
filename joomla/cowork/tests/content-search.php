@@ -121,6 +121,7 @@ namespace {
         public function quote($text): string { return "'" . addslashes((string) $text) . "'"; }
         public function setQuery($query, $offset = 0, $limit = 0): self { $this->pending = [$query, $offset, $limit]; return $this; }
         public function loadAssocList(): array { $this->run(); return $this->pdo !== null ? $this->fetched : $this->rows; }
+        public function loadObjectList(): array { $this->run(); return array_map(static fn($row) => (object) $row, $this->pdo !== null ? $this->fetched : $this->rows); }
         public function loadResult()
         {
             $this->run();
@@ -156,6 +157,15 @@ namespace {
     }
 
     use Tracy\Component\ClaudeCowork\Site\Controller\JoomlaSiteWriter;
+
+    // media.delete's real writer quotes all identifiers (notably MySQL's reserved FULLTEXT) and
+    // makes each path character literal in LIKE instead of treating '_' and '%' as wildcards.
+    $muDb = new CsDb();
+    (new JoomlaSiteWriter($muDb))->mediaUsage('images/foo_bar%photo.jpg');
+    $muSql = array_column($muDb->ran, 'sql');
+    checkTrue('media usage quotes the reserved fulltext column and all table names', str_contains($muSql[0], '`fulltext`') && str_contains($muSql[0], '`#__content`'));
+    checkTrue('media usage quotes every searched identifier', str_contains($muSql[1], '`content`') && str_contains($muSql[1], '`params`') && str_contains($muSql[2], '`#__template_styles`') && str_contains($muSql[3], '`#__menu`'));
+    checkTrue('media usage escapes LIKE wildcards in paths', str_contains($muSql[0], "LIKE '%images/foo!_bar!%photo.jpg%' ESCAPE '!'"));
 
     // A PHP without intl has no `Normalizer` (the official `php` docker images are such a PHP). Stand in
     // for it with the two letters the fixtures use, so the code that calls the real class is what runs;

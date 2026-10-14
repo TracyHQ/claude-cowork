@@ -149,6 +149,21 @@ interface MediaWriter
      * all, which a plain file delete leaves behind as orphans nobody will ever find.
      */
     public function deleteAttachment(int $attachmentId): void;
+
+    /** Snapshot one attachment and every generated file, without changing the site. */
+    public function snapshotForDelete(int $attachmentId): ?array;
+
+    /** Restore a snapshot made by snapshotForDelete(), refusing any occupied target. */
+    public function restoreDeletedAttachment(array $snapshot, bool $rollback = false): void;
+
+    /** Cheap, bounded references to this attachment, with the searched scope. */
+    public function attachmentUsage(int $attachmentId, array $files): array;
+
+    /** Whether a snapshot's file path is occupied now. */
+    public function deletedAttachmentPathExists(string $path): bool;
+
+    /** Resolve a site uploads URL only when exactly one attachment owns it. */
+    public function attachmentIdForUrl(string $url): ?int;
 }
 
 /**

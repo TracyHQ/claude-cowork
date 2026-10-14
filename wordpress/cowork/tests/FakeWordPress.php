@@ -723,6 +723,7 @@ final class WP_Fake_Db
 {
     public string $prefix = 'wp_';
     public string $posts = 'wp_posts';
+    public string $postmeta = 'wp_postmeta';
     public string $dbname = 'wp';
     /** @var string[] every statement seen, so a test can see the lock taken and released */
     public array $queries = [];
@@ -731,6 +732,7 @@ final class WP_Fake_Db
 
     public function prepare(string $query, ...$args): string
     {
+        if (count($args) === 1 && is_array($args[0])) $args = $args[0];
         foreach ($args as $arg) {
             $query = preg_replace('/%[sd]/', is_int($arg) ? (string) $arg : "'" . (string) $arg . "'", $query, 1);
         }

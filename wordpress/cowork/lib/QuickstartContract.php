@@ -2013,6 +2013,12 @@ final class QuickstartContract
         return $path;
     }
 
+    /** Reduce a stored image-slot value to its uploads-relative path, accepting each stored form. */
+    public function normalizeImagePath(string $value): ?string
+    {
+        return $this->uploadPath($value);
+    }
+
     /** A derived picture written in the form its slot already holds: with the site's origin, root-relative, or bare. */
     private function storedImage(string $value, string $old): string
     {

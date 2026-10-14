@@ -1887,6 +1887,125 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		}
 	}
 
+	/** Snapshot every byte and database row owned by an attachment before a hard delete. */
+	public function snapshotForDelete( int $attachmentId ): ?array {
+		global $wpdb;
+		$post = get_post( $attachmentId, ARRAY_A );
+		if ( ! is_array( $post ) || ( $post['post_type'] ?? '' ) !== 'attachment' || strpos( (string) ( $post['post_mime_type'] ?? '' ), 'image/' ) !== 0 ) return null;
+		$meta = get_post_meta( $attachmentId );
+		$terms = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->term_relationships} WHERE object_id = %d", $attachmentId
+		), ARRAY_A );
+		$paths = [];
+		$original = get_attached_file( $attachmentId );
+		if ( is_string( $original ) && $original !== '' ) $paths[] = $original;
+		$metadata = wp_get_attachment_metadata( $attachmentId );
+		if ( is_array( $metadata ) ) {
+			if ( ! empty( $metadata['original_image'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . $metadata['original_image'];
+			foreach ( (array) ( $metadata['sizes'] ?? [] ) as $size ) if ( ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
+		}
+		foreach ( (array) get_post_meta( $attachmentId, '_wp_attachment_backup_sizes', true ) as $size ) if ( is_array( $size ) && ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
+		$dirs = wp_upload_dir( null, false );
+		$basedir = realpath( (string) ( $dirs['basedir'] ?? '' ) );
+		if ( $basedir === false ) throw new RuntimeException( 'uploads folder is unavailable' );
+		$files = [];
+		foreach ( array_values( array_unique( $paths ) ) as $path ) {
+			$real = realpath( $path );
+			if ( is_link( $path ) || $real === false || ! is_file( $real ) || strncmp( $real, $basedir . DIRECTORY_SEPARATOR, strlen( $basedir ) + 1 ) !== 0 ) {
+				throw new RuntimeException( 'an attachment file is missing or escapes uploads' );
+			}
+			$bytes = file_get_contents( $real );
+			if ( $bytes === false ) throw new RuntimeException( 'could not read an attachment file' );
+			$size = filesize( $real );
+			if ( $size === false || strlen( $bytes ) !== $size ) throw new RuntimeException( 'an attachment file changed while its undo copy was read' );
+			$relative = str_replace( DIRECTORY_SEPARATOR, '/', ltrim( substr( $real, strlen( $basedir ) ), DIRECTORY_SEPARATOR ) );
+			$files[] = [ 'path' => 'wp-content/uploads/' . $relative, 'bytes' => $bytes, 'size' => strlen( $bytes ), 'sha256' => hash( 'sha256', $bytes ) ];
+		}
+		return [ 'id' => $attachmentId, 'post' => $post, 'meta' => $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->postmeta} WHERE post_id = %d", $attachmentId ), ARRAY_A ), 'terms' => is_array( $terms ) ? $terms : [], 'files' => $files ];
+	}
+
+	/** Reinsert the exact attachment identity, metadata, relationships and original bytes. */
+	public function restoreDeletedAttachment( array $snapshot, bool $rollback = false ): void {
+		global $wpdb;
+		$id = (int) ( $snapshot['id'] ?? 0 );
+		$current = $id > 0 ? get_post( $id, ARRAY_A ) : null;
+		if ( $id <= 0 || ( $current && ( ! $rollback || $current !== (array) ( $snapshot['post'] ?? [] ) ) ) ) throw new RuntimeException( 'attachment id is already in use' );
+		foreach ( (array) ( $snapshot['files'] ?? [] ) as $file ) {
+			$path = (string) ( $file['path'] ?? '' );
+			if ( $this->deletedAttachmentPathExists( $path ) ) {
+				if ( ! $rollback ) throw new RuntimeException( 'attachment file path already exists: ' . $path );
+				$relative = substr( $path, strlen( 'wp-content/uploads/' ) );
+				$dirs = wp_upload_dir();
+				$existing = file_get_contents( rtrim( (string) $dirs['basedir'], '/\\' ) . '/' . $relative );
+				if ( $existing === false || ! hash_equals( (string) ( $file['sha256'] ?? '' ), hash( 'sha256', $existing ) ) ) throw new RuntimeException( 'attachment file path now contains different bytes: ' . $path );
+			}
+		}
+		$written = [];
+		$transaction = false;
+		try {
+			foreach ( (array) ( $snapshot['files'] ?? [] ) as $file ) {
+				if ( $this->deletedAttachmentPathExists( (string) $file['path'] ) ) continue;
+				$relative = substr( (string) $file['path'], strlen( 'wp-content/uploads/' ) );
+				$dirs = wp_upload_dir();
+				$target = rtrim( (string) $dirs['basedir'], '/\\' ) . '/' . $relative;
+				if ( ! is_dir( dirname( $target ) ) && ! wp_mkdir_p( dirname( $target ) ) ) throw new RuntimeException( 'could not create attachment folder' );
+				$written[] = $target;
+				$writtenBytes = file_put_contents( $target, (string) $file['bytes'] );
+				if ( $writtenBytes !== (int) ( $file['size'] ?? -1 ) || ! hash_equals( (string) ( $file['sha256'] ?? '' ), (string) @hash_file( 'sha256', $target ) ) ) throw new RuntimeException( 'restored attachment file failed verification: ' . $file['path'] );
+			}
+			if ( ! $current ) {
+				if ( $wpdb->query( 'START TRANSACTION' ) === false ) throw new RuntimeException( 'could not start attachment restore transaction' );
+				$transaction = true;
+				if ( $wpdb->insert( $wpdb->posts, (array) ( $snapshot['post'] ?? [] ) ) === false ) throw new RuntimeException( 'could not restore attachment post row' );
+				foreach ( (array) ( $snapshot['meta'] ?? [] ) as $row ) if ( $wpdb->insert( $wpdb->postmeta, (array) $row ) === false ) throw new RuntimeException( 'could not restore attachment metadata' );
+				foreach ( (array) ( $snapshot['terms'] ?? [] ) as $row ) if ( $wpdb->insert( $wpdb->term_relationships, (array) $row ) === false ) throw new RuntimeException( 'could not restore attachment term relationships' );
+				if ( $wpdb->query( 'COMMIT' ) === false ) throw new RuntimeException( 'could not commit attachment restore' );
+				$transaction = false;
+			}
+		} catch ( Throwable $e ) {
+			if ( $transaction ) $wpdb->query( 'ROLLBACK' );
+			foreach ( $written as $target ) if ( is_file( $target ) ) unlink( $target );
+			throw $e;
+		}
+		clean_post_cache( $id );
+	}
+
+	public function deletedAttachmentPathExists( string $path ): bool {
+		if ( strpos( $path, 'wp-content/uploads/' ) !== 0 || strpos( $path, '..' ) !== false ) return false;
+		$dirs = wp_upload_dir( null, false );
+		$target = rtrim( (string) ( $dirs['basedir'] ?? '' ), '/\\' ) . '/' . substr( $path, strlen( 'wp-content/uploads/' ) );
+		return file_exists( $target ) || is_link( $target );
+	}
+
+	public function attachmentIdForUrl( string $url ): ?int {
+		global $wpdb;
+		$base = rtrim( (string) ( wp_upload_dir( null, false )['baseurl'] ?? '' ), '/' ) . '/';
+		if ( $base === '/' || strpos( $url, $base ) !== 0 ) return null;
+		$relative = rawurldecode( substr( $url, strlen( $base ) ) );
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key='_wp_attached_file' AND meta_value=%s", $relative ) );
+		$ids = array_values( array_unique( array_map( 'intval', (array) $ids ) ) );
+		return count( $ids ) === 1 ? $ids[0] : null;
+	}
+
+	/** Search only post bodies, featured-image references and the two site icon options. */
+	public function attachmentUsage( int $id, array $files ): array {
+		global $wpdb;
+		$urls = [];
+		foreach ( $files as $file ) if ( isset( $file['path'] ) ) $urls[] = trailingslashit( (string) wp_upload_dir( null, false )['baseurl'] ) . substr( $file['path'], strlen( 'wp-content/uploads/' ) );
+		$where = [ "post_content REGEXP %s" ];
+		$args = [ 'wp-image-' . $id . '([^0-9]|$)' ];
+		foreach ( $urls as $imageUrl ) { $where[] = "post_content LIKE %s"; $args[] = '%' . $wpdb->esc_like( $imageUrl ) . '%'; }
+		$posts = $wpdb->get_results( $wpdb->prepare( "SELECT ID, post_type, post_title FROM {$wpdb->posts} WHERE post_type IN ('post','page') AND (" . implode( ' OR ', $where ) . ')', $args ), ARRAY_A );
+		$out = [];
+		foreach ( (array) $posts as $row ) $out[] = [ 'type' => 'post', 'id' => (int) $row['ID'], 'postType' => $row['post_type'], 'title' => $row['post_title'] ];
+		$thumbs = $wpdb->get_results( $wpdb->prepare( "SELECT p.ID, p.post_type, p.post_title FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} m ON m.post_id=p.ID WHERE p.post_type IN ('post','page') AND m.meta_key='_thumbnail_id' AND m.meta_value=%s", (string) $id ), ARRAY_A );
+		foreach ( (array) $thumbs as $row ) $out[] = [ 'type' => 'featuredImage', 'id' => (int) $row['ID'], 'postType' => $row['post_type'], 'title' => $row['post_title'] ];
+		if ( function_exists( 'get_theme_mod' ) && (int) get_theme_mod( 'custom_logo', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_logo' ];
+		if ( (int) get_option( 'site_logo', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_logo' ];
+		if ( (int) get_option( 'site_icon', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_icon' ];
+		return $out;
+	}
+
 	/** Register a file with the Media Library and build its thumbnails. */
 	private function attach( string $abs ): int {
 		$name = basename( $abs );
