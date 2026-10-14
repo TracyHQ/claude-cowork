@@ -1084,6 +1084,7 @@ final class FakeMediaWriter implements MediaWriter
 {
     /** @var array<string,string> */
     public array $store = [];
+    public bool $failSnapshot = false;
     public function read(string $path): ?string
     {
         return $this->store[$path] ?? null;
@@ -1096,6 +1097,20 @@ final class FakeMediaWriter implements MediaWriter
     {
         unset($this->store[$path]);
     }
+    public function snapshotForDelete(string $path): array
+    {
+        if ($this->failSnapshot) throw new RuntimeException('snapshot read failed');
+        if (!array_key_exists($path, $this->store)) throw new RuntimeException('path is not a file');
+        $bytes = $this->store[$path];
+        return ['path' => $path, 'bytes' => $bytes, 'size' => strlen($bytes), 'sha256' => hash('sha256', $bytes)];
+    }
+    public function restoreDeletedFile(array $snapshot, bool $rollback = false): void
+    {
+        $path = (string) $snapshot['path'];
+        if (array_key_exists($path, $this->store)) throw new RuntimeException('file path already exists');
+        $this->store[$path] = (string) $snapshot['bytes'];
+    }
+    public function deletedFilePathExists(string $path): bool { return array_key_exists($path, $this->store); }
 }
 
 final class FakeApplyLog implements ApplyLog
@@ -1228,6 +1243,8 @@ $mw = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
     'params' => ['apply_id' => 'M1', 'path' => 'images/logo.png', 'content_b64' => base64_encode('PNGDATA')]]);
 check('media.upload lands the file', $mediaW->read('images/logo.png'), 'PNGDATA');
 check('a new upload reports created', $mw['created'], true);
+$spacedUpload = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload', 'params' => ['apply_id' => 'M-space', 'path' => 'images/a name-é.png', 'content_b64' => base64_encode('a')]]);
+check('media.upload accepts spaces and non-ASCII path names', $spacedUpload['ok'], true);
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M1']]);
 check('reverting a new upload deletes it', $mediaW->read('images/logo.png'), null);
 
@@ -1238,6 +1255,85 @@ $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.upload',
 check('overwrite lands the new bytes', $mediaW->read('images/hero.jpg'), 'NEWBYTES');
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'M2']]);
 check('reverting an overwrite restores the old bytes', $mediaW->read('images/hero.jpg'), 'OLDBYTES');
+
+// media.delete is restricted to images/, previews references, and stores its bytes in the apply log.
+$mediaW->store['images/delete.jpg'] = 'PHOTO';
+$dryDelete = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD0', 'path' => 'images/delete.jpg', 'dry_run' => true]]);
+check('media.delete dry_run answers', $dryDelete['ok'], true);
+check('media.delete dry_run leaves the image', $mediaW->read('images/delete.jpg'), 'PHOTO');
+$deleted = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD1', 'path' => 'images/delete.jpg']]);
+check('media.delete removes the image', $deleted['storageDeleted'], true);
+check('media.delete records its revert instruction', $deleted['undo'], 'apply.revert MD1');
+$delRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'MD1']]);
+check('media.delete revert restores the image', $mediaW->read('images/delete.jpg'), 'PHOTO');
+$mediaW->store['images/conflict.jpg'] = 'OLD';
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD2', 'path' => 'images/conflict.jpg']]);
+$mediaW->store['images/conflict.jpg'] = 'NEW';
+$delConflict = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'MD2']]);
+check('media.delete revert refuses an existing path', $delConflict['error'], 'conflict');
+check('media.delete conflict does not overwrite bytes', $mediaW->read('images/conflict.jpg'), 'NEW');
+$badDelete = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD3', 'path' => '../images/delete.jpg']]);
+check('media.delete refuses an escaping path', $badDelete['error'], 'bad_params');
+$mediaW->store['images/too-large.png'] = str_repeat('z', 8 * 1024 * 1024 + 1);
+$bigPreview = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD3', 'path' => 'images/too-large.png', 'dry_run' => true]]);
+check('media.delete dry_run reports an over-cap image', $bigPreview['undoCopyUnderCap'], false);
+$bigDelete = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD3', 'path' => 'images/too-large.png']]);
+check('media.delete refuses an over-cap undo copy', $bigDelete['error'], 'too_large');
+check('the over-cap image stays in place', $mediaW->read('images/too-large.png') !== null, true);
+$badImage = $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD4', 'path' => 'images/not-an-image.php']]);
+check('media.delete refuses a non-image extension', $badImage['error'], 'bad_params');
+$failMedia = new FakeMediaWriter();
+$failMedia->store['images/rollback.png'] = 'ROLLBACK';
+$failWriter = new FakeSiteWriter();
+$failDeleteEngine = new Engine($WTOKEN, [], null, null, null, null, $failWriter, $failMedia, new FailingApplyLog());
+$failDelete = $failDeleteEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD5', 'path' => 'images/rollback.png']]);
+check('media.delete log failure is reported', $failDelete['error'], 'write_failed');
+check('media.delete log failure restores the bytes', $failMedia->read('images/rollback.png'), 'ROLLBACK');
+$copyFailMedia = new FakeMediaWriter();
+$copyFailMedia->store['images/copy-fail.png'] = 'UNCHANGED';
+$copyFailMedia->failSnapshot = true;
+$copyFailEngine = new Engine($WTOKEN, [], null, null, null, null, new FakeSiteWriter(), $copyFailMedia, new FakeApplyLog());
+$copyFailed = $copyFailEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD8', 'path' => 'images/copy-fail.png']]);
+check('media.delete refuses an undo-copy read failure', $copyFailed['error'], 'write_failed');
+check('an undo-copy failure leaves the image untouched', $copyFailMedia->read('images/copy-fail.png'), 'UNCHANGED');
+
+// The real filesystem writer rejects image paths that look safe but escape through a symlink.
+if (!defined('_JEXEC')) define('_JEXEC', 1);
+require_once __DIR__ . '/../com_claudecowork/site/src/Controller/JoomlaMediaWriter.php';
+$mdRoot = rtrim((string) realpath(sys_get_temp_dir()), DIRECTORY_SEPARATOR) . '/cowork-media-delete-' . bin2hex(random_bytes(5));
+mkdir($mdRoot . '/images', 0755, true);
+mkdir($mdRoot . '/images/directory.png', 0755, true);
+mkdir($mdRoot . '/outside', 0755, true);
+mkdir($mdRoot . '/media', 0755, true);
+file_put_contents($mdRoot . '/outside/photo.png', 'OUTSIDE');
+symlink($mdRoot . '/outside/photo.png', $mdRoot . '/images/escape.png');
+$realMedia = new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaMediaWriter($mdRoot);
+$realMedia->write('media/legacy.png', 'MEDIA-UPLOAD');
+check('existing media.upload media/ paths remain writable', file_get_contents($mdRoot . '/media/legacy.png'), 'MEDIA-UPLOAD');
+$realMedia->write('media/a name-é.png', 'UNICODE-UPLOAD');
+check('media.upload still accepts spaces and non-ASCII names', file_get_contents($mdRoot . '/media/a name-é.png'), 'UNICODE-UPLOAD');
+file_put_contents($mdRoot . '/images/photo.png', 'VALID');
+$mdAlias = sys_get_temp_dir() . '/cowork-media-delete-alias-' . bin2hex(random_bytes(5));
+symlink($mdRoot, $mdAlias);
+$aliasMedia = new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaMediaWriter($mdAlias);
+check('media writer resolves a symlinked webroot before fencing paths', $aliasMedia->snapshotForDelete('images/photo.png')['size'], 5);
+$realMedia->delete('media/legacy.png');
+$realMedia->delete('media/a name-é.png');
+$symlinkRefused = false;
+try { $realMedia->snapshotForDelete('images/escape.png'); } catch (Throwable $e) { $symlinkRefused = true; }
+check('media.delete refuses an images symlink that resolves outside images', $symlinkRefused, true);
+$directoryRefused = false;
+try { $realMedia->snapshotForDelete('images/directory.png'); } catch (Throwable $e) { $directoryRefused = true; }
+check('media.delete refuses a directory', $directoryRefused, true);
+unlink($mdRoot . '/images/escape.png');
+unlink($mdRoot . '/outside/photo.png');
+unlink($mdRoot . '/images/photo.png');
+rmdir($mdRoot . '/images/directory.png');
+rmdir($mdRoot . '/images');
+rmdir($mdRoot . '/outside');
+rmdir($mdRoot . '/media');
+rmdir($mdRoot);
+unlink($mdAlias);
 
 // apply.list names what was touched, without the before payload
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',

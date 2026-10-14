@@ -44,6 +44,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `content.language` | write | ok | ok |
 | `content.delete` | write | ok | ok |
 | `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
+| `media.delete` (unreleased) | write | ok | ok; refuses a picture that is the current value of a bound image slot |
 | `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
@@ -52,6 +53,17 @@ column. Where the site differs from its design, the contract door says so in `wa
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
+
+## Deleting a Media Library picture: `media.delete` (unreleased)
+
+`media.delete {apply_id, id}` deletes one attachment and all of its original, scaled, intermediate
+and backup-size files. An optional `url` is accepted only when it resolves to exactly one attachment.
+Call with `dry_run: true` first to see the files, total bytes, whether the undo copy fits the 8 MiB
+cap, and `usedIn` references found in post/page bodies, featured images, `site_logo` and `site_icon`.
+If the picture and sizes exceed the cap, the write refuses with `too_large` and changes nothing.
+The successful answer reports `storageDeleted`, `filesLeft`, the search scope and a CDN/browser
+cache note; it does not claim that a cached URL is dead. The Apply log holds the original bytes and
+attachment database state; `apply.revert {apply_id}` restores them under the same attachment id.
 
 ## The content contract
 

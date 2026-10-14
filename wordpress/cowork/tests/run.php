@@ -813,6 +813,20 @@ $apply('apply.revert', ['apply_id' => 'A4']);
 check('reverting an option restores the old value', $writer->read('option', 0, 'blogname'), ['value' => 'Old name']);
 
 // Media: a new file, and the attachment that makes it visible in the library, both undone.
+$normalizerReflection = new ReflectionClass(QuickstartContract::class);
+$imageNormalizer = $normalizerReflection->newInstanceWithoutConstructor();
+$homeHostProperty = $normalizerReflection->getProperty('homeHost');
+$homeHostProperty->setValue($imageNormalizer, 'example.test');
+foreach ([
+    'full URL' => 'https://example.test/wp-content/uploads/photo.jpg',
+    'root-relative path' => '/wp-content/uploads/photo.jpg',
+    'bare upload path' => 'wp-content/uploads/photo.jpg',
+] as $form => $value) {
+    check("bound image slot normalises {$form}", $imageNormalizer->normalizeImagePath($value), 'wp-content/uploads/photo.jpg');
+}
+checkTrue('attachment usage matches a complete wp-image class token', (bool) preg_match('/wp-image-5([^0-9]|$)/', 'alignleft wp-image-5 size-large'));
+checkTrue('attachment usage excludes a longer wp-image id', !(bool) preg_match('/wp-image-5([^0-9]|$)/', 'alignleft wp-image-50 size-large'));
+
 $mw = $apply('media.upload', [
     'apply_id' => 'M1', 'path' => 'wp-content/uploads/2026/08/logo.png', 'content_b64' => base64_encode('PNGDATA'),
 ]);
@@ -832,6 +846,68 @@ check('overwrite lands the new bytes', $mediaW->read('wp-content/uploads/hero.jp
 check('replacing a file creates no second attachment', $over['attachment'], 0);
 $apply('apply.revert', ['apply_id' => 'M2']);
 check('reverting an overwrite restores the old bytes', $mediaW->read('wp-content/uploads/hero.jpg'), 'OLDBYTES');
+
+// media.delete snapshots every owned file before the hard delete and apply.revert restores the same id.
+$mediaW->store['wp-content/uploads/photo.jpg'] = 'ORIGINAL';
+$mediaW->store['wp-content/uploads/photo-150x150.jpg'] = 'THUMB';
+$mediaW->attachments[777] = 'wp-content/uploads/photo.jpg';
+$mediaW->attachmentFiles[777] = ['wp-content/uploads/photo.jpg', 'wp-content/uploads/photo-150x150.jpg'];
+$mediaW->attachmentRows[777] = ['post' => ['ID' => 777, 'post_type' => 'attachment', 'post_title' => 'Photo'], 'meta' => [['meta_key' => '_caption', 'meta_value' => 'Original caption']], 'terms' => [['term_taxonomy_id' => 18, 'term_order' => 2]]];
+$dryDelete = $apply('media.delete', ['apply_id' => 'MD0', 'id' => 777, 'dry_run' => true]);
+check('media.delete dry_run succeeds', $dryDelete['ok'], true);
+check('media.delete dry_run lists both files', count($dryDelete['deleted']['files']), 2);
+checkTrue('media.delete dry_run changes nothing', isset($mediaW->attachments[777]) && isset($mediaW->store['wp-content/uploads/photo-150x150.jpg']));
+$deleted = $apply('media.delete', ['apply_id' => 'MD1', 'id' => 777]);
+check('media.delete deletes the attachment', $deleted['storageDeleted'], true);
+check('media.delete removes each owned file', $mediaW->read('wp-content/uploads/photo-150x150.jpg'), null);
+check('media.delete records a receipt undo', $deleted['undo'], 'apply.revert MD1');
+$deleteRevert = $apply('apply.revert', ['apply_id' => 'MD1']);
+check('media.delete revert succeeds', $deleteRevert['reverted'], 1);
+check('media.delete revert restores original bytes', $mediaW->read('wp-content/uploads/photo.jpg'), 'ORIGINAL');
+check('media.delete revert restores generated sizes', $mediaW->read('wp-content/uploads/photo-150x150.jpg'), 'THUMB');
+check('media.delete revert keeps the same attachment id', $mediaW->attachments[777], 'wp-content/uploads/photo.jpg');
+check('media.delete revert restores attachment metadata', $mediaW->attachmentRows[777]['meta'], [['meta_key' => '_caption', 'meta_value' => 'Original caption']]);
+check('media.delete revert restores term relationships', $mediaW->attachmentRows[777]['terms'], [['term_taxonomy_id' => 18, 'term_order' => 2]]);
+
+$mediaW->store['wp-content/uploads/conflict.jpg'] = 'SOURCE';
+$mediaW->attachments[778] = 'wp-content/uploads/conflict.jpg';
+$mediaW->attachmentFiles[778] = ['wp-content/uploads/conflict.jpg'];
+$apply('media.delete', ['apply_id' => 'MD2', 'id' => 778]);
+$mediaW->store['wp-content/uploads/conflict.jpg'] = 'NEW FILE';
+$conflicted = $apply('apply.revert', ['apply_id' => 'MD2']);
+check('media.delete revert refuses an occupied path', $conflicted['error'], 'conflict');
+check('media.delete conflict keeps the new bytes', $mediaW->read('wp-content/uploads/conflict.jpg'), 'NEW FILE');
+$mediaW->store['wp-content/uploads/id-conflict.jpg'] = 'SOURCE';
+$mediaW->attachments[783] = 'wp-content/uploads/id-conflict.jpg';
+$mediaW->attachmentFiles[783] = ['wp-content/uploads/id-conflict.jpg'];
+$apply('media.delete', ['apply_id' => 'MD7', 'id' => 783]);
+WP_Fake::$posts[783] = ['post_type' => 'post', 'post_title' => 'New row'];
+$idConflict = $apply('apply.revert', ['apply_id' => 'MD7']);
+check('media.delete revert refuses a reused attachment id', $idConflict['error'], 'conflict');
+unset(WP_Fake::$posts[783]);
+$mediaW->store['wp-content/uploads/too-large.jpg'] = str_repeat('x', 8 * 1024 * 1024 + 1);
+$mediaW->attachments[779] = 'wp-content/uploads/too-large.jpg';
+$tooLargePreview = $apply('media.delete', ['apply_id' => 'MD3', 'id' => 779, 'dry_run' => true]);
+check('media.delete dry_run reports an over-cap copy', $tooLargePreview['undoCopyUnderCap'], false);
+$tooLargeDelete = $apply('media.delete', ['apply_id' => 'MD3', 'id' => 779]);
+check('media.delete refuses an over-cap undo copy', $tooLargeDelete['error'], 'too_large');
+checkTrue('over-cap media remains untouched', isset($mediaW->attachments[779]) && isset($mediaW->store['wp-content/uploads/too-large.jpg']));
+$mediaW->attachments[780] = 'wp-content/uploads/missing.jpg';
+$copyFailure = $apply('media.delete', ['apply_id' => 'MD4', 'id' => 780]);
+check('media.delete refuses an unreadable undo copy', $copyFailure['error'], 'write_failed');
+checkTrue('copy failure leaves attachment identity untouched', isset($mediaW->attachments[780]));
+$mediaW->nonAttachmentIds[782] = true;
+$notAttachment = $apply('media.delete', ['apply_id' => 'MD6', 'id' => 782]);
+check('media.delete refuses a non-attachment post', $notAttachment['error'], 'not_found');
+$failMedia = new FakeMediaWriter();
+$failMedia->store['wp-content/uploads/rollback.jpg'] = 'ROLLBACK';
+$failMedia->attachments[781] = 'wp-content/uploads/rollback.jpg';
+$failMedia->attachmentFiles[781] = ['wp-content/uploads/rollback.jpg'];
+$failDeleteEngine = new Engine($WTOKEN, [], null, null, null, null, new FakeSiteWriter(), $failMedia, new FailingApplyLog());
+$failDelete = $failDeleteEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD5', 'id' => 781]]);
+check('media.delete log failure is reported', $failDelete['error'], 'write_failed');
+check('media.delete log failure rolls back file bytes', $failMedia->read('wp-content/uploads/rollback.jpg'), 'ROLLBACK');
+check('media.delete log failure rolls back attachment id', $failMedia->attachments[781], 'wp-content/uploads/rollback.jpg');
 
 // apply.list names what was touched, without the before payload.
 $apply('content.update', ['apply_id' => 'L1', 'kind' => 'post', 'fields' => ['post_content' => 'x']]);
@@ -1639,6 +1715,11 @@ require_once __DIR__ . '/retired-sitemaps.php';
 require_once __DIR__ . '/site-language.php';
 require_once __DIR__ . '/site-locale-follow.php';
 require_once __DIR__ . '/theme-style-variation.php';
+$usageMediaWriter = new Claude_Cowork_Media_Writer();
+$usageMediaWriter->attachmentUsage(5, []);
+$usageQuery = '';
+foreach ($GLOBALS['wpdb']->queries as $query) if (str_contains($query, 'REGEXP')) $usageQuery = $query;
+checkTrue('real attachment usage query uses the numeric boundary regexp', str_contains($usageQuery, "REGEXP 'wp-image-5([^0-9]|$)'"));
 require_once __DIR__ . '/global-styles-kses.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';

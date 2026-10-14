@@ -286,6 +286,27 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $this->db = $db;
     }
 
+    /** Cheap substring search for the references a media.delete answer can safely claim to have checked. */
+    public function mediaUsage(string $path): array
+    {
+        $escaped = str_replace(['!', '%', '_', '\\'], ['!!', '!%', '!_', '!\\'], $path);
+        $like = $this->db->quote('%' . $escaped . '%');
+        $contains = static fn(string $column): string => $column . " LIKE {$like} ESCAPE '!'";
+        $out = [];
+        $queries = [
+            ['articles', 'SELECT ' . $this->db->quoteName('id') . ', ' . $this->db->quoteName('title') . ' FROM ' . $this->db->quoteName('#__content') . ' WHERE ' . $contains($this->db->quoteName('introtext')) . ' OR ' . $contains($this->db->quoteName('fulltext')) . ' OR ' . $contains($this->db->quoteName('images'))],
+            ['modules', 'SELECT ' . $this->db->quoteName('id') . ', ' . $this->db->quoteName('title') . ' FROM ' . $this->db->quoteName('#__modules') . ' WHERE ' . $contains($this->db->quoteName('content')) . ' OR ' . $contains($this->db->quoteName('params'))],
+            ['templateStyles', 'SELECT ' . $this->db->quoteName('id') . ', ' . $this->db->quoteName('title') . ' FROM ' . $this->db->quoteName('#__template_styles') . ' WHERE ' . $contains($this->db->quoteName('params'))],
+            ['menuItems', 'SELECT ' . $this->db->quoteName('id') . ', ' . $this->db->quoteName('title') . ' FROM ' . $this->db->quoteName('#__menu') . ' WHERE ' . $contains($this->db->quoteName('params'))],
+        ];
+        foreach ($queries as [$type, $sql]) {
+            foreach ((array) $this->db->setQuery($sql)->loadObjectList() as $row) {
+                $out[] = ['type' => $type, 'id' => (int) $row->id, 'title' => (string) $row->title];
+            }
+        }
+        return $out;
+    }
+
     /** InnoDB rolls the whole batch and its apply log back if PHP dies mid-request. */
     public function transaction(callable $work): array
     {

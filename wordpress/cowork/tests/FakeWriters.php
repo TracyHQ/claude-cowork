@@ -113,6 +113,12 @@ final class FakeMediaWriter implements MediaWriter
     public array $store = [];
     /** @var array<int,string> attachment id => path */
     public array $attachments = [];
+    /** @var array<int,list<string>> */
+    public array $attachmentFiles = [];
+    /** @var array<int,bool> ids present as non-attachments */
+    public array $nonAttachmentIds = [];
+    /** @var array<int,array{post?:array,meta?:array,terms?:array}> */
+    public array $attachmentRows = [];
     private int $nextId = 900;
 
     public function read(string $path): ?string
@@ -141,10 +147,40 @@ final class FakeMediaWriter implements MediaWriter
     {
         // As WordPress does: the attachment takes its file with it.
         if (isset($this->attachments[$attachmentId])) {
-            unset($this->store[$this->attachments[$attachmentId]]);
+            foreach ($this->attachmentFiles[$attachmentId] ?? [$this->attachments[$attachmentId]] as $path) unset($this->store[$path]);
             unset($this->attachments[$attachmentId]);
+            unset($this->attachmentRows[$attachmentId]);
         }
     }
+
+    public function snapshotForDelete(int $attachmentId): ?array
+    {
+        if (isset($this->nonAttachmentIds[$attachmentId])) return null;
+        if (!isset($this->attachments[$attachmentId])) return null;
+        $files = [];
+        foreach ($this->attachmentFiles[$attachmentId] ?? [$this->attachments[$attachmentId]] as $path) {
+            if (!array_key_exists($path, $this->store)) throw new RuntimeException('attachment file missing');
+            $bytes = $this->store[$path];
+            $files[] = ['path' => $path, 'bytes' => $bytes, 'size' => strlen($bytes), 'sha256' => hash('sha256', $bytes)];
+        }
+        return ['id' => $attachmentId, 'files' => $files, 'post' => $this->attachmentRows[$attachmentId]['post'] ?? ['ID' => $attachmentId], 'meta' => $this->attachmentRows[$attachmentId]['meta'] ?? [], 'terms' => $this->attachmentRows[$attachmentId]['terms'] ?? []];
+    }
+
+    public function restoreDeletedAttachment(array $snapshot, bool $rollback = false): void
+    {
+        $id = (int) ($snapshot['id'] ?? 0);
+        if ($id < 1 || isset($this->attachments[$id])) throw new RuntimeException('attachment id already in use');
+        foreach ((array) ($snapshot['files'] ?? []) as $f) if (array_key_exists($f['path'], $this->store)) throw new RuntimeException('attachment file path already exists: ' . $f['path']);
+        foreach ((array) ($snapshot['files'] ?? []) as $f) $this->store[$f['path']] = $f['bytes'];
+        $paths = array_column((array) ($snapshot['files'] ?? []), 'path');
+        $this->attachments[$id] = $paths[0] ?? '';
+        $this->attachmentFiles[$id] = $paths;
+        $this->attachmentRows[$id] = ['post' => $snapshot['post'] ?? [], 'meta' => $snapshot['meta'] ?? [], 'terms' => $snapshot['terms'] ?? []];
+    }
+
+    public function attachmentUsage(int $attachmentId, array $files): array { return []; }
+    public function deletedAttachmentPathExists(string $path): bool { return array_key_exists($path, $this->store); }
+    public function attachmentIdForUrl(string $url): ?int { return null; }
 }
 
 final class FakeApplyLog implements ApplyLog

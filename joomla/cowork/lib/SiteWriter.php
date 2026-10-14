@@ -611,6 +611,15 @@ interface MediaWriter
 
     /** Remove a media file. Used only to reverse an upload this run made. */
     public function delete(string $path): void;
+
+    /** Read and verify one safe image beneath images/, without changing it. */
+    public function snapshotForDelete(string $path): array;
+
+    /** Restore a snapshot, refusing to overwrite an existing path. */
+    public function restoreDeletedFile(array $snapshot, bool $rollback = false): void;
+
+    /** Whether this safe images/ path exists (including a symlink at the leaf). */
+    public function deletedFilePathExists(string $path): bool;
 }
 
 interface ApplyLog
