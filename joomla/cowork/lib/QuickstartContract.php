@@ -927,7 +927,9 @@ final class QuickstartContract
             if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw $refuse('SLOT_IMAGE_INVALID','Image must already exist in the site media library: '.$key);
             $resolved=realpath($this->root.'/'.$value);$imageRoot=realpath($this->root.'/images');
             if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw $refuse('SLOT_IMAGE_INVALID','Image escapes the site media library: '.$key);
-            $before=@getimagesize($this->root.'/'.$slot['sample']);$after=@getimagesize($this->root.'/'.$value);
+            // the slot's own picture is stored as Joomla writes media values (`images/a.png#joomlaImage://local-images/a.png?width=…`):
+            // read whole, it named no file, its shape was never known, and every shape was taken
+            $before=@getimagesize($this->root.'/'.self::imagePath((string)$slot['sample']));$after=@getimagesize($this->root.'/'.$value);
             if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
     }

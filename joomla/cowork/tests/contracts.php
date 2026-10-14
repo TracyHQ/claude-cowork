@@ -540,3 +540,25 @@ check('a switcher the job created still goes with it',$orphans->invoke($bare,$he
 // Ids are per table: an ARTICLE 5000 being governed says nothing about the module 5000 the job made.
 $heldState['keys']['post']=['kind'=>'article'];$heldState['ids']['post']=5000;
 check('a governed article does not shield a created switcher of the same id',$orphans->invoke($bare,$heldState,'vi-VN'),['module'=>[5000,4139]]);
+
+// A captured picture slot keeps its shape: its sample is stored the way Joomla writes media values, with the
+// `#joomlaImage://` suffix, and the shape check must read the file under it (TCH #1298, 14/10/2026: every shape
+// was taken, since the suffixed path named no file).
+$shapeRoot=sys_get_temp_dir().'/cowork-shape-'.bin2hex(random_bytes(6));
+mkdir($shapeRoot.'/images/demo',0777,true);
+$png=function(int $w,int $h):string{
+    $ihdr=pack('NNCCCCC',$w,$h,8,2,0,0,0);
+    return "\x89PNG\r\n\x1a\n".pack('N',13).'IHDR'.$ihdr.pack('N',crc32('IHDR'.$ihdr)).pack('N',0).'IEND'.pack('N',crc32('IEND'));
+};
+file_put_contents($shapeRoot.'/images/demo/wide.png',$png(1200,800));
+file_put_contents($shapeRoot.'/images/demo/same.png',$png(600,400));
+file_put_contents($shapeRoot.'/images/demo/tall.png',$png(400,1200));
+$shape=(new ReflectionClass(QuickstartContract::class))->newInstanceWithoutConstructor();
+$shapeRootProp=new ReflectionProperty(QuickstartContract::class,'root');$shapeRootProp->setAccessible(true);$shapeRootProp->setValue($shape,$shapeRoot);
+$shapeCheck=new ReflectionMethod(QuickstartContract::class,'checkValue');$shapeCheck->setAccessible(true);
+$shapeSlot=['key'=>'gallery.2','type'=>'image','maxCharacters'=>255,'sample'=>'images/demo/wide.png#joomlaImage://local-images/demo/wide.png?width=1200&height=800'];
+$shapeCode=function(string $value) use ($shape,$shapeCheck,$shapeSlot):?string{
+    try{$shapeCheck->invoke($shape,$shapeSlot,$value,[]);return null;}catch(ContractProblem $e){return $e->reason;}catch(Throwable $e){return get_class($e).': '.$e->getMessage();}
+};
+check('a picture of its slot\'s shape is taken, the slot stored with Joomla\'s media suffix',$shapeCode('images/demo/same.png'),null);
+check('a picture of another shape is refused, the slot stored with Joomla\'s media suffix',$shapeCode('images/demo/tall.png'),'SLOT_IMAGE_INVALID');
