@@ -1046,6 +1046,44 @@ try {
 }
 checkTrue('the media writer refuses a path that escapes uploads', $escaped !== null);
 
+// Existing apply logs contain WP_Post::to_array() runtime keys. MySQL rejects those keys on
+// INSERT, so the fake enforces the wp_posts schema and this exercises the actual revert writer.
+$legacyId = 987654;
+$legacyPost = [
+    'ID' => $legacyId, 'post_author' => '2', 'post_date' => '2026-01-02 03:04:05', 'post_date_gmt' => '2026-01-02 03:04:05',
+    'post_content' => '', 'post_title' => 'Legacy photo', 'post_excerpt' => '', 'post_status' => 'inherit',
+    'comment_status' => 'closed', 'ping_status' => 'closed', 'post_password' => '', 'post_name' => 'legacy-photo',
+    'to_ping' => '', 'pinged' => '', 'post_modified' => '2026-01-02 03:04:05', 'post_modified_gmt' => '2026-01-02 03:04:05',
+    'post_content_filtered' => '', 'post_parent' => '0', 'guid' => 'https://real.test/legacy.jpg', 'menu_order' => '0',
+    'post_type' => 'attachment', 'post_mime_type' => 'image/jpeg', 'comment_count' => '0',
+    'filter' => 'raw', 'ancestors' => [], 'page_template' => '', 'post_category' => [], 'tags_input' => [],
+];
+$legacySnapshot = [
+    'id' => $legacyId,
+    'post' => $legacyPost,
+    'meta' => [['meta_id' => 901, 'post_id' => $legacyId, 'meta_key' => '_caption', 'meta_value' => 'Legacy caption']],
+    'terms' => [['object_id' => $legacyId, 'term_taxonomy_id' => 18, 'term_order' => 2]],
+    'files' => [],
+];
+check('fake wp_posts rejects WP_Post runtime properties like MySQL', $GLOBALS['wpdb']->insert($GLOBALS['wpdb']->posts, $legacyPost), false);
+$legacyLog = new FakeApplyLog();
+$legacyLog->record('legacy-media-delete', ['op' => 'media.delete', 'id' => $legacyId, 'snapshot' => $legacySnapshot]);
+$legacyEngine = new Engine('legacy-token-at-least-16', [], null, null, null, null, new FakeSiteWriter(), $mediaWriter, $legacyLog);
+$legacyRevert = $legacyEngine->handle(['token' => 'legacy-token-at-least-16', 'action' => 'apply.revert', 'params' => ['apply_id' => 'legacy-media-delete']]);
+check('apply.revert restores a legacy-shaped attachment snapshot', $legacyRevert['reverted'] ?? null, 1);
+check('legacy restore writes only snapshotted wp_posts columns', WP_Fake::$posts[$legacyId] ?? null, array_diff_key($legacyPost, array_flip(['filter', 'ancestors', 'page_template', 'post_category', 'tags_input'])));
+check('legacy restore preserves attachment meta rows', end($GLOBALS['wpdb']->postmetaRows), $legacySnapshot['meta'][0]);
+check('legacy restore preserves attachment term rows', end($GLOBALS['wpdb']->termRelationshipRows), $legacySnapshot['terms'][0]);
+WP_Fake::$posts[$legacyId] = $legacyPost;
+$rollbackCompared = true;
+try {
+    $mediaWriter->restoreDeletedAttachment($legacySnapshot, true);
+} catch (Throwable $e) {
+    $rollbackCompared = false;
+}
+check('rollback comparison ignores WP_Post runtime properties', $rollbackCompared, true);
+unset(WP_Fake::$posts[$legacyId]);
+
 // ------------------------------------------------------- taking an update on request --
 // WordPress finds updates on its own clock: the cron that acts on its update set runs twice a day. Right for a site nobody watches; wrong for the minutes after a
 // release, when a fix can be published and still be half a day from the site it was written for.
