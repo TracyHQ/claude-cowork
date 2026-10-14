@@ -1933,11 +1933,7 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		foreach ( (array) ( $snapshot['files'] ?? [] ) as $file ) {
 			$path = (string) ( $file['path'] ?? '' );
 			if ( $this->deletedAttachmentPathExists( $path ) ) {
-				if ( ! $rollback ) throw new RuntimeException( 'attachment file path already exists: ' . $path );
-				$relative = substr( $path, strlen( 'wp-content/uploads/' ) );
-				$dirs = wp_upload_dir();
-				$existing = file_get_contents( rtrim( (string) $dirs['basedir'], '/\\' ) . '/' . $relative );
-				if ( $existing === false || ! hash_equals( (string) ( $file['sha256'] ?? '' ), hash( 'sha256', $existing ) ) ) throw new RuntimeException( 'attachment file path now contains different bytes: ' . $path );
+				if ( ! $this->deletedAttachmentPathMatchesSnapshot( $path, $file ) ) throw new RuntimeException( 'attachment file path already exists: ' . $path );
 			}
 		}
 		$written = [];
@@ -1949,8 +1945,24 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 				$dirs = wp_upload_dir();
 				$target = rtrim( (string) $dirs['basedir'], '/\\' ) . '/' . $relative;
 				if ( ! is_dir( dirname( $target ) ) && ! wp_mkdir_p( dirname( $target ) ) ) throw new RuntimeException( 'could not create attachment folder' );
+				$handle = @fopen( $target, 'xb' );
+				if ( $handle === false ) {
+					if ( $this->deletedAttachmentPathExists( (string) $file['path'] ) && $this->deletedAttachmentPathMatchesSnapshot( (string) $file['path'], $file ) ) continue;
+					throw new RuntimeException( 'could not create attachment file: ' . $file['path'] );
+				}
 				$written[] = $target;
-				$writtenBytes = file_put_contents( $target, (string) $file['bytes'] );
+				$bytes = (string) $file['bytes'];
+				$writtenBytes = 0;
+				try {
+					while ( $writtenBytes < strlen( $bytes ) ) {
+						$count = fwrite( $handle, substr( $bytes, $writtenBytes ) );
+						if ( $count === false || $count === 0 ) throw new RuntimeException( 'could not write attachment file: ' . $file['path'] );
+						$writtenBytes += $count;
+					}
+					if ( ! fflush( $handle ) ) throw new RuntimeException( 'could not flush attachment file: ' . $file['path'] );
+				} finally {
+					fclose( $handle );
+				}
 				if ( $writtenBytes !== (int) ( $file['size'] ?? -1 ) || ! hash_equals( (string) ( $file['sha256'] ?? '' ), (string) @hash_file( 'sha256', $target ) ) ) throw new RuntimeException( 'restored attachment file failed verification: ' . $file['path'] );
 			}
 			if ( ! $current ) {
@@ -1975,6 +1987,25 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		$dirs = wp_upload_dir( null, false );
 		$target = rtrim( (string) ( $dirs['basedir'] ?? '' ), '/\\' ) . '/' . substr( $path, strlen( 'wp-content/uploads/' ) );
 		return file_exists( $target ) || is_link( $target );
+	}
+
+	/** Whether an existing path is a regular file under uploads with the snapshotted bytes. */
+	public function deletedAttachmentPathMatchesSnapshot( string $path, array $file ): bool {
+		if ( strpos( $path, 'wp-content/uploads/' ) !== 0 || strpos( $path, '..' ) !== false || strpos( $path, "\0" ) !== false ) return false;
+		$uploads = rtrim( (string) ( wp_upload_dir( null, false )['basedir'] ?? '' ), '/\\' );
+		$basedir = realpath( $uploads );
+		$relative = substr( $path, strlen( 'wp-content/uploads/' ) );
+		$target = $uploads . '/' . $relative;
+		if ( $basedir === false || is_link( $target ) ) return false;
+		$cursor = $uploads;
+		foreach ( explode( '/', $relative ) as $part ) {
+			$cursor .= '/' . $part;
+			if ( is_link( $cursor ) ) return false;
+		}
+		$real = realpath( $target );
+		if ( $real === false || ! is_file( $real ) || strncmp( $real, $basedir . DIRECTORY_SEPARATOR, strlen( $basedir ) + 1 ) !== 0 ) return false;
+		$sha = @hash_file( 'sha256', $real );
+		return is_string( $sha ) && hash_equals( (string) ( $file['sha256'] ?? '' ), $sha );
 	}
 
 	public function attachmentIdForUrl( string $url ): ?int {

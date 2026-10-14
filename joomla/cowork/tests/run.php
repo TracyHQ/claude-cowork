@@ -1107,10 +1107,18 @@ final class FakeMediaWriter implements MediaWriter
     public function restoreDeletedFile(array $snapshot, bool $rollback = false): void
     {
         $path = (string) $snapshot['path'];
-        if (array_key_exists($path, $this->store)) throw new RuntimeException('file path already exists');
+        if ($this->deletedFilePathExists($path)) {
+            if (!$this->deletedFilePathMatchesSnapshot($snapshot)) throw new RuntimeException('file path already exists');
+            return;
+        }
         $this->store[$path] = (string) $snapshot['bytes'];
     }
     public function deletedFilePathExists(string $path): bool { return array_key_exists($path, $this->store); }
+    public function deletedFilePathMatchesSnapshot(array $snapshot): bool
+    {
+        $path = (string) ($snapshot['path'] ?? '');
+        return isset($this->store[$path]) && hash_equals((string) ($snapshot['sha256'] ?? ''), hash('sha256', $this->store[$path]));
+    }
 }
 
 final class FakeApplyLog implements ApplyLog
@@ -1266,6 +1274,12 @@ check('media.delete removes the image', $deleted['storageDeleted'], true);
 check('media.delete records its revert instruction', $deleted['undo'], 'apply.revert MD1');
 $delRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'MD1']]);
 check('media.delete revert restores the image', $mediaW->read('images/delete.jpg'), 'PHOTO');
+$mediaW->store['images/identical.jpg'] = 'SAME';
+$wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD-identical', 'path' => 'images/identical.jpg']]);
+$mediaW->store['images/identical.jpg'] = 'SAME';
+$identicalDelRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'MD-identical']]);
+check('media.delete revert accepts an identical restored file', $identicalDelRevert['reverted'], 1);
+check('media.delete identical-file revert clears its log', count($log->entries('MD-identical')), 0);
 $mediaW->store['images/conflict.jpg'] = 'OLD';
 $wEngine->handle(['token' => $WTOKEN, 'action' => 'media.delete', 'params' => ['apply_id' => 'MD2', 'path' => 'images/conflict.jpg']]);
 $mediaW->store['images/conflict.jpg'] = 'NEW';
