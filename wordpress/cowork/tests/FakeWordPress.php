@@ -107,6 +107,8 @@ final class WP_Fake
         if (isset($GLOBALS['wpdb']) && $GLOBALS['wpdb'] instanceof WP_Fake_Db) {
             $GLOBALS['wpdb']->queries = [];
             $GLOBALS['wpdb']->lockAnswer = 1;
+            $GLOBALS['wpdb']->postmetaRows = [];
+            $GLOBALS['wpdb']->termRelationshipRows = [];
         }
         self::$posts = [];
         self::$meta = [];
@@ -724,6 +726,11 @@ final class WP_Fake_Db
     public string $prefix = 'wp_';
     public string $posts = 'wp_posts';
     public string $postmeta = 'wp_postmeta';
+    public string $term_relationships = 'wp_term_relationships';
+    /** @var array<int,array<string,mixed>> */
+    public array $postmetaRows = [];
+    /** @var array<int,array<string,mixed>> */
+    public array $termRelationshipRows = [];
     public string $dbname = 'wp';
     /** @var string[] every statement seen, so a test can see the lock taken and released */
     public array $queries = [];
@@ -752,6 +759,14 @@ final class WP_Fake_Db
     public function get_results(string $query, $output = 'OBJECT'): array
     {
         $this->queries[] = $query;
+        if (strpos($query, 'FROM wp_postmeta') !== false && preg_match('/post_id = (\d+)/', $query, $m)) {
+            return array_values(array_filter($this->postmetaRows, static fn(array $row): bool => (int) ($row['post_id'] ?? 0) === (int) $m[1]));
+        }
+        if (strpos($query, 'FROM wp_term_relationships') !== false && preg_match('/object_id = (\d+)/', $query, $m)) {
+            if (strpos($query, 'SELECT *') === 0) {
+                return array_values(array_filter($this->termRelationshipRows, static fn(array $row): bool => (int) ($row['object_id'] ?? 0) === (int) $m[1]));
+            }
+        }
         if (strpos($query, 'term_relationships') === false || !preg_match('/object_id = (\d+)/', $query, $m)) {
             return [];
         }
@@ -771,6 +786,38 @@ final class WP_Fake_Db
         foreach ($data as $column => $value) {
             WP_Fake::$posts[$id][$column] = $value;
         }
+        return 1;
+    }
+
+    /** Match MySQL's unknown-column error for the tables used by media restoration. */
+    public function insert(string $table, array $data, $format = null)
+    {
+        $columns = [
+            'wp_posts' => ['ID', 'post_author', 'post_date', 'post_date_gmt', 'post_content', 'post_title', 'post_excerpt', 'post_status', 'comment_status', 'ping_status', 'post_password', 'post_name', 'to_ping', 'pinged', 'post_modified', 'post_modified_gmt', 'post_content_filtered', 'post_parent', 'guid', 'menu_order', 'post_type', 'post_mime_type', 'comment_count'],
+            'wp_postmeta' => ['meta_id', 'post_id', 'meta_key', 'meta_value'],
+            'wp_term_relationships' => ['object_id', 'term_taxonomy_id', 'term_order'],
+        ];
+        if (!isset($columns[$table]) || array_diff(array_keys($data), $columns[$table]) !== []) return false;
+        if ($table === $this->posts) {
+            $id = (int) ($data['ID'] ?? 0);
+            if ($id <= 0 || isset(WP_Fake::$posts[$id])) return false;
+            WP_Fake::$posts[$id] = $data;
+            return 1;
+        }
+        if ($table === $this->postmeta) {
+            $this->postmetaRows[] = $data;
+            return 1;
+        }
+        if ($table === $this->term_relationships) {
+            $this->termRelationshipRows[] = $data;
+            return 1;
+        }
+        return false;
+    }
+
+    public function query(string $query)
+    {
+        $this->queries[] = $query;
         return 1;
     }
 }

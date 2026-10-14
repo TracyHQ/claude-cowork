@@ -1824,6 +1824,13 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
  * Both halves happen here, so both halves can be undone.
  */
 final class Claude_Cowork_Media_Writer implements MediaWriter {
+	/** Columns in WordPress's wp_posts table, in database order. */
+	private const POST_ROW_COLUMNS = array(
+		'ID', 'post_author', 'post_date', 'post_date_gmt', 'post_content', 'post_title', 'post_excerpt',
+		'post_status', 'comment_status', 'ping_status', 'post_password', 'post_name', 'to_ping', 'pinged',
+		'post_modified', 'post_modified_gmt', 'post_content_filtered', 'post_parent', 'guid', 'menu_order',
+		'post_type', 'post_mime_type', 'comment_count',
+	);
 
 	/** The prefix the engine speaks in, stripped before the path is resolved against the real basedir. */
 	private const PREFIX = 'wp-content/uploads/';
@@ -1892,6 +1899,9 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		global $wpdb;
 		$post = get_post( $attachmentId, ARRAY_A );
 		if ( ! is_array( $post ) || ( $post['post_type'] ?? '' ) !== 'attachment' || strpos( (string) ( $post['post_mime_type'] ?? '' ), 'image/' ) !== 0 ) return null;
+		// WP_Post::to_array() adds runtime properties (filter, ancestors, page_template,
+		// post_category and tags_input). Snapshots are also consumed by raw SQL on restore.
+		$post = array_intersect_key( $post, array_flip( self::POST_ROW_COLUMNS ) );
 		$meta = get_post_meta( $attachmentId );
 		$terms = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->term_relationships} WHERE object_id = %d", $attachmentId
@@ -1929,7 +1939,10 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		global $wpdb;
 		$id = (int) ( $snapshot['id'] ?? 0 );
 		$current = $id > 0 ? get_post( $id, ARRAY_A ) : null;
-		if ( $id <= 0 || ( $current && ( ! $rollback || $current !== (array) ( $snapshot['post'] ?? [] ) ) ) ) throw new RuntimeException( 'attachment id is already in use' );
+		$normalizePostRow = static function ( $post ): array {
+			return is_array( $post ) ? array_intersect_key( $post, array_flip( self::POST_ROW_COLUMNS ) ) : array();
+		};
+		if ( $id <= 0 || ( $current && ( ! $rollback || $normalizePostRow( $current ) !== $normalizePostRow( (array) ( $snapshot['post'] ?? [] ) ) ) ) ) throw new RuntimeException( 'attachment id is already in use' );
 		foreach ( (array) ( $snapshot['files'] ?? [] ) as $file ) {
 			$path = (string) ( $file['path'] ?? '' );
 			if ( $this->deletedAttachmentPathExists( $path ) ) {
@@ -1968,7 +1981,8 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 			if ( ! $current ) {
 				if ( $wpdb->query( 'START TRANSACTION' ) === false ) throw new RuntimeException( 'could not start attachment restore transaction' );
 				$transaction = true;
-				if ( $wpdb->insert( $wpdb->posts, (array) ( $snapshot['post'] ?? [] ) ) === false ) throw new RuntimeException( 'could not restore attachment post row' );
+				$postRow = $normalizePostRow( (array) ( $snapshot['post'] ?? [] ) );
+				if ( $wpdb->insert( $wpdb->posts, $postRow ) === false ) throw new RuntimeException( 'could not restore attachment post row' );
 				foreach ( (array) ( $snapshot['meta'] ?? [] ) as $row ) if ( $wpdb->insert( $wpdb->postmeta, (array) $row ) === false ) throw new RuntimeException( 'could not restore attachment metadata' );
 				foreach ( (array) ( $snapshot['terms'] ?? [] ) as $row ) if ( $wpdb->insert( $wpdb->term_relationships, (array) $row ) === false ) throw new RuntimeException( 'could not restore attachment term relationships' );
 				if ( $wpdb->query( 'COMMIT' ) === false ) throw new RuntimeException( 'could not commit attachment restore' );
