@@ -157,7 +157,7 @@
   margin: 0;
 }
 .hx-article .hx-article__breadcrumb a:hover {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 /* 5. eyebrow pill (overrides the plain-text .hx-eyebrow from wp-ja-kinetic-sections.css —
    higher specificity via the `.hx-article` prefix, matching the source) */
@@ -233,7 +233,7 @@
   font-size: 15px;
   font-weight: 700;
   line-height: 1;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-article .hx-author__c {
   display: flex;
@@ -397,7 +397,7 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10.5px;
   letter-spacing: 1px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-article .hx-related__ti {
   font-family: "Space Grotesk", sans-serif;
@@ -584,16 +584,16 @@
   margin: 0 0 0.5rem;
 }
 .hx-prose li::marker {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-prose a:not([class*="btn"]) {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   text-decoration: none;
   border-bottom: 1px solid var(--border);
   transition: color 0.15s, border-color 0.15s;
 }
 .hx-prose a:not([class*="btn"]):hover {
-  color: var(--primary-hover);
+  color: var(--ds-c-accent-text-hover, var(--primary-hover));
   border-color: var(--primary);
 }
 .hx-prose a.btn,
@@ -620,7 +620,7 @@
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--elevated);
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-prose pre,
 .item-page pre {
@@ -693,7 +693,7 @@
 }
 .hx-prose .tags a:hover,
 .hx-article__head .tags a:hover {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
   border-color: var(--primary);
 }
 /* Source single-article.css §12: the Joomla info block and prev/next nav are
@@ -822,7 +822,7 @@
   background: var(--elevated);
 }
 .hx-railitem.is-active {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   background: var(--elevated);
   border-color: var(--border);
 }
@@ -832,7 +832,7 @@
   color: var(--muted);
 }
 .hx-railitem.is-active .hx-railcount {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 @media (max-width: 760px) {
   .hx-blog-rail {
@@ -873,7 +873,7 @@
   background: rgba(255, 255, 255, 0.04) !important;
 }
 .hx-blogrow:hover .hx-blogtitle {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 @media (max-width: 560px) {
   .hx-blogrow {
@@ -1103,7 +1103,7 @@ body.item-221 .hx-blogmast .hx-eyebrow {
   font-family: "JetBrains Mono", monospace !important;
   font-size: 11.5px !important;
   letter-spacing: 1.5px !important;
-  color: var(--primary) !important;
+  color: var(--ds-c-accent-text, var(--primary)) !important;
   text-transform: uppercase !important;
   margin-bottom: 0 !important;
 }
@@ -1174,7 +1174,7 @@ body.item-221 .hx-blogcat {
   font-size: 11.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-221 .hx-blogauthor,
 body.item-221 .hx-blogdatetxt {
@@ -1211,7 +1211,7 @@ body.item-221 .hx-blogtopics__lbl {
   font-size: 11px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-221 .hx-blogtopics__list {
   display: flex;
@@ -1225,7 +1225,7 @@ body.item-221 .hx-blogtopics__list {
 body.item-221 .hx-blogtopics__list li + li::before {
   content: "\2022";
   margin-right: 20px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-221 .hx-blogtopics__chip {
   font-family: "JetBrains Mono", monospace;
@@ -1238,7 +1238,7 @@ body.item-221 .hx-blogtopics__chip:hover {
   color: var(--heading);
 }
 body.item-221 .hx-blogtopics__chip.is-active {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 /* the tag-cloud block's own markup (`.tagcloud a`), styled to the same chip look */
 body.item-221 .hx-blogtopics__tags .wp-block-tag-cloud,
@@ -1267,7 +1267,7 @@ body.item-221 .hx-railitem:hover {
   color: var(--heading) !important;
 }
 body.item-221 .hx-railitem.is-active {
-  color: var(--primary) !important;
+  color: var(--ds-c-accent-text, var(--primary)) !important;
   background: rgba(163, 230, 53, 0.082) !important;
   border-color: transparent !important;
 }
@@ -1329,7 +1329,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
 .hx-feat-num {
   font-family: "JetBrains Mono", monospace;
   font-size: 14px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-feat-head__r {
   font-family: "JetBrains Mono", monospace;
@@ -1369,7 +1369,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   background-color: #161B18;
 }
 .hx-featcard__sigil {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-featcard__sigil svg {
   width: 30px;
@@ -1390,7 +1390,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   font-size: 12px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-featcard__title {
   font-family: "Space Grotesk", sans-serif;
@@ -1402,7 +1402,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   transition: color 0.15s ease;
 }
 .hx-featcard:hover .hx-featcard__title {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 .hx-featcard__excerpt {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -1508,7 +1508,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
     grid-area: meta;
   }
   body.item-221 .hx-blogdate::before {
-    color: var(--primary) !important;
+    color: var(--ds-c-accent-text, var(--primary)) !important;
   }
   body.item-221 .hx-blogrow > .hx-blogmeta {
     display: flex !important;
@@ -1601,7 +1601,7 @@ body.item-253 .hxcat-bc__crumb {
 }
 body.item-253 .hxcat-bc__home:hover,
 body.item-253 .hxcat-bc__crumb:hover {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-253 .hxcat-pill {
   display: inline-flex;
@@ -1616,7 +1616,7 @@ body.item-253 .hxcat-pill {
   font-family: "JetBrains Mono", monospace;
   font-size: 11.5px;
   letter-spacing: 1.5px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1689,7 +1689,7 @@ body.item-253 .hxcat-row:hover {
   box-shadow: 0 6px 24px -12px color-mix(in srgb, var(--primary) 40%, transparent);
 }
 body.item-253 .hxcat-row:hover .hxcat-row__title {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-253 .hxcat-row__cover {
   flex: 0 0 200px;
@@ -1714,7 +1714,7 @@ body.item-253 .hxcat-tag {
   font-family: "JetBrains Mono", monospace;
   font-size: 10.5px;
   letter-spacing: 1px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   text-transform: uppercase;
 }
 body.item-253 .hxcat-row__title {
@@ -1808,7 +1808,7 @@ body.item-253 .hxcat-cloud a {
 }
 body.item-253 .hxcat-cloud a:hover {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
   background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 body.item-253 .hxcat-pagination {
@@ -1918,7 +1918,7 @@ body.item-251 .hx-bc-tail {
   color: var(--muted);
 }
 body.item-251 .hx-bc-home:hover {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-251 .hx-archmast__pill {
   display: inline-flex;
@@ -1933,7 +1933,7 @@ body.item-251 .hx-archmast__pill {
   font-size: 11.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 /* `archive/default.php:107` — the pill's leading dot, present in the source's own markup
    but missing from this file until now (measured "pill dot missing in WP"). */
@@ -2013,11 +2013,11 @@ body.item-251 .hx-monthrow:hover .hx-monthrow__m {
   color: var(--heading);
 }
 body.item-251 .hx-monthrow.is-active .hx-monthrow__m {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   font-weight: 500;
 }
 body.item-251 .hx-monthrow.is-active .hx-monthrow__c {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-251 .hx-arch-list {
   display: flex;
@@ -2085,7 +2085,7 @@ body.item-251 .hx-archrow__arr {
   line-height: 1;
 }
 body.item-251 .hx-archrow:hover .hx-archrow__arr {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
   transform: translateX(2px);
 }
 body.item-251 .hx-arch-empty {
@@ -2217,7 +2217,7 @@ body.item-254 .hx-author__head-inner {
 }
 .hx-author__bc-home:hover,
 .hx-author__bc-link:hover {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 /* the dynamic last segment (`wp:post-author-name` on author.html) needs the same muted colour
    as the rest of the trail — it is a sibling of the `.hx-author__bc-trail` span, not nested
@@ -2250,7 +2250,7 @@ body.item-254 .hx-au-pill__t {
   font-size: 11.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   line-height: 1;
 }
 body.item-254 .hx-author__title {
@@ -2386,7 +2386,7 @@ body.item-254 .hx-aupost__tag {
   font-size: 10.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-254 .hx-aupost__t {
   font-family: "Space Grotesk", sans-serif;
@@ -2399,7 +2399,7 @@ body.item-254 .hx-aupost__t {
   transition: color 0.15s;
 }
 body.item-254 .hx-aupost:hover .hx-aupost__t {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-254 .hx-aupost__e {
   margin: 0;
@@ -2513,7 +2513,7 @@ body.item-254 .hx-aupost__m {
   font-size: 11.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   line-height: 1;
 }
 .hx-authors__title {
@@ -2546,7 +2546,7 @@ body.item-254 .hx-aupost__m {
 }
 .hx-aucard {
   /* No colour is set for this class in the source's own page-252.css (verbatim above): it is an
-     unstyled <a>, so it inherits the source's sitewide base rule `a { color: var(--primary); }`
+     unstyled <a>, so it inherits the source's sitewide base rule `a { color: var(--ds-c-accent-text, var(--primary)); }`
      (css/template.css:19448-19451), which wp-ja-kinetic-sections.css's bridge now carries — no
      local override needed here. Invisible on every descendant, which each carry their own
      explicit colour already (.hx-aucard__n: var(--heading), .hx-aucard__c: var(--text)). */
@@ -2596,7 +2596,7 @@ body.item-254 .hx-aupost__m {
   text-align: center;
 }
 .hx-aucard:hover .hx-aucard__n {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 /* the job-title line — genuinely missing until now (`css/page-252.css`'s own `.hx-aucard__r`
    rule); measured live against the source: mono 11.5px muted, centred, not the inherited
@@ -2684,7 +2684,7 @@ body.item-250 .hx-cats-pill {
   font-weight: 400;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-250 .hx-cats-pill__dot {
   display: inline-block;
@@ -2743,7 +2743,7 @@ body.item-250 .hx-cat-card:focus-visible {
 }
 body.item-250 .hx-cat-card:hover .hx-cat-name,
 body.item-250 .hx-cat-card:focus-visible .hx-cat-name {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-250 .hx-cat-hd {
   display: flex;
@@ -2763,7 +2763,7 @@ body.item-250 .hx-cat-tile {
 body.item-250 .hx-cat-ic {
   width: 21px;
   height: 21px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-250 .hx-cat-count {
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -3080,10 +3080,10 @@ body.item-231 .com-tags-tag .hx-tagcard:hover {
   background: var(--elevated);
 }
 body.item-231 .com-tags-tag .hx-tagcard:hover .com-tags__row-title {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-231 .com-tags-tag .hx-tagcard:hover .com-tags__row-chevron {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 body.item-231 .com-tags-tag .com-tags__row-main {
   display: flex;
@@ -3098,7 +3098,7 @@ body.item-231 .com-tags-tag .com-tags__row-eyebrow {
   line-height: 1;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-231 .com-tags-tag .com-tags__row-title {
   margin: 0;
@@ -3177,7 +3177,7 @@ body.item-231 .com-tags-tag .com-tags__row-chevron svg {
 /* Every row/card title below is `wp:post-title {"isLink":true}` — a heading wrapping its OWN
    `<a>` — and every one of the classes on that heading sets `color` to `var(--heading)` (or, on
    hover, `var(--primary)`) SOMEWHERE above in this file. None of that reaches the nested `<a>`:
-   this theme's shared `a { color: var(--primary); }` fallback (`wp-ja-kinetic-sections.css`,
+   this theme's shared `a { color: var(--ds-c-accent-text, var(--primary)); }` fallback (`wp-ja-kinetic-sections.css`,
    deliberately a bare, lowest-specificity element selector so it never outranks a real pattern
    rule) is still a rule DIRECTLY on the anchor — and a direct rule on an element always wins over
    an inherited value from an ancestor, regardless of the ancestor rule's specificity. Measured

@@ -280,7 +280,7 @@ body.tracy {
   border: 1px solid var(--wp--preset--color--accent);
   border-radius: 8px;
   background: var(--wp--preset--color--accent);
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
@@ -1280,7 +1280,7 @@ body.tracy {
   padding: 64px;
   border-radius: 16px;
   background: var(--wp--preset--color--accent);
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   text-align: center;
 }
 
@@ -1819,7 +1819,7 @@ body.tracy {
   border: 1px solid var(--wp--preset--color--accent);
   border-radius: 8px;
   background: var(--wp--preset--color--accent);
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   font: inherit;
   font-weight: 500;
 }
@@ -1854,7 +1854,7 @@ body.tracy {
   border: 0;
   border-radius: 8px;
   background: var(--wp--preset--color--accent);
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   font: inherit;
   font-weight: 500;
   cursor: pointer;
@@ -2537,7 +2537,7 @@ body.tracy {
 }
 
 .jv-accordion__item.is-open .jv-accordion__button::after {
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     var(--wp--preset--color--accent);
@@ -8170,7 +8170,7 @@ body.tracy {
   font: inherit;
   font-size: 16px;
   font-weight: 500;
-  color: #fff;
+  color: var(--ds-c-accent-on, #fff);
   cursor: pointer;
 }
 

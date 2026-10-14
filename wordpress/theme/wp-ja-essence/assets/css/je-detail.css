@@ -325,12 +325,12 @@
 .je-pagination__link { box-sizing: border-box; display: block; min-width: 48px; min-height: 48px; padding: 0 12px; border-radius: 30px; background: rgba(0, 0, 0, 0.1); color: #000; font-size: 16px; line-height: 48px; text-align: center; text-decoration: none; }
 a.je-pagination__link:hover { background: rgba(0, 0, 0, 0.18); }
 a.je-pagination__link:focus-visible { outline: 2px solid var(--wp--preset--color--accent); outline-offset: 2px; }
-.je-pagination__item.is-active .je-pagination__link { background: var(--wp--preset--color--accent); color: #fff; }
+.je-pagination__item.is-active .je-pagination__link { background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); }
 .je-pagination__item.is-disabled { opacity: 0.4; }
 .je-pagination__icon { display: inline-block; vertical-align: -2px; width: auto; height: 16px; }
 :root[data-theme="dark"] .je-pagination__link { background: #1a2130; color: #c2c9d6; }
 :root[data-theme="dark"] a.je-pagination__link:hover { background: #222a3b; }
-:root[data-theme="dark"] .je-pagination__item.is-active .je-pagination__link { background: var(--wp--preset--color--accent); color: #fff; }
+:root[data-theme="dark"] .je-pagination__item.is-active .je-pagination__link { background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); }
 
 /* ===== 1.0.3 lens fixes: the article (source: .item-page, .name-category, .page-header h2, .article-aside, .area-footer, the pagenavigation,
    the share buttons, "Author's latest articles" and "More reading"; rules read from the source's compiled sheet, measured at 1440 and 390) ===== */
@@ -368,7 +368,7 @@ a.je-pagination__link:focus-visible { outline: 2px solid var(--wp--preset--color
 .je-artfoot { margin: 0; padding: 0; }
 .je-pagenav { display: flex; justify-content: space-between; margin: 24px 0 0; }
 .je-pagenav a { display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; border-radius: 8px; background: var(--wp--preset--color--bg); color: var(--wp--preset--color--fg); font-family: var(--wp--preset--font-family--display, Jost, sans-serif); font-size: 18px; line-height: 20.7px; text-decoration: none; transition: all 0.3s; }
-.je-pagenav a:hover { background: var(--wp--preset--color--accent); color: #fff; }
+.je-pagenav a:hover { background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); }
 .je-pagenav__next { margin-left: auto; }
 .je-pagenav__arrow { font-size: 22px; line-height: 20px; }
 .je-pagenav__prev .je-pagenav__arrow::before { content: "\2039"; }
@@ -559,7 +559,7 @@ a[href*="/lifestyle"], .je-cat--lifestyle { --je-cat: var(--ds-c-danger, #dc3545
 .je-video:not(.is-poster) .je-video__poster { display: none; }
 .je-video.is-poster .je-video__embed { display: none; }
 .je-video__play { position: absolute; top: 50%; left: 50%; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: -32px 0 0 -32px; padding: 0 0 0 3px; border: 0; border-radius: 4px; background: var(--ds-c-surface, #fff); color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); cursor: pointer; }
-.je-video__play:hover { background: var(--wp--preset--color--accent); color: #fff; }
+.je-video__play:hover { background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); }
 .je-video__play:focus-visible { outline: 3px solid var(--wp--preset--color--accent); outline-offset: 3px; }
 
 /* ===== 1.0.3 lens fixes: the sign-in and registration forms (source: .login-wrap, .com-users-registration__form; measured at 1440 and 390) ===== */
@@ -595,7 +595,7 @@ a[href*="/lifestyle"], .je-cat--lifestyle { --je-cat: var(--ds-c-danger, #dc3545
 .je-acct .login-remember label { display: flex; align-items: center; margin: 0; font: 400 16px/24px var(--wp--preset--font-family--body, "Noto Serif", serif); color: var(--wp--preset--color--fg); }
 .je-acct .login-remember input[type="checkbox"] { width: 16px; height: 16px; margin: 0 12px 0 0; }
 .je-acct .login-submit { margin: 0; }
-.je-acct #wp-submit, .je-acct__btn { box-sizing: border-box; display: inline-block; height: 48.3px; padding: 12.8px 18px; border: 1px solid var(--wp--preset--color--accent); border-radius: 8px; background: var(--wp--preset--color--accent); color: #fff; font: 400 18px/20.7px var(--wp--preset--font-family--display, Jost, sans-serif); text-align: center; text-decoration: none; cursor: pointer; }
+.je-acct #wp-submit, .je-acct__btn { box-sizing: border-box; display: inline-block; height: 48.3px; padding: 12.8px 18px; border: 1px solid var(--wp--preset--color--accent); border-radius: 8px; background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); font: 400 18px/20.7px var(--wp--preset--font-family--display, Jost, sans-serif); text-align: center; text-decoration: none; cursor: pointer; }
 .je-acct #wp-submit { width: 100%; }
 .je-acct__btn--danger { border-color: var(--ds-c-danger, #dc3545); background: var(--ds-c-danger, #dc3545); }
 .je-acct #wp-submit:focus-visible, .je-acct__btn:focus-visible { outline: 2px solid var(--wp--preset--color--fg-2); outline-offset: 2px; }
@@ -674,7 +674,7 @@ a[href*="/lifestyle"], .je-cat--lifestyle { --je-cat: var(--ds-c-danger, #dc3545
 .je-sf__input { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: 47.9px; padding: 12.8px 18px; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 8px; background: light-dark(var(--ds-c-surface, #fff), var(--ds-c-surface, #222a3b)); color: var(--wp--preset--color--fg-2); font: 400 16px/20px var(--wp--preset--font-family--body, "Noto Serif", serif); }
 :root[data-theme="dark"] .je-sf__input { border-color: #2b3548; }
 .je-sf__go, .je-sf__adv { display: inline-flex; align-items: center; gap: 14px; box-sizing: border-box; height: 48px; margin-left: 10px; padding: 12.8px 18px; border: 1px solid transparent; border-radius: 8px; font: 400 18px/20.7px var(--wp--preset--font-family--display, Jost, sans-serif); cursor: pointer; white-space: nowrap; }
-.je-sf__go { background: var(--wp--preset--color--accent); border-color: var(--wp--preset--color--accent); color: #fff; }
+.je-sf__go { background: var(--wp--preset--color--accent); border-color: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); }
 .je-sf__adv { background: light-dark(#fdf6f2, #1a2130); color: var(--wp--preset--color--fg); opacity: 1; }
 .je-sf__input:focus-visible, .je-sf__go:focus-visible, .je-sf__adv:focus-visible { outline: 2px solid var(--wp--preset--color--accent); outline-offset: 2px; }
 .je-sf__panel { margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -1507,7 +1507,7 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 /* tags cloud: the chip is the link itself (light grey), as in the source `a.tag-cloud-link` */
 .je-prose .wp-block-tag-cloud li a.tag-cloud-link, .wp-block-tag-cloud li a.tag-cloud-link { background: light-dark(var(--ds-c-bg, #f8f8ff), var(--ds-c-bg, #222a3b)); }
 /* tagged items: both filter buttons are the accent colour with the muted-grey glyph (source .btn-secondary); on a phone the counter sits under the page buttons, centred */
-.je-taglist__go, .je-taglist__clear { background: var(--wp--preset--color--accent); border-color: var(--wp--preset--color--accent); color: var(--ds-c-muted, #6c757d); }
+.je-taglist__go, .je-taglist__clear { background: var(--wp--preset--color--accent); border-color: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #6c757d); }
 @media (max-width: 767px) {
   .je-pagination--row { flex-direction: column-reverse; justify-content: flex-end; align-items: center; padding-top: 32px; }
   .je-pagination--row .je-pagination__nav { width: 100%; padding-bottom: 16px; box-sizing: content-box; }
@@ -1522,7 +1522,7 @@ div.je-acct__links { display: flex; justify-content: center; flex-wrap: wrap; }
 /* registration: the strength meter is a native <meter> 288x16 under the field (as the source), the eye button follows the dark surface, and the date field carries an accent calendar button */
 .je-acct meter.je-acct__strength { display: block; width: 288px; max-width: 100%; height: 16px; margin-top: 5px; border-radius: 0; background: none; overflow: visible; }
 :root[data-theme="dark"] .je-acct__eye { background: #222a3b; color: #c2c9d6; border-color: #3a4459; }
-.je-acct__cal { flex: 0 0 56px; width: 56px; height: auto; align-self: stretch; margin: 0 0 0 -1px; padding: 0; border: 0; border-radius: 0 8px 8px 0; background: var(--wp--preset--color--accent); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.je-acct__cal { flex: 0 0 56px; width: 56px; height: auto; align-self: stretch; margin: 0 0 0 -1px; padding: 0; border: 0; border-radius: 0 8px 8px 0; background: var(--wp--preset--color--accent); color: var(--ds-c-accent-on, #fff); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .je-acct__cal:focus-visible { outline: 2px solid var(--wp--preset--color--fg-2); outline-offset: 2px; }
 .je-acct__pw:has(.je-acct__cal) { position: relative; }
 .je-acct__pw input.je-acct__datepicker, input.je-acct__datepicker { position: absolute; right: 0; bottom: 0; width: 1px; min-width: 0; height: 1px; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
