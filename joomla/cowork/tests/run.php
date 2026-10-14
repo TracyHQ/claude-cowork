@@ -2090,6 +2090,9 @@ require __DIR__ . "/update-receipt.php";
 // The self-updater claims and knocks in a visitor's request and downloads in its own, a block at a
 // time (0.24.28). Plugin cases run against Joomla stand-ins in their own PHP processes.
 require __DIR__ . "/updater-out-of-request.php";
+// extension.install streams the package to a file as the updater does (0.24.29): a 40 MB install
+// through the API under memory_limit 24M, against Joomla stand-ins in their own PHP processes.
+require __DIR__ . "/extension-install-streaming.php";
 require __DIR__ . "/content-search.php";
 // EngineFactory's catches log what they answer for. Each case runs in its own PHP process, so the
 // Joomla stand-ins it needs never meet the ones defined above.
