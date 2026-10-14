@@ -82,18 +82,36 @@ final class JoomlaMediaWriter implements \MediaWriter
         $bytes = (string) ($snapshot['bytes'] ?? '');
         if (strlen($bytes) !== (int) ($snapshot['size'] ?? -1) || !hash_equals((string) ($snapshot['sha256'] ?? ''), hash('sha256', $bytes))) throw new \RuntimeException('undo bytes failed verification');
         if ($this->deletedFilePathExists($path)) {
-            if (!$rollback) throw new \RuntimeException('file path already exists: ' . $path);
-            $existing = $this->snapshotForDelete($path);
-            if (!hash_equals((string) $snapshot['sha256'], (string) ($existing['sha256'] ?? ''))) throw new \RuntimeException('file path now contains different bytes: ' . $path);
+            if (!$this->deletedFilePathMatchesSnapshot($snapshot)) throw new \RuntimeException('file path already exists: ' . $path);
             return;
         }
+        $created = false;
+        $handle = null;
         try {
-            $this->write($path, $bytes);
+            $abs = $this->confine($path);
+            $dir = \dirname($abs);
+            if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) throw new \RuntimeException("could not create {$dir}");
+            $abs = $this->confine($path);
+            $handle = @fopen($abs, 'xb');
+            if ($handle === false) {
+                if ($this->deletedFilePathExists($path) && $this->deletedFilePathMatchesSnapshot($snapshot)) return;
+                throw new \RuntimeException('could not create file: ' . $path);
+            }
+            $created = true;
+            $offset = 0;
+            while ($offset < strlen($bytes)) {
+                $count = fwrite($handle, substr($bytes, $offset));
+                if ($count === false || $count === 0) throw new \RuntimeException('could not write ' . $path);
+                $offset += $count;
+            }
+            if (!fflush($handle)) throw new \RuntimeException('could not flush ' . $path);
+            fclose($handle);
+            $handle = null;
             $restored = $this->snapshotForDelete($path);
             if (!hash_equals((string) $snapshot['sha256'], (string) ($restored['sha256'] ?? ''))) throw new \RuntimeException('restored image failed verification');
         } catch (\Throwable $e) {
-            $abs = $this->root . '/' . $path;
-            if (is_file($abs) && !is_link($abs)) unlink($abs);
+            if (is_resource($handle)) fclose($handle);
+            if ($created && is_file($abs) && !is_link($abs)) unlink($abs);
             throw $e;
         }
     }
@@ -103,6 +121,26 @@ final class JoomlaMediaWriter implements \MediaWriter
         if (strpos($path, 'images/') !== 0 || strpos($path, '..') !== false || strpos($path, "\0") !== false) return false;
         $abs = $this->root . '/' . $path;
         return file_exists($abs) || is_link($abs);
+    }
+
+    /** Whether an existing path is a regular file under images/ with the snapshotted bytes. */
+    public function deletedFilePathMatchesSnapshot(array $snapshot): bool
+    {
+        $path = (string) ($snapshot['path'] ?? '');
+        if (strpos($path, 'images/') !== 0 || strpos($path, '..') !== false || strpos($path, "\0") !== false) return false;
+        try { $abs = $this->confine($path); } catch (\Throwable $e) { return false; }
+        if (is_link($abs)) return false;
+        $images = realpath($this->root . '/images');
+        $relative = substr($path, strlen('images/'));
+        $cursor = $this->root . '/images';
+        foreach (explode('/', $relative) as $part) {
+            $cursor .= '/' . $part;
+            if (is_link($cursor)) return false;
+        }
+        $real = realpath($abs);
+        if ($images === false || $real === false || !is_file($real) || strncmp($real, $images . DIRECTORY_SEPARATOR, strlen($images) + 1) !== 0) return false;
+        $sha = @hash_file('sha256', $real);
+        return is_string($sha) && hash_equals((string) ($snapshot['sha256'] ?? ''), $sha);
     }
 
     /**

@@ -3355,7 +3355,9 @@ final class Engine
         foreach (array_reverse($entries) as $entry) {
             if (($entry['op'] ?? '') !== 'media.delete') continue;
             $path = (string) ($entry['path'] ?? '');
-            if ($this->media !== null && method_exists($this->media, 'deletedFilePathExists') && $this->media->deletedFilePathExists($path)) {
+            $snapshot = is_array($entry['snapshot'] ?? null) ? $entry['snapshot'] : [];
+            if ($this->media !== null && method_exists($this->media, 'deletedFilePathExists') && $this->media->deletedFilePathExists($path)
+                && (!method_exists($this->media, 'deletedFilePathMatchesSnapshot') || !$this->media->deletedFilePathMatchesSnapshot($snapshot))) {
                 $message = 'File path ' . $path . ' exists now; it was not overwritten.';
                 return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)], 'next' => 'Move the conflicting file, then apply.revert again.']);
             }

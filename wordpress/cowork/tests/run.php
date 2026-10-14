@@ -869,6 +869,17 @@ check('media.delete revert keeps the same attachment id', $mediaW->attachments[7
 check('media.delete revert restores attachment metadata', $mediaW->attachmentRows[777]['meta'], [['meta_key' => '_caption', 'meta_value' => 'Original caption']]);
 check('media.delete revert restores term relationships', $mediaW->attachmentRows[777]['terms'], [['term_taxonomy_id' => 18, 'term_order' => 2]]);
 
+$mediaW->store['wp-content/uploads/identical.jpg'] = 'SAME';
+$mediaW->attachments[784] = 'wp-content/uploads/identical.jpg';
+$mediaW->attachmentFiles[784] = ['wp-content/uploads/identical.jpg'];
+$mediaW->attachmentRows[784] = ['post' => ['ID' => 784, 'post_type' => 'attachment'], 'meta' => [['meta_key' => '_caption', 'meta_value' => 'Restored']], 'terms' => []];
+$apply('media.delete', ['apply_id' => 'MD-identical', 'id' => 784]);
+$mediaW->store['wp-content/uploads/identical.jpg'] = 'SAME';
+$identicalRevert = $apply('apply.revert', ['apply_id' => 'MD-identical']);
+check('media.delete revert accepts an identical restored file', $identicalRevert['reverted'], 1);
+check('media.delete identical-file revert restores attachment row', $mediaW->attachments[784], 'wp-content/uploads/identical.jpg');
+check('media.delete identical-file revert restores metadata', $mediaW->attachmentRows[784]['meta'], [['meta_key' => '_caption', 'meta_value' => 'Restored']]);
+
 $mediaW->store['wp-content/uploads/conflict.jpg'] = 'SOURCE';
 $mediaW->attachments[778] = 'wp-content/uploads/conflict.jpg';
 $mediaW->attachmentFiles[778] = ['wp-content/uploads/conflict.jpg'];

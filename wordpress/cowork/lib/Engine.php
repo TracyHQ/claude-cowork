@@ -3796,7 +3796,10 @@ final class Engine
             if (function_exists('get_post') && get_post($id)) return $this->conflict('Attachment id ' . $id . ' is now in use; it was not overwritten', 'Remove the conflicting attachment, then apply.revert again.', $entry, ['reason' => 'id_taken', 'id' => $id]);
             foreach ((array) ($entry['snapshot']['files'] ?? []) as $file) {
                 $path = (string) ($file['path'] ?? '');
-                if ($this->media !== null && method_exists($this->media, 'deletedAttachmentPathExists') && $this->media->deletedAttachmentPathExists($path)) return $this->conflict('Attachment file path ' . $path . ' now exists; it was not overwritten', 'Move the conflicting file, then apply.revert again.', $entry, ['reason' => 'path_exists', 'path' => $path]);
+                if ($this->media !== null && method_exists($this->media, 'deletedAttachmentPathExists') && $this->media->deletedAttachmentPathExists($path)
+                    && (!method_exists($this->media, 'deletedAttachmentPathMatchesSnapshot') || !$this->media->deletedAttachmentPathMatchesSnapshot($path, $file))) {
+                    return $this->conflict('Attachment file path ' . $path . ' now exists; it was not overwritten', 'Move the conflicting file, then apply.revert again.', $entry, ['reason' => 'path_exists', 'path' => $path]);
+                }
             }
         }
         /** @var array<string,array<string,mixed>|null> $rows the row each target will hold, as the revert walks */

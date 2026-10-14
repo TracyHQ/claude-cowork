@@ -170,8 +170,8 @@ final class FakeMediaWriter implements MediaWriter
     {
         $id = (int) ($snapshot['id'] ?? 0);
         if ($id < 1 || isset($this->attachments[$id])) throw new RuntimeException('attachment id already in use');
-        foreach ((array) ($snapshot['files'] ?? []) as $f) if (array_key_exists($f['path'], $this->store)) throw new RuntimeException('attachment file path already exists: ' . $f['path']);
-        foreach ((array) ($snapshot['files'] ?? []) as $f) $this->store[$f['path']] = $f['bytes'];
+        foreach ((array) ($snapshot['files'] ?? []) as $f) if ($this->deletedAttachmentPathExists((string) $f['path']) && !$this->deletedAttachmentPathMatchesSnapshot((string) $f['path'], $f)) throw new RuntimeException('attachment file path already exists: ' . $f['path']);
+        foreach ((array) ($snapshot['files'] ?? []) as $f) if (!$this->deletedAttachmentPathExists((string) $f['path'])) $this->store[$f['path']] = $f['bytes'];
         $paths = array_column((array) ($snapshot['files'] ?? []), 'path');
         $this->attachments[$id] = $paths[0] ?? '';
         $this->attachmentFiles[$id] = $paths;
@@ -180,6 +180,7 @@ final class FakeMediaWriter implements MediaWriter
 
     public function attachmentUsage(int $attachmentId, array $files): array { return []; }
     public function deletedAttachmentPathExists(string $path): bool { return array_key_exists($path, $this->store); }
+    public function deletedAttachmentPathMatchesSnapshot(string $path, array $file): bool { return isset($this->store[$path]) && hash_equals((string) ($file['sha256'] ?? ''), hash('sha256', $this->store[$path])); }
     public function attachmentIdForUrl(string $url): ?int { return null; }
 }
 
