@@ -1502,8 +1502,8 @@ body.tracy {
   text-align: center;
   color: var(--jv-on-night-soft);
   background:
-    radial-gradient(50% 90% at 0% 10%, rgba(86, 60, 190, 0.28), transparent 70%),
-    radial-gradient(40% 90% at 100% 20%, rgba(29, 78, 216, 0.22), transparent 70%),
+    radial-gradient(50% 90% at 0% 10%, color-mix(in srgb, var(--ds-c-accent, rgb(86, 60, 190)) 28%, transparent), transparent 70%),
+    radial-gradient(40% 90% at 100% 20%, color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 22%, transparent), transparent 70%),
     var(--jv-night);
 }
 
@@ -1752,7 +1752,7 @@ body.tracy {
   display: inline-block;
   padding: 8px;
   border-radius: 8px;
-  background: light-dark(rgba(29, 78, 216, 0.1), rgba(59, 139, 255, 0.1));
+  background: light-dark(color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 10%, transparent), color-mix(in srgb, var(--ds-c-accent-text, rgb(59, 139, 255)) 10%, transparent));
   color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-family: var(--jv-font);
   font-size: 11.6px;
@@ -1869,8 +1869,8 @@ body.tracy {
   border: 0;
   color: var(--jv-on-night-soft);
   background:
-    radial-gradient(40% 60% at 5% 5%, rgba(86, 60, 190, 0.3), transparent 70%),
-    radial-gradient(35% 60% at 95% 95%, rgba(29, 78, 216, 0.22), transparent 70%),
+    radial-gradient(40% 60% at 5% 5%, color-mix(in srgb, var(--ds-c-accent, rgb(86, 60, 190)) 30%, transparent), transparent 70%),
+    radial-gradient(35% 60% at 95% 95%, color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 22%, transparent), transparent 70%),
     var(--jv-night);
 }
 
@@ -3137,7 +3137,7 @@ body.tracy {
  * (D-08): drawn as its two measured ends, a pale blue top (#dae1fa) into near white (#f8f6fd). */
 .page-template-page-service .jv-related {
   border-top: 0;
-  background: linear-gradient(180deg, light-dark(#dae1fa, transparent) 0%, light-dark(#f1f0fc, transparent) 60%, light-dark(#f8f6fd, transparent) 100%);
+  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, #dae1fa), transparent) 0%, light-dark(var(--jv-wash-f1f0fc, #f1f0fc), transparent) 60%, light-dark(var(--jv-wash-f8f6fd, #f8f6fd), transparent) 100%);
 }
 
 /* ── The services listing (/services: its child pages, seeder `childPagesQuery`), M4c ld-0 ────── */
@@ -3711,7 +3711,7 @@ body.tracy {
 .jv-main :where(input[type='text'], input[type='email'], input[type='password'], input[type='search'], input[type='tel'], textarea, select),
 .tracy .wp-block-loginout input.input.input { background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530)); color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); }
 .jv-page .tracy-eyebrow,
-.jv-page .wp-block-post-terms.tracy-eyebrow a { background: rgba(29, 78, 216, 0.1); }
+.jv-page .wp-block-post-terms.tracy-eyebrow a { background: color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 10%, transparent); }
 .jv-page .wp-block-post-terms.tracy-eyebrow { background: transparent; }
 .tracy .jv-btn--light .wp-block-button__link {
   color: light-dark(#ffffff, #c7ccd4);
@@ -4747,7 +4747,7 @@ body.tracy {
  * over #0f141c, measured #191f28 at the top to #1b2028 at the bottom; its cards have no border
  * (`.relateditems .item-inner` border 0, dark fill #161d28) and 16 px corners in both modes. */
 .page-template-page-service .jv-related {
-  background: linear-gradient(180deg, light-dark(#dae1fa, #191f28) 0%, light-dark(#f1f0fc, #1a1f28) 60%, light-dark(#f8f6fd, #1b2028) 100%);
+  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, #dae1fa), #191f28) 0%, light-dark(var(--jv-wash-f1f0fc, #f1f0fc), #1a1f28) 60%, light-dark(var(--jv-wash-f8f6fd, #f8f6fd), #1b2028) 100%);
 }
 
 .tracy.page-template-page-service .jv-related .jv-card {
@@ -6655,7 +6655,7 @@ body.tracy {
   width: 489px;
   height: 1037px;
   pointer-events: none;
-  background: radial-gradient(ellipse 330px 400px at 100% 43%, rgba(52, 68, 191, 0.25) 0%, rgba(52, 68, 191, 0.13) 50%, rgba(52, 68, 191, 0.05) 80%, rgba(52, 68, 191, 0) 100%);
+  background: radial-gradient(ellipse 330px 400px at 100% 43%, color-mix(in srgb, var(--ds-c-accent, rgb(52, 68, 191)) 25%, transparent) 0%, color-mix(in srgb, var(--ds-c-accent, rgb(52, 68, 191)) 13%, transparent) 50%, color-mix(in srgb, var(--ds-c-accent, rgb(52, 68, 191)) 5%, transparent) 80%, color-mix(in srgb, var(--ds-c-accent, rgb(52, 68, 191)) 0%, transparent) 100%);
 }
 
 /* M6 Round-9d (lens r9d; header measured source :8261 vs site :8262 at 992, 1000, 1100, 1199, 1200, 1330, 1399,
@@ -6951,7 +6951,7 @@ body.tracy {
     left: 0;
     width: 2000px;
     height: 100%;
-    background: linear-gradient(-180deg, light-dark(#d2ddfa, #232e45) 0%, light-dark(#f9f6ff, #1a2331) 100%);
+    background: linear-gradient(-180deg, light-dark(var(--jv-wash-d2ddfa, #d2ddfa), #232e45) 0%, light-dark(var(--jv-wash-f9f6ff, #f9f6ff), #1a2331) 100%);
   }
 
   .jv-header .jv-mega__columns > .wp-block-column:last-child > * {
@@ -6997,7 +6997,7 @@ body.tracy {
 @media (max-width: 1199.98px) {
   .jv-masthead {
     background:
-      radial-gradient(50% 90% at 0% 10%, rgba(86, 60, 190, 0.28), transparent 70%),
+      radial-gradient(50% 90% at 0% 10%, color-mix(in srgb, var(--ds-c-accent, rgb(86, 60, 190)) 28%, transparent), transparent 70%),
       var(--jv-night);
   }
 }
@@ -7005,7 +7005,7 @@ body.tracy {
 @media (max-width: 575.98px) {
   .jv-masthead {
     background:
-      radial-gradient(40% 60% at 0% 0%, rgba(86, 60, 190, 0.12), transparent 70%),
+      radial-gradient(40% 60% at 0% 0%, color-mix(in srgb, var(--ds-c-accent, rgb(86, 60, 190)) 12%, transparent), transparent 70%),
       var(--jv-night);
   }
 }
