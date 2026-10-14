@@ -192,7 +192,6 @@ namespace {
         Joomla\CMS\Factory::$app = $app;
 
         $dir = __DIR__ . '/../plg_system_claudecoworkupdate/src/Extension/';
-        require $dir . 'PackageDownload.php';
         require $dir . 'UpdateBackoff.php';
         require $dir . 'ClaudeCoworkUpdate.php';
         $plugin = new Tracy\Plugin\System\ClaudeCoworkUpdate\Extension\ClaudeCoworkUpdate(null, ['params' => UP_CASE['plugin']]);
@@ -245,8 +244,8 @@ namespace {
         fclose($fh);
         $want = hash_file('sha256', $src);
         $probe = $tmp . '/probe.php';
-        file_put_contents($probe, '<?php define("_JEXEC", 1); require ' . var_export($upDir . 'PackageDownload.php', true) . ';'
-            . ' $P = "Tracy\\\\Plugin\\\\System\\\\ClaudeCoworkUpdate\\\\Extension\\\\PackageDownload";'
+        file_put_contents($probe, '<?php require ' . var_export(__DIR__ . '/../lib/PackageDownload.php', true) . ';'
+            . ' $P = "PackageDownload";'
             . ' $r = $P::toFile($argv[1], $argv[2], (int) $argv[3], $argv[4] === "-" ? null : $argv[4], [], $argv[5] === "curl");'
             . ' $r["exists"] = is_file($argv[2]); $r["peak"] = memory_get_peak_usage(true); echo json_encode($r);');
         $download = static function (string $url, string $sha, string $how, int $max = 104857600) use ($probe, $tmp): array {
@@ -270,6 +269,11 @@ namespace {
             check("download ({$how}): a package over the limit is refused and the file removed", [$big['ok'] ?? null, $big['exists'] ?? null], [false, false]);
         }
         echo '  (download transports tried: ' . implode(', ', $hows) . ")\n";
+
+        // The worker requires PackageDownload from the component's lib/ (0.24.29), so the fixture's
+        // JPATH_ADMINISTRATOR carries that one file; LoopbackRoute stays absent on purpose (below).
+        @mkdir($tmp . '/administrator/components/com_claudecowork/lib', 0777, true);
+        copy(__DIR__ . '/../lib/PackageDownload.php', $tmp . '/administrator/components/com_claudecowork/lib/PackageDownload.php');
 
         // ── 3. the plugin ───────────────────────────────────────────────────────────────────────
         $manifest = static function (string $version, string $extra = ''): string {
@@ -333,7 +337,8 @@ namespace {
         checkTrue('source: Joomla\'s whole-body download is gone from the updater', strpos($updaterSrc, 'InstallerHelper::downloadPackage') === false);
 
         foreach (glob($tmp . '/*') as $f) @unlink($f);
-        @rmdir($tmp);
+        @unlink($tmp . '/administrator/components/com_claudecowork/lib/PackageDownload.php');
+        foreach (['/administrator/components/com_claudecowork/lib', '/administrator/components/com_claudecowork', '/administrator/components', '/administrator', ''] as $d) @rmdir($tmp . $d);
 
         if (!empty($upStandalone)) { echo "\n{$passed} passed, {$failed} failed\n"; exit($failed ? 1 : 0); }
     }

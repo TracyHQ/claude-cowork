@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>extension.install through the Tracy API downloads the package straight to a file, checked against its sha256, instead of reading it into memory; a large package such as this one no longer runs out of memory at memory_limit 128M</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.29</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.29</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.29/pkg_claudecowork-0.24.29.zip</downloadurl>
+        </downloads>
+        <sha256>14080d2b11416201370ca94556adb231fd2e039f994ebce5163c885112050dee</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>the self-updater no longer downloads inside a visitor's request: it knocks on the site's own door and the download goes straight to a file, checked against its sha256; a failed version waits before it is tried again</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

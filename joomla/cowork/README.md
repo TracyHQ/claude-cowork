@@ -328,6 +328,11 @@ a language later does not move every page of the site back under `/en/`.
 
 `extension.install` accepts optional `sha256` and `bytes`; a pinned package is verified
 before extraction, including official language-pack download URLs with query strings.
+Since 0.24.29 the package goes straight to a file, a block at a time, through the same
+`lib/PackageDownload.php` the self-updater uses (100 MiB limit, the site's proxy, sha256 hashed
+from the file). Before it, Joomla's `InstallerHelper::downloadPackage` read the whole body into
+memory, and installing a ~42 MB package such as `pkg_claudecowork` was a fatal error at the
+default `memory_limit` 128M instead of an answer; a failed download is now `install_failed`.
 This version does not change the default template or publish an automatic update feed.
 
 Verified on Joomla 6: English seeding, adding French, repeated reconciliation, and

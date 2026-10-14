@@ -54,8 +54,9 @@ use Joomla\Event\SubscriberInterface;
  * demos, 14/10/2026) Joomla appended its "500 Whoops" page to the visitor's page, with status 200.
  * A fatal error is out of reach of any try/catch; the only cure is not to be there.
  *
- * The download itself goes to a file a block at a time ({@see PackageDownload}) and a version that
- * failed waits before it is tried again ({@see UpdateBackoff}), so the worker request is neither
+ * The download itself goes to a file a block at a time ({@see \PackageDownload}, from the
+ * component's lib/) and a version that failed waits before it is tried again ({@see UpdateBackoff}),
+ * so the worker request is neither
  * the memory hog nor the endless retry the old path was.
  *
  * When the site cannot reach itself (no curl, no route), nothing is installed: the claim records
@@ -503,7 +504,18 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
         $path    = $tmp . '/tracy-update-' . $element . '-' . bin2hex(random_bytes(4)) . '.zip';
         $package = null;
 
-        $got = PackageDownload::toFile($release['url'], $path, self::MAX_PACKAGE_BYTES, $release['sha256'] ?? null, $this->proxyOptions());
+        // lib/PackageDownload.php ships in the component of this same package (0.24.29 moved it there so
+        // the API door's installer uses the same copy); required like LoopbackRoute in kick().
+        $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/PackageDownload.php';
+
+        if (!is_file($lib)) {
+            $this->log(\sprintf('%s: cannot download, %s is missing', $element, $lib), Log::WARNING);
+            return false;
+        }
+
+        require_once $lib;
+
+        $got = \PackageDownload::toFile($release['url'], $path, self::MAX_PACKAGE_BYTES, $release['sha256'] ?? null, $this->proxyOptions());
 
         if (!$got['ok']) {
             $this->log(\sprintf('%s: could not download %s: %s', $element, $release['url'], $got['error']), Log::WARNING);
@@ -559,17 +571,7 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
     {
         $app = Factory::getApplication();
 
-        if (!(int) $app->get('proxy_enable') || (string) $app->get('proxy_host') === '') {
-            return [];
-        }
-
-        $options = [CURLOPT_PROXY => $app->get('proxy_host') . ':' . (int) $app->get('proxy_port')];
-
-        if ((string) $app->get('proxy_user') !== '') {
-            $options[CURLOPT_PROXYUSERPWD] = $app->get('proxy_user') . ':' . $app->get('proxy_pass');
-        }
-
-        return $options;
+        return \PackageDownload::proxyOptions($app->get('proxy_enable'), $app->get('proxy_host'), $app->get('proxy_port'), $app->get('proxy_user'), $app->get('proxy_pass'));
     }
 
     /**

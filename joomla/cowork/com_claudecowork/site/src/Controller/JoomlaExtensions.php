@@ -23,7 +23,8 @@ use Joomla\Database\DatabaseInterface;
  * component that unzipped one itself would be a second, worse installer running on someone's
  * production site.
  *
- * The download is bounded and the temporary file removed whatever happens. A package that
+ * The download is streamed to a file (lib/PackageDownload.php), bounded, checked against the
+ * catalog's sha256 when there is one, and the temporary file removed whatever happens. A package that
  * refuses to install is reported with the installer's own words, because "install failed" with
  * no reason is the message this exists to avoid.
  */
@@ -31,6 +32,22 @@ final class JoomlaExtensions implements \ExtensionManager
 {
     /** A package this large on a shared host is a mistake somewhere, not a template. */
     private const MAX_PACKAGE_BYTES = 104857600; // 100 MiB
+
+    /** @var bool|null null: curl when PHP has it. A test passes false to take the stream copy. */
+    private $useCurl;
+
+    public function __construct(?bool $useCurl = null)
+    {
+        $this->useCurl = $useCurl;
+    }
+
+    /** lib/ is plain PHP outside the PSR-4 map, required from where EngineFactory requires it. */
+    private function loadDownloader(): void
+    {
+        if (!class_exists('PackageDownload', false)) {
+            require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/PackageDownload.php';
+        }
+    }
 
     /**
      * Flip `enabled` on one row of `#__extensions`.
@@ -109,21 +126,54 @@ final class JoomlaExtensions implements \ExtensionManager
 
     public function installFromUrl(string $url, ?string $sha256 = null, ?int $bytes = null): array
     {
-        $file = InstallerHelper::downloadPackage($url, $sha256 ? 'tracy-' . $sha256 . '.zip' : false);
-        if ($file === false) {
-            return ['ok' => false, 'error' => 'could not download the package'];
+        // Only the web: the stream copy below would open a local path or a php:// wrapper as
+        // happily as a URL, and this door takes its address from a caller.
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if ($scheme !== 'https' && $scheme !== 'http') {
+            return ['ok' => false, 'error' => 'package URL must be http or https'];
         }
 
-        $path = Factory::getApplication()->get('tmp_path') . '/' . basename((string) $file);
-        if (is_file($path) && filesize($path) > self::MAX_PACKAGE_BYTES) {
-            @unlink($path);
-            return ['ok' => false, 'error' => 'package is larger than this site allows'];
+        $app  = Factory::getApplication();
+        $path = rtrim((string) $app->get('tmp_path'), '/\\') . '/tracy-install-' . bin2hex(random_bytes(8)) . '.zip';
+
+        // Streamed to a file in blocks, never held whole in memory (0.24.29). Joomla's
+        // InstallerHelper::downloadPackage asks for the body as one string, and a 42 MB package
+        // like pkg_claudecowork was a "memory size exhausted" fatal at the default 128M: no catch
+        // sees it, the API answered with a dead 500, and the half-written file stayed in tmp/.
+        // Same helper and limits as the self-updater's worker (lib/PackageDownload.php).
+        try {
+            $this->loadDownloader();
+            $got = \PackageDownload::toFile(
+                $url,
+                $path,
+                self::MAX_PACKAGE_BYTES,
+                $sha256,
+                \PackageDownload::proxyOptions($app->get('proxy_enable'), $app->get('proxy_host'), $app->get('proxy_port'), $app->get('proxy_user'), $app->get('proxy_pass')),
+                $this->useCurl
+            );
+        } catch (\Throwable $e) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+            return ['ok' => false, 'error' => 'could not download the package: ' . $e->getMessage()];
         }
 
-        if ($sha256 !== null && (!is_file($path) || !hash_equals($sha256, hash_file('sha256', $path)) || ($bytes !== null && filesize($path) !== $bytes))) {
-            @unlink($path);
-            return ['ok' => false, 'error' => 'package checksum or size does not match the catalog'];
+        if (!$got['ok']) {
+            $error = (string) $got['error'];
+            if (strpos($error, 'sha256 ') === 0) {
+                return ['ok' => false, 'error' => 'package checksum or size does not match the catalog (' . $error . ')'];
+            }
+            if (strpos($error, 'larger than') !== false) {
+                return ['ok' => false, 'error' => 'package is larger than this site allows'];
+            }
+            return ['ok' => false, 'error' => 'could not download the package: ' . $error];
         }
+
+        if ($bytes !== null && $got['bytes'] !== $bytes) {
+            @unlink($path);
+            return ['ok' => false, 'error' => 'package checksum or size does not match the catalog (' . $got['bytes'] . ' bytes, not ' . $bytes . ')'];
+        }
+
         $package = InstallerHelper::unpack($path, true);
         if ($package === false || empty($package['dir'])) {
             InstallerHelper::cleanupInstall($path, '');

@@ -1,17 +1,12 @@
 <?php
-
 /**
- * @package     Claude Cowork for Joomla
- * @copyright   (C) 2026 Tracy
- * @license     GPL-2.0-or-later
- */
-
-namespace Tracy\Plugin\System\ClaudeCoworkUpdate\Extension;
-
-\defined('_JEXEC') or die;
-
-/**
- * Downloads a package straight to a file, a chunk at a time, and hashes it from that file.
+ * PackageDownload — downloads a package straight to a file, a chunk at a time, and hashes it from
+ * that file.
+ *
+ * Two callers, one copy: the self-updater's worker (plg_system_claudecoworkupdate, which requires
+ * this file from the component's lib/ the way it requires LoopbackRoute) and the API door's
+ * `extension.install` (JoomlaExtensions::installFromUrl). Both used to take the whole body into
+ * memory; the door moved here in 0.24.29, after the updater in 0.24.28.
  *
  * ## Why not InstallerHelper::downloadPackage
  *
@@ -23,7 +18,8 @@ namespace Tracy\Plugin\System\ClaudeCoworkUpdate\Extension;
  * same way. Here the bytes go from the socket to the disk through curl's own buffer (or an 8 KiB
  * stream copy without curl), so memory stays flat whatever the package weighs.
  *
- * Plain PHP with no CMS, so tests/updater-out-of-request.php runs it on its own.
+ * Plain PHP with no CMS and no namespace, like the rest of lib/, so tests/updater-out-of-request.php
+ * and tests/extension-install-streaming.php run it on their own.
  */
 final class PackageDownload
 {
@@ -86,7 +82,7 @@ final class PackageDownload
             CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_TIMEOUT        => 600,
             CURLOPT_FAILONERROR    => true,
-            CURLOPT_USERAGENT      => 'Tracy Claude Cowork updater',
+            CURLOPT_USERAGENT      => 'Tracy Claude Cowork',
             CURLOPT_NOPROGRESS     => false,
             // Stops a body that turns out larger than the limit while it arrives, not after.
             CURLOPT_PROGRESSFUNCTION => static function ($handle, $downloadTotal, $downloaded) use ($maxBytes): int {
@@ -111,7 +107,7 @@ final class PackageDownload
     /** @param resource $out */
     private static function viaStream(string $url, $out, int $maxBytes): ?string
     {
-        $context = stream_context_create(['http' => ['timeout' => 600, 'follow_location' => 1, 'max_redirects' => 5, 'user_agent' => 'Tracy Claude Cowork updater']]);
+        $context = stream_context_create(['http' => ['timeout' => 600, 'follow_location' => 1, 'max_redirects' => 5, 'user_agent' => 'Tracy Claude Cowork']]);
         $in      = @fopen($url, 'rb', false, $context);
 
         if ($in === false) {
@@ -145,6 +141,28 @@ final class PackageDownload
         fclose($in);
 
         return $error;
+    }
+
+    /**
+     * The site's own proxy (Global Configuration -> Server) as curl options, the one Joomla's HTTP
+     * client would use. Takes the configuration values, not the application, so it stays CMS-free.
+     *
+     * @return array<int,mixed>
+     */
+    public static function proxyOptions($enabled, $host, $port, $user, $pass): array
+    {
+        // No curl, no curl constants: the stream copy then goes without the proxy, as it always has.
+        if (!(int) $enabled || (string) $host === '' || !\defined('CURLOPT_PROXY')) {
+            return [];
+        }
+
+        $options = [CURLOPT_PROXY => $host . ':' . (int) $port];
+
+        if ((string) $user !== '') {
+            $options[CURLOPT_PROXYUSERPWD] = $user . ':' . $pass;
+        }
+
+        return $options;
     }
 
     private static function fail(string $target, string $error): array
