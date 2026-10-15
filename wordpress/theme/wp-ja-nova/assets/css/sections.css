@@ -569,7 +569,7 @@
 
 .tracy-plan__list li::before {
   content: '✓ ';
-  color: var(--wp--preset--color--success);
+  color: var(--ds-c-success-text, var(--wp--preset--color--success));
 }
 
 .tracy-btn--inverse .wp-block-button__link,
@@ -633,11 +633,11 @@
 }
 
 .tracy-form__note--ok {
-  color: var(--wp--preset--color--success);
+  color: var(--ds-c-success-text, var(--wp--preset--color--success));
 }
 
 .tracy-form__note--bad {
-  color: var(--wp--preset--color--danger);
+  color: var(--ds-c-danger-text, var(--wp--preset--color--danger));
 }
 
 .tracy-pagination__item.is-current {
