@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>a picture written into a captured image slot keeps its slot's shape: the demo picture is read under Joomla's media suffix, so a picture of another shape is refused as WordPress already refuses it</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.30</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.30</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.30/pkg_claudecowork-0.24.30.zip</downloadurl>
+        </downloads>
+        <sha256>39b7571f100629a1b2fe8282270d602a0b1a626300d5c97ae775e82bec87bc5e</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>extension.install through the Tracy API downloads the package straight to a file, checked against its sha256, instead of reading it into memory; a large package such as this one no longer runs out of memory at memory_limit 128M</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
