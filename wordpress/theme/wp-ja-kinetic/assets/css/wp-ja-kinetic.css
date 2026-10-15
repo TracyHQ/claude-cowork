@@ -216,7 +216,7 @@ h6 {
   position: sticky;
   top: 0;
   z-index: 1030;
-  background: light-dark(var(--ds-c-bg, #fbfcfa), #0a0d0c);
+  background: light-dark(var(--ds-c-bg, #fbfcfa), var(--ds-c-bg, #0a0d0c));
   border-bottom: 1px solid var(--wp--preset--color--border);
 }
 
@@ -851,7 +851,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 
 .tracy-header__menu .tracy-nav .wp-block-navigation-item__content[aria-current='page'],
 .tracy-header__menu .tracy-nav .wp-block-navigation-item.has-child:has(.wp-block-navigation__submenu-container [aria-current='page']) > .wp-block-navigation-item__content {
-  color: var(--chrome-primary);
+  color: var(--ds-c-accent-text, var(--chrome-primary));
   background: var(--chrome-elevated);
 }
 
@@ -951,7 +951,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 .tracy-header__menu .tracy-nav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__submenu-container .wp-block-navigation-item__content:hover {
   border-color: var(--chrome-muted);
   background: transparent;
-  color: var(--primary-hover);
+  color: var(--ds-c-accent-text-hover, var(--primary-hover));
 }
 
 /* Source: `li.parent > a::after { content:"›"; font-size:18px; line-height:1; color:chrome-muted; flex:none }`
@@ -1054,7 +1054,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   width: 18px;
   height: 18px;
   flex: none;
-  color: var(--chrome-primary);
+  color: var(--ds-c-accent-text, var(--chrome-primary));
 }
 
 /* Source: `.kinetic-drill-sublabel { font:600 11px "JetBrains Mono"; letter-spacing:1.5px;
@@ -1193,7 +1193,7 @@ body .tracy-footer__columns {
   height: 24px;
   width: 24px;
   flex: 0 0 auto;
-  color: var(--chrome-primary);
+  color: var(--ds-c-accent-text, var(--chrome-primary));
 }
 
 .tracy-footer__lock .tracy-brand {
@@ -1662,7 +1662,7 @@ body .tracy-footer__bottom {
 .tracy-back-to-top:focus,
 .tracy-back-to-top:active {
   background-color: var(--primary);
-  color: #fff;
+  color: var(--ds-c-accent-on, #fff);
 }
 
 body.tracy-top-away .tracy-back-to-top {
@@ -1941,7 +1941,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   font-weight: 400;
   line-height: 1;
   letter-spacing: 2px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   margin: 0 0 28px;
   text-transform: uppercase;
 }
@@ -2046,7 +2046,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   text-decoration: none;
   transition: opacity 0.15s;
 }

@@ -56,7 +56,7 @@ body.item-232 .kinetic-finder .kinetic-eyebrow {
   font-weight: 400;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   margin: 0;
 }
 
@@ -371,11 +371,11 @@ body.item-232 .kinetic-finder .kinetic-result__meta {
   margin-bottom: 6px;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 
 body.item-232 .kinetic-finder .kinetic-result__url {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
   word-break: break-all;
@@ -401,7 +401,7 @@ body.item-232 .kinetic-finder .kinetic-result__title a {
 
 body.item-232 .kinetic-finder .kinetic-result:hover .kinetic-result__title a,
 body.item-232 .kinetic-finder .kinetic-result:focus-within .kinetic-result__title a {
-  color: var(--primary);
+  color: var(--ds-c-accent-text-hover, var(--primary));
 }
 
 body.item-232 .kinetic-finder .kinetic-result__text {
@@ -417,7 +417,7 @@ body.item-232 .kinetic-finder .kinetic-result__text {
    search does not mark matches itself; the block wraps them server-side (see render.php). */
 body.item-232 .kinetic-finder .highlight {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   font-weight: 600;
   border-radius: 3px;
   padding: 0 2px;
@@ -673,7 +673,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   font-weight: 400;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 
 .kinetic-auth__eyebrow-dot {
@@ -1156,13 +1156,13 @@ body.item-234 .kinetic-auth meter {
 }
 
 .kinetic-auth__inline-link a {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   font-size: 13px;
   font-weight: 400;
 }
 
 .kinetic-auth__inline-link a:hover {
-  color: var(--primary-hover);
+  color: var(--ds-c-accent-text-hover, var(--primary-hover));
   text-decoration: underline;
 }
 
@@ -1203,12 +1203,12 @@ div.com-users-reset .com-users-reset__submit {
 }
 
 .kinetic-auth__altrow a {
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   font-weight: 600;
 }
 
 .kinetic-auth__altrow a:hover {
-  color: var(--primary-hover);
+  color: var(--ds-c-accent-text-hover, var(--primary-hover));
   text-decoration: underline;
 }
 
@@ -1259,7 +1259,7 @@ div.com-users-reset .com-users-reset__submit {
   height: 18px;
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
 }
 
 .kinetic-auth__checklist li span {
@@ -1659,7 +1659,7 @@ body.item-237 .kinetic-auth-masthead__sub,
   font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: 28px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--ds-c-accent-text, var(--primary));
   line-height: 1;
 }
 
