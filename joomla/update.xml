@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries 28 new Joomla quickstart contracts (status colours set as text read the design system's readable shade)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.34</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.34</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.34/pkg_claudecowork-0.24.34.zip</downloadurl>
+        </downloads>
+        <sha256>d77f0a89ab22009e1d09c2ed09a0e76ab44d91c12c57117f322e1af78528cea4</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the Tracy Business 1.2.4, Tracy Base 1.0.4 and JA Kinetic 1.0.8 contracts (their templates read the standard design-system role variables; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

@@ -2588,8 +2588,8 @@ body.tracy {
 
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-primary { color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-secondary { color: #111112; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-success { color: var(--ds-c-success, #198754); }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-danger { color: var(--ds-c-danger, #dc3545); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-success { color: var(--ds-c-success-text, #198754); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-danger { color: var(--ds-c-danger-text, #dc3545); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-warning { color: #f59e0b; }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-info { color: #0dcaf0; }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-light { color: #fafafa; }
@@ -4035,7 +4035,7 @@ body.tracy {
 .jv-contact__form .wtb-form__field br { display: none; }
 /* The required mark the seeder writes as its own element (upstream #37, M6-11): the source's
  * `label.required .star` is #dc3545 in both colour schemes (measured 28/09, 1440 light and dark). */
-.jv-contact__form .wtb-form__required { color: var(--ds-c-danger, #dc3545); }
+.jv-contact__form .wtb-form__required { color: var(--ds-c-danger-text, #dc3545); }
 .jv-contact__form .wpcf7-form-control-wrap { display: block; margin-top: 8px; }
 .tracy .jv-contact__form :is(input[type='text'], input[type='email'], textarea) {
   display: block;
@@ -4885,7 +4885,7 @@ body.tracy {
  * (p.login-username, p.login-password), both required to log in. */
 .tracy .wp-block-loginout :is(.login-username, .login-password) label::after {
   content: '\00a0*';
-  color: var(--ds-c-danger, #dc3545);
+  color: var(--ds-c-danger-text, #dc3545);
 }
 
 /* M6c (lens, /featured-articles "Latest News"): source rows are 16 px apart above a 16 px padded
