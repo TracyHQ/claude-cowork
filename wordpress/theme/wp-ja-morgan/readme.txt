@@ -44,6 +44,14 @@ Font License 1.1 (assets/fonts/font-awesome-OFL.txt).
 
 == Changelog ==
 
+= 1.1.19 =
+* The Twitter links of the top bar and the footers draw the Twitter bird, as the source does, instead of the X mark:
+  they are WordPress's "twitter" social link now, not "x". Their label, link and square stay as they were; a footer
+  already edited in the Site Editor keeps its "x" link and its square.
+* The demo site is named "Morgan", the name the source's logo and copyright line print, so the header logo reads
+  "Morgan." and the copyright lines "Morgan" instead of "JA Morgan". Both still print the site name, so a renamed site
+  shows its own. Not released on its own: the name ships with the next quickstart/ja-morgan/wp7 cut.
+
 = 1.1.15 =
 * Every word the theme itself prints is in the site's language: the Home Style 3 and 4 footers, the sidebar headings
   (Login, News & Update, Categories, Tags), the search page's title, description, form and tips, the Blog and Contact

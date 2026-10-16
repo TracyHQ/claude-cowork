@@ -11,8 +11,9 @@ not hidden gaps (docs/checks-and-recovery.md).
 
 - The site is the demonstration site of the JoomlArt JA Morgan quickstart. The content contract
   (`spec/content-contract.json`) has mode `demo`, language `en`, and one fact status per claim:
-  site name "JA Morgan" and tagline "Creative multipurpose Joomla template for business" are
-  **verified** from the source's `<title>` and meta description; the demo disclosure "Demonstration
+  site name "Morgan" is **verified** from the source's logo text (`Morgan<b>.</b>`, the T3 style's
+  `sitename`) and its footer copyright ("© 2019 Morgan."), and the tagline "Creative multipurpose
+  Joomla template for business" from the source's meta description; the demo disclosure "Demonstration
   site: company details, team profiles and prices are illustrative." has status `demo`.
 - Company details, people, addresses ("312 North 24th Street Brooklyn, New York", "212.218.8500",
   "inquiry@stark.com"), prices, testimonials and all pictures are the source's demonstration

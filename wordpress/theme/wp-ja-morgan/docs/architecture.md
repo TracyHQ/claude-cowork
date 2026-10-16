@@ -34,7 +34,7 @@ patterns keep the source's class names (`t3-*`, `acm-*`, `container`); `jm-*` is
 | Section pattern | `patterns/*.php`, registered as `wp-ja-morgan/*` | inserted copies live in `post_content` |
 | Navigation | menu blocks in the parts carry a `metadata.name` (`nav.mainmenu`, `nav.joomla-pages`, `nav.navigate`, `nav.services`, `nav.support`, `nav.careers`, `nav.terms-privacy`) | `wp_navigation` posts, one per Joomla menu type of the spec (docs/content-model.md) |
 | Global styles | `theme.json` | a `wp_global_styles` row holding any Site Editor override |
-| Site identity | none | options `blogname` ("JA Morgan"), `blogdescription`, `custom_logo`, `show_on_front`, `page_on_front` |
+| Site identity | none | options `blogname` ("Morgan"), `blogdescription`, `custom_logo`, `show_on_front`, `page_on_front` |
 | Masthead heading that differs from the page title | the `page.title` filter in `inc/extra.php` | post meta `tracy_page_heading` |
 | Masthead description | constant text in `inc/groups/account.php` (all pages) and `inc/groups/home.php` (about-us, services-page) | the page's own excerpt, when written |
 | 404 page text | none: `templates/404.html` holds no words, the heading and text are the draft page's content | the draft page `page-not-found`, named by option `wp_ja_morgan_404_page` |
