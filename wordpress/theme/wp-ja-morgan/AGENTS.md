@@ -5,7 +5,7 @@ not the Tracy skill (`tracy-wordpress-theme`) that produced them.
 
 Theme: **WP Morgan**, slug `wp-ja-morgan`, text domain `wp-ja-morgan`, version in `style.css`
 (`Version:` is stamped at build; 1.1.2 when these documents were written). Requires WordPress 7.0
-and PHP 8.1; built on WordPress 7.1.2. The site is "JA Morgan", a business-consulting site ported
+and PHP 8.1; built on WordPress 7.1.2. The site is "Morgan", a business-consulting site ported
 from the JoomlArt Joomla 6 quickstart `quickstart/ja-morgan/j6` (template `ja_morgan` on the T3
 framework) so that it renders the same pages. No plugin is required by the theme.
 

@@ -53,7 +53,7 @@
 <!-- /wp:heading -->
 <!-- wp:social-links {"className":"social-follow is-style-logos-only"} -->
 <ul class="wp-block-social-links social-follow is-style-logos-only"><!-- wp:social-link {"url":"https://www.facebook.com/","service":"facebook","label":"Facebook"} /-->
-<!-- wp:social-link {"url":"https://x.com/","service":"x","label":"Twitter"} /-->
+<!-- wp:social-link {"url":"https://x.com/","service":"twitter","label":"Twitter"} /-->
 <!-- wp:social-link {"url":"https://www.instagram.com/","service":"instagram","label":"Instagram"} /--></ul>
 <!-- /wp:social-links -->
 </div>

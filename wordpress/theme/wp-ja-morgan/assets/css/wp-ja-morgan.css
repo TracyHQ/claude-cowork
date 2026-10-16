@@ -1627,6 +1627,8 @@ body:has(.t3-section-footer) .t3-footnav {
 .social-follow .wp-social-link-facebook {
 	background: #3b5999;
 }
+/* Twitter is the `twitter` service, whose core icon is the source's bird; `x` stays for a footer edited before 1.1.19. */
+.social-follow .wp-social-link-twitter,
 .social-follow .wp-social-link-x {
 	background: #55acee;
 }
@@ -3195,6 +3197,7 @@ ul.tagspopular.wp-block-tag-cloud {
 	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -448 512 510'%3E%3Cpath transform='scale(1,-1)' d='M512 192Q511 264 477 321L477 321L477 321Q443 379 385 413L385 413L385 413Q328 447 256 448Q184 447 127 413Q69 379 35 321Q1 264 0 192Q2 100 55 33Q109 -34 194 -57L194 114L194 114L141 114L141 114L141 192L141 192L194 192L194 192L194 226L194 226Q193 355 319 353Q332 353 349 351Q365 349 375 347L375 276L375 276Q365 277 345 277Q314 277 300 264Q287 250 287 220L287 192L287 192L371 192L371 192L356 114L356 114L287 114L287 114L287 -62L287 -62Q384 -48 447 22Q510 92 512 192L512 192Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -448 512 510'%3E%3Cpath transform='scale(1,-1)' d='M512 192Q511 264 477 321L477 321L477 321Q443 379 385 413L385 413L385 413Q328 447 256 448Q184 447 127 413Q69 379 35 321Q1 264 0 192Q2 100 55 33Q109 -34 194 -57L194 114L194 114L141 114L141 114L141 192L141 192L194 192L194 192L194 226L194 226Q193 355 319 353Q332 353 349 351Q365 349 375 347L375 276L375 276Q365 277 345 277Q314 277 300 264Q287 250 287 220L287 192L287 192L371 192L371 192L356 114L356 114L287 114L287 114L287 -62L287 -62Q384 -48 447 22Q510 92 512 192L512 192Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
+.social-follow .wp-social-link-twitter a::before,
 .social-follow .wp-social-link-x a::before {
 	transform: translate(-0.5px, -0.75px);
 	width: 13px;
