@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 require_once __DIR__ . '/IdentityTokens.php';
 /**
  * The versioned multilingual extension of a quickstart content contract.

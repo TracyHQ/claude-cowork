@@ -100,7 +100,9 @@ final class DeadlockingDb
 {
     public array $queries = [];
     private string $pending = '';
-    public function __construct(public int $failures, public int $code = 1213) {}
+    public int $failures;
+    public int $code;
+    public function __construct(int $failures, int $code = 1213) { $this->failures = $failures; $this->code = $code; }
     public function getPrefix(): string { return 'ng_'; }
     public function quote($v): string { return "'" . $v . "'"; }
     public function setQuery($q): self { $this->pending = (string) $q; return $this; }

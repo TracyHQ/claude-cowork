@@ -153,8 +153,11 @@ final class WP_Block_Patterns_Registry
 
 final class WP_Error
 {
-    public function __construct(private string $message)
+    private string $message;
+
+    public function __construct(string $message)
     {
+        $this->message = $message;
     }
 
     public function get_error_message(): string

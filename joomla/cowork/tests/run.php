@@ -20,10 +20,8 @@ require_once __DIR__ . '/../lib/Door.php';
 require_once __DIR__ . '/../lib/ContentIdentity.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
-// PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
-if (!function_exists('str_contains')) {
-    function str_contains(string $haystack, string $needle): bool { return $needle === '' || strpos($haystack, $needle) !== false; }
-}
+// PHP 7.4 (Joomla 3's floor) has no str_contains: lib/Php8Functions.php, which Engine.php loads,
+// defines it there, for the harness as for the engine.
 
 $passed = 0;
 $failed = 0;
