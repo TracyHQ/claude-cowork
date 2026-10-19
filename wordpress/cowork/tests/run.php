@@ -359,6 +359,9 @@ $engineNoDeps = new Engine($goodToken);
 $noDump = $engineNoDeps->handle(['token' => $goodToken, 'action' => 'db.dump', 'params' => ['table' => 'x']]);
 check('engine without dumper wired -> unavailable', $noDump['error'], 'unavailable');
 
+// db.dump_many: several tables per request, so a host firewall counting requests does not ban the importer.
+require __DIR__ . "/db-dump-many.php";
+
 // ---- site.stats -------------------------------------------------------------------------
 // The two questions a caller settles before committing anyone to a wait: how big is this, and
 // has it moved since last time.

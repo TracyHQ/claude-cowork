@@ -105,10 +105,21 @@ final class DbDumper
      * paging strategies below carry different things inside it, and a caller that could read it
      * would end up depending on which one it got.
      *
+     * `$more`, when given, cuts the batch short: it is asked after each row but the last with the
+     * bytes the answer would hold if it ended there, and returning false ends it after that row.
+     * The answer is then exactly what this method returns for the same cursor with `limit` set to
+     * the rows taken — the same SQL, the same next cursor — so a cut page resumes at the very next
+     * row. At least one row is always taken. Without `$more` nothing here changes.
+     *
+     * A cut on a keyed table reads the rows it keeps a second time, with the shorter limit: the key
+     * of the row it stopped at is the source's to report, and asking again keeps it so. It costs one
+     * extra read of at most one batch per cut, and the batch already read is let go first.
+     *
      * @param ?string $cursor
+     * @param ?callable $more `fn(int $bytes): bool`
      * @return array{sql:string, next_cursor:?string, done:bool, rows:int, total:int}
      */
-    public function dumpChunkFrom(string $table, ?string $cursor, int $limit): array
+    public function dumpChunkFrom(string $table, ?string $cursor, int $limit, ?callable $more = null): array
     {
         if ($limit < 1) {
             throw new InvalidArgumentException('limit must be >= 1');
@@ -137,6 +148,13 @@ final class DbDumper
             $offset = is_array($state) && isset($state['o']) ? (int) $state['o'] : 0;
             $rows = $this->src->readRows($table, $offset, $limit);
             $read = count($rows);
+            $taken = $more === null ? $read : $this->rowsToTake($table, $sql, $rows, $more);
+            if ($taken < $read) {
+                // The rows a read of `$taken` would have returned from here: the same slice.
+                $rows = array_slice($rows, 0, $taken);
+                $read = $taken;
+                $limit = $taken;
+            }
             $sql .= SqlValue::insert($table, $rows);
             return [
                 'sql'         => $sql,
@@ -149,6 +167,14 @@ final class DbDumper
 
         $after = is_array($state) && isset($state['k']) && is_array($state['k']) ? $state['k'] : null;
         $batch = $this->src->readRowsAfter($table, $after, $limit);
+        if ($more !== null) {
+            $taken = $this->rowsToTake($table, $sql, $batch['rows'], $more);
+            if ($taken < count($batch['rows'])) {
+                $batch = null;
+                $limit = $taken;
+                $batch = $this->src->readRowsAfter($table, $after, $limit);
+            }
+        }
         $rows = $batch['rows'];
         $read = count($rows);
         $sql .= SqlValue::insert($table, $rows);
@@ -162,6 +188,29 @@ final class DbDumper
             'rows'        => $read,
             'total'       => $total,
         ];
+    }
+
+    /**
+     * How many of `$rows` to keep: the first row for which `$more` answers false, or all of them.
+     * The bytes it is told are exactly strlen() of `$sql` plus the INSERT of the rows so far.
+     *
+     * @param array<int,array<int,?string>> $rows
+     */
+    private function rowsToTake(string $table, string $sql, array $rows, callable $more): int
+    {
+        $count = count($rows);
+        if ($count < 2) {
+            return $count;
+        }
+        // 'INSERT INTO `t` VALUES ' + the tuples joined by ',' + ";\n", as SqlValue::insert writes it.
+        $bytes = strlen($sql) + strlen('INSERT INTO `' . str_replace('`', '``', $table) . '` VALUES ') + 2;
+        for ($i = 0; $i < $count - 1; $i++) {
+            $bytes += strlen(SqlValue::rowTuple($rows[$i])) + ($i > 0 ? 1 : 0);
+            if (!$more($bytes)) {
+                return $i + 1;
+            }
+        }
+        return $count;
     }
 
     /**
