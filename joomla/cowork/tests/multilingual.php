@@ -417,7 +417,9 @@ foreach ([
     // A site with no association groups yet: the source belongs to none.
     'writer' => new FakeSiteWriter(),
 ] as $name => $value) {
-    $applyRef->getProperty($name)->setValue($applyForRelations, $value);
+    $applyProperty = $applyRef->getProperty($name);
+    if (PHP_VERSION_ID < 80100) $applyProperty->setAccessible(true);
+    $applyProperty->setValue($applyForRelations, $value);
 }
 $relationsJob = MultilingualApply::start('zh-CN', 'apply-1', 'req-1', 't', 'c', 'p', 'rev');
 $relationsJob['phase'] = 'relations';

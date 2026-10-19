@@ -20,9 +20,26 @@ require_once __DIR__ . '/../lib/Door.php';
 require_once __DIR__ . '/../lib/ContentIdentity.php';
 require_once __DIR__ . '/FakeRowSource.php';
 
-// PHP 7.4 (Joomla 3's floor) has no str_contains — polyfill it so the harness runs there too.
-if (!function_exists('str_contains')) {
-    function str_contains(string $haystack, string $needle): bool { return $needle === '' || strpos($haystack, $needle) !== false; }
+// PHP 7.4 (Joomla 3's floor) has no str_contains: lib/Php8Functions.php, which Engine.php loads,
+// defines it there, for the harness as for the engine.
+
+/**
+ * The command for a fresh PHP that reads no ini file (`php -n`), for the tests that need one.
+ *
+ * Before PHP 8.0 json is an extension a distribution may build shared and load from an ini file —
+ * Ubuntu's PHP 7.4, the one CI's setup-php installs, does — so under `-n` json_encode is gone and
+ * every child that answers in JSON answers nothing. That child is loaded with json again; the
+ * official docker images build json in, and on PHP 8 it always is.
+ */
+function isolatedPhp(): string
+{
+    static $command = null;
+    if ($command === null) {
+        $command = escapeshellarg(PHP_BINARY) . ' -n';
+        if (trim((string) shell_exec($command . ' -r ' . escapeshellarg('echo function_exists("json_encode") ? 1 : 0;'))) !== '1')
+            $command .= ' -d extension=json';
+    }
+    return $command;
 }
 
 $passed = 0;

@@ -75,6 +75,30 @@ jobs:
       - name: Language check
         run: node ../../scripts/check-language.mjs claude-cowork/lib
 
+  # The floor both packages declare: `requires_php` 7.4 in joomla/update.json and wordpress/update.json.
+  # The jobs above run 8.1, which parses a nullsafe `?->` and calls str_starts_with without a word, so
+  # 0.24.38 carried an engine a PHP 7 site could not even parse: every call answered HTTP 500. Every PHP file is
+  # linted here, tests included; the Joomla engine tests run too, because a PHP 8 function called on
+  # 7.4 is no parse error — it is a fatal error at the line that calls it.
+  php74:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+
+      - name: Lint every PHP file of the Joomla package
+        run: find joomla/cowork -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Lint every PHP file of the WordPress plugin
+        run: find wordpress/cowork -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Joomla engine tests
+        run: php tests/run.php
+        working-directory: joomla/cowork
+
   # The look a Tracy site is built in: one Joomla template and one WordPress theme, each mirrored
   # here from the repository that generates them. Nothing is compiled here, so the job asks the two
   # questions a mirror can still get wrong — does every PHP file parse, and does the zip assemble

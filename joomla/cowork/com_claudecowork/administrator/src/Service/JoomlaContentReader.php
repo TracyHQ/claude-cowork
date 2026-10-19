@@ -49,7 +49,8 @@ final class JoomlaContentReader
             'defaultLanguage'=>(string)\Joomla\CMS\Component\ComponentHelper::getParams('com_languages')->get('site','en-GB'),
         ],(string)(parse_url($this->base,PHP_URL_PATH)??'/'),static fn(string $query): ?string =>
             \Joomla\CMS\Router\Route::link('site',$query,false,\Joomla\CMS\Router\Route::TLS_IGNORE,false));
-        return static fn(string $kind,int $id): string|false|null => $address->path($kind,$id);
+        // Answers string|false|null: the union type PHP 7.4 cannot declare.
+        return static fn(string $kind,int $id) => $address->path($kind,$id);
     }
     /**
      * Every file under images/ with its stat signature (size, mtime, ctime, inode): what brackets
@@ -269,9 +270,9 @@ final class JoomlaContentReader
             $this->db->transactionStart();
             try {
                 $data=[];
-                foreach ($tables as $table) $data[$table]=$this->rows($table,match($table) {
+                foreach ($tables as $table) $data[$table]=$this->rows($table,[
                     'modules_menu'=>'moduleid,menuid','associations'=>'context,id','languages'=>'lang_id','claudecowork_content_identity'=>'kind,native_id',
-                    'fields_values'=>\ContentProjection::TABLES['fields_values'],'contentitem_tag_map'=>\ContentProjection::TABLES['contentitem_tag_map'],default=>'id'});
+                    'fields_values'=>\ContentProjection::TABLES['fields_values'],'contentitem_tag_map'=>\ContentProjection::TABLES['contentitem_tag_map']][$table]??'id');
                 if (!\ContentIdentity::covers($data['menu'],$data['claudecowork_content_identity'],'page')) {
                     $this->db->transactionRollback();
                     if ($attempt>=3) throw new \ContentReadError('CONTENT_SNAPSHOT_EXPIRED',409,'Menu items changed during the read; restart');

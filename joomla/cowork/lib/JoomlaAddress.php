@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 /**
  * The path a visitor sees for a menu item or an article, from Joomla's own router.
  *

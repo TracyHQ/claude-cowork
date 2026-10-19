@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 /** Projection and signed continuation protocol. No Joomla globals and no writes. */
 final class ContentReadError extends RuntimeException
 {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 /**
  * Engine — turns one HTTP call into one bounded piece of work and answers with a plain array.
  *
@@ -3325,7 +3326,7 @@ final class Engine
             }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
-        try { if (!$this->batching) $this->writer?->purgeCache(); } catch (Throwable $e) {}
+        try { if (!$this->batching && $this->writer) $this->writer->purgeCache(); } catch (Throwable $e) {}
         if (!$this->batching) $this->stamped('media');
         return $this->ok(['deleted' => ['path' => $path, 'files' => $shown], 'storageDeleted' => $left === [], 'filesLeft' => $left, 'usedIn' => $usage, 'usedInScope' => $scope, 'undo' => 'apply.revert ' . $applyId, 'cdnCache' => 'a CDN or browser may still serve a cached copy of the old URL for a while']);
     }

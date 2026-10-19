@@ -478,7 +478,7 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
             $version = trim((string) $update->version);
             $url     = trim((string) ($update->downloads->downloadurl ?? ''));
 
-            if ($version === '' || !str_starts_with($url, self::ASSET_PREFIX)) {
+            if ($version === '' || strpos($url, self::ASSET_PREFIX) !== 0) {
                 continue;
             }
 

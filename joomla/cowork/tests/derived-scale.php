@@ -47,6 +47,9 @@ namespace {
             $this->pdo->sqliteCreateFunction('CRC32', static fn($v) => crc32((string) $v), 1);
             $this->pdo->sqliteCreateFunction('REGEXP', static fn($pattern, $value) => (int) preg_match('~' . $pattern . '~', (string) $value), 2);
             $this->pdo->sqliteCreateFunction('CHAR_LENGTH', static fn($v) => mb_strlen((string) $v), 1);
+            // SQLite gained CONCAT_WS in 3.44; PHP 7.4's images carry 3.34. MySQL's, which skips NULLs.
+            if (version_compare((string) $this->pdo->query('SELECT sqlite_version()')->fetchColumn(), '3.44.0', '<'))
+                $this->pdo->sqliteCreateFunction('CONCAT_WS', static fn($separator, ...$values) => implode((string) $separator, array_filter($values, static fn($v) => $v !== null)), -1);
             $this->pdo->sqliteCreateAggregate('BIT_XOR', static fn($carry, $row, $v) => ((int) $carry) ^ (int) $v, static fn($carry) => (int) $carry, 1);
         }
 

@@ -140,9 +140,12 @@ namespace {
         $efuOut = ['appleOnDisk' => is_file(JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/contracts/tracy-apple/j6/1.1.0/manifest.json')];
         if ($efuCase['mode'] === 'build') {
             try {
-                $efuContract = (new ReflectionMethod($efuFactory, 'buildContract'))->invoke(null);
+                $efuBuild = new ReflectionMethod($efuFactory, 'buildContract');
+                if (PHP_VERSION_ID < 80100) $efuBuild->setAccessible(true);
+                $efuContract = $efuBuild->invoke(null);
                 $efuProperty = static function (object $object, string $name) {
                     $property = new ReflectionProperty($object, $name);
+                    if (PHP_VERSION_ID < 80100) $property->setAccessible(true);
                     return $property->isInitialized($object) ? $property->getValue($object) : null;
                 };
                 $efuOut['contract'] = $efuContract === null ? null : [

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 /**
  * Where one door call's time went, phase by phase — measured only when the caller asks for it.
  *
