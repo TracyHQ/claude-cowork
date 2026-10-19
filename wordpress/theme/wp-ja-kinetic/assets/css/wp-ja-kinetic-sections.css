@@ -38,16 +38,19 @@
   --primary-ink: var(--wp--preset--color--accent-on);       /* #FFFFFF */
   --primary-hover: var(--wp--preset--color--accent-hover);  /* #3F6A0A */
   --logo: var(--wp--preset--color--accent);                 /* #4D7C0F */
+  /* the drawer's logo mark (inc/extra.php): the brand's own green with no system; under one, the accent made
+     readable on the page (accent-text), as the Joomla template strokes its glyph */
+  --kds-logo-mark: light-dark(var(--ds-c-accent-text, #4D7C0F), var(--ds-c-accent-text, #A3E635));
 
   /* the source's second green. The spec pack calls it `secondary`; this theme's palette has no
      row for it, so it keeps the source's literal. */
-  --accent: #65A30D;
+  --accent: var(--ds-c-accent, #65A30D);
 
   /* state colours: three have a preset, `--up` has none */
   --ok: var(--wp--preset--color--success);                  /* #30A46C */
   --warn: var(--wp--preset--color--warn);                   /* #F5A623 */
   --err: var(--wp--preset--color--danger);                  /* #E5484D */
-  --up: #16A34A;
+  --up: var(--ds-c-success, #16A34A);
 
   /* the chrome set. The source keeps a second copy of the neutrals under `--chrome-*` so the
      header, menu and footer can stay on the terminal values while a page changes direction
@@ -58,7 +61,7 @@
   --chrome-border: var(--wp--preset--color--border);
   --chrome-text: var(--wp--preset--color--fg);
   --chrome-heading: var(--wp--preset--color--fg-2);
-  --chrome-muted: light-dark(#646F68, #7F8B86);
+  --chrome-muted: var(--ds-c-muted, light-dark(#646F68, #7F8B86));
   --chrome-primary: var(--primary);
   --chrome-primary-ink: var(--primary-ink);
 
@@ -69,7 +72,7 @@
   /* the faint rule the source paints its grid backgrounds with, and the two rgb triples it uses
      inside rgba(). A custom property cannot hold a preset's channels, so these stay literal, as
      they are in the source. */
-  --grid: rgba(16, 20, 15, .04);
+  --grid: rgba(16, 20, 15, .04); /* ds-keep: decorative grid backdrop of the masthead */
   --bg-rgb: 251, 252, 250;
   --text-rgb: 70, 81, 75;
 }
@@ -196,12 +199,12 @@ a:hover {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
   padding: 11px 18px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   border: 1px solid transparent;
   transition: 0.15s;
 }
@@ -224,11 +227,11 @@ a:hover {
 .hx-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   padding: 26px 28px;
 }
 .hx-card--lg {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 .hx-check {
   color: var(--ds-c-accent-text, var(--primary));
@@ -339,7 +342,7 @@ a:hover {
   font-weight: 600;
   font-size: 14px;
   padding: 9px 16px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   border: none;
   text-decoration: none;
   transition: background 0.15s;
@@ -369,7 +372,7 @@ a:hover {
   color: var(--primary-ink);
   font-weight: 600;
   padding: 13px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   border: none;
   text-decoration: none;
 }
@@ -390,16 +393,16 @@ a:hover {
    that reads `var(--p-a08/09/12/25)` was kept — so those `var()` calls resolved to nothing and
    painted transparent instead of the lime tile tint (measured on `.hx-spec-icon`, module 192). */
 body.item-218 {
-  --p-a08: rgba(163, 230, 53, 0.082);
-  --p-a12: rgba(163, 230, 53, 0.125);
-  --p-a09: rgba(163, 230, 53, 0.094);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a08: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  --p-a12: var(--kds-accent-125, var(--ds-c-accent, rgba(163, 230, 53, 0.125)));
+  --p-a09: var(--kds-accent-094, var(--ds-c-accent, rgba(163, 230, 53, 0.094)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 html.t4-dark body.item-218 {
-  --p-a08: rgba(163, 230, 53, 0.082);
-  --p-a12: rgba(163, 230, 53, 0.125);
-  --p-a09: rgba(163, 230, 53, 0.094);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a08: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  --p-a12: var(--kds-accent-125, var(--ds-c-accent, rgba(163, 230, 53, 0.125)));
+  --p-a09: var(--kds-accent-094, var(--ds-c-accent, rgba(163, 230, 53, 0.094)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 body.item-218 .acm-page-masthead .hx-section {
   padding-top: 66px;
@@ -419,8 +422,8 @@ body.item-218 .acm-page-masthead .hx-eyebrow {
   gap: 7px;
   padding: 5px 12px;
   
-  background: rgba(163, 230, 53, 0.078);
-  border: 1px solid rgba(163, 230, 53, 0.251);
+  background: var(--kds-accent-078, var(--ds-c-accent, rgba(163, 230, 53, 0.078)));
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251)));
   border-radius: 100px;
   margin: 0 0 16px;
   
@@ -472,7 +475,7 @@ body.item-218 .acm-features-ledger .hx-fl-ruled-idx {
   color: var(--primary);
 }
 body.item-218 .acm-features-ledger .hx-fl-ruled-title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.6px;
@@ -511,7 +514,7 @@ body.item-218 .acm-features-ledger .hx-spec-text {
 body.item-218 .acm-features-ledger .hx-specrows {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   overflow: hidden;
 }
 body.item-218 .acm-features-ledger .hx-specrows > .hx-specrow:first-child {
@@ -523,7 +526,7 @@ body.item-218 .acm-features-ledger .hx-specrow {
   align-items: center;
 }
 body.item-218 .acm-features-ledger .hx-spec-num {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 34px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -552,7 +555,7 @@ body.item-218 .acm-features-ledger .hx-spec-icon {
   width: 46px;
   height: 46px;
   flex-shrink: 0;
-  border-radius: 11px;
+  border-radius: var(--ds-card-radius, 11px);
   background: var(--p-a12);
   color: var(--ds-c-accent-text, var(--primary));
   margin-top: 0;
@@ -592,7 +595,7 @@ body.item-225 .acm-features-ledger.layout-metrics .hx-section {
   body.item-225 .acm-features-ledger .hx-metrics-card {
     background: transparent !important;
     border: 0 !important;
-    border-radius: 0 !important;
+    border-radius: var(--ds-card-radius, 0) !important;
     max-width: 1240px !important;
     overflow: visible !important;
   }
@@ -619,7 +622,7 @@ body.item-218 #acm-features-intro-193 .hx-section {
   padding-bottom: 72px;
 }
 html.t4-dark body.item-218 #acm-features-intro-193 .hx-section {
-  background: #161B18;
+  background: var(--ds-c-surface, #161B18);
 }
 body.item-218 #acm-features-intro-193 .hx-eyebrow {
   font-size: 12px;
@@ -639,7 +642,7 @@ body.item-218 #acm-features-intro-193 .hx-fi-grid {
 body.item-218 #acm-features-intro-193 .hx-feat {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   padding: 28px;
   margin: 0;
   gap: 14px;
@@ -653,7 +656,7 @@ body.item-218 #acm-features-intro-193 .hx-feat:hover {
 body.item-218 #acm-features-intro-193 .hx-feat-icon {
   background: var(--p-a09);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--ds-card-radius, 10px);
   width: 44px;
   height: 44px;
   margin-bottom: 0; 
@@ -684,13 +687,13 @@ body.item-218 #acm-features-intro-194 .hx-fi-head {
 body.item-218 #acm-features-intro-194 .hx-fi-grid {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   overflow: hidden;
   gap: 0;
 }
 body.item-218 #acm-features-intro-194 .hx-feat {
   padding: 28px;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: inner cell of a rounded grid, square on purpose */
   gap: 6px;
   border: none;
   border-left: 1px solid var(--border);
@@ -752,7 +755,7 @@ body.item-218 #acm-features-intro-194 .hx-section {
   }
 body.item-218 #acm-features-intro-194 .hx-fi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-    border-radius: 12px;
+    border-radius: var(--ds-card-radius, 12px);
   }
 body.item-218 #acm-features-intro-194 .hx-feat {
     border-left: none;
@@ -773,8 +776,8 @@ body.item-218 #acm-features-intro-194 .hx-feat-title {
    border and background transparent. Source keeps one fixed value in both themes (only the
    solid foreground flips via `--primary`), verified `css/page-220.css:18-21`. */
 body.item-220 {
-  --p-a08: rgba(163, 230, 53, 0.082);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a08: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 body.item-220 .acm-page-masthead .hx-section {
   background-color: var(--chrome-elevated);
@@ -865,7 +868,7 @@ body.item-220 .acm-incident-timeline .hx-inc-node {
   display: none;
 }
 body.item-220 .acm-incident-timeline .hx-inc-time {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 18px;
   font-weight: 700;
   color: var(--heading);
@@ -900,7 +903,7 @@ body.item-220 .acm-incident-timeline .hx-inc-badge {
   margin: 0 0 8px;
   background: var(--p-a08);
   border: 1px solid var(--p-a25);
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
 }
 body.item-220 .acm-incident-timeline .hx-inc-badge-l {
   font-family: 'JetBrains Mono', monospace;
@@ -915,7 +918,7 @@ body.item-220 .acm-incident-timeline .hx-inc-badge-l {
 body.item-220 .acm-incident-timeline .hx-inc-title {
   grid-column: 2;
   grid-row: 2;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 19px;
   font-weight: 600;
   color: var(--heading);
@@ -927,7 +930,7 @@ body.item-220 .acm-incident-timeline .hx-inc-title {
 body.item-220 .acm-incident-timeline .hx-inc-text {
   grid-column: 2;
   grid-row: 3;
-  font-family: 'IBM Plex Sans', sans-serif;
+  font-family: var(--ds-font-body, 'IBM Plex Sans', sans-serif);
   font-size: 15px;
   font-weight: 400;
   color: var(--text);
@@ -1006,9 +1009,9 @@ body.item-220 .acm-incident-timeline .hx-inc-text {
 /* --- page-225.css (remainder — masthead, story, values, team, journey; §2b STATS BAND is
    already ported above, next to the shared features-ledger rules) --- */
 html.t4-dark body.item-225 .acm-page-masthead .hx-section {
-  background-color: #161B18 !important;
+  background-color: var(--ds-c-surface, #161B18) !important;
   background-image:
-    radial-gradient(ellipse 60% 80% at 50% 0%, rgba(163, 230, 53, 0.06) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 80% at 50% 0%, var(--kds-accent-060, var(--ds-c-accent, rgba(163, 230, 53, 0.06))) 0%, transparent 100%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
   background-size: auto, 30px 30px, 30px 30px !important;
@@ -1068,7 +1071,8 @@ body.item-225 .acm-features-intro .hx-section {
   padding-bottom: 72px !important;
 }
 html.t4-dark body.item-225 .acm-features-intro .hx-section {
-  background-color: #161B18 !important;
+  /* the values band is a quiet raised band: a worn system's warm surface, the cards keep its surface */
+  background-color: var(--ds-c-surface-warm, #161B18) !important;
 }
 body.item-225 .acm-features-intro .hx-fi-grid {
   grid-template-columns: 1fr 1fr !important;
@@ -1077,7 +1081,7 @@ body.item-225 .acm-features-intro .hx-fi-grid {
 body.item-225 .acm-features-intro .hx-feat {
   background-color: var(--surface) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 14px !important;
+  border-radius: var(--ds-card-radius, 14px) !important;
   padding: 26px !important;
   margin: 0 !important;
 }
@@ -1088,9 +1092,9 @@ body.item-225 .acm-features-intro .hx-feat:hover {
   border-color: var(--primary) !important;
 }
 body.item-225 .acm-features-intro .hx-feat-icon {
-  background: rgba(163, 230, 53, 0.094) !important;
+  background: var(--kds-accent-094, var(--ds-c-accent, rgba(163, 230, 53, 0.094))) !important;
   border: none !important;
-  border-radius: 10px !important;
+  border-radius: var(--ds-card-radius, 10px) !important;
   width: 44px !important;
   height: 44px !important;
   margin-bottom: 20px !important;
@@ -1113,17 +1117,17 @@ body.item-225 .acm-teams .hx-section {
   padding-bottom: 72px !important;
 }
 body.item-225 .acm-teams .hx-team-card {
-  border-radius: 14px !important;
+  border-radius: var(--ds-card-radius, 14px) !important;
   padding: 24px !important;
 }
 body.item-225 .acm-teams .hx-team-chip {
-  background: rgba(163, 230, 53, 0.145) !important;
+  background: var(--kds-accent-145, var(--ds-c-accent, rgba(163, 230, 53, 0.145))) !important;
   border: none !important;
-  border-radius: 50% !important;
+  border-radius: var(--ds-pill-radius, 50%) !important;
   font-size: 20px !important;
 }
 body.item-225 .acm-teams .hx-team-avatar {
-  border-radius: 50% !important;
+  border-radius: var(--ds-card-radius, 50%) !important;
 }
 body.item-225 .acm-teams .hx-team-name {
   font-size: 17px !important;
@@ -1179,7 +1183,7 @@ body.item-225 .acm-incident-timeline .hx-inc-node {
   justify-self: center !important;
   width: 12px !important;
   height: 12px !important;
-  border-radius: 50% !important;
+  border-radius: var(--ds-card-radius, 50%) !important;
   background: var(--primary) !important;
   border: none !important;
   flex: none !important;
@@ -1190,6 +1194,9 @@ body.item-225 .acm-incident-timeline .hx-inc-node svg {
   display: none !important;
 }
 body.item-225 .acm-incident-timeline .hx-inc-time {
+  /* the upright journey timeline draws its line beside the labels: a label carries no ground or ring */
+  background-color: transparent !important;
+  box-shadow: none !important;
   grid-column: 2 !important;
   grid-row: 1 !important;
   align-self: start !important;
@@ -1251,17 +1258,17 @@ body.item-219 #t4-main-body {
   padding-top: 0 !important;
 }
 body.item-219 .acm-page-masthead .hx-section {
-  background-color: #161B18;
+  background-color: var(--ds-c-ink, #161B18);
   background-image: radial-gradient(ellipse 150% 120% at 50% 0%,
-    rgba(163, 230, 53, 0.059) 0%,
-    #161B18 55%);
-  border-bottom: 1px solid #232A27;
+    var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%,
+    var(--ds-c-ink, #161B18) 55%);
+  border-bottom: 1px solid var(--ds-c-border, #232A27);
   padding: 66px 0 58px;
 }
 html:not(.t4-dark) body.item-219 .acm-page-masthead .hx-section {
   background-color: var(--ds-c-surface-warm, #F2F5EE);
   background-image: radial-gradient(ellipse 150% 120% at 50% 0%,
-    rgba(163, 230, 53, 0.059) 0%,
+    var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%,
     var(--ds-c-surface-warm, #F2F5EE) 55%);
   border-bottom: 1px solid var(--ds-c-border, #E4E8E0);
 }
@@ -1279,14 +1286,14 @@ body.item-219 .acm-page-masthead .hx-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: rgba(163, 230, 53, 0.078);
-  border: 1px solid rgba(163, 230, 53, 0.251);
+  background: var(--kds-accent-078, var(--ds-c-accent, rgba(163, 230, 53, 0.078)));
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251)));
   border-radius: 100px;
   padding: 5px 12px;
   font-size: 11.5px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #A3E635;
+  color: var(--ds-c-accent-text, #A3E635);
   margin: 0 0 16px;
 }
 body.item-219 .acm-page-masthead .hx-eyebrow::before {
@@ -1294,7 +1301,7 @@ body.item-219 .acm-page-masthead .hx-eyebrow::before {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #A3E635;
+  background: var(--ds-c-accent, #A3E635);
   flex-shrink: 0;
 }
 html:not(.t4-dark) body.item-219 .acm-page-masthead .hx-eyebrow {
@@ -1317,10 +1324,10 @@ html:not(.t4-dark) body.item-219 .acm-clients.style-2 .acm-clients-mark img {
   filter: brightness(0.42) saturate(1.3);
 }
 body.item-219 .acm-clients.style-2 .acm-clients-mark {
-  background: rgba(163, 230, 53, 0.125);
+  background: var(--kds-accent-125, var(--ds-c-accent, rgba(163, 230, 53, 0.125)));
 }
 body.item-219 .acm-clients.style-2 .hx-section {
-  background: var(--bg, #0A0D0C);
+  background: var(--bg, var(--ds-c-ink, #0A0D0C));
 }
 html:not(.t4-dark) body.item-219 .acm-clients.style-2 .hx-section {
   background: var(--bg, var(--ds-c-bg, #FBFCFA));
@@ -1331,7 +1338,8 @@ body.item-219 .acm-features-intro {
 body.item-219 .acm-cta.cta-bar .hx-section {
   padding-top: 0;
   padding-bottom: 72px;
-  background: #0A0D0C;
+  /* the bar's section is level with the page on both sides (1.00:1): a worn system's page ground, not its ink */
+  background: var(--ds-c-bg, #0A0D0C);
 }
 html:not(.t4-dark) body.item-219 .acm-cta.cta-bar .hx-section {
   background: var(--ds-c-bg, #FBFCFA);
@@ -1347,9 +1355,9 @@ body.item-219 .acm-cta.cta-bar .hx-cta-inner {
   row-gap: 0;
   align-items: center;
   text-align: left;
-  background: #161B18;
-  border: 1px solid #232A27;
-  border-radius: 16px;
+  background: var(--ds-c-ink, #161B18);
+  border: 1px solid var(--ds-c-border, #232A27);
+  border-radius: var(--ds-card-radius, 16px);
   padding: 32px;
   background-image: none;
 }
@@ -1363,7 +1371,7 @@ body.item-219 .acm-cta.cta-bar .hx-cta-title {
   font-weight: 700;
   letter-spacing: normal;
   line-height: 1.3;
-  color: #F2F5F3;
+  color: var(--ds-c-on-ink, #F2F5F3);
   grid-column: 1;
   grid-row: 1;
   margin: 0 0 4px;
@@ -1374,7 +1382,7 @@ html:not(.t4-dark) body.item-219 .acm-cta.cta-bar .hx-cta-title {
 body.item-219 .acm-cta.cta-bar .hx-cta-sub {
   font-size: 14px;
   line-height: 1.55;
-  color: #9AA6A1;
+  color: var(--ds-c-on-ink, #9AA6A1);
   max-width: none;
   margin: 0;
   grid-column: 1;
@@ -1396,14 +1404,14 @@ body.item-219 .acm-cta.cta-bar .hx-cta-btn-primary {
   font-size: 14.5px;
   font-weight: 600;
   padding: 12px 22px;
-  border-radius: 9px;
-  background: #A3E635;
-  color: #0A0D0C;
+  border-radius: var(--ds-btn-radius, 9px);
+  background: var(--ds-c-accent, #A3E635);
+  color: var(--ds-c-accent-on, #0A0D0C);
   white-space: nowrap;
 }
 body.item-219 .acm-cta.cta-bar .hx-cta-btn-primary:hover {
-  background: #BCF25A;
-  color: #0A0D0C;
+  background: var(--ds-c-accent-hover, #BCF25A);
+  color: var(--ds-c-accent-on, #0A0D0C);
 }
 html:not(.t4-dark) body.item-219 .acm-cta.cta-bar .hx-cta-btn-primary {
   background: var(--ds-c-accent, #4D7C0F);
@@ -1453,7 +1461,7 @@ body.item-219 .acm-cta.cta-bar .hx-cta-inner {
     align-items: flex-start;
     gap: 16px;
     padding: 28px;
-    border-radius: 16px;
+    border-radius: var(--ds-card-radius, 16px);
   }
 body.item-219 .acm-cta.cta-bar .hx-cta-title {
     grid-column: unset;
@@ -1476,15 +1484,15 @@ body.item-219 .acm-cta.cta-bar .hx-cta-btn-primary {
     text-align: center;
   }
 html.t4-dark body.item-219 .acm-page-masthead .hx-section {
-    background-color: #161B18;
+    background-color: var(--ds-c-surface, #161B18);
     background-image: radial-gradient(ellipse 160% 110% at 50% 0%,
-      rgba(163, 230, 53, 0.059) 0%,
-      #161B18 55%);
+      var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%,
+      var(--ds-c-surface, #161B18) 55%);
   }
 html:not(.t4-dark) body.item-219 .acm-page-masthead .hx-section {
     background-color: var(--ds-c-surface-warm, #F2F5EE);
     background-image: radial-gradient(ellipse 160% 110% at 50% 0%,
-      rgba(163, 230, 53, 0.059) 0%,
+      var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%,
       var(--ds-c-surface-warm, #F2F5EE) 55%);
   }
 }
@@ -1503,17 +1511,17 @@ body.item-222 .acm-page-masthead .hx-eyebrow {
   display: inline-flex !important;
   align-items: center;
   gap: 7px;
-  background: rgba(163, 230, 53, 0.078) !important;
-  border: 1px solid rgba(163, 230, 53, 0.251) !important;
-  border-radius: 100px !important;
+  background: var(--kds-accent-078, var(--ds-c-accent, rgba(163, 230, 53, 0.078))) !important;
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251))) !important;
+  border-radius: var(--ds-pill-radius, 100px) !important;
   padding: 5px 12px !important;
   margin-bottom: 16px;
   font-size: 11.5px !important;
   letter-spacing: 1.5px !important;
 }
 html:not(.t4-dark) body.item-222 .acm-page-masthead .hx-eyebrow {
-  background: rgba(77, 124, 15, 0.08) !important;
-  border: 1px solid rgba(77, 124, 15, 0.2) !important;
+  background: var(--kds-accent-080, var(--ds-c-accent, rgba(77, 124, 15, 0.08))) !important;
+  border: 1px solid var(--kds-accent-200, var(--ds-c-accent, rgba(77, 124, 15, 0.2))) !important;
 }
 body.item-222 .acm-page-masthead .hx-eyebrow::before {
   content: "";
@@ -1525,9 +1533,9 @@ body.item-222 .acm-page-masthead .hx-eyebrow::before {
   flex-shrink: 0;
 }
 body.item-222 .acm-page-masthead .hx-section {
-  background-color: #161B18 !important;
+  background-color: var(--ds-c-ink, #161B18) !important;
   background-image:
-    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, transparent 55%),
+    radial-gradient(ellipse 150% 120% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, transparent 55%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
   background-size: auto, 30px 30px, 30px 30px !important;
@@ -1535,7 +1543,7 @@ body.item-222 .acm-page-masthead .hx-section {
 html:not(.t4-dark) body.item-222 .acm-page-masthead .hx-section {
   background-color: var(--ds-c-surface-warm, #F2F5EE) !important;
   background-image:
-    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(77, 124, 15, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse 150% 120% at 50% 0%, var(--kds-accent-050, var(--ds-c-accent, rgba(77, 124, 15, 0.05))) 0%, transparent 55%),
     linear-gradient(rgba(16, 20, 15, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(16, 20, 15, 0.04) 1px, transparent 1px) !important;
 }
@@ -1579,7 +1587,7 @@ body.item-222 .acm-accordion .hx-faq-list > *:first-child .hx-faq-group {
 body.item-222 .acm-accordion .hx-faq-item {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
+  border-radius: var(--ds-card-radius, 12px) !important;
   padding: 18px 20px !important;
 }
 /* Dropped: `.hx-faq-item` above already draws a border on all four sides of every card, so an
@@ -1607,13 +1615,14 @@ body.item-222 .acm-accordion .hx-faq-a {
   padding: 14px 0 0 !important;
 }
 body.item-222 .acm-faq-support .hx-sup-section {
-  background: #161B18 !important;
+  /* a quiet raised band on the dark side: a worn system's warm surface, as its light side */
+  background: var(--ds-c-surface-warm, #161B18) !important;
 }
 html:not(.t4-dark) body.item-222 .acm-faq-support .hx-sup-section {
   background: var(--ds-c-surface-warm, #F2F5EE) !important;
 }
 body.item-222 .acm-faq-support .hx-sup-card {
-  background: #161B18 !important;
+  background: var(--ds-c-ink, #161B18) !important;
   border-color: var(--border) !important;
 }
 html:not(.t4-dark) body.item-222 .acm-faq-support .hx-sup-card {
@@ -1646,7 +1655,7 @@ body.item-222 .acm-accordion .hx-pad {
   }
 body.item-222 .acm-accordion .hx-faq-item {
     padding: 16px 18px !important;
-    border-radius: 10px !important;
+    border-radius: var(--ds-card-radius, 10px) !important;
   }
 body.item-222 .acm-accordion .hx-faq-q {
     font-size: 15px !important;
@@ -1691,8 +1700,8 @@ body.item-223 .acm-page-masthead .hx-eyebrow {
   gap: 7px;
   padding: 5px 12px;
   border-radius: 100px;
-  background: rgba(163, 230, 53, 0.082);
-  border: 1px solid rgba(163, 230, 53, 0.25);
+  background: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  border: 1px solid var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
   margin-bottom: 16px;
 }
 body.item-223 .acm-page-masthead .hx-section {
@@ -1719,7 +1728,7 @@ body.item-223 .acm-pricing .hx-h2 {
 body.item-223 .hx-plan.is-popular {
   background-image: radial-gradient(
     ellipse at 50% 0%,
-    rgba(163, 230, 53, 0.086) 0%,
+    var(--kds-accent-086, var(--ds-c-accent, rgba(163, 230, 53, 0.086))) 0%,
     transparent 70%
   ) !important;
 }
@@ -1737,7 +1746,7 @@ body.item-223 .acm-pricing-matrix .hx-pm-title {
   letter-spacing: -0.6px !important;
 }
 body.item-223 .hx-matrix-wrap {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   border: 1px solid var(--border);
   overflow: hidden;
   background: var(--surface);
@@ -1746,7 +1755,7 @@ body.item-223 .hx-matrix thead tr {
   background: var(--elevated);
 }
 html.t4-dark body.item-223 .hx-matrix thead tr {
-  background: #161B18;
+  background: var(--ds-c-surface, #161B18);
 }
 body.item-223 .acm-accordion .hx-h2 {
   font-size: 28px !important;
@@ -1791,20 +1800,20 @@ body.item-223 .acm-accordion .hx-h2 {
 
 /* --- page-226.css --- */
 body.item-226 {
-  --p-a12: rgba(163, 230, 53, 0.125);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a12: var(--kds-accent-125, var(--ds-c-accent, rgba(163, 230, 53, 0.125)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 html.t4-dark body.item-226 {
-  --p-a12: rgba(163, 230, 53, 0.125);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a12: var(--kds-accent-125, var(--ds-c-accent, rgba(163, 230, 53, 0.125)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 body.item-226 .acm-page-masthead .hx-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 5px 12px;
-  background: rgba(163, 230, 53, 0.078);
-  border: 1px solid rgba(163, 230, 53, 0.251);
+  background: var(--kds-accent-078, var(--ds-c-accent, rgba(163, 230, 53, 0.078)));
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251)));
   border-radius: 100px;
   margin: 0 0 16px;
   text-transform: none;
@@ -1858,7 +1867,7 @@ body.item-226 .acm-teams .hx-pad {
 }
 body.item-226 .acm-teams .hx-team-card {
   padding: 28px 24px;
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   gap: 0;
   align-items: center;
   text-align: center;
@@ -1873,10 +1882,10 @@ body.item-226 .acm-teams .hx-team-chip {
   width: 76px;
   height: 76px;
   flex: 0 0 76px;
-  border-radius: 38px;
+  border-radius: var(--ds-pill-radius, 38px);
   background: var(--p-a12);
   border: none;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0;
@@ -1885,7 +1894,7 @@ body.item-226 .acm-teams .hx-team-avatar {
   width: 76px;
   height: 76px;
   flex: 0 0 76px;
-  border-radius: 38px;
+  border-radius: 38px; /* ds-keep: the avatar's own rounded shape */
   border: none;
 }
 body.item-226 .acm-teams .hx-team-id {
@@ -1923,14 +1932,14 @@ body.item-226 .acm-teams .hx-team-chip {
     width: 72px;
     height: 72px;
     flex: 0 0 72px;
-    border-radius: 36px;
+    border-radius: var(--ds-pill-radius, 36px);
     font-size: 24px;
   }
 body.item-226 .acm-teams .hx-team-avatar {
     width: 72px;
     height: 72px;
     flex: 0 0 72px;
-    border-radius: 36px;
+    border-radius: 36px; /* ds-keep: the avatar's own rounded shape */
   }
 body.item-226 .acm-teams .hx-team-id {
     padding-top: 14px;
@@ -1957,13 +1966,13 @@ body.item-226 #acm-cta-204 .hx-cta-sub {
 }
 body.item-226 #acm-cta-204 .hx-cta-inner {
   padding: 36px;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--chrome-elevated) !important;
   border: 1px solid var(--border);
 }
 body.item-226 #acm-cta-204 .hx-cta-btn {
   padding: 12px 22px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   font-size: 14.5px;
 }
 @media (max-width: 620px) {
@@ -2016,7 +2025,7 @@ body.item-227 .kinetic-contact__formcard {
 }
 body.item-227 .kinetic-contact__formcard > .hx-form-title {
   display: block;
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
@@ -2033,7 +2042,7 @@ body.item-227 .kinetic-contactform .kinetic-contactform__field {
 }
 body.item-227 .kinetic-contact .control-label,
 body.item-227 .kinetic-contact .kinetic-contactform label {
-  font-family: "IBM Plex Sans", system-ui, sans-serif !important;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   letter-spacing: 0 !important;
@@ -2047,7 +2056,7 @@ body.item-227 .kinetic-contact .kinetic-contactform input[type="email"],
 body.item-227 .kinetic-contact .kinetic-contactform textarea,
 body.item-227 .kinetic-contact .kinetic-contactform select {
   background: var(--bg) !important;
-  border-radius: 9px !important;
+  border-radius: var(--ds-input-radius, 9px) !important;
   padding: 12px 13px !important;
 }
 body.item-227 .kinetic-contact .kinetic-contactform textarea {
@@ -2063,7 +2072,7 @@ body.item-227 .kinetic-contactform fieldset > fieldset.dynamic-fields {
 }
 body.item-227 .kinetic-contactform__actions .hx-btn,
 body.item-227 .kinetic-contactform__actions button {
-  border-radius: 9px !important;
+  border-radius: var(--ds-btn-radius, 9px) !important;
   padding: 13px 24px !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2099,15 +2108,15 @@ body.item-227 .hx-method {
   gap: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   padding: 22px;
 }
 body.item-227 .hx-method__icon {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border-radius: 11px;
-  background: rgba(163, 230, 53, .12);
+  border-radius: var(--ds-card-radius, 11px);
+  background: var(--kds-accent-120, var(--ds-c-accent, rgba(163, 230, 53, .12)));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2126,7 +2135,7 @@ body.item-227 .hx-method__body {
   min-width: 0;
 }
 body.item-227 .hx-method__title {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 600;
   line-height: 1.25;
@@ -2134,7 +2143,7 @@ body.item-227 .hx-method__title {
   margin: 0;
 }
 body.item-227 .hx-method__desc {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 13.5px;
   line-height: 1.5;
   color: var(--text);
@@ -2247,7 +2256,7 @@ body.item-227 .hx-method {
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(120% 100% at 80% 0%, rgba(163, 230, 53, .12), transparent 60%);
+    radial-gradient(120% 100% at 80% 0%, var(--kds-accent-120, var(--ds-c-accent, rgba(163, 230, 53, .12))), transparent 60%);
   background-size: 34px 34px, 34px 34px, 100% 100%;
   background-repeat: repeat, repeat, no-repeat;
 }
@@ -2275,7 +2284,7 @@ body.item-227 .hx-method {
 }
 
 .acm-hero .hx-h1 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 52px;
   line-height: 1.04;
   font-weight: 700;
@@ -2306,7 +2315,7 @@ body.item-227 .hx-method {
   justify-content: center;
   box-sizing: border-box;
   height: 44px;              /* both buttons EXACTLY equal height (.pen primary ~44; cmd matched up from ~41) */
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   text-decoration: none;
   cursor: pointer;
   /* micro-interactions.md §3b BUTTON gesture — named properties only, no `all` */
@@ -2326,7 +2335,7 @@ body.item-227 .hx-method {
 .acm-hero .hx-btn--primary:focus-visible {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
   outline: none;
 }
 
@@ -2349,7 +2358,7 @@ body.item-227 .hx-method {
 .acm-hero .hx-btn--ghost:focus-visible {
   color: var(--ds-c-accent-text-hover, var(--primary));
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .18);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .18));
   outline: none;
 }
 
@@ -2382,7 +2391,7 @@ body.item-227 .hx-method {
   width: 100%;
   height: auto;
   border: 0;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: code-panel picture, square on purpose */
   box-shadow: none;
   filter: drop-shadow(0 20px 42px rgba(8, 12, 10, .35));
 }
@@ -2466,13 +2475,13 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
 .acm-hero .hx-btn--primary:has(> .wp-block-button__link:focus-visible) {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 
 .acm-hero .hx-btn--ghost:has(> .wp-block-button__link:focus-visible) {
   color: var(--ds-c-accent-text-hover, var(--primary));
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .18);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .18));
 }
 
 /* The primary arrow <svg>, the ghost `<span class="hx-prompt">$</span>` and the trust
@@ -2497,7 +2506,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   --clients-border: var(--border, var(--ds-c-border, #E4E8E0));
   --clients-heading: var(--heading, var(--ds-c-fg-2, #10140F));
   --clients-text: var(--text, var(--ds-c-fg, #46514B));
-  --clients-muted: var(--muted, #66716A);
+  --clients-muted: var(--muted, var(--ds-c-muted, #66716A));
   --clients-primary: var(--primary, var(--ds-c-accent, #4D7C0F));
 }
 .acm-clients .hx-container {
@@ -2519,7 +2528,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   margin-bottom: 14px;
 }
 .acm-clients .acm-clients-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -2567,7 +2576,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   transition: opacity .2s ease;
 }
 .acm-clients .acm-clients-logo.is-text {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-weight: 600;
   font-size: 18px;
   color: var(--clients-muted);
@@ -2613,7 +2622,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
 .acm-clients .acm-clients-card {
   border: 1px solid var(--clients-border);
   background: var(--clients-surface);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   padding: 18px 20px;
   display: flex;
   align-items: center;
@@ -2631,7 +2640,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   display: inline-flex;
   width: 42px;
   height: 42px;
-  border-radius: 10px;
+  border-radius: var(--ds-card-radius, 10px);
   /* .pen icon-chip tint #A3E63518 (~9.4% alpha). color-mix keeps the primary token
      so blueprint/signal recolor; only the strength drops from 12% -> 9.4%. */
   background: color-mix(in srgb, var(--clients-primary) 9.4%, transparent);
@@ -2646,8 +2655,20 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   height: 22px;
   object-fit: contain;
 }
+/* The integration marks are pictures stroked in Kinetic's lime, the template's accent (olive on the
+   light page through the filter above). Under a design system inc/extra.php draws the picture inline
+   in currentColor (wp_ja_kinetic_clients_mark_inline), and it takes the readable accent role, as the
+   mark's letter fallback takes the primary. Without a system the <img> stays and this rule matches
+   nothing. (A CSS mask over the <img>, 15/10/2026, was withdrawn: a mask that does not load leaves
+   the tile empty.) */
+.acm-clients .acm-clients-mark .acm-clients-mark-svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: var(--ds-c-accent-text, var(--clients-primary));
+}
 .acm-clients .acm-clients-mark-letter {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 16px;
   font-weight: 700;
   color: var(--clients-primary);
@@ -2656,7 +2677,7 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   min-width: 0;
 }
 .acm-clients .acm-clients-card-name {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 15px;
   font-weight: 600;
   color: var(--clients-heading);
@@ -2701,13 +2722,13 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
 :root[data-theme="dark"] .acm-clients,
 [data-bs-theme="dark"] .acm-clients,
 [data-theme="dark"] .acm-clients {
-  --clients-surface: var(--surface, #121614);
-  --clients-elevated: var(--elevated, #0F1311);
-  --clients-border: var(--border, #232A27);
-  --clients-heading: var(--heading, #F2F5F3);
-  --clients-text: var(--text, #9AA6A1);
-  --clients-muted: var(--muted, #7F8B86);
-  --clients-primary: var(--primary, #A3E635);
+  --clients-surface: var(--surface, var(--ds-c-surface, #121614));
+  --clients-elevated: var(--elevated, var(--ds-c-surface, #0F1311));
+  --clients-border: var(--border, var(--ds-c-border-soft, #232A27));
+  --clients-heading: var(--heading, var(--ds-c-heading, #F2F5F3));
+  --clients-text: var(--text, var(--ds-c-muted, #9AA6A1));
+  --clients-muted: var(--muted, var(--ds-c-muted, #7F8B86));
+  --clients-primary: var(--primary, var(--ds-c-accent, #A3E635));
 }
 
 /* =========================================================================
@@ -2718,9 +2739,9 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
  * copy out exactly as the other comes in → no seam, no jump.
  * ========================================================================= */
 .acm-clients-ticker {
-  background: #0D1110;
-  border-top: 1px solid #1B211E;
-  border-bottom: 1px solid #1B211E;
+  background: var(--ds-c-ink, #0D1110);
+  border-top: 1px solid var(--ds-c-border, #1B211E);
+  border-bottom: 1px solid var(--ds-c-border, #1B211E);
   overflow: hidden;
 }
 /* `.hx-container` (shared) carries padding-block:30 on style-1 (0,3,0) — beat it so
@@ -2740,13 +2761,13 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   font-size: 11px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--tick-accent, #A3E635);
+  color: var(--tick-accent, var(--ds-c-accent-text, #A3E635));
 }
 .acm-clients-ticker .acm-tick-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--tick-accent, #A3E635);
+  background: var(--tick-accent, var(--ds-c-accent, #A3E635));
   flex: none;
   animation: acmTickPulse 2s ease-in-out infinite;
 }
@@ -2778,19 +2799,25 @@ html[data-style="signal"]    .acm-hero .hx-panelimg.is-signal    { display: bloc
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
-.acm-clients-ticker .acm-tick-item.is-bright { color: #C9D1CE; }
-.acm-clients-ticker .acm-tick-item.is-dim    { color: #7E8A85; }
+/* The ticker is an ink band in both themes: its words read the ink band's own words (on-ink), not
+   the page's text roles, which a worn system sets for the page ground. */
+.acm-clients-ticker .acm-tick-item.is-bright { color: var(--ds-c-on-ink, #C9D1CE); }
+/* The dim words keep the source's #7E8A85 unworn. Under a system they take the band's own words
+   (--ds-c-on-ink), the only colour the slot makes read 4.5:1 on its ink: a mix 60% of the way off
+   the band read 3.0:1 under Airbnb and 3.6:1 under Eddie and ElevenLabs, whose ink is a mid grey
+   (TDSR CON-1, 16/10/2026). */
+.acm-clients-ticker .acm-tick-item.is-dim    { color: var(--ds-c-on-ink, #7E8A85); }
 .acm-clients-ticker .acm-tick-sep {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--tick-accent, #A3E635);
+  color: var(--tick-accent, var(--ds-c-accent-text, #A3E635));
   flex: none;
 }
 /* Always-dark ticker bar: accent uses each style's BRIGHT (dark-mode) primary,
    fixed regardless of page light/dark so it never dims to olive/light on the dark bar. */
-.acm-clients-ticker { --tick-accent: #A3E635; }
-html[data-style="blueprint"] .acm-clients-ticker { --tick-accent: #818CF8; }
-html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
+.acm-clients-ticker { --tick-accent: var(--ds-c-accent-on-ink, #A3E635); }
+html[data-style="blueprint"] .acm-clients-ticker { --tick-accent: var(--ds-c-accent-on-ink, #818CF8); }
+html[data-style="signal"]    .acm-clients-ticker { --tick-accent: var(--ds-c-accent-on-ink, #22D3EE); }
 .acm-clients-ticker:hover .acm-tick-track { animation-play-state: paused; }
 @keyframes acmTickScroll {
   from { transform: translateX(0); }
@@ -2903,7 +2930,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   --bento-border: var(--border, var(--ds-c-border, #E4E8E0));
   --bento-heading: var(--heading, var(--ds-c-fg-2, #10140F));
   --bento-text: var(--text, var(--ds-c-fg, #46514B));
-  --bento-muted: var(--muted, #66716A);
+  --bento-muted: var(--muted, var(--ds-c-muted, #66716A));
   --bento-primary: var(--primary, var(--ds-c-accent, #4D7C0F));
 }
 .acm-bento .hx-section {
@@ -2939,7 +2966,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   margin-bottom: 14px;
 }
 .acm-bento .acm-bento-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -2967,7 +2994,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
 .acm-bento .hx-card {
   border: 1px solid var(--bento-border);
   background: var(--bento-surface);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   padding: 28px;
   display: flex;
   flex-direction: column;
@@ -2994,7 +3021,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   display: inline-flex;
   width: 44px;
   height: 44px;
-  border-radius: 11px;
+  border-radius: var(--ds-card-radius, 11px);
   background: color-mix(in srgb, var(--bento-primary) 12%, transparent);
   align-items: center;
   justify-content: center;
@@ -3006,7 +3033,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   color: var(--bento-primary);
 }
 .acm-bento .acm-bento-stat {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 46px;
   font-weight: 700;
   letter-spacing: -2px;
@@ -3015,7 +3042,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   margin-bottom: 10px;
 }
 .acm-bento .acm-bento-tile-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.3px;
@@ -3041,7 +3068,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   border: 1px solid var(--bento-border);
 }
 @media (max-width: 620px) {
@@ -3068,13 +3095,13 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
 :root[data-theme="dark"] .acm-bento,
 [data-bs-theme="dark"] .acm-bento,
 [data-theme="dark"] .acm-bento {
-  --bento-surface: var(--surface, #121614);
-  --bento-elevated: var(--elevated, #0F1311);
-  --bento-border: var(--border, #232A27);
-  --bento-heading: var(--heading, #F2F5F3);
-  --bento-text: var(--text, #9AA6A1);
-  --bento-muted: var(--muted, #7F8B86);
-  --bento-primary: var(--primary, #A3E635);
+  --bento-surface: var(--surface, var(--ds-c-surface, #121614));
+  --bento-elevated: var(--elevated, var(--ds-c-surface, #0F1311));
+  --bento-border: var(--border, var(--ds-c-border-soft, #232A27));
+  --bento-heading: var(--heading, var(--ds-c-heading, #F2F5F3));
+  --bento-text: var(--text, var(--ds-c-muted, #9AA6A1));
+  --bento-muted: var(--muted, var(--ds-c-muted, #7F8B86));
+  --bento-primary: var(--primary, var(--ds-c-accent, #A3E635));
 }
 
 /* =========================================================================
@@ -3108,7 +3135,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
 .acm-bento.style-2 .is-feat .acm-bento-media { margin-top: 0; }
 .acm-bento.style-2 .is-feat .acm-bento-media img {
   border: 0;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: full-bleed feature picture, square on purpose */
   box-shadow: none;
   width: 100%;
   height: auto;
@@ -3138,7 +3165,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
 }
 .acm-bento.style-2 .acm-bento-stat-row { display: flex; align-items: flex-end; gap: 6px; }
 .acm-bento.style-2 .acm-bento-stat-val {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 46px;
   line-height: 1;
   font-weight: 700;
@@ -3162,7 +3189,7 @@ html[data-style="signal"]    .acm-clients-ticker { --tick-accent: #22D3EE; }
 
 /* Small (Smart / Distributed) */
 .acm-bento.style-2 .acm-bento-tile.is-small { padding: 24px 22px; gap: 12px; }
-.acm-bento.style-2 .is-small .acm-bento-ico { width: 40px; height: 40px; border-radius: 10px; }
+.acm-bento.style-2 .is-small .acm-bento-ico { width: 40px; height: 40px; border-radius: var(--ds-card-radius, 10px); }
 .acm-bento.style-2 .is-small .acm-bento-ico svg { width: 19px; height: 19px; }
 .acm-bento.style-2 .is-small .acm-bento-tile-title { font-size: 16px; letter-spacing: -0.2px; }
 .acm-bento.style-2 .is-small .acm-bento-tile-text { font-size: 13px; line-height: 1.54; }
@@ -3333,7 +3360,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
 }
 
 .acm-incident-timeline .hx-h2 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 34px;
   line-height: 1.1;
   font-weight: 700;
@@ -3383,7 +3410,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   content: "";
   position: absolute;
   inset: -16px -12px -20px;
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   background: transparent;
   border: 1px solid transparent;
   transition: background-color .15s ease, border-color .15s ease;
@@ -3465,7 +3492,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
 }
 
 .acm-incident-timeline .hx-inc-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 18px;
   font-weight: 600;
   color: var(--heading);
@@ -3590,22 +3617,22 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   --split-border: var(--border, var(--ds-c-border, #E4E8E0));
   --split-heading: var(--heading, var(--ds-c-fg-2, #10140F));
   --split-text: var(--text, var(--ds-c-fg, #46514B));
-  --split-muted: var(--muted, #66716A);
+  --split-muted: var(--muted, var(--ds-c-muted, #66716A));
   --split-primary: var(--primary, var(--ds-c-accent, #4D7C0F));
-  --split-primary-ink: var(--primary-ink, #FFFFFF);
+  --split-primary-ink: var(--primary-ink, var(--ds-c-accent-on, #FFFFFF));
   --split-shadow: var(--shadow, 0 18px 44px -20px rgba(20, 30, 15, .2));
   --err: var(--ds-c-danger, #E5484D);
   --warn: var(--ds-c-warn, #F5A623);
   --ok: var(--ds-c-success, #30A46C);
-  --split-code-bg: #0D1110;
-  --split-code-bar: #111614;
-  --split-code-line: #1b211e;
-  --split-code-title: #7E8A85;
-  --split-code-default: #C9D1CE;
-  --split-syn-key: #A3E635;
+  --split-code-bg: var(--ds-c-ink, #0D1110);
+  --split-code-bar: #111614; /* ds-keep: code panel syntax colours, a picture of code */
+  --split-code-line: var(--ds-c-border, #1b211e);
+  --split-code-title: var(--ds-c-heading, #7E8A85);
+  --split-code-default: #C9D1CE; /* ds-keep: code panel syntax colours, a picture of code */
+  --split-syn-key: #A3E635; /* ds-keep: code panel syntax colours, a picture of code */
   --split-syn-str: var(--ds-c-warn, #F5A623);
-  --split-syn-num: #56E0F4;
-  --split-syn-com: #5F6B66;
+  --split-syn-num: #56E0F4; /* ds-keep: code panel syntax colours, a picture of code */
+  --split-syn-com: #5F6B66; /* ds-keep: code panel syntax colours, a picture of code */
 }
 .acm-kineticql-split .hx-section {
   padding: 80px 0;
@@ -3634,7 +3661,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   margin-bottom: 14px;
 }
 .acm-kineticql-split .acm-split-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--ds-font-display, 'Space Grotesk', sans-serif);
   font-size: 34px;
   line-height: 1.12;
   font-weight: 700;
@@ -3684,7 +3711,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   align-items: center;
   margin-top: 26px;
   padding: 11px 20px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--split-primary);
   color: var(--split-primary-ink);
   font-family: 'JetBrains Mono', monospace;
@@ -3698,7 +3725,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   background: var(--primary-hover, var(--split-primary));
   color: var(--split-primary-ink);
   transform: translateY(-1px);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
   outline: none;
 }
 /* Per-direction KineticQL code-panel image (owner-swappable media field,
@@ -3711,7 +3738,7 @@ html[data-style="signal"] .acm-bento .acm-bento-media img {
   width: 100%;
   height: auto;
   border: 0;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: code-panel picture, square on purpose */
   box-shadow: none;
   filter: drop-shadow(0 20px 42px rgba(8, 12, 10, .35));
 }
@@ -3743,13 +3770,13 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 :root[data-theme="dark"] .acm-kineticql-split,
 [data-bs-theme="dark"] .acm-kineticql-split,
 [data-theme="dark"] .acm-kineticql-split {
-  --split-surface: var(--surface, #121614);
-  --split-border: var(--border, #232A27);
-  --split-heading: var(--heading, #F2F5F3);
-  --split-text: var(--text, #9AA6A1);
-  --split-muted: var(--muted, #7F8B86);
-  --split-primary: var(--primary, #A3E635);
-  --split-primary-ink: var(--primary-ink, #0A0D0C);
+  --split-surface: var(--surface, var(--ds-c-surface, #121614));
+  --split-border: var(--border, var(--ds-c-border-soft, #232A27));
+  --split-heading: var(--heading, var(--ds-c-heading, #F2F5F3));
+  --split-text: var(--text, var(--ds-c-muted, #9AA6A1));
+  --split-muted: var(--muted, var(--ds-c-muted, #7F8B86));
+  --split-primary: var(--primary, var(--ds-c-accent, #A3E635));
+  --split-primary-ink: var(--primary-ink, var(--ds-c-accent-on, #0A0D0C));
   --split-shadow: var(--shadow, 0 20px 50px -18px rgba(0, 0, 0, .6));
 }
 
@@ -3820,7 +3847,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   width: 100%;
   height: auto;
   border: 0;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: code-panel picture, square on purpose */
   box-shadow: none;
 }
 
@@ -3845,7 +3872,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   background: var(--primary-hover, var(--split-primary));
   color: var(--split-primary-ink);
   transform: translateY(-1px);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 .acm-kineticql-split .acm-split-cta > .wp-block-button__link:focus-visible {
   outline: none;
@@ -3865,7 +3892,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
    Ported verbatim from templates/ja_kinetic/acm/features-ledger/css/style.css. */
 
 .acm-features-ledger {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-features-ledger .hx-section {
@@ -3894,7 +3921,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-features-ledger .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -3916,12 +3943,12 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-features-ledger .hx-stat {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   background: var(--surface);
   padding: 30px 28px;
 }
 .acm-features-ledger .hx-stat-val {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 44px;
   line-height: 1;
   font-weight: 700;
@@ -3952,7 +3979,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-features-ledger .hx-stat-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.3px;
@@ -4019,7 +4046,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-features-ledger .hx-spec-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.3px;
@@ -4037,7 +4064,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-features-ledger .hx-spec-stat-val {
   display: block;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -4095,7 +4122,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   margin: 0 auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   overflow: hidden;
 }
 .acm-features-ledger .hx-metrics-head {
@@ -4159,7 +4186,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   white-space: nowrap;
 }
 .acm-features-ledger .hx-metric-value {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 42px;
   /* !important: on an article-templated page (features 194, about 233) this <p> falls inside
      `.hx-article .hx-prose .article-body p{line-height:1.75}` (wp-ja-kinetic-article.css), a
@@ -4403,11 +4430,11 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   --testi-surface: var(--surface, var(--ds-c-surface, #FFFFFF));
   --testi-border: var(--border, var(--ds-c-border, #E4E8E0));
   --testi-heading: var(--heading, var(--ds-c-fg-2, #10140F));
-  --testi-muted: var(--muted, #66716A);
+  --testi-muted: var(--muted, var(--ds-c-muted, #66716A));
   --testi-primary: var(--primary, var(--ds-c-accent, #4D7C0F));
   --testi-chip-bg: color-mix(in srgb, var(--primary, var(--ds-c-accent, #4D7C0F)) 15%, transparent);
 
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--testi-heading);
 }
 
@@ -4454,7 +4481,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 .acm-testimonials .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 34px;
   line-height: 1.1;
   font-weight: 700;
@@ -4493,7 +4520,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   display: flex;
   flex-direction: column;
   background: var(--testi-surface);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 /* The source figcaption first takes the T4 framework's `figure figcaption` rule
    (css/template.css:13522-13531); the reset below then drops its box and colours, so the type
@@ -4512,7 +4539,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   background: transparent;
   color: inherit;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ds-card-radius, 0);
 }
 .acm-testimonials .hx-testi-q {
   margin: 0;
@@ -4531,7 +4558,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   border-color: var(--testi-primary);
 }
 .acm-testimonials .hx-testi-hero .hx-testi-q {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 24px;
   font-weight: 600;
   line-height: 1.4167;
@@ -4546,7 +4573,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   border: 1px solid var(--testi-border);
 }
 .acm-testimonials .hx-testi-small .hx-testi-q {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.5333;
@@ -4570,7 +4597,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-weight: 700;
   color: var(--testi-primary);
   text-transform: uppercase;
@@ -4606,7 +4633,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 .acm-testimonials .hx-testi-author--sm .hx-testi-id { gap: 1px; }
 
 .acm-testimonials .hx-testi-name {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-weight: 600;
   color: var(--testi-heading);
 }
@@ -4663,18 +4690,18 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 :root[data-theme="dark"] .acm-testimonials,
 [data-bs-theme="dark"] .acm-testimonials,
 [data-theme="dark"] .acm-testimonials {
-  --testi-band: #161B18;
-  --testi-surface: var(--surface, #121614);
-  --testi-border: var(--border, #232A27);
-  --testi-heading: var(--heading, #F2F5F3);
-  --testi-muted: var(--muted, #7F8B86);
-  --testi-primary: var(--primary, #A3E635);
-  --testi-chip-bg: color-mix(in srgb, var(--primary, #A3E635) 15%, transparent);
+  --testi-band: var(--ds-c-surface, #161B18);
+  --testi-surface: var(--surface, var(--ds-c-surface, #121614));
+  --testi-border: var(--border, var(--ds-c-border-soft, #232A27));
+  --testi-heading: var(--heading, var(--ds-c-heading, #F2F5F3));
+  --testi-muted: var(--muted, var(--ds-c-muted, #7F8B86));
+  --testi-primary: var(--primary, var(--ds-c-accent, #A3E635));
+  --testi-chip-bg: color-mix(in srgb, var(--primary, var(--ds-c-accent, #A3E635)) 15%, transparent);
 }
 /* Blueprint/Signal directions keep #161B18 only on the Terminal palette; other
    directions use their own elevated band so the dark band matches the page. */
-:root[data-theme="dark"][data-style="blueprint"] .acm-testimonials { --testi-band: #12141E; }
-:root[data-theme="dark"][data-style="signal"] .acm-testimonials { --testi-band: #0F1626; }
+:root[data-theme="dark"][data-style="blueprint"] .acm-testimonials { --testi-band: var(--ds-c-surface, #12141E); }
+:root[data-theme="dark"][data-style="signal"] .acm-testimonials { --testi-band: var(--ds-c-surface, #0F1626); }
 
 /* -------------------------------------------------------------------------
  * Ported verbatim from templates/ja_kinetic/acm/testimonials/css/style.css,
@@ -4735,7 +4762,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 
 .acm-cta .hx-cta-title {
-	font-family: "Space Grotesk", system-ui, sans-serif;
+	font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
 	font-size: 40px;
 	font-weight: 700;
 	line-height: 1.08;
@@ -4745,7 +4772,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 }
 
 .acm-cta .hx-cta-sub {
-	font-family: "IBM Plex Sans", system-ui, sans-serif;
+	font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
 	font-size: 16px;
 	line-height: 1.6;
 	margin: 14px auto 0;
@@ -4770,14 +4797,14 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
-	font-family: "IBM Plex Sans", system-ui, sans-serif;
+	font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
 	font-size: 15px;
 	font-weight: 600;
 	line-height: 1;
 	text-decoration: none;
 	white-space: nowrap;
 	padding: 14px 26px;
-	border-radius: 9px;
+	border-radius: var(--ds-btn-radius, 9px);
 	border: 1px solid transparent;
 	transition: background-color .18s ease, color .18s ease, border-color .18s ease;
 }
@@ -4797,7 +4824,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 .acm-cta .hx-cta-btn-primary:focus-visible {
 	background: var(--primary-hover);
 	color: var(--primary-ink);
-	box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+	box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 	outline: none;
 }
 
@@ -4814,7 +4841,7 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 	background: color-mix(in srgb, var(--primary) 10%, transparent);
 	border-color: var(--primary);
 	color: var(--ds-c-accent-text-hover, var(--primary));
-	box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .18);
+	box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .18));
 	outline: none;
 }
 
@@ -4829,10 +4856,10 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 	line-height: 1;
 	text-decoration: none;
 	padding: 13px 20px;
-	border-radius: 9px;
-	background: #121614;
-	border: 1px solid #232A27;
-	color: #9AA6A1;
+	border-radius: var(--ds-btn-radius, 9px);
+	background: var(--ds-c-ink, #121614);
+	border: 1px solid var(--ds-c-border, #232A27);
+	color: var(--ds-c-on-ink, #9AA6A1);
 	transition: border-color .15s ease, box-shadow .15s ease;
 }
 
@@ -4844,15 +4871,16 @@ html[data-style="signal"]    .acm-kineticql-split .hx-panelimg.is-signal    { di
 	outline: none;
 }
 .acm-cta .hx-cta-chip:focus-visible {
-	box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+	box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 
 .acm-cta .hx-cta-chip .hx-cta-chip-sigil {
-	color: var(--sigil-accent, #A3E635);
+	color: var(--sigil-accent, var(--ds-c-accent-on-ink, #A3E635));
 }
-/* dark chip: sigil uses each style's bright accent, fixed across page light/dark */
-html[data-style="blueprint"] .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #818CF8; }
-html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #22D3EE; }
+/* dark chip: the sigil sits on the chip ground (--ds-c-ink), so it takes the accent read on that
+   ground (--ds-c-accent-on-ink), not the page accent (3.66:1 under Moxie light) */
+html[data-style="blueprint"] .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: var(--ds-c-accent-on-ink, #818CF8); }
+html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: var(--ds-c-accent-on-ink, #22D3EE); }
 
 /* ----------  variant: card  (THEMED — flips with the page theme)  ---------- */
 .acm-cta.cta-card .hx-cta-inner {
@@ -4860,13 +4888,13 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
 		radial-gradient(110% 90% at 72% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 75%),
 		linear-gradient(180deg, var(--hx-cta-elevated, var(--elevated)) 0%, var(--surface) 100%);
 	border: 1px solid var(--border);
-	border-radius: 20px;
+	border-radius: var(--ds-card-radius, 20px);
 	padding: 60px 40px;
 }
 
 /* body --elevated (dark) is #0F1311 in this build; design card top = $elevated #161B18 */
 :root[data-theme="dark"] .acm-cta.cta-card .hx-cta-inner {
-	--hx-cta-elevated: #161B18;
+	--hx-cta-elevated: var(--ds-c-accent, #161B18);
 }
 
 .acm-cta.cta-card .hx-cta-title {
@@ -5015,19 +5043,19 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
 .acm-cta .hx-cta-btn-primary:has(> .wp-block-button__link:focus-visible) {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 
 .acm-cta .hx-cta-btn-ghost:has(> .wp-block-button__link:focus-visible) {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border-color: var(--primary);
   color: var(--ds-c-accent-text-hover, var(--primary));
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .18);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .18));
 }
 
 .acm-cta .hx-cta-chip:has(> .wp-block-button__link:focus-visible) {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 
 /* The primary arrow <svg> and the chip's `hx-cta-chip-sigil` / `hx-cta-chip-text` spans are
@@ -5045,7 +5073,7 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
    (JA Kinetic Joomla 6 capture). No `html.t4-dark` or `html[data-style]` rule
    exists in this source file, so nothing needed rewriting. */
 .acm-accordion {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-accordion .hx-section {
@@ -5074,7 +5102,7 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
 }
 .acm-accordion .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -5123,7 +5151,7 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
   padding: 20px 4px;
   cursor: pointer;
   list-style: none;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 18px;
   font-weight: 600;
   line-height: 1.35;
@@ -5252,7 +5280,7 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
    scoped override so the section bg matches the design precisely. */
 
 .acm-faq-support {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
 }
 
 /* ---- section wrapper ---- */
@@ -5279,7 +5307,7 @@ html[data-style="signal"]    .acm-cta .hx-cta-chip .hx-cta-chip-sigil { color: #
   padding: 32px;
   background: var(--elevated);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   text-align: center;
   transition: border-color .15s ease, transform .2s ease, box-shadow .2s ease;
 }
@@ -5305,7 +5333,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 /* ---- title ---- */
 .acm-faq-support .hx-sup-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.25;
@@ -5329,8 +5357,8 @@ html body .acm-faq-support .hx-sup-card:hover {
   padding: 14px 26px;
   background: var(--primary);
   color: var(--primary-ink);
-  border-radius: 10px;
-  font-family: "IBM Plex Sans", sans-serif;
+  border-radius: var(--ds-btn-radius, 10px);
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 15px;
   font-weight: 600;
   line-height: 1;
@@ -5341,7 +5369,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-faq-support .hx-sup-btn:focus-visible {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
   outline: none;
 }
 .acm-faq-support .hx-sup-btn-ico {
@@ -5379,7 +5407,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   .acm-faq-support .hx-sup-btn {
     font-size: 14.5px;
     padding: 12px 22px;
-    border-radius: 9px;
+    border-radius: var(--ds-btn-radius, 9px);
   }
   .acm-faq-support .hx-sup-btn-ico {
     width: 16px;
@@ -5440,7 +5468,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-faq-support .hx-sup-btn:has(> .wp-block-button__link:focus-visible) {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
 }
 .acm-faq-support .hx-sup-btn > .wp-block-button__link:focus-visible {
   outline: none;
@@ -5469,7 +5497,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    Ported verbatim from templates/ja_kinetic/acm/features-intro/css/style.css. */
 
 .acm-features-intro {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-features-intro .hx-section {
@@ -5498,7 +5526,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-features-intro .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -5539,7 +5567,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   padding: 10px 12px;
   margin: -10px -12px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   transition: border-color .15s ease, transform .2s ease, box-shadow .2s ease;
 }
 .acm-features-intro .hx-feat:hover {
@@ -5553,7 +5581,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   justify-content: center;
   width: 46px;
   height: 46px;
-  border-radius: 11px;
+  border-radius: var(--ds-card-radius, 11px);
   background: var(--elevated);
   border: 1px solid var(--border);
   color: var(--ds-c-accent-text, var(--primary));
@@ -5569,7 +5597,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-features-intro .hx-feat-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.3px;
@@ -5584,7 +5612,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-features-intro .hx-feat-stat {
   align-self: flex-start;
   margin-top: 16px;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -5674,7 +5702,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    + all three directions (terminal/blueprint/signal) resolve automatically. */
 
 .acm-page-masthead {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-page-masthead .hx-section {
@@ -5704,7 +5732,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-page-masthead .hx-h1 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px;
   line-height: 1.08;
   font-weight: 700;
@@ -5746,7 +5774,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-page-masthead .hx-mast-head a.hx-cta-btn:focus-visible {
   background: var(--primary-hover);
   color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 77, 124, 15), .25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(var(--primary-rgb, 77, 124, 15), .25));
   outline: none;
 }
 
@@ -5791,8 +5819,8 @@ html body .acm-faq-support .hx-sup-card:hover {
    radial LAYERS over the existing .hx-grid-bg lines (same element) — keep both grid
    gradients here so the shorthand doesn't wipe the grid. ---- */
 :root[data-theme="dark"] .acm-page-masthead .hx-section {
-  --mast-tint: rgba(163, 230, 53, 0.10);
-  background-color: #161B18;
+  --mast-tint: var(--kds-accent-100, var(--ds-c-accent, rgba(163, 230, 53, 0.10)));
+  background-color: var(--ds-c-surface, #161B18);
   /* .pen g6vc2x radial glow #A3E6350F -> #A3E63522: brighter center that fades
      through a low-alpha mid-stop, so the glow reads instead of ending flat on the
      elevated band. --mast-tint (the center alpha) recolors per direction below. */
@@ -5802,8 +5830,8 @@ html body .acm-faq-support .hx-sup-card:hover {
     linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 100% 100%, 30px 30px, 30px 30px;
 }
-:root[data-theme="dark"][data-style="blueprint"] .acm-page-masthead .hx-section { --mast-tint: rgba(99, 102, 241, 0.12); }
-:root[data-theme="dark"][data-style="signal"] .acm-page-masthead .hx-section { --mast-tint: rgba(34, 211, 238, 0.12); }
+:root[data-theme="dark"][data-style="blueprint"] .acm-page-masthead .hx-section { --mast-tint: var(--kds-accent-120, var(--ds-c-accent, rgba(99, 102, 241, 0.12))); }
+:root[data-theme="dark"][data-style="signal"] .acm-page-masthead .hx-section { --mast-tint: var(--kds-accent-120, var(--ds-c-accent, rgba(34, 211, 238, 0.12))); }
 /* page-219.css loads after the rule above in the source, so its own masthead (copied under
    "--- page-219.css ---" earlier in this file) wins there in dark too. The dark selector above is
    one class heavier than the source's html.t4-dark, so restate that masthead's ground here —
@@ -5811,10 +5839,10 @@ html body .acm-faq-support .hx-sup-card:hover {
    max-width: 767.98px block) already wins. */
 @media (min-width: 768px) {
   :root[data-theme="dark"] body.item-219 .acm-page-masthead .hx-section {
-    background-color: #161B18;
+    background-color: var(--ds-c-surface, #161B18);
     background-image: radial-gradient(ellipse 150% 120% at 50% 0%,
-      rgba(163, 230, 53, 0.059) 0%,
-      #161B18 55%);
+      var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%,
+      var(--ds-c-surface, #161B18) 55%);
   }
 }
 
@@ -5845,7 +5873,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    (JA Kinetic Joomla 6 capture). No `html.t4-dark` or `html[data-style]` rule
    exists in this source file, so nothing needed rewriting. */
 .acm-pricing {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-pricing .hx-section {
@@ -5887,7 +5915,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-pricing .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 28px;
   line-height: 1;
   font-weight: 700;
@@ -5919,7 +5947,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   flex-direction: column;
   height: 100%;
   padding: 30px 26px;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   box-shadow: var(--shadow);
   transition: border-color .15s ease, transform .2s ease, box-shadow .2s ease;
 }
@@ -5949,11 +5977,11 @@ html body .acm-faq-support .hx-sup-card:hover {
   background: var(--primary);
   color: var(--primary-ink);
   padding: 4px 10px;
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
 }
 
 .acm-pricing .hx-plan-name {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 20px;
   font-weight: 700;
   color: var(--heading);
@@ -5974,7 +6002,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   margin-bottom: 22px;
 }
 .acm-pricing .hx-plan-amount {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 40px;
   font-weight: 700;
   line-height: 1;
@@ -5994,7 +6022,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   width: 100%;
   margin-bottom: 22px;
   padding: 12px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   font-size: 14.5px;
 }
 
@@ -6030,7 +6058,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   padding: 32px;
   background: var(--chrome-elevated, var(--elevated));
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 .acm-pricing .hx-pi-text {
   display: flex;
@@ -6039,7 +6067,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   min-width: 0;
 }
 .acm-pricing .hx-pi-title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 20px;
   font-weight: 700;
   color: var(--heading);
@@ -6055,10 +6083,10 @@ html body .acm-faq-support .hx-sup-card:hover {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   background: var(--surface);
   border: 1px solid var(--border);
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14.5px;
   font-weight: 600;
   color: var(--heading);
@@ -6148,7 +6176,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    .hx-plan-cta and .hx-pi-btn rules above. */
 .acm-pricing .hx-plan-cta.wp-block-button {
   padding: 0;
-  border-radius: 0;
+  border-radius: var(--ds-btn-radius, 0);
   /* measured 2026-09-22 run 3 (SB-11): the wrapper still carried the shared `.hx-btn` base
      `border: 1px solid transparent` plus (on the ghost variant) `.hx-btn--ghost`'s visible
      `border-color: var(--border)` — with padding/radius already flattened to 0 above, that read
@@ -6161,7 +6189,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   justify-content: center;
   width: 100%;
   padding: 12px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   border: 1px solid transparent;
   font-size: 14.5px;
 }
@@ -6186,10 +6214,10 @@ html body .acm-faq-support .hx-sup-card:hover {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   background: var(--surface);
   border: 1px solid var(--border);
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14.5px;
   font-weight: 600;
   color: var(--heading);
@@ -6226,7 +6254,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    (JA Kinetic Joomla 6 capture). No `html.t4-dark` or `html[data-style]` rule
    exists in this source file, so nothing needed rewriting. */
 .acm-pricing-matrix {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 
@@ -6254,7 +6282,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-pricing-matrix .hx-pm-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 28px;
   line-height: 1;
   font-weight: 700;
@@ -6272,7 +6300,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-pricing-matrix .hx-matrix-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   overflow: hidden;
 }
 .acm-pricing-matrix .hx-matrix {
@@ -6285,7 +6313,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 
 /* ---- table head (plan names) ---- */
 .acm-pricing-matrix .hx-matrix thead th {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 15px;
   font-weight: 400;
   color: var(--heading);
@@ -6415,7 +6443,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    dark resolve automatically with the active [data-style]/[data-theme] / html.t4-dark. */
 
 .acm-prose-quote {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-prose-quote .hx-section {
@@ -6462,7 +6490,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-prose-quote .hx-prose-title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
@@ -6513,7 +6541,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   color: var(--primary-hover, var(--ds-c-accent-text-hover, var(--primary)));
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 2px; /* ds-keep: link hover highlight, a text mark */
 }
 .acm-prose-quote .hx-prose-body strong,
 .acm-prose-quote .hx-prose-body b {
@@ -6524,7 +6552,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-prose-quote .hx-prose-body h3,
 .acm-prose-quote .hx-prose-body h4 {
   margin: 34px 0 14px;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-weight: 600;
   letter-spacing: -0.5px;
   color: var(--heading);
@@ -6549,7 +6577,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   padding: 4px 0 4px 24px;
   border-left: 3px solid var(--primary);
   text-align: left;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 24px;        /* .pen Blockquote Quote */
   font-weight: 600;
   line-height: 1.4;
@@ -6559,7 +6587,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .acm-prose-quote .hx-prose-cite {
   display: block;
   margin-top: 18px;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   font-weight: 400;
   font-style: normal;
@@ -6637,7 +6665,7 @@ html body .acm-faq-support .hx-sup-card:hover {
    dark resolve automatically with the active [data-style]/[data-theme] / html.t4-dark. */
 
 .acm-teams {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 .acm-teams .hx-section {
@@ -6666,7 +6694,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-teams .hx-h2 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 38px;
   line-height: 1.08;
   font-weight: 700;
@@ -6696,7 +6724,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   margin: 0;
   padding: 28px 26px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   background: var(--surface);
   transition: border-color .15s ease, transform .2s ease, box-shadow .2s ease;
 }
@@ -6712,7 +6740,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   object-fit: cover;
   border: 1px solid var(--border);
   transition: border-color .15s ease;
@@ -6724,7 +6752,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
-  border-radius: 12px;
+  border-radius: var(--ds-pill-radius, 12px);
   background: var(--elevated);
   border: 1px solid var(--border);
   font-family: "JetBrains Mono", monospace;
@@ -6748,7 +6776,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .acm-teams .hx-team-name {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 18px;
   line-height: 1.3;
   font-weight: 600;
@@ -6784,7 +6812,7 @@ html body .acm-faq-support .hx-sup-card:hover {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--muted);
@@ -6926,7 +6954,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 /* The record-name heading and the Name form field share `.contact-name` on the source, so this
    rule (css/template.css) styles both; the field's own label/input rules override it. */
 .kinetic-contact .contact-name {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 23px;
   font-weight: 600;
   color: var(--heading);
@@ -7009,9 +7037,9 @@ html body .acm-faq-support .hx-sup-card:hover {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   padding: 11px 14px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15px;
   line-height: 1.4;
   transition: border-color .15s, box-shadow .15s;
@@ -7038,7 +7066,7 @@ html body .acm-faq-support .hx-sup-card:hover {
 .kinetic-contact .contact-error,
 .kinetic-contact .alert {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   padding: 12px 14px;
   margin: 0 0 18px;
   color: var(--text);
@@ -7062,10 +7090,10 @@ html body .acm-faq-support .hx-sup-card:hover {
   position: relative;
 }
 
-/* Required-field star: source's own global reboot rule, `span.star{color:var(--ds-c-danger, #dc3545)}`
+/* Required-field star: source's own global reboot rule, span.star in Bootstrap's danger red,
    (css/template.css:18170) — never ported anywhere in this file before now (SB-32). */
 .kinetic-contact .star {
-  color: var(--ds-c-danger, #dc3545);
+  color: var(--ds-c-danger-text, #dc3545);
   display: inline-block;
 }
 
@@ -7088,12 +7116,12 @@ html body .acm-faq-support .hx-sup-card:hover {
   max-width: 276px;
   margin-bottom: 1rem;
   padding: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 0.3rem;
+  border: 1px solid var(--ds-c-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--ds-input-radius, 0.3rem);
   background-color: var(--ds-c-surface, #fff);
   background-clip: padding-box;
   color: var(--ds-c-fg, #212529);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: var(--ds-font-body, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
   font-size: 0.875rem;
   font-style: normal;
   font-weight: 400;
@@ -7120,11 +7148,11 @@ html body .acm-faq-support .hx-sup-card:hover {
 }
 .kinetic-contact .control-label .form-control-feedback::after {
   bottom: -7px;
-  border-top-color: #fff;
+  border-top-color: var(--ds-c-border-soft, #fff);
 }
 .kinetic-contact .control-label .form-control-feedback::before {
   bottom: -8px;
-  border-top-color: rgba(0, 0, 0, 0.25);
+  border-top-color: var(--ds-c-border, rgba(0, 0, 0, 0.25));
 }
 
 /* The hidden privacy-consent field's Joomla control-group layout (css/template.css:11520-11532). */
@@ -7151,60 +7179,62 @@ html body .acm-faq-support .hx-sup-card:hover {
    direction's primary, as it does on the source (`var(--primary)` resolved on <html>).
    ========================================================================== */
 html[data-style="blueprint"] {
-  --wp--preset--color--bg: light-dark(#FAFAFB, #0B0D14);
+  --wp--preset--color--bg: light-dark(var(--ds-c-bg, #FAFAFB), var(--ds-c-bg, #0B0D14));
   --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), var(--ds-c-surface, #12141E));
-  --wp--preset--color--surface-warm: light-dark(#F3F4F8, #161925);
-  --wp--preset--color--fg: light-dark(#57606E, #9AA1B3);
-  --wp--preset--color--fg-2: light-dark(#0F1117, #EEF0F6);
-  --wp--preset--color--muted: light-dark(#666F7C, #7C8395);
-  --wp--preset--color--meta: light-dark(#666F7C, #7C8395);
-  --wp--preset--color--border: light-dark(#E4E7EC, #242838);
-  --wp--preset--color--border-soft: light-dark(#E4E7EC, #242838);
-  --wp--preset--color--accent: light-dark(#4F46E5, #818CF8);
-  --wp--preset--color--accent-on: light-dark(#FFFFFF, #0B0D14);
-  --wp--preset--color--accent-hover: light-dark(#3F37CF, #A5B4FC);
-  --wp--preset--color--accent-active: light-dark(#3F37CF, #A5B4FC);
-  --accent: #7C3AED;
+  --wp--preset--color--surface-warm: light-dark(var(--ds-c-surface-warm, #F3F4F8), var(--ds-c-surface-warm, #161925));
+  --wp--preset--color--fg: light-dark(var(--ds-c-fg, #57606E), var(--ds-c-fg, #9AA1B3));
+  --wp--preset--color--fg-2: light-dark(var(--ds-c-heading, #0F1117), var(--ds-c-heading, #EEF0F6));
+  --wp--preset--color--muted: light-dark(var(--ds-c-muted, #666F7C), var(--ds-c-muted, #7C8395));
+  --wp--preset--color--meta: light-dark(var(--ds-c-meta, #666F7C), var(--ds-c-meta, #7C8395));
+  --wp--preset--color--border: light-dark(var(--ds-c-border, #E4E7EC), var(--ds-c-border, #242838));
+  --wp--preset--color--border-soft: light-dark(var(--ds-c-border-soft, #E4E7EC), var(--ds-c-border-soft, #242838));
+  --wp--preset--color--accent: light-dark(var(--ds-c-accent, #4F46E5), var(--ds-c-accent, #818CF8));
+  --wp--preset--color--accent-on: light-dark(var(--ds-c-accent-on, #FFFFFF), var(--ds-c-accent-on, #0B0D14));
+  --wp--preset--color--accent-hover: light-dark(var(--ds-c-accent-hover, #3F37CF), var(--ds-c-accent-hover, #A5B4FC));
+  --wp--preset--color--accent-active: light-dark(var(--ds-c-accent-active, #3F37CF), var(--ds-c-accent-active, #A5B4FC));
+  --accent: var(--ds-c-accent, #7C3AED);
   --logo: light-dark(#4F46E5, #A5B4FC);
-  --grid: rgba(79, 70, 229, .05);
+  --kds-logo-mark: light-dark(var(--ds-c-accent-text, #4F46E5), var(--ds-c-accent-text, #818CF8));
+  --grid: rgba(79, 70, 229, .05); /* ds-keep: decorative grid backdrop of the masthead */
   --bg-rgb: 250, 250, 251;
   --text-rgb: 87, 96, 110;
-  --wp--custom--elev--raised: 0 20px 50px -18px rgba(15, 17, 23, .16);
+  --wp--custom--elev--raised: 0 20px 50px -18px rgba(15, 17, 23, .16); /* ds-keep: shadow depth, not a colour role */
 }
 html[data-style="signal"] {
-  --wp--preset--color--bg: light-dark(#F7FAFC, #0A0F1A);
+  --wp--preset--color--bg: light-dark(var(--ds-c-bg, #F7FAFC), var(--ds-c-bg, #0A0F1A));
   --wp--preset--color--surface: light-dark(var(--ds-c-surface, #FFFFFF), var(--ds-c-surface, #0F1626));
-  --wp--preset--color--surface-warm: light-dark(#EDF3F8, #121A2C);
-  --wp--preset--color--fg: light-dark(#41506A, #93A0B8);
-  --wp--preset--color--fg-2: light-dark(#06121F, #EAF1FB);
-  --wp--preset--color--muted: light-dark(#606E86, #78849C);
-  --wp--preset--color--meta: light-dark(#606E86, #78849C);
-  --wp--preset--color--border: light-dark(#DBE5EE, #1E2A41);
-  --wp--preset--color--border-soft: light-dark(#DBE5EE, #1E2A41);
-  --wp--preset--color--accent: light-dark(#0E7490, #22D3EE);
-  --wp--preset--color--accent-on: light-dark(#FFFFFF, #04141A);
-  --wp--preset--color--accent-hover: light-dark(#155E75, #56E0F4);
-  --wp--preset--color--accent-active: light-dark(#155E75, #56E0F4);
-  --accent: #6366F1;
+  --wp--preset--color--surface-warm: light-dark(var(--ds-c-surface-warm, #EDF3F8), var(--ds-c-surface-warm, #121A2C));
+  --wp--preset--color--fg: light-dark(var(--ds-c-fg, #41506A), var(--ds-c-fg, #93A0B8));
+  --wp--preset--color--fg-2: light-dark(var(--ds-c-heading, #06121F), var(--ds-c-heading, #EAF1FB));
+  --wp--preset--color--muted: light-dark(var(--ds-c-muted, #606E86), var(--ds-c-muted, #78849C));
+  --wp--preset--color--meta: light-dark(var(--ds-c-meta, #606E86), var(--ds-c-meta, #78849C));
+  --wp--preset--color--border: light-dark(var(--ds-c-border, #DBE5EE), var(--ds-c-border, #1E2A41));
+  --wp--preset--color--border-soft: light-dark(var(--ds-c-border-soft, #DBE5EE), var(--ds-c-border-soft, #1E2A41));
+  --wp--preset--color--accent: light-dark(var(--ds-c-accent, #0E7490), var(--ds-c-accent, #22D3EE));
+  --wp--preset--color--accent-on: light-dark(var(--ds-c-accent-on, #FFFFFF), var(--ds-c-accent-on, #04141A));
+  --wp--preset--color--accent-hover: light-dark(var(--ds-c-accent-hover, #155E75), var(--ds-c-accent-hover, #56E0F4));
+  --wp--preset--color--accent-active: light-dark(var(--ds-c-accent-active, #155E75), var(--ds-c-accent-active, #56E0F4));
+  --accent: var(--ds-c-accent, #6366F1);
   --logo: light-dark(#0E7490, #22D3EE);
-  --grid: rgba(8, 145, 178, .06);
+  --kds-logo-mark: light-dark(var(--ds-c-accent-text, #0E7490), var(--ds-c-accent-text, #22D3EE));
+  --grid: rgba(8, 145, 178, .06); /* ds-keep: decorative grid backdrop of the masthead */
   --bg-rgb: 247, 250, 252;
   --text-rgb: 65, 80, 106;
-  --wp--custom--elev--raised: 0 18px 44px -20px rgba(6, 18, 31, .18);
+  --wp--custom--elev--raised: 0 18px 44px -20px rgba(6, 18, 31, .18); /* ds-keep: shadow depth, not a colour role */
 }
 html[data-style="blueprint"][data-theme="dark"] {
-  --accent: #A78BFA;
-  --grid: rgba(99, 102, 241, .08);
+  --accent: var(--ds-c-accent, #A78BFA);
+  --grid: rgba(99, 102, 241, .08); /* ds-keep: decorative grid backdrop of the masthead */
   --bg-rgb: 11, 13, 20;
   --text-rgb: 154, 161, 179;
-  --wp--custom--elev--raised: 0 20px 50px -18px rgba(0, 0, 0, .55);
+  --wp--custom--elev--raised: 0 20px 50px -18px rgba(0, 0, 0, .55); /* ds-keep: shadow depth, not a colour role */
 }
 html[data-style="signal"][data-theme="dark"] {
-  --accent: #818CF8;
-  --grid: rgba(34, 211, 238, .06);
+  --accent: var(--ds-c-accent, #818CF8);
+  --grid: rgba(34, 211, 238, .06); /* ds-keep: decorative grid backdrop of the masthead */
   --bg-rgb: 10, 15, 26;
   --text-rgb: 147, 160, 184;
-  --wp--custom--elev--raised: 0 20px 50px -18px rgba(0, 0, 0, .6);
+  --wp--custom--elev--raised: 0 20px 50px -18px rgba(0, 0, 0, .6); /* ds-keep: shadow depth, not a colour role */
 }
 html[data-style="blueprint"],
 html[data-style="signal"] {
@@ -7214,7 +7244,7 @@ html[data-style="signal"] {
   --chrome-border: light-dark(var(--ds-c-border, #E4E8E0), var(--ds-c-border, #232A27));
   --chrome-text: light-dark(var(--ds-c-fg, #46514B), var(--ds-c-fg, #9AA6A1));
   --chrome-heading: light-dark(var(--ds-c-fg-2, #10140F), var(--ds-c-fg-2, #F2F5F3));
-  --chrome-muted: light-dark(#646F68, #7F8B86);
+  --chrome-muted: var(--ds-c-muted, light-dark(#646F68, #7F8B86));
 }
 /* The source's per-page overlays for the two direction pages (css/page-215.css, page-216.css): the
    KineticQL panel's keyword colour is the direction's primary, not the terminal lime. (Their hero

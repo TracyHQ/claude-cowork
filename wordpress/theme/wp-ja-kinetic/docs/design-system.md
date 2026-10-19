@@ -54,6 +54,10 @@ no colour-scheme mechanism of its own; this follows the Developer Blog's `color-
 approach (https://developer.wordpress.org/news/2025/09/building-a-light-dark-toggle-with-the-interactivity-api/)
 with a cookie instead of the Interactivity API store.
 
+The block editor's canvas wears the same state: `inc/extra.php` (`wp_ja_kinetic_editor_canvas_theme()`)
+puts the edited page's `data-style` and `data-theme-default` on the canvas root and loads the same
+switch there, so a page visitors see dark is edited on a dark canvas (the Blueprint page on a light one).
+
 To test dark mode: set `data-theme="dark"` on `<html>`, or click the toggle and reload — the cookie
 must persist the state. A page cached for everyone is cached with the page's default; the
 visitor's choice is applied client-side before paint.
