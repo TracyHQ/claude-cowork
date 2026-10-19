@@ -16,82 +16,82 @@
         {
           "slug": "bg",
           "name": "Background",
-          "color": "#ffffff"
+          "color": "var(--ds-c-bg, #ffffff)"
         },
         {
           "slug": "surface",
           "name": "Surface",
-          "color": "#111111"
+          "color": "var(--ds-c-surface, #111111)"
         },
         {
           "slug": "surface-warm",
           "name": "Surface warm",
-          "color": "#111111"
+          "color": "var(--ds-c-ink, #111111)"
         },
         {
           "slug": "fg",
           "name": "Foreground",
-          "color": "#777777"
+          "color": "var(--ds-c-fg, #777777)"
         },
         {
           "slug": "fg-2",
           "name": "Foreground 2",
-          "color": "#333333"
+          "color": "var(--ds-c-heading, #333333)"
         },
         {
           "slug": "muted",
           "name": "Muted",
-          "color": "#6e6e73"
+          "color": "var(--ds-c-muted, #6e6e73)"
         },
         {
           "slug": "meta",
           "name": "Meta",
-          "color": "#86868b"
+          "color": "var(--ds-c-meta, #86868b)"
         },
         {
           "slug": "border",
           "name": "Border",
-          "color": "#eaeaea"
+          "color": "var(--ds-c-border, #eaeaea)"
         },
         {
           "slug": "border-soft",
           "name": "Border soft",
-          "color": "#e8e8ed"
+          "color": "var(--ds-c-border-soft, #e8e8ed)"
         },
         {
           "slug": "accent",
           "name": "Accent",
-          "color": "#d93030"
+          "color": "var(--ds-c-accent, #d93030)"
         },
         {
           "slug": "accent-on",
           "name": "On accent",
-          "color": "#d93030"
+          "color": "var(--ds-c-accent-on, #d93030)"
         },
         {
           "slug": "accent-hover",
           "name": "Accent hover",
-          "color": "#0077ed"
+          "color": "var(--ds-c-accent-hover, #0077ed)"
         },
         {
           "slug": "accent-active",
           "name": "Accent active",
-          "color": "#0066cc"
+          "color": "var(--ds-c-accent-active, #0066cc)"
         },
         {
           "slug": "success",
           "name": "Success",
-          "color": "#16a34a"
+          "color": "var(--ds-c-success, #16a34a)"
         },
         {
           "slug": "warn",
           "name": "Warn",
-          "color": "#eab308"
+          "color": "var(--ds-c-warn, #eab308)"
         },
         {
           "slug": "danger",
           "name": "Danger",
-          "color": "#dc2626"
+          "color": "var(--ds-c-danger, #dc2626)"
         }
       ]
     },
@@ -102,12 +102,12 @@
         {
           "slug": "display",
           "name": "Display",
-          "fontFamily": "PTRootUI, Helvetica, Arial, sans-serif"
+          "fontFamily": "var(--ds-font-display, PTRootUI, Helvetica, Arial, sans-serif)"
         },
         {
           "slug": "body",
           "name": "Body",
-          "fontFamily": "PTRootUI, Helvetica, Arial, sans-serif"
+          "fontFamily": "var(--ds-font-body, PTRootUI, Helvetica, Arial, sans-serif)"
         },
         {
           "slug": "mono",
@@ -225,17 +225,17 @@
         "phone": "60px"
       },
       "radius": {
-        "sm": "8px",
-        "md": "4px",
-        "lg": "18px",
-        "pill": "980px"
+        "sm": "var(--ds-input-radius, 8px)",
+        "md": "var(--ds-btn-radius, 4px)",
+        "lg": "var(--ds-card-radius, 18px)",
+        "pill": "var(--ds-pill-radius, 980px)"
       },
       "elev": {
         "flat": "none",
         "ring": "0 0 0 1px var(--wp--preset--color--border)",
-        "raised": "0 12px 32px rgba(0, 0, 0, 0.08)"
+        "raised": "0 12px 32px rgba(0, 0, 0, 0.08) /* ds-keep: shadow depth, not a colour role */"
       },
-      "focusRing": "0 0 0 4px color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%)",
+      "focusRing": "0 0 0 4px var(--ds-c-focus-ring, color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%))",
       "motion": {
         "fast": "150ms",
         "base": "220ms"
@@ -328,7 +328,7 @@
         }
       }
     },
-    "css": "/* wp-ja-morgan: dark mode. The source (JA Morgan, Joomla 6 T3) follows the OS until the visitor picks: its pre-paint script sets html[data-theme] from localStorage or prefers-color-scheme (tpls/blocks/head-prepaint.php), and css/darkmode.css scopes the dark look under html[data-theme=\"dark\"]. Here every colour preset carries both halves through light-dark(): light = tokens.css (measured 29/09 on :8281), dark = the computed values of the source in dark (body #0f1320 / #a7b0c2, headings #f2f4f8, accent --ja-accent #e0463f, declared per mode because the design contract reads it as a resolved colour, form surfaces #1a2032, borders #2a3247, navy re-tint #6f8fd6). The footer band is #111111 in both modes, as measured. No attribute = auto, the OS decides; assets/js/wp-ja-morgan-dark.js writes data-theme light|dark from the tracy_theme cookie before the first paint. */ :root{color-scheme:light dark;--ja-accent:#d93030;--wp--preset--color--bg:light-dark(#ffffff,#0f1320);--wp--preset--color--surface:light-dark(#f6f7fb,#1a2032);--wp--preset--color--surface-warm:light-dark(#111111,#111111);--wp--preset--color--fg:light-dark(#777777,#a7b0c2);--wp--preset--color--fg-2:light-dark(#333333,#f2f4f8);--wp--preset--color--muted:light-dark(#777777,#8b93a4);--wp--preset--color--border:light-dark(#eaeaea,#2a3247);--wp--preset--color--border-soft:light-dark(#eaeaea,#2a3247);--wp--preset--color--accent:light-dark(#d93030,#e0463f);--wp--preset--color--accent-on:light-dark(#ffffff,#ffffff);--wp--preset--color--accent-hover:light-dark(#b22323,#f06b64);--wp--preset--color--accent-active:light-dark(#b22323,#e0463f);}:root[data-theme=\"light\"]{color-scheme:light}:root[data-theme=\"dark\"]{color-scheme:dark;--ja-accent:#e0463f}@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){--ja-accent:#e0463f}}"
+    "css": "/* wp-ja-morgan: dark mode. The source (JA Morgan, Joomla 6 T3) follows the OS until the visitor picks: its pre-paint script sets html[data-theme] from localStorage or prefers-color-scheme (tpls/blocks/head-prepaint.php), and css/darkmode.css scopes the dark look under html[data-theme=\"dark\"]. Here every colour preset carries both halves through light-dark(): light = tokens.css (measured 29/09 on :8281), dark = the computed values of the source in dark (body #0f1320 / #a7b0c2, headings #f2f4f8, accent --ja-accent #e0463f, declared per mode because the design contract reads it as a resolved colour, form surfaces #1a2032, borders #2a3247, navy re-tint #6f8fd6). The footer band is #111111 in both modes, as measured. No attribute = auto, the OS decides; assets/js/wp-ja-morgan-dark.js writes data-theme light|dark from the tracy_theme cookie before the first paint. */ :root{color-scheme:light dark;--ja-accent:var(--ds-c-accent, #d93030);--wp--preset--color--bg:light-dark(var(--ds-c-bg, #ffffff),var(--ds-c-bg, #0f1320));--wp--preset--color--surface:light-dark(var(--ds-c-surface, #f6f7fb),var(--ds-c-surface, #1a2032));--wp--preset--color--surface-warm:light-dark(var(--ds-c-ink, #111111),var(--ds-c-ink, #111111));--wp--preset--color--fg:light-dark(var(--ds-c-fg, #777777),var(--ds-c-fg, #a7b0c2));--wp--preset--color--fg-2:light-dark(var(--ds-c-heading, #333333),var(--ds-c-heading, #f2f4f8));--wp--preset--color--muted:light-dark(var(--ds-c-muted, #777777),var(--ds-c-muted, #8b93a4));--wp--preset--color--border:light-dark(var(--ds-c-border, #eaeaea),var(--ds-c-border, #2a3247));--wp--preset--color--border-soft:light-dark(var(--ds-c-border-soft, #eaeaea),var(--ds-c-border-soft, #2a3247));--wp--preset--color--accent:light-dark(var(--ds-c-accent, #d93030),var(--ds-c-accent, #e0463f));--wp--preset--color--accent-on:light-dark(var(--ds-c-accent-on, #ffffff),var(--ds-c-accent-on, #ffffff));--wp--preset--color--accent-hover:light-dark(var(--ds-c-accent-hover, #b22323),var(--ds-c-accent-hover, #f06b64));--wp--preset--color--accent-active:light-dark(var(--ds-c-accent-active, #b22323),var(--ds-c-accent-active, #e0463f));}:root[data-theme=\"light\"]{color-scheme:light}:root[data-theme=\"dark\"]{color-scheme:dark;--ja-accent:var(--ds-c-accent, #e0463f)}@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){--ja-accent:var(--ds-c-accent, #e0463f)}}"
   },
   "customTemplates": [
     {

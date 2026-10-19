@@ -97,7 +97,7 @@
 		box-sizing: border-box;
 		height: 42px;
 		background: var(--jm-bg);
-		color: #aaaaaa;
+		color: var(--ds-c-muted, #aaaaaa);
 		border: 1px solid var(--ds-c-border, #eaeaea);
 	}
 	body.jm-route-home-style-2 .t3-topbar > .container {
@@ -105,7 +105,7 @@
 	}
 	body.jm-route-home-style-2 .t3-topbar .wp-block-social-links .wp-social-link {
 		border-color: var(--ds-c-border, #eaeaea);
-		color: #aaaaaa;
+		color: var(--ds-c-muted, #aaaaaa);
 	}
 	body.jm-route-home-style-2 .t3-header {
 		height: auto;
@@ -128,7 +128,7 @@
 		position: relative;
 		justify-content: flex-end;
 		height: 60px;
-		border-radius: 4px;
+		border-radius: var(--ds-card-radius, 4px);
 		background: var(--jm-secondary);
 	}
 	body.jm-route-home-style-2 .headright {
@@ -140,9 +140,9 @@
 		width: 60px;
 		height: 60px;
 		margin: 0;
-		border-radius: 0;
+		border-radius: 0; /* ds-keep: square on purpose: the toggle sits flush in the header row, as the source */
 		background: transparent;
-		color: #ffffff;
+		color: var(--ds-c-on-ink, #ffffff);
 	}
 	body.jm-route-home-style-2 .off-canvas-toggle {
 		padding: 21px 22px;
@@ -167,7 +167,7 @@
 		height: 61px;
 		margin-bottom: -91px;
 		background: transparent;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* ds-keep: a faint line of light over the photograph, drawn for the picture, not a role */
 	}
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header > .container {
 		max-width: none;
@@ -200,12 +200,12 @@
 		height: 60px;
 		margin: 0;
 		padding: 0;
-		border-radius: 0;
+		border-radius: 0; /* ds-keep: square on purpose: the toggle sits flush in the header row, as the source */
 		background: transparent;
-		color: #ffffff;
+		color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	}
 	body.jm-route-home-style-3 .off-canvas-toggle {
-		border-right: 1px solid rgba(255, 255, 255, 0.2);
+		border-right: 1px solid rgba(255, 255, 255, 0.2); /* ds-keep: a faint line of light over the photograph, drawn for the picture, not a role */
 	}
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .off-canvas-toggle {
 		margin-left: 6px;
@@ -220,7 +220,7 @@
 		width: 60px;
 		height: 60px;
 		margin: 0 0 0 6px;
-		border-left: 1px solid rgba(255, 255, 255, 0.1);
+		border-left: 1px solid rgba(255, 255, 255, 0.1); /* ds-keep: a faint line of light over the photograph, drawn for the picture, not a role */
 	}
 	body.jm-route-home-style-4 .head-search .wp-block-search__inside-wrapper,
 	body.jm-route-home-style-4 .head-search .wp-block-search__button {
@@ -653,7 +653,7 @@
 /* ---- the dropdown caret of the main menu: the source's 8 x 4 px solid triangle in the link's colour, in a 24 px button (the core chevron is gone) ---- */
 @media (min-width: 992px) {
 	.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
-		color: light-dark(var(--jm-heading), #cdd4e0);
+		color: light-dark(var(--jm-heading), var(--ds-c-fg, #cdd4e0));
 		transform: translateX(8px);
 	}
 	.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle svg {
@@ -669,11 +669,11 @@
 	}
 	.t3-mainnav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-submenu__toggle,
 	.t3-mainnav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-submenu__toggle {
-		color: var(--jm-red);
+		color: var(--ds-c-accent-text, var(--jm-red));
 	}
 	.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:hover > .wp-block-navigation-submenu__toggle,
 	.t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:focus-within > .wp-block-navigation-submenu__toggle {
-		color: light-dark(var(--jm-red), #cdd4e0);
+		color: light-dark(var(--ds-c-accent-text, var(--jm-red)), var(--ds-c-fg, #cdd4e0));
 	}
 }
 

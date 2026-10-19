@@ -67,28 +67,37 @@
 	font-display: block;
 }
 
+/* ds-not-used: --ds-c-disabled-bg — the template paints no disabled ground: a disabled pager step is hidden, a disabled tab or pill only greys its words (read through --ds-c-disabled-fg) */
 :root {
-	--jm-font: "PTRootUI", Helvetica, Arial, sans-serif;
-	--jm-navy: light-dark(#1b3060, #1b3060);
-	--jm-navy-fg: light-dark(#1b3060, #cdd4e0);
+	--jm-font: var(--ds-font-body, "PTRootUI", Helvetica, Arial, sans-serif);
+	--jm-navy: light-dark(var(--ds-c-accent, #1b3060), var(--ds-c-accent, #1b3060));
+	--jm-navy-fg: var(--ds-c-heading, light-dark(#1b3060, #cdd4e0));
 	--jm-heading: var(--wp--preset--color--fg-2, var(--ds-c-fg-2, #333333));
 	--jm-text: var(--wp--preset--color--fg, var(--ds-c-fg, #777777));
 	--jm-bg: var(--wp--preset--color--bg, var(--ds-c-bg, #ffffff));
-	--jm-gray: light-dark(#f2f3f7, #141927);
+	--jm-gray: light-dark(var(--ds-c-surface, #f2f3f7), var(--ds-c-surface, #141927));
 	--jm-card: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1a2032));
 	--jm-line: light-dark(var(--ds-c-border, #eaeaea), var(--ds-c-border, #2a3247));
-	--jm-soft: light-dark(#aaaaaa, #8b93a4);
-	--jm-footer: #111111;
+	--jm-soft: light-dark(var(--ds-c-muted, #aaaaaa), var(--ds-c-muted, #8b93a4));
+	--jm-footer: light-dark(var(--ds-c-ink, #111111), var(--ds-c-bg, #111111));
 	/* The red of buttons and section kickers stays #d93030 in dark too (measured); links take --ja-accent. */
-	--jm-red: #d93030;
+	--jm-red: var(--ds-c-accent, #d93030);
 	--jm-lead: light-dark(var(--ds-c-fg, #777777), var(--ds-c-fg, #f2f4f8));
 	--jm-gutter: 15px;
+	/* Translucent light over the ink bands (topbar, footer, the secondary band): only defined when a system sets --ds-c-on-ink;
+	   with no system they are invalid and every reader falls back to the template's own rgba(255, 255, 255, a). */
+	--jm-mix-on-ink-5: color-mix(in srgb, var(--ds-c-on-ink) 5%, transparent);
+	--jm-mix-on-ink-10: color-mix(in srgb, var(--ds-c-on-ink) 10%, transparent);
+	--jm-mix-on-ink-20: color-mix(in srgb, var(--ds-c-on-ink) 20%, transparent);
+	--jm-mix-on-ink-40: color-mix(in srgb, var(--ds-c-on-ink) 40%, transparent);
+	--jm-mix-on-ink-50: color-mix(in srgb, var(--ds-c-on-ink) 50%, transparent);
+	--jm-mix-on-ink-60: color-mix(in srgb, var(--ds-c-on-ink) 60%, transparent);
 }
 html:lang(vi),
 html:lang(vi) body {
-	--jm-font: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
+	--jm-font: var(--ds-font-body, "Be Vietnam Pro", Helvetica, Arial, sans-serif);
 	--wp--preset--font-family--display: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
-	--wp--preset--font-family--body: "Be Vietnam Pro", Helvetica, Arial, sans-serif;
+	--wp--preset--font-family--body: var(--ds-font-body, "Be Vietnam Pro", Helvetica, Arial, sans-serif);
 }
 
 /* ---- Base ---- */
@@ -114,7 +123,7 @@ body :where(p) {
 	margin: 0 0 25px;
 }
 body a {
-	color: var(--ja-accent);
+	color: var(--ds-c-accent-text, var(--ja-accent));
 	text-decoration: none;
 }
 .screen-reader-text {
@@ -186,16 +195,16 @@ body a {
 	line-height: 18.08px;
 	padding: 20px 30px;
 	border: 1px solid var(--jm-red);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	text-decoration: none;
 	transition: background-color 0.2s, border-color 0.2s;
 }
 .wp-block-button.btn .wp-block-button__link:hover,
 .wp-block-button.btn .wp-block-button__link:focus-visible {
-	background: var(--wp--preset--color--accent-hover, #b22323);
-	border-color: var(--wp--preset--color--accent-hover, #b22323);
+	background: var(--wp--preset--color--accent-hover, var(--ds-c-accent-hover, #b22323));
+	border-color: var(--wp--preset--color--accent-hover, var(--ds-c-accent-hover, #b22323));
 }
 .jm-arrow .wp-block-button__link::after,
 .jm-quick-contact .jm-arrow::after {
@@ -220,9 +229,9 @@ body a {
 	width: 30px;
 	height: 30px;
 	line-height: 30px;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	text-align: center;
 	font-size: 0;
 	text-decoration: none;
@@ -235,8 +244,8 @@ body a {
 
 /* ---- Topbar ---- */
 .t3-topbar {
-	background: #1b3060;
-	color: rgba(255, 255, 255, 0.5);
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--jm-mix-on-ink-50, var(--ds-c-on-ink, rgba(255, 255, 255, 0.5)));
 	font-size: 13px;
 	line-height: 40px;
 	height: 40px;
@@ -255,10 +264,10 @@ body a {
 }
 .t3-topbar .topbar-left li {
 	padding: 0 25px;
-	border-right: 1px solid rgba(255, 255, 255, 0.1);
+	border-right: 1px solid var(--jm-mix-on-ink-10, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
 }
 .t3-topbar .topbar-left li:first-child {
-	border-left: 1px solid rgba(255, 255, 255, 0.1);
+	border-left: 1px solid var(--jm-mix-on-ink-10, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
 }
 .t3-topbar .topbar-left li::before {
 	font-family: "Ionicons";
@@ -277,11 +286,11 @@ body a {
 .t3-topbar .wp-block-social-links .wp-social-link {
 	width: 40px;
 	height: 40px;
-	border-left: 1px solid rgba(255, 255, 255, 0.1);
+	border-left: 1px solid var(--jm-mix-on-ink-10, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: rgba(255, 255, 255, 0.5);
+	color: var(--jm-mix-on-ink-50, var(--ds-c-on-ink, rgba(255, 255, 255, 0.5)));
 	background: none;
 }
 .t3-topbar .wp-block-social-links .wp-social-link a {
@@ -323,7 +332,7 @@ body a {
 	color: var(--jm-navy-fg);
 }
 .t3-header .logo strong {
-	color: var(--ja-accent);
+	color: var(--ds-c-accent-text, var(--ja-accent));
 	font-weight: 700;
 }
 .t3-header .header-inner {
@@ -344,28 +353,28 @@ body a {
 	display: block;
 	padding: 32.5px 15px 32.5px 0;
 	margin-left: 30px;
-	color: light-dark(var(--jm-heading), #cdd4e0);
+	color: light-dark(var(--jm-heading), var(--ds-c-fg, #cdd4e0));
 }
 .t3-mainnav .current-menu-item > .wp-block-navigation-item__content,
 .t3-mainnav .current-menu-ancestor > .wp-block-navigation-item__content,
 .t3-mainnav .wp-block-navigation-item__content:hover {
-	color: var(--ja-accent);
+	color: var(--ds-c-accent-text, var(--ja-accent));
 }
 /* The top-level colour rule above is (0,4,0): restate the lit states at the same weight and later (audit 03/10, defect 3).
    Measured on the source: the current item is #d93030 in light and dark; hover reddens in light and leaves the colour alone in dark. */
 .t3-mainnav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
 .t3-mainnav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
-	color: var(--jm-red);
+	color: var(--ds-c-accent-text, var(--jm-red));
 }
 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content:hover,
 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:hover > .wp-block-navigation-item__content,
 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu:focus-within > .wp-block-navigation-item__content {
-	color: light-dark(var(--jm-red), #cdd4e0);
+	color: light-dark(var(--ds-c-accent-text, var(--jm-red)), var(--ds-c-fg, #cdd4e0));
 }
 .t3-mainnav .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content:hover,
 .t3-mainnav .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content:hover,
 .t3-mainnav .wp-block-navigation__container > .current-menu-ancestor:hover > .wp-block-navigation-item__content {
-	color: var(--jm-red);
+	color: var(--ds-c-accent-text, var(--jm-red));
 }
 /* Escape closed the dropdown (assets/js/wp-ja-morgan.js): it stays closed until the pointer leaves. */
 .t3-mainnav .wp-block-navigation-submenu.jm-submenu-closed > .wp-block-navigation__submenu-container {
@@ -402,8 +411,8 @@ body a {
 	font-size: 15px;
 	font-weight: 400;
 	line-height: 23.4375px;
-	border: 1px solid light-dark(rgba(0, 0, 0, 0.15), #2a3247) !important;
-	border-radius: 0 0 4px 4px;
+	border: 1px solid light-dark(var(--ds-c-border, rgba(0, 0, 0, 0.15)), var(--ds-c-border, #2a3247)) !important;
+	border-radius: 0 0 var(--ds-card-radius, 4px) var(--ds-card-radius, 4px);
 	padding: 15px;
 	width: 200px;
 	min-width: 200px !important;
@@ -429,7 +438,7 @@ body a {
 	color: light-dark(var(--ds-c-fg-2, #333333), var(--ds-c-fg-2, #cdd4e0));
 }
 .t3-mainnav .wp-block-navigation__submenu-container .current-menu-item > .wp-block-navigation-item__content {
-	color: light-dark(var(--ja-accent), #cdd4e0);
+	color: light-dark(var(--ds-c-accent-text, var(--ja-accent)), var(--ds-c-fg, #cdd4e0));
 }
 .headright {
 	display: flex;
@@ -458,7 +467,7 @@ body a {
 	font-size: 14px;
 	height: 30px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-input-radius, 4px);
 	background: var(--jm-bg);
 	color: var(--jm-text);
 }
@@ -494,7 +503,7 @@ body a {
 	margin-left: 14px;
 	padding: 9px 8px;
 	border: 0;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
 	cursor: pointer;
 	display: inline-flex;
@@ -510,7 +519,7 @@ body a {
 	width: 14px;
 	height: 1px;
 	margin-left: -7px;
-	background: var(--ds-c-bg, #ffffff);
+	background: var(--ds-c-accent-on, #ffffff);
 	transform: translateY(-1px);
 }
 .off-canvas-toggle span:first-child {
@@ -519,6 +528,15 @@ body a {
 .off-canvas-toggle span:last-child {
 	margin-top: 5px;
 }
+/* The bars take the words of the bar the toggle sits in: on-ink on home style 2's ink header, the white of
+   the photograph on the transparent headers of home styles 3 and 4. */
+body.jm-route-home-style-2 .off-canvas-toggle span {
+	background: var(--ds-c-on-ink, #ffffff);
+}
+body:is(.jm-route-home-style-3, .jm-route-home-style-4) .off-canvas-toggle span {
+	background: rgb(255, 255, 255); /* ds-keep: the bars stand on the hero photograph, which keeps its tones under a system */
+}
+
 /* While the panel is open the source turns the three bars into a cross: the middle bar goes, the other two cross at 45 degrees. */
 html.jm-off-canvas-open .off-canvas-toggle span:nth-child(2) {
 	display: none;
@@ -570,7 +588,7 @@ html.jm-off-canvas-open body::after {
 	align-items: center;
 	height: 40px;
 	padding: 0 0 0 30px;
-	background: #1b3060;
+	background: var(--ds-c-ink, #1b3060);
 }
 .t3-off-canvas-header-title {
 	flex: 1;
@@ -579,15 +597,15 @@ html.jm-off-canvas-open body::after {
 	line-height: 40px;
 	font-weight: 700;
 	text-transform: uppercase;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .t3-off-canvas-header .close {
 	width: 40px;
 	height: 40px;
 	padding: 0;
 	border: 0;
-	background: #192c58;
-	color: #ffffff;
+	background: var(--ds-c-ink, #192c58);
+	color: var(--ds-c-on-ink, #ffffff);
 	font-family: inherit;
 	font-size: 24px;
 	font-weight: 700;
@@ -665,17 +683,17 @@ html.jm-off-canvas-open body::after {
 	background-color: var(--jm-bg);
 }
 .mod-bg-gray {
-	background-color: var(--jm-gray);
+	background-color: light-dark(var(--jm-gray), var(--ds-c-bg, var(--jm-gray)));
 }
 .mod-bg-secondary {
-	background-color: #1b3060;
-	color: #ffffff;
+	background-color: light-dark(var(--ds-c-ink, #1b3060), var(--ds-c-bg, #1b3060));
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .mod-bg-secondary :where(h1, h2, h3, h4, .lead) {
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .mod-bg-secondary .section-title .sub-heading {
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 /* The T3Section background picture (a faint world map) sits behind the section content. */
 .jm-section-bg {
@@ -701,7 +719,7 @@ html.jm-off-canvas-open body::after {
 	font-size: 16px;
 	font-weight: 500;
 	line-height: 25px;
-	color: var(--jm-red);
+	color: var(--ds-c-accent-text, var(--jm-red));
 	margin: 0 0 25px;
 }
 .section-title h3 {
@@ -727,14 +745,14 @@ html.jm-off-canvas-open body::after {
 	color: var(--jm-lead);
 }
 .mod-bg-secondary .lead {
-	color: light-dark(#ffffff, #f2f4f8);
+	color: var(--ds-c-on-ink, light-dark(#ffffff, #f2f4f8));
 }
 
 /* ---- hero style-1 ---- */
 .acm-hero {
 	position: relative;
 	overflow: hidden;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .acm-hero .ft-bg,
 .acm-hero .ft-bg-xs {
@@ -781,7 +799,7 @@ html.jm-off-canvas-open body::after {
 	text-align: center;
 }
 .acm-hero .sub-heading {
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	font-weight: 500;
 	margin-bottom: 25px;
 }
@@ -790,11 +808,11 @@ html.jm-off-canvas-open body::after {
 	font-weight: 700;
 	line-height: 75px;
 	letter-spacing: -0.6px;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	margin: 0 0 30px;
 }
 .acm-hero .lead {
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	padding-right: 60px;
 	margin: 0 0 60px;
 }
@@ -854,13 +872,13 @@ html.jm-off-canvas-open body::after {
 	font-weight: 700;
 	line-height: 75px;
 	letter-spacing: -0.6px;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .acm-slideshow .description {
 	margin: 50px 0 0;
 	font-size: 18px;
 	line-height: 30px;
-	color: rgba(255, 255, 255, 0.75);
+	color: rgba(255, 255, 255, 0.75); /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .acm-slideshow .wp-block-buttons {
 	margin: 60px 0 0;
@@ -894,7 +912,7 @@ html.jm-off-canvas-open body::after {
 	color: light-dark(var(--ds-c-fg-2, #333333), var(--ds-c-fg-2, #ffffff));
 }
 :root[data-theme="dark"] .jm-slide-tab:not(.is-current) {
-	color: #dfe4ec;
+	color: var(--ds-c-fg, #dfe4ec);
 }
 .jm-slide-tab + .jm-slide-tab {
 	border-left: 1px solid var(--jm-line);
@@ -910,7 +928,7 @@ html.jm-off-canvas-open body::after {
 	height: 30px;
 	margin-left: -15px;
 	border: 15px solid transparent;
-	border-bottom-color: #ffffff;
+	border-bottom-color: var(--ds-c-border-soft, #ffffff);
 }
 .jm-slide-tab.is-current::before {
 	top: -30px;
@@ -965,7 +983,7 @@ html.jm-off-canvas-open body::after {
 	height: auto;
 	aspect-ratio: 3 / 2;
 	object-fit: cover;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 .acm-feature-slide .features-img {
 	margin: 0 !important;
@@ -999,7 +1017,7 @@ html.jm-off-canvas-open body::after {
 	background: var(--jm-card);
 	padding: 60px 30px 30px;
 	margin: 0 0 30px;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	text-align: center;
 }
 .style-normal .acm-features.style-2 .features-item {
@@ -1128,7 +1146,7 @@ html.jm-off-canvas-open body::after {
 	flex: none;
 	border-radius: 50%;
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	text-align: center;
 }
 .acm-features.style-3 .features-action {
@@ -1136,7 +1154,7 @@ html.jm-off-canvas-open body::after {
 }
 .acm-accordion .panel {
 	background: var(--jm-card);
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	margin: 15px 0 0;
 }
 .acm-accordion .panel:first-child {
@@ -1149,7 +1167,7 @@ html.jm-off-canvas-open body::after {
 	height: 60px;
 	line-height: 60px;
 	padding: 0 60px 0 25px;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	background: var(--jm-gray);
 	color: var(--jm-heading);
 	font-size: 16px;
@@ -1167,28 +1185,28 @@ html.jm-off-canvas-open body::after {
 	top: 15px;
 	width: 30px;
 	height: 30px;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	background: var(--ja-accent);
 	font-size: 11px;
 	line-height: 31px;
 	text-align: center;
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 }
 .acm-accordion .panel[open] summary {
-	background: #1b3060;
-	color: #ffffff;
-	border-radius: 4px 4px 0 0;
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--ds-c-on-ink, #ffffff);
+	border-radius: var(--ds-card-radius, 4px) var(--ds-card-radius, 4px) 0 0;
 }
 .acm-accordion .panel[open] summary::after {
 	content: "\f068";
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .acm-accordion .panel-body {
 	margin: 0;
 	padding: 25px;
 	border: 1px solid var(--jm-line);
 	border-top: 0;
-	border-radius: 0 0 4px 4px;
+	border-radius: 0 0 var(--ds-card-radius, 4px) var(--ds-card-radius, 4px);
 }
 /* The quick contact form of the source (JA Quick Contact): underlined fields on the navy band. */
 .jm-quick-contact {
@@ -1225,15 +1243,15 @@ html.jm-off-canvas-open body::after {
 	font-size: 16px;
 	font-weight: 500;
 	line-height: 36px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	background: transparent;
 	border: 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	border-bottom: 1px solid var(--jm-mix-on-ink-40, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
 	padding: 0 10px 15px 0;
 	height: 36px;
 }
 .jm-quick-contact :where(input, textarea)::placeholder {
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	opacity: 1;
 }
 .jm-quick-contact textarea {
@@ -1244,7 +1262,7 @@ html.jm-off-canvas-open body::after {
 }
 .jm-quick-contact .btn {
 	font-weight: 700;
-	border-radius: 3px;
+	border-radius: var(--ds-btn-radius, 3px);
 	cursor: pointer;
 }
 
@@ -1259,7 +1277,7 @@ html.jm-off-canvas-open body::after {
 }
 .acm-teams .teams-item {
 	background: var(--jm-card);
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	overflow: hidden;
 	text-align: center;
 	box-shadow: 0 5px 30px rgba(0, 0, 0, 0.05);
@@ -1270,7 +1288,7 @@ html.jm-off-canvas-open body::after {
 .acm-teams .avatar img {
 	display: block;
 	width: 100%;
-	border-radius: 4px 4px 0 0;
+	border-radius: var(--ds-card-radius, 4px) var(--ds-card-radius, 4px) 0 0;
 }
 .acm-teams--cols-3 .avatar img {
 	height: 482px;
@@ -1312,8 +1330,8 @@ html.jm-off-canvas-open body::after {
 	padding: 30px 75px;
 }
 .jm-link-warning .teams-action .wp-block-button__link {
-	background: #ffbb22;
-	border-color: #ffbb22;
+	background: var(--ds-c-warn, #ffbb22);
+	border-color: var(--ds-c-warn, #ffbb22);
 }
 
 /* ---- testimonials style-1 (case study cards) ---- */
@@ -1392,9 +1410,9 @@ html.jm-off-canvas-open body::after {
 	max-width: 90%;
 	margin: 0;
 	padding: 0 15px;
-	border-radius: 4px;
-	background: #1b3060;
-	color: #ffffff;
+	border-radius: var(--ds-pill-radius, 4px);
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--ds-c-on-ink, #ffffff);
 	font-size: 11px;
 	font-weight: 700;
 	line-height: 30px;
@@ -1439,7 +1457,7 @@ html.jm-off-canvas-open body::after {
 	position: absolute;
 	inset: 0;
 	border-radius: 50%;
-	background: #d2d3d7;
+	background: var(--ds-c-fg, #d2d3d7);
 }
 /* The dot is 8 px, the target around it is not: it reaches 24 px. */
 .tracy-motion-dots button::before {
@@ -1448,7 +1466,7 @@ html.jm-off-canvas-open body::after {
 	inset: -8px;
 }
 .tracy-motion-dots button[aria-current="true"] {
-	border-color: var(--jm-secondary, #1b3060);
+	border-color: var(--jm-secondary, var(--ds-c-heading, #1b3060));
 }
 .tracy-motion-dots button[aria-current="true"]::after {
 	background: transparent;
@@ -1457,7 +1475,7 @@ html.jm-off-canvas-open body::after {
 /* ---- testimonials style-2 (the quote over the footer) ---- */
 .t3-section-footer.jm-acm {
 	background: var(--jm-footer);
-	color: #888888;
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #888888));
 }
 .t3-section-footer > .container {
 	padding-top: 150px;
@@ -1495,14 +1513,14 @@ html.jm-off-canvas-open body::after {
 .acm-testimonial.style-2 .testimonial-content {
 	font-size: 24px;
 	line-height: 37.5px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	margin: 0 0 30px;
 }
 .acm-testimonial.style-2 .testimonial-detail {
 	font-size: 20px;
 	font-weight: 500;
 	line-height: 31.25px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	margin: 0;
 }
 .acm-testimonial.style-2 .testimonial-role {
@@ -1510,7 +1528,7 @@ html.jm-off-canvas-open body::after {
 	font-size: 13px;
 	font-weight: 500;
 	line-height: 20.3px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	margin: 6.25px 0 0;
 }
 .acm-testimonial.style-2 .tracy-motion-dots {
@@ -1518,7 +1536,7 @@ html.jm-off-canvas-open body::after {
 	margin: 25px 0 0 210px;
 }
 .acm-testimonial.style-2 .tracy-motion-dots button[aria-current="true"] {
-	border-color: #ffffff;
+	border-color: var(--ds-c-border-soft, #ffffff);
 }
 
 /* ---- clients style-1 ---- */
@@ -1554,7 +1572,7 @@ html.jm-off-canvas-open body::after {
 /* ---- Footer ---- */
 .t3-footer {
 	background: var(--jm-footer);
-	color: #888888;
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #888888));
 }
 .t3-spotlight {
 	display: grid;
@@ -1579,7 +1597,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	font-weight: 500;
 	line-height: 23.33px;
 	letter-spacing: -0.6px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	margin: 0 0 12.5px;
 }
 .t3-footnav .wp-block-navigation {
@@ -1592,10 +1610,10 @@ body:has(.t3-section-footer) .t3-footnav {
 	display: block;
 	font-size: 16px;
 	line-height: 30px;
-	color: #888888;
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #888888));
 }
 .t3-footnav .wp-block-navigation-item__content:hover {
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .social-follow.wp-block-social-links {
 	gap: 5px;
@@ -1604,7 +1622,7 @@ body:has(.t3-section-footer) .t3-footnav {
 .social-follow .wp-social-link {
 	width: 30px;
 	height: 30px;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -1638,7 +1656,7 @@ body:has(.t3-section-footer) .t3-footnav {
 .t3-copyright {
 	font-size: 13px;
 	line-height: 20.3px;
-	color: var(--ds-c-fg, #777777);
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #777777));
 	padding: 50px 0 150px;
 }
 .t3-copyright small {
@@ -1650,8 +1668,8 @@ body:has(.t3-section-footer) .t3-footnav {
 	margin: 0;
 }
 .t3-copyright a {
-	color: #888888;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #888888));
+	border-bottom: 1px solid var(--jm-mix-on-ink-5, var(--ds-c-on-ink, rgba(255, 255, 255, 0.05)));
 }
 
 /* ---- Masthead (mod_jamasthead): the page's picture behind its title, darkened 58 % ---- */
@@ -1663,18 +1681,18 @@ body:has(.t3-section-footer) .t3-footnav {
 }
 .ja-masthead.wp-block-cover .wp-block-cover__background {
 	opacity: 0.58;
-	background: #000000;
+	background: var(--ds-c-ink, #000000);
 }
 .ja-masthead .wp-block-cover__inner-container {
 	width: 100%;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .ja-masthead-detail {
 	position: relative;
 	z-index: 2;
 	max-width: 500px;
 	margin-inline: auto;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .ja-masthead-title.wp-block-post-title,
 .ja-masthead .ja-masthead-title {
@@ -1682,14 +1700,14 @@ body:has(.t3-section-footer) .t3-footnav {
 	font-weight: 600;
 	line-height: 90px;
 	letter-spacing: -0.6px;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	margin: 0 0 12.5px;
 }
 .ja-masthead-description {
 	margin: 25px 0 0;
 	font-size: 20px;
 	line-height: 31.25px;
-	color: #ffffff;
+	color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 }
 .ja-masthead-description p {
 	margin: 0;
@@ -1700,7 +1718,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	padding: 120px 0;
 	background-size: cover;
 	background-position: 0 0;
-	background-color: #1b3060;
+	background-color: var(--ds-c-ink, #1b3060);
 }
 .jm-article-masthead::before {
 	content: "";
@@ -1724,9 +1742,9 @@ body:has(.t3-section-footer) .t3-footnav {
 .category-name a {
 	display: inline-block;
 	padding: 6.5px 15px;
-	border-radius: 4px;
-	background: #1b3060;
-	color: #ffffff;
+	border-radius: var(--ds-pill-radius, 4px);
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--ds-c-on-ink, #ffffff);
 	font-size: 11px;
 	font-weight: 700;
 	line-height: 17.19px;
@@ -1739,12 +1757,12 @@ body:has(.t3-section-footer) .t3-footnav {
 	gap: 0 10px;
 	font-size: 12px;
 	line-height: 18.75px;
-	color: #999999;
+	color: var(--ds-c-meta, #999999);
 }
 .jm-article-masthead .article-info {
 	font-size: 14px;
 	line-height: 21.875px;
-	color: #f2f3f7;
+	color: var(--ds-c-on-ink, #f2f3f7);
 	margin: 50px 0 25px;
 }
 .article-info .createdby::before,
@@ -1859,7 +1877,7 @@ body:has(.t3-section-footer) .t3-footnav {
 .item-page img {
 	max-width: 100%;
 	height: auto;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 /* Bootstrap rows in an article: one column below 992 px, equal columns from there. */
 .item-page .row {
@@ -1889,7 +1907,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	display: inline;
 	padding: 2.4px 7.2px 3.6px;
 	margin-right: 5px;
-	border-radius: 3px;
+	border-radius: var(--ds-pill-radius, 3px);
 	background: var(--jm-gray);
 	color: var(--jm-text);
 	font-size: 12px;
@@ -1929,9 +1947,9 @@ body:has(.t3-section-footer) .t3-footnav {
 	box-sizing: border-box;
 	padding: 5px 10px;
 	border: 1px solid transparent;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: transparent;
-	color: light-dark(var(--jm-red), #cdd4e0);
+	color: light-dark(var(--ds-c-accent-text, var(--jm-red)), var(--ds-c-accent-text, #cdd4e0));
 	font-size: 12px;
 	font-weight: 600;
 	line-height: 13.56px;
@@ -1966,7 +1984,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	font-weight: 500;
 	line-height: 26.24px;
 	letter-spacing: -0.6px;
-	color: light-dark(var(--jm-red), #f2f4f8);
+	color: light-dark(var(--ds-c-accent-text, var(--jm-red)), var(--ds-c-heading, #f2f4f8));
 	margin: 0 0 15px;
 }
 /* Below 768 px the source's sidebar modules use the xs spacing: 25 px between modules, 12.5 px under the title. */
@@ -2002,11 +2020,11 @@ body:has(.t3-section-footer) .t3-footnav {
 	height: 60px;
 	padding: 20px 30px 20px 90px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-input-radius, 4px);
 	background: var(--jm-card) no-repeat;
 	font-family: var(--jm-font);
 	font-size: 16px;
-	color: #555555;
+	color: var(--ds-c-muted, #555555);
 }
 .jm-login .login-username,
 .jm-login .login-password {
@@ -2022,9 +2040,9 @@ body:has(.t3-section-footer) .t3-footnav {
 	height: 60px;
 	line-height: 60px;
 	text-align: center;
-	border-radius: 4px 0 0 4px;
-	background: #eeeeee;
-	color: #555555;
+	border-radius: var(--ds-input-radius, 4px) 0 0 var(--ds-input-radius, 4px);
+	background: var(--ds-c-surface-warm, #eeeeee);
+	color: var(--ds-c-muted, #555555);
 	font-family: "FontAwesome";
 }
 .jm-login .login-username::before {
@@ -2044,9 +2062,9 @@ body:has(.t3-section-footer) .t3-footnav {
 	line-height: 18.08px;
 	padding: 20px 30px;
 	border: 1px solid var(--jm-red);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	cursor: pointer;
 }
 .jm-login .unstyled {
@@ -2075,7 +2093,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	height: auto;
 	aspect-ratio: 3 / 2;
 	object-fit: cover;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 .mostread .wp-block-latest-posts__post-title {
 	font-size: 15px;
@@ -2101,7 +2119,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	position: absolute;
 	left: 0;
 	top: 10px;
-	color: #999999;
+	color: var(--ds-c-meta, #999999);
 }
 .categories-module li a {
 	color: var(--jm-text);
@@ -2115,7 +2133,7 @@ body:has(.t3-section-footer) .t3-footnav {
 .tagspopular.wp-block-tag-cloud a {
 	margin: 0;
 	padding: 5px 10px;
-	border-radius: 4px;
+	border-radius: var(--ds-pill-radius, 4px);
 	background: var(--jm-gray);
 	color: var(--jm-text);
 	font-size: 14px !important;
@@ -2138,7 +2156,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	height: 100%;
 	padding: 30px 30px 60px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	background: none;
 	box-shadow: none;
 }
@@ -2149,7 +2167,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	display: block;
 	width: 100%;
 	height: auto;
-	border-radius: 4px 4px 0 0;
+	border-radius: var(--ds-card-radius, 4px) var(--ds-card-radius, 4px) 0 0;
 }
 .blog .category-name {
 	margin: -45px 0 25px;
@@ -2180,9 +2198,9 @@ body:has(.t3-section-footer) .t3-footnav {
 	width: 30px;
 	height: 30px;
 	overflow: hidden;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	font-size: 0;
 	line-height: 30px;
 	text-align: center;
@@ -2202,7 +2220,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	display: inline-block;
 	padding: 12.5px 25px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	font-size: 16px;
 	font-weight: 600;
 	line-height: 25px;
@@ -2211,7 +2229,7 @@ body:has(.t3-section-footer) .t3-footnav {
 .blog .pagination .page-numbers.current {
 	background: var(--jm-red);
 	border-color: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 }
 
 /* ---- The not-found page (the source's error.php, in the site frame) ---- */
@@ -2225,18 +2243,18 @@ body:has(.t3-section-footer) .t3-footnav {
 	font-size: 300px;
 	line-height: 1;
 	font-weight: 400;
-	color: #ffffff;
+	color: var(--ds-c-danger-text, #ffffff);
 	margin: 0 0 36px;
 }
 .jm-error .error-message {
 	font-size: 48px;
 	font-weight: 700;
 	line-height: 60px;
-	color: #ffffff;
+	color: var(--ds-c-danger-text, #ffffff);
 	margin: 0 0 25px;
 }
 .jm-error .error-text {
-	color: rgba(255, 255, 255, 0.5);
+	color: rgba(255, 255, 255, 0.5); /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	margin: 0 0 30px;
 }
 .jm-error .error-actions {
@@ -2441,14 +2459,14 @@ body:has(.t3-section-footer) .t3-footnav {
 
 /* ---- Dark mode: the surfaces the source repaints under html[data-theme="dark"] ---- */
 :root[data-theme="dark"] .t3-header {
-	background: #0f1320;
+	background: var(--ds-c-bg, #0f1320);
 }
 :root[data-theme="dark"] .acm-accordion .panel[open] summary {
-	background: #1b3060;
+	background: var(--ds-c-ink, #1b3060);
 }
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme]) .t3-header {
-		background: #0f1320;
+		background: var(--ds-c-bg, #0f1320);
 	}
 }
 
@@ -2458,22 +2476,22 @@ body:has(.t3-section-footer) .t3-footnav {
 }
 /* The off-canvas panel in dark: its own surface, quieter group headings than links (measured). */
 .t3-off-canvas {
-	background: light-dark(var(--jm-bg), #141927);
+	background: light-dark(var(--jm-bg), var(--ds-c-surface, #141927));
 }
 .t3-off-canvas-header {
-	background: light-dark(#1b3060, #0c1019);
+	background: light-dark(var(--ds-c-ink, #1b3060), var(--ds-c-ink, #0c1019));
 }
 .t3-off-canvas-header .close {
-	color: light-dark(#ffffff, #cdd4e0);
+	color: var(--ds-c-on-ink, light-dark(#ffffff, #cdd4e0));
 }
 .t3-off-canvas-body .module-title,
 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
 .t3-off-canvas .jm-off-canvas-nav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
-	color: light-dark(var(--jm-heading), #a7b0c2);
+	color: light-dark(var(--jm-heading), var(--ds-c-heading, #a7b0c2));
 }
 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item .wp-block-navigation-item__content,
 .t3-off-canvas .jm-off-canvas-nav .wp-block-navigation-item__label {
-	color: light-dark(var(--jm-heading), #cdd4e0);
+	color: light-dark(var(--jm-heading), var(--ds-c-fg, #cdd4e0));
 }
 
 /* The listing's category chip uses the page font (the base theme sets its eyebrow in mono). */
@@ -2510,8 +2528,8 @@ body:has(.t3-section-footer) .t3-footnav {
 	box-sizing: border-box;
 }
 .social-follow .wp-social-link a {
-	color: #ffffff;
-	fill: #ffffff;
+	color: #ffffff; /* ds-keep: white glyph on the social service's own brand colour */
+	fill: #ffffff; /* ds-keep: white glyph on the social service's own brand colour */
 }
 /* The seeder's Joomla pager (tracy-pager): boxes as the source's, the current page filled, the
    disabled steps not drawn, the page counter boxed on the right. */
@@ -2537,7 +2555,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	margin-bottom: 6.25px;
 	padding: 12.5px 25px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	font-size: 16px;
 	font-weight: 600;
 	line-height: 25px;
@@ -2546,13 +2564,13 @@ body:has(.t3-section-footer) .t3-footnav {
 .tracy-joomla-pager .is-current .tracy-pager__link {
 	background: var(--jm-red);
 	border-color: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 }
 .tracy-joomla-pager .tracy-pager__counter {
 	margin: 0;
 	padding: 12.5px 25px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	line-height: 25px;
 }
 
@@ -2568,9 +2586,9 @@ body:has(.t3-section-footer) .t3-footnav {
 .jm-article-masthead .category-name a {
 	display: inline-block;
 	padding: 6.5px 15px;
-	border-radius: 4px;
-	background: #1b3060;
-	color: light-dark(#ffffff, #f2f4f8);
+	border-radius: var(--ds-pill-radius, 4px);
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--ds-c-on-ink, light-dark(#ffffff, #f2f4f8));
 	font-size: 11px;
 	font-weight: 700;
 	line-height: 17.19px;
@@ -2599,7 +2617,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	height: auto;
 	aspect-ratio: 3 / 2;
 	object-fit: cover;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 .mostread .mostread-title {
 	font-size: 15px;
@@ -2618,19 +2636,19 @@ body:has(.t3-section-footer) .t3-footnav {
 .tagspopular.wp-block-tag-cloud a,
 .tags a {
 	color: light-dark(var(--ds-c-fg, #777777), var(--ds-c-fg, #cdd4e0));
-	background: light-dark(#f2f3f7, #20283c);
+	background: light-dark(var(--ds-c-surface, #f2f3f7), var(--ds-c-surface, #20283c));
 }
 .jm-error .error-message {
 	font-size: 50px;
 	letter-spacing: normal;
 	line-height: 83.5px;
 	margin: 0 0 10px;
-	color: light-dark(#ffffff, #f2f4f8);
+	color: var(--ds-c-danger-text, light-dark(#ffffff, #f2f4f8));
 }
 .jm-error .error-text {
 	font-size: 18px;
 	line-height: 30.06px;
-	color: light-dark(#888888, #a7b0c2);
+	color: var(--ds-c-danger-text, light-dark(#888888, #a7b0c2));
 }
 .jm-error .error-actions .wp-block-button__link::after {
 	margin-left: 7.05px;
@@ -2641,7 +2659,7 @@ body:has(.t3-section-footer) .t3-footnav {
 	border: 0;
 	padding: 20px 40px;
 	line-height: 18.4px;
-	color: light-dark(#ffffff, #e0463f);
+	color: var(--ds-c-danger-text, light-dark(#ffffff, #e0463f));
 }
 @media (max-width: 767px) {
 	.ja-masthead-description {
@@ -2733,9 +2751,9 @@ ul.tagspopular.wp-block-tag-cloud {
 		margin: 0 0 0 15px;
 		padding: 0;
 		border: 0;
-		border-radius: 4px;
+		border-radius: var(--ds-btn-radius, 4px);
 		background: var(--jm-red);
-		color: #ffffff;
+		color: var(--ds-c-accent-on, #ffffff);
 	}
 	/* The source's menu button is the solid three-bar glyph (Font Awesome "bars"); WordPress draws two thin lines.
 	   The button keeps its bars while the menu is open; the close button draws the same glyph, not a cross. */
@@ -2784,8 +2802,8 @@ ul.tagspopular.wp-block-tag-cloud {
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container {
 		display: block;
 		padding: 1px 0 0;
-		border-top: 1px solid light-dark(#f2f3f7, #2a3247);
-		border-bottom: 1px solid light-dark(#f2f3f7, #2a3247);
+		border-top: 1px solid light-dark(var(--ds-c-border-soft, #f2f3f7), var(--ds-c-border-soft, #2a3247));
+		border-bottom: 1px solid light-dark(var(--ds-c-border-soft, #f2f3f7), var(--ds-c-border-soft, #2a3247));
 		font-size: 16px;
 		font-weight: 700;
 		line-height: 25px;
@@ -2796,7 +2814,7 @@ ul.tagspopular.wp-block-tag-cloud {
 		width: 100%;
 		padding: 0 15px;
 		box-sizing: border-box;
-		border-top: 1px solid light-dark(#f2f3f7, #2a3247);
+		border-top: 1px solid light-dark(var(--ds-c-border-soft, #f2f3f7), var(--ds-c-border-soft, #2a3247));
 	}
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .wp-block-navigation-item:first-child {
 		border-top: 0;
@@ -2809,7 +2827,7 @@ ul.tagspopular.wp-block-tag-cloud {
 	}
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-item > .wp-block-navigation-item__content,
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__container > .current-menu-ancestor > .wp-block-navigation-item__content {
-		color: light-dark(var(--jm-red), var(--ja-accent));
+		color: light-dark(var(--ds-c-accent-text, var(--jm-red)), var(--ja-accent));
 	}
 	/* The submenu stays folded until its caret is opened, as in the source. */
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__submenu-container {
@@ -2840,7 +2858,7 @@ ul.tagspopular.wp-block-tag-cloud {
 		padding: 0;
 		border: 0;
 		background: none;
-		color: var(--ja-accent);
+		color: var(--ds-c-accent-text, var(--ja-accent));
 		font-size: 0;
 	}
 	.t3-header .t3-mainnav .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-submenu__toggle svg {
@@ -2859,11 +2877,11 @@ ul.tagspopular.wp-block-tag-cloud {
    and keeps its quiet heading colour in dark (measured). */
 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item.current-menu-item > .wp-block-navigation-item__content,
 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container .wp-block-navigation-item.current-menu-item > .wp-block-navigation-item__content .wp-block-navigation-item__label {
-	color: var(--ja-accent);
+	color: var(--ds-c-accent-text, var(--ja-accent));
 }
 .t3-off-canvas .jm-off-canvas-nav.wp-block-navigation .wp-block-navigation__container > .wp-block-navigation-item:has(.current-menu-item) > .wp-block-navigation-item__content,
 .t3-off-canvas .jm-off-canvas-nav .wp-block-navigation__container > .wp-block-navigation-item:has(.current-menu-item) > .wp-block-navigation-item__content .wp-block-navigation-item__label {
-	color: light-dark(var(--ja-accent), #a7b0c2);
+	color: light-dark(var(--ds-c-accent-text, var(--ja-accent)), var(--ds-c-fg, #a7b0c2));
 }
 
 @media (max-width: 767px) {
@@ -2886,7 +2904,7 @@ ul.tagspopular.wp-block-tag-cloud {
 		width: 60px;
 		height: 60px;
 		/* In dark the source's wrapper is painted (#1a2032) behind the tile, so the tile's rounded corners show it, not the page. */
-		background: light-dark(transparent, #1a2032);
+		background: light-dark(transparent, var(--ds-c-surface, #1a2032));
 		opacity: 0;
 		visibility: hidden;
 		transition: opacity 0.3s, visibility 0.3s;
@@ -2903,10 +2921,10 @@ ul.tagspopular.wp-block-tag-cloud {
 		height: 60px;
 		padding: 0;
 		border: 0;
-		border-radius: 4px;
+		border-radius: var(--ds-btn-radius, 4px);
 		background: var(--jm-navy);
 		box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-		color: #ffffff;
+		color: var(--ds-c-accent-on, #ffffff);
 		cursor: pointer;
 		font-size: 20px;
 		font-weight: 400;
@@ -2921,13 +2939,13 @@ ul.tagspopular.wp-block-tag-cloud {
 	}
 	/* The tile follows the home style, as the source's `#back-to-top .btn` does per template style. */
 	.jm-route-home-style-2 .back-to-top .btn {
-		background: #1e375c;
+		background: var(--ds-c-accent, #1e375c);
 	}
 	.jm-route-home-style-3 .back-to-top .btn {
-		background: #67615c;
+		background: var(--ds-c-accent, #67615c);
 	}
 	.jm-route-home-style-4 .back-to-top .btn {
-		background: #333399;
+		background: var(--ds-c-accent, #333399);
 	}
 }
 
@@ -2961,7 +2979,7 @@ ul.tagspopular.wp-block-tag-cloud {
 	margin: 0 0 25px;
 	font-size: 16px;
 	line-height: 25px;
-	color: #888888;
+	color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, #888888));
 }
 .t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) p a {
 	color: inherit;
@@ -2969,7 +2987,7 @@ ul.tagspopular.wp-block-tag-cloud {
 .jm-footer-hs4 .t3-footnav p,
 .jm-footer-hs4 .t3-copyright,
 .jm-footer-hs4 .t3-copyright small {
-	color: #aaaaaa;
+	color: var(--ds-c-on-ink, #aaaaaa);
 }
 @media (max-width: 767px) {
 	.t3-footnav:is(.jm-foot-hs3, .jm-foot-hs4) {
@@ -3000,11 +3018,11 @@ ul.tagspopular.wp-block-tag-cloud {
  * rule `.tracy :focus-visible` paints a 4 px translucent ring on every focusable element; text fields, text areas and selects of the
  * sidebar log-in, the listing filters, the finder and the quick contact take the border instead. The header search keeps its own rule. */
 .tracy :is(input:not([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='range'], [type='file'], [type='color'], [type='hidden']), textarea, select):not(.wp-block-search__input):is(:focus, :focus-visible) {
-	border-color: light-dark(#999999, #2a3247);
+	border-color: var(--ds-c-border, light-dark(#999999, #2a3247));
 	box-shadow: none;
 }
 .tracy .jm-quick-contact .jm-field :is(input, textarea):is(:focus, :focus-visible):not(.wp-block-search__input) {
-	border-bottom-color: rgba(255, 255, 255, 0.6);
+	border-bottom-color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, rgba(255, 255, 255, 0.6)));
 }
 /* Typography page: the source puts an empty paragraph (25 px + 25 px margin) between two sections, the port has the block gap (25 px) only. */
 .core-typo > .docs-section + .docs-section {
@@ -3062,9 +3080,9 @@ ul.tagspopular.wp-block-tag-cloud {
 /* Inline code as the source styles it (the port left the browser default). */
 .t3-content code {
 	padding: 2px 4px;
-	border-radius: 4px;
-	background: #f9f2f4;
-	color: #c7254e;
+	border-radius: var(--ds-input-radius, 4px);
+	background: var(--ds-c-surface-warm, #f9f2f4);
+	color: var(--ds-c-accent-text, #c7254e);
 	font-family: Monaco, Menlo, Consolas, "Courier New", monospace;
 	font-size: 90%;
 	line-height: 1.6667;
@@ -3074,10 +3092,10 @@ ul.tagspopular.wp-block-tag-cloud {
 	position: relative;
 	margin: 0 0 10px;
 	padding: 5px 12.5px;
-	border: 1px solid #f4cfce;
-	border-radius: 2.5px;
-	background: #f7dddc;
-	color: #712b29;
+	border: 1px solid var(--ds-c-border, #f4cfce);
+	border-radius: var(--ds-card-radius, 2.5px);
+	background: var(--ds-c-surface-warm, #f7dddc);
+	color: var(--ds-c-danger-text, #712b29);
 	font-size: 16px;
 	line-height: 25px;
 }
@@ -3088,7 +3106,7 @@ ul.tagspopular.wp-block-tag-cloud {
 	padding: 2px 10px;
 	border: 0;
 	background: transparent;
-	color: #000;
+	color: var(--ds-c-fg, #000);
 	font-size: 15px;
 	line-height: 15px;
 	opacity: 0.5;
@@ -3188,7 +3206,7 @@ ul.tagspopular.wp-block-tag-cloud {
 }
 .social-follow .wp-social-link a::before {
 	content: "";
-	background: var(--ds-c-bg, #ffffff);
+	background: rgb(255, 255, 255); /* ds-keep: the white glyph on the social service's own brand colour */
 }
 .social-follow .wp-social-link-facebook a::before {
 	transform: translate(-0.5px, -1.25px);

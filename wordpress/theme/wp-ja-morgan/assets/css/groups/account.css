@@ -11,7 +11,7 @@
 	margin-inline: auto;
 	padding: 60px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 .login-wrap.jm-form,
 .registration.jm-form {
@@ -47,10 +47,10 @@
 	font-weight: 300;
 }
 .jm-form .login label {
-	color: light-dark(var(--ds-c-fg, #777777), #cdd4e0);
+	color: light-dark(var(--ds-c-fg, #777777), var(--ds-c-fg, #cdd4e0));
 }
 .jm-form .star {
-	color: #ffcc00;
+	color: var(--ds-c-warn-text, #ffcc00);
 }
 .jm-form .form-group {
 	margin: 0 -15px 25px;
@@ -74,16 +74,16 @@
 	height: 60px;
 	padding: 20px 30px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
-	background: light-dark(var(--ds-c-bg, #ffffff), #1a2032);
-	color: light-dark(#555555, #e6e9ef);
+	border-radius: var(--ds-input-radius, 4px);
+	background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-surface, #1a2032));
+	color: light-dark(var(--ds-c-fg, #555555), var(--ds-c-fg, #e6e9ef));
 	font: inherit;
 	line-height: 25px;
 	box-shadow: none;
 }
 .jm-form .form-control:focus {
 	outline: 0;
-	border-color: light-dark(#999999, #6f8fd6);
+	border-color: light-dark(var(--ds-c-focus-ring, #999999), var(--ds-c-focus-ring, #6f8fd6));
 }
 .jm-form textarea.form-control {
 	height: 167px;
@@ -100,17 +100,17 @@
 .jm-form .alert-warning {
 	margin: 0 0 25px;
 	padding: 15px;
-	border: 1px solid light-dark(#faebcc, #5a4d20);
-	border-radius: 4px;
-	background: light-dark(#fcf8e3, #2a2410);
-	color: light-dark(#c09853, #e6c46a);
+	border: 1px solid var(--ds-c-warn, light-dark(#faebcc, #5a4d20));
+	border-radius: var(--ds-card-radius, 4px);
+	background: light-dark(var(--ds-c-warn-bg, #fcf8e3), var(--ds-c-warn-bg, #2a2410));
+	color: light-dark(var(--ds-c-warn-text, #c09853), var(--ds-c-warn-text, #e6c46a));
 }
 .jm-form .btn {
 	display: inline-block;
 	box-sizing: border-box;
 	padding: 20px 30px;
 	border: 1px solid transparent;
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	font: 600 16px/18.08px var(--jm-font);
 	text-align: center;
 	text-decoration: none;
@@ -119,12 +119,12 @@
 .jm-form .btn-primary {
 	border-color: var(--jm-red);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 }
 .jm-form .btn-primary:hover,
 .jm-form .btn-primary:focus-visible {
-	border-color: var(--wp--preset--color--accent-hover, #b22323);
-	background: var(--wp--preset--color--accent-hover, #b22323);
+	border-color: var(--wp--preset--color--accent-hover, var(--ds-c-accent-hover, #b22323));
+	background: var(--wp--preset--color--accent-hover, var(--ds-c-accent-hover, #b22323));
 }
 .jm-form .btn-block {
 	display: block;
@@ -133,8 +133,8 @@
 .jm-form .btn-default {
 	margin: 5px 12.5px 0 0;
 	border-color: var(--jm-line);
-	background: light-dark(var(--ds-c-bg, #ffffff), #20283c);
-	color: light-dark(var(--ds-c-fg-2, #333333), #cdd4e0);
+	background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-surface, #20283c));
+	color: light-dark(var(--ds-c-fg-2, #333333), var(--ds-c-fg-2, #cdd4e0));
 }
 
 /* Password and date fields: the input joined to a grey button */
@@ -144,7 +144,7 @@
 .jm-form .input-group .form-control {
 	flex: 1 1 auto;
 	min-width: 0;
-	border-radius: 4px 0 0 4px;
+	border-radius: var(--ds-input-radius, 4px) 0 0 var(--ds-input-radius, 4px);
 }
 .jm-form .input-group .btn {
 	margin: 0;
@@ -152,10 +152,10 @@
 }
 .jm-form .input-group .btn-secondary {
 	flex: none;
-	border: 1px solid transparent;
-	border-radius: 0 4px 4px 0;
-	background: light-dark(#efefef, #20283c);
-	color: light-dark(var(--ds-c-fg, #777777), #cdd4e0);
+	border: 1px solid var(--ds-c-border, transparent);
+	border-radius: 0 var(--ds-btn-radius, 4px) var(--ds-btn-radius, 4px) 0;
+	background: light-dark(var(--ds-c-surface, #efefef), var(--ds-c-surface, #20283c));
+	color: light-dark(var(--ds-c-fg, #777777), var(--ds-c-fg-2, #cdd4e0));
 }
 .jm-form .icon-eye,
 .jm-form .icon-calendar {
@@ -180,9 +180,9 @@
 }
 .jm-form .input-calendar-toggle.btn-primary {
 	flex: none;
-	border-radius: 0 4px 4px 0;
+	border-radius: 0 var(--ds-btn-radius, 4px) var(--ds-btn-radius, 4px) 0;
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 }
 .jm-form .password-group meter {
 	display: block;
@@ -195,7 +195,7 @@
 	height: 21px;
 	padding-top: 21px;
 	box-sizing: border-box;
-	color: light-dark(#555555, #cdd4e0);
+	color: light-dark(var(--ds-c-fg, #555555), var(--ds-c-fg, #cdd4e0));
 }
 .jm-form .icon-eye::before,
 .jm-form .icon-calendar::before {
@@ -241,7 +241,7 @@
 .jm-form .other-links a {
 	font-size: 12px;
 	line-height: 18.75px;
-	color: light-dark(#555555, #a7b0c2);
+	color: light-dark(var(--ds-c-fg, #555555), var(--ds-c-fg, #a7b0c2));
 	text-decoration: none;
 }
 .jm-form .other-links a:hover {
@@ -268,7 +268,7 @@
 }
 .jm-form .small {
 	font-size: 13.6px;
-	color: #999999;
+	color: var(--ds-c-meta, #999999);
 }
 .registration.jm-form .form-check {
 	display: block;
@@ -316,7 +316,7 @@
 }
 .jm-contact-page .box-info {
 	padding: 150px 0;
-	background: var(--jm-gray);
+	background: light-dark(var(--jm-gray), var(--ds-c-bg, var(--jm-gray)));
 }
 .jm-contact-page .header-title {
 	margin-bottom: 60px;
@@ -327,7 +327,7 @@
 	font-size: 16px;
 	font-weight: 500;
 	line-height: 25px;
-	color: var(--jm-red);
+	color: var(--ds-c-accent-text, var(--jm-red));
 }
 .jm-contact-page .header-title__name {
 	margin: 0;
@@ -335,7 +335,7 @@
 	font-weight: 500;
 	line-height: 50px;
 	letter-spacing: -0.6px;
-	color: light-dark(var(--ds-c-fg-2, #333333), #f2f4f8);
+	color: light-dark(var(--ds-c-fg-2, #333333), var(--ds-c-heading, #f2f4f8));
 }
 .jm-contact-page .contact-info {
 	display: grid;
@@ -347,7 +347,7 @@
 .jm-contact-page .address-detail {
 	box-sizing: border-box;
 	padding: 50px 15px;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	background: var(--jm-card);
 	text-align: center;
 }
@@ -356,7 +356,7 @@
 	margin: 0 0 25px;
 	font-size: 36px;
 	line-height: 36px;
-	color: light-dark(#1b3060, #6f8fd6);
+	color: light-dark(var(--ds-c-heading, #1b3060), var(--ds-c-heading, #6f8fd6));
 }
 .jm-contact-page .address-detail .fa::before {
 	font-family: "FontAwesome";
@@ -379,11 +379,11 @@
 	font-size: 20px;
 	font-weight: 500;
 	line-height: 31.25px;
-	color: light-dark(var(--ds-c-fg-2, #333333), #f2f4f8);
+	color: light-dark(var(--ds-c-fg-2, #333333), var(--ds-c-heading, #f2f4f8));
 }
 .jm-contact-page .address-detail .content {
 	margin: 0;
-	color: light-dark(var(--ds-c-fg, #777777), #e6e9ef);
+	color: light-dark(var(--ds-c-fg, #777777), var(--ds-c-fg, #e6e9ef));
 }
 .jm-contact-page .address-detail a {
 	color: inherit;
@@ -411,8 +411,8 @@
 	flex: 0 0 50%;
 	align-items: center;
 	padding: 90px;
-	background: #1b3060;
-	color: #ffffff;
+	background: var(--ds-c-ink, #1b3060);
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .jm-contact-page .contact-box {
 	box-sizing: border-box;
@@ -426,7 +426,7 @@
 	font-weight: 500;
 	line-height: 45px;
 	letter-spacing: -0.6px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .jm-contact-page .contact-legend {
 	margin: 0 0 12.5px;
@@ -446,7 +446,7 @@
 	border: 0;
 	font-size: 16px;
 	line-height: 25px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	opacity: 0.6;
 }
 .jm-contact-page .jm-contact-form .form-group {
@@ -482,10 +482,10 @@
 	margin: 0;
 	padding: 0;
 	border: 0;
-	border-bottom: 1px solid rgba(225, 225, 225, 0.2);
-	border-radius: 0;
+	border-bottom: 1px solid var(--jm-mix-on-ink-40, var(--ds-c-on-ink, rgba(225, 225, 225, 0.2)));
+	border-radius: var(--ds-input-radius, 0);
 	background: transparent;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	font: inherit;
 	line-height: 60px;
 	box-shadow: none;
@@ -496,13 +496,13 @@
 }
 .jm-contact-page .jm-contact-form input::placeholder,
 .jm-contact-page .jm-contact-form textarea::placeholder {
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 	opacity: 1;
 }
 .jm-contact-page .jm-contact-form input:focus,
 .jm-contact-page .jm-contact-form textarea:focus {
 	outline: 0;
-	border-bottom-color: rgba(255, 255, 255, 0.6);
+	border-bottom-color: var(--jm-mix-on-ink-60, var(--ds-c-on-ink, rgba(255, 255, 255, 0.6)));
 }
 .jm-contact-page .jm-contact-form .checkbox {
 	position: relative;
@@ -518,7 +518,7 @@
 	display: block;
 	padding: 0 0 6.25px 20px;
 	line-height: 25px;
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 .jm-contact-page .jm-contact-form .control-btn {
 	margin-top: 30px;
@@ -528,14 +528,14 @@
 	box-sizing: border-box;
 	padding: 20px 30px;
 	border: 1px solid var(--jm-red);
-	border-radius: 4px;
+	border-radius: var(--ds-btn-radius, 4px);
 	background: var(--jm-red);
-	color: #ffffff;
+	color: var(--ds-c-accent-on, #ffffff);
 	font: 600 16px/18.08px var(--jm-font);
 	cursor: pointer;
 }
 .jm-contact-page .jm-contact-form .btn:hover {
-	background: var(--wp--preset--color--accent-hover, #b22323);
+	background: var(--wp--preset--color--accent-hover, var(--ds-c-accent-hover, #b22323));
 }
 .jm-contact-page .jm-contact-form .btn .icon {
 	margin-left: 6.25px;
@@ -548,27 +548,27 @@
 .jm-contact-page .jm-contact-form .alert {
 	margin: 0 0 12.5px;
 	padding: 12px 15px;
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 	background: rgba(255, 255, 255, 0.12);
-	color: #ffffff;
+	color: var(--ds-c-on-ink, #ffffff);
 }
 
 /* Status messages the account handlers print above a form */
 .jm-form .alert-success {
 	margin: 0 0 25px;
 	padding: 15px;
-	border: 1px solid light-dark(#d6e9c6, #2f5a2a);
-	border-radius: 4px;
-	background: light-dark(#dff0d8, #14261a);
-	color: light-dark(#3c763d, #9fd39a);
+	border: 1px solid var(--ds-c-success, light-dark(#d6e9c6, #2f5a2a));
+	border-radius: var(--ds-card-radius, 4px);
+	background: light-dark(var(--ds-c-success-bg, #dff0d8), var(--ds-c-success-bg, #14261a));
+	color: light-dark(var(--ds-c-success-text, #3c763d), var(--ds-c-success-text, #9fd39a));
 }
 .jm-form .alert-danger {
 	margin: 0 0 25px;
 	padding: 15px;
-	border: 1px solid light-dark(#ebccd1, #6a2a2a);
-	border-radius: 4px;
-	background: light-dark(#f2dede, #2a1414);
-	color: light-dark(#a94442, #e69a9a);
+	border: 1px solid var(--ds-c-danger, light-dark(#ebccd1, #6a2a2a));
+	border-radius: var(--ds-card-radius, 4px);
+	background: light-dark(var(--ds-c-danger-bg, #f2dede), var(--ds-c-danger-bg, #2a1414));
+	color: light-dark(var(--ds-c-danger-text, #a94442), var(--ds-c-danger-text, #e69a9a));
 }
 
 @media (max-width: 991px) {
@@ -699,7 +699,7 @@
 	margin-top: 16px;
 	padding: 16px;
 	border: 1px solid var(--jm-line);
-	border-radius: 4px;
+	border-radius: var(--ds-card-radius, 4px);
 }
 
 /* ---- Header variants of the three other home styles (desktop only; the drawer below 992 px is shared) ----
@@ -738,7 +738,7 @@
 		font-weight: 400;
 		margin-bottom: 6.1px;
 		line-height: 16.3px;
-		color: #aaaaaa;
+		color: var(--ds-c-muted, #aaaaaa);
 	}
 	body.jm-route-home-style-2 .jm-head-info span,
 	body.jm-route-home-style-2 .jm-head-info a {
@@ -758,7 +758,7 @@
 		box-sizing: border-box;
 		height: 42px;
 		background: var(--jm-bg);
-		color: #aaaaaa;
+		color: var(--ds-c-muted, #aaaaaa);
 		border: 1px solid var(--ds-c-border, #eaeaea);
 	}
 	body.jm-route-home-style-2 .t3-topbar > .container {
@@ -767,7 +767,7 @@
 	body.jm-route-home-style-2 .t3-topbar .topbar-left li,
 	body.jm-route-home-style-2 .t3-topbar .wp-block-social-links .wp-social-link {
 		border-color: var(--ds-c-border, #eaeaea);
-		color: #aaaaaa;
+		color: var(--ds-c-muted, #aaaaaa);
 	}
 	body.jm-route-home-style-2 .t3-header {
 		height: auto;
@@ -789,20 +789,20 @@
 		flex: 0 0 100%;
 		justify-content: space-between;
 		height: 60px;
-		border-radius: 4px;
+		border-radius: var(--ds-card-radius, 4px);
 		background: var(--jm-secondary);
 	}
 	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content {
 		padding: 17.5px 20px 17.5px 0;
 		margin-left: 20px;
-		color: #ffffff;
+		color: var(--ds-c-on-ink, #ffffff);
 	}
 	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-item__content {
 		padding-right: 34px;
 	}
 	body.jm-route-home-style-2 .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
 		right: 20px;
-		color: #ffffff;
+		color: var(--ds-c-on-ink, #ffffff);
 	}
 	body.jm-route-home-style-2 .headright {
 		height: 60px;
@@ -822,9 +822,9 @@
 		width: 60px;
 		height: 60px;
 		margin: 0;
-		border-radius: 0;
+		border-radius: var(--ds-btn-radius, 0);
 		background: transparent;
-		color: #ffffff;
+		color: var(--ds-c-on-ink, #ffffff);
 	}
 	body.jm-route-home-style-2 .off-canvas-toggle {
 		padding: 21px 22px;
@@ -836,7 +836,7 @@
 		height: 91px;
 		margin-bottom: -91px;
 		background: transparent;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* ds-keep: a faint line of light over the photograph, drawn for the picture, not a role */
 	}
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-header .logo a,
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .head-search .wp-block-search__button,
@@ -845,7 +845,7 @@
 	}
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-item > .wp-block-navigation-item__content,
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .t3-mainnav .wp-block-navigation__container > .wp-block-navigation-submenu > .wp-block-navigation-submenu__toggle {
-		color: #ffffff;
+		color: #ffffff; /* ds-keep: words over the photograph: the picture keeps its tones under a system, so its words keep the template white */
 	}
 	/* The hero now starts under the header, so it gives the header's height back as padding. */
 	body:is(.jm-route-home-style-3, .jm-route-home-style-4) .jm-sections > .acm-hero:first-child {
@@ -908,7 +908,7 @@
 	body.jm-route-home-style-3 .off-canvas-toggle {
 		margin-left: 6px;
 		padding: 39px 36px;
-		border-radius: 0;
+		border-radius: 0; /* ds-keep: square on purpose: the toggle sits flush in the header row, as the source */
 		background: transparent;
 	}
 	body.jm-route-home-style-4 .off-canvas-toggle {

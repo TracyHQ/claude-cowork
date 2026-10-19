@@ -748,6 +748,19 @@ add_action(
 );
 
 /**
+ * The tint the navy line icons of the icon grids are drawn through (about-us, Home Styles 1, 2 and 4: item-1.png
+ * to item-4.png, one colour on transparency). Without a design system the flood is the icons' own
+ * navy, so they look as they are; under one it is the system's readable accent (accent-text), so the icons stop showing the
+ * template's navy (ACCENT-LEAK). The Joomla twin does the same (ja-products 792ade433).
+ */
+add_action(
+	'wp_footer',
+	static function () {
+		echo '<svg class="jm-icon-tint" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><filter id="jm-icon-tint" color-interpolation-filters="sRGB"><feFlood style="flood-color:var(--ds-c-accent-text, #1b3060)"/><feComposite in2="SourceGraphic" operator="in"/></filter></svg>';
+	}
+);
+
+/**
  * Home Style 3 and 4 close with their own footers (the source's modules differ there: logo, info,
  * office, social on style 3; logo, office, conversation, copyright on style 4). The templates all
  * name the one `footer` part, so on those two pages the part is swapped when it is rendered.
