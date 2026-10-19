@@ -16,10 +16,10 @@ column. Where the site differs from its design, the contract door says so in `wa
 
 | Action | Kind | Unbound site | Bound site |
 | --- | --- | --- | --- |
-| `info` (carries `db_prefix`, `$wpdb->prefix`, and `db_base_prefix`, `$wpdb->base_prefix`, unreleased) | read | ok | ok |
+| `info` (carries `db_prefix`, `$wpdb->prefix`, and `db_base_prefix`, `$wpdb->base_prefix`) | read | ok | ok |
 | `site.stats` | read | ok | ok |
 | `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
-| `db.tables` (`prefix` and `base_prefix` beside `tables`, the same two values, so a caller can pick this site's tables out of a database several sites share: on multisite `prefix` is the site's own (`wp_2_`) and `base_prefix` the network's (`wp_`, which its shared tables such as `wp_users` carry), on a single site both are the same; `tables` still lists every table, unreleased) | read | ok | ok |
+| `db.tables` (`prefix` and `base_prefix` beside `tables`, the same two values, so a caller can pick this site's tables out of a database several sites share: on multisite `prefix` is the site's own (`wp_2_`) and `base_prefix` the network's (`wp_`, which its shared tables such as `wp_users` carry), on a single site both are the same; `tables` still lists every table) | read | ok | ok |
 | `db.dump` | read | ok | ok |
 | `db.dump_many`: `db.dump` for several tables per request, checked after every row, so an answer ends after the row that crosses `max_bytes`/`max_seconds` (a larger row comes back alone; the read is still one page, as with `db.dump`), see the Joomla README; advertised in `info` as `db_dump_many` | read | ok | ok |
 | `db.cleanup` | write | ok | ok |
