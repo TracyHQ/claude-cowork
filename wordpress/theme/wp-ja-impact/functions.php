@@ -23,6 +23,9 @@ require_once __DIR__ . '/inc/asset-version.php';
 // The customer's logo for dark backgrounds (option tracy_logo_dark), the site name as text where no logo
 // fits, and {site.title}/{year} in a copyright line: inc/brand-logo.php.
 require_once __DIR__ . '/inc/brand-logo.php';
+// The block and site editors get plain colours where a palette entry reads a design-system role
+// (`var(--ds-c-bg, #f5f3ee)`): their colour pickers parse the raw value. inc/role-reads.php.
+require_once __DIR__ . '/inc/role-reads.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );

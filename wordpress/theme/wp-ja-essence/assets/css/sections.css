@@ -488,6 +488,7 @@
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
+      /* ds-keep: Tailwind's own registered property defaults, not a design role */
       --tw-border-style: solid;
       --tw-leading: initial;
       --tw-font-weight: initial;

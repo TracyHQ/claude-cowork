@@ -13,27 +13,28 @@
  * The navy bands (header top, contact, footer, `blue` pattern sections) stay navy in dark, as the source's do.
  */
 
+/* ds-not-used: --ds-c-disabled-bg, --ds-c-disabled-fg — the template dims a disabled control with opacity only (the Contact Form 7 Send button) and hides a disabled page link (display: none); it paints no disabled ground or text colour */
 :root {
-  --jim-primary: var(--ds-c-fg-2, #1d3677);
-  --jim-success: #0cb76d;
+  --jim-primary: var(--ds-c-ink, #1d3677);
+  --jim-success: var(--ds-c-accent, #0cb76d);
   --jim-warning: var(--ds-c-warn, #f48a29);
-  --jim-info: #2970db;
+  --jim-info: var(--ds-c-info, #2970db);
   --jim-heading: light-dark(var(--ds-c-fg-2, #1d3677), var(--ds-c-fg-2, #eef1f6));
   --jim-text: light-dark(var(--ds-c-fg, #495057), var(--ds-c-fg, #c2c9d6));
   --jim-muted: light-dark(var(--ds-c-muted, #6c757d), var(--ds-c-muted, #8c97a8));
   --jim-surface: light-dark(var(--ds-c-surface, #fbfbfb), var(--ds-c-surface, #1e2a45));
-  --jim-raised: light-dark(#ffffff, #1e2a45);
+  --jim-raised: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1e2a45));
   --jim-raised-2: light-dark(var(--ds-c-surface, #f8f9fa), var(--ds-c-surface, #28354f));
   --jim-band: light-dark(var(--ds-c-surface-warm, #fff9ef), var(--ds-c-surface-warm, #141d33));
   --jim-line: light-dark(var(--ds-c-border, #e9ecef), var(--ds-c-border, #33415e));
   --jim-link: light-dark(var(--ds-c-fg-2, #1d3677), var(--ds-c-fg-2, #6f9bf0));
   --jim-link-hover: var(--ds-c-accent, #0cb76d);
-  --jim-eyebrow: light-dark(#0cb76d, #2fd98a);
-  --jim-on-band: #dee2e6;
-  --jim-on-band-muted: #ced4da;
-  --jim-radius: 8px;
+  --jim-eyebrow: light-dark(var(--ds-c-accent-text, #0cb76d), var(--ds-c-accent-text, #2fd98a));
+  --jim-on-band: var(--ds-c-on-ink, #dee2e6);
+  --jim-on-band-muted: var(--ds-c-on-ink, #ced4da);
+  --jim-radius: var(--ds-card-radius, 8px);
   --jim-gutter: 16px;
-  --jim-font: 'Readex Pro';
+  --jim-font: var(--ds-font-body, 'Readex Pro');
   --jim-h1: 72px;
   --jim-h2: 40px;
   --jim-h3: 28px;
@@ -150,7 +151,7 @@ body.tracy .jim-band--primary {
   background: var(--jim-primary);
   color: var(--jim-on-band);
 }
-body.tracy .jim-band--primary :where(h1, h2, h3, h4, h5, h6) { color: #ffffff; }
+body.tracy .jim-band--primary :where(h1, h2, h3, h4, h5, h6) { color: var(--ds-c-on-ink, #ffffff); }
 
 /* Buttons: the source's .btn is 56 px high (17 px 32 px padding, line 1.63), 8 px radius, 500 weight, the
    green fills with white text; hover keeps the colour and drops opacity to .85 (theme.tpl.css:171-180). */
@@ -162,9 +163,9 @@ body.tracy .wp-block-button.btn .wp-block-button__link {
   gap: 8px;
   padding: 17px 32px;
   border: 1px solid var(--jim-success);
-  border-radius: var(--jim-radius);
+  border-radius: var(--ds-btn-radius, var(--jim-radius));
   background: var(--jim-success);
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
   font-family: inherit;
   font-size: 16px;
   font-weight: 500;
@@ -176,19 +177,19 @@ body.tracy .jim-btn .wp-block-button__link:hover,
 body.tracy .jim-btn .wp-block-button__link:focus,
 body.tracy .wp-block-button.btn .wp-block-button__link:hover,
 body.tracy .wp-block-button.btn .wp-block-button__link:focus {
-  background: var(--jim-success);
-  color: #ffffff;
+  background: var(--ds-c-accent-hover, var(--jim-success));
+  color: var(--ds-c-accent-on, #ffffff);
   opacity: 0.85;
 }
 body.tracy .jim-btn--white .wp-block-button__link {
   background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #28354f));
-  border-color: light-dark(#ffffff, #33415e);
-  color: var(--jim-primary);
+  border-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-border, #33415e));
+  color: var(--ds-c-heading, var(--jim-primary));
 }
 body.tracy .jim-btn--white .wp-block-button__link:hover {
   background: var(--jim-primary);
   border-color: var(--jim-primary);
-  color: #ffffff;
+  color: var(--ds-c-on-ink, #ffffff);
   opacity: 1;
 }
 body.tracy .jim-btn--arrow .wp-block-button__link::after,
@@ -236,9 +237,9 @@ body.tracy .jim-contact__item::before {
   height: 48px;
   box-sizing: border-box;
   padding: 12px;
-  border-radius: 4px;
+  border-radius: var(--ds-btn-radius, 4px);
   background: rgba(255, 255, 255, 0.1);
-  color: var(--jim-success);
+  color: var(--ds-c-accent-on-ink, var(--jim-success));
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   font-size: 24px;
@@ -249,8 +250,8 @@ body.tracy .jim-contact__item--address::before { content: '\f57d'; }
 body.tracy .jim-contact__item--mail::before { content: '\f0e0'; }
 body.tracy .jim-contact__item--phone::before { content: '\f095'; }
 body.tracy .jim-contact__sub { margin: 0 0 4px; font-size: 16px; line-height: 1.6; color: var(--ds-c-meta, #adb5bd); }
-body.tracy .jim-contact__title { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.5; letter-spacing: -0.16px; color: #ffffff; }
-body.tracy .jim-contact__title a { color: #ffffff; }
+body.tracy .jim-contact__title { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.5; letter-spacing: -0.16px; color: var(--ds-c-on-ink, #ffffff); }
+body.tracy .jim-contact__title a { color: var(--ds-c-on-ink, #ffffff); }
 
 body.tracy .jim-header__bar {
   background: var(--wp--preset--color--bg);
@@ -272,7 +273,7 @@ body.tracy .jim-donate .wp-block-button__link {
   height: 66px;
   box-sizing: border-box;
   padding: 17px 32px;
-  border-radius: 0;
+  border-radius: var(--ds-btn-radius, 0);
 }
 body.tracy .jim-nav { font-size: 16px; font-weight: 500; letter-spacing: -0.16px; }
 body.tracy .jim-nav .wp-block-navigation__container { gap: 0; align-items: stretch; }
@@ -288,7 +289,7 @@ body.tracy .jim-nav .wp-block-navigation-item__content {
 }
 body.tracy .jim-nav .wp-block-navigation-item__content:hover,
 body.tracy .jim-nav .current-menu-item > .wp-block-navigation-item__content,
-body.tracy .jim-nav .current-menu-ancestor > .wp-block-navigation-item__content { color: var(--jim-success); }
+body.tracy .jim-nav .current-menu-ancestor > .wp-block-navigation-item__content { color: var(--ds-c-accent-text, var(--jim-success)); }
 body.tracy .jim-nav .wp-block-navigation__submenu-icon { margin-left: 0; width: 22px; height: 22px; }
 
 /* Theme switch: light → dark → auto. */
@@ -307,7 +308,7 @@ body.tracy .jim-theme-toggle svg { display: block; }
 body.tracy .jim-theme-toggle__sun { display: none; }
 body.tracy .jim-theme-toggle[data-theme-state='dark'] .jim-theme-toggle__moon { display: none; }
 body.tracy .jim-theme-toggle[data-theme-state='dark'] .jim-theme-toggle__sun { display: block; }
-body.tracy .jim-theme-toggle:hover { color: var(--jim-success); }
+body.tracy .jim-theme-toggle:hover { color: var(--ds-c-accent-text, var(--jim-success)); }
 
 body.tracy .jim-drawer-toggle { display: none; }
 body.tracy .jim-drawer__head { display: none; }
@@ -326,7 +327,7 @@ body.tracy .jim-drawer__head { display: none; }
     height: 40px;
     padding: 8px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--ds-btn-radius, 4px);
     background: transparent;
     cursor: pointer;
   }
@@ -359,11 +360,11 @@ body.tracy .jim-drawer__head { display: none; }
 /* ── Footer ───────────────────────────────────────────────────────────────────────────────────── */
 
 body.tracy .jim-footer__contact { padding-block: var(--jim-section-y) 64px; }
-body.tracy .jim-fcontact__heading { max-width: 656px; margin: 0 0 72px; font-size: 40px; color: #ffffff; }
+body.tracy .jim-fcontact__heading { max-width: 656px; margin: 0 0 72px; font-size: 40px; color: var(--ds-c-on-ink, #ffffff); }
 body.tracy .jim-fcontact__items { display: flex; flex-wrap: wrap; gap: 96px; }
 body.tracy .jim-fcontact__sub { margin: 0 0 16px; font-size: 16px; line-height: 1.2; letter-spacing: -0.16px; text-transform: uppercase; color: var(--jim-on-band-muted); }
-body.tracy .jim-fcontact__title { margin: 0; font-size: 24px; font-weight: 500; line-height: 1.2; letter-spacing: -0.24px; color: #ffffff; }
-body.tracy .jim-fcontact__title a { color: #ffffff; }
+body.tracy .jim-fcontact__title { margin: 0; font-size: 24px; font-weight: 500; line-height: 1.2; letter-spacing: -0.24px; color: var(--ds-c-on-ink, #ffffff); }
+body.tracy .jim-fcontact__title a { color: var(--ds-c-on-ink, #ffffff); }
 body.tracy .jim-footer__nav { padding-block: 80px 48px; }
 body.tracy .jim-footer__cols { display: flex; flex-wrap: wrap; gap: 32px 0; }
 body.tracy .jim-footer__col { flex: 0 0 50%; padding-inline: 16px; box-sizing: border-box; }
@@ -371,11 +372,11 @@ body.tracy .jim-footer__col--about { flex: 1 0 100%; }
 body.tracy .jim-footer__logo { margin: 0 0 24px; }
 body.tracy .jim-footer__logo img { width: 210px; max-width: none; height: auto; }
 body.tracy .jim-footer__about { max-width: 380px; margin: 0; color: var(--jim-on-band); }
-body.tracy .jim-footer__title { margin: 0 0 32px; font-size: 24px; color: #ffffff; }
+body.tracy .jim-footer__title { margin: 0 0 32px; font-size: 24px; color: var(--ds-c-on-ink, #ffffff); }
 body.tracy .jim-footnav { font-size: 15px; line-height: 24px; }
 body.tracy .jim-footnav .wp-block-navigation__container { gap: 0; align-items: flex-start; }
 body.tracy .jim-footnav .wp-block-navigation-item__content { padding: 6.4px 0; color: var(--jim-on-band-muted); }
-body.tracy .jim-footnav .wp-block-navigation-item__content:hover { color: var(--jim-success); }
+body.tracy .jim-footnav .wp-block-navigation-item__content:hover { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
 @media (min-width: 768px) {
   body.tracy .jim-footer__col { flex: 0 0 25%; }
 }
@@ -387,7 +388,7 @@ body.tracy .jim-footer__bar { padding-block: 32px; font-size: 14px; line-height:
 body.tracy .jim-footer__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 body.tracy .jim-footer__copy :where(p) { margin: 0; font-size: 14px; line-height: 1.6; }
 body.tracy .jim-footer__copy a { color: var(--jim-on-band-muted); }
-body.tracy .jim-footer__copy a:hover { color: var(--jim-success); }
+body.tracy .jim-footer__copy a:hover { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
 body.tracy .jim-social { margin: 0; gap: 0; }
 body.tracy .jim-social .wp-social-link { background: transparent; color: var(--jim-on-band-muted); }
 body.tracy .jim-social .wp-social-link a { padding: 16px; }

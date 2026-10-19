@@ -665,6 +665,19 @@ function wp_ja_impact_back_to_top(): void {
 add_action( 'wp_footer', 'wp_ja_impact_back_to_top', 5 );
 
 /**
+ * The SVG filter that repaints the round navy disc of the feature icons (acm-features style 3) with a worn design system's
+ * accent, as the Joomla twin does: the colour matrix keeps only the deep navy pixels (blue well above red and green), the
+ * flood (`.jim-disc-tint-flood`, assets/css/groups/g2.css) paints them. Only a worn system applies the filter to the icons.
+ */
+function wp_ja_impact_disc_tint(): void {
+	if ( in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
+		return;
+	}
+	echo '<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><filter id="jim-disc-tint" color-interpolation-filters="sRGB"><feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -6 -12 12 0 -1.3" result="blue"/><feComposite in="blue" in2="SourceAlpha" operator="in" result="disc"/><feFlood class="jim-disc-tint-flood" result="flood"/><feComposite in="flood" in2="disc" operator="in" result="tint"/><feComposite in="SourceGraphic" in2="tint" operator="out" result="own"/><feMerge><feMergeNode in="own"/><feMergeNode in="tint"/></feMerge></filter></svg>';
+}
+add_action( 'wp_footer', 'wp_ja_impact_disc_tint', 6 );
+
+/**
  * A search box is not `required` in the source (an empty search is sent and answered with "no results"), so the core
  * Search block's `required` attribute is dropped for every search form of the site.
  *

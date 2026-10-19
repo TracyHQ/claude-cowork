@@ -16,82 +16,82 @@
         {
           "slug": "bg",
           "name": "Background",
-          "color": "#ffffff"
+          "color": "var(--ds-c-bg, #ffffff)"
         },
         {
           "slug": "surface",
           "name": "Surface",
-          "color": "#fbfbfb"
+          "color": "var(--ds-c-surface, #fbfbfb)"
         },
         {
           "slug": "surface-warm",
           "name": "Surface warm",
-          "color": "#fff9ef"
+          "color": "var(--ds-c-surface-warm, #fff9ef)"
         },
         {
           "slug": "fg",
           "name": "Foreground",
-          "color": "#495057"
+          "color": "var(--ds-c-fg, #495057)"
         },
         {
           "slug": "fg-2",
           "name": "Foreground 2",
-          "color": "#1d3677"
+          "color": "var(--ds-c-heading, #1d3677)"
         },
         {
           "slug": "muted",
           "name": "Muted",
-          "color": "#6c757d"
+          "color": "var(--ds-c-muted, #6c757d)"
         },
         {
           "slug": "meta",
           "name": "Meta",
-          "color": "#6c757d"
+          "color": "var(--ds-c-meta, #6c757d)"
         },
         {
           "slug": "border",
           "name": "Border",
-          "color": "#e9ecef"
+          "color": "var(--ds-c-border, #e9ecef)"
         },
         {
           "slug": "border-soft",
           "name": "Border soft",
-          "color": "#e8e8ed"
+          "color": "var(--ds-c-border-soft, #e8e8ed)"
         },
         {
           "slug": "accent",
           "name": "Accent",
-          "color": "#0cb76d"
+          "color": "var(--ds-c-accent, #0cb76d)"
         },
         {
           "slug": "accent-on",
           "name": "On accent",
-          "color": "#ffffff"
+          "color": "var(--ds-c-accent-on, #ffffff)"
         },
         {
           "slug": "accent-hover",
           "name": "Accent hover",
-          "color": "#0cb76d"
+          "color": "var(--ds-c-accent-hover, #0cb76d)"
         },
         {
           "slug": "accent-active",
           "name": "Accent active",
-          "color": "#0cb76d"
+          "color": "var(--ds-c-accent-active, #0cb76d)"
         },
         {
           "slug": "success",
           "name": "Success",
-          "color": "#0cb76d"
+          "color": "var(--ds-c-success, #0cb76d)"
         },
         {
           "slug": "warn",
           "name": "Warn",
-          "color": "#f48a29"
+          "color": "var(--ds-c-warn, #f48a29)"
         },
         {
           "slug": "danger",
           "name": "Danger",
-          "color": "#dc3545"
+          "color": "var(--ds-c-danger, #dc3545)"
         }
       ]
     },
@@ -102,12 +102,12 @@
         {
           "slug": "display",
           "name": "Display",
-          "fontFamily": "\"Readex Pro\""
+          "fontFamily": "var(--ds-font-display, \"Readex Pro\")"
         },
         {
           "slug": "body",
           "name": "Body",
-          "fontFamily": "\"Readex Pro\""
+          "fontFamily": "var(--ds-font-body, \"Readex Pro\")"
         },
         {
           "slug": "mono",
@@ -225,17 +225,17 @@
         "phone": "48px"
       },
       "radius": {
-        "sm": "8px",
-        "md": "8px",
-        "lg": "8px",
-        "pill": "980px"
+        "sm": "var(--ds-input-radius, 8px)",
+        "md": "var(--ds-btn-radius, 8px)",
+        "lg": "var(--ds-card-radius, 8px)",
+        "pill": "var(--ds-pill-radius, 980px)"
       },
       "elev": {
         "flat": "none",
         "ring": "0 0 0 1px var(--wp--preset--color--border)",
-        "raised": "0 12px 32px rgba(0, 0, 0, 0.08)"
+        "raised": "0 12px 32px rgba(0, 0, 0, 0.08) /* ds-keep: shadow depth, not a colour role */"
       },
-      "focusRing": "0 0 0 4px color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%)",
+      "focusRing": "0 0 0 4px var(--ds-c-focus-ring, color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%))",
       "motion": {
         "fast": "150ms",
         "base": "220ms"
@@ -328,7 +328,7 @@
         }
       }
     },
-    "css": "/* wp-ja-impact: dark mode. The source (JA Impact, Joomla 6 T4) follows the OS until the visitor picks: its head script sets html[data-theme] from the ja_impact-theme cookie, else the default `auto` (prefers-color-scheme); the .t4-theme-toggle button switches it (css/darkmode.css, js/darkmode.js). Here every colour preset carries both halves through light-dark(): light = tokens.css (measured on the running source), dark = the source's --dm-* block (css/darkmode.css: bg #111a2c, surface #1e2a45, hover #28354f, band #141d33, border #33415e, text #c2c9d6, muted #8c97a8, heading #eef1f6; the primary navy and the green accent are kept as in the source), each read back as computed style in the design contract (desktop-dark). No attribute = auto, the OS decides; assets/js/wp-ja-impact-dark.js writes data-theme light|dark from the tracy_theme cookie before the first paint. */ :root{color-scheme:light dark;--wp--preset--color--bg:light-dark(#ffffff,#111a2c);--wp--preset--color--surface:light-dark(#fbfbfb,#1e2a45);--wp--preset--color--surface-warm:light-dark(#fff9ef,#141d33);--wp--preset--color--fg:light-dark(#495057,#c2c9d6);--wp--preset--color--fg-2:light-dark(#1d3677,#eef1f6);--wp--preset--color--muted:light-dark(#6c757d,#8c97a8);--wp--preset--color--meta:light-dark(#6c757d,#8c97a8);--wp--preset--color--border:light-dark(#e9ecef,#33415e);--wp--preset--color--border-soft:light-dark(#e8e8ed,#33415e);--wp--preset--color--accent:light-dark(#0cb76d,#0cb76d);--wp--preset--color--accent-on:light-dark(#ffffff,#ffffff);--wp--preset--color--accent-hover:light-dark(#0cb76d,#0cb76d);--wp--preset--color--accent-active:light-dark(#0cb76d,#0cb76d);--wp--preset--color--success:light-dark(#0cb76d,#0cb76d);--wp--preset--color--warn:light-dark(#f48a29,#f48a29);--wp--preset--color--danger:light-dark(#dc3545,#dc3545);}:root[data-theme=\"light\"]{color-scheme:light}:root[data-theme=\"dark\"]{color-scheme:dark}"
+    "css": "/* wp-ja-impact: dark mode. The source (JA Impact, Joomla 6 T4) follows the OS until the visitor picks: its head script sets html[data-theme] from the ja_impact-theme cookie, else the default `auto` (prefers-color-scheme); the .t4-theme-toggle button switches it (css/darkmode.css, js/darkmode.js). Here every colour preset carries both halves through light-dark(): light = tokens.css (measured on the running source), dark = the source's --dm-* block (css/darkmode.css: bg #111a2c, surface #1e2a45, hover #28354f, band #141d33, border #33415e, text #c2c9d6, muted #8c97a8, heading #eef1f6; the primary navy and the green accent are kept as in the source), each read back as computed style in the design contract (desktop-dark). No attribute = auto, the OS decides; assets/js/wp-ja-impact-dark.js writes data-theme light|dark from the tracy_theme cookie before the first paint. */ :root{color-scheme:light dark;--wp--preset--color--bg:light-dark(var(--ds-c-bg, #ffffff),var(--ds-c-bg, #111a2c));--wp--preset--color--surface:light-dark(var(--ds-c-surface, #fbfbfb),var(--ds-c-surface, #1e2a45));--wp--preset--color--surface-warm:light-dark(var(--ds-c-surface-warm, #fff9ef),var(--ds-c-surface-warm, #141d33));--wp--preset--color--fg:light-dark(var(--ds-c-fg, #495057),var(--ds-c-fg, #c2c9d6));--wp--preset--color--fg-2:light-dark(var(--ds-c-heading, #1d3677),var(--ds-c-heading, #eef1f6));--wp--preset--color--muted:light-dark(var(--ds-c-muted, #6c757d),var(--ds-c-muted, #8c97a8));--wp--preset--color--meta:light-dark(var(--ds-c-meta, #6c757d),var(--ds-c-meta, #8c97a8));--wp--preset--color--border:light-dark(var(--ds-c-border, #e9ecef),var(--ds-c-border, #33415e));--wp--preset--color--border-soft:light-dark(var(--ds-c-border-soft, #e8e8ed),var(--ds-c-border-soft, #33415e));--wp--preset--color--accent:light-dark(var(--ds-c-accent, #0cb76d),var(--ds-c-accent, #0cb76d));--wp--preset--color--accent-on:light-dark(var(--ds-c-accent-on, #ffffff),var(--ds-c-accent-on, #ffffff));--wp--preset--color--accent-hover:light-dark(var(--ds-c-accent-hover, #0cb76d),var(--ds-c-accent-hover, #0cb76d));--wp--preset--color--accent-active:light-dark(var(--ds-c-accent-active, #0cb76d),var(--ds-c-accent-active, #0cb76d));--wp--preset--color--success:light-dark(var(--ds-c-success, #0cb76d),var(--ds-c-success, #0cb76d));--wp--preset--color--warn:light-dark(var(--ds-c-warn, #f48a29),var(--ds-c-warn, #f48a29));--wp--preset--color--danger:light-dark(var(--ds-c-danger, #dc3545),var(--ds-c-danger, #dc3545));}:root[data-theme=\"light\"]{color-scheme:light}:root[data-theme=\"dark\"]{color-scheme:dark}"
   },
   "customTemplates": [
     {

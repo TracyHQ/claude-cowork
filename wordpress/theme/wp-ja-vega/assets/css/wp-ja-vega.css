@@ -46,24 +46,35 @@
 
 :root {
   /* Rows the palette has none for, measured light → dark (css/darkmode.css --dm-raised, --dm-border). */
-  --jv-raised: light-dark(#f5f7fa, #1d2530);
-  --jv-line: light-dark(rgba(0, 0, 0, 0.1), #2a323d);
-  --jv-dash: light-dark(#e2e5ea, var(--ds-c-fg-2, #2a323d));
+  --jv-raised: light-dark(var(--ds-c-surface-warm, #f5f7fa), var(--ds-c-surface-warm, #1d2530));
+  --jv-line: light-dark(var(--ds-c-border-soft, rgba(0, 0, 0, 0.1)), var(--ds-c-border-soft, #2a323d));
+  --jv-dash: light-dark(var(--ds-c-border-soft, #e2e5ea), var(--ds-c-fg-2, #2a323d));
   --jv-card: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
   /* The bands that are dark in both modes. */
-  --jv-night: #121316;
-  --jv-on-night: #ffffff;
-  --jv-on-night-soft: rgba(255, 255, 255, 0.6);
-  --jv-night-line: rgba(255, 255, 255, 0.1);
-  --jv-amber: #f59e0b;
+  --jv-night: light-dark(var(--ds-c-ink, #121316), var(--ds-c-surface-warm, #121316));
+  --jv-on-night: light-dark(var(--ds-c-on-ink, #ffffff), var(--ds-c-heading, #ffffff));
+  --jv-on-night-soft: var(--jv-mix-on-ink-60, var(--ds-c-on-ink, rgba(255, 255, 255, 0.6)));
+  --jv-night-line: var(--jv-mix-on-ink-10, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
+  --jv-amber: light-dark(var(--ds-c-accent-on-ink, #f59e0b), var(--ds-c-accent-text, #f59e0b));
   --jv-gap: 32px;
-  --jv-font: 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --jv-font: var(--ds-font-body, 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  /* Design-system mixes: no fallback on purpose, so without a system each is invalid and every reader
+   * falls back to the template's own literal; with one, the shade is made from the system's roles. */
+  --jv-mix-on-ink-7: color-mix(in srgb, light-dark(var(--ds-c-on-ink), var(--ds-c-heading)) 7%, transparent);
+  --jv-mix-on-ink-10: color-mix(in srgb, light-dark(var(--ds-c-on-ink), var(--ds-c-heading)) 10%, transparent);
+  --jv-mix-on-ink-20: color-mix(in srgb, light-dark(var(--ds-c-on-ink), var(--ds-c-heading)) 20%, transparent);
+  --jv-mix-on-ink-60: color-mix(in srgb, light-dark(var(--ds-c-on-ink), var(--ds-c-heading)) 60%, transparent);
+  --jv-mix-on-ink-80: color-mix(in srgb, light-dark(var(--ds-c-on-ink), var(--ds-c-heading)) 80%, transparent);
+  --jv-mix-dot: color-mix(in srgb, var(--ds-c-fg) 60%, var(--ds-c-bg));
+  --jv-mix-disc: color-mix(in srgb, var(--ds-c-fg) 10%, var(--ds-c-bg));
+  --jv-mix-accent-subtle: color-mix(in srgb, var(--ds-c-accent) 15%, var(--ds-c-bg));
   /* Container steps, measured on the source at 600 / 800 / 1024 / 1200 / 1440 (D-48, 27/09): its
    * `.container` is 540 / 720 / 960 / 1140 / 1320 px wide from 576 / 768 / 992 / 1200 / 1400, full
    * width below 576; the footer's `.container-lg` is full width below 992, then the same steps. */
   --jv-container-max: 100%;
   --jv-container-lg-max: 100%;
 }
+/* ds-not-used: --ds-c-disabled-bg, --ds-c-disabled-fg — the template dims a disabled control with opacity only (pager cells, pagination items); it paints no disabled ground or text colour */
 
 @media (min-width: 576px) {
   :root {
@@ -109,7 +120,7 @@ body.tracy {
 }
 
 .tracy :where(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--jv-font);
+  font-family: var(--ds-font-display, var(--jv-font));
   font-weight: 500;
   line-height: 1.2;
   color: var(--wp--preset--color--fg-2);
@@ -207,7 +218,7 @@ body.tracy {
   margin: 0 0 16px;
   padding: 8px 16px;
   border: 1px solid currentColor;
-  border-radius: 60px;
+  border-radius: var(--ds-pill-radius, 60px);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
@@ -278,7 +289,7 @@ body.tracy {
   gap: 8px;
   padding: 15.04px 24px;
   border: 1px solid var(--wp--preset--color--accent);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--wp--preset--color--accent);
   color: var(--ds-c-accent-on, #ffffff);
   font-size: 16px;
@@ -316,7 +327,7 @@ body.tracy {
   z-index: 50;
   border: 0;
   color: var(--jv-on-night);
-  background: #000000;
+  background: var(--ds-c-ink, #000000);
 }
 
 .jv-header--overlap {
@@ -456,7 +467,7 @@ body.tracy {
   margin-left: var(--jv-mega-shift, 0px);
   padding: 32px;
   border: 1px solid var(--jv-line);
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--bg);
   color: var(--wp--preset--color--fg);
   box-shadow: 0 24px 48px rgba(5, 5, 5, 0.12);
@@ -526,7 +537,7 @@ body.tracy {
   box-sizing: border-box;
   padding: 16px;
   border: 1px solid var(--jv-line);
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -579,7 +590,7 @@ body.tracy {
 }
 
 .jv-mega__thumb img {
-  border-radius: 4px;
+  border-radius: var(--ds-card-radius, 4px);
   object-fit: cover;
 }
 
@@ -608,7 +619,7 @@ body.tracy {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(127, 140, 160, 0.12);
+  background: rgba(127, 140, 160, 0.12); /* ds-keep: a translucent grey disc on the night header: it takes the tone of the ground under it, no role */
   color: var(--jv-on-night);
   cursor: pointer;
 }
@@ -650,7 +661,7 @@ body.tracy {
   height: 44px;
   padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
 }
@@ -659,7 +670,7 @@ body.tracy {
   display: block;
   height: 2px;
   background: var(--jv-on-night);
-  border-radius: 2px;
+  border-radius: 2px; /* ds-keep: a bar of the menu glyph, not a box */
 }
 
 /* ── Hero (ACM hero style-1) ──────────────────────────────────────────────────────────────────── */
@@ -668,7 +679,9 @@ body.tracy {
   position: relative;
   overflow: hidden;
   padding: 192px 0 128px;
-  background: var(--jv-night);
+  /* the night read here, not through --jv-night (resolved on :root): the slot keeps the hero (keepScopes) by
+     resetting the roles on it, so the hero falls back to the template's own night */
+  background: light-dark(var(--ds-c-ink, #121316), var(--ds-c-surface-warm, #121316));
   color: var(--jv-on-night-soft);
 }
 
@@ -712,7 +725,7 @@ body.tracy {
   width: 176px;
   height: 48px;
   margin-right: 8px;
-  border-radius: 16px;
+  border-radius: 16px; /* ds-keep: the avatar portraits keep their own frame */
   object-fit: cover;
 }
 
@@ -736,7 +749,7 @@ body.tracy {
 
 .jv-hero__picture img {
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 /* ── Carousels ────────────────────────────────────────────────────────────────────────────────── */
@@ -767,7 +780,7 @@ body.tracy {
 
 .jv-hero .tracy-motion-carousel {
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 .jv-hero .tracy-motion-track {
@@ -792,9 +805,9 @@ body.tracy {
   height: 9px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-pill-radius, 8px);
   /* M4d F5: the source's unselected owl dot is #e9ecef in both carousels, light and dark (measured). */
-  background: #e9ecef;
+  background: var(--jv-mix-dot, var(--ds-c-border, #e9ecef));
   cursor: pointer;
 }
 
@@ -830,7 +843,7 @@ body.tracy {
   width: 40px;
   height: 40px;
   margin-right: 8px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -891,7 +904,7 @@ body.tracy {
   height: 100%;
   box-sizing: border-box;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -956,7 +969,7 @@ body.tracy {
   box-sizing: border-box;
   height: 100%;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -1035,7 +1048,7 @@ body.tracy {
 .jv-split__media img {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   object-fit: cover;
 }
 
@@ -1132,8 +1145,8 @@ body.tracy {
   height: 48px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--ds-btn-radius, 8px);
+  background: var(--ds-c-surface, rgba(255, 255, 255, 0.9));
   color: var(--ds-c-fg-2, #050505);
   font-size: 18px;
   text-decoration: none;
@@ -1147,7 +1160,7 @@ body.tracy {
 .jv-member {
   box-sizing: border-box;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--jv-card);
   text-align: center;
 }
@@ -1155,7 +1168,7 @@ body.tracy {
 .jv-member__photo img {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   object-fit: cover;
 }
 
@@ -1189,13 +1202,13 @@ body.tracy {
   box-sizing: border-box;
   height: 448px;
   padding: 24px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   overflow: hidden;
   background: var(--jv-night);
 }
 
 .jv-story .jv-bg img {
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-story__box {
@@ -1203,7 +1216,7 @@ body.tracy {
   max-width: 350px;
   height: 100%;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
   color: var(--jv-on-night);
@@ -1278,7 +1291,7 @@ body.tracy {
   position: relative;
   overflow: hidden;
   padding: 64px;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--wp--preset--color--accent);
   color: var(--ds-c-accent-on, #ffffff);
   text-align: center;
@@ -1290,7 +1303,7 @@ body.tracy {
 }
 
 .jv-cta .jv-eyebrow {
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: words on the call-to-action photograph under its dark wash (a darkened accent under a system), as its title */
 }
 
 .tracy .jv-cta__line {
@@ -1298,7 +1311,7 @@ body.tracy {
   font-size: 48px;
   font-weight: 500;
   line-height: 1.2;
-  color: #ffffff;
+  color: var(--ds-c-accent-on, #ffffff);
 }
 
 .jv-main > .jv-cta-sec:last-child,
@@ -1346,7 +1359,7 @@ body.tracy {
 .jv-post__image img {
   width: 200px;
   height: 150px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   object-fit: cover;
 }
 
@@ -1370,7 +1383,7 @@ body.tracy {
 
 .jv-tags a {
   padding: 8px 12px;
-  border-radius: 800px;
+  border-radius: var(--ds-pill-radius, 800px);
   background: var(--jv-raised);
   color: var(--wp--preset--color--fg);
   font-size: 14px;
@@ -1397,7 +1410,7 @@ body.tracy {
 
 .jv-why__picture img {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-play {
@@ -1443,7 +1456,7 @@ body.tracy {
   display: flex;
   flex-direction: column;
   padding: 16px 16px 16px 96px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--surface);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
   pointer-events: auto;
@@ -1456,7 +1469,7 @@ body.tracy {
   top: 50%;
   width: 64px;
   height: 64px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--jv-raised);
   transform: translateY(-50%);
 }
@@ -1600,7 +1613,7 @@ body.tracy {
 
 .jv-article__image img {
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 .tracy .jv-article__body {
@@ -1618,7 +1631,7 @@ body.tracy {
 }
 
 .jv-prose img {
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-related {
@@ -1626,7 +1639,7 @@ body.tracy {
 }
 
 .jv-post-card__image img {
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .tracy .jv-post-card .jv-post__date {
@@ -1659,7 +1672,7 @@ body.tracy {
   gap: 48px;
   align-items: center;
   padding: 48px;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -1683,7 +1696,7 @@ body.tracy {
   height: 100%;
   padding: 24px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: transparent;
   /* The source theme's card ring (a 1 px #ced4da box-shadow) sat outside the measured border
    * (M4c ld-0: a second line round every card and round the leading panel). */
@@ -1698,7 +1711,7 @@ body.tracy {
 .jv-list-item__image img,
 .jv-page .tracy-card__media img {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   object-fit: cover;
 }
 
@@ -1751,7 +1764,7 @@ body.tracy {
 .jv-page .wp-block-post-terms.tracy-eyebrow a {
   display: inline-block;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: var(--ds-pill-radius, 8px);
   background: light-dark(color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 10%, transparent), color-mix(in srgb, var(--ds-c-accent-text, rgb(59, 139, 255)) 10%, transparent));
   color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   font-family: var(--jv-font);
@@ -1808,7 +1821,7 @@ body.tracy {
 .jv-search .wp-block-search__input {
   padding: 15px 24px;
   border: 1px solid var(--wp--preset--color--border);
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: var(--wp--preset--color--bg);
   color: var(--wp--preset--color--fg-2);
   font: inherit;
@@ -1817,7 +1830,7 @@ body.tracy {
 .jv-search .wp-block-search__button {
   padding: 14px 24px;
   border: 1px solid var(--wp--preset--color--accent);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--wp--preset--color--accent);
   color: var(--ds-c-accent-on, #ffffff);
   font: inherit;
@@ -1843,7 +1856,7 @@ body.tracy {
   max-width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--wp--preset--color--border);
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: var(--wp--preset--color--bg);
   color: var(--wp--preset--color--fg-2);
   font: inherit;
@@ -1852,7 +1865,7 @@ body.tracy {
 .jv-main :where(input[type='submit'], button[type='submit']) {
   padding: 15px 24px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--wp--preset--color--accent);
   color: var(--ds-c-accent-on, #ffffff);
   font: inherit;
@@ -1987,7 +2000,7 @@ body.tracy {
   height: 50px;
   border: 1px solid var(--jv-line);
   border-right: 0;
-  border-radius: 8px 0 0 8px;
+  border-radius: var(--ds-btn-radius, 8px) 0 0 var(--ds-btn-radius, 8px);
   background: var(--wp--preset--color--surface);
   color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
   opacity: 0;
@@ -2007,8 +2020,8 @@ body.tracy {
   width: min(960px, 92vw);
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: #000000;
+  border-radius: var(--ds-card-radius, 8px);
+  background: #000000; /* ds-keep: the video player letterbox, black behind the film */
   overflow: visible;
 }
 
@@ -2021,7 +2034,7 @@ body.tracy {
   width: 100%;
   aspect-ratio: 16 / 9;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-video__close {
@@ -2033,7 +2046,7 @@ body.tracy {
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: the close glyph on the dark video backdrop, drawn for the backdrop not the page */
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
@@ -2078,13 +2091,13 @@ body.tracy {
 
 :root[data-theme='dark'] .jv-quote,
 :root[data-theme='dark'] .jv-card {
-  border: 1px solid #2a323d;
+  border: 1px solid var(--ds-c-border, #2a323d);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .jv-quote,
   :root:not([data-theme]) .jv-card {
-    border: 1px solid #2a323d;
+    border: 1px solid var(--ds-c-border, #2a323d);
   }
 
   :root:not([data-theme]) .jv-logo__image img[src*="/uploads/2026/09/item-"] {
@@ -2199,7 +2212,7 @@ body.tracy {
     width: 100%;
     padding: 0 0 16px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ds-card-radius, 0);
     background: none;
     box-shadow: none;
     color: var(--jv-on-night-soft);
@@ -2426,7 +2439,7 @@ body.tracy {
 .tracy .jv-benefits__item {
   margin: 0;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: light-dark(var(--ds-c-surface, #fafafa), var(--ds-c-surface, #1d2530));
 }
 
@@ -2528,11 +2541,11 @@ body.tracy {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  color: #050505;
+  color: var(--ds-c-fg-2, #050505);
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,
-    #f0f1f2;
+    var(--jv-mix-disc, var(--ds-c-surface, #f0f1f2));
   transition: background-color 0.2s ease;
 }
 
@@ -2587,13 +2600,13 @@ body.tracy {
 }
 
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-primary { color: var(--ds-c-accent-text, var(--wp--preset--color--accent)); }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-secondary { color: #111112; }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-secondary { color: var(--ds-c-heading, #111112); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-success { color: var(--ds-c-success-text, #198754); }
 .wp-block-post-content :is(.spinner-border, .spinner-grow).text-danger { color: var(--ds-c-danger-text, #dc3545); }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-warning { color: #f59e0b; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-info { color: #0dcaf0; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-light { color: #fafafa; }
-.wp-block-post-content :is(.spinner-border, .spinner-grow).text-dark { color: #121316; }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-warning { color: var(--ds-c-warn-text, #f59e0b); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-info { color: var(--ds-c-info-text, #0dcaf0); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-light { color: var(--ds-c-on-ink, #fafafa); }
+.wp-block-post-content :is(.spinner-border, .spinner-grow).text-dark { color: var(--ds-c-heading, #121316); }
 
 .wp-block-post-content :is(.spinner-border, .spinner-grow) .visually-hidden {
   position: absolute;
@@ -2651,7 +2664,7 @@ body.tracy {
 .wp-block-post-content ul.list-special > li + li {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px dashed light-dark(#d1d5db, #2a323d);
+  border-top: 1px dashed light-dark(var(--ds-c-border, #d1d5db), var(--ds-c-border, #2a323d));
 }
 
 .wp-block-post-content ul.list-special > li::before {
@@ -2685,7 +2698,7 @@ body.tracy {
   flex: 0 0 24px;
   width: 24px;
   height: 25px;
-  border-radius: 0;
+  border-radius: 0; /* ds-keep: a list marker icon, square on purpose */
 }
 
 /* "Other Services" cards open with the service's intro image, a 56 px icon linking to it (G58,
@@ -2698,7 +2711,7 @@ body.tracy {
   width: 56px;
   height: 56px;
   object-fit: contain;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 /* The article's full image at the top of a service page's body (G56, source `figure.item-image`:
@@ -2710,14 +2723,14 @@ body.tracy {
 .jv-prose > .jv-article__image img {
   width: 100%;
   height: auto;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 /* ── Blog cards: the category is a plain link (source /category-blog, M4 26/09) ──────────────── */
 /* 14/16.8 500 in the accent, no chip — the chip is the portfolio listing's. */
 .jv-page .category-blogs .wp-block-post-terms.tracy-eyebrow a {
   padding: 0;
-  border-radius: 0;
+  border-radius: var(--ds-pill-radius, 0);
   background: transparent;
   font-size: 14px;
 }
@@ -2760,7 +2773,7 @@ body.tracy {
   margin-inline: auto;
   padding: 48px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .tracy .wp-block-loginout form > p {
@@ -2785,7 +2798,7 @@ body.tracy {
   height: 56px;
   padding: 15px 16px;
   border: 1px solid light-dark(var(--ds-c-border, #ced4da), var(--ds-c-border, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   font: inherit;
   color: var(--wp--preset--color--fg-2);
   background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, transparent));
@@ -2801,7 +2814,7 @@ body.tracy {
   box-sizing: border-box;
   width: 100%;
   height: 56px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   font-weight: 500;
 }
 
@@ -2908,7 +2921,7 @@ body.tracy {
   box-sizing: border-box;
   margin-bottom: 16px;
   padding: 16px 48px 16px 16px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-prose .alert > p { margin: 0; }
@@ -2922,7 +2935,7 @@ body.tracy {
   height: 16px;
   padding: 20px 16px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--ds-btn-radius, 4px);
   background: transparent;
   cursor: pointer;
 }
@@ -2930,24 +2943,24 @@ body.tracy {
 .jv-prose .badge {
   display: inline-block;
   padding: 0.35em 0.65em;
-  border-radius: 8px;
+  border-radius: var(--ds-pill-radius, 8px);
   font-size: 0.75em;
   font-weight: 700;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  color: #ffffff;
+  color: var(--ds-c-on-ink, #ffffff);
 }
 
-.jv-prose .badge.rounded-pill { border-radius: 50rem; }
+.jv-prose .badge.rounded-pill { border-radius: var(--ds-pill-radius, 50rem); }
 
 .jv-prose .btn {
   display: inline-block;
   box-sizing: border-box;
   padding: 15.04px 24px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   font-family: inherit;
   font-size: 16px;
   font-weight: 500;
@@ -2957,10 +2970,10 @@ body.tracy {
   cursor: pointer;
 }
 
-.jv-prose .btn-sm { padding: 4px 8px; border-radius: 4px; font-size: 14px; }
-.jv-prose .btn-lg { padding: 8px 16px; border-radius: 16px; font-size: 20px; }
+.jv-prose .btn-sm { padding: 4px 8px; border-radius: var(--ds-btn-radius, 4px); font-size: 14px; }
+.jv-prose .btn-lg { padding: 8px 16px; border-radius: var(--ds-btn-radius, 16px); font-size: 20px; }
 
-.jv-prose { --jv-bs-primary: var(--ds-c-accent, #1d4ed8); --jv-bs-secondary: #111112; --jv-bs-success: var(--ds-c-success, #198754); --jv-bs-danger: var(--ds-c-danger, #dc3545); --jv-bs-warning: #f59e0b; --jv-bs-info: #0dcaf0; --jv-bs-light: var(--ds-c-surface, #fafafa); --jv-bs-dark: #121316; }
+.jv-prose { --jv-bs-primary: var(--ds-c-accent, #1d4ed8); --jv-bs-secondary: var(--ds-c-ink, #111112); --jv-bs-success: var(--ds-c-success, #198754); --jv-bs-danger: var(--ds-c-danger, #dc3545); --jv-bs-warning: var(--ds-c-warn, #f59e0b); --jv-bs-info: var(--ds-c-info, #0dcaf0); --jv-bs-light: var(--ds-c-surface, #fafafa); --jv-bs-dark: var(--ds-c-ink, #121316); }
 .jv-prose .bg-primary, .jv-prose .btn-primary { background-color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
 .jv-prose .bg-secondary, .jv-prose .btn-secondary { background-color: var(--jv-bs-secondary); border-color: var(--jv-bs-secondary); }
 .jv-prose .bg-success, .jv-prose .btn-success { background-color: var(--jv-bs-success); border-color: var(--jv-bs-success); }
@@ -2969,10 +2982,10 @@ body.tracy {
 .jv-prose .bg-info, .jv-prose .btn-info { background-color: var(--jv-bs-info); border-color: var(--jv-bs-info); }
 .jv-prose .bg-light, .jv-prose .btn-light { background-color: var(--jv-bs-light); border-color: var(--jv-bs-light); }
 .jv-prose .bg-dark, .jv-prose .btn-dark { background-color: var(--jv-bs-dark); border-color: var(--jv-bs-dark); }
-.jv-prose :is(.btn-primary, .btn-secondary, .btn-success, .btn-danger, .btn-dark) { color: #ffffff; }
-.jv-prose :is(.btn-warning, .btn-info, .btn-light) { color: #000000; }
-.jv-prose .badge:is(.bg-warning, .bg-info, .bg-light) { color: #121316; }
-.jv-prose .text-dark { color: #121316; }
+.jv-prose :is(.btn-primary, .btn-secondary, .btn-success, .btn-danger, .btn-dark) { color: var(--ds-c-on-ink, #ffffff); }
+.jv-prose :is(.btn-warning, .btn-info, .btn-light) { color: #000000; } /* ds-keep: dark words on the bright warning and info fills: no role is the text on a status fill, the template near black reads on every bright status colour */
+.jv-prose .badge:is(.bg-warning, .bg-info, .bg-light) { color: #121316; } /* ds-keep: dark words on the bright warning and info fills: no role is the text on a status fill, the template near black reads on every bright status colour */
+.jv-prose .text-dark { color: var(--ds-c-heading, #121316); }
 
 .jv-prose [class*='btn-outline-'] { background: transparent; }
 .jv-prose .btn-outline-primary { color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
@@ -2981,7 +2994,7 @@ body.tracy {
 .jv-prose .btn-outline-danger { color: var(--jv-bs-danger); border-color: var(--jv-bs-danger); }
 .jv-prose .btn-outline-warning { color: var(--jv-bs-warning); border-color: var(--jv-bs-warning); }
 .jv-prose .btn-outline-info { color: var(--jv-bs-info); border-color: var(--jv-bs-info); }
-.jv-prose .btn-outline-light { color: rgba(0, 0, 0, 0.5); border-color: rgba(0, 0, 0, 0.5); }
+.jv-prose .btn-outline-light { color: var(--ds-c-muted, rgba(0, 0, 0, 0.5)); border-color: var(--ds-c-border, rgba(0, 0, 0, 0.5)); }
 .jv-prose .btn-outline-dark { color: var(--jv-bs-dark); border-color: var(--jv-bs-dark); }
 
 .jv-prose .card {
@@ -2989,27 +3002,27 @@ body.tracy {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border: 1px solid rgba(0, 0, 0, 0.125);
-  border-radius: 8px;
+  border: 1px solid var(--ds-c-border-soft, rgba(0, 0, 0, 0.125));
+  border-radius: var(--ds-card-radius, 8px);
   background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
   overflow: hidden;
 }
 
 .jv-prose .card-img-top { width: 100%; }
-.jv-prose .card-header { padding: 8px 16px; border-bottom: 1px solid rgba(0, 0, 0, 0.125); background-color: rgba(0, 0, 0, 0.03); }
+.jv-prose .card-header { padding: 8px 16px; border-bottom: 1px solid var(--ds-c-border-soft, rgba(0, 0, 0, 0.125)); background-color: rgba(0, 0, 0, 0.03); }
 .jv-prose .card-body { flex: 1 1 auto; padding: 16px; }
 /* The title keeps the card's text colour (grey on the coloured cards, near-black with .text-dark). */
 .tracy .jv-prose .card-title { margin: 8px 0; font-size: 18px; font-weight: 500; line-height: 1.2; color: inherit; }
 .jv-prose .card-text { margin-bottom: 16px; }
 .jv-prose .card-text:last-child { margin-bottom: 0; }
-.jv-prose .card.bg-primary, .jv-prose .card.bg-secondary, .jv-prose .card.bg-success, .jv-prose .card.bg-danger, .jv-prose .card.bg-warning, .jv-prose .card.bg-info, .jv-prose .card.bg-light, .jv-prose .card.bg-dark { border-color: rgba(0, 0, 0, 0.125); }
+.jv-prose .card.bg-primary, .jv-prose .card.bg-secondary, .jv-prose .card.bg-success, .jv-prose .card.bg-danger, .jv-prose .card.bg-warning, .jv-prose .card.bg-info, .jv-prose .card.bg-light, .jv-prose .card.bg-dark { border-color: var(--ds-c-border-soft, rgba(0, 0, 0, 0.125)); }
 .jv-prose .img-fluid { max-width: 100%; height: auto; }
 
 .jv-prose .progress {
   display: flex;
   height: 16px;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: var(--ds-pill-radius, 4px);
   background-color: var(--ds-c-surface-warm, #e9ecef);
   font-size: 12px;
   line-height: 1.5;
@@ -3036,7 +3049,7 @@ body.tracy {
 .jv-prose .progress-bar.bg-info { --jv-bar-bg: var(--jv-bs-info); }
 .jv-prose .progress-bar.bg-light { --jv-bar-bg: var(--jv-bs-light); }
 .jv-prose .progress-bar.bg-dark { --jv-bar-bg: var(--jv-bs-dark); }
-.jv-prose .progress-bar.text-dark { color: #121316; }
+.jv-prose .progress-bar.text-dark { color: var(--ds-c-heading, #121316); }
 
 .jv-prose .w-25 { width: 25%; }
 .jv-prose .w-50 { width: 50%; }
@@ -3058,7 +3071,7 @@ body.tracy {
   height: 42px;
   padding: 0 12px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 4px;
+  border-radius: var(--ds-pill-radius, 4px);
   font-size: 14px;
   line-height: 40px;
   text-align: center;
@@ -3067,7 +3080,7 @@ body.tracy {
   background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, transparent));
 }
 
-.jv-prose .page-item.active .page-link { color: #ffffff; background-color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
+.jv-prose .page-item.active .page-link { color: var(--ds-c-accent-on, #ffffff); background-color: var(--jv-bs-primary); border-color: var(--jv-bs-primary); }
 /* G71 (M5b R4, layout lens on /typography): the source dims a disabled item ("Previous") with
  * li opacity 0.4 and takes its link out of the pointer (pointer-events none), in both themes. */
 .jv-prose .page-item.disabled { opacity: 0.4; }
@@ -3137,7 +3150,7 @@ body.tracy {
  * (D-08): drawn as its two measured ends, a pale blue top (#dae1fa) into near white (#f8f6fd). */
 .page-template-page-service .jv-related {
   border-top: 0;
-  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, #dae1fa), transparent) 0%, light-dark(var(--jv-wash-f1f0fc, #f1f0fc), transparent) 60%, light-dark(var(--jv-wash-f8f6fd, #f8f6fd), transparent) 100%);
+  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, var(--ds-c-bg, #dae1fa)), transparent) 0%, light-dark(var(--jv-wash-f1f0fc, var(--ds-c-bg, #f1f0fc)), transparent) 60%, light-dark(var(--jv-wash-f8f6fd, var(--ds-c-bg, #f8f6fd)), transparent) 100%);
 }
 
 /* ── The services listing (/services: its child pages, seeder `childPagesQuery`), M4c ld-0 ────── */
@@ -3148,7 +3161,7 @@ body.tracy {
 .jv-page .tracy-grid > .type-page .tracy-card {
   padding: 32px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -3246,7 +3259,7 @@ body.tracy {
 .jv-page .tracy-grid > li.category-blogs .tracy-card__meta .tracy-eyebrow a {
   display: inline;
   padding: 0;
-  border-radius: 0;
+  border-radius: var(--ds-card-radius, 0);
   background: transparent;
   font-size: 14px;
   font-weight: 500;
@@ -3311,7 +3324,7 @@ body.tracy {
   align-items: center;
   padding: 48px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--wp--preset--color--surface);
 }
 
@@ -3340,7 +3353,7 @@ body.tracy {
   padding: 16px 0;
   border: 0;
   border-bottom: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 0;
+  border-radius: var(--ds-card-radius, 0);
 }
 
 .jv-route-tagged-items .tracy-grid :is(.tracy-card__media, .tracy-card__meta, .tracy-card__text) {
@@ -3379,9 +3392,9 @@ body.tracy {
   margin: 32px 0;
   padding: 32px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--wp--preset--color--surface);
-  color: light-dark(#000000, var(--wp--preset--color--fg-2));
+  color: light-dark(var(--ds-c-fg, #000000), var(--wp--preset--color--fg-2));
   font-size: 20px;
   line-height: 1.5;
   text-align: center;
@@ -3404,7 +3417,7 @@ body.tracy {
 .jv-prose .row > * > .wp-block-image img {
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   object-fit: cover;
 }
 
@@ -3454,13 +3467,13 @@ body.tracy {
   bottom: 48px;
   margin: 0;
   padding: 24px 16px 4px;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--ds-card-radius, 8px) var(--ds-card-radius, 8px) 0 0;
 }
 
 .jv-teams-grid .jv-member__role {
   bottom: 8px;
   padding: 0 16px 16px;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 var(--ds-card-radius, 8px) var(--ds-card-radius, 8px);
   color: var(--wp--preset--color--fg);
 }
 
@@ -3503,7 +3516,7 @@ body.tracy {
 
 /* Tag list titles: #242627 (source com_tags list link colour). */
 .jv-route-tagged-items .jv-page .tracy-grid .tracy-card__title a {
-  color: light-dark(#242627, var(--wp--preset--color--fg-2));
+  color: light-dark(var(--ds-c-heading, #242627), var(--wp--preset--color--fg-2));
 }
 
 .jv-route-featured-articles .jv-page .tracy-grid {
@@ -3699,57 +3712,57 @@ body.tracy {
  * lead text keep the light grey #757575; team roles sit on #161d28. The style guide's Bootstrap
  * parts take Bootstrap 5.3's dark values (alerts, buttons, cards, badges). Light mode is unchanged. */
 .tracy .jv-masthead__title,
-.tracy .jv-hero__title { color: light-dark(#ffffff, #f1f3f6); }
+.tracy .jv-hero__title { color: light-dark(#ffffff, #f1f3f6); } /* ds-keep: words on the photograph under its dark glows: the picture keeps its tones under a system, so its words keep the template white */
 /* 1.1.7: the source's `.section-title span` is plain #000 in light (template.css), not the #050505 heading colour; the border and dot follow the text. */
-.jv-pill { color: light-dark(#000000, #c7ccd4); }
+.jv-pill { color: light-dark(var(--ds-c-heading, #000000), var(--ds-c-heading, #c7ccd4)); }
 /* M4d F6 (source measured in dark, `.section-title span`): the pill's border is #8b94a3 and its dot
  * the accent #3b8bff; in light both follow the text colour, as before. */
-.jv-pill { border-color: light-dark(currentColor, #8b94a3); }
+.jv-pill { border-color: light-dark(currentColor, var(--ds-c-border, #8b94a3)); }
 .jv-pill::before { background: light-dark(currentColor, var(--ds-c-accent-hover, #3b8bff)); }
 /* M4d F7 (source /login-form measured in dark): a text field is filled #1d2530 with #c7ccd4 text under
  * its #2a323d border; light is unchanged (white field). */
 .jv-main :where(input[type='text'], input[type='email'], input[type='password'], input[type='search'], input[type='tel'], textarea, select),
-.tracy .wp-block-loginout input.input.input { background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530)); color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); }
+.tracy .wp-block-loginout input.input.input { background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530)); color: light-dark(var(--wp--preset--color--fg-2), var(--ds-c-fg, #c7ccd4)); }
 .jv-page .tracy-eyebrow,
 .jv-page .wp-block-post-terms.tracy-eyebrow a { background: color-mix(in srgb, var(--ds-c-accent-hover, rgb(29, 78, 216)) 10%, transparent); }
 .jv-page .wp-block-post-terms.tracy-eyebrow { background: transparent; }
 .tracy .jv-btn--light .wp-block-button__link {
-  color: light-dark(#ffffff, #c7ccd4);
+  color: light-dark(#ffffff, #c7ccd4); /* ds-keep: a glass button on the hero photograph and on the call band picture: its words keep the template colours like the words beside it */
   background: light-dark(rgba(255, 255, 255, 0.1), #161d28);
 }
-.tracy .jv-benefits__number { color: light-dark(var(--wp--preset--color--fg), #5b9dff); }
+.tracy .jv-benefits__number { color: light-dark(var(--wp--preset--color--fg), var(--ds-c-accent-text, #5b9dff)); }
 .tracy .jv-accordion__body,
 .jv-split__copy .jv-lead,
 .tracy .jv-point__desc { color: light-dark(var(--wp--preset--color--fg), var(--ds-c-fg, #757575)); }
-.jv-member__role { background: light-dark(transparent, #161d28); }
+.jv-member__role { background: light-dark(transparent, var(--ds-c-surface, #161d28)); }
 .tracy .jv-teams-grid .jv-member__name,
 .jv-teams-grid .jv-member__role { background: light-dark(rgba(255, 255, 255, 0.7), #161d28); }
 .tracy .jv-teams-grid .jv-member__name { color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6)); }
 /* M4d F2: `.tracy a { color: inherit }` (0,1,1) outranked these, so the dark branch never applied; the
  * source dark slide paints its category and "Learn More" #3b8bff and its title #f1f3f6 (dd-cp0). */
 .tracy :is(.jv-story__more, .jv-story__category a) { color: light-dark(var(--jv-on-night), var(--ds-c-accent-text-hover, #3b8bff)); }
-.tracy .jv-story__title a { color: light-dark(var(--jv-on-night), #f1f3f6); }
-.tracy .jv-prose .wp-block-quote { color: light-dark(#000000, #c7ccd4); }
+.tracy .jv-story__title a { color: light-dark(var(--jv-on-night), #f1f3f6); } /* ds-keep: words on the photograph under its dark glows: the picture keeps its tones under a system, so its words keep the template white */
+.tracy .jv-prose .wp-block-quote { color: light-dark(var(--ds-c-fg, #000000), var(--ds-c-fg, #c7ccd4)); }
 
 .jv-prose {
   --jv-bs-primary: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
-  --jv-bs-secondary: #111112;
+  --jv-bs-secondary: var(--ds-c-ink, #111112);
   --jv-bs-light: light-dark(var(--ds-c-surface, #fafafa), var(--ds-c-surface, #161d28));
 }
-.jv-prose .btn-light { color: light-dark(#000000, #c7ccd4); border-color: light-dark(#fafafa, #2a323d); }
-.jv-prose .btn-outline-secondary { color: light-dark(var(--jv-bs-secondary), #c7ccd4); border-color: light-dark(var(--jv-bs-secondary), #2a323d); }
-.jv-prose .btn-outline-dark { color: light-dark(var(--jv-bs-dark), #c7ccd4); border-color: light-dark(var(--jv-bs-dark), #2a323d); }
-.jv-prose .btn-outline-light { color: light-dark(rgba(0, 0, 0, 0.5), #c7ccd4); border-color: light-dark(rgba(0, 0, 0, 0.5), #2a323d); }
-.jv-prose .alert-primary { color: light-dark(currentColor, #6ea8fe); background: light-dark(transparent, #031633); border: 1px solid light-dark(transparent, #084298); }
-.jv-prose .alert-secondary { color: light-dark(currentColor, #a7acb1); background: light-dark(transparent, #161719); border: 1px solid light-dark(transparent, #41464b); }
-.jv-prose .alert-success { color: light-dark(currentColor, #75b798); background: light-dark(transparent, #051b11); border: 1px solid light-dark(transparent, #0f5132); }
-.jv-prose .alert-danger { color: light-dark(currentColor, #ea868f); background: light-dark(transparent, #2c0b0e); border: 1px solid light-dark(transparent, #842029); }
-.jv-prose .alert-warning { color: light-dark(currentColor, #ffda6a); background: light-dark(transparent, #332701); border: 1px solid light-dark(transparent, #997404); }
-.jv-prose .alert-info { color: light-dark(currentColor, #6edff6); background: light-dark(transparent, #032830); border: 1px solid light-dark(transparent, #087990); }
-.jv-prose .alert-light { color: light-dark(currentColor, #f8f9fa); background: light-dark(transparent, #343a40); border: 1px solid light-dark(transparent, #495057); }
-.jv-prose .alert-dark { color: light-dark(currentColor, #dee2e6); background: light-dark(transparent, #1a1d20); border: 1px solid light-dark(transparent, #343a40); }
+.jv-prose .btn-light { color: light-dark(var(--ds-c-fg, #000000), var(--ds-c-fg, #c7ccd4)); border-color: light-dark(var(--ds-c-surface, #fafafa), var(--ds-c-border, #2a323d)); }
+.jv-prose .btn-outline-secondary { color: light-dark(var(--jv-bs-secondary), var(--ds-c-fg, #c7ccd4)); border-color: light-dark(var(--jv-bs-secondary), var(--ds-c-border, #2a323d)); }
+.jv-prose .btn-outline-dark { color: light-dark(var(--jv-bs-dark), var(--ds-c-fg, #c7ccd4)); border-color: light-dark(var(--jv-bs-dark), var(--ds-c-border, #2a323d)); }
+.jv-prose .btn-outline-light { color: light-dark(var(--ds-c-muted, rgba(0, 0, 0, 0.5)), var(--ds-c-fg, #c7ccd4)); border-color: light-dark(var(--ds-c-border, rgba(0, 0, 0, 0.5)), var(--ds-c-border, #2a323d)); }
+.jv-prose .alert-primary { color: light-dark(currentColor, var(--ds-c-accent-text, #6ea8fe)); background: light-dark(transparent, var(--jv-mix-accent-subtle, var(--ds-c-accent, #031633))); border: 1px solid light-dark(transparent, var(--ds-c-accent, #084298)); }
+.jv-prose .alert-secondary { color: light-dark(currentColor, var(--ds-c-muted, #a7acb1)); background: light-dark(transparent, var(--ds-c-surface, #161719)); border: 1px solid light-dark(transparent, var(--ds-c-border, #41464b)); }
+.jv-prose .alert-success { color: light-dark(currentColor, var(--ds-c-success-text, #75b798)); background: light-dark(transparent, var(--ds-c-success-bg, #051b11)); border: 1px solid light-dark(transparent, var(--ds-c-success, #0f5132)); }
+.jv-prose .alert-danger { color: light-dark(currentColor, var(--ds-c-danger-text, #ea868f)); background: light-dark(transparent, var(--ds-c-danger-bg, #2c0b0e)); border: 1px solid light-dark(transparent, var(--ds-c-danger, #842029)); }
+.jv-prose .alert-warning { color: light-dark(currentColor, var(--ds-c-warn-text, #ffda6a)); background: light-dark(transparent, var(--ds-c-warn-bg, #332701)); border: 1px solid light-dark(transparent, var(--ds-c-warn, #997404)); }
+.jv-prose .alert-info { color: light-dark(currentColor, var(--ds-c-info-text, #6edff6)); background: light-dark(transparent, var(--ds-c-info-bg, #032830)); border: 1px solid light-dark(transparent, var(--ds-c-info, #087990)); }
+.jv-prose .alert-light { color: light-dark(currentColor, var(--ds-c-heading, #f8f9fa)); background: light-dark(transparent, var(--ds-c-surface-warm, #343a40)); border: 1px solid light-dark(transparent, var(--ds-c-border, #495057)); }
+.jv-prose .alert-dark { color: light-dark(currentColor, var(--ds-c-fg, #dee2e6)); background: light-dark(transparent, var(--ds-c-surface, #1a1d20)); border: 1px solid light-dark(transparent, var(--ds-c-border, #343a40)); }
 .jv-prose .alert > p { color: inherit; }
-.jv-prose .card:not([class*="bg-"]) { color: light-dark(currentColor, #dee2e6); background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28)); border-color: light-dark(rgba(0, 0, 0, 0.176), #2a323d); }
+.jv-prose .card:not([class*="bg-"]) { color: light-dark(currentColor, var(--ds-c-fg, #dee2e6)); background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28)); border-color: light-dark(var(--ds-c-border-soft, rgba(0, 0, 0, 0.176)), var(--ds-c-border-soft, #2a323d)); }
 .jv-prose .card-text { color: inherit; }
 
 /* Dark, second pass (dd-0 layout lens, source measured in dark): the line icons of the feature and
@@ -3771,7 +3784,7 @@ body.tracy {
   background:
     linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
     linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,
-    light-dark(#f0f1f2, #1d2530);
+    light-dark(var(--jv-mix-disc, var(--ds-c-surface, #f0f1f2)), var(--jv-mix-disc, var(--ds-c-surface, #1d2530)));
 }
 .jv-accordion__item.is-open .jv-accordion__button::after {
   color: var(--ds-c-accent-on, #ffffff);
@@ -3780,23 +3793,23 @@ body.tracy {
     light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
 }
 /* M4d F14 (lens note f12 lr, source measured 390 and 1440): the light track is transparent; dark #343a40. */
-.jv-prose .progress { background-color: light-dark(transparent, #343a40); }
-.jv-prose mark { color: light-dark(currentColor, #dee2e6); background-color: light-dark(transparent, #664d03); }
-.jv-prose .badge.bg-secondary { color: light-dark(#ffffff, var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-secondary), #1d2530); }
+.jv-prose .progress { background-color: light-dark(transparent, var(--ds-c-surface-warm, #343a40)); }
+.jv-prose mark { color: light-dark(currentColor, #dee2e6); background-color: light-dark(transparent, #664d03); } /* ds-keep: a text highlight mark, drawn in its own marker colours */
+.jv-prose .badge.bg-secondary { color: light-dark(var(--ds-c-on-ink, #ffffff), var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-secondary), var(--ds-c-surface, #1d2530)); }
 /* M4d F4 (dd-cp0, source measured in dark): the style guide's light badges are #8b94a3 text on no fill,
  * and a card title is the heading colour #f1f3f6 on every card, the coloured ones included. */
-.jv-prose .badge.bg-light.bg-light { color: light-dark(#121316, var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-light), transparent); }
+.jv-prose .badge.bg-light.bg-light { color: light-dark(var(--ds-c-fg, #121316), var(--ds-c-muted, #8b94a3)); background-color: light-dark(var(--jv-bs-light), transparent); }
 /* M4d F11 (lens note dr-f10, source measured in dark): every coloured badge is #8b94a3 on #1d2530 in
  * dark, not only the secondary one; light mode keeps the variant fill and its text colour. */
-.jv-prose .badge:is(.bg-primary, .bg-success, .bg-danger, .bg-dark) { color: light-dark(#ffffff, var(--ds-c-muted, #8b94a3)); }
-.jv-prose .badge:is(.bg-warning, .bg-info) { color: light-dark(#121316, var(--ds-c-muted, #8b94a3)); }
-.jv-prose .badge.bg-primary { background-color: light-dark(var(--jv-bs-primary), #1d2530); }
-.jv-prose .badge.bg-success { background-color: light-dark(var(--jv-bs-success), #1d2530); }
-.jv-prose .badge.bg-danger { background-color: light-dark(var(--jv-bs-danger), #1d2530); }
-.jv-prose .badge.bg-warning { background-color: light-dark(var(--jv-bs-warning), #1d2530); }
-.jv-prose .badge.bg-info { background-color: light-dark(var(--jv-bs-info), #1d2530); }
-.jv-prose .badge.bg-dark { background-color: light-dark(var(--jv-bs-dark), #1d2530); }
-.tracy .jv-prose .card .card-title { color: light-dark(currentColor, #f1f3f6); }
+.jv-prose .badge:is(.bg-primary, .bg-success, .bg-danger, .bg-dark) { color: light-dark(var(--ds-c-on-ink, #ffffff), var(--ds-c-muted, #8b94a3)); }
+.jv-prose .badge:is(.bg-warning, .bg-info) { color: light-dark(#121316, var(--ds-c-muted, #8b94a3)); } /* ds-keep: dark words on the bright warning and info fills: no role is the text on a status fill, the template near black reads on every bright status colour */
+.jv-prose .badge.bg-primary { background-color: light-dark(var(--jv-bs-primary), var(--ds-c-surface, #1d2530)); }
+.jv-prose .badge.bg-success { background-color: light-dark(var(--jv-bs-success), var(--ds-c-surface, #1d2530)); }
+.jv-prose .badge.bg-danger { background-color: light-dark(var(--jv-bs-danger), var(--ds-c-surface, #1d2530)); }
+.jv-prose .badge.bg-warning { background-color: light-dark(var(--jv-bs-warning), var(--ds-c-surface, #1d2530)); }
+.jv-prose .badge.bg-info { background-color: light-dark(var(--jv-bs-info), var(--ds-c-surface, #1d2530)); }
+.jv-prose .badge.bg-dark { background-color: light-dark(var(--jv-bs-dark), var(--ds-c-surface, #1d2530)); }
+.tracy .jv-prose .card .card-title { color: light-dark(currentColor, var(--ds-c-heading, #f1f3f6)); }
 
 /* Alerts in dark (dd-1 parity): the text paragraph carries the alert's fill (source `.alert` is the
  * paragraph's own box) and an alert link is the dark accent #3b8bff. */
@@ -3826,11 +3839,11 @@ body.tracy {
 .jv-prose .card.bg-info { background-color: var(--jv-bs-info); }
 .jv-prose .card.bg-light { background-color: var(--jv-bs-light); }
 .jv-prose .card.bg-dark { background-color: var(--jv-bs-dark); }
-.jv-prose .card.bg-light.text-dark { color: light-dark(#121316, #c7ccd4); }
+.jv-prose .card.bg-light.text-dark { color: light-dark(var(--ds-c-fg, #121316), var(--ds-c-fg, #c7ccd4)); }
 
 /* dr-1 parity (source in dark): the style guide's pagination #c7ccd4 on #161d28; the /about-us figure
  * captions keep the light grey #757575. */
-.jv-prose .page-link { color: light-dark(var(--wp--preset--color--fg-2), #c7ccd4); background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28)); }
+.jv-prose .page-link { color: light-dark(var(--wp--preset--color--fg-2), var(--ds-c-fg, #c7ccd4)); background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28)); }
 .jv-why__caption { color: light-dark(var(--wp--preset--color--fg), var(--ds-c-fg, #757575)); }
 
 /* ── M4d F9 (G44): the author view ─────────────────────────────────────────────────────────────
@@ -3846,7 +3859,7 @@ body.tracy {
 }
 .jv-author {
   position: relative;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
 }
 .jv-prose .jv-author > * { margin: 0; }
@@ -3856,7 +3869,7 @@ body.tracy {
   height: auto;
   aspect-ratio: 3 / 4;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 .jv-prose .jv-author__info {
   position: absolute;
@@ -3865,7 +3878,7 @@ body.tracy {
   box-sizing: border-box;
   width: 75%;
   padding: 24px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: light-dark(rgba(255, 255, 255, 0.7), rgba(15, 20, 28, 0.82));
 }
 .tracy .jv-prose .jv-author__name {
@@ -3904,7 +3917,7 @@ body.tracy {
   line-height: 1.2;
 }
 .jv-prose .jv-tag-list__title a {
-  color: light-dark(#242627, var(--wp--preset--color--fg-2));
+  color: light-dark(var(--ds-c-heading, #242627), var(--wp--preset--color--fg-2));
   text-decoration: none;
 }
 
@@ -3922,7 +3935,7 @@ body.tracy {
   margin: 0;
   padding: 0 12px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 4px;
+  border-radius: var(--ds-pill-radius, 4px);
   background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #c7ccd4));
   font-size: 16px;
@@ -3947,7 +3960,7 @@ body.tracy {
  * #2a323d on #1d2530; radius 8, 15/24 in), Name and Email side by side from 576 with a 32 px gutter,
  * 16 px between rows, the message 272 px, 48 px to "Send Email". */
 .jv-route-contact .jv-prose > * { margin-block: 0; }
-.jv-contact__image img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.jv-contact__image img { display: block; width: 100%; height: auto; border-radius: var(--ds-card-radius, 8px); }
 .jv-prose .jv-contact__image { margin: 0 0 64px; }
 .jv-contact {
   display: grid;
@@ -3959,7 +3972,7 @@ body.tracy {
 .jv-prose .jv-contact__info {
   box-sizing: border-box;
   padding: 48px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: light-dark(var(--ds-c-surface, #fafafa), var(--ds-c-surface, #161d28));
 }
 .jv-prose .jv-contact__info > * { margin: 0; }
@@ -4005,13 +4018,13 @@ body.tracy {
 /* F15 re-check (dd/dr): the source e-mail row is a link in the body colour, #757575 in both modes. */
 .tracy .jv-prose .jv-contact__item--email .jv-contact__value { color: var(--ds-c-fg, #757575); }
 .tracy .jv-contact__social.wp-block-social-links { gap: 8px; margin: 0; padding: 0; }
-.tracy .jv-contact__social .wp-social-link { width: 36px; height: 36px; margin: 0; border-radius: 50%; color: #ffffff; }
+.tracy .jv-contact__social .wp-social-link { width: 36px; height: 36px; margin: 0; border-radius: 50%; color: #ffffff; } /* ds-keep: white glyph on the social service's own brand colour */
 .tracy .jv-contact__social .wp-social-link a { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; }
 .tracy .jv-contact__social .wp-social-link svg { width: 14px; height: 14px; }
 /* The source icons fade to .85 on hover; they do not grow (core social links scale 1.1). */
 .tracy .jv-contact__social .wp-social-link:hover { transform: none; opacity: 0.85; }
 .tracy .jv-contact__social .wp-social-link-facebook { background-color: #1877f2; }
-.tracy .jv-contact__social .wp-social-link-x { background-color: #1da1f2; }
+.tracy .jv-contact__social .wp-social-link-x { background-color: #1da1f2; } /* ds-keep: the social service's own brand colour */
 .tracy .jv-contact__social .wp-social-link-youtube { background-color: #cd201f; }
 .jv-prose .jv-contact__form > * { margin: 0; }
 .tracy .jv-prose .jv-contact__title.jv-contact__title {
@@ -4021,7 +4034,7 @@ body.tracy {
   line-height: 1.2;
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6));
 }
-.tracy .jv-prose .jv-contact__legend { margin: 0 0 24px; font-size: 16px; line-height: 24px; color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-fg, #f1f3f6)); background-color: light-dark(transparent, #0f141c); }
+.tracy .jv-prose .jv-contact__legend { margin: 0 0 24px; font-size: 16px; line-height: 24px; color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-fg, #f1f3f6)); background-color: light-dark(transparent, var(--ds-c-bg, #0f141c)); }
 .jv-contact__form .wpcf7-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4044,16 +4057,16 @@ body.tracy {
   height: 56px;
   padding: 15px 24px;
   border: 1px solid light-dark(var(--ds-c-border, #ced4da), var(--ds-c-border, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530));
-  color: light-dark(#242627, #c7ccd4);
+  color: light-dark(var(--ds-c-fg, #242627), var(--ds-c-fg, #c7ccd4));
   font: inherit;
   line-height: 24px;
 }
 /* F19 (own check at 1440): the field rule above is (0,3,1) through :is(input[type]); the message box needs its own weight. */
 .tracy .jv-contact__form textarea.wpcf7-textarea { height: 272px; }
 .jv-contact__form .wpcf7-form > .wtb-form__actions { margin-top: 32px; }
-.tracy .jv-contact__form .wpcf7-submit { padding: 15px 24px; border: 1px solid light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); border-radius: 8px; background: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); color: var(--ds-c-accent-on, #ffffff); font-weight: 500; line-height: 24px; }
+.tracy .jv-contact__form .wpcf7-submit { padding: 15px 24px; border: 1px solid light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); border-radius: var(--ds-btn-radius, 8px); background: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff)); color: var(--ds-c-accent-on, #ffffff); font-weight: 500; line-height: 24px; }
 /* F21/F24: the source button ends in an arrow (fa-arrow-right turned -45deg, 13 px, 4 px after the label; button 146 px wide). The CF7 submit is an input,
    so the arrow is a background drawn for this theme, not a template asset (D-08, D-32). */
 .tracy .jv-contact__form .wpcf7-submit { padding-right: 43px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath transform='rotate(-45 6 6)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M1.2 6h9.4M6.4 1.8 10.6 6l-4.2 4.2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 24px center; background-size: 12px 12px; }
@@ -4113,9 +4126,9 @@ body.tracy {
   margin: 0;
   padding: 15px 40px 15px 24px;
   border: 1px solid light-dark(var(--ds-c-border, #ced4da), var(--ds-c-border, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530));
-  color: light-dark(#242627, #c7ccd4);
+  color: light-dark(var(--ds-c-fg, #242627), var(--ds-c-fg, #c7ccd4));
   font: inherit;
   line-height: 24px;
 }
@@ -4129,22 +4142,22 @@ body.tracy {
   padding: 0;
   border: 0;
   background: transparent;
-  color: light-dark(#242627, #f1f3f6);
+  color: light-dark(var(--ds-c-heading, #242627), var(--ds-c-heading, #f1f3f6));
 }
 .jv-aside__search .wp-block-search__button svg { width: 22px; height: 22px; min-width: 22px; min-height: 22px; fill: currentColor; }
 /* F20: Latest News is a Blogs-only query (module #119, catid 8); same box as the source list. */
 .tracy .jv-latest .jv-latest__list { margin: 0; padding: 0; list-style: none; }
 .tracy .jv-latest .jv-latest__list > li { display: flex; align-items: center; gap: 16px; margin: 0; color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6)); font-weight: 500; line-height: 19.2px; }
-.jv-latest .jv-latest__list > li + li { margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(0, 0, 0, 0.1); }
+.jv-latest .jv-latest__list > li + li { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--ds-c-border-soft, rgba(0, 0, 0, 0.1)); }
 .tracy .jv-latest .jv-latest__image { flex: 0 0 80px; width: 80px; height: 80px; margin: 0; }
-.jv-latest .jv-latest__image img { display: block; width: 80px; height: 80px; max-width: none; object-fit: cover; border-radius: 8px; }
+.jv-latest .jv-latest__image img { display: block; width: 80px; height: 80px; max-width: none; object-fit: cover; border-radius: var(--ds-card-radius, 8px); }
 .tracy .jv-latest .jv-latest__title { margin: 0; font-size: 16px; font-weight: 500; line-height: 19.2px; color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6)); }
 .tracy .jv-latest .jv-latest__title a { color: inherit; text-decoration: none; }
 /* jv-tag-cloud, not jv-tags: that class is the post's own tag row (templates/single.html). */
 .tracy .jv-prose ul.jv-tag-cloud { display: flex; flex-wrap: wrap; gap: 9px; margin: 0; padding: 0; list-style: none; }
-.tracy .jv-prose ul.jv-tag-cloud > li { margin: 0; padding: 0; border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d)); border-radius: 4px; background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530)); }
+.tracy .jv-prose ul.jv-tag-cloud > li { margin: 0; padding: 0; border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d)); border-radius: var(--ds-pill-radius, 4px); background: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #1d2530)); }
 .tracy .jv-prose ul.jv-tag-cloud > li::before { content: none; }
-.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: 0; background-color: transparent; font-size: 14px; line-height: 14px; color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-fg, #c7ccd4)); text-decoration: none; }
+.jv-prose .jv-tag-cloud a { display: flex; align-items: center; padding: 10px 16px; border-radius: var(--ds-pill-radius, 0); background-color: transparent; font-size: 14px; line-height: 14px; color: light-dark(var(--ds-c-fg, #757575), var(--ds-c-fg, #c7ccd4)); text-decoration: none; }
 @media (max-width: 991px) {
   .jv-listing { grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
 }
@@ -4208,12 +4221,12 @@ body.tracy {
 .tracy .jv-related .jv-post-card {
   padding: 24px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: var(--jv-card);
 }
 
 .jv-related .jv-post-card__image img {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 .tracy .jv-related .jv-post-card__meta {
@@ -4248,7 +4261,7 @@ body.tracy {
   display: inline;
   margin: 0;
   padding: 0;
-  border-radius: 0;
+  border-radius: var(--ds-card-radius, 0);
   background: transparent;
   font-family: inherit;
   font-size: 14px;
@@ -4449,7 +4462,7 @@ body.tracy {
   display: list-item;
   list-style: disc outside;
   margin: 8px 0 0;
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: words on the photograph under its dark glows: the picture keeps its tones under a system, so its words keep the template white */
 }
 
 .jv-story__info .jv-story__info-row:first-child {
@@ -4462,7 +4475,7 @@ body.tracy {
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: words on the photograph under its dark glows: the picture keeps its tones under a system, so its words keep the template white */
 }
 
 .tracy .jv-story__info .jv-story__info-label {
@@ -4685,12 +4698,12 @@ body.tracy {
 }
 
 :root[data-theme='dark'] .tracy .jv-benefits__number::before {
-  background: linear-gradient(to top, #1d2530 0%, transparent 70%);
+  background: linear-gradient(to top, var(--ds-c-surface, #1d2530) 0%, transparent 70%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .tracy .jv-benefits__number::before {
-    background: linear-gradient(to top, #1d2530 0%, transparent 70%);
+    background: linear-gradient(to top, var(--ds-c-surface, #1d2530) 0%, transparent 70%);
   }
 }
 
@@ -4747,12 +4760,12 @@ body.tracy {
  * over #0f141c, measured #191f28 at the top to #1b2028 at the bottom; its cards have no border
  * (`.relateditems .item-inner` border 0, dark fill #161d28) and 16 px corners in both modes. */
 .page-template-page-service .jv-related {
-  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, #dae1fa), #191f28) 0%, light-dark(var(--jv-wash-f1f0fc, #f1f0fc), #1a1f28) 60%, light-dark(var(--jv-wash-f8f6fd, #f8f6fd), #1b2028) 100%);
+  background: linear-gradient(180deg, light-dark(var(--jv-wash-dae1fa, var(--ds-c-bg, #dae1fa)), var(--jv-wash-dae1fa, var(--ds-c-bg, #191f28))) 0%, light-dark(var(--jv-wash-f1f0fc, var(--ds-c-bg, #f1f0fc)), var(--jv-wash-f1f0fc, var(--ds-c-bg, #1a1f28))) 60%, light-dark(var(--jv-wash-f8f6fd, var(--ds-c-bg, #f8f6fd)), var(--jv-wash-f8f6fd, var(--ds-c-bg, #1b2028))) 100%);
 }
 
 .tracy.page-template-page-service .jv-related .jv-card {
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 /* M6c (lens ld/lr/dr): /about-us value cards — source `.acm-features.style-1 .features-item`: the text
@@ -4778,7 +4791,7 @@ body.tracy {
   left: 50%;
   width: 100%;
   height: 1px;
-  background: #e6e6e6;
+  background: var(--ds-c-border-soft, #e6e6e6);
   transform: translateX(-50%);
 }
 
@@ -4796,7 +4809,7 @@ body.tracy {
 }
 
 :root[data-theme='dark'] .jv-teams-grid .jv-member__photo img {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -4805,7 +4818,7 @@ body.tracy {
   }
 
   :root:not([data-theme]) .jv-teams-grid .jv-member__photo img {
-    border-radius: 16px;
+    border-radius: var(--ds-card-radius, 16px);
   }
 }
 
@@ -4868,7 +4881,7 @@ body.tracy {
 
 /* M6c (lens, /typography "Badges"): the source's `.badge.rounded-pill` row draws square corners
  * (computed border-radius 0 on all eight badges, 1440 and 390). */
-.jv-prose .badge.rounded-pill { border-radius: 0; }
+.jv-prose .badge.rounded-pill { border-radius: var(--ds-pill-radius, 0); }
 
 /* M6c (lens, /typography "Spinners"): the source's spinners carry no margin (only the space between
  * inline boxes separates them: ~36 px pitch for 32 px spinners); the site added 4 px right / below. */
@@ -4923,10 +4936,10 @@ body.tracy {
 /* M6c (lens, /featured-articles, /category-blog): in dark the source rounds its listing pictures
  * 16 px (`.item-image img`, measured on /featured-articles, /category-blog, /portfolio; 8 px in light,
  * and the sidebar's 80 px thumbnails stay 8 px in both). */
-:root[data-theme='dark'] .tracy-grid > li.type-post .tracy-card__media img { border-radius: 16px; }
+:root[data-theme='dark'] .tracy-grid > li.type-post .tracy-card__media img { border-radius: var(--ds-card-radius, 16px); }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .tracy-grid > li.type-post .tracy-card__media img { border-radius: 16px; }
+  :root:not([data-theme]) .tracy-grid > li.type-post .tracy-card__media img { border-radius: var(--ds-card-radius, 16px); }
 }
 
 /* ── M6c A-home: home page layout-lens fixes (proposed; verified live by injection) ─────────────── */
@@ -5076,7 +5089,7 @@ body.tracy {
 }
 
 .tracy .jv-teams .jv-arrow .wp-block-button__link {
-  background: light-dark(rgba(255, 255, 255, 0.9), #1d2530);
+  background: light-dark(var(--ds-c-surface, rgba(255, 255, 255, 0.9)), var(--ds-c-surface, #1d2530));
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6));
 }
 
@@ -5925,7 +5938,7 @@ body.tracy {
   height: 42px;
   padding: 0 12px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 4px;
+  border-radius: var(--ds-btn-radius, 4px);
   background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #c7ccd4));
   font-size: 16px;
@@ -5953,7 +5966,7 @@ body.tracy {
   margin: 0;
   padding: 8px 24px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 4px;
+  border-radius: var(--ds-btn-radius, 4px);
   background-color: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #161d28));
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6));
   font-size: 16px;
@@ -6036,7 +6049,7 @@ body.tracy {
  * Solutions + Join us, then Explore | Resources), stacked below 576, where the title is 22 px; the first
  * two keep the source module's 16 px bottom margin, and rows are 24 px apart (32 px from 768). */
 .jv-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--jv-mix-on-ink-7, var(--ds-c-on-ink, rgba(255, 255, 255, 0.07)));
 }
 
 @media (max-width: 1399.98px) {
@@ -6130,8 +6143,8 @@ body.tracy {
   height: 15px;
   margin: 0;
   border: 0;
-  border-radius: 4px;
-  background: light-dark(transparent, #1d2530) center / contain no-repeat;
+  border-radius: var(--ds-input-radius, 4px);
+  background: light-dark(transparent, var(--ds-c-bg, #1d2530)) center / contain no-repeat;
 }
 
 .tracy .wp-block-loginout .login-remember input[type='checkbox']:checked {
@@ -6212,8 +6225,8 @@ body.tracy {
  * its items stay a wrapping row from the left, 24 px apart across and 16 px down (the site stacked them
  * in a column 32 px from the band's top). */
 .jv-stats {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid var(--jv-mix-on-ink-20, var(--ds-c-on-ink, rgba(255, 255, 255, 0.2)));
+  border-bottom: 1px solid var(--jv-mix-on-ink-20, var(--ds-c-on-ink, rgba(255, 255, 255, 0.2)));
 }
 
 @media (max-width: 575.98px) {
@@ -6438,7 +6451,7 @@ body.tracy {
 }
 
 .tracy .jv-prose .progress {
-  border-radius: 0;
+  border-radius: var(--ds-pill-radius, 0);
 }
 
 @media (max-width: 575.98px) {
@@ -6549,7 +6562,7 @@ body.tracy {
 
 :is(.jv-page .tracy-grid > li.category-blogs .tracy-card__meta, .tracy .jv-related .jv-post-card__meta) > .tracy-card__author {
   font-weight: 500;
-  color: light-dark(#242627, var(--ds-c-muted, #8b94a3));
+  color: light-dark(var(--ds-c-fg, #242627), var(--ds-c-muted, #8b94a3));
 }
 
 /* "By" is 400 in the text colour (dark: the muted #8b94a3 of `.article-info`); so is the card date (the related
@@ -6735,9 +6748,9 @@ body.tracy {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    border: 1px solid light-dark(rgba(0, 0, 0, 0.1), #2a323d);
-    border-radius: 0;
-    background: light-dark(rgba(255, 255, 255, 0.95), #161d28);
+    border: 1px solid light-dark(var(--ds-c-border-soft, rgba(0, 0, 0, 0.1)), var(--ds-c-border-soft, #2a323d));
+    border-radius: 0; /* ds-keep: the menu panel runs edge to edge under the header, square on purpose */
+    background: light-dark(var(--ds-c-surface, rgba(255, 255, 255, 0.95)), var(--ds-c-surface, #161d28));
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
@@ -6774,7 +6787,7 @@ body.tracy {
     line-height: normal;
     letter-spacing: 0;
     text-transform: none;
-    color: light-dark(#242627, #f1f3f6);
+    color: light-dark(var(--ds-c-heading, #242627), var(--ds-c-heading, #f1f3f6));
   }
 
   /* Source Portfolio lead `.custom h3.mt-0`: 32 px, 500, line-height 1.2, margin-bottom 8, headings colour. */
@@ -6848,7 +6861,7 @@ body.tracy {
   }
 
   .jv-header .jv-mega__card:hover {
-    border-color: light-dark(rgba(0, 0, 0, 0.05), #2a323d);
+    border-color: light-dark(var(--ds-c-border-soft, rgba(0, 0, 0, 0.05)), var(--ds-c-border-soft, #2a323d));
   }
 
   .jv-header .jv-mega__card:hover .jv-mega__card-title a {
@@ -6865,7 +6878,7 @@ body.tracy {
   .jv-header .jv-mega__latest .wp-block-post-template > li + li {
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px dashed light-dark(rgba(0, 0, 0, 0.1), #2a323d);
+    border-top: 1px dashed light-dark(var(--ds-c-border-soft, rgba(0, 0, 0, 0.1)), var(--ds-c-border-soft, #2a323d));
   }
 
   .jv-header .jv-mega__project {
@@ -6883,7 +6896,7 @@ body.tracy {
     display: block;
     width: 80px !important;
     height: 80px !important;
-    border-radius: 8px;
+    border-radius: var(--ds-card-radius, 8px);
     object-fit: cover;
   }
 
@@ -6951,7 +6964,7 @@ body.tracy {
     left: 0;
     width: 2000px;
     height: 100%;
-    background: linear-gradient(-180deg, light-dark(var(--jv-wash-d2ddfa, #d2ddfa), #232e45) 0%, light-dark(var(--jv-wash-f9f6ff, #f9f6ff), #1a2331) 100%);
+    background: linear-gradient(-180deg, light-dark(var(--jv-wash-d2ddfa, var(--ds-c-bg, #d2ddfa)), var(--jv-wash-d2ddfa, var(--ds-c-bg, #232e45))) 0%, light-dark(var(--jv-wash-f9f6ff, var(--ds-c-bg, #f9f6ff)), var(--jv-wash-f9f6ff, var(--ds-c-bg, #1a2331))) 100%);
   }
 
   .jv-header .jv-mega__columns > .wp-block-column:last-child > * {
@@ -7033,7 +7046,7 @@ body.tracy {
   margin: 0;
   padding: 0 16px 0 0;
   border: 0;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--ds-input-radius, 8px) var(--ds-input-radius, 8px) 0;
   background: transparent;
   color: light-dark(var(--ds-c-fg-2, #050505), var(--ds-c-fg-2, #f1f3f6));
   cursor: pointer;
@@ -7153,7 +7166,7 @@ body.tracy {
   .jv-header__menu {
     width: 300px;
     padding: 89px 32px 32px;
-    background: #000;
+    background: var(--ds-c-ink, #000);
     transition:
       transform 300ms ease,
       visibility 0s linear 300ms;
@@ -7196,13 +7209,13 @@ body.tracy {
   .jv-header__menu .jv-nav .wp-block-navigation-item,
   .jv-header__menu .jv-mega {
     border-top: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* ds-keep: a black hairline on the black drawer: the source draws it invisible on its own ground, no role to read */
   }
 
   .jv-header .jv-header__menu .jv-nav .wp-block-navigation-item__content,
   .jv-header .jv-header__menu .jv-mega__link {
     padding: 12px 0;
-    color: #fff;
+    color: var(--ds-c-on-ink, #fff);
     font-size: 18px;
     font-weight: 600;
     line-height: 27px;
@@ -7211,7 +7224,7 @@ body.tracy {
   .jv-header .jv-header__menu .jv-nav .current-menu-item > .wp-block-navigation-item__content,
   .jv-header .jv-header__menu .jv-nav .wp-block-navigation-item__content[aria-current='page'],
   .jv-header .jv-header__menu .jv-mega.is-current > .jv-mega__link {
-    color: #f59e0b;
+    color: var(--ds-c-accent-on-ink, #f59e0b);
     text-decoration: none;
   }
 
@@ -7220,7 +7233,7 @@ body.tracy {
     width: 9px;
     height: 30px;
     padding: 0;
-    color: #fff;
+    color: var(--ds-c-on-ink, #fff);
   }
 
   .jv-header .jv-header__menu .jv-mega__caret {
@@ -7245,7 +7258,7 @@ body.tracy {
    * measured 1.1.9), on a touch screen the sticky hover look (primary fill, white bars: the 1.1.8 box, which only
    * matched the touch case); the real button is the panel's × above. */
   html.jv-drawer-open .jv-header .jv-header__right {
-    --jv-pushed-bars: light-dark(#757575, var(--ds-c-border, #c7ccd4));
+    --jv-pushed-bars: light-dark(var(--ds-c-fg, #757575), var(--ds-c-border, #c7ccd4));
     --jv-pushed-fill: transparent;
     position: relative;
   }
@@ -7254,7 +7267,7 @@ body.tracy {
    * after the page is pushed away; with a mouse the pointer is on the panel and the button is plain. */
   @media (hover: none) {
     html.jv-drawer-open .jv-header .jv-header__right {
-      --jv-pushed-bars: #fff;
+      --jv-pushed-bars: var(--ds-c-accent-on, #fff);
       --jv-pushed-fill: light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
     }
   }
@@ -7266,7 +7279,7 @@ body.tracy {
     right: 0;
     width: 56px;
     height: 56px;
-    border-radius: 8px;
+    border-radius: var(--ds-btn-radius, 8px);
     background:
       linear-gradient(var(--jv-pushed-bars), var(--jv-pushed-bars)) center calc(50% - 5px) / 14px 2px no-repeat,
       linear-gradient(var(--jv-pushed-bars), var(--jv-pushed-bars)) center / 14px 2px no-repeat,
@@ -7374,7 +7387,7 @@ body.tracy {
     width: 300px;
     margin: 0;
     padding: 16px 32px;
-    color: #fff;
+    color: var(--ds-c-on-ink, #fff);
     visibility: hidden;
     transform: translateX(300px);
     transition:
@@ -7401,7 +7414,7 @@ body.tracy {
     padding: 0 0 8px;
     border: 0;
     background: none;
-    color: #fff;
+    color: var(--ds-c-on-ink, #fff);
     font: inherit;
     font-size: 16px;
     font-weight: 600;
@@ -7450,13 +7463,13 @@ body.tracy {
   }
 
   .jv-header .jv-header__menu .jv-mega__links .wp-block-navigation-item {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* ds-keep: a black hairline on the black drawer: the source draws it invisible on its own ground, no role to read */
   }
 
   .jv-header .jv-header__menu .jv-mega__links .wp-block-navigation-item__content {
     display: block;
     padding: 12px 0;
-    color: #fff;
+    color: var(--ds-c-on-ink, #fff);
     font-size: 16px;
     font-weight: 400;
     line-height: 24px;
@@ -7464,7 +7477,7 @@ body.tracy {
 
   .jv-header .jv-header__menu .jv-mega__links .current-menu-item > .wp-block-navigation-item__content,
   .jv-header .jv-header__menu .jv-mega__links .wp-block-navigation-item__content[aria-current='page'] {
-    color: #f59e0b;
+    color: var(--ds-c-accent-on-ink, #f59e0b);
     font-weight: 500;
   }
 }
@@ -7478,13 +7491,13 @@ body.tracy {
  * (.jv-why__picture) and the /contact picture (.jv-contact__image). */
 :root[data-theme='dark'] .jv-main :is(.jv-post__image, .jv-split__media, .jv-member__photo, .jv-why__picture, .jv-contact__image),
 :root[data-theme='dark'] .jv-main :is(.jv-post__image, .jv-split__media, .jv-member__photo, .jv-why__picture, .jv-contact__image) img {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .jv-main :is(.jv-post__image, .jv-split__media, .jv-member__photo, .jv-why__picture, .jv-contact__image),
   :root:not([data-theme]) .jv-main :is(.jv-post__image, .jv-split__media, .jv-member__photo, .jv-why__picture, .jv-contact__image) img {
-    border-radius: 16px;
+    border-radius: var(--ds-card-radius, 16px);
   }
 }
 
@@ -7494,17 +7507,17 @@ body.tracy {
  * team (style 2, not `.teams-item-inner`) keeps its names in --dm-text #c7ccd4 (the port had #f1f3f6); the partner
  * logos are `brightness(0) invert(.62)` at 0.8 opacity (the port inverted them to near white). The benefit number's
  * fade (`.number::before`) runs into --dm-surface, so it follows the card. */
-:root[data-theme='dark'] .jv-benefits__item { background-color: #161d28; }
-:root[data-theme='dark'] .tracy .jv-benefits__number::before { background: linear-gradient(to top, #161d28 0%, transparent 70%); }
-:root[data-theme='dark'] .jv-search .wp-block-search__input { background-color: #1d2530; }
-:root[data-theme='dark'] .jv-teams-grid .jv-member__name { color: #c7ccd4; }
+:root[data-theme='dark'] .jv-benefits__item { background-color: var(--ds-c-surface, #161d28); }
+:root[data-theme='dark'] .tracy .jv-benefits__number::before { background: linear-gradient(to top, var(--ds-c-surface, #161d28) 0%, transparent 70%); }
+:root[data-theme='dark'] .jv-search .wp-block-search__input { background-color: var(--ds-c-bg, #1d2530); }
+:root[data-theme='dark'] .jv-teams-grid .jv-member__name { color: var(--ds-c-fg, #c7ccd4); }
 :root[data-theme='dark'] .jv-logo__image img[src*="/uploads/2026/09/item-"] { filter: brightness(0) invert(0.62); }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .jv-benefits__item { background-color: #161d28; }
-  :root:not([data-theme]) .tracy .jv-benefits__number::before { background: linear-gradient(to top, #161d28 0%, transparent 70%); }
-  :root:not([data-theme]) .jv-search .wp-block-search__input { background-color: #1d2530; }
-  :root:not([data-theme]) .jv-teams-grid .jv-member__name { color: #c7ccd4; }
+  :root:not([data-theme]) .jv-benefits__item { background-color: var(--ds-c-surface, #161d28); }
+  :root:not([data-theme]) .tracy .jv-benefits__number::before { background: linear-gradient(to top, var(--ds-c-surface, #161d28) 0%, transparent 70%); }
+  :root:not([data-theme]) .jv-search .wp-block-search__input { background-color: var(--ds-c-bg, #1d2530); }
+  :root:not([data-theme]) .jv-teams-grid .jv-member__name { color: var(--ds-c-fg, #c7ccd4); }
   :root:not([data-theme]) .jv-logo__image img[src*="/uploads/2026/09/item-"] { filter: brightness(0) invert(0.62); }
 }
 
@@ -7512,7 +7525,7 @@ body.tracy {
  * /services/managed-services "others/item-1.jpg") are rounded 16 px in light and dark alike; the port kept core's
  * 8 px (lens r10l, measured at 390 and 1440). */
 .jv-prose .wp-block-group.image img {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 /* (36) Phone header and search buttons, mirrored from ja_vega 1.2.3 (`scss/_styles.scss` `.t4-header-r`,
@@ -7600,7 +7613,7 @@ body.tracy {
   flex: 1 1 auto;
   margin: 0 16px;
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: rgba(255, 255, 255, 0.03);
   text-align: center;
 }
@@ -7618,7 +7631,7 @@ body.tracy {
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--jv-mix-on-ink-60, var(--ds-c-on-ink, rgba(255, 255, 255, 0.6)));
 }
 
 .jv-project__main {
@@ -7635,7 +7648,7 @@ body.tracy {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-project__picture figure,
@@ -7691,7 +7704,7 @@ body.tracy {
   align-self: start;
   padding: 32px;
   border: 1px solid light-dark(var(--ds-c-border-soft, #e6e6e6), var(--ds-c-border-soft, #2a323d));
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-project__info .jv-project__logo {
@@ -7779,7 +7792,7 @@ body.tracy {
   height: 24px;
   font-size: 0;
   line-height: 0;
-  background: linear-gradient(90deg, #f6b73c var(--jv-rating, 100%), light-dark(#d9d9d9, #3a4350) var(--jv-rating, 100%));
+  background: linear-gradient(90deg, #f6b73c var(--jv-rating, 100%), light-dark(var(--ds-c-border, #d9d9d9), var(--ds-c-border, #3a4350)) var(--jv-rating, 100%)); /* ds-keep: the gold of the star rating, a rating colour not a role */
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2.5 14.9,8.7 21.7,9.5 16.7,14.1 18,20.8 12,17.5 6,20.8 7.3,14.1 2.3,9.5 9.1,8.7'/%3E%3C/svg%3E") 0 0 / 24px 24px repeat-x;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2.5 14.9,8.7 21.7,9.5 16.7,14.1 18,20.8 12,17.5 6,20.8 7.3,14.1 2.3,9.5 9.1,8.7'/%3E%3C/svg%3E") 0 0 / 24px 24px repeat-x;
 }
@@ -7809,7 +7822,7 @@ body.tracy {
   min-height: 372px;
   object-fit: cover;
   object-position: center;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 
 .jv-project__cta {
@@ -7848,12 +7861,12 @@ body.tracy {
 /* 1.1.6 (Opus layout lens): the source's band cards are solid panels (white; #161d28 in dark), radius 16, no border, a 16 px intro. */
 .tracy .jv-page.jv-more-projects .tracy-card {
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: light-dark(var(--ds-c-bg, #fff), var(--ds-c-bg, #161d28));
 }
 
 .tracy .jv-page.jv-more-projects .tracy-card__media img {
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 .tracy .jv-page.jv-more-projects .tracy-card__text {
@@ -7931,7 +7944,7 @@ body.tracy {
 }
 
 .tracy .jv-project__masthead .jv-masthead__desc {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.8); /* ds-keep: words on the photograph under its dark glows: the picture keeps its tones under a system, so its words keep the template white */
 }
 
 .tracy .jv-more-projects .jv-main-title {
@@ -8100,7 +8113,7 @@ body.tracy {
   align-self: start;
   margin-top: 16px;
   padding: 32px;
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -8149,15 +8162,15 @@ body.tracy {
   min-height: 56px;
   padding: 15px 24px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: rgba(255, 255, 255, 0.05);
   font: inherit;
   font-size: 16px;
-  color: #fff;
+  color: var(--ds-c-on-ink, #fff);
 }
 
 .jv-newsletter__email::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--jv-mix-on-ink-60, var(--ds-c-on-ink, rgba(255, 255, 255, 0.6)));
 }
 
 .jv-newsletter__submit {
@@ -8165,7 +8178,7 @@ body.tracy {
   min-height: 56px;
   padding: 15px 24px;
   border: 1px solid var(--wp--preset--color--accent);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--wp--preset--color--accent);
   font: inherit;
   font-size: 16px;
@@ -8182,7 +8195,7 @@ body.tracy {
   margin: 12px 0 0;
   font-size: 14px;
   line-height: 20px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--jv-mix-on-ink-80, var(--ds-c-on-ink, rgba(255, 255, 255, 0.8)));
 }
 
 .jv-newsletter__status:not([class*='--']) {
@@ -8191,7 +8204,7 @@ body.tracy {
 
 .jv-newsletter__status--invalid,
 .jv-newsletter__status--failed {
-  color: #ff9d9d;
+  color: #ff9d9d; /* ds-keep: error words drawn for the night footer: the system's readable error shade is made for the page, not the ink band */
 }
 
 @media (max-width: 991.98px) {
@@ -8288,10 +8301,10 @@ body.tracy {
   flex: none;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1792 1792'%3E%3Cpath fill='%23fff' transform='translate(0 1536) scale(1 -1)' d='M1683 205l-166 -165q-19 -19 -45 -19t-45 19l-531 531l-531 -531q-19 -19 -45 -19t-45 19l-166 165q-19 19 -19 45.5t19 45.5l742 741q19 19 45 19t45 -19l742 -741q19 -19 19 -45.5t-19 -45.5z'/%3E%3C/svg%3E") center calc(50% - 2px) / 16px 16px no-repeat,
-    light-dark(#1d4ed8, #3b8bff);
+    light-dark(var(--ds-c-accent, #1d4ed8), var(--ds-c-accent-hover, #3b8bff));
 }
 
 /* (2) Footer social marks: the source draws four Font Awesome 4.7 glyphs 18 px high — Facebook 10.3, Instagram 15.4,
@@ -8360,12 +8373,12 @@ body.tracy {
  * element; text fields, text areas and selects (the log-in, contact, search and comment forms) keep the source's look, and the
  * footer's e-mail field takes the faint border the source gives it (rgba(255,255,255,.1)). */
 .tracy :is(input:not([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='range'], [type='file'], [type='color'], [type='hidden']), textarea, select):is(:focus, :focus-visible) {
-  border-color: light-dark(#86b7fe, #2a323d);
+  border-color: light-dark(var(--ds-c-focus-ring, #86b7fe), var(--ds-c-border, #2a323d));
   box-shadow: none;
 }
 
 .tracy .jv-newsletter__row input.jv-newsletter__email:is(:focus, :focus-visible) {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--jv-mix-on-ink-10, var(--ds-c-on-ink, rgba(255, 255, 255, 0.1)));
 }
 
 /* (5) Drawer sub-level back row: the source sets it in capitals ("OUR SERVICES"); the label's words stay as written. */
@@ -8423,7 +8436,7 @@ body.tracy {
   height: 24px;
   margin-top: 3px;
   vertical-align: top;
-  color: light-dark(#000, var(--ds-c-accent-text-hover, #3b8bff));
+  color: light-dark(var(--ds-c-heading, #000), var(--ds-c-accent-text-hover, #3b8bff));
   text-decoration: none;
 }
 
