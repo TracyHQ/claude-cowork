@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Resort 1.0.7 contract (the template reads the design-system role variables; with no design system worn it looks as before)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.41</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.41</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.41/pkg_claudecowork-0.24.41.zip</downloadurl>
+        </downloads>
+        <sha256>5b5f2eadedebb4e9f6b6ac3056e285e08c25498dd0eda0fb53d33bec941ad601</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>adds db.dump_many: several database tables in one request, bounded by size and time, so a host firewall that counts requests is less likely to block the importer on a site with many tables</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
