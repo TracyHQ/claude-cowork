@@ -60,7 +60,7 @@ function siSecrets(): array
 function siLoad(string $path): ?array
 {
     $code = 'include $argv[1]; echo json_encode(get_object_vars(new JConfig()));';
-    $out = shell_exec(escapeshellarg(PHP_BINARY) . ' -n -r ' . escapeshellarg($code) . ' ' . escapeshellarg($path) . ' 2>&1');
+    $out = shell_exec(isolatedPhp() . ' -r ' . escapeshellarg($code) . ' ' . escapeshellarg($path) . ' 2>&1');
     $decoded = is_string($out) ? json_decode($out, true) : null;
     return is_array($decoded) ? $decoded : null;
 }

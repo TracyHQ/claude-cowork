@@ -250,7 +250,7 @@ namespace {
             . ' $r["exists"] = is_file($argv[2]); $r["peak"] = memory_get_peak_usage(true); echo json_encode($r);');
         $download = static function (string $url, string $sha, string $how, int $max = 104857600) use ($probe, $tmp): array {
             $target = $tmp . '/target-' . bin2hex(random_bytes(3)) . '.zip';
-            $out = shell_exec(escapeshellarg(PHP_BINARY) . ' -n -d memory_limit=24M ' . (extension_loaded('curl') ? '' : '') . escapeshellarg($probe) . ' '
+            $out = shell_exec(isolatedPhp() . ' -d memory_limit=24M ' . (extension_loaded('curl') ? '' : '') . escapeshellarg($probe) . ' '
                 . implode(' ', array_map('escapeshellarg', [$url, $target, (string) $max, $sha, $how])) . ' 2>&1');
             $r = json_decode((string) $out, true);
             return is_array($r) ? $r + ['target' => $target] : ['ok' => false, 'error' => (string) $out, 'target' => $target];
@@ -258,7 +258,7 @@ namespace {
         // `php -n` leaves out every ini file, so curl is there only when it is compiled in; the
         // stream copy has no such condition and always runs.
         $hows = ['stream'];
-        if (trim((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -n -r ' . escapeshellarg('echo function_exists("curl_init") ? 1 : 0;'))) === '1') $hows[] = 'curl';
+        if (trim((string) shell_exec(isolatedPhp() . ' -r ' . escapeshellarg('echo function_exists("curl_init") ? 1 : 0;'))) === '1') $hows[] = 'curl';
         foreach ($hows as $how) {
             $r = $download(($how === 'curl' ? 'file://' : '') . $src, $want, $how);
             check("download ({$how}): 40 MB arrives whole under memory_limit 24M", [$r['ok'] ?? null, $r['bytes'] ?? null, $r['sha256'] ?? null], [true, 40 * 1024 * 1024, $want]);
