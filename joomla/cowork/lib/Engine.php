@@ -559,7 +559,14 @@ final class Engine
         } catch (Throwable $e) {
             $details = [];
         }
-        return $this->ok(['tables' => $tables, 'details' => $details]);
+        // `prefix` is the site's own table prefix, so a caller reading one site out of a database
+        // several sites share can pick its tables. The list itself stays whole: db.cleanup,
+        // db.restore and db.purge work on `_tracy_trash_` and `_tracy_snap_` names outside any prefix.
+        $answer = ['tables' => $tables, 'details' => $details];
+        if (isset($this->info['db_prefix']) && is_string($this->info['db_prefix'])) {
+            $answer['prefix'] = $this->info['db_prefix'];
+        }
+        return $this->ok($answer);
     }
 
     /**

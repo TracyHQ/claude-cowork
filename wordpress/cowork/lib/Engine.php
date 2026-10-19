@@ -1728,7 +1728,19 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('dump_failed', $e->getMessage());
         }
-        return $this->ok(['tables' => $tables]);
+        // `prefix` is the site's own table prefix, so a caller reading one site out of a database
+        // several sites share can pick its tables. The list itself stays whole: db.cleanup,
+        // db.restore and db.purge work on `_tracy_trash_` names, outside any prefix.
+        $answer = ['tables' => $tables];
+        if (isset($this->info['db_prefix']) && is_string($this->info['db_prefix'])) {
+            $answer['prefix'] = $this->info['db_prefix'];
+        }
+        // On a multisite network `prefix` is this site's (`wp_2_`) and the network's shared tables
+        // (`wp_users`, `wp_blogs`) carry `base_prefix`; on a single site the two are the same.
+        if (isset($this->info['db_base_prefix']) && is_string($this->info['db_base_prefix'])) {
+            $answer['base_prefix'] = $this->info['db_base_prefix'];
+        }
+        return $this->ok($answer);
     }
 
     private function dbDump(array $p): array

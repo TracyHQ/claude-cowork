@@ -497,6 +497,8 @@ check('engine without dumper wired -> unavailable', $noDump['error'], 'unavailab
 
 // db.dump_many: several tables per request, so a host firewall counting requests does not ban the importer.
 require __DIR__ . "/db-dump-many.php";
+// One database, several sites: info.db_prefix and db.tables.prefix name this site's own prefix.
+require __DIR__ . "/db-tables-prefix.php";
 
 // ---- site.stats -------------------------------------------------------------------------
 // The two questions a caller settles before committing anyone to a wait: how big is this, and

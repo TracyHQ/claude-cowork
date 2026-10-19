@@ -341,6 +341,11 @@ function claude_cowork_exec(): void
             'php'       => PHP_VERSION,
             'wordpress' => get_bloginfo('version'),
             'component' => claude_cowork_version(),
+            // The table prefix of THIS site, so a caller can pick its tables out of a database it
+            // shares with other sites; `db.tables` answers it as `prefix`.
+            'db_prefix' => (string) $GLOBALS['wpdb']->prefix,
+            // The network's prefix on multisite (its shared tables), the same as `db_prefix` elsewhere.
+            'db_base_prefix' => (string) $GLOBALS['wpdb']->base_prefix,
         ],
         claude_cowork_build_dumper(),
         claude_cowork_build_walker(),

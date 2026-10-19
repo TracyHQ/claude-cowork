@@ -228,6 +228,9 @@ final class EngineFactory
                 'joomla'    => \defined('JVERSION') ? JVERSION : null,
                 'component' => self::installedVersion(),
                 'upload'    => \AutoUploader::capability(),
+                // The table prefix of THIS site, so a caller can pick its tables out of a database
+                // it shares with other sites; `db.tables` answers it as `prefix`.
+                'db_prefix' => self::dbPrefix(),
             ],
             self::buildDumper(),
             self::buildWalker($params),
@@ -375,6 +378,17 @@ final class EngineFactory
         // Only mysqli is wired. On anything else `db.*` answers 'unavailable' rather than
         // half-working, which is the honest result.
         return $driver instanceof \mysqli ? new \DbDumper(new \MysqliRowSource($driver)) : null;
+    }
+
+    /** The database driver's table prefix (`#__`), or null when there is no database to ask. */
+    private static function dbPrefix(): ?string
+    {
+        try {
+            return (string) Factory::getContainer()->get(DatabaseInterface::class)->getPrefix();
+        } catch (\Throwable $e) {
+            self::logFailure('dbPrefix', $e);
+            return null;
+        }
     }
 
     /** An unreadable webroot leaves `files.*` reporting 'unavailable', not fatal. */
