@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>info and db.tables name the site's table prefix (db_prefix, prefix), so the importer can keep only this site's tables when one database holds several sites</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.42</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.42</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.42/pkg_claudecowork-0.24.42.zip</downloadurl>
+        </downloads>
+        <sha256>142edb729a443ca6abe8dda4ff603fe27ffebec7c9ee39239da690e1b551f544</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the JA Resort 1.0.7 contract (the template reads the design-system role variables; with no design system worn it looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
