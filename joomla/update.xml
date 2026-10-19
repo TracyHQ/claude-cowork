@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>info and db.tables name the site's table prefix (db_prefix, prefix), so the importer can keep only this site's tables when one database holds several sites</description>
+        <description>carries the JA Resort 1.0.7 contract (the template reads the design-system role variables; with no design system worn it looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.41</version>
@@ -24,7 +24,7 @@
         <downloads>
             <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.41/pkg_claudecowork-0.24.41.zip</downloadurl>
         </downloads>
-        <sha256>b8d3c07505732bdb1e4208de6b197612317d8d77f0a1dd6ff1b3f8b5a710280d</sha256>
+        <sha256>5b5f2eadedebb4e9f6b6ac3056e285e08c25498dd0eda0fb53d33bec941ad601</sha256>
         <tags>
             <tag>stable</tag>
         </tags>
