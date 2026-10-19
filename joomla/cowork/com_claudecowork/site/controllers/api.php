@@ -58,6 +58,7 @@ class ClaudeCoworkControllerApi extends BaseController
                 'joomla'    => \defined('JVERSION') ? JVERSION : null,
                 'component' => $this->installedVersion(),
                 'upload'    => \AutoUploader::capability(),
+                'db_prefix' => $this->dbPrefix(),
             ],
             $this->buildDumper(),
             $this->buildWalker($params),
@@ -82,6 +83,16 @@ class ClaudeCoworkControllerApi extends BaseController
         }
 
         return $driver instanceof \mysqli ? new \DbDumper(new \MysqliRowSource($driver)) : null;
+    }
+
+    /** The database driver's table prefix (`#__`), so a caller can pick this site's tables. */
+    private function dbPrefix()
+    {
+        try {
+            return (string) Factory::getDbo()->getPrefix();
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** An unreadable webroot leaves `files.*` reporting 'unavailable', not fatal. */

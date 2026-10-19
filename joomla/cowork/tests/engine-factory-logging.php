@@ -102,6 +102,7 @@ namespace {
                 return $this;
             }
             public function loadAssoc(): ?array { return null; } // 'disabled': no opt-in row
+            public function getPrefix(): string { return 'site2_'; }
         }
 
         /** The application: records headers and close() instead of ending the process. */
@@ -148,6 +149,10 @@ namespace {
                 if (PHP_VERSION_ID < 80100) $efMethod->setAccessible(true);
                 $efReport['results'][$method] = $efMethod->invokeArgs(null, $args);
             }
+        } elseif (EF_CASE['action'] === 'prefix') {
+            $efMethod = new ReflectionMethod(EngineFactory::class, 'dbPrefix');
+            if (PHP_VERSION_ID < 80100) $efMethod->setAccessible(true);
+            $efReport['prefix'] = $efMethod->invoke(null);
         } elseif (EF_CASE['action'] === 'build') {
             EngineFactory::loadEngine();
             $efReport['engine'] = get_class(EngineFactory::build());
@@ -311,7 +316,14 @@ namespace {
         count(array_filter($efMessages, static fn(string $m): bool => strpos($m, 'derivedSource:') !== false && strpos($m, 'database driver could not connect') !== false)) === 1);
     check('build without a database: no secret written', $efLeaks($efWritten($r)), false);
 
-    // 10. A stack frame whose argument is a credential: the frame is named, the value never written.
+    // 10. info.db_prefix is the database driver's prefix; with no database it is null, and logged.
+    $r = $efCase(['action' => 'prefix', 'db' => 'disabled']);
+    check('db prefix: the driver\'s prefix', [$r['broken'] ?? null, $r['prefix'] ?? null, $r['logs'] ?? null], [null, 'site2_', []]);
+    $r = $efCase(['action' => 'prefix', 'db' => 'container']);
+    check('db prefix without a database: null', [$r['broken'] ?? null, array_key_exists('prefix', $r), $r['prefix'] ?? null], [null, true, null]);
+    checkTrue('db prefix without a database: logged', count($r['logs'] ?? []) === 1 && strpos($r['logs'][0]['message'], 'dbPrefix:') !== false && strpos($r['logs'][0]['message'], 'database driver could not connect') !== false);
+
+    // 11. A stack frame whose argument is a credential: the frame is named, the value never written.
     $r = $efCase(['action' => 'secret-argument']);
     $entry = (string) ($r['logs'][0]['message'] ?? '');
     checkTrue('secret argument: the frame is in the stack', (bool) preg_match('~\{closure[^\n]*\(\)~', $entry) && strpos($entry, 'authentication backend failed') !== false);
