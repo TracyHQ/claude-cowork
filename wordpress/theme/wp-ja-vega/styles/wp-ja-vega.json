@@ -8,82 +8,82 @@
         {
           "slug": "bg",
           "name": "Background",
-          "color": "#ffffff"
+          "color": "var(--ds-c-bg, #ffffff)"
         },
         {
           "slug": "surface",
           "name": "Surface",
-          "color": "#fafafa"
+          "color": "var(--ds-c-surface, #fafafa)"
         },
         {
           "slug": "surface-warm",
           "name": "Surface warm",
-          "color": "#121316"
+          "color": "var(--ds-c-ink, #121316)"
         },
         {
           "slug": "fg",
           "name": "Foreground",
-          "color": "#757575"
+          "color": "var(--ds-c-fg, #757575)"
         },
         {
           "slug": "fg-2",
           "name": "Foreground 2",
-          "color": "#050505"
+          "color": "var(--ds-c-heading, #050505)"
         },
         {
           "slug": "muted",
           "name": "Muted",
-          "color": "#757575"
+          "color": "var(--ds-c-muted, #757575)"
         },
         {
           "slug": "meta",
           "name": "Meta",
-          "color": "#86868b"
+          "color": "var(--ds-c-meta, #86868b)"
         },
         {
           "slug": "border",
           "name": "Border",
-          "color": "#ced4da"
+          "color": "var(--ds-c-border, #ced4da)"
         },
         {
           "slug": "border-soft",
           "name": "Border soft",
-          "color": "#e8e8ed"
+          "color": "var(--ds-c-border-soft, #e8e8ed)"
         },
         {
           "slug": "accent",
           "name": "Accent",
-          "color": "#1d4ed8"
+          "color": "var(--ds-c-accent, #1d4ed8)"
         },
         {
           "slug": "accent-on",
           "name": "On accent",
-          "color": "#ffffff"
+          "color": "var(--ds-c-accent-on, #ffffff)"
         },
         {
           "slug": "accent-hover",
           "name": "Accent hover",
-          "color": "#0077ed"
+          "color": "var(--ds-c-accent-hover, #0077ed)"
         },
         {
           "slug": "accent-active",
           "name": "Accent active",
-          "color": "#0066cc"
+          "color": "var(--ds-c-accent-active, #0066cc)"
         },
         {
           "slug": "success",
           "name": "Success",
-          "color": "#16a34a"
+          "color": "var(--ds-c-success, #16a34a)"
         },
         {
           "slug": "warn",
           "name": "Warn",
-          "color": "#eab308"
+          "color": "var(--ds-c-warn, #eab308)"
         },
         {
           "slug": "danger",
           "name": "Danger",
-          "color": "#dc2626"
+          "color": "var(--ds-c-danger, #dc2626)"
         }
       ]
     },
@@ -92,12 +92,12 @@
         {
           "slug": "display",
           "name": "Display",
-          "fontFamily": "\"Inter Tight\""
+          "fontFamily": "var(--ds-font-display, \"Inter Tight\")"
         },
         {
           "slug": "body",
           "name": "Body",
-          "fontFamily": "\"Inter Tight\""
+          "fontFamily": "var(--ds-font-body, \"Inter Tight\")"
         },
         {
           "slug": "mono",
@@ -210,17 +210,17 @@
         "phone": "32px"
       },
       "radius": {
-        "sm": "8px",
-        "md": "8px",
-        "lg": "8px",
-        "pill": "980px"
+        "sm": "var(--ds-input-radius, 8px)",
+        "md": "var(--ds-btn-radius, 8px)",
+        "lg": "var(--ds-card-radius, 8px)",
+        "pill": "var(--ds-pill-radius, 980px)"
       },
       "elev": {
         "flat": "none",
         "ring": "0 0 0 1px var(--wp--preset--color--border)",
-        "raised": "0 12px 32px rgba(0, 0, 0, 0.08)"
+        "raised": "0 12px 32px rgba(0, 0, 0, 0.08) /* ds-keep: shadow depth, not a colour role */"
       },
-      "focusRing": "0 0 0 4px color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%)",
+      "focusRing": "0 0 0 4px var(--ds-c-focus-ring, color-mix(in oklab, var(--wp--preset--color--accent), transparent 65%))",
       "motion": {
         "fast": "150ms",
         "base": "150ms"

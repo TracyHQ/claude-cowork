@@ -34,10 +34,10 @@ body.tracy .jim-art-main .jim-crumbs a:hover { color: var(--jim-link-hover); }
 body.tracy .jim-art__masthead {
   background: url('../../img/gc-hero.jpg') center / cover no-repeat;
 }
-body.tracy .jim-art__masthead .jim-breadcrumbs { margin: 16px 0 0; color: #fff; text-align: center; }
+body.tracy .jim-art__masthead .jim-breadcrumbs { margin: 16px 0 0; color: #fff; text-align: center; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 body.tracy .jim-art__masthead .jim-breadcrumbs :is(ol, ul) { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; list-style: none; margin: 0; padding: 0; }
-body.tracy .jim-art__masthead .jim-breadcrumbs a { color: #fff; text-decoration: none; }
-body.tracy .jim-art__masthead .jim-breadcrumbs a:hover { color: var(--jim-success); }
+body.tracy .jim-art__masthead .jim-breadcrumbs a { color: #fff; text-decoration: none; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
+body.tracy .jim-art__masthead .jim-breadcrumbs a:hover { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
 
 /* ── Two columns: the article and its sidebar (source: col-md 2/3 and col-lg-4 with 32 px gutters) ─ */
 
@@ -64,7 +64,7 @@ body.tracy .jim-art__image { margin: 0; }
 body.tracy .jim-art__image img {
   display: block;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   object-fit: cover;
 }
 body.tracy .jim-art--blog .jim-art__image img { height: auto; max-height: 568px; aspect-ratio: auto; }
@@ -81,7 +81,7 @@ body.tracy .jim-art__meta {
   line-height: 22.4px;
 }
 body.tracy .jim-art__meta > * { margin: 0; font-size: 14px; line-height: 16.8px; color: var(--jim-text); }
-body.tracy .jim-art__author a { color: var(--jim-success); text-decoration: none; }
+body.tracy .jim-art__author a { color: var(--ds-c-accent-text, var(--jim-success)); text-decoration: none; }
 body.tracy .jim-art__author::before { content: '\2013'; margin-right: 8px; color: var(--jim-muted); }
 
 body.tracy .jim-art__title {
@@ -117,7 +117,7 @@ body.tracy .jim-art__body .mt-4 { margin-top: 24px; }
 body.tracy .jim-art__body .my-4 { margin-top: 24px; margin-bottom: 24px; }
 body.tracy .jim-art__body .my-5 { margin-top: 48px; margin-bottom: 48px; }
 body.tracy .jim-art__body .d-flex { display: flex; }
-body.tracy .jim-art__body img { max-width: 100%; height: auto; border-radius: 8px; display: block; }
+body.tracy .jim-art__body img { max-width: 100%; height: auto; border-radius: var(--ds-card-radius, 8px); display: block; }
 
 /* The Bootstrap rows and columns the article text carries (img-gallery, list, col-*). */
 body.tracy .jim-art__body .row {
@@ -144,10 +144,10 @@ body.tracy .jim-art--event .jim-art__body .row.mb-4 { margin-bottom: 24px; }
 body.tracy .jim-art__body .alert {
   box-sizing: border-box;
   padding: 16px;
-  border: 1px solid light-dark(#2970db, #055160);
-  border-radius: 8px;
-  background: light-dark(#2970db, #032830);
-  color: light-dark(#fff, #6edff6);
+  border: 1px solid var(--ds-c-info, light-dark(#2970db, #055160));
+  border-radius: var(--ds-card-radius, 8px);
+  background: var(--ds-c-info-bg, light-dark(#2970db, #032830));
+  color: var(--ds-c-info-text, light-dark(#fff, #6edff6));
   font-size: 16px;
   line-height: 1.6;
   margin: 32px 0;
@@ -157,7 +157,7 @@ body.tracy .jim-art__body .alert .h4 {
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: var(--ds-c-info-text, #fff);
   margin: 0;
 }
 
@@ -190,7 +190,7 @@ body.tracy .jim-art__body .list ul li p { margin: 0; }
 body.tracy .jim-art__body .list-service {
   display: grid;
   grid-template-columns: 1fr;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 @media (min-width: 768px) { body.tracy .jim-art__body .list-service { grid-template-columns: repeat(2, 1fr); } }
 body.tracy .jim-art__body .list-service > * { margin-block: 0; }
@@ -202,13 +202,13 @@ body.tracy .jim-art__body .service {
   box-shadow: 0 0 0 1px var(--jim-line);
 }
 @media (min-width: 768px) {
-  body.tracy .jim-art__body .service:nth-child(1) { border-top-left-radius: 8px; }
-  body.tracy .jim-art__body .service:nth-child(2) { border-top-right-radius: 8px; }
-  body.tracy .jim-art__body .service:nth-child(3) { border-bottom-left-radius: 8px; }
-  body.tracy .jim-art__body .service:nth-child(4) { border-bottom-right-radius: 8px; }
+  body.tracy .jim-art__body .service:nth-child(1) { border-top-left-radius: var(--ds-card-radius, 8px); }
+  body.tracy .jim-art__body .service:nth-child(2) { border-top-right-radius: var(--ds-card-radius, 8px); }
+  body.tracy .jim-art__body .service:nth-child(3) { border-bottom-left-radius: var(--ds-card-radius, 8px); }
+  body.tracy .jim-art__body .service:nth-child(4) { border-bottom-right-radius: var(--ds-card-radius, 8px); }
 }
 body.tracy .jim-art__body .service > * { margin-block: 0; }
-body.tracy .jim-art__body .service-image img { width: 48px; height: 48px; border-radius: 0; }
+body.tracy .jim-art__body .service-image img { width: 48px; height: 48px; border-radius: 0; } /* ds-keep: the service icon picture, square on purpose */
 body.tracy .jim-art__body .service-content { flex: 1; }
 body.tracy .jim-art__body .service h4 { margin: 0 0 8px; font-size: var(--jim-h4); line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; color: var(--jim-heading); }
 body.tracy .jim-art__body .service p { margin: 0; }
@@ -225,14 +225,14 @@ body.tracy .jim-art__place {
   line-height: 25.6px;
   letter-spacing: -0.01em;
 }
-body.tracy .jim-art__tag a { color: light-dark(var(--ds-c-warn, #f48a29), #6f9bf0); text-decoration: none; }
+body.tracy .jim-art__tag a { color: light-dark(var(--ds-c-warn-text, #f48a29), var(--ds-c-warn-text, #6f9bf0)); text-decoration: none; }
 body.tracy .jim-art__tag a::before {
   content: '\f02e';
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   margin-right: 4px;
 }
-body.tracy .jim-art__place { color: var(--jim-success); }
+body.tracy .jim-art__place { color: var(--ds-c-accent-text, var(--jim-success)); }
 body.tracy .jim-art__place::before {
   content: '\f3c5';
   font-family: 'Font Awesome 6 Free';
@@ -244,7 +244,7 @@ body.tracy .jim-art__figure::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.4));
   pointer-events: none;
 }
@@ -265,7 +265,7 @@ body.tracy .jim-prog__pct {
   margin: 0;
   font-size: 18px;
   line-height: 27px;
-  color: #fff;
+  color: #fff; /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
   text-align: center;
   transform: none;
 }
@@ -274,16 +274,16 @@ body.tracy .jim-prog__track {
   display: flex;
   height: 10px;
   margin: 0 0 16px;
-  border-radius: 8px;
-  background: light-dark(var(--ds-c-surface-warm, #e9ecef), #1e2a45);
+  border-radius: var(--ds-pill-radius, 8px);
+  background: light-dark(var(--ds-c-surface-warm, #e9ecef), var(--ds-c-surface-warm, #1e2a45));
   overflow: hidden;
 }
-body.tracy .jim-prog__fill { height: 100%; border-radius: 8px; background: var(--jim-success); }
+body.tracy .jim-prog__fill { height: 100%; border-radius: var(--ds-pill-radius, 8px); background: var(--jim-success); }
 body.tracy .jim-prog__nums { gap: 16px; }
 body.tracy .jim-prog__num { display: flex; align-items: baseline; gap: 8px; }
 body.tracy .jim-prog__num > * { margin: 0; }
-body.tracy .jim-prog__value { font-size: var(--jim-h4); line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; color: #fff; }
-body.tracy .jim-prog__label { font-size: 16px; line-height: 25.6px; color: #fff; }
+body.tracy .jim-prog__value { font-size: var(--jim-h4); line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; color: #fff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
+body.tracy .jim-prog__label { font-size: 16px; line-height: 25.6px; color: #fff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 
 /* ── Tags, share buttons and previous / next ───────────────────────────────────────────────────── */
 
@@ -296,7 +296,7 @@ body.tracy .jim-art__tags .wp-block-post-terms__separator { display: none; }
 body.tracy .jim-art__tags a {
   display: block;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--ds-pill-radius, 8px);
   background: var(--jim-surface);
   color: var(--jim-link);
   font-size: 14px;
@@ -316,13 +316,13 @@ body.tracy .jim-art__share .wp-social-link a {
   height: 48px;
   padding: 0;
   border: 1px solid var(--jim-surface);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--jim-surface);
 }
 body.tracy .jim-art__share .wp-social-link svg { width: 24px; height: 24px; fill: currentColor; }
 body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-facebook a { color: #3b5997; }
-body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-x a { color: #00acee; }
-body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-tumblr a { color: light-dark(#35465c, #c2c9d6); }
+body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-x a { color: #00acee; } /* ds-keep: the X (Twitter) brand colour */
+body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-tumblr a { color: var(--ds-c-fg, light-dark(#35465c, #c2c9d6)); }
 body.tracy .jim-art__share.wp-block-social-links .wp-social-link.wp-social-link-whatsapp a { color: #25d366; }
 
 body.tracy .jim-art__pager {
@@ -356,7 +356,7 @@ body.tracy .jim-side > * { margin-block: 0; }
 body.tracy .jim-side__box {
   padding: 32px;
   border: 1px solid var(--jim-line);
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
 }
 body.tracy .jim-side__box + *,
 body.tracy .jim-side__search + * { margin-top: 32px; }
@@ -385,9 +385,9 @@ body.tracy .jim-side__list .numitems {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 100%;
+  border-radius: 100%; /* ds-keep: the round count badge, a circle */
   background: var(--jim-raised-2);
-  color: light-dark(#2970db, #c2c9d6);
+  color: var(--ds-c-accent-text, light-dark(#2970db, #c2c9d6));
 }
 body.tracy .jim-side__search .wp-block-search__inside-wrapper { border: 0; padding: 0; background: transparent; }
 body.tracy .jim-side__search .wp-block-search__input {
@@ -395,7 +395,7 @@ body.tracy .jim-side__search .wp-block-search__input {
   height: 55.6px;
   padding: 0 56px 0 16px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: var(--jim-surface);
   color: var(--jim-text);
   font: inherit;
@@ -420,7 +420,7 @@ body.tracy .jim-side__latest .wp-block-post-template > li + li { padding-top: 16
 body.tracy .jim-side__item { gap: 16px; align-items: flex-start; }
 body.tracy .jim-side__item > * { margin: 0; }
 body.tracy .jim-side__thumb { flex: 0 0 120px; width: 120px; }
-body.tracy .jim-side__thumb img { display: block; width: 120px; height: 80px; border-radius: 8px; object-fit: cover; }
+body.tracy .jim-side__thumb img { display: block; width: 120px; height: 80px; border-radius: var(--ds-card-radius, 8px); object-fit: cover; }
 body.tracy .jim-side__post {
   font-size: var(--jim-h5);
   line-height: 1.5;
@@ -436,7 +436,7 @@ body.tracy .jim-side__tags .wp-block-tag-cloud li { margin: 0; }
 body.tracy .jim-side__tags .tag-cloud-link {
   display: inline-block;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--ds-pill-radius, 4px);
   background: var(--jim-surface);
   color: var(--jim-heading);
   font-size: 14px !important;
@@ -451,7 +451,7 @@ body.tracy .jim-art__aside > * { margin-block: 0; }
 body.tracy .jim-info {
   position: relative;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--jim-primary) url('../../img/gc-dt-bg.jpg') center / cover no-repeat;
 }
 body.tracy .jim-info__item { gap: 16px; align-items: flex-start; }
@@ -461,7 +461,7 @@ body.tracy .jim-info__icon {
   width: 40px;
   height: 40px;
   margin: 0;
-  color: var(--jim-success);
+  color: var(--ds-c-accent-on-ink, var(--jim-success));
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   font-size: 35.2px;
@@ -482,14 +482,14 @@ body.tracy .jim-info__tags {
   line-height: 1.5;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: var(--ds-c-on-ink, #fff);
 }
-body.tracy .jim-info__tags a { color: #fff; text-decoration: none; }
-body.tracy .jim-info__tags a:hover { color: var(--jim-success); }
+body.tracy .jim-info__tags a { color: var(--ds-c-on-ink, #fff); text-decoration: none; }
+body.tracy .jim-info__tags a:hover { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
 body.tracy .jim-cta {
   margin-top: 32px;
   padding: 64px 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('../../img/gc-cta.jpg') center / cover no-repeat;
   color: var(--jim-on-band-muted);
 }
@@ -500,13 +500,13 @@ body.tracy .jim-cta__title {
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: #fff; /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 }
 body.tracy .jim-cta__desc { margin: 0; font-size: 16px; line-height: 25.6px; color: var(--jim-on-band-muted); }
 body.tracy .jim-cta .cta-action { margin-top: 64px; }
 
 /* Blog Detail: the masthead title and the related-post card titles as the source draws them. */
-body.tracy .jim-art__masthead .jim-masthead__title { line-height: 44px; color: light-dark(#fff, #eef1f6); }
+body.tracy .jim-art__masthead .jim-masthead__title { line-height: 44px; color: light-dark(#fff, #eef1f6); } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 @media (max-width: 991.98px) { body.tracy .jim-art__masthead .jim-masthead__title { line-height: 30.8px; } }
 body.tracy .jim-art-main .jim-rel__title,
 body.tracy .jim-art-main .jim-rel__title a { font-size: 16px; line-height: 1.3; color: var(--jim-link); }

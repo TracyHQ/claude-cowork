@@ -17,7 +17,7 @@
 <!-- wp:group {"className":"feature-grid","layout":{"type":"default"}} -->
 <div class="wp-block-group feature-grid">
 <!-- wp:group {"className":"item bg-white","metadata":{"name":"features.item.1"},"layout":{"type":"default"}} -->
-<div class="wp-block-group item bg-white">
+<?php /* ds-keep: bg-white is a marker class the card rules test (:not(.bg-white)); the card ground is --jim-raised, which reads --ds-c-bg */ ?><div class="wp-block-group item bg-white">
 <!-- wp:heading {"level":1,"className":"count-number","metadata":{"role":"content","name":"features.count-number.1"}} -->
 <h1 class="wp-block-heading count-number"><?php esc_html_e( '01', 'wp-ja-impact' ); ?></h1>
 <!-- /wp:heading -->

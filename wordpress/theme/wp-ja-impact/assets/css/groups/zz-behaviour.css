@@ -7,7 +7,7 @@ body.tracy :is(input:not([type='checkbox'], [type='radio'], [type='submit'], [ty
   outline: 0;
   box-shadow: none;
   /* important: the newsletter and search fields paint their own border with a longer selector in their group sheet */
-  border-color: var(--jim-success) !important;
+  border-color: var(--ds-c-focus-ring, var(--jim-success)) !important;
 }
 
 /* Back to top: a 50 px square at the bottom right, light grey with the primary chevron (the source's `#back-to-top`), the
@@ -21,15 +21,15 @@ body.tracy .jim-back-to-top {
   box-sizing: border-box;
   width: 50px;
   height: 50px;
-  border-radius: 8px;
-  background: light-dark(var(--ds-c-surface-warm, #e9ecef), #28354f);
-  color: light-dark(var(--jim-primary), #c2c9d6);
+  border-radius: var(--ds-btn-radius, 8px);
+  background: light-dark(var(--ds-c-surface-warm, #e9ecef), var(--ds-c-surface-warm, #28354f));
+  color: light-dark(var(--ds-c-heading, var(--jim-primary)), var(--ds-c-heading, #c2c9d6));
   text-align: center;
   text-decoration: none;
   transition: all 0.35s ease;
 }
 body.tracy.top-away .jim-back-to-top { display: block; }
-body.tracy .jim-back-to-top:is(:hover, :focus, :active) { background: var(--jim-success); color: #ffffff; }
+body.tracy .jim-back-to-top:is(:hover, :focus, :active) { background: var(--jim-success); color: var(--ds-c-accent-on, #ffffff); }
 /* The source draws its Font Awesome 4 chevron (thicker strokes than the Font Awesome 6 one); the same outline as a mask in the text colour. */
 body.tracy .jim-back-to-top__mark {
   display: block;
@@ -56,7 +56,7 @@ body.tracy .jim-footer .jim-social .wp-social-link-tiktok a { color: light-dark(
     font-size: 14.4px;
     font-weight: 600;
     text-transform: uppercase;
-    color: light-dark(var(--ds-c-fg, #212529), #eef1f6);
+    color: light-dark(var(--ds-c-fg, #212529), var(--ds-c-fg, #eef1f6));
   }
   body.tracy .jim-header__menu .jim-drill-back__button::before { color: var(--jim-muted); }
 
@@ -105,9 +105,9 @@ body.tracy :not(h1, h2, h3, h4, h5, h6):is(.h5, .h6) { letter-spacing: -0.16px; 
 /* Contact form (1.0.4): the fields sit on the page tone with a border of the same colour and a light placeholder, as the source's;
    "Privacy Note *" is a label on its own line; the Send row sits under the last box as in the source. */
 body.tracy .jim-contactpage__main .wpcf7 :is(input[type='text'], input[type='email'], textarea) { border-color: var(--jim-surface); }
-body.tracy .jim-contactpage__main .wpcf7 :is(input, textarea)::placeholder { color: light-dark(var(--ds-c-meta, #adb5bd), #7b879c); opacity: 1; }
+body.tracy .jim-contactpage__main .wpcf7 :is(input, textarea)::placeholder { color: light-dark(var(--ds-c-meta, #adb5bd), var(--ds-c-meta, #7b879c)); opacity: 1; }
 body.tracy .jim-contactpage__main .jim-consent__label { display: block; line-height: 25.6px; color: var(--jim-link); }
-body.tracy .jim-contactpage__main .jim-consent__star { color: var(--ds-c-danger, #dc3545); }
+body.tracy .jim-contactpage__main .jim-consent__star { color: var(--ds-c-danger-text, #dc3545); }
 body.tracy .jim-contactpage__main .wtb-form__actions { margin-top: 62px; }
 @media (max-width: 991.98px) { body.tracy .jim-contactpage__main .wtb-form__actions { margin-top: 14px; } }
 

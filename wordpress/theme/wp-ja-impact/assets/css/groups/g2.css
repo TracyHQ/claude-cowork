@@ -8,20 +8,20 @@
 :root {
   --g2-white: #ffffff;
   --g2-black: #000000;
-  --g2-on-card: #e9ecef;
-  --g2-secondary: #6c757d;
+  --g2-on-card: var(--ds-c-on-ink, #e9ecef);
+  --g2-secondary: var(--ds-c-ink, #6c757d);
   --g2-placeholder: var(--ds-c-meta, #adb5bd);
   --g2-facebook: #1674ea;
   --g2-twitter: #1c9cea;
   --g2-tiktok: #000000;
   --g2-pinterest: #cf3431;
   /* The section picture behind the icon cards is veiled in dark (the source's .bg-overlay inset shadow). */
-  --g2-veil: light-dark(transparent, rgba(17, 26, 44, 0.94));
-  --g2-btn-white-bg: light-dark(var(--ds-c-bg, #ffffff), #28354f);
-  --g2-btn-white-fg: light-dark(var(--ds-c-fg-2, #1d3677), #eef1f6);
-  --g2-btn-white-line: light-dark(#ffffff, #33415e);
-  --g2-lift: light-dark(rgba(100, 100, 111, 0.2), rgba(0, 0, 0, 0.55));
+  --g2-veil: light-dark(transparent, var(--ds-c-bg, rgba(17, 26, 44, 0.94)));
+  --g2-btn-white-bg: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-bg, #28354f));
+  --g2-btn-white-fg: light-dark(var(--ds-c-fg-2, #1d3677), var(--ds-c-fg-2, #eef1f6));
+  --g2-btn-white-line: light-dark(var(--ds-c-bg, #ffffff), var(--ds-c-border, #33415e));
 }
+:root { --g2-lift: light-dark(rgba(100, 100, 111, 0.2), rgba(0, 0, 0, 0.55)); } /* ds-keep: hover shadow tint: depth, not a role */
 
 /* Module spacing (top-/bottom- classes) is declared once in g3.css for every section. */
 
@@ -62,7 +62,7 @@ body.tracy .acm-features .wp-block-button.btn-white .wp-block-button__link:hover
 body.tracy .acm-features .wp-block-button.btn-white .wp-block-button__link:focus {
   background: var(--jim-primary);
   border-color: var(--jim-primary);
-  color: var(--g2-white);
+  color: var(--ds-c-on-ink, var(--g2-white));
   opacity: 1;
 }
 body.tracy .acm-features .wp-block-button.btn-primary .wp-block-button__link { background: var(--jim-primary); border-color: var(--jim-primary); }
@@ -89,16 +89,16 @@ body.tracy .acm-features.style-2 .ft-item {
 }
 body.tracy .acm-features.style-2 .ft-item-detail {
   --g2-card-bg: var(--jim-primary);
-  --g2-card-head: var(--g2-white);
+  --g2-card-head: var(--ds-c-on-ink, var(--g2-white));
   --g2-card-text: var(--g2-on-card);
   box-sizing: border-box;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--g2-card-bg);
   color: var(--g2-card-text);
 }
-body.tracy .acm-features.style-2 .ft-item-detail.bg-info { --g2-card-bg: var(--jim-info); }
+body.tracy .acm-features.style-2 .ft-item-detail.bg-info { --g2-card-bg: var(--ds-c-accent, var(--jim-info)); --g2-card-head: var(--ds-c-accent-on, var(--g2-white)); --g2-card-text: var(--ds-c-accent-on, var(--g2-on-card)); }
 body.tracy .acm-features.style-2 .ft-item-detail.bg-primary { --g2-card-bg: var(--jim-primary); }
 body.tracy .acm-features.style-2 .ft-item-detail.bg-light {
   --g2-card-bg: var(--jim-band);
@@ -180,12 +180,18 @@ body.tracy .acm-features.style-3 .img-icon {
   width: 104px;
   height: 104px;
   margin: 0;
-  border-radius: 100%;
+  border-radius: 100%; /* ds-keep: the round icon disc, a circle not a corner */
 }
 @media (min-width: 576px) {
   body.tracy .acm-features.style-3 .img-icon { width: 120px; height: 120px; }
 }
-body.tracy .acm-features.style-3 .img-icon img { display: block; width: 100%; height: 100%; border-radius: 100%; object-fit: cover; object-position: center; }
+body.tracy .acm-features.style-3 .img-icon img { display: block; width: 100%; height: 100%; border-radius: 100%; object-fit: cover; object-position: center; } /* ds-keep: the round icon disc, a circle not a corner */
+/* Under a design system the icons' round navy disc follows its accent, as in the Joomla twin (acm/features style-3): the
+ * filter printed in the footer (inc/extra.php, #jim-disc-tint) repaints only the deep navy pixels with the flood colour.
+ * The helper reads the accent without a fallback, so with no design system it is invalid and the filter falls back to none. */
+:root { --jim-disc-filter: url(#jim-disc-tint) drop-shadow(0 0 0 color-mix(in srgb, var(--ds-c-accent) 0%, transparent)); }
+body.tracy .acm-features.style-3 .img-icon img { filter: var(--jim-disc-filter, none); }
+.jim-disc-tint-flood { flood-color: var(--ds-c-accent, transparent); }
 body.tracy .acm-features.style-3 .wrap-content {
   position: relative;
   box-sizing: border-box;
@@ -193,7 +199,7 @@ body.tracy .acm-features.style-3 .wrap-content {
   width: 100%;
   margin-top: -64px;
   padding: 120px 24px 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--jim-surface);
   transition: box-shadow 0.5s ease-in-out;
 }
@@ -211,7 +217,7 @@ body.tracy .acm-features.style-3 .wrap-content.bg-secondary { background: var(--
 body.tracy .acm-features.style-3 .wrap-content.bg-success { background: var(--jim-success); }
 body.tracy .acm-features.style-3 .wrap-content.bg-warning { background: var(--jim-warning); }
 body.tracy .acm-features.style-3 .wrap-content:not(.bg-default) .item-title,
-body.tracy .acm-features.style-3 .wrap-content:not(.bg-default) .item-description { color: var(--g2-white); }
+body.tracy .acm-features.style-3 .wrap-content:not(.bg-default) .item-description { color: var(--ds-c-on-ink, var(--g2-white)); }
 body.tracy .acm-features.style-3 .item-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; height: 100%; text-align: center; }
 body.tracy .acm-features.style-3 .item-title { margin: 0 0 16px; font-size: var(--jim-h4); color: var(--jim-heading); }
 body.tracy .acm-features.style-3 .item-description { flex-grow: 1; margin: 0 0 32px; color: var(--jim-text); }
@@ -245,7 +251,7 @@ body.tracy .acm-features.style-3 .tracy-motion-nav-buttons .wp-block-button__lin
   height: 56px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--jim-raised);
   box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.05);
   color: var(--jim-link);
@@ -275,7 +281,7 @@ body.tracy .acm-features.style-3 .feature-block { margin-top: 16px; }
 @media (min-width: 1200px) {
   body.tracy .acm-features.style-3 .feature-block { margin-top: 64px; }
 }
-body.tracy .acm-features.style-3 .block-inner { padding: 32px; border-radius: 8px; background: var(--jim-warning); }
+body.tracy .acm-features.style-3 .block-inner { padding: 32px; border-radius: var(--ds-card-radius, 8px); background: var(--jim-warning); }
 body.tracy .acm-features.style-3 .block-inner.bg-primary { background: var(--jim-primary); }
 body.tracy .acm-features.style-3 .block-inner.bg-secondary { background: var(--g2-secondary); }
 body.tracy .acm-features.style-3 .block-inner.bg-success { background: var(--jim-success); }
@@ -290,7 +296,7 @@ body.tracy .acm-features.style-3 .block-left {
 }
 body.tracy .acm-features.style-3 .block-img { flex: 0 0 auto; width: 68px; height: 68px; margin: 0; }
 body.tracy .acm-features.style-3 .block-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
-body.tracy .acm-features.style-3 .block-left .item-description { margin: 0; font-size: var(--jim-h4); color: var(--g2-white); }
+body.tracy .acm-features.style-3 .block-left .item-description { margin: 0; font-size: var(--jim-h4); color: var(--ds-c-on-ink, var(--g2-white)); }
 body.tracy .acm-features.style-3 .block-right { flex: 0 0 auto; text-align: center; }
 body.tracy .acm-features.style-3 .block-right .wp-block-button__link { white-space: nowrap; }
 body.tracy .acm-features.style-3 .block-right .wp-block-buttons { justify-content: center; }
@@ -321,9 +327,9 @@ body.tracy .acm-features.style-4 .feature-tag {
   line-height: 1.2;
   letter-spacing: -0.16px;
   text-transform: uppercase;
-  color: var(--jim-success);
+  color: var(--ds-c-accent-on-ink, var(--jim-success));
 }
-body.tracy .acm-features.style-4 .feature-title { margin: 0 0 32px; font-size: var(--jim-h2); color: var(--g2-white); }
+body.tracy .acm-features.style-4 .feature-title { margin: 0 0 32px; font-size: var(--jim-h2); color: var(--ds-c-on-ink, var(--g2-white)); }
 body.tracy .acm-features.style-4 .lead { margin: 0; font-size: 16px; line-height: 1.6; color: var(--jim-on-band); }
 @media (min-width: 992px) {
   body.tracy .acm-features.style-4 .lead { font-size: 18px; }
@@ -342,7 +348,7 @@ body.tracy .acm-features.style-4 .item-detail {
   box-sizing: border-box;
   height: 100%;
   padding: 32px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--jim-raised);
   text-align: center;
 }
@@ -359,7 +365,7 @@ body.tracy .acm-features.style-4 .item-media { max-width: 64px; max-height: 64px
 body.tracy .acm-features.style-4 .item-media img { display: block; width: 100%; height: auto; }
 body.tracy .acm-features.style-4 .item-title { margin: 0 0 16px; font-size: var(--jim-h2); color: var(--jim-heading); }
 body.tracy .acm-features.style-4 .item-title.text-success { color: var(--jim-eyebrow); }
-body.tracy .acm-features.style-4 .item-title.text-warning { color: var(--jim-warning); }
+body.tracy .acm-features.style-4 .item-title.text-warning { color: var(--ds-c-accent-on-ink, var(--jim-warning)); }
 body.tracy .acm-features.style-4 .item-title.text-primary { color: var(--jim-link); }
 body.tracy .acm-features.style-4 .item-des { margin: 0; color: var(--jim-text); }
 
@@ -413,7 +419,7 @@ body.tracy .acm-features.style-7 .video-btn .wp-block-button__link {
   border: 0;
   border-radius: 50%;
   background: var(--g2-white);
-  color: var(--jim-success);
+  color: var(--ds-c-accent-text, var(--jim-success));
   font-size: 0;
   cursor: pointer;
 }
@@ -425,7 +431,7 @@ body.tracy .acm-features.style-7 .video-btn .wp-block-button__link::before {
   line-height: 1;
 }
 body.tracy .acm-features.style-7 .video-btn .wp-block-button__link:hover,
-body.tracy .acm-features.style-7 .video-btn .wp-block-button__link:focus { background: var(--g2-white); color: var(--jim-primary); }
+body.tracy .acm-features.style-7 .video-btn .wp-block-button__link:focus { background: var(--g2-white); color: var(--ds-c-heading, var(--jim-primary)); }
 body.tracy .acm-features.style-7 .waves-block { position: absolute; inset: 0; }
 body.tracy .acm-features.style-7 .waves {
   position: absolute;
@@ -433,7 +439,7 @@ body.tracy .acm-features.style-7 .waves {
   bottom: -60px;
   width: 200px;
   height: 200px;
-  border-radius: 100%;
+  border-radius: 100%; /* ds-keep: the pulse ring around the video button, a circle */
   background: var(--g2-white);
   opacity: 0;
 }
@@ -489,7 +495,7 @@ body.tracy .acm-features.style-7 .acymailing :is(input[type='text'], input[type=
   height: auto;
   padding: 14px;
   border: 1px solid var(--g2-white);
-  border-radius: 8px;
+  border-radius: var(--ds-input-radius, 8px);
   background: var(--jim-raised);
   color: var(--jim-text);
   font: inherit;
@@ -508,7 +514,7 @@ body.tracy .acm-features.style-7 .acymailing .wtb-form__actions::after {
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
-  color: var(--g2-white);
+  color: var(--ds-c-accent-on, var(--g2-white));
   pointer-events: none;
 }
 body.tracy .acm-features.style-7 .acymailing input[type='submit'] {
@@ -516,9 +522,9 @@ body.tracy .acm-features.style-7 .acymailing input[type='submit'] {
   box-sizing: border-box;
   padding: 17px 48px 17px 32px;
   border: 1px solid var(--jim-success);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--jim-success);
-  color: var(--g2-white);
+  color: var(--ds-c-accent-on, var(--g2-white));
   font-family: inherit;
   font-size: 16px;
   font-weight: 500;
@@ -540,7 +546,7 @@ body.tracy .acm-features.style-7 .jim-follow .wp-social-link {
   width: 48px;
   height: 48px;
   margin: 0;
-  border-radius: 4px;
+  border-radius: var(--ds-btn-radius, 4px);
   background: var(--g2-white);
   font-size: 20px;
 }
@@ -567,12 +573,12 @@ body.tracy .acm-features.style-7 .jim-follow .wp-social-link-pinterest { color: 
   max-width: none;
   padding: 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   background: var(--g2-white);
   overflow: visible;
 }
 .jim-video-dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
-.jim-video-dialog__frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; }
+.jim-video-dialog__frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--ds-card-radius, 8px); }
 .jim-video-dialog__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .jim-video-dialog__close {
   position: absolute;

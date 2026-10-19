@@ -80,7 +80,7 @@ body.tracy .acm-accordion .jim-acc__q {
   margin: 0;
   padding: 16px 24px;
   background: var(--jim-primary);
-  color: #ffffff;
+  color: var(--ds-c-on-ink, #ffffff);
   font-size: 18px;
   font-weight: 500;
   line-height: 1.2;
@@ -95,7 +95,7 @@ body.tracy .acm-accordion .jim-acc__q[data-n]::before {
   font-weight: 500;
   line-height: 1.2;
   letter-spacing: -0.8px;
-  color: #dee2e6;
+  color: var(--ds-c-on-ink, #dee2e6);
   transition: color 0.15s ease;
 }
 body.tracy .acm-accordion .jim-acc__btn {
@@ -112,7 +112,7 @@ body.tracy .acm-accordion .jim-acc__btn {
   font: inherit;
   letter-spacing: inherit;
 }
-body.tracy .acm-accordion .jim-acc__btn:focus-visible { outline: 2px solid var(--jim-success); outline-offset: 4px; }
+body.tracy .acm-accordion .jim-acc__btn:focus-visible { outline: 2px solid var(--ds-c-focus-ring, var(--jim-success)); outline-offset: 4px; }
 body.tracy .acm-accordion .jim-acc__text {
   display: -webkit-box;
   overflow: hidden;
@@ -127,14 +127,14 @@ body.tracy .acm-accordion .jim-acc__marker::before {
   font-size: 14px;
 }
 body.tracy .acm-accordion .jim-acc__item:hover .jim-acc__q,
-body.tracy .acm-accordion .jim-acc__item:hover .jim-acc__q::before { color: var(--jim-success); }
+body.tracy .acm-accordion .jim-acc__item:hover .jim-acc__q::before { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
 body.tracy .acm-accordion .jim-acc__body { margin: 0; padding: 16px 24px; color: var(--jim-text); }
 body.tracy .acm-accordion .jim-acc__body[hidden] { display: none; }
 :root[data-theme='dark'] body.tracy .acm-accordion .jim-acc__item { border-color: var(--jim-line); }
-:root[data-theme='dark'] body.tracy .acm-accordion .jim-acc__q { background: var(--jim-raised-2); color: #eef1f6; }
+:root[data-theme='dark'] body.tracy .acm-accordion .jim-acc__q { background: var(--jim-raised-2); color: var(--ds-c-fg, #eef1f6); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) body.tracy .acm-accordion .jim-acc__item { border-color: var(--jim-line); }
-  :root:not([data-theme='light']) body.tracy .acm-accordion .jim-acc__q { background: var(--jim-raised-2); color: #eef1f6; }
+  :root:not([data-theme='light']) body.tracy .acm-accordion .jim-acc__q { background: var(--jim-raised-2); color: var(--ds-c-fg, #eef1f6); }
 }
 @media (min-width: 992px) {
   body.tracy .acm-accordion .jim-acc__info { margin-bottom: 64px; }
@@ -168,7 +168,7 @@ body.tracy .style-funds .jim-fund-slides > li {
   flex: 0 0 100%;
   box-sizing: border-box;
   padding: 0 16px;
-  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  border-right: 1px solid var(--ds-c-border-soft, rgba(0, 0, 0, 0.1));
 }
 body.tracy .style-funds .jim-fund-slides > li.is-last-active { border-right-color: transparent; }
 body.tracy .style-funds .jim-fund { position: relative; border-radius: var(--jim-radius); overflow: hidden; }
@@ -189,12 +189,12 @@ body.tracy .style-funds .jim-fund__info {
   flex-direction: column;
   justify-content: space-between;
   padding: 24px;
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 }
 body.tracy .style-funds .jim-fund__meta { display: flex; align-items: center; justify-content: space-between; margin: 0 0 16px; }
 body.tracy .style-funds .jim-fund__tag,
 body.tracy .style-funds .jim-fund__place { margin: 0; font-size: 16px; line-height: 1.6; letter-spacing: -0.16px; }
-body.tracy .style-funds .jim-fund__tag a { color: var(--jim-warning); }
+body.tracy .style-funds .jim-fund__tag a { color: var(--ds-c-on-ink, var(--jim-warning)); }
 body.tracy .style-funds .jim-fund__tag a::before,
 body.tracy .style-funds .jim-fund__place:not(:empty)::before {
   font-family: 'Font Awesome 6 Free';
@@ -202,12 +202,12 @@ body.tracy .style-funds .jim-fund__place:not(:empty)::before {
   margin-right: 8px;
 }
 body.tracy .style-funds .jim-fund__tag a::before { content: '\f02e'; }
-body.tracy .style-funds .jim-fund__place { color: #ffffff; }
+body.tracy .style-funds .jim-fund__place { color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 body.tracy .style-funds .jim-fund__place:not(:empty)::before { content: '\f3c5'; }
 body.tracy .style-funds .jim-fund__title { margin: 0 0 16px; font-size: var(--jim-h3); line-height: 1.2; letter-spacing: -0.28px; }
-body.tracy .style-funds .jim-fund__title a { color: #ffffff; }
-body.tracy .style-funds .jim-fund__title a:hover { color: var(--jim-success); }
-body.tracy .style-funds .jim-fund__intro { margin: 0; color: #dee2e6; }
+body.tracy .style-funds .jim-fund__title a { color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
+body.tracy .style-funds .jim-fund__title a:hover { color: var(--ds-c-accent-on-ink, var(--jim-success)); }
+body.tracy .style-funds .jim-fund__intro { margin: 0; color: #dee2e6; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 body.tracy .style-funds .jim-fund__intro p {
   display: -webkit-box;
   margin: 0;
@@ -223,14 +223,14 @@ body.tracy .style-funds .jim-fund__pct {
   font-size: 16px;
   line-height: 1.5;
   text-align: center;
-  color: #ffffff;
+  color: #ffffff; /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 }
-body.tracy .style-funds .jim-fund__track { height: 10px; margin: 0 0 16px; border-radius: var(--jim-radius); background: light-dark(var(--ds-c-surface-warm, #e9ecef), #1e2a45); overflow: hidden; }
-body.tracy .style-funds .jim-fund__fill { height: 100%; border-radius: var(--jim-radius); background: var(--jim-success); }
-body.tracy .style-funds .jim-fund__campaign { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #ffffff; }
+body.tracy .style-funds .jim-fund__track { height: 10px; margin: 0 0 16px; border-radius: var(--ds-pill-radius, var(--jim-radius)); background: light-dark(var(--ds-c-surface-warm, #e9ecef), var(--ds-c-surface-warm, #1e2a45)); overflow: hidden; }
+body.tracy .style-funds .jim-fund__fill { height: 100%; border-radius: var(--ds-pill-radius, var(--jim-radius)); background: var(--jim-success); }
+body.tracy .style-funds .jim-fund__campaign { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 body.tracy .style-funds .jim-fund__figure { display: flex; align-items: center; gap: 8px; }
-body.tracy .style-funds .jim-fund__amount { margin: 0; font-size: var(--jim-h5); line-height: 1.2; letter-spacing: -0.16px; color: #ffffff; }
-body.tracy .style-funds .jim-fund__label { margin: 0; color: #ffffff; }
+body.tracy .style-funds .jim-fund__amount { margin: 0; font-size: var(--jim-h5); line-height: 1.2; letter-spacing: -0.16px; color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
+body.tracy .style-funds .jim-fund__label { margin: 0; color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 /* The dots the carousel draws (tracy-motion-dots): the source's Owl dots, 12 px, the active one green. */
 body.tracy .style-funds .tracy-motion-dots {
   position: absolute;
@@ -249,7 +249,7 @@ body.tracy .style-funds .tracy-motion-dot {
   background: rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
-body.tracy .style-funds .tracy-motion-dot[aria-current='true'] { background: var(--jim-success); }
+body.tracy .style-funds .tracy-motion-dot[aria-current='true'] { background: var(--ds-c-accent-text, var(--jim-success)); }
 @media (min-width: 768px) {
   body.tracy .style-funds .jim-fund-list { padding-bottom: 76px; }
   body.tracy .style-funds .jim-fund-slides > li { flex-basis: 50%; }
@@ -313,7 +313,7 @@ body.tracy .style-events .jim-evt__date {
   text-align: center;
 }
 body.tracy .style-events .jim-evt__day,
-body.tracy .style-events .jim-evt__month { margin: 0; color: var(--jim-primary); }
+body.tracy .style-events .jim-evt__month { margin: 0; color: var(--ds-c-heading, var(--jim-primary)); }
 body.tracy .style-events .jim-evt__day { font-size: var(--jim-h3); line-height: 1.2; letter-spacing: -0.28px; }
 body.tracy .style-events .jim-evt__month { font-size: 16px; font-weight: 400; line-height: 1.2; letter-spacing: -0.16px; text-transform: uppercase; }
 body.tracy .style-events .jim-evt__date--warning { background: var(--jim-warning); }
@@ -324,13 +324,13 @@ body.tracy .style-events .jim-evt__date--warning .jim-evt__month,
 body.tracy .style-events .jim-evt__date--success .jim-evt__day,
 body.tracy .style-events .jim-evt__date--success .jim-evt__month,
 body.tracy .style-events .jim-evt__date--primary .jim-evt__day,
-body.tracy .style-events .jim-evt__date--primary .jim-evt__month { color: #ffffff; }
+body.tracy .style-events .jim-evt__date--primary .jim-evt__month { color: var(--ds-c-on-ink, #ffffff); }
 body.tracy .style-events .jim-evt__content { display: flex; flex: 1; flex-direction: column; }
 body.tracy .style-events .jim-evt__title { margin: 0 0 16px; font-size: var(--jim-h3); line-height: 1.2; letter-spacing: -0.28px; }
 body.tracy .style-events .jim-evt__title a { color: var(--jim-heading); }
-body.tracy .style-events .jim-evt__title a:hover { color: var(--jim-success); }
-body.tracy .style-events .jim-evt__place { margin: 0 0 16px; letter-spacing: -0.16px; color: var(--jim-primary); }
-:root[data-theme='dark'] body.tracy .style-events .jim-evt__place { color: #eef1f6; }
+body.tracy .style-events .jim-evt__title a:hover { color: var(--ds-c-accent-text, var(--jim-success)); }
+body.tracy .style-events .jim-evt__place { margin: 0 0 16px; letter-spacing: -0.16px; color: var(--ds-c-heading, var(--jim-primary)); }
+:root[data-theme='dark'] body.tracy .style-events .jim-evt__place { color: var(--ds-c-heading, #eef1f6); }
 body.tracy .style-events .jim-evt__place:not(:empty)::before {
   content: '\f3c5';
   margin-right: 8px;
@@ -341,8 +341,8 @@ body.tracy .style-events .jim-evt__intro { flex-grow: 1; margin: 0 0 32px; color
 body.tracy .style-events .jim-evt__intro p { margin: 0; }
 body.tracy .style-events .jim-evt__actions { margin: 0; }
 body.tracy .style-events .jim-evt--white .jim-evt__title a,
-body.tracy .style-events .jim-evt--white .jim-evt__place { color: #ffffff; }
-body.tracy .style-events .jim-evt--white .jim-evt__intro { color: #dee2e6; }
+body.tracy .style-events .jim-evt--white .jim-evt__place { color: #ffffff; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
+body.tracy .style-events .jim-evt--white .jim-evt__intro { color: #dee2e6; } /* ds-keep: words on the photo under its dark veil: the picture keeps its tones under a system, so its words keep the template white */
 body.tracy .style-events .jim-evt--bg-success .jim-evt__title a:hover { color: var(--jim-primary); }
 /* The highlighted card: the text on top, its picture below, fading into the card's colour. */
 body.tracy .style-events .jim-evt--hl {
@@ -408,20 +408,22 @@ body.tracy .style-news .jim-news__date::after {
   width: 8px;
   height: 1px;
   margin: 0 8px;
-  background: #495057;
+  background: var(--ds-c-fg, #495057);
 }
 body.tracy .style-news .jim-news__by { display: flex; align-items: center; gap: 4px; color: var(--jim-text); }
-body.tracy .style-news .jim-news__author { font-weight: 400; text-transform: lowercase; color: var(--jim-success); }
+body.tracy .style-news .jim-news__author { font-weight: 400; text-transform: lowercase; color: var(--ds-c-accent-text, var(--jim-success)); }
 /* The source prints "By" in the same element as the author; the word is drawn from the block's data-by attribute (inc/groups/g3.php). */
 body.tracy .style-news .jim-news__author::before { content: attr(data-by); margin-right: 4px; color: var(--jim-text); text-transform: none; }
 body.tracy .style-news .jim-news__title { margin: 8px 0; font-size: var(--jim-h4); line-height: 1.2; letter-spacing: -0.24px; }
 body.tracy .style-news .jim-news__title a { color: var(--jim-link); transition: color 0.25s ease-in; }
-body.tracy .style-news .jim-news__title a:hover { color: var(--jim-success); }
+body.tracy .style-news .jim-news__title a:hover { color: var(--ds-c-accent-text, var(--jim-success)); }
 body.tracy .style-news .jim-news__content--success { background: var(--jim-success); }
 body.tracy .style-news .jim-news__content--primary { background: var(--jim-primary); }
 body.tracy .style-news .jim-news__content--warning { background: var(--jim-warning); }
 body.tracy .style-news .jim-news__content--info { background: var(--jim-info); }
-body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) :is(.jim-news__date, .jim-news__by, .jim-news__author, .jim-news__title a) { color: #ffffff; }
+body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) :is(.jim-news__date, .jim-news__by, .jim-news__author, .jim-news__title a) { color: var(--ds-c-on-ink, #ffffff); }
+/* the success card is filled with the accent (--jim-success reads it): its words read the accent's own words colour */
+body.tracy .style-news .jim-news__content--success :is(.jim-news__date, .jim-news__by, .jim-news__author, .jim-news__title a) { color: var(--ds-c-accent-on, #ffffff); }
 body.tracy .style-news :is(.jim-news__content--success, .jim-news__content--primary, .jim-news__content--warning, .jim-news__content--info) .jim-news__date::after { background: var(--ds-c-bg, #ffffff); }
 @media (min-width: 768px) {
   body.tracy .style-news .jim-news-grid { grid-template-columns: repeat(2, 1fr); }
@@ -441,7 +443,7 @@ body.tracy .acm-related-items .jim-rel__content { padding: 16px; }
 body.tracy .acm-related-items .jim-rel__date { margin: 0 0 8px; color: var(--jim-text); }
 body.tracy .acm-related-items .jim-rel__title { margin: 0; font-size: var(--jim-h5); font-weight: 500; line-height: 1.3; letter-spacing: 0; }
 body.tracy .acm-related-items .jim-rel__title a { color: var(--jim-link); }
-body.tracy .acm-related-items .jim-rel__title a:hover { color: var(--jim-success); }
+body.tracy .acm-related-items .jim-rel__title a:hover { color: var(--ds-c-accent-text, var(--jim-success)); }
 @media (min-width: 768px) {
   body.tracy .acm-related-items .jim-rel-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -455,11 +457,11 @@ body.tracy .acm-related-items .jim-rel__title a:hover { color: var(--jim-success
 }
 
 /* Dark: the source paints every event date box in the card colour of the page (#1e2a45), whatever its light variant. */
-html[data-theme='dark'] body.tracy .style-events .jim-evt__date { background: #1e2a45; }
-html[data-theme='dark'] body.tracy .style-events .jim-evt__date :is(.jim-evt__day, .jim-evt__month) { color: #eef1f6; }
+html[data-theme='dark'] body.tracy .style-events .jim-evt__date { background: var(--ds-c-bg, #1e2a45); }
+html[data-theme='dark'] body.tracy .style-events .jim-evt__date :is(.jim-evt__day, .jim-evt__month) { color: var(--ds-c-heading, #eef1f6); }
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme]) body.tracy .style-events .jim-evt__date { background: #1e2a45; }
-  html:not([data-theme]) body.tracy .style-events .jim-evt__date :is(.jim-evt__day, .jim-evt__month) { color: #eef1f6; }
+  html:not([data-theme]) body.tracy .style-events .jim-evt__date { background: var(--ds-c-bg, #1e2a45); }
+  html:not([data-theme]) body.tracy .style-events .jim-evt__date :is(.jim-evt__day, .jim-evt__month) { color: var(--ds-c-heading, #eef1f6); }
 }
 
 /* The accordion's two columns start on the same line and space their items by 32 px (the source's .accordion-item margin). */

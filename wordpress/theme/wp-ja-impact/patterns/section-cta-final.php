@@ -11,7 +11,7 @@
 <!-- wp:group {"tagName":"section","className":"tracy-section tracy-cta-final py-section-phone sm:py-section-tablet lg:py-section-desktop px-container-phone sm:px-container-tablet lg:px-container-desktop"} -->
 <section class="wp-block-group tracy-section tracy-cta-final py-section-phone sm:py-section-tablet lg:py-section-desktop px-container-phone sm:px-container-tablet lg:px-container-desktop">
 <!-- wp:group {"className":"tracy-cta-final__box max-w-page mx-auto bg-accent text-accent-on rounded-lg py-12 px-8 text-center"} -->
-<div class="wp-block-group tracy-cta-final__box max-w-page mx-auto bg-accent text-accent-on rounded-lg py-12 px-8 text-center">
+<?php /* ds-keep: rounded-lg reads --wp--custom--radius--lg, which reads --ds-card-radius in theme.json */ ?><div class="wp-block-group tracy-cta-final__box max-w-page mx-auto bg-accent text-accent-on rounded-lg py-12 px-8 text-center">
 <!-- wp:heading {"level":2,"className":"text-2xl text-inherit mb-3"} -->
 <h2 class="wp-block-heading text-2xl text-inherit mb-3"><?php echo esc_html__( 'Start building with Tracy today', 'wp-ja-impact' ); ?></h2>
 <!-- /wp:heading -->
