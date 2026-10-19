@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Kinetic 1.0.9 and Tracy Business 1.2.6 contracts (two dot-1 design-system fixes moved into the template source; with no design system worn each looks as before)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.43</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.43</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.43/pkg_claudecowork-0.24.43.zip</downloadurl>
+        </downloads>
+        <sha256>bb21fba2fbd6b7914c5199e22579528106f01df6c97ecf753d1172b0b5cee341</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>info and db.tables name the site's table prefix (db_prefix, prefix), so the importer can keep only this site's tables when one database holds several sites</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
