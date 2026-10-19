@@ -93,7 +93,7 @@ body.item-232 .kinetic-finder .kinetic-finder__masthead-inner {
 }
 
 body.item-232 .kinetic-finder .kinetic-finder__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px;
   font-weight: 700;
   line-height: 1.08;
@@ -117,7 +117,7 @@ body.item-232 .kinetic-finder .kinetic-finder__field {
   gap: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-input-radius, 12px);
   padding: 4px 4px 4px 16px;
   box-shadow: var(--shadow);
 }
@@ -138,7 +138,7 @@ body.item-232 .kinetic-finder .kinetic-finder__input {
   background: transparent;
   border: 0;
   color: var(--heading);
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.55;
@@ -152,12 +152,12 @@ body.item-232 .kinetic-finder .kinetic-finder__input:focus {
 
 body.item-232 .kinetic-finder .kinetic-finder__input::placeholder {
   color: var(--muted);
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
 }
 
 body.item-232 .kinetic-finder .kinetic-finder__submit {
   flex: 0 0 auto;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   padding: 11px 20px;
   white-space: nowrap;
 }
@@ -255,13 +255,13 @@ body.item-232 .kinetic-finder .kinetic-finder__results > * {
 body.item-232 .kinetic-finder .kinetic-finder__empty {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   padding: 56px 40px;
   text-align: center;
 }
 
 body.item-232 .kinetic-finder .kinetic-finder__empty h2 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 22px;
   font-weight: 600;
   /* source inherits these from its global h2 rules (computed 23.32px / -1px); WP's h2 element
@@ -296,7 +296,7 @@ body.item-232 .kinetic-finder .kinetic-finder__explained span.term {
    also core finder.css `.com-finder__results>*+*{margin-top:1.5em}`; beats WP's flow-layout gap. */
 body.item-232 .kinetic-finder #search-result-empty {
   margin-top: 1.5rem;
-  color: #495057;
+  color: var(--ds-c-muted, #495057);
 }
 
 body.item-232 .kinetic-finder .kinetic-finder__resultcount {
@@ -328,7 +328,7 @@ body.item-232 .kinetic-finder .kinetic-result {
   padding: 20px 22px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   transition: background-color .15s, border-color .15s;
   /* declared-but-inert on this `display:block` element (matches the source's own values exactly,
      computed style parity only — no visual effect since `display` itself already agrees on both
@@ -383,7 +383,7 @@ body.item-232 .kinetic-finder .kinetic-result__url {
 }
 
 body.item-232 .kinetic-finder .kinetic-result__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 17px;
   font-weight: 600;
   line-height: 1.3;
@@ -405,7 +405,7 @@ body.item-232 .kinetic-finder .kinetic-result:focus-within .kinetic-result__titl
 }
 
 body.item-232 .kinetic-finder .kinetic-result__text {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.55;
@@ -419,7 +419,7 @@ body.item-232 .kinetic-finder .highlight {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--ds-c-accent-text, var(--primary));
   font-weight: 600;
-  border-radius: 3px;
+  border-radius: 3px; /* ds-keep: search hit highlight, a text mark */
   padding: 0 2px;
 }
 
@@ -474,7 +474,7 @@ body.item-232 .kinetic-finder .page-link {
   color: var(--ds-c-accent-text, #0d6efd);
   background-color: var(--ds-c-surface, #fff);
   border: 1px solid var(--ds-c-border, #dee2e6);
-  border-radius: 0;
+  border-radius: var(--ds-btn-radius, 0);
   text-decoration: none;
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
@@ -484,11 +484,11 @@ body.item-232 .kinetic-finder .page-item:not(:first-child) .page-link {
 }
 
 body.item-232 .kinetic-finder .page-item:first-of-type .page-link {
-  border-radius: 0.25rem 0 0 0.25rem;
+  border-radius: var(--ds-btn-radius, 0.25rem) 0 0 var(--ds-btn-radius, 0.25rem);
 }
 
 body.item-232 .kinetic-finder .page-item:last-of-type .page-link {
-  border-radius: 0 0.25rem 0.25rem 0;
+  border-radius: 0 var(--ds-btn-radius, 0.25rem) var(--ds-btn-radius, 0.25rem) 0;
 }
 
 /* source `img, svg { vertical-align: middle; }` (template.css); the parent theme's
@@ -507,14 +507,14 @@ body.item-232 .kinetic-finder .page-item.active {
 
 body.item-232 .kinetic-finder .page-link:hover {
   z-index: 2;
-  color: rgb(10.4, 88, 202.4);
+  color: var(--ds-c-accent-text-hover, rgb(10.4, 88, 202.4));
   background-color: var(--ds-c-surface-warm, #e9ecef);
   border-color: var(--ds-c-border, #dee2e6);
 }
 
 body.item-232 .kinetic-finder .page-link:focus {
   z-index: 3;
-  color: rgb(10.4, 88, 202.4);
+  color: var(--ds-c-accent-text-hover, rgb(10.4, 88, 202.4));
   background-color: var(--ds-c-surface-warm, #e9ecef);
   outline: 0;
   box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
@@ -634,7 +634,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   max-width: 440px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   padding: 36px 32px;
   box-shadow: var(--shadow);
 }
@@ -653,7 +653,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   gap: 16px;
   padding: 64px 24px 56px;
   text-align: center;
-  background-image: radial-gradient(ellipse 75% 60% at 50% 0%, rgba(163, 230, 53, .10) 0%, transparent 60%);
+  background-image: radial-gradient(ellipse 75% 60% at 50% 0%, var(--kds-accent-100, var(--ds-c-accent, rgba(163, 230, 53, .10))) 0%, transparent 60%);
   /* measured live: 0, not the block-group default top margin a preceding notice alert otherwise
      leaves it with (AU-212). */
   margin-top: 0;
@@ -665,8 +665,8 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   gap: 7px;
   margin: 0;
   padding: 5px 12px;
-  background: rgba(163, 230, 53, .082);
-  border: 1px solid rgba(163, 230, 53, .25);
+  background: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, .082)));
+  border: 1px solid var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, .25)));
   border-radius: 100px;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11.5px;
@@ -687,7 +687,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
 .kinetic-auth-masthead__title {
   margin: 0;
   max-width: 780px;
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 46px;
   font-weight: 700;
   line-height: 1.08;
@@ -698,7 +698,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
 .kinetic-auth-masthead__sub {
   margin: 0;
   max-width: 600px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 17px;
   line-height: 1.6;
   color: var(--text);
@@ -716,7 +716,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
 }
 
 .kinetic-auth__title {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.5px;
@@ -779,7 +779,7 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
    Company-row sibling fields use the same `.star` class and colour token elsewhere in this port):
    rgb(229,72,77) (AU-146/147/221/222/297/298). */
 .kinetic-auth .star {
-  color: var(--ds-c-danger, #e5484d);
+  color: var(--ds-c-danger-text, #e5484d);
 }
 
 /* ---- screen-reader-only utility — the source's own `.visually-hidden` (the show-password label,
@@ -828,12 +828,12 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
   max-width: 276px;
   margin-bottom: 1rem;
   padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 4.8px;
+  border: 1px solid var(--ds-c-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--ds-input-radius, 4.8px);
   background-color: var(--ds-c-surface, #fff);
   background-clip: padding-box;
   color: var(--ds-c-fg, #212529);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: var(--ds-font-body, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
   font-size: 14px;
   font-weight: 400;
   line-height: 21px;
@@ -855,12 +855,12 @@ body.item-232 .kinetic-finder .kinetic-finder__counter {
 
 .kinetic-auth .control-label label.invalid .form-control-feedback::before {
   bottom: -8px;
-  border-top-color: rgba(0, 0, 0, 0.25);
+  border-top-color: var(--ds-c-border, rgba(0, 0, 0, 0.25));
 }
 
 .kinetic-auth .control-label label.invalid .form-control-feedback::after {
   bottom: -7px;
-  border-top-color: #fff;
+  border-top-color: var(--ds-c-danger, #fff);
 }
 
 /* required "*" marker — kept in markup for D-11 element-tree parity (each label's own doc comment
@@ -892,9 +892,9 @@ body.item-237 .kinetic-auth .star {
   background: var(--bg);
   color: var(--heading);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   padding: 12px 13px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14px;
   line-height: 1.4;
   transition: border-color .15s, box-shadow .15s;
@@ -963,10 +963,10 @@ body.item-237 .kinetic-auth .star {
   margin-left: -1px;
   border: 1px solid var(--border);
   border-left-width: 0;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-top-right-radius: 9px;
-  border-bottom-right-radius: 9px;
+  border-top-left-radius: var(--ds-btn-radius, 0);
+  border-bottom-left-radius: var(--ds-btn-radius, 0);
+  border-top-right-radius: var(--ds-btn-radius, 9px);
+  border-bottom-right-radius: var(--ds-btn-radius, 9px);
   background: var(--bg);
   color: var(--muted);
   font-size: 14px;
@@ -1033,8 +1033,8 @@ body.item-237 .kinetic-auth .star {
      higher specificity (four `:not()` args each count toward it) — re-verified with the shared
      comparator, run-3 fix round: a plain declaration here did not win that fight. */
   position: relative;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+  border-top-right-radius: var(--ds-input-radius, 0) !important;
+  border-bottom-right-radius: var(--ds-input-radius, 0) !important;
 }
 
 /* the reset new-password fields keep the uniform 9px: the source's css/page-236.css:66-69 sets
@@ -1047,7 +1047,7 @@ body.item-237 .kinetic-auth .star {
 .kinetic-auth .input-group:has(#password2) > input.form-control {
   flex: 1 1 auto !important;
   width: auto !important;
-  border-radius: 9px !important;
+  border-radius: var(--ds-input-radius, 9px) !important;
 }
 
 /* ---- reset new-password page ONLY (`#password1`/`#password2`, kinetic-auth-password/render.php's
@@ -1064,7 +1064,7 @@ body.item-237 .kinetic-auth .star {
   justify-content: center;
   z-index: 2;
   border-left-width: 1px;
-  border-radius: 0 8px 8px 0;
+  border-radius: var(--ds-input-radius, 0 8px 8px 0);
   background-color: var(--ds-c-surface, #fff);
   vertical-align: middle;
 }
@@ -1093,7 +1093,7 @@ body.item-237 .kinetic-auth .star {
   margin: 0;
   font-size: 0.875em;
   line-height: 1.55;
-  color: rgba(33, 37, 41, 0.75);
+  color: var(--ds-c-muted, rgba(33, 37, 41, 0.75));
 }
 
 .kinetic-auth output {
@@ -1122,12 +1122,12 @@ body.item-234 .kinetic-auth meter {
   gap: 8px;
   width: 100%;
   margin-top: 6px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15px;
   font-weight: 600;
   line-height: 1;
   padding: 13px 0;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   border: 1px solid transparent;
   cursor: pointer;
   transition: .15s;
@@ -1229,7 +1229,7 @@ div.com-users-reset .com-users-reset__submit {
 
 .kinetic-auth__benefits-title {
   margin: 0;
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -.6px;
@@ -1263,7 +1263,7 @@ div.com-users-reset .com-users-reset__submit {
 }
 
 .kinetic-auth__checklist li span {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15px;
   line-height: 1.53;
   color: var(--text);
@@ -1328,8 +1328,8 @@ joomla-alert {
   margin: 0 0 16px;
   padding: 8px 20px;
   border: 1px solid transparent;
-  border-radius: 4px;
-  font-family: "IBM Plex Sans";
+  border-radius: var(--ds-card-radius, 4px);
+  font-family: var(--ds-font-body, "IBM Plex Sans");
   font-size: 16px;
   /* measured live (re-verified against the built fix): `position: static` (the default — the
      close button below is what carries `position: relative`, floated right, not this container)
@@ -1341,28 +1341,28 @@ joomla-alert {
 }
 
 joomla-alert[type="warning"] {
-  background-color: #fcefdc;
-  border-color: #fbe8cd;
-  color: #7d5a29;
+  background-color: var(--ds-c-warn-bg, #fcefdc);
+  border-color: var(--ds-c-warn, #fbe8cd);
+  color: var(--ds-c-warn-text, #7d5a29);
 }
 
 joomla-alert[type="danger"],
 joomla-alert[type="error"] {
-  background-color: #f7dddc;
-  border-color: #f4cfce;
-  color: #712b29;
+  background-color: var(--ds-c-danger-bg, #f7dddc);
+  border-color: var(--ds-c-danger, #f4cfce);
+  color: var(--ds-c-danger-text, #712b29);
 }
 
 joomla-alert[type="success"] {
-  background-color: #d9e6d9;
-  border-color: #cadcca;
-  color: #234423;
+  background-color: var(--ds-c-success-bg, #d9e6d9);
+  border-color: var(--ds-c-success, #cadcca);
+  color: var(--ds-c-success-text, #234423);
 }
 
 joomla-alert[type="info"] {
-  background-color: #d1ecf1;
-  border-color: #bee5eb;
-  color: #0c5460;
+  background-color: var(--ds-c-info-bg, #d1ecf1);
+  border-color: var(--ds-c-info, #bee5eb);
+  color: var(--ds-c-info-text, #0c5460);
 }
 
 /* `button.joomla-alert--close` — measured live: 46×30 box pinned to the alert's top-right corner,
@@ -1381,7 +1381,7 @@ joomla-alert .joomla-alert--close {
   padding: 3.2px 16px;
   border: 0;
   background: transparent;
-  color: #000;
+  color: var(--ds-c-fg, #000);
   font-family: inherit;
   font-size: 24px;
   font-weight: 700;
@@ -1419,7 +1419,7 @@ joomla-alert .alert-message {
      alert's own type colour (AU-211/254/271/290 all measured the same rgb(48,164,108), a base
      value unrelated to `type`; zero pixel effect, `border-top-width` stays 0). */
   text-align: left;
-  border-top-color: rgb(48, 164, 108);
+  border-top-color: var(--ds-c-success, rgb(48, 164, 108));
 }
 
 /* ==========================================================================
@@ -1454,7 +1454,7 @@ body.item-235 .kinetic-auth {
    survives the page rules above (it rounds the grid background's corners). */
 div.com-users-remind,
 div.com-users-reset {
-  border-radius: 0.25rem;
+  border-radius: var(--ds-card-radius, 0.25rem);
 }
 
 /* reset confirm's empty fieldset paragraph: css/template.css:21649-21655, then hidden by
@@ -1642,7 +1642,7 @@ body.item-237 .kinetic-auth-masthead__sub,
   padding: 28px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 
 .kinetic-profile__avatar {
@@ -1656,7 +1656,7 @@ body.item-237 .kinetic-auth-masthead__sub,
 }
 
 .kinetic-profile__avatar span {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 28px;
   font-weight: 700;
   color: var(--ds-c-accent-text, var(--primary));
@@ -1672,7 +1672,7 @@ body.item-237 .kinetic-auth-masthead__sub,
 }
 
 .kinetic-profile__name {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 18px;
   font-weight: 700;
   color: var(--heading);
@@ -1693,8 +1693,8 @@ body.item-237 .kinetic-auth-masthead__sub,
   padding: 11px 0;
   background: var(--primary);
   color: var(--primary-ink);
-  border-radius: 9px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  border-radius: var(--ds-btn-radius, 9px);
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
@@ -1708,7 +1708,7 @@ body.item-237 .kinetic-auth-masthead__sub,
 
 .kinetic-profile__logout {
   margin-top: 12px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 13px;
   font-weight: 500;
   color: var(--muted);
@@ -1731,7 +1731,7 @@ body.item-237 .kinetic-auth-masthead__sub,
   padding: 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
 }
 
 .kinetic-profile__card-head {
@@ -1767,7 +1767,7 @@ body.item-237 .kinetic-auth-masthead__sub,
   width: auto;
   text-transform: none;
   letter-spacing: 0;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.3;
@@ -1780,7 +1780,7 @@ body.item-237 .kinetic-auth-masthead__sub,
   border: 0;
   flex: 0 0 auto;
   width: auto;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.3;
@@ -1841,7 +1841,7 @@ body.item-235 .profile-edit.kinetic-auth {
 }
 
 .com-users-profile__edit caption {
-  color: rgba(33, 37, 41, 0.75);
+  color: var(--ds-c-muted, rgba(33, 37, 41, 0.75));
   text-align: left;
 }
 
@@ -1858,7 +1858,7 @@ body.item-235 .profile-edit.kinetic-auth {
 .com-users-profile__edit .btn {
   font-size: 14px;
   padding: 12px 18px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   text-align: center;
   vertical-align: middle;
 }
@@ -1878,14 +1878,14 @@ body.item-235 .profile-edit.kinetic-auth {
 .com-users-profile__edit .btn-success {
   background-color: var(--ds-c-success, #30a46c);
   border-color: var(--ds-c-success, #30a46c);
-  color: #fff;
+  color: var(--ds-c-success-text, #fff);
 }
 
 .com-users-profile__edit .btn-group {
   position: relative;
   display: inline-flex;
   vertical-align: middle;
-  border-radius: 0.25rem;
+  border-radius: var(--ds-btn-radius, 0.25rem);
 }
 
 .com-users-profile__edit .btn-group > .btn,
@@ -1965,8 +1965,8 @@ body.item-235 .profile-edit.kinetic-auth {
   color: var(--ds-c-fg, #000);
   text-align: start;
   background: var(--ds-c-surface, #fff);
-  border: 1px solid #6d757e;
-  border-radius: 0.25rem;
+  border: 1px solid var(--ds-c-border, #6d757e);
+  border-radius: var(--ds-card-radius, 0.25rem);
 }
 
 .com-users-profile__edit .table-responsive {
@@ -2018,7 +2018,7 @@ body.item-235 .profile-edit .kinetic-auth__card {
   padding: 32px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   box-shadow: none;
 }
 body.item-235 .com-users-profile__edit-form .control-label,
@@ -2036,11 +2036,11 @@ body.item-235 .com-users-profile__edit-form textarea,
 body.item-235 .com-users-profile__edit-form .form-control {
   background: var(--bg) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 9px !important;
+  border-radius: var(--ds-btn-radius, 9px) !important;
   padding: 12px 13px !important;
   max-width: none !important;
   color: var(--heading) !important;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14px !important;
 }
 body.item-235 .com-users-profile__edit-form textarea { min-height: 90px; }
@@ -2059,8 +2059,8 @@ body.item-235 .com-users-profile__edit-form .password-group input:not([type=chec
   flex: 1 1 auto !important;
   width: 1% !important;
   min-width: 0 !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+  border-top-right-radius: var(--ds-input-radius, 0) !important;
+  border-bottom-right-radius: var(--ds-input-radius, 0) !important;
 }
 body.item-235 .com-users-profile__edit-form .input-group-text,
 body.item-235 .com-users-profile__edit-form .input-group .input-password-toggle,
@@ -2078,7 +2078,7 @@ body.item-235 .com-users-profile__edit-form .password-group .btn {
   border: 1px solid var(--border) !important;
   border-left: 0 !important;
   color: var(--muted) !important;
-  border-radius: 0 9px 9px 0 !important;
+  border-radius: var(--ds-btn-radius, 0 9px 9px 0) !important;
 }
 body.item-235 .com-users-profile__edit-form .input-password-toggle:hover { background: var(--elevated) !important; color: var(--text) !important; }
 /* the toggle ships its label text "Show Password" + an icomoon eye span; keep only
@@ -2114,11 +2114,11 @@ body.item-235 .com-users-profile__edit-form meter::-moz-meter-bar { background: 
 body.item-235 .com-users-profile__edit-form .choices__inner {
   background: var(--bg) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 9px !important;
+  border-radius: var(--ds-input-radius, 9px) !important;
   min-height: 0;
   padding: 9px 13px !important;
   color: var(--heading);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14px;
 }
 body.item-235 .com-users-profile__edit-form .choices__list--single .choices__item { color: var(--heading); }
@@ -2146,7 +2146,7 @@ body.item-235 .com-users-profile__edit-form fieldset { border: 0; padding: 0; ma
 body.item-235 .com-users-profile__edit-form legend {
   display: block; width: 100%; float: none;
   border: 0; padding: 0; margin: 0 0 14px;
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 16px; font-weight: 600; color: var(--heading);
 }
 /* first fieldset legend ("Edit Your Profile") is redundant with the masthead H1 */
@@ -2165,8 +2165,8 @@ body.item-235 .com-users-profile__edit-submit .btn {
   width: auto;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 12px 24px;
-  border-radius: 9px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  border-radius: var(--ds-btn-radius, 9px);
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14.5px; font-weight: 600; line-height: 1;
   border: 1px solid transparent;
   text-decoration: none;
@@ -2209,7 +2209,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 .choices.is-disabled :is(.choices__inner,
 .choices__input) {
-  background-color: var(--choices-bg-color-disabled,#eaeaea);
+  background-color: var(--choices-bg-color-disabled,var(--ds-c-disabled-bg, #eaeaea));
   -webkit-user-select: none;
   user-select: none;
   cursor: not-allowed!important;
@@ -2217,7 +2217,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 .choices.is-disabled .choices__item {
   cursor: not-allowed;
-  color: var(--choices-item-disabled-color,#fff);
+  color: var(--choices-item-disabled-color,var(--ds-c-disabled-fg, #fff));
 }
 
 .choices [hidden] {
@@ -2238,7 +2238,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 .choices[data-type*=select-one] .choices__input {
   width: var(--choices-width,100%);
   padding: var(--choices-dropdown-item-padding,10px);
-  border-bottom: var(--choices-base-border,1px solid) var(--choices-keyline-color,#ddd);
+  border-bottom: var(--choices-base-border,1px solid) var(--choices-keyline-color,var(--ds-c-border-soft, #ddd));
   background-color: var(--choices-bg-color-dropdown,var(--ds-c-surface, #fff));
   margin: 0;
   display: block;
@@ -2248,7 +2248,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
   background-image: var(--choices-icon-cross-inverse,url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEiIGhlaWdodD0iMjEiIHZpZXdCb3g9IjAgMCAyMSAyMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjMDAwIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0yLjU5Mi4wNDRsMTguMzY0IDE4LjM2NC0yLjU0OCAyLjU0OEwuMDQ0IDIuNTkyeiIvPjxwYXRoIGQ9Ik0wIDE4LjM2NEwxOC4zNjQgMGwyLjU0OCAyLjU0OEwyLjU0OCAyMC45MTJ6Ii8+PC9nPjwvc3ZnPg==));
   opacity: .25;
   background-size: 8px;
-  border-radius: 10em;
+  border-radius: var(--ds-btn-radius, 10em);
   width: 20px;
   height: 20px;
   margin-top: -10px;
@@ -2275,7 +2275,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 .choices[data-type*=select-one]:after {
   content: "";
   border-style: solid;
-  border-color: var(--choices-text-color,#333) transparent transparent transparent;
+  border-color: var(--choices-text-color,#333) transparent transparent transparent; /* ds-keep: Choices.js library default behind its own variable */
   border-width: var(--choices-arrow-size,5px);
   width: 0;
   height: 0;
@@ -2287,7 +2287,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 }
 
 .choices[data-type*=select-one].is-open:after {
-  border-color: transparent transparent var(--choices-text-color,#333);
+  border-color: transparent transparent var(--choices-text-color,#333); /* ds-keep: Choices.js library default behind its own variable */
   margin-top: var(--choices-arrow-margin-top-open,-7.5px);
 }
 
@@ -2312,7 +2312,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 [data-type*=text]) .choices__button {
   margin: 0 calc(var(--choices-button-offset,8px)*-.5)0 var(--choices-button-offset,8px);
   padding-left: calc(var(--choices-button-offset,8px)*2);
-  border-left: 1px solid color-mix(in srgb,var(--choices-primary-color,#005f75) 90%,var(--choices-darken,black));
+  border-left: 1px solid color-mix(in srgb,var(--choices-primary-color,var(--ds-c-accent, #005f75)) 90%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
   background-image: var(--choices-icon-cross,url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEiIGhlaWdodD0iMjEiIHZpZXdCb3g9IjAgMCAyMSAyMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjRkZGIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0yLjU5Mi4wNDRsMTguMzY0IDE4LjM2NC0yLjU0OCAyLjU0OEwuMDQ0IDIuNTkyeiIvPjxwYXRoIGQ9Ik0wIDE4LjM2NEwxOC4zNjQgMGwyLjU0OCAyLjU0OEwyLjU0OCAyMC45MTJ6Ii8+PC9nPjwvc3ZnPg==));
   background-size: var(--choices-button-dimension,8px);
   width: var(--choices-button-dimension,8px);
@@ -2332,9 +2332,9 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 .choices__inner {
   vertical-align: top;
   width: var(--choices-width,100%);
-  background-color: var(--choices-bg-color,#f9f9f9);
+  background-color: var(--choices-bg-color,var(--ds-c-bg, #f9f9f9));
   padding: var(--choices-inner-padding,7.5px 7.5px 3.75px);
-  border: var(--choices-base-border,1px solid) var(--choices-keyline-color,#ddd);
+  border: var(--choices-base-border,1px solid) var(--choices-keyline-color,var(--ds-c-border-soft, #ddd));
   border-radius: var(--choices-border-radius,2.5px);
   font-size: var(--choices-font-size-md,14px);
   min-height: var(--choices-input-height,44px);
@@ -2344,7 +2344,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 .is-focused .choices__inner,
 .is-open .choices__inner {
-  border-color: color-mix(in srgb,var(--choices-keyline-color,#ddd) 85%,var(--choices-darken,black));
+  border-color: color-mix(in srgb,var(--choices-keyline-color,var(--ds-c-border-soft, #ddd)) 85%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
 }
 
 .is-open .choices__inner {
@@ -2352,7 +2352,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 }
 
 .is-invalid .choices__inner {
-  border-color: var(--choices-invalid-color,#d33141);
+  border-color: var(--choices-invalid-color,var(--ds-c-danger, #d33141));
 }
 
 .is-flipped.is-open .choices__inner {
@@ -2391,9 +2391,9 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
   font-size: var(--choices-font-size-sm,12px);
   margin-right: var(--choices-multiple-item-margin,3.75px);
   margin-bottom: var(--choices-multiple-item-margin,3.75px);
-  background-color: var(--choices-primary-color,#005f75);
-  border: 1px solid color-mix(in srgb,var(--choices-primary-color,#005f75) 95%,var(--choices-darken,black));
-  color: var(--choices-item-color,#fff);
+  background-color: var(--choices-primary-color,var(--ds-c-accent, #005f75));
+  border: 1px solid color-mix(in srgb,var(--choices-primary-color,var(--ds-c-accent, #005f75)) 95%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
+  color: var(--choices-item-color,#fff); /* ds-keep: Choices.js library default behind its own variable */
   word-break: break-all;
   box-sizing: border-box;
   font-weight: 500;
@@ -2410,13 +2410,13 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 }
 
 .choices__list--multiple .choices__item.is-highlighted {
-  background-color: color-mix(in srgb,var(--choices-primary-color,#005f75) 95%,var(--choices-darken,black));
-  border: 1px solid color-mix(in srgb,var(--choices-primary-color,#005f75) 90%,var(--choices-darken,black));
+  background-color: color-mix(in srgb,var(--choices-primary-color,var(--ds-c-accent, #005f75)) 95%,var(--choices-darken,var(--ds-c-ink, black)));
+  border: 1px solid color-mix(in srgb,var(--choices-primary-color,var(--ds-c-accent, #005f75)) 90%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
 }
 
 .is-disabled .choices__list--multiple .choices__item {
-  background-color: color-mix(in srgb,var(--choices-disabled-color,#eaeaea) 75%,var(--choices-darken,black));
-  border: 1px solid color-mix(in srgb,var(--choices-disabled-color,#eaeaea) 65%,var(--choices-darken,black));
+  background-color: color-mix(in srgb,var(--choices-disabled-color,var(--ds-c-surface-warm, #eaeaea)) 75%,var(--choices-darken,var(--ds-c-ink, black)));
+  border: 1px solid color-mix(in srgb,var(--choices-disabled-color,var(--ds-c-border-soft, #eaeaea)) 65%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
 }
 
 .choices__list--dropdown,
@@ -2424,7 +2424,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
   z-index: var(--choices-z-index,1);
   width: var(--choices-width,100%);
   background-color: var(--choices-bg-color-dropdown,var(--ds-c-surface, #fff));
-  border: var(--choices-base-border,1px solid) var(--choices-keyline-color,#ddd);
+  border: var(--choices-base-border,1px solid) var(--choices-keyline-color,var(--ds-c-border-soft, #ddd));
   border-bottom-left-radius: var(--choices-border-radius,2.5px);
   border-bottom-right-radius: var(--choices-border-radius,2.5px);
   word-break: break-all;
@@ -2442,12 +2442,12 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 .is-open .choices__list--dropdown,
 .is-open .choices__list[aria-expanded] {
-  border-color: color-mix(in srgb,var(--choices-keyline-color,#ddd) 85%,var(--choices-darken,black));
+  border-color: color-mix(in srgb,var(--choices-keyline-color,var(--ds-c-border-soft, #ddd)) 85%,var(--choices-darken,black)); /* ds-keep: Choices.js library default behind its own variable */
 }
 
 .is-flipped .choices__list--dropdown,
 .is-flipped .choices__list[aria-expanded] {
-  border-radius: .25rem .25rem 0 0;
+  border-radius: var(--ds-card-radius, .25rem .25rem 0 0);
   margin-top: 0;
   margin-bottom: -1px;
   top: auto;
@@ -2511,7 +2511,7 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 .choices__list--dropdown .choices__item--selectable.is-selected,
 .choices__list[aria-expanded] .choices__item--selectable.is-highlighted,
 .choices__list[aria-expanded] .choices__item--selectable.is-selected {
-  background-color: var(--choices-highlighted-color,#f2f2f2);
+  background-color: var(--choices-highlighted-color,var(--ds-c-surface-warm, #f2f2f2));
 }
 
 .choices__item {
@@ -2530,8 +2530,8 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 }
 
 .choices__heading {
-  border-bottom: 1px solid color-mix(in srgb,var(--choices-keyline-color,#ddd) 90%,var(--choices-lighten,white));
-  color: gray;
+  border-bottom: 1px solid color-mix(in srgb,var(--choices-keyline-color,var(--ds-c-border-soft, #ddd)) 90%,var(--choices-lighten,var(--ds-c-border-soft, white)));
+  color: var(--ds-c-meta, gray);
   padding: 10px;
   font-size: 12px;
   font-weight: 600;
@@ -2554,13 +2554,13 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 .choices__input {
   vertical-align: baseline;
-  background-color: var(--choices-bg-color,#f9f9f9);
+  background-color: var(--choices-bg-color,var(--ds-c-bg, #f9f9f9));
   font-size: var(--choices-font-size-md,14px);
   margin-bottom: var(--choices-input-margin-bottom,5px);
   max-width: var(--choices-width,100%);
   padding: var(--choices-input-padding,4px 0 4px 2px);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ds-input-radius, 0);
   display: inline-block;
 }
 
@@ -2589,10 +2589,10 @@ body.item-235 .com-users-profile__edit-submit .btn-danger:hover { background: va
 
 /* media/system/css/fields/joomla-field-media.min.css */
 joomla-field-media .field-media-preview {
-  background-color: #f2f2f2;
-  border: 1px solid #00000026;
+  background-color: var(--ds-c-surface-warm, #f2f2f2);
+  border: 1px solid var(--ds-c-border-soft, #00000026);
   border-bottom-width: 0;
-  border-radius: .25rem .25rem 0 0;
+  border-radius: var(--ds-input-radius, .25rem .25rem 0 0);
   justify-content: center;
   align-items: center;
   max-width: 356px;
@@ -2610,14 +2610,14 @@ joomla-field-media .field-media-preview-icon {
 }
 
 joomla-field-media .field-media-input {
-  border-top-left-radius: 0;
-  border-start-start-radius: 0;
+  border-top-left-radius: var(--ds-input-radius, 0);
+  border-start-start-radius: var(--ds-input-radius, 0);
 }
 
 joomla-field-media .input-group>.btn.btn-success.button-select,
 joomla-field-media .button-clear {
-  border-top-right-radius: 0;
-  border-start-end-radius: 0;
+  border-top-right-radius: var(--ds-btn-radius, 0);
+  border-start-end-radius: var(--ds-btn-radius, 0);
 }
 
 joomla-field-media img {

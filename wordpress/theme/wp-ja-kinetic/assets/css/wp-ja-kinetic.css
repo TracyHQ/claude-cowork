@@ -8,6 +8,31 @@
  * 1240px content container, the desktop row folding into the overlay menu below 992px, and the
  * gutter dropping at 620px. */
 
+/* Accent tints a worn design system derives from its accent role, as the slot contract mixes them.
+ * Each reads --ds-c-accent WITHOUT a fallback, so with no design system the property is invalid at
+ * computed-value time and every reader falls back to the template's own tint: the look does not change. */
+:root {
+  --kds-accent-050: color-mix(in srgb, var(--ds-c-accent) 5%, transparent);
+  --kds-accent-059: color-mix(in srgb, var(--ds-c-accent) 5.9%, transparent);
+  --kds-accent-060: color-mix(in srgb, var(--ds-c-accent) 6%, transparent);
+  --kds-accent-078: color-mix(in srgb, var(--ds-c-accent) 7.8%, transparent);
+  --kds-accent-080: color-mix(in srgb, var(--ds-c-accent) 8%, transparent);
+  --kds-accent-082: color-mix(in srgb, var(--ds-c-accent) 8.2%, transparent);
+  --kds-accent-086: color-mix(in srgb, var(--ds-c-accent) 8.6%, transparent);
+  --kds-accent-094: color-mix(in srgb, var(--ds-c-accent) 9.4%, transparent);
+  --kds-accent-100: color-mix(in srgb, var(--ds-c-accent) 10%, transparent);
+  --kds-accent-110: color-mix(in srgb, var(--ds-c-accent) 11%, transparent);
+  --kds-accent-120: color-mix(in srgb, var(--ds-c-accent) 12%, transparent);
+  --kds-accent-125: color-mix(in srgb, var(--ds-c-accent) 12.5%, transparent);
+  --kds-accent-130: color-mix(in srgb, var(--ds-c-accent) 13%, transparent);
+  --kds-accent-145: color-mix(in srgb, var(--ds-c-accent) 14.5%, transparent);
+  --kds-accent-200: color-mix(in srgb, var(--ds-c-accent) 20%, transparent);
+  --kds-accent-250: color-mix(in srgb, var(--ds-c-accent) 25%, transparent);
+  --kds-accent-251: color-mix(in srgb, var(--ds-c-accent) 25.1%, transparent);
+  --kds-accent-280: color-mix(in srgb, var(--ds-c-accent) 28%, transparent);
+}
+
+
 /* ---- web fonts: the source's own @import (css/template.css:20) pulls IBM Plex Sans (400/500/600),
    JetBrains Mono (400/500/700) and Space Grotesk (400/500/600/700) from Google Fonts. The build
    engine's generated theme.json can only carry a font-family STACK for the active variation
@@ -20,7 +45,7 @@
    the generated stack already asks for first, so no other sheet has to change. */
 
 @font-face {
-  font-family: 'IBM Plex Sans';
+  font-family: 'IBM Plex Sans'; /* ds-keep: @font-face family name, not a usage; a role read is invalid in a descriptor */
   font-style: normal;
   font-weight: 400 600;
   font-display: swap;
@@ -57,7 +82,7 @@
 }
 
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'Space Grotesk'; /* ds-keep: @font-face family name, not a usage; a role read is invalid in a descriptor */
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
@@ -71,7 +96,7 @@
    latin file, so a page in English looks exactly as before. */
 
 @font-face {
-  font-family: 'IBM Plex Sans';
+  font-family: 'IBM Plex Sans'; /* ds-keep: @font-face family name, not a usage; a role read is invalid in a descriptor */
   font-style: normal;
   font-weight: 400 600;
   font-display: swap;
@@ -111,7 +136,7 @@
 }
 
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'Space Grotesk'; /* ds-keep: @font-face family name, not a usage; a role read is invalid in a descriptor */
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
@@ -127,10 +152,12 @@
    The source's own computed font-family carries no such tail: `body`/buttons resolve to the bare
    family name, and only form controls add one literal fallback. Overriding the resolved custom
    property here reaches every consumer of the preset (this sheet and every other) without
-   touching the generated file. */
+   touching the generated file. The display and body presets read the worn system's face first (with
+   no system they resolve to the bare family, as before); mono stays JetBrains Mono, as the Joomla
+   template keeps its code and label text in it under every system. */
 :root {
-  --wp--preset--font-family--display: 'Space Grotesk';
-  --wp--preset--font-family--body: 'IBM Plex Sans';
+  --wp--preset--font-family--display: var(--ds-font-display, 'Space Grotesk');
+  --wp--preset--font-family--body: var(--ds-font-body, 'IBM Plex Sans');
   --wp--preset--font-family--mono: 'JetBrains Mono', monospace;
 }
 
@@ -147,7 +174,7 @@ body {
    `body { font-family: "IBM Plex Sans", system-ui, sans-serif }` (css/template.css:19397-19405) is
    the one in effect there and every element that inherits from body carries that stack. */
 body.error404 {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
 }
 
 /* Source: the last heading rule in the cascade is the T4 settings sheet's
@@ -313,7 +340,7 @@ body .tracy-header__inner {
    the wrapper. */
 .tracy-header__brand .tracy-brand,
 .tracy-header__brand .tracy-brand a {
-  font-family: var(--wp--preset--font-family--display);
+  font-family: var(--ds-font-display, var(--wp--preset--font-family--display)); /* the worn system's display face, as the Joomla wordmark reads it */
   font-size: 19px;
   font-weight: 700;
   line-height: 1;
@@ -374,7 +401,7 @@ body .tracy-header__inner {
   display: inline-flex;
   align-items: center;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   color: var(--chrome-text);
   text-decoration: none;
   transition: color var(--wp--custom--motion--fast) var(--wp--custom--ease--standard);
@@ -440,7 +467,7 @@ body .tracy-header__inner {
   line-height: 1;
   font-weight: 600;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
 }
 
 .tracy-header__cta .wp-block-button__link svg {
@@ -489,7 +516,7 @@ body .tracy-header__inner {
   text-align: left;
   gap: 0;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   color: var(--chrome-text);
   transition: color var(--wp--custom--motion--fast) var(--wp--custom--ease--standard);
 }
@@ -539,7 +566,7 @@ body .tracy-header__inner {
 /* Source, dark: `html.t4-dark .kinetic-header .item-caret { color:#E6EAE8 !important }` and the same
    on its ::before border (css/template.css:19935-19942); the ::before here draws in currentColor. */
 :root[data-theme="dark"] .tracy-mega__caret {
-  color: #E6EAE8 !important;
+  color: var(--ds-c-fg, #E6EAE8) !important;
 }
 
 /* The panel: an auto-width card hung from the trigger's bottom edge, painted only while open.
@@ -563,7 +590,7 @@ body .tracy-header__inner {
      page surface, and the source's panel stays the header's own colour */
   background: var(--chrome-surface);
   border: 1px solid var(--chrome-border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   box-shadow: var(--wp--custom--elev--raised);
   padding: 28px;
   color: var(--wp--preset--color--fg);
@@ -695,7 +722,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   padding: 0;
   margin: 0;
   border: 1px solid var(--chrome-border);
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   background: var(--chrome-surface);
   color: var(--chrome-text);
   cursor: pointer;
@@ -752,7 +779,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   height: 36px;
   padding: 0;
   border: 1px solid var(--chrome-border);
-  border-radius: 9px;
+  border-radius: var(--ds-card-radius, 9px);
   background: var(--chrome-surface);
   color: var(--chrome-heading);
 }
@@ -841,7 +868,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   width: 100%;
   padding: 13px 14px !important;
   border: 1px solid var(--chrome-border);
-  border-radius: 10px;
+  border-radius: var(--ds-card-radius, 10px);
   background: var(--chrome-bg);
   font-family: var(--wp--preset--font-family--display);
   font-size: 16px;
@@ -995,7 +1022,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 }
 
 .tracy-header__menu .tracy-nav .tracy-nav__drawer-logo span {
-  font-family: var(--wp--preset--font-family--display);
+  font-family: var(--ds-font-display, var(--wp--preset--font-family--display)); /* the worn system's display face, as the Joomla wordmark reads it */
   font-size: 17px;
   font-weight: 700;
   line-height: 1;
@@ -1038,7 +1065,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   padding: 2px 2px 12px;
   border: 0;
   border-bottom: 1px solid var(--chrome-border);
-  border-radius: 0;
+  border-radius: var(--ds-btn-radius, 0);
   background: none;
   appearance: none;
   cursor: pointer;
@@ -1092,7 +1119,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 
 .tracy-header__menu .tracy-nav .tracy-nav__signin > .wp-block-navigation-item__content {
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ds-card-radius, 0);
   background: none;
   padding: 0 14px !important;
   /* the 18px under the divider sit on the link, not on the item: the source's link has no padding,
@@ -1108,7 +1135,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
 .tracy-header__menu .tracy-nav .tracy-nav__cta > .wp-block-navigation-item__content {
   padding: 13px !important;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   background: var(--primary);
   color: var(--primary-ink);
   font-family: var(--wp--preset--font-family--body);
@@ -1145,7 +1172,7 @@ body .tracy-mega__columns.wp-block-columns:not(.is-not-stacked-on-mobile) > .wp-
   padding-block: 0;
   background: var(--chrome-elevated);
   background-clip: padding-box;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--ds-c-border-soft, rgba(255, 255, 255, 0.07));
 }
 
 .tracy .tracy-footer > .tracy-footer__band {
@@ -1197,7 +1224,7 @@ body .tracy-footer__columns {
 }
 
 .tracy-footer__lock .tracy-brand {
-  font-family: var(--wp--preset--font-family--display);
+  font-family: var(--ds-font-display, var(--wp--preset--font-family--display)); /* the worn system's display face, as the Joomla wordmark reads it */
   font-size: 18px;
   font-weight: 700;
   line-height: 1;
@@ -1207,6 +1234,17 @@ body .tracy-footer__columns {
      css/template.css:20548-20554). */
   letter-spacing: normal;
   color: var(--chrome-heading);
+}
+
+/* The Site Title's anchor: the base theme's own .tracy-brand a (tracy.css) names the display preset, the lg
+   size preset and the display tracking preset on it, one class higher than the rule above. The face follows
+   the worn system; the size, tracking and weight are the anchor's template-default values, pinned so a
+   system's type scale does not inflate the logo (Figma's lg drew it larger than the header's wordmark). */
+.tracy-footer__lock .tracy-brand a {
+  font-family: var(--ds-font-display, var(--wp--preset--font-family--display));
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -1.5px;
 }
 
 /* Source: the brand column's copy is `.hx-social-label` (the ACM social module's own intro
@@ -1320,7 +1358,7 @@ nav.tracy-footer__links .wp-block-navigation-item__content.wp-block-navigation-i
   align-items: center;
   justify-content: center;
   border: 1px solid var(--chrome-border);
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   color: var(--chrome-text);
   text-decoration: none;
   transition: color var(--wp--custom--motion--fast) var(--wp--custom--ease--standard),
@@ -1433,7 +1471,7 @@ body .tracy-footer__news-row {
   max-width: 100%;
   background: var(--chrome-surface);
   border: 1px solid var(--chrome-border);
-  border-radius: 9px;
+  border-radius: var(--ds-input-radius, 9px);
   padding: 13px 14px;
   color: var(--chrome-heading);
   font-family: var(--wp--preset--font-family--body);
@@ -1462,7 +1500,7 @@ body .tracy-footer__news-row {
   align-items: center;
   background: var(--primary);
   color: var(--primary-ink);
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   padding: 13px 22px;
   font-family: var(--wp--preset--font-family--body);
   font-size: 14px;
@@ -1493,7 +1531,7 @@ body .tracy-footer__news-row {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(77, 124, 15, 0.25);
+  box-shadow: 0 0 0 3px var(--ds-c-focus-ring, rgba(77, 124, 15, 0.25));
 }
 
 /* AcyMailing's own client-side check marks a failed field with `.acym_invalid_field` and shows
@@ -1503,8 +1541,10 @@ body .tracy-footer__news-row {
    `__active` modifier that shows it) while its input still paints a red border on that state, so
    the field itself carries the error and the text block stays hidden, matching source exactly. */
 .tracy-footer__news-row .acym_module input.acym_invalid_field {
-  background: color-mix(in srgb, var(--err) 12%, white);
-  border-color: rgb(157, 38, 29);
+  background: var(--ds-c-danger-bg, color-mix(in srgb, var(--err) 12%, white));
+  border-color: var(--ds-c-danger, rgb(157, 38, 29));
+  /* the same corner the field's own rule draws (input[type='email'|'text'] above) */
+  border-radius: var(--ds-input-radius, 9px);
 }
 
 .tracy-footer__news-row .acym_module .acym__field__error__block {
@@ -1522,7 +1562,7 @@ body .tracy-footer__news-row {
   background: var(--primary);
   color: var(--primary-ink);
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   padding: 13px 34px;
   /* The source also loads AcyMailing's module sheet (media/com_acym/css/module.min.css
      `.acym_module_form input{max-width:90%}`), dequeued here: 90% of the 135px wrapper gives way to
@@ -1634,9 +1674,9 @@ body .tracy-footer__bottom {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--ds-btn-radius, 5px);
   background-color: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: var(--ds-c-on-ink, #fff);
   cursor: pointer;
   transition: background-color 0.35s ease, color 0.35s ease;
 }
@@ -1948,7 +1988,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 
 /* Source error.css §5: Big 404 */
 .hx-error-code {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 120px;
   font-weight: 700;
   line-height: 1;
@@ -1960,7 +2000,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 
 /* Source error.css §6: H1 */
 .hx-error-h1 {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 28px;
   font-weight: 700;
   line-height: 1.2;
@@ -1972,7 +2012,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 
 /* Source error.css §7: Subhead */
 .hx-error-sub {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.6;
@@ -1995,7 +2035,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 .hx-error-btns .hx-btn--error-p {
   font-size: 14.5px;
   padding: 13px 22px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   gap: 8px;
 }
 
@@ -2008,12 +2048,12 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14.5px;
   font-weight: 600;
   line-height: 1;
   padding: 12px 20px;
-  border-radius: 9px;
+  border-radius: var(--ds-btn-radius, 9px);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--heading);
@@ -2043,7 +2083,7 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
   padding-top: 32px;
 }
 .hx-error-quick a {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 14px;
   font-weight: 500;
   color: var(--ds-c-accent-text, var(--primary));
@@ -2158,3 +2198,22 @@ body.error404 .tracy-header__cta .wp-block-button__link svg {
 .tracy-header__brand .tracy-logo--dark, .tracy-footer__lock .tracy-footer__logo--dark { display: none; }
 :root[data-theme='dark'] .tracy-header__brand .tracy-logo--light, :root[data-theme='dark'] .tracy-footer__lock .tracy-footer__logo--light { display: none; }
 :root[data-theme='dark'] .tracy-header__brand .tracy-logo--dark, :root[data-theme='dark'] .tracy-footer__lock .tracy-footer__logo--dark { display: block; }
+/* Design system: the demo's logo is a picture of the Kinetic glyph in its own lime (kinetic-mark.png and
+   kinetic-mark-dark.png in the quickstart's uploads). Under a system it is painted in the accent-text role,
+   cut to the glyph's shape (assets/images/favicon.svg, the same two strokes), as the Joomla template strokes
+   its glyph with the readable accent. Each declaration reads the role with no fallback, so with no system it
+   is invalid at computed-value time and the picture draws exactly as before. A logo the customer uploads has
+   another file name and is never repainted. The second mask layer is fully transparent: it is there only to
+   read the role. The two values are custom properties of the theme's own, so each reader carries the
+   template's value as its fallback (content: normal, mask: none, what the picture computes to with no rule):
+   with no system the properties are guaranteed-invalid and the readers take those values. */
+:root {
+  --kds-logo-paint: linear-gradient(var(--ds-c-accent-text), var(--ds-c-accent-text));
+  --kds-logo-mask: url("../images/favicon.svg") center / contain no-repeat,
+    linear-gradient(color-mix(in srgb, var(--ds-c-accent-text) 0%, transparent), transparent);
+}
+.tracy-header__brand .tracy-logo img[src*="/kinetic-mark"],
+.tracy-footer__lock .tracy-footer__logo img[src*="/kinetic-mark"] {
+  content: var(--kds-logo-paint, normal);
+  mask: var(--kds-logo-mask, none);
+}

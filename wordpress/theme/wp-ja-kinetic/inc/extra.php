@@ -39,6 +39,10 @@ require get_theme_file_path( 'inc/list-pages.php' );
 // item-ids.php above.
 require get_theme_file_path( 'inc/owner-text.php' );
 
+// The pricing comparison table drops the empty feature row the demo content carries under each
+// group divider. Its own file for the same reason as item-ids.php above.
+require get_theme_file_path( 'inc/pricing-matrix.php' );
+
 // The Contact page's mailboxes — the one it shows and the one its form sends to — read from the
 // site, never written into a template (ledger L17). Its own file for the same reason as
 // item-ids.php above.
@@ -691,7 +695,7 @@ function wp_ja_kinetic_drawer_head( string $content, array $block ): string {
 	$head = '<div class="tracy-nav__drawer-head">'
 		/* translators: %s: the site title. */
 		. '<a class="tracy-nav__drawer-logo" href="' . esc_url( home_url( '/' ) ) . '" aria-label="' . esc_attr( sprintf( __( '%s home', 'wp-ja-kinetic' ), $name ) ) . '">'
-		. '<svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 4 Q16 12 8 20 Q16 28 24 20" stroke="var(--chrome-primary)" stroke-width="2.6" stroke-linecap="round"></path><path d="M24 12 Q16 20 24 28 Q16 4 8 12" stroke="var(--chrome-primary)" stroke-width="2.6" stroke-linecap="round" opacity="0.5"></path></svg>'
+		. '<svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 4 Q16 12 8 20 Q16 28 24 20" stroke="var(--kds-logo-mark)" stroke-width="2.6" stroke-linecap="round"></path><path d="M24 12 Q16 20 24 28 Q16 4 8 12" stroke="var(--kds-logo-mark)" stroke-width="2.6" stroke-linecap="round" opacity="0.5"></path></svg>'
 		. '<span>' . esc_html( $name ) . '</span></a></div>';
 	return (string) preg_replace(
 		'/(<div\b[^>]*\bclass="wp-block-navigation__responsive-dialog"[^>]*>)/',
@@ -735,6 +739,41 @@ function wp_ja_kinetic_editor_styles(): void {
 	add_editor_style( 'assets/css/wp-ja-kinetic-finder-auth.css' );
 }
 add_action( 'after_setup_theme', 'wp_ja_kinetic_editor_styles', 11 );
+
+/**
+ * The editor canvas wears the page's own theme and direction, as the page does. Without this the
+ * canvas root carried neither `data-theme` nor `t4-dark`, so every `light-dark()` preset resolved
+ * to its light half and every `html:not(.t4-dark)` rule applied: a page visitors see dark (every
+ * page but Blueprint) was edited on a light canvas. The page's `data-style` and
+ * `data-theme-default` (the same post meta wp_ja_kinetic_direction_attributes() reads) go on the
+ * canvas root first, then the front end's own switch resolves the theme from them and from the
+ * `tracy_theme` cookie, so the canvas shows what the editing person sees on the site.
+ * `enqueue_block_assets` runs inside the editor iframe; the front end is left to
+ * wp_ja_kinetic_enqueue_assets().
+ */
+function wp_ja_kinetic_editor_canvas_theme(): void {
+	if ( ! is_admin() ) {
+		return;
+	}
+	// Read only: the id picks which page's meta the canvas wears.
+	$id        = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : (int) get_the_ID(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$direction = $id ? (string) get_post_meta( $id, 'wp_ja_kinetic_style', true ) : '';
+	$default   = $id ? (string) get_post_meta( $id, 'wp_ja_kinetic_theme_default', true ) : '';
+	$direction = in_array( $direction, array( 'terminal', 'blueprint', 'signal' ), true ) ? $direction : 'terminal';
+	$default   = 'light' === $default ? 'light' : 'dark';
+	$version   = wp_get_theme()->get( 'Version' ) . '.' . filemtime( get_theme_file_path( 'assets/js/wp-ja-kinetic-dark.js' ) );
+	wp_enqueue_script( 'wp-ja-kinetic-dark', get_theme_file_uri( 'assets/js/wp-ja-kinetic-dark.js' ), array(), $version, array( 'in_footer' => false ) );
+	wp_add_inline_script(
+		'wp-ja-kinetic-dark',
+		sprintf(
+			'document.documentElement.setAttribute("data-style",%s);document.documentElement.setAttribute("data-theme-default",%s);',
+			wp_json_encode( $direction ),
+			wp_json_encode( $default )
+		),
+		'before'
+	);
+}
+add_action( 'enqueue_block_assets', 'wp_ja_kinetic_editor_canvas_theme' );
 
 /**
  * `aria-hidden="true"` the source puts on elements block markup has no attribute for: the
@@ -883,6 +922,89 @@ function wp_ja_kinetic_clients_mark_fallback( string $content, array $block ): s
 	return (string) preg_replace( '/<figure\b.*?<\/figure>/s', $fallback, $content, 1 );
 }
 add_filter( 'render_block', 'wp_ja_kinetic_clients_mark_fallback', 10, 2 );
+
+/**
+ * Whether the site wears a Tracy design system: the worn variation's custom CSS states the role
+ * variables (`--ds-c-accent-text` …); the theme's own styles never do. Read once per request.
+ *
+ * @return bool
+ */
+function wp_ja_kinetic_wears_design_system(): bool {
+	static $worn = null;
+	if ( null === $worn ) {
+		$styles = function_exists( 'wp_get_global_styles' ) ? wp_get_global_styles() : array();
+		$css    = is_array( $styles ) && isset( $styles['css'] ) && is_string( $styles['css'] ) ? $styles['css'] : '';
+		$worn   = str_contains( $css, '--ds-c-accent-text' );
+	}
+	return $worn;
+}
+
+/**
+ * Under a design system the integration card's mark follows the system's accent. The marks are
+ * pictures stroked in Kinetic's lime (the template's accent: olive on the light page through a
+ * filter), so the picture is drawn inline instead, its strokes and fills in currentColor, and the
+ * stylesheet colours it with the readable accent role. Without a system nothing changes: the
+ * published `<img>` stays. Inline, not a CSS mask: a mask is a second fetch (CORS mode) that a
+ * preview proxy or a missing file turns into an empty tile; the inline mark has nothing left to
+ * load. Only a small, plain SVG file of this site (uploads or the theme) is inlined; anything else
+ * keeps its `<img>`.
+ *
+ * @param string $content The rendered block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_kinetic_clients_mark_inline( string $content, array $block ): string {
+	$class_attr = (string) ( $block['attrs']['className'] ?? '' );
+	if ( ! in_array( 'acm-clients-mark', preg_split( '/\s+/', $class_attr ), true ) || ! wp_ja_kinetic_wears_design_system() ) {
+		return $content;
+	}
+	if ( 1 !== preg_match( '/<img\b[^>]*\bsrc="([^"]+\.svg)"[^>]*>/i', $content, $m ) ) {
+		return $content;
+	}
+	$svg = wp_ja_kinetic_local_svg( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ) );
+	if ( null === $svg ) {
+		return $content;
+	}
+	return str_replace( $m[0], $svg, $content );
+}
+add_filter( 'render_block', 'wp_ja_kinetic_clients_mark_inline', 11, 2 );
+
+/**
+ * A local SVG picture as inline markup painted in currentColor, or null when the address is not a
+ * small, plain SVG file inside the uploads or theme folder.
+ *
+ * @param string $url The picture's address (absolute or root-relative).
+ * @return string|null
+ */
+function wp_ja_kinetic_local_svg( string $url ): ?string {
+	$path    = (string) wp_parse_url( $url, PHP_URL_PATH );
+	$uploads = wp_get_upload_dir();
+	$roots   = array(
+		array( (string) wp_parse_url( $uploads['baseurl'], PHP_URL_PATH ), $uploads['basedir'] ),
+		array( (string) wp_parse_url( get_stylesheet_directory_uri(), PHP_URL_PATH ), get_stylesheet_directory() ),
+	);
+	foreach ( $roots as list( $base_path, $base_dir ) ) {
+		if ( '' === $base_path || ! str_starts_with( $path, trailingslashit( $base_path ) ) ) {
+			continue;
+		}
+		$file = realpath( $base_dir . '/' . substr( $path, strlen( trailingslashit( $base_path ) ) ) );
+		$root = realpath( $base_dir );
+		if ( false === $file || false === $root || ! str_starts_with( $file, $root . DIRECTORY_SEPARATOR ) || filesize( $file ) > 8192 ) {
+			return null;
+		}
+		$svg = (string) file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file.
+		$svg = (string) preg_replace( '/^\s*(<\?xml[^>]*>\s*)?/', '', $svg );
+		if ( 1 !== preg_match( '/^<svg\b[^>]*>.*<\/svg>\s*$/is', $svg ) || 1 === preg_match( '/<(script|style|foreignObject|image|use|a)\b|\son[a-z]+\s*=|href\s*=/i', $svg ) ) {
+			return null;
+		}
+		// Every painted stroke and fill takes the text colour; "none" stays none.
+		$svg = (string) preg_replace( '/\b(stroke|fill)="(?!none")[^"]*"/i', '$1="currentColor"', $svg );
+		$svg = (string) preg_replace( '/^<svg\b([^>]*?)\s(?:width|height)="[^"]*"/i', '<svg$1', $svg );
+		$svg = (string) preg_replace( '/^<svg\b([^>]*?)\s(?:width|height)="[^"]*"/i', '<svg$1', $svg );
+		return (string) preg_replace( '/^<svg\b/i', '<svg class="acm-clients-mark-svg" aria-hidden="true" focusable="false"', trim( $svg ) );
+	}
+	return null;
+}
 
 /**
  * The source's section buttons carry decoration inside the anchor: a trailing arrow `<svg>` on the

@@ -56,7 +56,7 @@
    template.css:21198-21470 (com_content override), single-article.css unchanged.
    --------------------------------------------------------------------------- */
 .hx-article {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 /* base masthead (template.css) — single-article.css below raises specificity with the
@@ -96,7 +96,7 @@
   padding-bottom: 52px;
   background-image: linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 160% 110% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--elevated) 55%);
+    radial-gradient(ellipse 160% 110% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--elevated) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
   background-color: var(--bg);
 }
@@ -106,7 +106,7 @@
 :root[data-theme="dark"] .hx-article .hx-article__head {
   background-image: linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 160% 110% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, #161b18 55%);
+    radial-gradient(ellipse 160% 110% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--ds-c-surface, #161b18) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
 }
 /* 3. masthead inner: centred flex column */
@@ -166,8 +166,8 @@
   align-items: center;
   gap: 7px;
   padding: 5px 12px;
-  background-color: rgba(163, 230, 53, 0.082) !important;
-  border: 1px solid rgba(163, 230, 53, 0.25) !important;
+  background-color: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082))) !important;
+  border: 1px solid var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25))) !important;
   border-radius: 100px;
   font-size: 11.5px !important;
   letter-spacing: 1.5px !important;
@@ -205,7 +205,7 @@
    collapsed at render (inc/tag-parity.php), so this is the source's single `p.hx-article__sub`. */
 .hx-article .hx-article__sub {
   max-width: 600px;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 17px;
   font-weight: 400;
   line-height: 1.6;
@@ -227,9 +227,9 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background-color: rgba(163, 230, 53, 0.145);
+  background-color: var(--kds-accent-145, var(--ds-c-accent, rgba(163, 230, 53, 0.145)));
   overflow: hidden;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 15px;
   font-weight: 700;
   line-height: 1;
@@ -241,7 +241,7 @@
   gap: 2px;
 }
 .hx-article .hx-author__name {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   font-weight: 600;
   color: var(--heading);
@@ -266,7 +266,7 @@
   width: 100%;
   height: 300px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   border: 1px solid var(--border);
 }
 /* 10c. body checklist — replaces the default disc bullets on a plain <ul> in the body */
@@ -282,7 +282,7 @@
   position: relative;
   margin: 0;
   padding-left: 28px;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 16px;
   line-height: 1.5;
   color: var(--text);
@@ -305,7 +305,7 @@
   padding: 4px 0 4px 22px !important;
   border-left: 3px solid var(--primary) !important;
   background: transparent !important;
-  font-family: "Space Grotesk", sans-serif !important;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif) !important;
   font-size: 20px !important;
   font-weight: 600 !important;
   line-height: 1.45 !important;
@@ -357,7 +357,7 @@
   margin-top: 0 !important;
 }
 :root[data-theme="dark"] .hx-article .hx-related {
-  background: #161b18;
+  background: var(--ds-c-surface, #161b18);
 }
 .hx-article .hx-related__inner {
   display: flex;
@@ -368,7 +368,7 @@
 }
 .hx-article .hx-related__title {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -384,7 +384,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 22px;
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   background: var(--surface);
   border: 1px solid var(--border);
   text-decoration: none;
@@ -400,7 +400,7 @@
   color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-article .hx-related__ti {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 16px;
   font-weight: 600;
   line-height: 1.25;
@@ -508,7 +508,7 @@
 .hx-prose img {
   max-width: 100%;
   height: auto;
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
 }
 .hx-prose .full_image,
 .hx-prose figure {
@@ -549,11 +549,11 @@
   font-size: 0.75em;
   font-weight: 700;
   line-height: 1;
-  color: #fff;
+  color: var(--ds-c-accent-on, #fff);
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  border-radius: 0.25rem;
+  border-radius: var(--ds-pill-radius, 0.25rem);
 }
 .badge:empty {
   display: none;
@@ -604,7 +604,7 @@
   margin: 28px 0;
   padding: 6px 0 6px 22px;
   border-left: 3px solid var(--primary);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 21px;
   line-height: 1.4;
   letter-spacing: -0.3px;
@@ -617,17 +617,17 @@
   font-family: "JetBrains Mono", monospace;
   font-size: 0.88em;
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: 6px; /* ds-keep: inline code chip of the code face */
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-prose pre,
 .item-page pre {
-  background: #0d1110;
-  color: #c9d1ce;
-  border: 1px solid #232a27;
-  border-radius: 12px;
+  background: var(--ds-c-ink, #0d1110);
+  color: var(--ds-c-on-ink, #c9d1ce);
+  border: 1px solid var(--ds-c-border, #232a27);
+  border-radius: var(--ds-card-radius, 12px);
   padding: 18px 20px;
   margin: 0 0 1.4rem;
   overflow: auto;
@@ -683,7 +683,7 @@
 .hx-article__head .tags a {
   display: inline-flex;
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: var(--ds-pill-radius, 999px);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -736,7 +736,7 @@
 /* the listing wrapper's own family stack (template.css:20981 `.hx-content`) — every listing
    element without a font-family of its own inherits this string, not the bare body family. */
 .hx-content {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
 }
 .hx-blogmast {
   padding-block: 64px 40px;
@@ -809,7 +809,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   border: 1px solid transparent;
   font-size: 14px;
   font-weight: 500;
@@ -910,7 +910,7 @@
 }
 .hx-blogtitle {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 19px;
   font-weight: 600;
   line-height: 1.3;
@@ -988,7 +988,7 @@
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ds-btn-radius, 8px);
   background: var(--surface);
   color: var(--text);
   font-family: "JetBrains Mono", monospace;
@@ -1037,10 +1037,10 @@
   margin-left: -1px;
 }
 .hx-blog-pagination .pagination .page-item:first-of-type .page-link {
-  border-radius: 0.25rem 0 0 0.25rem;
+  border-radius: var(--ds-btn-radius, 0.25rem) 0 0 var(--ds-btn-radius, 0.25rem);
 }
 .hx-blog-pagination .pagination .page-item:last-of-type .page-link {
-  border-radius: 0 0.25rem 0.25rem 0;
+  border-radius: 0 var(--ds-btn-radius, 0.25rem) var(--ds-btn-radius, 0.25rem) 0;
 }
 .hx-blog-pagination .pagination .disabled .page-link {
   pointer-events: none;
@@ -1081,7 +1081,7 @@ body.item-221 .hx-blogmast {
   background-color: var(--blog-mast-end) !important;
   background-image: linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 140% 130% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--blog-mast-end) 55%) !important;
+    radial-gradient(ellipse 140% 130% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--blog-mast-end) 55%) !important;
   background-size: 30px 30px, 30px 30px, 100% 100% !important;
 }
 body.item-221 .hx-blogmast .hx-container {
@@ -1097,9 +1097,9 @@ body.item-221 .hx-blogmast .hx-eyebrow {
   gap: 7px;
   width: fit-content;
   padding: 5px 12px !important;
-  border-radius: 100px !important;
-  background: rgba(163, 230, 53, 0.082) !important;
-  border: 1px solid rgba(163, 230, 53, 0.251) !important;
+  border-radius: var(--ds-pill-radius, 100px) !important;
+  background: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082))) !important;
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251))) !important;
   font-family: "JetBrains Mono", monospace !important;
   font-size: 11.5px !important;
   letter-spacing: 1.5px !important;
@@ -1153,7 +1153,7 @@ body.item-221 .hx-blogdate .wp-block-post-date {
 }
 body.item-221 .hx-blogdate::before {
   content: counter(blog-row, decimal-leading-zero);
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
@@ -1268,7 +1268,7 @@ body.item-221 .hx-railitem:hover {
 }
 body.item-221 .hx-railitem.is-active {
   color: var(--ds-c-accent-text, var(--primary)) !important;
-  background: rgba(163, 230, 53, 0.082) !important;
+  background: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082))) !important;
   border-color: transparent !important;
 }
 body.item-221 .hx-railcount {
@@ -1289,7 +1289,7 @@ body.item-221 .hx-bloglist__head {
   border-bottom: 1px solid var(--border);
 }
 body.item-221 .hx-bloglist__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.2px;
@@ -1320,7 +1320,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   border-top: 1px solid var(--border);
 }
 .hx-feat-head__l {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -1343,7 +1343,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   align-items: stretch;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
   overflow: hidden;
   text-decoration: none;
   transition: border-color 0.15s ease, transform 0.2s ease, box-shadow 0.2s ease;
@@ -1366,7 +1366,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   background-position: center;
 }
 :root[data-theme="dark"] .hx-featcard__media {
-  background-color: #161B18;
+  background-color: var(--ds-c-surface, #161B18);
 }
 .hx-featcard__sigil {
   color: var(--ds-c-accent-text, var(--primary));
@@ -1393,7 +1393,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   color: var(--ds-c-accent-text, var(--primary));
 }
 .hx-featcard__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 28px;
   font-weight: 700;
   line-height: 1.21;
@@ -1405,7 +1405,7 @@ body.item-221 .hx-bloglist__head + .wp-block-post-template > li:first-child > .h
   color: var(--ds-c-accent-text-hover, var(--primary));
 }
 .hx-featcard__excerpt {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15.5px;
   line-height: 1.6;
   color: var(--text);
@@ -1610,7 +1610,7 @@ body.item-253 .hxcat-pill {
   width: fit-content;
   margin: 0;
   padding: 5px 12px;
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
   background: color-mix(in srgb, var(--primary) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
   font-family: "JetBrains Mono", monospace;
@@ -1629,7 +1629,7 @@ body.item-253 .hxcat-pill::before {
   flex-shrink: 0;
 }
 body.item-253 .hxcat-h1 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px;
   letter-spacing: -1.3px;
   line-height: 1.08;
@@ -1678,7 +1678,7 @@ body.item-253 .hxcat-row {
   align-items: stretch;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   overflow: hidden;
   text-decoration: none;
   transition: border-color 0.15s ease, transform 0.2s ease, box-shadow 0.2s ease;
@@ -1718,7 +1718,7 @@ body.item-253 .hxcat-tag {
   text-transform: uppercase;
 }
 body.item-253 .hxcat-row__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   margin: 0;
   font-size: 19px;
   font-weight: 600;
@@ -1754,7 +1754,7 @@ body.item-253 .hxcat-card {
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
 }
 body.item-253 .hxcat-card__h {
   margin: 0;
@@ -1778,7 +1778,7 @@ body.item-253 .hxcat-catrow {
   gap: 12px;
   padding: 6px 8px;
   margin: -6px -8px;
-  border-radius: 8px;
+  border-radius: var(--ds-card-radius, 8px);
   text-decoration: none;
   transition: background-color 0.15s ease;
 }
@@ -1786,7 +1786,7 @@ body.item-253 .hxcat-catrow:hover {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 body.item-253 .hxcat-catrow__n {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   color: var(--text);
   transition: color 0.15s ease;
@@ -1799,7 +1799,7 @@ body.item-253 .hxcat-cloud a {
   display: inline-flex !important;
   padding: 5px 10px !important;
   border: 1px solid var(--border);
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
   font-family: "JetBrains Mono", monospace !important;
   font-size: 12px !important;
   color: var(--text);
@@ -1928,7 +1928,7 @@ body.item-251 .hx-archmast__pill {
   padding: 5px 12px;
   background: color-mix(in srgb, var(--primary) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11.5px;
   letter-spacing: 1.5px;
@@ -1945,7 +1945,7 @@ body.item-251 .hx-archmast__dot {
   flex-shrink: 0;
 }
 body.item-251 .hx-archmast__title {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   margin: 0;
   font-size: 46px;
   line-height: 1.08;
@@ -1953,7 +1953,7 @@ body.item-251 .hx-archmast__title {
   color: var(--heading);
 }
 body.item-251 .hx-archmast__sub {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   margin: 0;
   max-width: 600px;
   font-size: 17px;
@@ -1977,7 +1977,7 @@ body.item-251 .hx-arch-rail {
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   /* neutralises the 16px WordPress flow-gap a later grid sibling can carry regardless of
      the grid's own `gap` — the source's grid has no per-child margin. */
   margin-top: 0 !important;
@@ -1998,7 +1998,7 @@ body.item-251 .hx-monthrow {
   text-decoration: none;
 }
 body.item-251 .hx-monthrow__m {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 13.5px;
   color: var(--text);
   transition: color 0.15s;
@@ -2036,7 +2036,7 @@ body.item-251 .hx-archrow {
   padding: 18px 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ds-card-radius, 12px);
   transition: border-color 0.15s;
 }
 body.item-251 .hx-archrow:hover {
@@ -2058,7 +2058,7 @@ body.item-251 .hx-archrow__tc {
   min-width: 0;
 }
 body.item-251 .hx-archrow__t {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 600;
   line-height: 1.3;
@@ -2089,7 +2089,7 @@ body.item-251 .hx-archrow:hover .hx-archrow__arr {
   transform: translateX(2px);
 }
 body.item-251 .hx-arch-empty {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", system-ui, sans-serif);
   font-size: 15px;
   color: var(--muted);
   margin: 0;
@@ -2163,7 +2163,7 @@ body.item-251 .hx-arch-pagination {
    ============================================================================ */
 /* page-254.css:12 — the archive wrapper's family stack, inherited by the whole view. */
 body.item-254 .hx-author {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
 }
 body.item-254 .hx-author__head {
   padding-top: 60px;
@@ -2172,14 +2172,14 @@ body.item-254 .hx-author__head {
   background-color: var(--bg);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 75% 60% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--elevated) 55%);
+    radial-gradient(ellipse 75% 60% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--elevated) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
 }
 /* page-254.css:29-35 — dark: the radial ends on the chrome's elevated surface */
 :root[data-theme="dark"] body.item-254 .hx-author__head {
   background-image: linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 75% 60% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, #161B18 55%);
+    radial-gradient(ellipse 75% 60% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--ds-c-surface, #161B18) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
 }
 body.item-254 .hx-author__head-inner {
@@ -2235,9 +2235,9 @@ body.item-254 .hx-au-pill {
   gap: 7px;
   margin: 0;
   padding: 5px 12px;
-  border-radius: 100px;
-  background: rgba(77, 124, 15, 0.08);
-  border: 1px solid rgba(77, 124, 15, 0.28);
+  border-radius: var(--ds-pill-radius, 100px);
+  background: var(--kds-accent-080, var(--ds-c-accent, rgba(77, 124, 15, 0.08)));
+  border: 1px solid var(--kds-accent-280, var(--ds-c-accent, rgba(77, 124, 15, 0.28)));
 }
 body.item-254 .hx-au-pill__dot {
   width: 6px;
@@ -2254,7 +2254,7 @@ body.item-254 .hx-au-pill__t {
   line-height: 1;
 }
 body.item-254 .hx-author__title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   margin: 0;
   font-size: 46px;
   line-height: 1.05;
@@ -2292,7 +2292,7 @@ body.item-254 .hx-auaside {
   padding: 28px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--ds-card-radius, 16px);
 }
 body.item-254 .hx-auaside .hx-auav--lg {
   width: 88px;
@@ -2300,7 +2300,7 @@ body.item-254 .hx-auaside .hx-auav--lg {
 }
 body.item-254 .hx-auav {
   border-radius: 50%;
-  background: rgba(77, 124, 15, 0.11);
+  background: var(--kds-accent-110, var(--ds-c-accent, rgba(77, 124, 15, 0.11)));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2309,7 +2309,7 @@ body.item-254 .hx-auav {
 }
 /* page-254.css:10 — the avatar tint in dark (`--hx-au-avatar-bg`, inlined above) */
 :root[data-theme="dark"] body.item-254 .hx-auav {
-  background: rgba(163, 230, 53, 0.145);
+  background: var(--kds-accent-145, var(--ds-c-accent, rgba(163, 230, 53, 0.145)));
 }
 body.item-254 .hx-auav__img {
   width: 100%;
@@ -2326,7 +2326,7 @@ body.item-254 .hx-auaside__nm {
   padding: 16px 0 14px;
 }
 body.item-254 .hx-auaside__n {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 19px;
   font-weight: 700;
   color: var(--heading);
@@ -2373,7 +2373,7 @@ body.item-254 .hx-aupost {
   padding: 22px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   text-decoration: none;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -2389,7 +2389,7 @@ body.item-254 .hx-aupost__tag {
   color: var(--ds-c-accent-text, var(--primary));
 }
 body.item-254 .hx-aupost__t {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   margin: 0;
   width: 100%;
   font-size: 18px;
@@ -2455,12 +2455,12 @@ body.item-254 .hx-aupost__m {
 /* ---- Authors directory (.hx-authors — css/page-252.css; NOT Itemid-scoped in the source, loaded
    for every render of the index) ---- */
 .hx-authors {
-  --hx-au-avatar-bg: rgba(77, 124, 15, 0.10);
-  font-family: "IBM Plex Sans", sans-serif;
+  --hx-au-avatar-bg: var(--kds-accent-100, var(--ds-c-accent, rgba(77, 124, 15, 0.10)));
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   color: var(--text);
 }
 :root[data-theme="dark"] .hx-authors {
-  --hx-au-avatar-bg: rgba(163, 230, 53, 0.13);
+  --hx-au-avatar-bg: var(--kds-accent-130, var(--ds-c-accent, rgba(163, 230, 53, 0.13)));
 }
 .t4-main-body:has(.hx-authors) {
   padding-top: 0 !important;
@@ -2473,14 +2473,14 @@ body.item-254 .hx-aupost__m {
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 75% 60% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--elevated) 55%);
+    radial-gradient(ellipse 75% 60% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--elevated) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
 }
 :root[data-theme="dark"] .hx-authors__head {
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    radial-gradient(ellipse 75% 60% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, #161B18 55%);
+    radial-gradient(ellipse 75% 60% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--ds-c-surface, #161B18) 55%);
   background-size: 30px 30px, 30px 30px, 100% 100%;
 }
 .hx-authors__head-inner {
@@ -2494,13 +2494,13 @@ body.item-254 .hx-aupost__m {
   align-items: center;
   gap: 7px;
   padding: 5px 12px;
-  border-radius: 100px;
-  background: rgba(163, 230, 53, 0.08);
-  border: 1px solid rgba(163, 230, 53, 0.25);
+  border-radius: var(--ds-pill-radius, 100px);
+  background: var(--kds-accent-080, var(--ds-c-accent, rgba(163, 230, 53, 0.08)));
+  border: 1px solid var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 :root:not([data-theme="dark"]) .hx-au-pill {
-  background: rgba(77, 124, 15, 0.08);
-  border-color: rgba(77, 124, 15, 0.28);
+  background: var(--kds-accent-080, var(--ds-c-accent, rgba(77, 124, 15, 0.08)));
+  border-color: var(--kds-accent-280, var(--ds-c-accent, rgba(77, 124, 15, 0.28)));
 }
 .hx-au-pill__dot {
   width: 6px;
@@ -2519,7 +2519,7 @@ body.item-254 .hx-aupost__m {
 .hx-authors__title {
   margin: 0;
   max-width: 760px;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px;
   line-height: 50px;
   font-weight: 700;
@@ -2556,7 +2556,7 @@ body.item-254 .hx-aupost__m {
   padding: 28px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   text-decoration: none;
   transition: border-color .15s, background .15s;
 }
@@ -2589,7 +2589,7 @@ body.item-254 .hx-aupost__m {
   padding: 14px 0 8px;
 }
 .hx-aucard__n {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 16px;
   font-weight: 600;
   color: var(--heading);
@@ -2642,10 +2642,10 @@ body.item-254 .hx-aupost__m {
 /* ---- Categories index (body.item-250 .hx-cats — css/page-250.css) ---- */
 body.item-250 {
   --cats-mast-end: var(--elevated);
-  --cats-tile-bg: color-mix(in srgb, #A3E635 13%, transparent);
-  --cats-pill-bg: color-mix(in srgb, #A3E635 8%, transparent);
-  --cats-pill-bd: color-mix(in srgb, #A3E635 25%, transparent);
-  --cats-glow: color-mix(in srgb, #A3E635 6%, transparent);
+  --cats-tile-bg: color-mix(in srgb, var(--ds-c-accent, #A3E635) 13%, transparent);
+  --cats-pill-bg: color-mix(in srgb, var(--ds-c-accent, #A3E635) 8%, transparent);
+  --cats-pill-bd: color-mix(in srgb, var(--ds-c-accent, #A3E635) 25%, transparent);
+  --cats-glow: color-mix(in srgb, var(--ds-c-accent, #A3E635) 6%, transparent);
 }
 :root[data-theme="dark"] body.item-250 {
   --cats-mast-end: var(--chrome-elevated);
@@ -2676,7 +2676,7 @@ body.item-250 .hx-cats-pill {
   gap: 7px;
   width: fit-content;
   padding: 5px 12px;
-  border-radius: 100px;
+  border-radius: var(--ds-pill-radius, 100px);
   background: var(--cats-pill-bg);
   border: 1px solid var(--cats-pill-bd);
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -2697,7 +2697,7 @@ body.item-250 .hx-cats-pill__dot {
 body.item-250 .hx-cats-title {
   margin: 0;
   max-width: 760px;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px;
   font-weight: 700;
   letter-spacing: -1.3px;
@@ -2707,7 +2707,7 @@ body.item-250 .hx-cats-title {
 body.item-250 .hx-cats-sub {
   margin: 0;
   max-width: 600px;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 17px;
   font-weight: 400;
   line-height: 1.6;
@@ -2729,7 +2729,7 @@ body.item-250 .hx-cat-card {
   padding: 26px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-card-radius, 14px);
   color: inherit;
   text-decoration: none;
   transition: border-color .15s ease, transform .2s ease, box-shadow .2s ease;
@@ -2757,7 +2757,7 @@ body.item-250 .hx-cat-tile {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
-  border-radius: 11px;
+  border-radius: var(--ds-card-radius, 11px);
   background: var(--cats-tile-bg);
 }
 body.item-250 .hx-cat-ic {
@@ -2773,7 +2773,7 @@ body.item-250 .hx-cat-count {
   color: var(--muted);
 }
 body.item-250 .hx-cat-name {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 18px;
   font-weight: 600;
   line-height: 1.25;
@@ -2782,7 +2782,7 @@ body.item-250 .hx-cat-name {
 }
 body.item-250 .hx-cat-desc {
   margin: 0;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.55;
@@ -2832,26 +2832,26 @@ body.item-231 .com-tags {
   margin-top: 0 !important;
 }
 body.item-231 {
-  --p-a08: rgba(163, 230, 53, 0.082);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a08: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 :root[data-theme="dark"] body.item-231 {
-  --p-a08: rgba(163, 230, 53, 0.082);
-  --p-a25: rgba(163, 230, 53, 0.25);
+  --p-a08: var(--kds-accent-082, var(--ds-c-accent, rgba(163, 230, 53, 0.082)));
+  --p-a25: var(--kds-accent-250, var(--ds-c-accent, rgba(163, 230, 53, 0.25)));
 }
 body.item-231 .com-tags__masthead {
   padding: 66px 0 58px;
   border-bottom: 1px solid var(--border);
   text-align: center;
   background:
-    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, var(--ds-c-surface-warm, #F2F5EE) 55%),
+    radial-gradient(ellipse 150% 120% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--ds-c-surface-warm, #F2F5EE) 55%),
     linear-gradient(rgba(16, 20, 15, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(16, 20, 15, 0.04) 1px, transparent 1px);
   background-size: auto, 30px 30px, 30px 30px;
 }
 :root[data-theme="dark"] body.item-231 .com-tags__masthead {
   background:
-    radial-gradient(ellipse 150% 120% at 50% 0%, rgba(163, 230, 53, 0.059) 0%, #161B18 55%),
+    radial-gradient(ellipse 150% 120% at 50% 0%, var(--kds-accent-059, var(--ds-c-accent, rgba(163, 230, 53, 0.059))) 0%, var(--ds-c-surface, #161B18) 55%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
   background-size: auto, 30px 30px, 30px 30px !important;
@@ -2867,9 +2867,9 @@ body.item-231 .kinetic-tags-eyebrow {
   align-items: center;
   gap: 7px;
   padding: 5px 12px;
-  background: rgba(163, 230, 53, 0.078);
-  border: 1px solid rgba(163, 230, 53, 0.251);
-  border-radius: 100px;
+  background: var(--kds-accent-078, var(--ds-c-accent, rgba(163, 230, 53, 0.078)));
+  border: 1px solid var(--kds-accent-251, var(--ds-c-accent, rgba(163, 230, 53, 0.251)));
+  border-radius: var(--ds-pill-radius, 100px);
   font-size: 11.5px !important;
   letter-spacing: 1.5px !important;
   margin: 0;
@@ -2884,7 +2884,7 @@ body.item-231 .kinetic-tags-eyebrow::before {
   flex-shrink: 0;
 }
 body.item-231 .kinetic-tags-h1 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", sans-serif);
   font-size: 46px !important;
   font-weight: 700;
   letter-spacing: -1.3px;
@@ -2894,7 +2894,7 @@ body.item-231 .kinetic-tags-h1 {
   margin: 0;
 }
 body.item-231 .kinetic-tags-sub {
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--ds-font-body, "IBM Plex Sans", sans-serif);
   font-size: 17px;
   font-weight: 400;
   line-height: 1.6;
@@ -2946,7 +2946,7 @@ body.item-231 .kinetic-tags-pill {
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  border-radius: 9999px;
+  border-radius: var(--ds-pill-radius, 9999px);
   background: var(--ds-c-surface, #FFFFFF);
   border: 1px solid var(--ds-c-border, #E4E8E0);
   text-decoration: none;
@@ -2960,8 +2960,8 @@ body.item-231 .kinetic-tags-pill:focus-visible {
   outline: none;
 }
 :root[data-theme="dark"] body.item-231 .kinetic-tags-pill {
-  background: #121614 !important;
-  border-color: #232A27 !important;
+  background: var(--ds-c-surface, #121614) !important;
+  border-color: var(--ds-c-border-soft, #232A27) !important;
 }
 :root[data-theme="dark"] body.item-231 .kinetic-tags-pill:hover,
 :root[data-theme="dark"] body.item-231 .kinetic-tags-pill:focus-visible {
@@ -3063,7 +3063,7 @@ body.item-231 .com-tags-tag .hx-tagcard {
   padding: 22px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--ds-pill-radius, 14px);
   text-decoration: none;
   color: var(--text);
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -3102,7 +3102,7 @@ body.item-231 .com-tags-tag .com-tags__row-eyebrow {
 }
 body.item-231 .com-tags-tag .com-tags__row-title {
   margin: 0;
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 18px;
   font-weight: 600;
   line-height: 1.3;
@@ -3313,7 +3313,7 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
   color: var(--ds-c-accent-text, #0d6efd);
   background-color: var(--ds-c-surface, #fff);
   border: 1px solid var(--ds-c-border, #dee2e6);
-  border-radius: 0.25rem;
+  border-radius: var(--ds-pill-radius, 0.25rem);
   text-decoration: none;
 }
 .com-tags .page-item:first-child .page-link {
@@ -3321,7 +3321,7 @@ body.item-231 .com-tags-tag .com-tags__row-meta {
 }
 .com-tags .page-link:hover {
   z-index: 2;
-  color: rgb(10.4, 88, 202.4);
+  color: var(--ds-c-accent-text-hover, rgb(10.4, 88, 202.4));
   background-color: var(--ds-c-surface-warm, #e9ecef);
 }
 .com-tags .active > .page-link {
