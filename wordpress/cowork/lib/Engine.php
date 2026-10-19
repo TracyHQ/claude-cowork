@@ -67,6 +67,17 @@ final class Engine
     private const CONTRACT_OPTIONS = [QuickstartContract::STORE_OPTION, 'claude_cowork_contract', StringOverrides::OPTION, BlockWords::OPTION];
 
     private const MAX_DB_LIMIT = 5000;
+    /**
+     * db.dump_many's budgets. The bytes are raw SQL (the answer carries it base64, a third more), in
+     * the range one db.dump page of 5000 rows comes to; the seconds stay well under the thirty a
+     * shared host gives PHP, leaving room for the one page that runs over.
+     */
+    private const DUMP_MANY_BYTES = 4194304; // 4 MiB
+    private const MIN_DUMP_MANY_BYTES = 1024;
+    private const MAX_DUMP_MANY_BYTES = 8388608; // 8 MiB
+    private const DUMP_MANY_SECONDS = 10;
+    private const MAX_DUMP_MANY_SECONDS = 20;
+    private const MAX_DUMP_MANY_TABLES = 5000;
     /** `content.list {kind: "pattern"}`: rows a page holds when the caller names no `limit`, and the most it may name. */
     private const PATTERN_LIST_DEFAULT = 50;
     private const PATTERN_LIST_MAX = 200;
@@ -238,13 +249,21 @@ final class Engine
 
         switch ($action) {
             case 'info':
-                return $this->ok(['info' => $this->info]);
+                // What the engine itself can do rides beside what the host says, so a caller can tell a
+                // site that takes db.dump_many from an older one and fall back to db.dump there.
+                return $this->ok(['info' => $this->info + ['db_dump_many' => [
+                    'max_tables' => self::MAX_DUMP_MANY_TABLES,
+                    'max_bytes' => self::MAX_DUMP_MANY_BYTES,
+                    'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ]]]);
             case 'site.stats':
                 return $this->siteStats();
             case 'db.tables':
                 return $this->dbTables();
             case 'db.dump':
                 return $this->dbDump($params);
+            case 'db.dump_many':
+                return $this->dbDumpMany($params);
             case 'files.list':
                 return $this->filesList($params);
             case 'files.pack':
@@ -1763,6 +1782,155 @@ final class Engine
             'done'        => $chunk['done'],
             'rows'        => $chunk['rows'],
             'total'       => $chunk['total'],
+        ]);
+    }
+
+    /** What db.dump_many measures its time budget with: `fn(): float` seconds. Absent, microtime(true). */
+    private $dumpClock = null;
+
+    /** Let db.dump_many read another clock (tests stand one in, to stop on time without waiting). */
+    public function dumpClock(callable $now): self
+    {
+        $this->dumpClock = $now;
+        return $this;
+    }
+
+    /**
+     * Several tables in one answer, for a site whose firewall counts requests.
+     *
+     * db.dump answers one page of one table, so a site with hundreds of small tables costs hundreds
+     * of requests, and some hosts ban the caller's address for less. This walks an ordered list of
+     * tables, one dumpChunkFrom page after another, and stops at whichever comes first: the end of
+     * the list, `max_bytes` of SQL, or `max_seconds` on the clock. A table larger than the budget is
+     * carried across calls by its row cursor, so nothing here holds state between requests either.
+     *
+     * The budgets are checked after every row, so the answer ends after the row that crosses one,
+     * with a row cursor that resumes at the next. Across calls that is the same rows in the same
+     * order, none missed and none twice; each answer is standalone SQL (a page cut short becomes two
+     * INSERTs), each segment is exactly db.dump at that cursor with `limit` set to the rows it took,
+     * and where no page was cut the SQL is byte for byte the db.dump pages concatenated. At least one
+     * row is read per call, so a call always moves: a row larger than `max_bytes` comes back alone.
+     *
+     * `max_bytes` bounds the answer, not the read. A page of `limit` rows is still fetched whole, so
+     * the peak memory is about one page, as db.dump costs for the same `limit`; a cut on a keyed
+     * table re-reads the rows it keeps (DbDumper::dumpChunkFrom). A page that fails after others were
+     * read ends the answer early with what it has and a cursor at the failing table; the next call
+     * starts there and reports the failure itself.
+     *
+     * `cursor` is `{table, row}`: the index into `tables` and the db.dump cursor inside that table
+     * (null to start it). Pass the same `tables` with every call; `next_cursor` is null when done.
+     */
+    private function dbDumpMany(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $tables = $p['tables'] ?? null;
+        if (!is_array($tables) || $tables === []) {
+            return $this->err('bad_params', 'tables required: a list of table names');
+        }
+        if (count($tables) > self::MAX_DUMP_MANY_TABLES) {
+            return $this->err('bad_params', 'at most ' . self::MAX_DUMP_MANY_TABLES . ' tables per list');
+        }
+        $tables = array_values($tables);
+        foreach ($tables as $table) {
+            if (!is_string($table) || $table === '') {
+                return $this->err('bad_params', 'every table must be a non-empty string');
+            }
+        }
+        $limit = (int) ($p['limit'] ?? 1000);
+        $limit = max(1, min($limit, self::MAX_DB_LIMIT));
+        $maxBytes = (int) ($p['max_bytes'] ?? self::DUMP_MANY_BYTES);
+        $maxBytes = max(self::MIN_DUMP_MANY_BYTES, min($maxBytes, self::MAX_DUMP_MANY_BYTES));
+        $maxSeconds = (float) ($p['max_seconds'] ?? self::DUMP_MANY_SECONDS);
+        $maxSeconds = max(1.0, min($maxSeconds, (float) self::MAX_DUMP_MANY_SECONDS));
+
+        $index = 0;
+        $row = null;
+        $cursor = $p['cursor'] ?? null;
+        if ($cursor !== null) {
+            if (!is_array($cursor)) {
+                return $this->err('bad_params', 'cursor must be {table, row}');
+            }
+            $at = $cursor['table'] ?? 0;
+            if (is_string($at) && ctype_digit($at)) {
+                $at = (int) $at;
+            }
+            if (!is_int($at) || $at < 0 || $at > count($tables)) {
+                return $this->err('bad_params', 'cursor.table must be an index into tables');
+            }
+            $index = $at;
+            $row = $cursor['row'] ?? null;
+            if ($row !== null && !is_string($row)) {
+                return $this->err('bad_params', 'cursor.row must be a string or null');
+            }
+            $row = $row === '' ? null : $row;
+        }
+
+        $now = $this->dumpClock ?? static function (): float { return microtime(true); };
+        $started = $now();
+        $count = count($tables);
+        $sql = '';
+        $rows = 0;
+        $pages = 0;
+        $tablesDone = 0;
+        $progress = [];
+        $stopped = 'done';
+        while ($index < $count) {
+            $table = $tables[$index];
+            try {
+                // Asked between the rows of a page too, so one page of large rows cannot carry the
+                // answer far past either budget: it ends after the row that crosses.
+                $chunk = $this->dumper->dumpChunkFrom($table, $row, $limit, function (int $bytes) use ($sql, $maxBytes, $now, $started, $maxSeconds): bool {
+                    return strlen($sql) + $bytes < $maxBytes && $now() - $started < $maxSeconds;
+                });
+            } catch (Throwable $e) {
+                if ($pages === 0) {
+                    return $this->err('dump_failed', $e->getMessage()) + ['table' => $table, 'cursor' => ['table' => $index, 'row' => $row]];
+                }
+                $stopped = 'error';
+                break;
+            }
+            $pages++;
+            $sql .= $chunk['sql'];
+            $rows += $chunk['rows'];
+            $last = count($progress) - 1;
+            if ($last >= 0 && $progress[$last]['index'] === $index) {
+                $progress[$last]['rows'] += $chunk['rows'];
+                $progress[$last]['total'] = $chunk['total'];
+                $progress[$last]['done'] = $chunk['done'];
+            } else {
+                $progress[] = ['index' => $index, 'table' => $table, 'rows' => $chunk['rows'], 'total' => $chunk['total'], 'done' => $chunk['done']];
+            }
+            if ($chunk['done']) {
+                $index++;
+                $row = null;
+                $tablesDone++;
+            } else {
+                $row = $chunk['next_cursor'];
+            }
+            if ($index >= $count) {
+                break;
+            }
+            if (strlen($sql) >= $maxBytes) {
+                $stopped = 'bytes';
+                break;
+            }
+            if ($now() - $started >= $maxSeconds) {
+                $stopped = 'time';
+                break;
+            }
+        }
+        $done = $index >= $count;
+        return $this->ok([
+            'sql_b64'     => base64_encode($sql),
+            'next_cursor' => $done ? null : ['table' => $index, 'row' => $row],
+            'done'        => $done,
+            'stopped'     => $stopped,
+            'rows'        => $rows,
+            'tables_done' => $tablesDone,
+            'bytes'       => strlen($sql),
+            'progress'    => $progress,
         ]);
     }
 

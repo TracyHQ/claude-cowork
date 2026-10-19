@@ -21,6 +21,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
 | `db.tables` | read | ok | ok |
 | `db.dump` | read | ok | ok |
+| `db.dump_many` (unreleased): `db.dump` for several tables per request, checked after every row, so an answer ends after the row that crosses `max_bytes`/`max_seconds` (a larger row comes back alone; the read is still one page, as with `db.dump`), see the Joomla README; advertised in `info` as `db_dump_many` | read | ok | ok |
 | `db.cleanup` | write | ok | ok |
 | `db.restore` | write | ok | ok |
 | `db.purge` | write | ok | ok |
