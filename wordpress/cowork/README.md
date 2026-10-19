@@ -21,7 +21,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `site.counts` | read (answered by the plugin, not the engine) | ok | ok |
 | `db.tables` | read | ok | ok |
 | `db.dump` | read | ok | ok |
-| `db.dump_many` (unreleased): `db.dump` for several tables per request, checked after every row, so an answer ends after the row that crosses `max_bytes`/`max_seconds` (a larger row comes back alone; the read is still one page, as with `db.dump`), see the Joomla README; advertised in `info` as `db_dump_many` | read | ok | ok |
+| `db.dump_many`: `db.dump` for several tables per request, checked after every row, so an answer ends after the row that crosses `max_bytes`/`max_seconds` (a larger row comes back alone; the read is still one page, as with `db.dump`), see the Joomla README; advertised in `info` as `db_dump_many` | read | ok | ok |
 | `db.cleanup` | write | ok | ok |
 | `db.restore` | write | ok | ok |
 | `db.purge` | write | ok | ok |
@@ -39,13 +39,13 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `theme.palette` | read with no `colors`, else write | ok | ok |
 | `core.manifest` | read | ok | ok |
 | `language.install` | write | ok | ok |
-| `content.list` | read; `search` (unreleased) keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search-unreleased); `kind: "pattern"` (unreleased) lists the registered block patterns, see [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern-unreleased) | ok | ok |
-| `content.get` | read; a post, template part or template answers its `body_revision` (unreleased), see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision-unreleased) | ok | ok |
-| `content.update` | write; `expected_body_revision` (unreleased) writes only over the body that was read, see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision-unreleased) | ok | ok |
+| `content.list` | read; `search` keeps the posts whose title or slug holds some words, see [Finding a post by its title](#finding-a-post-by-its-title-contentlist-search); `kind: "pattern"` lists the registered block patterns, see [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern) | ok | ok |
+| `content.get` | read; a post, template part or template answers its `body_revision`, see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision) | ok | ok |
+| `content.update` | write; `expected_body_revision` writes only over the body that was read, see [A write held to the body it read](#a-write-held-to-the-body-it-read-body_revision) | ok | ok |
 | `content.language` | write | ok | ok |
 | `content.delete` | write | ok | ok |
 | `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
-| `media.delete` (unreleased) | write | ok | ok; refuses a picture that is the current value of a bound image slot |
+| `media.delete` | write | ok | ok; refuses a picture that is the current value of a bound image slot |
 | `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
@@ -55,7 +55,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
 
-## Deleting a Media Library picture: `media.delete` (unreleased)
+## Deleting a Media Library picture: `media.delete`
 
 `media.delete {apply_id, id}` deletes one attachment and all of its original, scaled, intermediate
 and backup-size files. An optional `url` is accepted only when it resolves to exactly one attachment.
@@ -332,7 +332,7 @@ same request id never rotates twice. A restore of the same site keeps its seed. 
 hand keeps the seed too, and so the ids, until whoever copied it declares the fork. Writes still go
 through `content.contract` `apply`.
 
-## Finding a post by its title: `content.list` `search` (unreleased)
+## Finding a post by its title: `content.list` `search`
 
 `content.list` lists posts and pages in id order, a page at a time, and a caller who knows a page by
 its name used to read the whole list to find it: on a Joomla site of 1,900 articles one such lookup
@@ -398,7 +398,7 @@ finding here. It narrows the same list, so every other parameter (`post_type`, `
 - **Refused** (`bad_params`), never answered with the whole list: `search` that is not a string, is
   longer than 200 characters once cleaned, or is more than 4,096 bytes before it is cleaned; and any
   `search` on `kind` `templatePart`, `template` or another kind than `post` and `pattern` (patterns
-  are searched as [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern-unreleased)
+  are searched as [Listing block patterns](#listing-block-patterns-contentlist-kind-pattern)
   says). The engine refuses text
   that is not valid UTF-8 the same way, but over the door it never gets that far: a body that is not
   valid UTF-8 is not valid JSON, so the door reads no request from it and answers `unauthorized`, as
@@ -428,7 +428,7 @@ for a caller who is not logged in), and `WP_Query` then loads exactly those rows
 send, and `tests/content-search-load.php` searches in a fresh process with only the classes
 `claude-cowork.php` loads.
 
-## A write held to the body it read: `body_revision` (unreleased)
+## A write held to the body it read: `body_revision`
 
 `content.update` replaces a body whole, so two callers that read the same page and each write their
 change back lose the first change without a word: the second write lands over a body its caller
@@ -471,7 +471,7 @@ longer there.
 - **Without the key** nothing is compared: the write, its undo entry and every refusal are what 0.16.0
   did, and `apply.revert` takes back a write that named a revision as it takes back any other.
 
-## Listing block patterns: `content.list` `kind: "pattern"` (unreleased)
+## Listing block patterns: `content.list` `kind: "pattern"`
 
 A block theme builds its pages out of registered patterns, and a caller that wants to put one on a
 page has to know which ones the site has before `content.get {kind: "pattern", key}` reads one.
@@ -503,7 +503,7 @@ page has to know which ones the site has before `content.get {kind: "pattern", k
   string, and an `offset` or `limit` that is not a whole number (an integer, or a string of digits).
   A plugin too old to list patterns answers `unavailable`.
 
-## A page's search title and description (unreleased)
+## A page's search title and description
 
 WordPress has neither on its own: `<title>` is built from the post title and the site name, and no
 meta description is printed. So changing what a search engine shows for one page, and nothing else on
@@ -546,7 +546,7 @@ Writing one page's title, undone on its own by `apply.revert`:
 - **Read back:** every row of `content.list` carries `seo` as the site prints it — the running plugin's
   keys, or this plugin's own — and `content.get {kind: "postmeta", id, key}` reads one value.
 
-## A shared link's preview: `tracy_share_image` (unreleased)
+## A shared link's preview: `tracy_share_image`
 
 WordPress prints no Open Graph tags, and no Tracy theme does, so Facebook, Zalo or X picked any
 picture off a shared page. Option `tracy_share_image` (an attachment id; Tracy writes the uploaded
