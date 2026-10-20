@@ -244,6 +244,14 @@ Nothing in the plugin knows about any particular gatekeeper; it ships inside thi
 install or update brings it, its install script enables it and orders it first, and both answerers
 share one engine wiring (`EngineFactory`) so neither can drift.
 
+Both doors answer without the component's site folder (`components/com_claudecowork`): the wiring
+lives on the administrator side, and a collaborator only the site folder has (the write side, the
+extension installer) is left out, so what needs it answers `unavailable` while the reads an import
+makes keep working. On Joomla 3 the plugin answers through its legacy entry `claudecoworkapi.php`
+(Joomla 3 loads a system plugin from that file only) and the Joomla 3 wiring
+`administrator/legacy/LegacyDoor.php`, which the site's `controllers/api.php` shares.
+`tests/e2e/admin-door.sh` checks both doors on a throwaway Joomla 3 to 6.
+
 ## Render stamps for the page picker (0.18.0)
 
 Tracy's page picker lets a person click an element of their site and ask for a change. To change

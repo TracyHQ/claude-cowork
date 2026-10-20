@@ -1803,6 +1803,16 @@ check('the door plugin is a system plugin', (string) $doorManifest['group'], 'sy
 check('the door plugin registers its namespace', trim((string) $doorManifest->namespace), 'Tracy\Plugin\System\ClaudeCoworkApi');
 check('the door plugin enables itself on install', trim((string) $doorManifest->scriptfile), 'script.php');
 checkTrue('build.sh zips the door plugin', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'plg_system_claudecoworkapi.zip'));
+// Joomla 3 loads a system plugin from `<element>.php` and nothing else; without it the plugin never
+// ran there and the administrator door answered Joomla's own 403 (measured 19/10/2026, Joomla 3.10).
+$doorFiles = array_map('strval', iterator_to_array($doorManifest->files->filename, false));
+checkTrue('the door plugin ships its Joomla 3 entry', in_array('claudecoworkapi.php', $doorFiles, true));
+check('…which Joomla 4+ ignores: the element still comes from services/', (string) $doorManifest->files->folder[0]['plugin'], 'claudecoworkapi');
+checkTrue('…and declares the class Joomla 3 instantiates', (bool) preg_match('/^class PlgSystemClaudecoworkapi extends CMSPlugin$/m', file_get_contents(__DIR__ . '/../plg_system_claudecoworkapi/claudecoworkapi.php')));
+// The Joomla 3 wiring both its answerers share lives on the administrator side, so the administrator
+// door answers without the site folder.
+$comFolders = array_map('strval', iterator_to_array(simplexml_load_file(__DIR__ . '/../com_claudecowork/claudecowork.xml')->administration->files->folder, false));
+checkTrue('the component ships its Joomla 3 wiring on the administrator side', in_array('legacy', $comFolders, true) && is_file(__DIR__ . '/../com_claudecowork/administrator/legacy/LegacyDoor.php'));
 
 
 // ---------------------------------------------------------------- StreamUploader --

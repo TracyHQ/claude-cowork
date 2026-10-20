@@ -235,15 +235,15 @@ final class EngineFactory
             self::buildDumper(),
             self::buildWalker($params),
             new \AutoUploader(120),
-            new JoomlaExtensions(),
+            self::orNull('extensions', static fn() => new JoomlaExtensions()),
             self::buildWriter(),
             self::buildMedia(),
             self::buildLog(),
             // JPATH_ROOT and not the configured walker root: the stamp has to sit where the site
             // is SERVED from, because a preview reads it over HTTP as `/tracy-changed.json`.
             new \ChangeStamp(JPATH_ROOT),
-            new JoomlaCoreUpgrader(),
-            new JoomlaFilesRestorer(),
+            self::orNull('coreUpgrader', static fn() => new JoomlaCoreUpgrader()),
+            self::orNull('filesRestorer', static fn() => new JoomlaFilesRestorer()),
             $contract
         );
         // Apply's `expected_content_revisions` are checked against the very projection content.read
@@ -360,6 +360,24 @@ final class EngineFactory
             return $engine->handle($request);
         });
         $app->close();
+    }
+
+    /**
+     * A collaborator from the site folder (`site/src/Controller`), or null — logged — when it cannot
+     * be built, like every builder below. The administrator door is the way in when the front end is
+     * broken, so it has to answer without that folder: what needs it answers 'unavailable', and the
+     * reads keep working. Measured 19/10/2026 on Joomla 6.1: with `components/com_claudecowork`
+     * removed, `new JoomlaExtensions()` threw "Class not found" out of `build()`, and the
+     * administrator door answered Joomla's 403 to every token call.
+     */
+    private static function orNull(string $where, callable $make): ?object
+    {
+        try {
+            return $make();
+        } catch (\Throwable $e) {
+            self::logFailure($where, $e);
+            return null;
+        }
     }
 
     /**

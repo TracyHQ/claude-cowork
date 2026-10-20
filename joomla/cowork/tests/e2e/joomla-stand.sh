@@ -6,7 +6,7 @@
 # Gives: $P (container prefix), sql "<query>", call <action> '<params JSON>' (answer in $ANSWER),
 # answered_id, expect "<what>" "<got>" "<want>" (counts failures in $FAILED), say, and finish.
 #
-#   JOOMLA_IMAGE=joomla:5-apache <script>     # another Joomla
+#   JOOMLA_IMAGE=joomla:5-apache <script>     # another Joomla (joomla:3.10-php7.4-apache: Joomla 3)
 #   KEEP=1 <script>                           # leave the containers up to look around
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,17 +47,49 @@ docker run -d --name "$P-joomla" --network "$NET" \
   -e JOOMLA_DB_HOST="$P-db" -e JOOMLA_DB_USER=root -e JOOMLA_DB_PASSWORD="$DBPW" -e JOOMLA_DB_NAME=joomla \
   -e JOOMLA_DB_PREFIX=jos_ -e JOOMLA_SITE_NAME=cowork-e2e -e JOOMLA_ADMIN_USER=Admin -e JOOMLA_ADMIN_USERNAME=admin \
   -e JOOMLA_ADMIN_PASSWORD=e2e-admin-password-1 -e JOOMLA_ADMIN_EMAIL=admin@example.invalid "$IMAGE" >/dev/null
-for _ in $(seq 1 180); do
-  docker exec "$P-joomla" sh -c 'test -f configuration.php && curl -fsS -o /dev/null http://localhost/' >/dev/null 2>&1 && break
-  sleep 2
-done
-docker exec "$P-joomla" test -f configuration.php || { echo "Joomla did not install itself" >&2; docker logs --tail 30 "$P-joomla" >&2; exit 1; }
-
 sql() { docker exec "$P-db" mariadb -uroot -p"$DBPW" joomla -N -e "$1"; }
+
+# Joomla 3 images only copy the files (no JOOMLA_ADMIN_* install, no cli/joomla.php): joomla3-install.php
+# installs the core, and the package goes in through the administrator's own installer.
+JOOMLA3=0
+docker run --rm --entrypoint sh "$IMAGE" -c 'test ! -f /usr/src/joomla/cli/joomla.php' && JOOMLA3=1
+if [ "$JOOMLA3" = 1 ]; then
+  for _ in $(seq 1 90); do
+    docker exec "$P-joomla" sh -c 'test -f index.php && curl -sS -o /dev/null http://localhost/' >/dev/null 2>&1 && break
+    sleep 2
+  done
+  docker cp "$HERE/joomla3-install.php" "$P-joomla:/tmp/joomla3-install.php"
+  docker exec -u www-data "$P-joomla" php /tmp/joomla3-install.php "$P-db" root "$DBPW" joomla jos_ e2e-admin-password-1
+else
+  for _ in $(seq 1 180); do
+    docker exec "$P-joomla" sh -c 'test -f configuration.php && curl -fsS -o /dev/null http://localhost/' >/dev/null 2>&1 && break
+    sleep 2
+  done
+fi
+docker exec "$P-joomla" test -f configuration.php || { echo "Joomla did not install itself" >&2; docker logs --tail 30 "$P-joomla" >&2; exit 1; }
 
 say "installing the package"
 docker cp "$WORK/src/joomla/cowork/dist/pkg_claudecowork.zip" "$P-joomla:/tmp/pkg_claudecowork.zip"
-docker exec -u www-data "$P-joomla" php cli/joomla.php extension:install --path=/tmp/pkg_claudecowork.zip 2>&1 | tail -1
+if [ "$JOOMLA3" = 1 ]; then
+  # Log in, then install as the "Install from Folder" tab does: the zip is far over the image's 2M
+  # upload limit.
+  docker exec "$P-joomla" php -r '$z = new ZipArchive(); exit($z->open("/tmp/pkg_claudecowork.zip") === true && $z->extractTo("/tmp/pkg_claudecowork") ? 0 : 1);'
+  docker exec "$P-joomla" chown -R www-data:www-data /tmp/pkg_claudecowork
+  docker exec "$P-joomla" sh -c '
+    set -e
+    jar=/tmp/e2e-admin.cookies; admin=http://localhost/administrator/index.php
+    token() { grep -o "name=\"[0-9a-f]\{32\}\" value=\"1\"" | head -1 | cut -d\" -f2; }
+    form=$(curl -sS -c $jar -b $jar "$admin")
+    curl -sS -o /dev/null -c $jar -b $jar "$admin" --data-urlencode username=admin --data-urlencode passwd=e2e-admin-password-1 \
+      -d option=com_login -d task=login -d return="$(printf %s "$form" | grep -o "name=\"return\" value=\"[^\"]*\"" | cut -d\" -f4)" -d "$(printf %s "$form" | token)=1"
+    t=$(curl -sS -c $jar -b $jar "$admin?option=com_installer&view=install" | token)
+    [ -n "$t" ] || { echo "could not log in to the Joomla 3 administrator" >&2; exit 1; }
+    curl -sS -L -c $jar -b $jar "$admin" -d installtype=folder -d install_directory=/tmp/pkg_claudecowork \
+      -d option=com_installer -d task=install.install -d "$t=1" | grep -o "alert-message\">[^<]*" | grep -v "PHP 7" | head -3 || true
+    rm -f $jar'
+else
+  docker exec -u www-data "$P-joomla" php cli/joomla.php extension:install --path=/tmp/pkg_claudecowork.zip 2>&1 | tail -1
+fi
 TOKEN=$(sql "SELECT JSON_VALUE(params,'\$.token') FROM jos_extensions WHERE element='com_claudecowork'")
 [ -n "$TOKEN" ] && [ "$TOKEN" != NULL ] || { echo "the install wrote no token" >&2; exit 1; }
 

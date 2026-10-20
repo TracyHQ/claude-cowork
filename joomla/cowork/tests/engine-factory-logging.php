@@ -156,6 +156,12 @@ namespace {
         } elseif (EF_CASE['action'] === 'build') {
             EngineFactory::loadEngine();
             $efReport['engine'] = get_class(EngineFactory::build());
+        } elseif (EF_CASE['action'] === 'build-without-site') {
+            // No autoloader for the site controllers: components/com_claudecowork is gone.
+            EngineFactory::loadEngine();
+            $efEngine = EngineFactory::build();
+            $efReport['engine'] = get_class($efEngine);
+            $efReport['answer'] = $efEngine->handle(EF_CASE['request']);
         } elseif (EF_CASE['action'] === 'secret-argument') {
             // A frame whose argument is a credential: the diagnostic names the frame, never the value.
             $efLog = new ReflectionMethod(EngineFactory::class, 'logFailure');
@@ -315,6 +321,18 @@ namespace {
     checkTrue('build without a database: derive source failure is logged',
         count(array_filter($efMessages, static fn(string $m): bool => strpos($m, 'derivedSource:') !== false && strpos($m, 'database driver could not connect') !== false)) === 1);
     check('build without a database: no secret written', $efLeaks($efWritten($r)), false);
+
+    // 9b. Without the site folder (the administrator door on a site whose front end is broken), build()
+    // still returns the engine, info answers, and each collaborator it could not build is logged.
+    $r = $efCase(['action' => 'build-without-site', 'db' => 'container', 'request' => ['action' => 'info', 'token' => $efSecret]]);
+    check('build without the site folder: still returns the engine', [$r['broken'] ?? null, $r['engine'] ?? null], [null, 'Engine']);
+    check('build without the site folder: info answers', $r['answer']['ok'] ?? null, true);
+    $efMessages = array_column($r['logs'] ?? [], 'message');
+    foreach (['extensions' => 'JoomlaExtensions', 'coreUpgrader' => 'JoomlaCoreUpgrader', 'filesRestorer' => 'JoomlaFilesRestorer'] as $efWhere => $efCause) {
+        checkTrue("build without the site folder: {$efWhere} logs its cause",
+            count(array_filter($efMessages, static fn(string $m): bool => strpos($m, $efWhere . ':') === 0 && strpos($m, $efCause) !== false && strpos($m, 'not found') !== false)) === 1);
+    }
+    check('build without the site folder: no secret written', $efLeaks($efWritten($r)), false);
 
     // 10. info.db_prefix is the database driver's prefix; with no database it is null, and logged.
     $r = $efCase(['action' => 'prefix', 'db' => 'disabled']);

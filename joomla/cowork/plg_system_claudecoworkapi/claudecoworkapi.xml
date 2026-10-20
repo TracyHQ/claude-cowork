@@ -16,5 +16,7 @@
     <files>
         <folder plugin="claudecoworkapi">services</folder>
         <folder>src</folder>
+        <!-- Joomla 3 loads a system plugin from this file and nothing else; Joomla 4+ uses services/. -->
+        <filename>claudecoworkapi.php</filename>
     </files>
 </extension>

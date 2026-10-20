@@ -42,6 +42,10 @@
             <!-- Joomla 3 admin dispatch: the legacy entry, controller and view render the same
                  connect screen. Ignored by Joomla 4+, which uses services/ + src/ above. -->
             <folder>views</folder>
+            <!-- Joomla 3 engine wiring, shared by the site's controllers/api.php and the door
+                 plugin's legacy entry. Here, not under site/, so the administrator door still
+                 answers when the site folder is gone. -->
+            <folder>legacy</folder>
             <filename>claudecowork.php</filename>
             <filename>controller.php</filename>
             <!-- The engine — no Joomla dependency, unit tested on its own. Under
