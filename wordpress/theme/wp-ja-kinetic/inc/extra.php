@@ -924,30 +924,14 @@ function wp_ja_kinetic_clients_mark_fallback( string $content, array $block ): s
 add_filter( 'render_block', 'wp_ja_kinetic_clients_mark_fallback', 10, 2 );
 
 /**
- * Whether the site wears a Tracy design system: the worn variation's custom CSS states the role
- * variables (`--ds-c-accent-text` …); the theme's own styles never do. Read once per request.
- *
- * @return bool
- */
-function wp_ja_kinetic_wears_design_system(): bool {
-	static $worn = null;
-	if ( null === $worn ) {
-		$styles = function_exists( 'wp_get_global_styles' ) ? wp_get_global_styles() : array();
-		$css    = is_array( $styles ) && isset( $styles['css'] ) && is_string( $styles['css'] ) ? $styles['css'] : '';
-		$worn   = str_contains( $css, '--ds-c-accent-text' );
-	}
-	return $worn;
-}
-
-/**
- * Under a design system the integration card's mark follows the system's accent. The marks are
- * pictures stroked in Kinetic's lime (the template's accent: olive on the light page through a
- * filter), so the picture is drawn inline instead, its strokes and fills in currentColor, and the
- * stylesheet colours it with the readable accent role. Without a system nothing changes: the
- * published `<img>` stays. Inline, not a CSS mask: a mask is a second fetch (CORS mode) that a
- * preview proxy or a missing file turns into an empty tile; the inline mark has nothing left to
- * load. Only a small, plain SVG file of this site (uploads or the theme) is inlined; anything else
- * keeps its `<img>`.
+ * The integration card's mark is drawn inline, its strokes and fills in currentColor, so the
+ * stylesheet colours it: the readable accent role under a design system, the picture's own lime
+ * (olive on the light Integrations page) without one. The demo's marks are uploaded SVG pictures;
+ * as an `<img>` no stylesheet reaches their strokes, and the client-side design system preview has
+ * no server-side "worn" signal to switch on, so the mark is inline on every page view. Inline, not a
+ * CSS mask: a mask is a second fetch (CORS mode) that a preview proxy or a missing file turns into
+ * an empty tile; the inline mark has nothing left to load. Only a small, plain SVG file of this site
+ * (uploads or the theme) is inlined; anything else keeps its `<img>`.
  *
  * @param string $content The rendered block.
  * @param array  $block   The parsed block.
@@ -955,7 +939,7 @@ function wp_ja_kinetic_wears_design_system(): bool {
  */
 function wp_ja_kinetic_clients_mark_inline( string $content, array $block ): string {
 	$class_attr = (string) ( $block['attrs']['className'] ?? '' );
-	if ( ! in_array( 'acm-clients-mark', preg_split( '/\s+/', $class_attr ), true ) || ! wp_ja_kinetic_wears_design_system() ) {
+	if ( ! in_array( 'acm-clients-mark', preg_split( '/\s+/', $class_attr ), true ) ) {
 		return $content;
 	}
 	if ( 1 !== preg_match( '/<img\b[^>]*\bsrc="([^"]+\.svg)"[^>]*>/i', $content, $m ) ) {
