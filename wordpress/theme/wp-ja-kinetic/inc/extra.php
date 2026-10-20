@@ -924,30 +924,14 @@ function wp_ja_kinetic_clients_mark_fallback( string $content, array $block ): s
 add_filter( 'render_block', 'wp_ja_kinetic_clients_mark_fallback', 10, 2 );
 
 /**
- * Whether the site wears a Tracy design system: the worn variation's custom CSS states the role
- * variables (`--ds-c-accent-text` …); the theme's own styles never do. Read once per request.
- *
- * @return bool
- */
-function wp_ja_kinetic_wears_design_system(): bool {
-	static $worn = null;
-	if ( null === $worn ) {
-		$styles = function_exists( 'wp_get_global_styles' ) ? wp_get_global_styles() : array();
-		$css    = is_array( $styles ) && isset( $styles['css'] ) && is_string( $styles['css'] ) ? $styles['css'] : '';
-		$worn   = str_contains( $css, '--ds-c-accent-text' );
-	}
-	return $worn;
-}
-
-/**
- * Under a design system the integration card's mark follows the system's accent. The marks are
- * pictures stroked in Kinetic's lime (the template's accent: olive on the light page through a
- * filter), so the picture is drawn inline instead, its strokes and fills in currentColor, and the
- * stylesheet colours it with the readable accent role. Without a system nothing changes: the
- * published `<img>` stays. Inline, not a CSS mask: a mask is a second fetch (CORS mode) that a
- * preview proxy or a missing file turns into an empty tile; the inline mark has nothing left to
- * load. Only a small, plain SVG file of this site (uploads or the theme) is inlined; anything else
- * keeps its `<img>`.
+ * The integration card's mark is drawn inline, its strokes and fills in currentColor, so the
+ * stylesheet colours it: the readable accent role under a design system, the picture's own lime
+ * (olive on the light Integrations page) without one. The demo's marks are uploaded SVG pictures;
+ * as an `<img>` no stylesheet reaches their strokes, and the client-side design system preview has
+ * no server-side "worn" signal to switch on, so the mark is inline on every page view. Inline, not a
+ * CSS mask: a mask is a second fetch (CORS mode) that a preview proxy or a missing file turns into
+ * an empty tile; the inline mark has nothing left to load. Only a small, plain SVG file of this site
+ * (uploads or the theme) is inlined; anything else keeps its `<img>`.
  *
  * @param string $content The rendered block.
  * @param array  $block   The parsed block.
@@ -955,7 +939,7 @@ function wp_ja_kinetic_wears_design_system(): bool {
  */
 function wp_ja_kinetic_clients_mark_inline( string $content, array $block ): string {
 	$class_attr = (string) ( $block['attrs']['className'] ?? '' );
-	if ( ! in_array( 'acm-clients-mark', preg_split( '/\s+/', $class_attr ), true ) || ! wp_ja_kinetic_wears_design_system() ) {
+	if ( ! in_array( 'acm-clients-mark', preg_split( '/\s+/', $class_attr ), true ) ) {
 		return $content;
 	}
 	if ( 1 !== preg_match( '/<img\b[^>]*\bsrc="([^"]+\.svg)"[^>]*>/i', $content, $m ) ) {
@@ -2676,3 +2660,41 @@ function wp_ja_kinetic_dot_spaces( string $content ): string {
 	return str_replace( "\u{00A0}·\u{00A0}", ' · ', $content );
 }
 add_filter( 'the_content', 'wp_ja_kinetic_dot_spaces', 99 );
+
+/**
+ * Three demo pictures are drawn in the template's lime: the hero terminal, the KineticQL code
+ * panel and the bento telemetry chart (raster pictures, owner-swappable image blocks). A worn
+ * design system cannot recolour a raster, so each one gets a drawn twin: the same picture as an
+ * inline SVG whose lime marks read `--ds-c-accent-on-ink` (the accent readable on a dark band) and
+ * whose status colours (INFO/WARN/ERROR, the timings) stay the picture's own. The twin is printed
+ * hidden after the `<img>` on every page view, so the client-side preview gets it too; the slot
+ * contract's sideRules lay the twin over the picture (the same box; the picture and its alt text stay
+ * under it) while a system is worn. Without a system the page renders the picture alone, as before. Only the template's own picture (matched by file
+ * name) gets a twin: a picture the owner put in its place is left alone.
+ *
+ * @param string $content The rendered block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_kinetic_picture_twin( string $content, array $block ): string {
+	if ( 'core/image' !== ( $block['blockName'] ?? '' ) ) {
+		return $content;
+	}
+	if ( 1 !== preg_match( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $m ) ) {
+		return $content;
+	}
+	$path = (string) wp_parse_url( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ), PHP_URL_PATH );
+	$name = (string) pathinfo( $path, PATHINFO_FILENAME );
+	$twins = array( 'hero-terminal-panel-terminal', 'kineticql-code-panel-terminal', 'bento-telemetry-chart' );
+	if ( 'webp' !== strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) ) || ! in_array( $name, $twins, true ) ) {
+		return $content;
+	}
+	$file = get_theme_file_path( 'assets/twins/' . $name . '.svg' );
+	if ( ! is_readable( $file ) ) {
+		return $content;
+	}
+	$svg = trim( (string) file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a theme file.
+	$svg = (string) preg_replace( '/^<svg\b/i', '<svg class="hx-twin" aria-hidden="true" focusable="false"', $svg );
+	return substr_replace( $content, $m[0] . $svg, strpos( $content, $m[0] ), strlen( $m[0] ) );
+}
+add_filter( 'render_block', 'wp_ja_kinetic_picture_twin', 12, 2 );
