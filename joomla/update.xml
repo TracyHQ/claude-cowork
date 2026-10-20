@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Restaurant 1.0.6, Fresco 1.0.2 and Diner 1.0.2 contracts (Fresco and Diner are new to the package; design-system role-variable releases)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.47</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.47</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.47/pkg_claudecowork-0.24.47.zip</downloadurl>
+        </downloads>
+        <sha256>810c4f905a61822e28a4e3882e16d3489aa28b1c960f4170b077bb4db8e4ed6e</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the JA Social II 1.0.5 contract (design-system role-variable release; with no design system worn it looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
