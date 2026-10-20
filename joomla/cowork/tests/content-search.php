@@ -885,7 +885,7 @@ namespace {
         return $names[1];
     };
     $csFactoryList = $csListOf(__DIR__ . '/../com_claudecowork/administrator/src/Service/EngineFactory.php', 'function loadEngine');
-    $csLegacyList = $csListOf(__DIR__ . '/../com_claudecowork/site/controllers/api.php', 'function exec');
+    $csLegacyList = $csListOf(__DIR__ . '/../com_claudecowork/administrator/legacy/LegacyDoor.php', 'function answer');
     checkTrue('loading: the lists were read from the source', in_array('SiteWriter', $csFactoryList, true) && in_array('Engine', $csFactoryList, true)
         && in_array('SiteWriter', $csLegacyList, true) && in_array('Engine', $csLegacyList, true));
 
