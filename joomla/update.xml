@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Prodex 1.0.4, Smallbiz 1.0.4, Rent 1.0.5, Mood 1.0.4, Symphony 1.0.4, Donate 1.0.7 and Space 1.0.6 contracts (design-system role-variable releases; with no design system worn each looks as before)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.45</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.45</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.45/pkg_claudecowork-0.24.45.zip</downloadurl>
+        </downloads>
+        <sha256>ddc07202f9e396ff068f377361edcbdbd29e9b0b2360c6b23be136daed4097ad</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>answers the administrator door on Joomla 3 and on sites missing the component's site folder</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
