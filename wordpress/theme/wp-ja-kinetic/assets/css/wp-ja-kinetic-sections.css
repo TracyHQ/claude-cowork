@@ -7300,3 +7300,15 @@ html[data-style="signal"] .acm-kineticql-split { --split-syn-key: var(--primary)
     font-size: 12px !important;
   }
 }
+
+/* The drawn twins of the three lime demo pictures (inc/extra.php wp_ja_kinetic_picture_twin):
+   hidden here; the slot contract lays the twin over the picture while a system is worn. */
+.hx-twin {
+  display: none;
+  width: 100%;
+  height: auto;
+}
+.acm-bento .acm-bento-media .hx-twin {
+  border-radius: var(--ds-card-radius, 12px);
+  border: 1px solid var(--bento-border);
+}

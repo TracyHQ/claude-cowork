@@ -2660,3 +2660,41 @@ function wp_ja_kinetic_dot_spaces( string $content ): string {
 	return str_replace( "\u{00A0}·\u{00A0}", ' · ', $content );
 }
 add_filter( 'the_content', 'wp_ja_kinetic_dot_spaces', 99 );
+
+/**
+ * Three demo pictures are drawn in the template's lime: the hero terminal, the KineticQL code
+ * panel and the bento telemetry chart (raster pictures, owner-swappable image blocks). A worn
+ * design system cannot recolour a raster, so each one gets a drawn twin: the same picture as an
+ * inline SVG whose lime marks read `--ds-c-accent-on-ink` (the accent readable on a dark band) and
+ * whose status colours (INFO/WARN/ERROR, the timings) stay the picture's own. The twin is printed
+ * hidden after the `<img>` on every page view, so the client-side preview gets it too; the slot
+ * contract's sideRules lay the twin over the picture (the same box; the picture and its alt text stay
+ * under it) while a system is worn. Without a system the page renders the picture alone, as before. Only the template's own picture (matched by file
+ * name) gets a twin: a picture the owner put in its place is left alone.
+ *
+ * @param string $content The rendered block.
+ * @param array  $block   The parsed block.
+ * @return string
+ */
+function wp_ja_kinetic_picture_twin( string $content, array $block ): string {
+	if ( 'core/image' !== ( $block['blockName'] ?? '' ) ) {
+		return $content;
+	}
+	if ( 1 !== preg_match( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $m ) ) {
+		return $content;
+	}
+	$path = (string) wp_parse_url( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ), PHP_URL_PATH );
+	$name = (string) pathinfo( $path, PATHINFO_FILENAME );
+	$twins = array( 'hero-terminal-panel-terminal', 'kineticql-code-panel-terminal', 'bento-telemetry-chart' );
+	if ( 'webp' !== strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) ) || ! in_array( $name, $twins, true ) ) {
+		return $content;
+	}
+	$file = get_theme_file_path( 'assets/twins/' . $name . '.svg' );
+	if ( ! is_readable( $file ) ) {
+		return $content;
+	}
+	$svg = trim( (string) file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a theme file.
+	$svg = (string) preg_replace( '/^<svg\b/i', '<svg class="hx-twin" aria-hidden="true" focusable="false"', $svg );
+	return substr_replace( $content, $m[0] . $svg, strpos( $content, $m[0] ), strlen( $m[0] ) );
+}
+add_filter( 'render_block', 'wp_ja_kinetic_picture_twin', 12, 2 );
