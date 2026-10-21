@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Fresco 1.0.4 and JA Diner 1.0.4 contracts (text colours read text roles)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.49</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.49</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.49/pkg_claudecowork-0.24.49.zip</downloadurl>
+        </downloads>
+        <sha256>698d08855c9f8a0d57adb93e6a2b88d0a64e9d83a14a634cec9ffd6505f9773d</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the JA Fresco 1.0.3 and JA Diner 1.0.3 contracts (Customize fixes and demo link targets)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
