@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>answers the cheap questions a sync asks first: site.fingerprint, files.list without the sha1, and files.hash</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.50</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.50</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.50/pkg_claudecowork-0.24.50.zip</downloadurl>
+        </downloads>
+        <sha256>fe5a4def8fd1abd624700322f6790613afedb48ccec086a4d21e91fe2e82b3f9</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the JA Fresco 1.0.4 and JA Diner 1.0.4 contracts (text colours read text roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
