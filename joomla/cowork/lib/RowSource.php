@@ -42,6 +42,20 @@ interface RowSource
     public function tableStats(): array;
 
     /**
+     * `CHECKSUM TABLE` over the tables named, in ONE statement: a cheap "has this table changed?"
+     * that reads no row across the wire.
+     *
+     * Keyed by the names asked for, in their order. A value is the checksum as a string (it is an
+     * unsigned 64-bit number, past what a PHP int holds) or null where the server answers NULL — a
+     * table that does not exist, or one it cannot checksum. The caller keeps the list short; the
+     * batching lives in {@see DbDumper::checksums}.
+     *
+     * @param string[] $tables
+     * @return array<string,?string>
+     */
+    public function checksums(array $tables): array;
+
+    /**
      * One batch of rows: LIMIT $limit OFFSET $offset. Each row is an array of column values in
      * column order, where null means SQL NULL.
      *

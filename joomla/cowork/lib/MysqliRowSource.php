@@ -65,6 +65,41 @@ final class MysqliRowSource implements RowSource
         return $out;
     }
 
+    public function checksums(array $tables): array
+    {
+        $out = [];
+        if ($tables === []) {
+            return $out;
+        }
+        $names = array_map(fn($t) => '`' . str_replace('`', '``', (string) $t) . '`', $tables);
+        $res = $this->db->query('CHECKSUM TABLE ' . implode(', ', $names));
+        if (!$res) {
+            throw new RuntimeException($this->db->error ?: 'checksum failed');
+        }
+        // One row per table named, in the order named, with `Table` as `<database>.<table>`. Matched
+        // by position and checked by that suffix, so a database name with a dot in it changes nothing.
+        $i = 0;
+        while ($row = $res->fetch_assoc()) {
+            $table = $tables[$i] ?? null;
+            $i++;
+            if ($table === null) {
+                continue;
+            }
+            $named = (string) ($row['Table'] ?? '');
+            if ($named !== $table && substr($named, -strlen('.' . $table)) !== '.' . $table) {
+                continue;
+            }
+            $sum = $row['Checksum'] ?? null;
+            $out[$table] = $sum === null ? null : (string) $sum;
+        }
+        foreach ($tables as $table) {
+            if (!array_key_exists($table, $out)) {
+                $out[$table] = null;
+            }
+        }
+        return $out;
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $t = $this->db->real_escape_string($table);

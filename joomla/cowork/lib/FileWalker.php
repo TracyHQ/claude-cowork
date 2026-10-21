@@ -2,9 +2,10 @@
 /**
  * FileWalker — an ordered, resumable walk of the webroot that leaves out what nobody wants.
  *
- * Returns one batch of paths at a time, relative to the webroot, with size and sha1. The caller
- * keeps the cursor — the last path of the previous batch — and asks again; nothing about the
- * walk is remembered between requests. The order is sorted and therefore stable, which is what
+ * Returns one batch of paths at a time, relative to the webroot, with size and sha1 — or size and
+ * mtime, or one digest over a page of them, neither of which reads a file. The caller keeps the
+ * cursor — the last path of the previous batch — and asks again; nothing about the walk is
+ * remembered between requests. The order is sorted and therefore stable, which is what
  * makes resuming from a path mean anything at all.
  *
  * Every path that leaves this class has been checked to be inside the webroot, so a caller
@@ -136,6 +137,174 @@ final class FileWalker
             'next_cursor' => count($slice) ? end($slice) : null,
             'done'        => $done,
         ];
+    }
+
+    /**
+     * The same batch as {@see listBatch}, with the modification time in place of the sha1.
+     *
+     * Same walk, same exclusions, same order and the same cursor rule, so a caller can switch
+     * between the two answers page for page. Nothing is read here: size and mtime are one stat
+     * per file, where a sha1 is every byte of it. On a real site of 34 000 files that difference
+     * is what makes "has anything changed?" a question worth asking on every sync.
+     *
+     * @return array{files:array<int,array{path:string,size:int,mtime:int}>, next_cursor:?string, done:bool}
+     */
+    public function statBatch(string $after, int $limit): array
+    {
+        if ($limit < 1) {
+            throw new InvalidArgumentException('limit must be >= 1');
+        }
+        $all = $this->allPaths();
+        $start = 0;
+        if ($after !== '') {
+            $pos = array_search($after, $all, true);
+            $start = ($pos === false) ? 0 : $pos + 1;
+        }
+        $slice = array_slice($all, $start, $limit);
+        $files = [];
+        foreach ($slice as $rel) {
+            [$size, $mtime] = $this->sizeAndTime($rel);
+            $files[] = ['path' => $rel, 'size' => $size, 'mtime' => $mtime];
+        }
+        return [
+            'files'       => $files,
+            'next_cursor' => count($slice) ? end($slice) : null,
+            'done'        => $start + count($slice) >= count($all),
+        ];
+    }
+
+    /**
+     * One page of the walk folded into a single digest: what a caller compares with the digest it
+     * kept from the last time, to learn whether this stretch of the tree moved without listing it.
+     *
+     * The page starts at the first path that sorts AFTER `$after` and holds at most `$limit` paths.
+     * A fixed count, never a clock, so the same tree cuts into the same pages every time and a
+     * digest from last week still describes the same stretch. "After" is a comparison, not a
+     * lookup: listBatch() starts again from the top when its cursor is no longer in the tree, and
+     * here a deleted cursor file would then turn every later page into a different one.
+     *
+     * The digest is sha1 over `path NUL size NUL mtime LF` for each path of the page, in order. No
+     * byte of any file is read, so a change that keeps both the size and the mtime goes unseen;
+     * {@see hashPaths} is the expensive question for the files a caller does want to be sure of.
+     *
+     * @return array{count:int, bytes:int, digest:string, next_after:?string}
+     */
+    public function fingerprintPage(string $after, int $limit): array
+    {
+        if ($limit < 1) {
+            throw new InvalidArgumentException('limit must be >= 1');
+        }
+        $all = $this->allPaths();
+        $total = count($all);
+        $start = 0;
+        if ($after !== '') {
+            // The first path greater than the cursor, by the same byte order sort(SORT_STRING) used.
+            $lo = 0;
+            $hi = $total;
+            while ($lo < $hi) {
+                $mid = intdiv($lo + $hi, 2);
+                if (strcmp($all[$mid], $after) <= 0) {
+                    $lo = $mid + 1;
+                } else {
+                    $hi = $mid;
+                }
+            }
+            $start = $lo;
+        }
+        $slice = array_slice($all, $start, $limit);
+        $ctx = hash_init('sha1');
+        $bytes = 0;
+        foreach ($slice as $rel) {
+            [$size, $mtime] = $this->sizeAndTime($rel);
+            $bytes += $size;
+            hash_update($ctx, $rel . "\0" . $size . "\0" . $mtime . "\n");
+        }
+        $more = $start + count($slice) < $total;
+        return [
+            'count'      => count($slice),
+            'bytes'      => $bytes,
+            'digest'     => hash_final($ctx),
+            'next_after' => $more && $slice !== [] ? end($slice) : null,
+        ];
+    }
+
+    /**
+     * The sha1 of each path asked for, or null where there is no file this walker would list and
+     * file.read would serve.
+     *
+     * Null rather than an error per path, so one stale name in a list of five hundred does not
+     * cost the other 499. The checks are file.read's and then some: no absolute path, no `.` or
+     * `..` segment, no protected path ({@see isSecretPath}); nothing under a directory the walk
+     * leaves out or a symlinked directory the walk does not descend into; and the real path must
+     * stay inside the webroot and be a regular file, which is what stops a symlink leading out.
+     *
+     * @param string[] $paths
+     * @return array<string,?string>
+     */
+    public function hashPaths(array $paths): array
+    {
+        $out = [];
+        foreach ($paths as $rel) {
+            $abs = $this->walkedFile($rel);
+            $sha = $abs === null ? false : @sha1_file($abs);
+            $out[$rel] = $sha === false ? null : $sha;
+        }
+        return $out;
+    }
+
+    /** The absolute path of a file the walk lists and file.read serves, or null. */
+    private function walkedFile(string $rel): ?string
+    {
+        if ($rel === '' || strpos($rel, "\0") !== false || strpos($rel, '\\') !== false) {
+            return null;
+        }
+        if ($rel[0] === '/' || preg_match('~^[A-Za-z]:~', $rel)) {
+            return null;
+        }
+        $parts = explode('/', $rel);
+        foreach ($parts as $part) {
+            if ($part === '' || $part === '.' || $part === '..') {
+                return null;
+            }
+        }
+        if ($this->isSecretPath($rel)) {
+            return null;
+        }
+        $prefix = '';
+        $last = count($parts) - 1;
+        for ($i = 0; $i < $last; $i++) {
+            $prefix = $i === 0 ? $parts[0] : $prefix . '/' . $parts[$i];
+            foreach ($this->skipDirs as $skip) {
+                // Lowercased, unlike the walk: on a filesystem that ignores case, `Cache/x` is the
+                // file the walk leaves out under `cache/`. Refusing too much is the safe side.
+                if (strtolower($prefix) === strtolower($skip)) {
+                    return null;
+                }
+            }
+            if (is_link($this->root . '/' . $prefix)) {
+                return null;
+            }
+        }
+        $abs = realpath($this->root . '/' . $rel);
+        if ($abs === false || strpos($abs, $this->root . DIRECTORY_SEPARATOR) !== 0) {
+            return null;
+        }
+        return is_file($abs) ? $abs : null;
+    }
+
+    /**
+     * Size and mtime of one walked path, from one stat. A file removed since the walk reads as
+     * 0 and 0, as `(int) filesize()` already does in listBatch().
+     *
+     * @return array{0:int,1:int}
+     */
+    private function sizeAndTime(string $rel): array
+    {
+        $st = @stat($this->root . '/' . $rel);
+        if ($st === false) {
+            return [0, 0];
+        }
+        return [(int) $st['size'], (int) $st['mtime']];
     }
 
     /**

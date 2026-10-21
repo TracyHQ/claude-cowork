@@ -499,6 +499,8 @@ check('engine without dumper wired -> unavailable', $noDump['error'], 'unavailab
 require __DIR__ . "/db-dump-many.php";
 // One database, several sites: info.db_prefix and db.tables.prefix name this site's own prefix.
 require __DIR__ . "/db-tables-prefix.php";
+// The cheap questions a sync asks first: files.list without the sha1, files.hash, site.fingerprint.
+require __DIR__ . "/site-fingerprint.php";
 
 // ---- site.stats -------------------------------------------------------------------------
 // The two questions a caller settles before committing anyone to a wait: how big is this, and

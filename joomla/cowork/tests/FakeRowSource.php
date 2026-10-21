@@ -97,6 +97,31 @@ final class FakeRowSource implements RowSource
         unset($this->tables[$table]);
     }
 
+    /** @var array<int,string[]> Every list checksums() was asked for, so a test can see the batches. */
+    public array $checksumCalls = [];
+
+    /**
+     * A checksum of the table's rows as the fake holds them, so changing a row changes it. Not
+     * MySQL's number — only its shape: a decimal string, or null for a table that is not here, as
+     * CHECKSUM TABLE answers NULL for one. A table may pin `checksum` (null included) to stand for
+     * an engine that cannot checksum.
+     */
+    public function checksums(array $tables): array
+    {
+        $this->checksumCalls[] = $tables;
+        $out = [];
+        foreach ($tables as $table) {
+            if (!isset($this->tables[$table])) {
+                $out[$table] = null;
+            } elseif (array_key_exists('checksum', $this->tables[$table])) {
+                $out[$table] = $this->tables[$table]['checksum'];
+            } else {
+                $out[$table] = (string) hexdec(substr(sha1(serialize($this->tables[$table]['rows'] ?? [])), 0, 12));
+            }
+        }
+        return $out;
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $rows = $this->tables[$table]['rows'] ?? [];
