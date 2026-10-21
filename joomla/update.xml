@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>carries the JA Fresco 1.0.3 and JA Diner 1.0.3 contracts (Customize fixes and demo link targets)</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.48</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.48</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.48/pkg_claudecowork-0.24.48.zip</downloadurl>
+        </downloads>
+        <sha256>4f9d3ce82e896eb6c97a92188a609e2a96cc84233c11e0197b21a73cd1fd65ad</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>carries the JA Restaurant 1.0.6, Fresco 1.0.2 and Diner 1.0.2 contracts (Fresco and Diner are new to the package; design-system role-variable releases)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
