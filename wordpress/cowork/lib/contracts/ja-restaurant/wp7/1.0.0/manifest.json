@@ -18,14 +18,14 @@
     "parts": {
       "webroot": {
         "file": "ja-restaurant-wp7-webroot-1.0.0.tar.gz",
-        "bytes": 55883169,
-        "sha256": "f2e577085400d19ab951b346eb817fb30db3fb573b1ba73bdb0da9b09a0696e5",
+        "bytes": 55886216,
+        "sha256": "c794e16426f9abc04d65d2c4ec4e5ed33b20971918b4fd4674b3833876f58106",
         "url": "https://github.com/JoomlArt-Products/ja-products/releases/download/quickstart%2Fja-restaurant%2Fwp7/ja-restaurant-wp7-webroot-1.0.0.tar.gz"
       },
       "database": {
         "file": "ja-restaurant-wp7-database-1.0.0.sql.gz",
-        "bytes": 83649,
-        "sha256": "31e8d0d708e8623363d61beaceb844804f2b9c10ae977ef5eaa2494eedd04ec3",
+        "bytes": 83766,
+        "sha256": "c48e6724822f687ac85cb74fdb2045f845b0f8f6882e21480071ae103a249528",
         "url": "https://github.com/JoomlArt-Products/ja-products/releases/download/quickstart%2Fja-restaurant%2Fwp7/ja-restaurant-wp7-database-1.0.0.sql.gz"
       }
     }

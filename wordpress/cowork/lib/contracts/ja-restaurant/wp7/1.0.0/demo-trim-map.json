@@ -2,11 +2,11 @@
   "schemaVersion": "tracy-quickstart-demo-trim/wordpress/v1",
   "extensionVersion": "1.0.0",
   "contract": "ja-restaurant/wp7/1.0.0",
-  "baseHash": "b2ba62507c588f60e9c3db212872f48f09b256333e52b342e608a2f5cd5761e3",
+  "baseHash": "765bcfa9ade09e5033f89494968d7fd07ef3444d1f2e5c393b968cba091a0d96",
   "baseFiles": {
-    "manifest.json": "0024c5cf4545aef5fc5e27e2bf87757657963d61a671d1bffcf7880ca2523fc9",
+    "manifest.json": "416250ac3b37b65f0cf258706d525323c4732c20f3c078baea7a7d744af454d2",
     "content-map.json": "3da2500fa124dc4b363d22db547db65f129c9770ca6e2d276324132bc09f49e0",
-    "presentation-lock.json": "bc2d64337efa909968f65a184f140ef0a6e05a153ac1f63c7a3fc510119fdd02"
+    "presentation-lock.json": "32da7d95a095c3c550205cfebb3ec187718d1b69c9c4a770ec76391126cea00b"
   },
   "kept": [
     {
