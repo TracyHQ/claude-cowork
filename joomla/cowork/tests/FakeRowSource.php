@@ -122,6 +122,34 @@ final class FakeRowSource implements RowSource
         return $out;
     }
 
+    /**
+     * The substance checksum in its real shape, "<rows>:<xor>", over the columns `$skip` leaves:
+     * not MySQL's number, but it moves exactly when a kept column does. A table without `columns`
+     * names its columns c0, c1, … by position.
+     */
+    public function substanceChecksum(string $table, array $skip): ?string
+    {
+        if (!isset($this->tables[$table])) {
+            return null;
+        }
+        $rows = $this->tables[$table]['rows'] ?? [];
+        $drop = array_map('strtolower', $skip);
+        $xor = 0;
+        foreach ($rows as $row) {
+            $kept = [];
+            foreach (array_values($row) as $i => $value) {
+                $name = $this->tables[$table]['columns'][$i] ?? "c{$i}";
+                if (!in_array(strtolower($name), $drop, true)) {
+                    $kept[] = $value === null ? 'N' : bin2hex($value);
+                }
+            }
+            if ($kept !== []) {
+                $xor ^= hexdec(substr(md5(implode("\x1f", $kept)), 0, 12));
+            }
+        }
+        return count($rows) . ':' . $xor;
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $rows = $this->tables[$table]['rows'] ?? [];

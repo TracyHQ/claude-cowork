@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>answers the cheap questions a sync asks first: site.fingerprint, files.list without the sha1, and files.hash</description>
+        <description>answers the cheap questions a sync asks first: site.fingerprint (with skip_columns, a table checksum that ignores hit counters and visit dates), files.list without the sha1, and files.hash</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.50</version>
@@ -24,7 +24,7 @@
         <downloads>
             <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.50/pkg_claudecowork-0.24.50.zip</downloadurl>
         </downloads>
-        <sha256>fe5a4def8fd1abd624700322f6790613afedb48ccec086a4d21e91fe2e82b3f9</sha256>
+        <sha256>f425e274fed0405fcf0d7d791a7adca2020a79c933a2485c7e09e036b3b60657</sha256>
         <tags>
             <tag>stable</tag>
         </tags>

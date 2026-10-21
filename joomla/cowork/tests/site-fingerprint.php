@@ -75,7 +75,7 @@ function fpDigest(array $entries): string
 // ---- info ---------------------------------------------------------------------------------------
 
 $fpInfo = $fp('info')['info'];
-check('fingerprint: info advertises site.fingerprint', $fpInfo['site_fingerprint'] ?? null, ['version' => 1, 'max_files' => 50000]);
+check('fingerprint: info advertises site.fingerprint', $fpInfo['site_fingerprint'] ?? null, ['version' => 2, 'max_files' => 50000]);
 check('fingerprint: info advertises files.list without the sha1', $fpInfo['files_list'] ?? null, ['stat' => true, 'max_stat_limit' => 5000]);
 check('fingerprint: info advertises files.hash', $fpInfo['files_hash'] ?? null, ['max_paths' => 500]);
 checkTrue('fingerprint: info keeps db_dump_many and what the host said', isset($fpInfo['db_dump_many'], $fpInfo['php']));
@@ -161,7 +161,7 @@ check('files.hash without a walker is unavailable', (new Engine($FPTOKEN))->hand
 $fpOne = $fp('site.fingerprint');
 check('fingerprint ok', $fpOne['ok'], true);
 check('fingerprint shape', array_keys($fpOne['fingerprint']), ['version', 'files', 'tables', 'seconds']);
-check('fingerprint version', $fpOne['fingerprint']['version'], 1);
+check('fingerprint version', $fpOne['fingerprint']['version'], 2);
 check('fingerprint files shape', array_keys($fpOne['fingerprint']['files']), ['count', 'bytes', 'digest', 'next_after']);
 check('fingerprint counts the walk files.list walks', $fpOne['fingerprint']['files']['count'], count($fpHashPaths));
 check('fingerprint bytes are the walk\'s bytes', $fpOne['fingerprint']['files']['bytes'], array_sum(array_column($fpStatEntries, 'size')));
@@ -237,7 +237,7 @@ check('fingerprint tables: a subset answers those, in the order asked',
 check('fingerprint tables: a name db.tables does not list is refused', $fp('site.fingerprint', ['files' => false, 'tables' => ['jos_a', 'jos_nope']])['error'], 'bad_params');
 check('fingerprint tables: an empty subset is refused', $fp('site.fingerprint', ['tables' => []])['error'], 'bad_params');
 check('fingerprint tables: checksums false leaves the database out', $fp('site.fingerprint', ['checksums' => false])['fingerprint']['tables'], null);
-check('fingerprint: both false is an empty fingerprint', array_slice($fp('site.fingerprint', ['files' => false, 'checksums' => false])['fingerprint'], 0, 3), ['version' => 1, 'files' => null, 'tables' => null]);
+check('fingerprint: both false is an empty fingerprint', array_slice($fp('site.fingerprint', ['files' => false, 'checksums' => false])['fingerprint'], 0, 3), ['version' => 2, 'files' => null, 'tables' => null]);
 
 $fpMany = [];
 for ($i = 1; $i <= 120; $i++) {
@@ -248,6 +248,60 @@ $fpManyAnswer = (new Engine($FPTOKEN, [], new DbDumper($fpManySource)))->handle(
 check('fingerprint tables: 120 tables are three CHECKSUM TABLE statements of at most 50', array_map('count', $fpManySource->checksumCalls), [50, 50, 20]);
 check('fingerprint tables: and every one answered', count((array) $fpManyAnswer['fingerprint']['tables']), 120);
 
+// ---- site.fingerprint: skip_columns, a checksum of the substance --------------------------------
+// On a live site CHECKSUM TABLE moves on almost every request (content.hits on each page view,
+// users.lastvisitDate on each login), so "nothing changed" was never seen.
+
+$fpSubSource = new FakeRowSource([
+    'jos_content' => ['create' => 'CREATE TABLE c', 'columns' => ['id', 'title', 'hits'], 'key' => ['id'],
+        'rows' => [['1', 'Home', '10'], ['2', 'About', '3']]],
+    'jos_users' => ['create' => 'CREATE TABLE u', 'columns' => ['id', 'name', 'lastvisitDate'], 'key' => ['id'],
+        'rows' => [['1', 'Ana', '2026-10-01 10:00:00']]],
+    'jos_empty' => ['create' => 'CREATE TABLE e', 'columns' => ['id'], 'rows' => []],
+    'jos_counter' => ['create' => 'CREATE TABLE n', 'columns' => ['hits'], 'rows' => [['1'], ['2']]],
+]);
+$fpSubEngine = new Engine($FPTOKEN, [], new DbDumper($fpSubSource));
+$fpSub = function (array $params) use ($fpSubEngine, $FPTOKEN): array {
+    return $fpSubEngine->handle(['token' => $FPTOKEN, 'action' => 'site.fingerprint', 'params' => ['files' => false] + $params]);
+};
+$fpSkip = ['skip_columns' => ['lastvisitDate', 'hits']];
+$fpSubOne = $fpSub($fpSkip)['fingerprint'];
+check('skip_columns: the answer echoes the names used, sorted', $fpSubOne['skip_columns'], ['hits', 'lastvisitDate']);
+check('skip_columns: the echo sits beside tables', array_keys($fpSubOne), ['version', 'files', 'tables', 'skip_columns', 'seconds']);
+checkTrue('skip_columns: every table answers "<rows>:<xor>"', count(array_filter((array) $fpSubOne['tables'], function ($v) { return is_string($v) && preg_match('/^\d+:\d+$/D', $v); })) === 4);
+check('skip_columns: a table with no rows is 0:0', $fpSubOne['tables']->jos_empty, '0:0');
+check('skip_columns: a table with no column left is <rows>:0', $fpSubOne['tables']->jos_counter, '2:0');
+check('skip_columns: the count leads the value', explode(':', $fpSubOne['tables']->jos_content)[0], '2');
+$fpSubSource->deleteRow('jos_content', 0);
+$fpSubSource->insertRow('jos_content', ['1', 'Home', '11']);
+$fpSubSource->deleteRow('jos_users', 0);
+$fpSubSource->insertRow('jos_users', ['1', 'Ana', '2026-10-22 09:00:00']);
+$fpSubTwo = $fpSub($fpSkip)['fingerprint'];
+check('skip_columns: a page view and a login keep every value', (array) $fpSubTwo['tables'], (array) $fpSubOne['tables']);
+check('skip_columns: names match ignoring case, as MySQL names columns',
+    (array) $fpSub(['skip_columns' => ['HITS', 'lastVisitDate']])['fingerprint']['tables'], (array) $fpSubOne['tables']);
+$fpSubPlain = (array) $fpSub([])['fingerprint']['tables'];
+$fpSubSource->deleteRow('jos_content', 0);
+$fpSubSource->insertRow('jos_content', ['1', 'Home', '12']);
+checkTrue('skip_columns: without them the same hit moves CHECKSUM TABLE', (array) $fpSub([])['fingerprint']['tables'] !== $fpSubPlain);
+$fpSubSource->deleteRow('jos_content', 0);
+$fpSubSource->insertRow('jos_content', ['1', 'Welcome', '12']);
+$fpSubThree = (array) $fpSub($fpSkip)['fingerprint']['tables'];
+checkTrue('skip_columns: a changed title moves its table', $fpSubThree['jos_content'] !== $fpSubOne['tables']->jos_content);
+check('skip_columns: and no other', [$fpSubThree['jos_users'], $fpSubThree['jos_empty'], $fpSubThree['jos_counter']],
+    [$fpSubOne['tables']->jos_users, $fpSubOne['tables']->jos_empty, $fpSubOne['tables']->jos_counter]);
+check('skip_columns: no CHECKSUM TABLE is asked when they are given', $fpSubSource->checksumCalls, [[ 'jos_content', 'jos_users', 'jos_empty', 'jos_counter'], ['jos_content', 'jos_users', 'jos_empty', 'jos_counter']]);
+check('skip_columns: a subset of tables takes them too', array_keys((array) $fpSub($fpSkip + ['tables' => ['jos_users']])['fingerprint']['tables']), ['jos_users']);
+check('skip_columns: an empty list is CHECKSUM TABLE and no echo', array_key_exists('skip_columns', $fpSub(['skip_columns' => []])['fingerprint']), false);
+check('skip_columns: without them there is no echo', array_keys($fpSub([])['fingerprint']), ['version', 'files', 'tables', 'seconds']);
+check('skip_columns: duplicates are used once', $fpSub(['skip_columns' => ['hits', 'hits']])['fingerprint']['skip_columns'], ['hits']);
+foreach ([['hits`'], ['1hits'], ['hi ts'], ['a.b'], [''], [7], [str_repeat('a', 65)], 'hits'] as $fpBad) {
+    check('skip_columns: refused ' . json_encode($fpBad), $fpSub(['skip_columns' => $fpBad])['error'] ?? null, 'bad_params');
+}
+check('skip_columns: 50 names are taken', $fpSub(['skip_columns' => array_map(function ($i) { return "c_{$i}"; }, range(1, 50))])['ok'], true);
+check('skip_columns: 51 are refused', $fpSub(['skip_columns' => array_map(function ($i) { return "c_{$i}"; }, range(1, 51))])['error'], 'bad_params');
+check('skip_columns: a 64-character name is taken', $fpSub(['skip_columns' => [str_repeat('a', 64)]])['ok'], true);
+
 check('fingerprint without a dumper: checksums are unavailable', (new Engine($FPTOKEN, [], null, $fpWalker))->handle(['token' => $FPTOKEN, 'action' => 'site.fingerprint'])['error'], 'unavailable');
 check('fingerprint without a dumper: the files alone still answer', (new Engine($FPTOKEN, [], null, $fpWalker))->handle(['token' => $FPTOKEN, 'action' => 'site.fingerprint', 'params' => ['checksums' => false]])['ok'], true);
 check('fingerprint without a walker: the files are unavailable', (new Engine($FPTOKEN, [], new DbDumper($fpSource)))->handle(['token' => $FPTOKEN, 'action' => 'site.fingerprint'])['error'], 'unavailable');
@@ -255,6 +309,7 @@ check('fingerprint without a walker: the files are unavailable', (new Engine($FP
 // One real answer, as the door encodes it, when asked for (COWORK_TEST_SHOW_FINGERPRINT=1).
 if (getenv('COWORK_TEST_SHOW_FINGERPRINT')) {
     echo json_encode($fp('site.fingerprint', ['limit' => 5]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+    echo json_encode($fpSub($fpSkip), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
     echo json_encode($fp('files.list', ['limit' => 2, 'hash' => false]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
     echo json_encode($fp('files.hash', ['paths' => ['images/a.png', 'images/missing.png', '../index.php']]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
     echo json_encode(array_intersect_key($fp('info')['info'], ['site_fingerprint' => 1, 'files_list' => 1, 'files_hash' => 1]), JSON_PRETTY_PRINT) . "\n";

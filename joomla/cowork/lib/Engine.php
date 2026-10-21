@@ -85,7 +85,10 @@ final class Engine
     private const FINGERPRINT_FILES = 20000;
     private const MAX_FINGERPRINT_FILES = 50000;
     /** The version of the fingerprint's shape: a digest kept under another version is not comparable. */
-    private const FINGERPRINT_VERSION = 1;
+    private const FINGERPRINT_VERSION = 2;
+    /** site.fingerprint `skip_columns`: how many names, and the one shape a name may have. */
+    private const MAX_SKIP_COLUMNS = 50;
+    private const COLUMN_NAME = '/^[A-Za-z_][A-Za-z0-9_]{0,63}$/D';
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
     /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
     private const MIN_PART_BYTES = 5242880;
@@ -1269,6 +1272,12 @@ final class Engine
      * list), in batches; a value is the checksum as a string, null where the server answers NULL.
      * `checksums: false` leaves the database out. The tables are answered in full on every page;
      * a caller paging the files asks for them once, with the first.
+     *
+     * `skip_columns` (version 2): up to MAX_SKIP_COLUMNS column names. Given and not empty, EVERY
+     * table of the call is checksummed by its substance instead ({@see
+     * RowSource::substanceChecksum}, "<rows>:<xor>"), those columns left out wherever they occur,
+     * so a hit counter or a last-visit date no longer reads as a change. The names used come back
+     * sorted as `fingerprint.skip_columns`; without them the answer is CHECKSUM TABLE's, as before.
      */
     private function siteFingerprint(array $p): array
     {
@@ -1281,6 +1290,17 @@ final class Engine
         $after = isset($p['after']) && is_string($p['after']) ? $p['after'] : '';
         $limit = (int) ($p['limit'] ?? self::FINGERPRINT_FILES);
         $limit = max(1, min($limit, self::MAX_FINGERPRINT_FILES));
+        $skip = $p['skip_columns'] ?? [];
+        if (!is_array($skip) || count($skip) > self::MAX_SKIP_COLUMNS) {
+            return $this->err('bad_params', 'skip_columns must be a list of at most ' . self::MAX_SKIP_COLUMNS . ' column names');
+        }
+        foreach ($skip as $column) {
+            if (!is_string($column) || !preg_match(self::COLUMN_NAME, $column)) {
+                return $this->err('bad_params', 'every skip_columns entry must be a plain column name: a letter or _, then up to 63 letters, digits or _');
+            }
+        }
+        $skip = array_values(array_unique($skip));
+        sort($skip, SORT_STRING);
         $only = $p['tables'] ?? null;
         if ($only !== null) {
             if (!is_array($only) || $only === []) {
@@ -1328,18 +1348,20 @@ final class Engine
                 }
             }
             try {
-                $tables = (object) $this->dumper->checksums($names);
+                $tables = (object) ($skip === []
+                    ? $this->dumper->checksums($names)
+                    : $this->dumper->substanceChecksums($names, $skip));
             } catch (Throwable $e) {
                 return $this->err('checksum_failed', $e->getMessage());
             }
         }
 
-        return $this->ok(['fingerprint' => [
-            'version' => self::FINGERPRINT_VERSION,
-            'files' => $files,
-            'tables' => $tables,
-            'seconds' => round(microtime(true) - $started, 3),
-        ]]);
+        $answer = ['version' => self::FINGERPRINT_VERSION, 'files' => $files, 'tables' => $tables];
+        if ($skip !== []) {
+            $answer['skip_columns'] = $skip;
+        }
+        $answer['seconds'] = round(microtime(true) - $started, 3);
+        return $this->ok(['fingerprint' => $answer]);
     }
 
     /**

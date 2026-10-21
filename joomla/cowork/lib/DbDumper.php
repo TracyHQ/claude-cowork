@@ -70,6 +70,23 @@ final class DbDumper
         return $out;
     }
 
+    /**
+     * The substance checksum ({@see RowSource::substanceChecksum}) of every table named, one query
+     * each, with the same columns left out of all of them so the values stay comparable.
+     *
+     * @param string[] $tables
+     * @param string[] $skip
+     * @return array<string,?string> keyed by table, in the order given
+     */
+    public function substanceChecksums(array $tables, array $skip): array
+    {
+        $out = [];
+        foreach (array_values($tables) as $table) {
+            $out[$table] = $this->src->substanceChecksum($table, $skip);
+        }
+        return $out;
+    }
+
     /** RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). */
     public function renameTable(string $from, string $to): void
     {
