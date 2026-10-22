@@ -889,6 +889,7 @@ class FakeSiteWriterBase implements SiteWriter
      * so one (field_id, item_id) may have several. Null keeps fieldValue in $store like every kind.
      */
     public ?array $fieldValues = null;
+    public bool $failFieldWrite = false;
     private function fieldValueRows(int $id): array
     {
         [$field, $item] = FieldValueKey::decode($id);
@@ -1020,6 +1021,7 @@ class FakeSiteWriterBase implements SiteWriter
     public function write(string $kind, int $id, array $fields): int
     {
         if ($this->trace !== null) $this->trace[] = ['write', $kind];
+        if ($this->failFieldWrite) throw new RuntimeException('Duplicate alias');
         if ($kind === 'fieldValue' && $this->fieldValues !== null) {
             $rows = $this->fieldValueRows($id);
             FieldValueKey::single($rows);
@@ -1451,6 +1453,14 @@ $mvBoth = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
 check('move plus rename lands', $mvBoth['ok'], true);
 check('the rename landed too', $writer->store['menuItem'][102]['title'], 'Add-ons');
 check('the move landed too', $writer->pos['menuItem'][102]['parent_id'], 9);
+// A move that landed and a field update that threw: the answer says part of it landed.
+$writer->failFieldWrite = true;
+$mvPartly = $wEngine->handle(['token' => $WTOKEN, 'action' => 'content.update',
+    'params' => ['apply_id' => 'V3', 'kind' => 'menuItem', 'id' => 102,
+        'fields' => ['title' => 'Again', 'parent_id' => 5]]]);
+$writer->failFieldWrite = false;
+check('move then failed field update is refused', $mvPartly['error'] ?? null, 'write_failed');
+check('and says part of the change landed', $mvPartly['landed'] ?? null, true);
 $mvBothRevert = $wEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'V2']]);
 check('one revert undoes both', $mvBothRevert['ok'], true);
 check('title restored', $writer->store['menuItem'][102]['title'], 'Extensions');
