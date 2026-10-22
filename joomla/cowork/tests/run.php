@@ -618,6 +618,61 @@ checkTrue('and carries Joomla core code that sits on the protected list',
 check('while a caller asking for it directly is still refused',
     refusal(new FileWalker($growTmp), 'configuration.php'), 'refused: protected path');
 
+// ── files.pack cut to `paths` ───────────────────────────────────────────────────────────────
+//
+// A sync that knows which files moved takes the ones file.read will not serve (a protected file,
+// one too large) without the rest of the tree: a changed Global Configuration made a sync read a
+// customer's whole 578 MB site to take one file (22/10/2026). The cut carries the same bytes a
+// whole pack would, configuration.php included, in the walk's order; a name the walk does not
+// list is left out.
+$cutEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($growTmp), new CapturingUploader());
+$untar = function (string $bytes) use ($growTmp): array {
+    $file = "$growTmp-cut.tar";
+    file_put_contents($file, $bytes);
+    $names = [];
+    exec('tar -tf ' . escapeshellarg($file) . ' 2>&1', $names, $code);
+    $out = [];
+    exec('tar -xOf ' . escapeshellarg($file) . ' configuration.php 2>/dev/null', $out);
+    unlink($file);
+    return ['code' => $code, 'names' => $names, 'configuration' => implode("\n", $out)];
+};
+$cut = $cutEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => [
+    'inline' => true, 'paths' => ['zz-after.txt', 'configuration.php', 'gone.txt'],
+]]);
+checkTrue('a pack cut to paths succeeds in one part', $cut['ok'] === true && $cut['done'] === true);
+$got = $untar(base64_decode($cut['part_b64']));
+check('the cut is a whole archive', $got['code'], 0);
+check('it carries exactly the listed files asked for, in the walk order', $got['names'], ['configuration.php', 'zz-after.txt']);
+check('configuration.php comes byte for byte, as a whole pack carries it', $got['configuration'], '<?php $offset="America/Chicago"; $sef=1;');
+check('the answer counts them', $cut['files'], 2);
+
+// A cut across parts: the cursor walks the named files alone.
+$parts = '';
+$cursor = [];
+for ($i = 0; $i < 5; $i++) {
+    $r = $cutEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => [
+        'inline' => true, 'target_bytes' => 5 * 1024 * 1024, 'paths' => ['big.bin', 'zz-after.txt'],
+    ] + $cursor]);
+    checkTrue("cut part $i succeeded", $r['ok'] === true);
+    $parts .= base64_decode($r['part_b64']);
+    if ($r['done']) {
+        break;
+    }
+    $cursor = ['path' => $r['next_path'], 'offset' => $r['next_offset'], 'size' => $r['next_size']];
+}
+check('a cut spanning parts takes two of them', $i, 1);
+$got = $untar($parts);
+check('the parts make one archive', $got['code'], 0);
+check('of the named files only', $got['names'], ['big.bin', 'zz-after.txt']);
+
+$bad = fn(array $params) => $cutEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['inline' => true] + $params]);
+check('an empty paths list is refused', $bad(['paths' => []])['error'] ?? null, 'bad_params');
+check('a path that is not a string is refused', $bad(['paths' => [7]])['error'] ?? null, 'bad_params');
+check('more paths than one pack takes are refused', $bad(['paths' => array_map(fn($n) => "f$n", range(1, 2001))])['error'] ?? null, 'bad_params');
+check('a cursor outside the paths is refused', $bad(['paths' => ['zz-after.txt'], 'path' => 'big.bin'])['error'] ?? null, 'bad_params');
+$cutInfo = $cutEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'info']);
+check('info names the cut and its bound', $cutInfo['info']['files_pack']['max_paths'] ?? null, 2000);
+
 // And the other direction: a file TRUNCATED mid-pack. Stopping short would shift the archive
 // exactly as growing does, so the remainder is zero-filled to the size the header declared.
 $shrinkTmp = sys_get_temp_dir() . '/tracy_pack_shrink_' . bin2hex(random_bytes(4));
