@@ -81,6 +81,8 @@ final class Engine
     private const MAX_FILE_STAT_LIMIT = 5000;
     /** files.hash: the paths one call may ask about, each hashed in full. */
     private const MAX_HASH_PATHS = 500;
+    /** files.pack `paths`: the files one pack may be cut to. */
+    private const MAX_PACK_PATHS = 2000;
     /** site.fingerprint: the walk paths per page, by default and at most. A count, never a clock. */
     private const FINGERPRINT_FILES = 20000;
     private const MAX_FINGERPRINT_FILES = 50000;
@@ -447,6 +449,8 @@ final class Engine
                     'max_stat_limit' => self::MAX_FILE_STAT_LIMIT,
                 ], 'files_hash' => [
                     'max_paths' => self::MAX_HASH_PATHS,
+                ], 'files_pack' => [
+                    'max_paths' => self::MAX_PACK_PATHS,
                 ]]]);
             case 'site.stats':
                 return $this->siteStats();
@@ -1380,6 +1384,13 @@ final class Engine
      * per-file cursor a 500 MB file would force an entire part into memory, which is fatal on
      * exactly the hosting this is built for.
      *
+     * `paths` (1..MAX_PACK_PATHS relative paths) cuts the pack to those files, in the walk's order;
+     * the cursor then moves through them alone. The same files and bytes a whole pack would carry
+     * ({@see FileWalker::archivePath}, so `configuration.php` included): a sync that knows which
+     * files moved takes the ones file.read will not serve — a protected file, one too large — without
+     * the rest of the tree. On a customer's site a changed Global Configuration made the sync read
+     * all 578 MB to take one file (22/10/2026).
+     *
      * @param array<string,mixed> $p
      */
     private function filesPack(array $p): array
@@ -1411,15 +1422,39 @@ final class Engine
         $entryOffset = max(0, (int) ($p['offset'] ?? 0));
         // The size that entry's header declared, handed back with the rest of the cursor.
         $declared = max(0, (int) ($p['size'] ?? 0));
+        $only = null;
+        if (array_key_exists('paths', $p)) {
+            $asked = $p['paths'];
+            if (!is_array($asked) || $asked === []) {
+                return $this->err('bad_params', 'paths must be a non-empty list of relative paths');
+            }
+            if (count($asked) > self::MAX_PACK_PATHS) {
+                return $this->err('bad_params', 'at most ' . self::MAX_PACK_PATHS . ' paths per pack');
+            }
+            foreach ($asked as $one) {
+                if (!is_string($one) || $one === '') {
+                    return $this->err('bad_params', 'every path must be a non-empty string');
+                }
+            }
+        }
 
         try {
             // Fetched once and walked in memory. The loop used to ask the walker for "the next
             // file" per file, and each of those was a search across the whole list — quadratic.
             // On a real webroot of 19,971 files PHP hit its thirty-second limit during the first
             // part. A fixture of five files never came close.
-            $queue = $path === ''
-                ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
-                : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            if (isset($asked)) {
+                $only = $this->walker->listedPaths(array_values($asked));
+                $at = $path === '' ? 0 : array_search($path, $only, true);
+                if ($at === false) {
+                    return $this->err('bad_params', 'the cursor names a path outside paths');
+                }
+                $queue = array_slice($only, $at);
+            } else {
+                $queue = $path === ''
+                    ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
+                    : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            }
             $qi = 0;
 
             $buf   = '';
@@ -1525,7 +1560,7 @@ final class Engine
                 $declared    = 0;
                 // The look-ahead ran out but the tree has not: ask for more, starting after the
                 // file just finished.
-                if ($qi >= count($queue)) {
+                if ($only === null && $qi >= count($queue)) {
                     $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
                     if ($more !== []) {
                         $queue = $more;
