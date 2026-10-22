@@ -39,6 +39,16 @@ use Joomla\CMS\Factory;
  * the path; what the files are is proven by the manifest's hashes against the release asset on
  * GitHub, and a receipt counts only where its tag and manifest hash match those.
  *
+ * ## Contract profiles it no longer needs (TCH #1568)
+ *
+ * The package carries no contract profile any more; the component fetches the one a site is held to
+ * (lib/ContractFetch.php). Joomla's upgrade removes no file from inside a folder (README, "What an
+ * upgrade leaves behind"), so a site updated from a release that carried all 225 profiles keeps
+ * all of them unless something removes them: {@see pruneContracts()}, on install and update alike.
+ * It keeps the profile the site is held to, resolved as EngineFactory resolves it, and the
+ * profiles that one names in `quickstart.contract`. When anything is unclear it deletes nothing:
+ * an extra profile costs disk, a missing one only a fetch.
+ *
  * Named class rather than `return new class`, like the component's script: Joomla 3 resolves the
  * script by this exact name. Nothing here loads the component's lib: in the same request the
  * installed (older) lib may already be loaded, and the new one could not be declared beside it.
@@ -54,6 +64,15 @@ class pkg_claudecoworkInstallerScript
     public const MANIFEST = 'administrator/components/com_claudecowork/tracy-release.json';
 
     public const UPDATER_CLASS = 'Tracy\\Plugin\\System\\ClaudeCoworkUpdate\\Extension\\ClaudeCoworkUpdate';
+
+    /** Where the component keeps its contract profiles, relative to the site root. */
+    public const CONTRACTS = 'administrator/components/com_claudecowork/lib/contracts';
+
+    /** A profile id as EngineFactory and ContractFetch accept it (copied: this script loads no lib). */
+    public const PROFILE_ID = '~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\\.[0-9]+\\.[0-9]+$~D';
+
+    /** What a derived binding's JSON holds (EngineFactory::DERIVED_MARK). */
+    public const DERIVED_MARK = '"mode":"derived"';
 
     /** The version installed before this run, read in preflight while it is still the old one. */
     private ?string $fromVersion = null;
@@ -78,7 +97,152 @@ class pkg_claudecoworkInstallerScript
             // receipt could not be written.
         }
 
+        try {
+            if (\defined('JPATH_ROOT')) {
+                self::pruneContracts(Factory::getDbo(), JPATH_ROOT);
+            }
+        } catch (\Throwable $e) {
+            // Swallowed, and nothing was deleted past the failure: extra profiles are harmless.
+        }
+
         return true;
+    }
+
+    /**
+     * Reads what the site is held to and prunes the rest. Throws when the database cannot be read,
+     * before anything is deleted.
+     *
+     * @return string[]|null the ids deleted, or null when nothing was pruned because the binding is unclear
+     */
+    public static function pruneContracts($db, string $root): ?array
+    {
+        $derived = $db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE(' . $db->quote(self::DERIVED_MARK) . ', binding) > 0')->loadResult();
+        $params = $db->setQuery(
+            $db->getQuery(true)
+                ->select($db->quoteName('params'))
+                ->from($db->quoteName('#__extensions'))
+                ->where($db->quoteName('element') . ' = ' . $db->quote('com_claudecowork'))
+                ->where($db->quoteName('type') . ' = ' . $db->quote('component'))
+        )->loadResult();
+        $held = self::heldProfiles($derived === null ? null : (string) $derived, $params === null ? null : (string) $params);
+
+        return $held === null ? null : self::prune($root . '/' . self::CONTRACTS, $held);
+    }
+
+    /**
+     * The profiles this site is held to, as EngineFactory::buildContract resolves it: a derived
+     * binding first (it reads no profile), then the component's `contract` param (none when empty).
+     * Null when that cannot be told — a stored binding that holds DERIVED_MARK but is no well-formed
+     * derived binding, no component row, params that are not JSON, a `contract` the engine would
+     * refuse — and then nothing is pruned.
+     *
+     * @param string|null $derivedBinding the stored binding when it holds DERIVED_MARK, else null
+     * @param string|null $componentParams `#__extensions.params` of com_claudecowork, null when there is no row
+     *
+     * @return string[]|null
+     */
+    public static function heldProfiles(?string $derivedBinding, ?string $componentParams): ?array
+    {
+        if ($derivedBinding !== null) {
+            $binding = json_decode($derivedBinding, true);
+            if (\is_array($binding) && ($binding['mode'] ?? null) === 'derived' && \is_string($binding['contract'] ?? null) && strpos($binding['contract'], 'derived/') === 0) {
+                return [];
+            }
+
+            return null;
+        }
+        if ($componentParams === null) {
+            return null;
+        }
+        $params = trim($componentParams) === '' ? [] : json_decode($componentParams, true);
+        if (!\is_array($params)) {
+            return null;
+        }
+        $contract = $params['contract'] ?? '';
+        if (!\is_string($contract)) {
+            return null;
+        }
+        $contract = trim($contract);
+        if ($contract === '') {
+            return [];
+        }
+
+        return preg_match(self::PROFILE_ID, $contract) ? [$contract] : null;
+    }
+
+    /**
+     * Deletes every profile folder `<slug>/<platform>/<version>/` under `$contracts` except `$held`
+     * and the profiles they name in `quickstart.contract` (followed four deep). Anything else there —
+     * files, folders of another shape, symlinks, a fetch's temporary folders — is left alone. When a
+     * kept profile's manifest is on disk but cannot be read, nothing is deleted.
+     *
+     * @param string[] $held
+     *
+     * @return string[] the ids deleted
+     */
+    public static function prune(string $contracts, array $held): array
+    {
+        if (!is_dir($contracts) || is_link($contracts)) {
+            return [];
+        }
+        $keep = [];
+        foreach ($held as $id) {
+            for ($depth = 0; $depth < 5 && \is_string($id) && preg_match(self::PROFILE_ID, $id) && !isset($keep[$id]); $depth++) {
+                $keep[$id] = true;
+                $file = $contracts . '/' . $id . '/manifest.json';
+                if (!is_file($file)) {
+                    break;
+                }
+                $manifest = json_decode((string) @file_get_contents($file), true);
+                if (!\is_array($manifest)) {
+                    return [];
+                }
+                $id = $manifest['quickstart']['contract'] ?? null;
+            }
+        }
+
+        $folders = static function (string $dir): array {
+            $out = [];
+            foreach (@scandir($dir) ?: [] as $name) {
+                if ($name !== '.' && $name !== '..' && is_dir($dir . '/' . $name) && !is_link($dir . '/' . $name)) {
+                    $out[] = $name;
+                }
+            }
+            return $out;
+        };
+        $deleted = [];
+        foreach ($folders($contracts) as $slug) {
+            foreach ($folders($contracts . '/' . $slug) as $platform) {
+                foreach ($folders($contracts . '/' . $slug . '/' . $platform) as $version) {
+                    $id = $slug . '/' . $platform . '/' . $version;
+                    if (isset($keep[$id]) || !preg_match(self::PROFILE_ID, $id)) {
+                        continue;
+                    }
+                    self::remove($contracts . '/' . $id);
+                    $deleted[] = $id;
+                }
+                @rmdir($contracts . '/' . $slug . '/' . $platform);
+            }
+            @rmdir($contracts . '/' . $slug);
+        }
+        sort($deleted);
+
+        return $deleted;
+    }
+
+    /** Removes a folder tree; a symlink inside it is removed, never followed. */
+    private static function remove(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            @unlink($path);
+            return;
+        }
+        foreach (@scandir($path) ?: [] as $name) {
+            if ($name !== '.' && $name !== '..') {
+                self::remove($path . '/' . $name);
+            }
+        }
+        @rmdir($path);
     }
 
     private function writeReceipt($db, $parent): void

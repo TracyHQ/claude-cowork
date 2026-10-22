@@ -27,14 +27,22 @@ final class PackageDownload
     public const CHUNK = 8192;
 
     /**
+     * Where this repository's release assets are downloaded from: `<RELEASES>joomla-v<version>/<asset>`.
+     * The one copy: the self-updater installs nothing from anywhere else, and a site fetches its
+     * contract profile from here (ContractFetch).
+     */
+    public const RELEASES = 'https://github.com/TracyHQ/claude-cowork/releases/download/';
+
+    /**
      * Fetch $url into $target. Never throws: every outcome is in the answer.
      *
      * @param array<int,mixed> $curlOptions extra curl options (the site's proxy), applied last
      * @param bool|null        $useCurl     null: curl when this PHP has it; false: the stream copy
+     * @param int              $timeout     seconds for the whole transfer (a contract profile asks for far less)
      *
      * @return array{ok:bool, bytes:int, sha256:?string, error:?string}
      */
-    public static function toFile(string $url, string $target, int $maxBytes, ?string $sha256 = null, array $curlOptions = [], ?bool $useCurl = null): array
+    public static function toFile(string $url, string $target, int $maxBytes, ?string $sha256 = null, array $curlOptions = [], ?bool $useCurl = null, int $timeout = 600): array
     {
         $useCurl = $useCurl ?? \function_exists('curl_init');
         $out     = @fopen($target, 'wb');
@@ -43,7 +51,7 @@ final class PackageDownload
             return self::fail($target, 'cannot write ' . $target);
         }
 
-        $error = $useCurl ? self::viaCurl($url, $out, $maxBytes, $curlOptions) : self::viaStream($url, $out, $maxBytes);
+        $error = $useCurl ? self::viaCurl($url, $out, $maxBytes, $curlOptions, $timeout) : self::viaStream($url, $out, $maxBytes, $timeout);
         fclose($out);
 
         if ($error !== null) {
@@ -71,7 +79,7 @@ final class PackageDownload
     }
 
     /** @param resource $out */
-    private static function viaCurl(string $url, $out, int $maxBytes, array $curlOptions): ?string
+    private static function viaCurl(string $url, $out, int $maxBytes, array $curlOptions, int $timeout): ?string
     {
         $ch = curl_init($url);
         $options = [
@@ -79,8 +87,8 @@ final class PackageDownload
             CURLOPT_FILE           => $out,
             CURLOPT_FOLLOWLOCATION => true, // a release asset answers with a redirect to its storage
             CURLOPT_MAXREDIRS      => 5,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_TIMEOUT        => 600,
+            CURLOPT_CONNECTTIMEOUT => min(15, $timeout),
+            CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_FAILONERROR    => true,
             CURLOPT_USERAGENT      => 'Tracy Claude Cowork',
             CURLOPT_NOPROGRESS     => false,
@@ -105,20 +113,38 @@ final class PackageDownload
     }
 
     /** @param resource $out */
-    private static function viaStream(string $url, $out, int $maxBytes): ?string
+    private static function viaStream(string $url, $out, int $maxBytes, int $timeout): ?string
     {
-        $context = stream_context_create(['http' => ['timeout' => 600, 'follow_location' => 1, 'max_redirects' => 5, 'user_agent' => 'Tracy Claude Cowork']]);
-        $in      = @fopen($url, 'rb', false, $context);
+        // One deadline for the whole transfer, the open included. The context's and the stream's
+        // timeouts bound a single wait, so each is set to what is left; past the deadline the
+        // download failed, whatever arrived.
+        $deadline = microtime(true) + $timeout;
+        $late     = 'download failed: timed out after ' . $timeout . ' s';
+        $context  = stream_context_create(['http' => ['timeout' => (float) $timeout, 'follow_location' => 1, 'max_redirects' => 5, 'user_agent' => 'Tracy Claude Cowork']]);
+        $in       = @fopen($url, 'rb', false, $context);
 
         if ($in === false) {
-            return 'download failed: cannot open ' . $url;
+            return microtime(true) > $deadline ? $late : 'download failed: cannot open ' . $url;
         }
 
         $copied = 0;
         $error  = null;
 
         while (!feof($in)) {
+            $left = $deadline - microtime(true);
+
+            if ($left <= 0) {
+                $error = $late;
+                break;
+            }
+
+            stream_set_timeout($in, (int) $left, (int) (($left - (int) $left) * 1e6));
             $chunk = fread($in, self::CHUNK);
+
+            if (!empty(stream_get_meta_data($in)['timed_out'])) {
+                $error = $late;
+                break;
+            }
 
             if ($chunk === false) {
                 $error = 'download failed: read error';
@@ -136,6 +162,10 @@ final class PackageDownload
                 $error = 'download failed: disk write error';
                 break;
             }
+        }
+
+        if ($error === null && microtime(true) > $deadline) {
+            $error = $late;
         }
 
         fclose($in);

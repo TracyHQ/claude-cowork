@@ -133,11 +133,38 @@ final class EngineFactory
         // an unbound site.
         $valid = preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured) === 1;
         $directory = self::libDir() . '/contracts/' . ($valid ? $configured : 'unconfigured');
+        // The package carries no profile since TCH #1568: the one this site is held to is fetched
+        // from the release's assets the first time it is needed, before it is read.
+        $missing = $valid ? self::ensureContract($configured) : null;
         $writer = self::buildWriter();
         if (!$writer) return null;
         $db = Factory::getContainer()->get(DatabaseInterface::class);
-        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory))
+        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory, $missing))
             ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
+    }
+
+    /**
+     * Contract profile `$id` on disk (and the profiles it names), fetched from this release's assets
+     * when it is not: the one place a profile folder comes from (lib/ContractFetch.php). Null when
+     * it is there; otherwise why not, for the "does not carry" refusal (empty: the release does not
+     * list it, refused as before).
+     */
+    private static function ensureContract(string $id): ?string
+    {
+        try {
+            require_once self::libDir() . '/ContractFetch.php';
+            $proxy = [];
+            try {
+                $app = Factory::getApplication();
+                $proxy = \PackageDownload::proxyOptions($app->get('proxy_enable'), $app->get('proxy_host'), $app->get('proxy_port'), $app->get('proxy_user'), $app->get('proxy_pass'));
+            } catch (\Throwable $e) {
+                // No application to ask (a CLI caller): no proxy.
+            }
+            return (new \ContractFetch(self::libDir(), \ContractFetch::releaseOf(self::installedVersion()), $proxy))->ensure($id);
+        } catch (\Throwable $e) {
+            self::logFailure('ensureContract', $e);
+            return 'fetch failed: ' . get_class($e);
+        }
     }
 
     /**

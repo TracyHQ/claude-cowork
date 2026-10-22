@@ -7,7 +7,8 @@
  *
  * - `mismatched`: manifest entries whose file is missing or whose bytes hash differently;
  * - `unlisted`: files under the manifest's `roots` that the manifest does not name (left over from an
- *   earlier release, or put there by someone else);
+ *   earlier release, or put there by someone else), except under its `runtime` folders, which the
+ *   extension fills itself (the component's fetched contract profiles);
  * - `present`: for each extra path given, whether it exists.
  */
 declare(strict_types=1);
@@ -35,6 +36,7 @@ foreach ($manifest['roots'] ?? [] as $root) {
     foreach ($it as $file) {
         $path = str_replace('\\', '/', $file->getPathname());
         if ($path === $manifest['path'] || isset($manifest['files'][$path])) continue;
+        foreach ($manifest['runtime'] ?? [] as $runtime) if (strpos($path, $runtime) === 0) continue 2;
         $unlisted[] = $path;
     }
 }

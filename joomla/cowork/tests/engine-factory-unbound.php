@@ -155,6 +155,7 @@ namespace {
                     'derived' => $efuProperty($efuContract, 'derivedMode'),
                     'fileProofs' => $efuProperty($efuContract, 'proofs') !== null,
                 ];
+                $efuOut['unavailable'] = $efuContract === null ? null : $efuProperty($efuContract, 'unavailable');
             } catch (Throwable $e) {
                 $efuOut['threw'] = get_class($e);
             }
@@ -212,6 +213,11 @@ namespace {
                     if ($entry !== '.' && $entry !== '..') symlink($source . '/lib/contracts/' . $entry, $component . '/lib/contracts/' . $entry);
                 foreach (['manifest' => '{"id":', 'content-map' => '{}', 'presentation-lock' => '{}'] as $name => $json)
                     file_put_contents($component . '/lib/contracts/efu-corrupt/j6/1.0.0/' . $name . '.json', $json);
+                // The index the package ships (TCH #1568): one profile listed and not on disk. With no
+                // component manifest there is no installed version, so it cannot be fetched — and no
+                // case here reaches the network.
+                file_put_contents($component . '/lib/contracts.json', json_encode(['contracts' => ['efu-fetch/j6/1.0.0' =>
+                    ['asset' => 'efu-fetch--j6--1.0.0.zip', 'sha256' => str_repeat('0', 64), 'bytes' => 100]]]));
                 foreach (glob($source . '/com_claudecowork/administrator/src/Service/*.php') as $file)
                     copy($file, $component . '/src/Service/' . basename($file));
 
@@ -270,6 +276,16 @@ namespace {
                         ['class' => 'QuickstartContract', 'id' => null, 'refuses' => true, 'derived' => false, 'fileProofs' => true]);
                 }
                 check('refusing: a profile that is not JSON still throws, as before', $contract(['contract' => 'efu-corrupt/j6/1.0.0'])['threw'] ?? null, 'JsonException');
+
+                // Every profile read goes through ContractFetch::ensure first (TCH #1568).
+                $carry = 'This site names a content contract this receiver does not carry';
+                check('fetch: a profile the release does not list is refused exactly as before',
+                    $contract(['contract' => 'tracy-apple/j6/9.9.9'])['unavailable'] ?? null, $carry);
+                $answer = $contract(['contract' => 'efu-fetch/j6/1.0.0']);
+                check('fetch: a listed profile that cannot be fetched refuses, with the reason appended',
+                    [$built($answer)['refuses'] ?? null, $answer['unavailable'] ?? null], [true, $carry . ' (fetch failed: the installed version is unknown)']);
+                check('fetch: and the failure is remembered beside it, so the next request does not try again',
+                    is_file($component . '/lib/contracts/efu-fetch/j6/1.0.0.fetch-failed'), true);
 
                 // A derived binding wins over any param, the empty one included.
                 $derived = json_encode(['mode' => 'derived', 'contract' => 'derived/northwind-import']);

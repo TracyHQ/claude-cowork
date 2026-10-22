@@ -20,6 +20,8 @@
 // WordPress the folder in the zip IS the install path, so the staged folder is walked as it is.
 //
 // The manifest does not list itself (a file cannot carry its own hash); `path` says where it sits.
+// `runtime` names the folders under `roots` that the extension fills itself on a site (the Joomla
+// component's fetched contract profiles): a file there is not "unlisted".
 
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -128,6 +130,7 @@ class Collector {
   constructor(selfPath) {
     this.files = new Map()
     this.roots = new Set()
+    this.runtime = new Set()
     this.selfPath = selfPath
   }
 
@@ -237,6 +240,10 @@ export function joomlaPackage(coworkDir, selfPath) {
     // build.sh zips each part from the folder of the same name: com_claudecowork.zip ← com_claudecowork/.
     joomlaExtension(join(coworkDir, part.name.replace(/\.zip$/, '')), c)
   }
+  // The component fetches its contract profile from the release's assets when it first needs it
+  // (TCH #1568): those files sit under a root and are listed nowhere, by design. Each one is checked
+  // against `lib/contracts.json`, which this manifest does list.
+  c.runtime.add(JOOMLA_CONTRACTS_RUNTIME)
   const version = m.version
   return finish(c, { product: 'joomla-package', element: `pkg_${m.packagename}`, version, tag: `joomla-v${version}`, path: selfPath })
 }
@@ -293,11 +300,16 @@ function finish(c, meta) {
     generatedAt: (epoch ? new Date(Number(epoch) * 1000) : new Date()).toISOString(),
     path: meta.path,
     roots: [...c.roots].sort(),
+    // Folders under `roots` the extension fills at runtime: files in them are neither listed nor
+    // leftovers. Only written when there is one, so manifests without it keep their exact shape.
+    ...(c.runtime.size ? { runtime: [...c.runtime].sort() } : {}),
     files: Object.fromEntries([...c.files.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
   }
 }
 
 export const JOOMLA_PACKAGE_SELF = `administrator/components/com_claudecowork/${MANIFEST_NAME}`
+/** Where a site keeps the contract profiles it fetched; see `lib/ContractFetch.php`. */
+export const JOOMLA_CONTRACTS_RUNTIME = 'administrator/components/com_claudecowork/lib/contracts/'
 
 export function build(kind, dir) {
   switch (kind) {

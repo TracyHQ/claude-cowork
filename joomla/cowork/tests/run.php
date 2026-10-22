@@ -1626,9 +1626,9 @@ $updaterSrc = file_get_contents(__DIR__ . '/../plg_system_claudecoworkupdate/src
 // A package is downloaded by URL and installed on somebody's server. A manifest that has been
 // tampered with, or one day moved, must not be able to point a site at anything else.
 checkTrue('it will only install a release asset of this repository', str_contains(
-    $updaterSrc,
-    "ASSET_PREFIX = 'https://github.com/TracyHQ/claude-cowork/releases/download/'"
-));
+    file_get_contents(__DIR__ . '/../lib/PackageDownload.php'),
+    "RELEASES = 'https://github.com/TracyHQ/claude-cowork/releases/download/'"
+) && str_contains($updaterSrc, 'strpos($url, \\PackageDownload::RELEASES) !== 0'));
 checkTrue('it keeps the package current', str_contains($updaterSrc, "'pkg_claudecowork' => 'https://raw.githubusercontent.com/TracyHQ/claude-cowork/main/joomla/update.xml'"));
 // The look is released from the same repository and drifts the same silent way.
 checkTrue('and the template', str_contains($updaterSrc, "'tpl_tracy'") && str_contains($updaterSrc, "main/joomla/template/update.xml'"));
@@ -2135,6 +2135,9 @@ require __DIR__ . "/engine-factory-unbound.php";
 // recording driver, the engine's answers, and the loading production does. Last: it defines a
 // Normalizer stand-in when the PHP has none, and nothing after it should run beside that.
 require __DIR__ . "/update-receipt.php";
+// The package carries no contract profile (TCH #1568): a site fetches its own, checked against the
+// index the package ships, and install and update prune the ones it is not held to.
+require __DIR__ . "/contract-fetch.php";
 // The self-updater claims and knocks in a visitor's request and downloads in its own, a block at a
 // time (0.24.28). Plugin cases run against Joomla stand-ins in their own PHP processes.
 require __DIR__ . "/updater-out-of-request.php";
