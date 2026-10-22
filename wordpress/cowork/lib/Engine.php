@@ -3719,7 +3719,7 @@ final class Engine
             $this->log->record($applyId, ['op' => 'media.delete', 'id' => $id, 'snapshot' => $snapshot]);
         } catch (Throwable $e) {
             try { $this->media->restoreDeletedAttachment($snapshot, true); } catch (Throwable $undo) {
-                return $this->err('write_failed', 'undo could not be recorded and the attachment could not be fully restored: ' . $undo->getMessage());
+                return $this->err('write_failed', 'undo could not be recorded and the attachment could not be fully restored: ' . $undo->getMessage(), ['landed' => true]);
             }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
@@ -4236,8 +4236,8 @@ final class Engine
         return $this->err('locked', EditLock::message((string) ($row['post_title'] ?? ''), $lock)) + ['code' => EditLock::CODE, 'lockedBy' => $lock];
     }
 
-    private function err(string $code, string $message): array
+    private function err(string $code, string $message, array $extra = []): array
     {
-        return ['ok' => false, 'error' => $code, 'message' => $message];
+        return array_merge(['ok' => false, 'error' => $code, 'message' => $message], $extra);
     }
 }
