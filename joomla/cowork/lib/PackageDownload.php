@@ -115,16 +115,15 @@ final class PackageDownload
     /** @param resource $out */
     private static function viaStream(string $url, $out, int $maxBytes, int $timeout): ?string
     {
-        // One deadline for the whole transfer, the open included. The context's and the stream's
-        // timeouts bound a single wait, so each is set to what is left; past the deadline the
-        // download failed, whatever arrived.
+        // One deadline for the whole transfer: every redirect, the open of each, and the body. The
+        // context's and the stream's timeouts bound a single wait, so each is set to what is left;
+        // past the deadline the download failed, whatever arrived.
         $deadline = microtime(true) + $timeout;
         $late     = 'download failed: timed out after ' . $timeout . ' s';
-        $context  = stream_context_create(['http' => ['timeout' => (float) $timeout, 'follow_location' => 1, 'max_redirects' => 5, 'user_agent' => 'Tracy Claude Cowork']]);
-        $in       = @fopen($url, 'rb', false, $context);
+        $in       = self::openStream($url, $deadline);
 
-        if ($in === false) {
-            return microtime(true) > $deadline ? $late : 'download failed: cannot open ' . $url;
+        if (!\is_resource($in)) {
+            return microtime(true) > $deadline ? $late : $in;
         }
 
         $copied = 0;
@@ -171,6 +170,112 @@ final class PackageDownload
         fclose($in);
 
         return $error;
+    }
+
+    /**
+     * Opens `$url` for the stream copy, following redirects here rather than in PHP's http wrapper:
+     * the wrapper gives every hop the whole timeout, so five slow redirects could take five times the
+     * budget. Each hop gets what is left until `$deadline`. Like the curl path (CURLOPT_MAXREDIRS 5,
+     * CURLOPT_REDIR_PROTOCOLS https), at most five redirects, and a redirect may only lead to https —
+     * or, from a plain http start, to http as well: a download that starts on https never leaves it,
+     * and every caller starts there. Any other scheme (a local file, a test wrapper) is opened once.
+     *
+     * @return resource|string the open body, or why it could not be opened
+     */
+    private static function openStream(string $url, float $deadline)
+    {
+        $start = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+
+        if ($start !== 'http' && $start !== 'https') {
+            $in = @fopen($url, 'rb');
+
+            return $in === false ? 'download failed: cannot open ' . $url : $in;
+        }
+
+        $allowed = $start === 'https' ? ['https'] : ['http', 'https'];
+
+        for ($redirects = 0; ; $redirects++) {
+            $left = $deadline - microtime(true);
+
+            if ($left <= 0) {
+                return 'download failed: timed out';
+            }
+
+            $context = stream_context_create(['http' => ['timeout' => $left, 'follow_location' => 0, 'ignore_errors' => true, 'user_agent' => 'Tracy Claude Cowork']]);
+            $in      = @fopen($url, 'rb', false, $context);
+
+            if ($in === false) {
+                return 'download failed: cannot open ' . $url;
+            }
+
+            $headers = stream_get_meta_data($in)['wrapper_data'] ?? null;
+
+            // Only PHP's own http wrapper answers with header lines; a wrapper registered in its
+            // place (a test fixture) has no status or redirect to read, so its body is the answer.
+            if (!\is_array($headers)) {
+                return $in;
+            }
+
+            $status   = 0;
+            $location = null;
+
+            foreach ($headers as $line) {
+                if (preg_match('~^HTTP/\S+\s+(\d{3})~', (string) $line, $m)) {
+                    $status = (int) $m[1];
+                } elseif (stripos((string) $line, 'location:') === 0) {
+                    $location = trim(substr((string) $line, 9));
+                }
+            }
+
+            if ($status >= 200 && $status < 300) {
+                return $in;
+            }
+
+            fclose($in);
+
+            if ($status < 300 || $status >= 400 || $location === null || $location === '') {
+                return 'download failed: cannot open ' . $url . ' (HTTP ' . $status . ')';
+            }
+
+            if ($redirects >= 5) {
+                return 'download failed: more than 5 redirects from ' . $url;
+            }
+
+            $next = self::resolve($url, $location);
+
+            if (!\in_array(strtolower((string) parse_url($next, PHP_URL_SCHEME)), $allowed, true)) {
+                return 'download failed: a redirect to ' . $next . ' is refused';
+            }
+
+            $url = $next;
+        }
+    }
+
+    /** `$location` from a response to `$base`, as an absolute URL. */
+    private static function resolve(string $base, string $location): string
+    {
+        if (preg_match('~^[a-z][a-z0-9+.-]*:~i', $location)) {
+            return $location;
+        }
+
+        $p      = parse_url($base);
+        $scheme = $p['scheme'] ?? 'https';
+
+        if (strpos($location, '//') === 0) {
+            return $scheme . ':' . $location;
+        }
+
+        $origin = $scheme . '://' . (isset($p['user']) ? $p['user'] . (isset($p['pass']) ? ':' . $p['pass'] : '') . '@' : '')
+            . ($p['host'] ?? '') . (isset($p['port']) ? ':' . $p['port'] : '');
+
+        if (strpos($location, '/') === 0) {
+            return $origin . $location;
+        }
+
+        $path = $p['path'] ?? '/';
+        $dir  = substr($path, 0, (int) strrpos($path, '/') + 1);
+
+        return $origin . ($dir === '' ? '/' : $dir) . $location;
     }
 
     /**

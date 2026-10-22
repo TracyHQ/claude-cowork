@@ -288,6 +288,43 @@ final class ContractFetchSlowStream
         } finally {
             stream_wrapper_unregister('cfslow');
         }
+
+        // Redirects, over a real http server: each hop gets only what is left of the budget.
+        $router = $tmp . '/router.php';
+        file_put_contents($router, '<?php
+            $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+            if (preg_match("~^/slow/(\\d+)$~", $path, $m)) { usleep(700000); header("Location: /slow/" . ($m[1] + 1), true, 302); return; }
+            if (preg_match("~^/fast/(\\d+)$~", $path, $m)) { header("Location: " . ($m[1] < 3 ? ($m[1] + 1) : "/asset"), true, 302); return; }
+            if ($path === "/loop") { header("Location: /loop", true, 302); return; }
+            if ($path === "/file") { header("Location: file:///etc/hosts", true, 302); return; }
+            if ($path === "/asset") { echo "body"; return; }
+            http_response_code(404);');
+        $probe = stream_socket_server('tcp://127.0.0.1:0');
+        $port = (int) substr(strrchr(stream_socket_get_name($probe, false), ':'), 1);
+        fclose($probe);
+        $server = proc_open([PHP_BINARY, '-n', '-S', '127.0.0.1:' . $port, $router], [['pipe', 'r'], ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']], $pipes);
+        try {
+            for ($i = 0; $i < 100 && !($up = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1)); $i++) usleep(50000);
+            if ($up) fclose($up);
+            $base = 'http://127.0.0.1:' . $port;
+            $get = static function (string $path, int $budget) use ($base, $tmp): array {
+                @unlink($tmp . '/hop.bin');
+                $began = microtime(true);
+                $got = PackageDownload::toFile($base . $path, $tmp . '/hop.bin', 100, null, [], false, $budget);
+                return [$got['ok'], $got['error'], microtime(true) - $began, is_file($tmp . '/hop.bin') ? file_get_contents($tmp . '/hop.bin') : null];
+            };
+            [$ok, $error, $took] = $get('/slow/1', 1);
+            check('download: a chain of slow redirects fails at the budget, not a full timeout per hop',
+                [$ok, strpos((string) $error, 'timed out') !== false, $took < 1.5], [false, true, true]);
+            [$ok, $error, , $body] = $get('/fast/1', 5);
+            check('download: a chain of redirects, relative and absolute, still lands', [$ok, $error, $body], [true, null, 'body']);
+            check('download: more than five redirects are refused', strpos((string) $get('/loop', 5)[1], 'more than 5 redirects') !== false, true);
+            check('download: a redirect off the web is refused', strpos((string) $get('/file', 5)[1], 'is refused') !== false, true);
+            check('download: an error status is a failure', [$get('/missing', 5)[0], strpos((string) $get('/missing', 5)[1], 'HTTP 404') !== false], [false, true]);
+        } finally {
+            proc_terminate($server);
+            proc_close($server);
+        }
     } finally {
         $remove($tmp);
     }
