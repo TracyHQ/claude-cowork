@@ -97,6 +97,59 @@ final class FakeRowSource implements RowSource
         unset($this->tables[$table]);
     }
 
+    /** @var array<int,string[]> Every list checksums() was asked for, so a test can see the batches. */
+    public array $checksumCalls = [];
+
+    /**
+     * A checksum of the table's rows as the fake holds them, so changing a row changes it. Not
+     * MySQL's number — only its shape: a decimal string, or null for a table that is not here, as
+     * CHECKSUM TABLE answers NULL for one. A table may pin `checksum` (null included) to stand for
+     * an engine that cannot checksum.
+     */
+    public function checksums(array $tables): array
+    {
+        $this->checksumCalls[] = $tables;
+        $out = [];
+        foreach ($tables as $table) {
+            if (!isset($this->tables[$table])) {
+                $out[$table] = null;
+            } elseif (array_key_exists('checksum', $this->tables[$table])) {
+                $out[$table] = $this->tables[$table]['checksum'];
+            } else {
+                $out[$table] = (string) hexdec(substr(sha1(serialize($this->tables[$table]['rows'] ?? [])), 0, 12));
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The substance checksum in its real shape, "<rows>:<xor>", over the columns `$skip` leaves:
+     * not MySQL's number, but it moves exactly when a kept column does. A table without `columns`
+     * names its columns c0, c1, … by position.
+     */
+    public function substanceChecksum(string $table, array $skip): ?string
+    {
+        if (!isset($this->tables[$table])) {
+            return null;
+        }
+        $rows = $this->tables[$table]['rows'] ?? [];
+        $drop = array_map('strtolower', $skip);
+        $xor = 0;
+        foreach ($rows as $row) {
+            $kept = [];
+            foreach (array_values($row) as $i => $value) {
+                $name = $this->tables[$table]['columns'][$i] ?? "c{$i}";
+                if (!in_array(strtolower($name), $drop, true)) {
+                    $kept[] = $value === null ? 'N' : bin2hex($value);
+                }
+            }
+            if ($kept !== []) {
+                $xor ^= hexdec(substr(md5(implode("\x1f", $kept)), 0, 12));
+            }
+        }
+        return count($rows) . ':' . $xor;
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $rows = $this->tables[$table]['rows'] ?? [];

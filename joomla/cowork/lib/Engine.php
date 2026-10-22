@@ -77,6 +77,18 @@ final class Engine
     private const MAX_DUMP_MANY_SECONDS = 20;
     private const MAX_DUMP_MANY_TABLES = 5000;
     private const MAX_FILE_LIMIT = 500;
+    /** files.list without the sha1: a stat per file and no read, so a page can be ten times longer. */
+    private const MAX_FILE_STAT_LIMIT = 5000;
+    /** files.hash: the paths one call may ask about, each hashed in full. */
+    private const MAX_HASH_PATHS = 500;
+    /** site.fingerprint: the walk paths per page, by default and at most. A count, never a clock. */
+    private const FINGERPRINT_FILES = 20000;
+    private const MAX_FINGERPRINT_FILES = 50000;
+    /** The version of the fingerprint's shape: a digest kept under another version is not comparable. */
+    private const FINGERPRINT_VERSION = 2;
+    /** site.fingerprint `skip_columns`: how many names, and the one shape a name may have. */
+    private const MAX_SKIP_COLUMNS = 50;
+    private const COLUMN_NAME = '/^[A-Za-z_][A-Za-z0-9_]{0,63}$/D';
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
     /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
     private const MIN_PART_BYTES = 5242880;
@@ -421,13 +433,25 @@ final class Engine
             case 'info':
                 // What the engine itself can do rides beside what the host says, so a caller can tell a
                 // site that takes db.dump_many from an older one and fall back to db.dump there.
+                // The same for the cheap questions a sync asks first: site.fingerprint, files.list without
+                // the sha1, and files.hash. An engine without these entries answers none of them.
                 return $this->ok(['info' => $this->info + ['db_dump_many' => [
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ], 'site_fingerprint' => [
+                    'version' => self::FINGERPRINT_VERSION,
+                    'max_files' => self::MAX_FINGERPRINT_FILES,
+                ], 'files_list' => [
+                    'stat' => true,
+                    'max_stat_limit' => self::MAX_FILE_STAT_LIMIT,
+                ], 'files_hash' => [
+                    'max_paths' => self::MAX_HASH_PATHS,
                 ]]]);
             case 'site.stats':
                 return $this->siteStats();
+            case 'site.fingerprint':
+                return $this->siteFingerprint($params);
             case 'db.tables':
                 return $this->dbTables();
             case 'db.cleanup':
@@ -446,6 +470,8 @@ final class Engine
                 return $this->dbRollback($params);
             case 'files.list':
                 return $this->filesList($params);
+            case 'files.hash':
+                return $this->filesHash($params);
             case 'files.pack':
                 return $this->filesPack($params);
             case 'file.read':
@@ -1173,20 +1199,169 @@ final class Engine
         ]);
     }
 
+    /**
+     * One page of the walk. `hash` (default true) is the sha1 of every file, which reads every byte;
+     * `hash: false` answers `{path, size, mtime}` instead — the same walk, order and cursor — at a stat
+     * per file, so its page may run to MAX_FILE_STAT_LIMIT paths.
+     */
     private function filesList(array $p): array
     {
         if ($this->walker === null) {
             return $this->err('unavailable', 'file walk not wired');
         }
+        $hash = $p['hash'] ?? true;
+        if (!is_bool($hash)) {
+            return $this->err('bad_params', 'hash must be true or false');
+        }
         $after = isset($p['after']) && is_string($p['after']) ? $p['after'] : '';
         $limit = (int) ($p['limit'] ?? 100);
-        $limit = max(1, min($limit, self::MAX_FILE_LIMIT));
+        $limit = max(1, min($limit, $hash ? self::MAX_FILE_LIMIT : self::MAX_FILE_STAT_LIMIT));
         try {
-            $batch = $this->walker->listBatch($after, $limit);
+            $batch = $hash ? $this->walker->listBatch($after, $limit) : $this->walker->statBatch($after, $limit);
         } catch (Throwable $e) {
             return $this->err('walk_failed', $e->getMessage());
         }
         return $this->ok($batch);
+    }
+
+    /**
+     * The sha1 of the files named — the expensive question, asked only for the paths a cheap one
+     * (files.list without hash, site.fingerprint) said may have changed.
+     *
+     * `paths` is 1..MAX_HASH_PATHS relative paths, as files.list names them. Each answers its sha1,
+     * or null where there is no file the walk lists and file.read would serve ({@see
+     * FileWalker::hashPaths}): one missing or refused path does not fail the rest. `hashes` is an
+     * object keyed by path, always — a path such as `0` must not turn it into a list.
+     */
+    private function filesHash(array $p): array
+    {
+        if ($this->walker === null) {
+            return $this->err('unavailable', 'file walk not wired');
+        }
+        $paths = $p['paths'] ?? null;
+        if (!is_array($paths) || $paths === []) {
+            return $this->err('bad_params', 'paths required: a list of relative paths');
+        }
+        if (count($paths) > self::MAX_HASH_PATHS) {
+            return $this->err('bad_params', 'at most ' . self::MAX_HASH_PATHS . ' paths per call');
+        }
+        foreach ($paths as $path) {
+            if (!is_string($path) || $path === '') {
+                return $this->err('bad_params', 'every path must be a non-empty string');
+            }
+        }
+        try {
+            $hashes = $this->walker->hashPaths(array_values($paths));
+        } catch (Throwable $e) {
+            return $this->err('walk_failed', $e->getMessage());
+        }
+        return $this->ok(['hashes' => (object) $hashes]);
+    }
+
+    /**
+     * The cheapest answer to "has this site changed since I last read it?": one digest per page of
+     * the file walk and one CHECKSUM TABLE value per table, and no byte of either copied.
+     *
+     * Files: the walk of files.list, from the first path after `after`, at most `limit` paths
+     * (default FINGERPRINT_FILES, at most MAX_FINGERPRINT_FILES) — a fixed count, so the same tree
+     * cuts into the same pages every time. `count` and `bytes` are the page's, `digest` is sha1 over
+     * `path NUL size NUL mtime LF` per path ({@see FileWalker::fingerprintPage}), and `next_after`
+     * the page's last path while more remain, else null. `files: false` leaves the walk out.
+     *
+     * Tables: CHECKSUM TABLE over the tables db.tables lists, or over `tables` (each of them in that
+     * list), in batches; a value is the checksum as a string, null where the server answers NULL.
+     * `checksums: false` leaves the database out. The tables are answered in full on every page;
+     * a caller paging the files asks for them once, with the first.
+     *
+     * `skip_columns` (version 2): up to MAX_SKIP_COLUMNS column names. Given and not empty, EVERY
+     * table of the call is checksummed by its substance instead ({@see
+     * RowSource::substanceChecksum}, "<rows>:<xor>"), those columns left out wherever they occur,
+     * so a hit counter or a last-visit date no longer reads as a change. The names used come back
+     * sorted as `fingerprint.skip_columns`; without them the answer is CHECKSUM TABLE's, as before.
+     */
+    private function siteFingerprint(array $p): array
+    {
+        $started = microtime(true);
+        $wantFiles = $p['files'] ?? true;
+        $wantSums = $p['checksums'] ?? true;
+        if (!is_bool($wantFiles) || !is_bool($wantSums)) {
+            return $this->err('bad_params', 'files and checksums must be true or false');
+        }
+        $after = isset($p['after']) && is_string($p['after']) ? $p['after'] : '';
+        $limit = (int) ($p['limit'] ?? self::FINGERPRINT_FILES);
+        $limit = max(1, min($limit, self::MAX_FINGERPRINT_FILES));
+        $skip = $p['skip_columns'] ?? [];
+        if (!is_array($skip) || count($skip) > self::MAX_SKIP_COLUMNS) {
+            return $this->err('bad_params', 'skip_columns must be a list of at most ' . self::MAX_SKIP_COLUMNS . ' column names');
+        }
+        foreach ($skip as $column) {
+            if (!is_string($column) || !preg_match(self::COLUMN_NAME, $column)) {
+                return $this->err('bad_params', 'every skip_columns entry must be a plain column name: a letter or _, then up to 63 letters, digits or _');
+            }
+        }
+        $skip = array_values(array_unique($skip));
+        sort($skip, SORT_STRING);
+        $only = $p['tables'] ?? null;
+        if ($only !== null) {
+            if (!is_array($only) || $only === []) {
+                return $this->err('bad_params', 'tables must be a non-empty list of names');
+            }
+            foreach ($only as $table) {
+                if (!is_string($table) || $table === '') {
+                    return $this->err('bad_params', 'every table must be a non-empty string');
+                }
+            }
+        }
+
+        $files = null;
+        if ($wantFiles) {
+            if ($this->walker === null) {
+                return $this->err('unavailable', 'file walk not wired');
+            }
+            try {
+                $files = $this->walker->fingerprintPage($after, $limit);
+            } catch (Throwable $e) {
+                return $this->err('walk_failed', $e->getMessage());
+            }
+        }
+
+        $tables = null;
+        if ($wantSums) {
+            if ($this->dumper === null) {
+                return $this->err('unavailable', 'db dump not wired');
+            }
+            try {
+                $known = $this->dumper->tables();
+            } catch (Throwable $e) {
+                return $this->err('dump_failed', $e->getMessage());
+            }
+            $names = $known;
+            if ($only !== null) {
+                $names = [];
+                foreach ($only as $table) {
+                    if (!in_array($table, $known, true)) {
+                        return $this->err('bad_params', "table {$table} is not one db.tables lists");
+                    }
+                    if (!in_array($table, $names, true)) {
+                        $names[] = $table;
+                    }
+                }
+            }
+            try {
+                $tables = (object) ($skip === []
+                    ? $this->dumper->checksums($names)
+                    : $this->dumper->substanceChecksums($names, $skip));
+            } catch (Throwable $e) {
+                return $this->err('checksum_failed', $e->getMessage());
+            }
+        }
+
+        $answer = ['version' => self::FINGERPRINT_VERSION, 'files' => $files, 'tables' => $tables];
+        if ($skip !== []) {
+            $answer['skip_columns'] = $skip;
+        }
+        $answer['seconds'] = round(microtime(true) - $started, 3);
+        return $this->ok(['fingerprint' => $answer]);
     }
 
     /**

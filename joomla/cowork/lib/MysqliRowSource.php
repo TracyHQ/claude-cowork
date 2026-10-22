@@ -65,6 +65,83 @@ final class MysqliRowSource implements RowSource
         return $out;
     }
 
+    public function checksums(array $tables): array
+    {
+        $out = [];
+        if ($tables === []) {
+            return $out;
+        }
+        $names = array_map(fn($t) => '`' . str_replace('`', '``', (string) $t) . '`', $tables);
+        $res = $this->db->query('CHECKSUM TABLE ' . implode(', ', $names));
+        if (!$res) {
+            throw new RuntimeException($this->db->error ?: 'checksum failed');
+        }
+        // One row per table named, in the order named, with `Table` as `<database>.<table>`. Matched
+        // by position and checked by that suffix, so a database name with a dot in it changes nothing.
+        $i = 0;
+        while ($row = $res->fetch_assoc()) {
+            $table = $tables[$i] ?? null;
+            $i++;
+            if ($table === null) {
+                continue;
+            }
+            $named = (string) ($row['Table'] ?? '');
+            if ($named !== $table && substr($named, -strlen('.' . $table)) !== '.' . $table) {
+                continue;
+            }
+            $sum = $row['Checksum'] ?? null;
+            $out[$table] = $sum === null ? null : (string) $sum;
+        }
+        foreach ($tables as $table) {
+            if (!array_key_exists($table, $out)) {
+                $out[$table] = null;
+            }
+        }
+        return $out;
+    }
+
+    public function substanceChecksum(string $table, array $skip): ?string
+    {
+        $quoted = '`' . str_replace('`', '``', $table) . '`';
+        $drop = array_map('strtolower', $skip);
+        // SHOW COLUMNS answers in ordinal order, which is what keeps the concatenation stable.
+        try {
+            $res = $this->db->query('SHOW COLUMNS FROM ' . $quoted);
+        } catch (Throwable $e) {
+            return null;
+        }
+        if (!$res) {
+            return null;
+        }
+        $kept = [];
+        while ($row = $res->fetch_assoc()) {
+            $name = (string) ($row['Field'] ?? '');
+            if ($name !== '' && !in_array(strtolower($name), $drop, true)) {
+                $kept[] = $name;
+            }
+        }
+        if ($kept === []) {
+            $sql = "SELECT COUNT(*), 0 FROM {$quoted}";
+        } else {
+            // CAST AS BINARY before HEX: HEX() of a DECIMAL or DOUBLE rounds it to an integer (1.40
+            // and 1.60 hex as 1 and 2), so a price edited by cents would not move the value. The
+            // binary cast is the exact text of a number and the raw bytes of a string or BLOB, with
+            // no character set or collation in between. 'N' for NULL cannot be a hex string, and
+            // 0x1f cannot be inside one, so neither NULL against '' nor a shifted value collides.
+            $parts = array_map(function ($c) {
+                return "IFNULL(HEX(CAST(`" . str_replace('`', '``', $c) . "` AS BINARY)), 'N')";
+            }, $kept);
+            $sql = 'SELECT COUNT(*), BIT_XOR(CAST(CONV(SUBSTRING(MD5(CONCAT_WS(0x1f, ' . implode(', ', $parts)
+                . ')), 1, 16), 16, 10) AS UNSIGNED)) FROM ' . $quoted;
+        }
+        $res = $this->db->query($sql);
+        if (!$res) {
+            throw new RuntimeException($this->db->error ?: 'substance checksum failed');
+        }
+        $row = $res->fetch_row();
+        return (string) ($row[0] ?? '0') . ':' . (string) ($row[1] ?? '0');
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $t = $this->db->real_escape_string($table);

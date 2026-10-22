@@ -47,6 +47,46 @@ final class DbDumper
         return $this->src->tableStats();
     }
 
+    /** How many tables one CHECKSUM TABLE statement names. */
+    public const CHECKSUM_BATCH = 50;
+
+    /**
+     * CHECKSUM TABLE over every table named, a batch of {@see CHECKSUM_BATCH} per statement, so a
+     * site of five hundred tables costs ten statements rather than one each or one too long to send.
+     *
+     * @param string[] $tables
+     * @return array<string,?string> keyed by table, in the order given
+     */
+    public function checksums(array $tables): array
+    {
+        $out = [];
+        foreach (array_chunk(array_values($tables), self::CHECKSUM_BATCH) as $batch) {
+            $answer = $this->src->checksums($batch);
+            foreach ($batch as $table) {
+                $value = $answer[$table] ?? null;
+                $out[$table] = $value === null ? null : (string) $value;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The substance checksum ({@see RowSource::substanceChecksum}) of every table named, one query
+     * each, with the same columns left out of all of them so the values stay comparable.
+     *
+     * @param string[] $tables
+     * @param string[] $skip
+     * @return array<string,?string> keyed by table, in the order given
+     */
+    public function substanceChecksums(array $tables, array $skip): array
+    {
+        $out = [];
+        foreach (array_values($tables) as $table) {
+            $out[$table] = $this->src->substanceChecksum($table, $skip);
+        }
+        return $out;
+    }
+
     /** RENAME TABLE, for the trash-not-drop cleanup (ADR 0083). */
     public function renameTable(string $from, string $to): void
     {
