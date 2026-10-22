@@ -123,7 +123,7 @@ final class PackageDownload
         $in       = self::openStream($url, $deadline);
 
         if (!\is_resource($in)) {
-            return microtime(true) > $deadline ? $late : $in;
+            return (microtime(true) > $deadline || $in === 'download failed: timed out') ? $late : $in;
         }
 
         $copied = 0;
@@ -202,10 +202,13 @@ final class PackageDownload
             }
 
             $context = stream_context_create(['http' => ['timeout' => $left, 'follow_location' => 0, 'ignore_errors' => true, 'user_agent' => 'Tracy Claude Cowork']]);
+            $opened  = microtime(true);
             $in      = @fopen($url, 'rb', false, $context);
 
             if ($in === false) {
-                return 'download failed: cannot open ' . $url;
+                // An open that used up what was left timed out, even when the clock reads a hair
+                // short of the deadline (the wrapper's timer and microtime() round differently).
+                return microtime(true) - $opened >= $left - 0.05 ? 'download failed: timed out' : 'download failed: cannot open ' . $url;
             }
 
             $headers = stream_get_meta_data($in)['wrapper_data'] ?? null;
