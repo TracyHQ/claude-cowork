@@ -3468,7 +3468,7 @@ final class Engine
                 $newId = $this->writer->write($kind, $id, $fields);
             } catch (Throwable $e) {
                 return $moveTo !== null
-                    ? $this->err('write_failed', 'the move landed (revert via apply.revert); the field update failed: ' . $e->getMessage())
+                    ? $this->err('write_failed', 'the move landed (revert via apply.revert); the field update failed: ' . $e->getMessage(), ['landed' => true])
                     : $this->err('write_failed', $e->getMessage());
             }
 
@@ -4010,7 +4010,7 @@ final class Engine
                 $this->siteIdentity->write($previous);
             } catch (Throwable $undo) {
                 // The recorder is down and so is the way back — the failure below says so.
-                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage(), ['landed' => true]);
             }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
@@ -4161,7 +4161,7 @@ final class Engine
             try {
                 $this->templateSite->restore($files);
             } catch (Throwable $undo) {
-                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage(), ['landed' => true]);
             }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
@@ -4271,7 +4271,7 @@ final class Engine
             try {
                 $this->overrides->restore($files);
             } catch (Throwable $undo) {
-                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage());
+                return $this->err('write_failed', 'the change landed but its undo could not be recorded, and it could not be rolled back: ' . $undo->getMessage(), ['landed' => true]);
             }
             return $this->err('write_failed', 'change was rolled back: could not record its undo');
         }
