@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>the package no longer carries the quickstart contract profiles (70 MB to under 1 MB): each is a release asset listed with its sha256 in lib/contracts.json, the component fetches the one the site is bound to, and an update removes the profiles no longer used</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.55</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.55</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.55/pkg_claudecowork-0.24.55.zip</downloadurl>
+        </downloads>
+        <sha256>d771c2637ea8369a46c46b3bc1152bf0a33966279a70a6d2aab3e0980fc26f00</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>files.pack can be cut to named paths: Sync from live takes a changed configuration.php or large file without reading the whole site again</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

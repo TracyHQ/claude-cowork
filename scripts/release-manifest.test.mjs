@@ -76,6 +76,8 @@ test('a component: site, administrator, languages, its manifest and script, neve
   ])
   assert.equal(m.files['components/com_claudecowork/x.php'], sha('site entry'))
   assert.deepEqual(m.roots, ['administrator/components/com_claudecowork/', 'components/com_claudecowork/', 'plugins/system/xapi/'])
+  // Fetched contract profiles land under a root without being listed (TCH #1568): declared, so they are not "unlisted".
+  assert.deepEqual(m.runtime, ['administrator/components/com_claudecowork/lib/contracts/'])
 })
 
 test('a file the manifest lists but the tree lacks fails the build', () => {
@@ -110,6 +112,7 @@ test('a site template: its folder, its media, its site-side languages', () => {
     'templates/tpl_demo/templateDetails.xml'
   ])
   assert.deepEqual(m.roots, ['media/templates/site/tpl_demo/', 'templates/tpl_demo/'])
+  assert.ok(!('runtime' in m), 'a template fills nothing at runtime, and its manifest keeps its shape')
   // Named in <files> but written by the build after this runs: anywhere but its own path, it must exist.
   assert.throws(() => joomlaTemplate(join(root, 'tpl'), 'elsewhere.json'), /tracy-release\.json, which does not exist/)
 })
@@ -165,4 +168,8 @@ test('the real Joomla package: every part, the package script, the receipt manif
   assert.ok(m.files['administrator/manifests/packages/claudecowork/script.php'])
   assert.ok(m.files['administrator/components/com_claudecowork/lib/SecretLeaf.php'])
   assert.ok(!(m.path in m.files))
+  // No profile travels in the package; the index of them does, and where they land is declared.
+  assert.ok(m.files['administrator/components/com_claudecowork/lib/contracts.json'])
+  assert.deepEqual(Object.keys(m.files).filter((p) => p.startsWith('administrator/components/com_claudecowork/lib/contracts/')), [])
+  assert.deepEqual(m.runtime, ['administrator/components/com_claudecowork/lib/contracts/'])
 })

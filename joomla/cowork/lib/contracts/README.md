@@ -1,7 +1,9 @@
 # Quickstart content contracts
 
 A contract maps one published quickstart to its content slots and records the presentation it shipped with.
-The canonical files live here; the exact same files ship with the seeder and Joomla Cowork.
+The canonical files live here. Joomla Cowork does not carry them in its package: each profile is attached to
+the release as an asset of its own, and a site fetches only the profile it is held to, checked against the
+sha256 the package lists in `lib/contracts.json` (see joomla/cowork/README.md).
 Never accept a contract supplied by an agent in a write request.
 
 - `manifest.json`: package identity, archive checksums, contract schema and required receiver.
@@ -66,7 +68,8 @@ rendered positions, responsive rules, access, language and schedules still apply
 The seeder accepts an explicit reviewed mapping through its existing `--copy` argument:
 `contract`, `revision` from `content.contract inspect`, `changes` keyed by slot, `evidence` for
 factual copy, and `pending` for missing customer inputs. The new receiver is Cowork 0.14.0.
-Its package contains the same three canonical JSON files. A bound site's generic structural
+Its release carries the same three canonical JSON files, one asset per profile, fetched by the site that
+needs them. A bound site's generic structural
 write actions are refused; content receipts support replay and reverse-order undo.
 
 This is an opt-in path in the current implementation. The default Joomla build stages still use

@@ -114,11 +114,12 @@ final class QuickstartContract
         if ($new) throw new ContractProblem('PRESENTATION_DRIFT', $new[0]);
     }
 
-    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory) {
+    /** `$missing`: why the profile could not be fetched (ContractFetch), appended when it is not on disk. */
+    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory, ?string $missing = null) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
         foreach (['manifest','content-map','presentation-lock'] as $name) {
             $file = $directory . '/' . $name . '.json';
-            if (!is_file($file)) { $this->unavailable = 'This site names a content contract this receiver does not carry'; return; }
+            if (!is_file($file)) { $this->unavailable = 'This site names a content contract this receiver does not carry' . ($missing !== null && $missing !== '' ? ' (' . $missing . ')' : ''); return; }
             $value = json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
             if ($name === 'manifest') $this->manifest=$value;
             elseif ($name === 'content-map') $this->map=$value;

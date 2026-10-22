@@ -87,13 +87,6 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
     ];
 
     /**
-     * A package is downloaded by URL and installed on somebody's server. It has to come from the
-     * repository this plugin was built from — a manifest that has been tampered with, or one day
-     * moved, cannot point a site at anything else.
-     */
-    private const ASSET_PREFIX = 'https://github.com/TracyHQ/claude-cowork/releases/download/';
-
-    /**
      * How often the manifests are read at all.
      *
      * A quarter of an hour, so a release reaches a site the next time somebody opens it in Tracy
@@ -460,6 +453,14 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
      */
     private function announced(string $manifestUrl): ?array
     {
+        // A package is downloaded by URL and installed on somebody's server. It has to come from the
+        // repository this plugin was built from — a manifest that has been tampered with, or one day
+        // moved, cannot point a site at anything else. The prefix is `\PackageDownload::RELEASES`,
+        // the one copy a site's contract fetch reads too; without that file nothing can be downloaded.
+        if (!$this->requireDownload()) {
+            return null;
+        }
+
         $response = HttpFactory::getHttp([], ['curl', 'stream'])->get($manifestUrl, [], 10);
 
         if ((int) $response->code !== 200) {
@@ -478,7 +479,7 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
             $version = trim((string) $update->version);
             $url     = trim((string) ($update->downloads->downloadurl ?? ''));
 
-            if ($version === '' || strpos($url, self::ASSET_PREFIX) !== 0) {
+            if ($version === '' || strpos($url, \PackageDownload::RELEASES) !== 0) {
                 continue;
             }
 
@@ -494,6 +495,24 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
     }
 
     /**
+     * lib/PackageDownload.php ships in the component of this same package (0.24.29 moved it there so
+     * the API door's installer uses the same copy); required like LoopbackRoute in kick().
+     */
+    private function requireDownload(string $element = 'pkg_claudecowork'): bool
+    {
+        $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/PackageDownload.php';
+
+        if (!is_file($lib)) {
+            $this->log(\sprintf('%s: cannot download, %s is missing', $element, $lib), Log::WARNING);
+            return false;
+        }
+
+        require_once $lib;
+
+        return true;
+    }
+
+    /**
      * Download to a file, verify, unpack, install, clean up. Every outcome is written to the log,
      * including success. True only when the installer took the package.
      */
@@ -504,16 +523,9 @@ final class ClaudeCoworkUpdate extends CMSPlugin implements SubscriberInterface
         $path    = $tmp . '/tracy-update-' . $element . '-' . bin2hex(random_bytes(4)) . '.zip';
         $package = null;
 
-        // lib/PackageDownload.php ships in the component of this same package (0.24.29 moved it there so
-        // the API door's installer uses the same copy); required like LoopbackRoute in kick().
-        $lib = JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/PackageDownload.php';
-
-        if (!is_file($lib)) {
-            $this->log(\sprintf('%s: cannot download, %s is missing', $element, $lib), Log::WARNING);
+        if (!$this->requireDownload($element)) {
             return false;
         }
-
-        require_once $lib;
 
         $got = \PackageDownload::toFile($release['url'], $path, self::MAX_PACKAGE_BYTES, $release['sha256'] ?? null, $this->proxyOptions());
 

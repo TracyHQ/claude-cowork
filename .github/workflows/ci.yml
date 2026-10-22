@@ -42,6 +42,11 @@ jobs:
       - name: Release manifest generator
         run: node --test ../../scripts/release-manifest.test.mjs
 
+      # After the build too: the last case checks the component carries no profile and every
+      # dist/contracts asset matches the index the component ships (TCH #1568).
+      - name: Contract profile assets
+        run: node --test ../../scripts/contract-assets.test.mjs
+
       - name: Language check
         run: node ../../scripts/check-language.mjs com_claudecowork/administrator/lib
 

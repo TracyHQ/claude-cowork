@@ -28,6 +28,7 @@ an empty token refuses every request.
 | `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `template.languageOverrides` (unreleased) | The front-end language strings a site still shows in en-GB for one language — its template's own words (JA templates ship en-GB only), keys the language pack lacks or leaves in English (the en-GB words, or English reworded: vi-VN 4.2.2 "Show Profile" for en-GB "User Profile"), the column titles and captions of a T4 mega menu (`etc/navigation/*.json`, printed raw, offered as page literals), and pack strings whose translation is implausibly long for their words (vi-VN 4.2.2.1 gives "Details" the sentence of another string) — read, and set as Joomla language overrides in `language/overrides/<tag>.override.ini` under an `apply_id` so `apply.revert` takes them back. Only a key the read offers (from any page), one line of plain text with the en-GB placeholders; other override lines are kept. The read is ranked (`rank`: `template`, `used` — named by front-end code or a month/day name —, `core`, `other`) and paged (`offset`, `limit` ≤ 1500; `total`, `truncated`, `nextOffset`); `DATE_FORMAT_*` is never offered. |
+| Contract profiles fetched, not shipped (unreleased) | The package carries no contract profile, only their index (`lib/contracts.json`). A site held to a profile fetches that one from the release it runs, checks it against the index's sha256 and size, and keeps it; installing or updating the package removes the profiles the site is not held to. See "Contract profiles: one release asset each" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
 | `db.snapshot`, `db.rollback` | Copy the tables aside before something rewrites the schema, and rename them back if it does not land. Two renames per table, so a rollback is metadata and finishes in one request; what it displaces goes to the trash, not a `DROP`. |
@@ -151,7 +152,8 @@ on a site, by the path it lands at under the site root, with its sha256.
 
 - **Where it is.** Inside the package, installed at `path` (the component lists it in its `<files>`),
   and in `dist/tracy-release.json`, which is **attached to the GitHub release as an asset of its own**:
-  `gh release create joomla-v<x> dist/pkg_claudecowork-<x>.zip dist/tracy-release.json`. The copy on a
+  `gh release create joomla-v<x> dist/pkg_claudecowork-<x>.zip dist/tracy-release.json dist/contracts/*`
+  (the last are the contract profiles, below). The copy on a
   site names a tag; the asset under that tag is the copy nobody on the site can change, so a file is
   "Tracy's" only when its bytes hash to what the asset says. The template's manifest is
   `templates/tpl_tracy/tracy-release.json`, attached by `scripts/release-joomla-template.mjs`.
@@ -160,6 +162,9 @@ on a site, by the path it lands at under the site root, with its sha256.
   script — so a file Joomla would not install is not listed and one it would install is never
   forgotten. It never lists itself. `roots` are the folders the release owns whole (shared folders
   such as `administrator/language/` are not roots, though files in them are listed).
+- **What it leaves to the site (unreleased).** `runtime` names the folders the site fills itself:
+  `administrator/components/com_claudecowork/lib/contracts/`, where fetched profiles land. Nothing in
+  them is listed, and a file there is not a leftover.
 - **Proven on a real install** by `tests/e2e/updater.sh` on Joomla 5.4.8 and 6.1.3 (02/10/2026): after
   each install every entry exists with the listed hash, and nothing under `roots` is unlisted —
   160 entries for a build with extra files, 156 for this package, 827 for `tpl_tracy`.
@@ -358,7 +363,7 @@ presentation before and inside the write transaction. The private
 `#__claudecowork_content_contract` table stores the installation binding and baseline.
 
 `lib/contracts/tracy-apple/j6/1.1.0` is a verbatim mirror of the canonical TCH profile. `build.sh`
-packages it with the engine. Update the canonical TCH files first, then copy the entire profile;
+makes it a release asset (below). Update the canonical TCH files first, then copy the entire profile;
 never allow an agent to submit its own presentation lock. Generic structural writes are blocked
 once bound. Reverting a contract is transactional and refuses to overwrite a later revision.
 
@@ -392,6 +397,46 @@ The link is tied to a record the same way article links are (`TaxonomyLinks`: ca
 alias, confirmed by building the route Joomla's category/tag view builds). A category or tag that a
 published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
 not the category's. Menu modules get no such stamps for the same reason.
+
+## Contract profiles: one release asset each (unreleased)
+
+The package used to carry every profile under `lib/contracts/`: 225 of them, 530 MB unpacked, a 70 MB
+zip, on every site — while a site is held to one profile at most. Now `build.sh`
+(`scripts/contract-assets.mjs`) writes each profile as its own zip, `dist/contracts/<id with "/" as
+"--">.zip` (`tracy-business/j6/1.2.6` → `tracy-business--j6--1.2.6.zip`), the profile's files at the
+zip root, and the package carries only the index, `lib/contracts.json`:
+
+```json
+{ "contracts": { "tracy-business/j6/1.2.6": { "asset": "tracy-business--j6--1.2.6.zip", "sha256": "<hex of the zip>", "bytes": 123,
+                                               "template": "<manifest.template>", "names": "tracy-business/j6/1.2.5" } } }
+```
+
+`template` and `names` are copied from the profile's `manifest.json` (`template`, `quickstart.contract`),
+each only when the manifest has it, so Tracy can pick candidates from the index without downloading an
+asset. The site checks `asset`, `sha256` and `bytes` and ignores the rest.
+
+The zips are reproducible (sorted entries, 1980-01-01 timestamps, mode 0644, no extra fields): the same
+tree gives the same sha256 whoever builds it. The package is now 0.45 MB.
+
+- **Fetch (`lib/ContractFetch.php`).** Every profile read (`EngineFactory::buildContract`, so bind,
+  inspect and content reads) asks `ensure($id)` first. An id the index does not list is refused as
+  before. A listed one that is not on disk is downloaded from the release the site runs,
+  `…/releases/download/joomla-v<installed version>/<asset>` (the base URL the updater already trusts,
+  `PackageDownload::RELEASES`), within 15 s, and checked against the index's size and sha256. It is
+  unpacked into a temporary folder — a name with `..`, an absolute path, a backslash, a symlink or any
+  entry other than a regular file or folder refuses the whole zip — and renamed into place only when
+  its `manifest.json` names that id. A profile it names in `quickstart.contract` is fetched too (at
+  most four steps, a cycle stops it).
+- **On failure** the site still refuses: `…does not carry (fetch failed: <reason>)`, and
+  `<version>.fetch-failed` beside the profile folder keeps the reason, so for five minutes no request
+  tries again. A site whose installed version is unknown cannot fetch at all.
+- **Prune (`script.php` postflight).** Installing or updating the package deletes the profile folders
+  the site is not held to. Held means: nothing when a derived binding is stored, else the component's
+  `contract` parameter, plus the profiles that one names. When the binding query fails, the
+  parameters are not JSON or a held manifest is unreadable, nothing is deleted. Only
+  `<slug>/<platform>/<version>` folders that are not symlinks are touched.
+- **Release.** Attach `dist/contracts/*` with the package: a site running a version whose release lacks
+  them cannot fetch. A dev stand on an unreleased version has no assets to fetch either.
 
 ## Derived contracts for imported sites (unreleased)
 

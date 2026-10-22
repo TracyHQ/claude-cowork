@@ -19,8 +19,13 @@ rm -rf build dist && mkdir -p build/packages dist
 rm -rf com_claudecowork/administrator/lib
 mkdir -p com_claudecowork/administrator/lib
 cp lib/*.php com_claudecowork/administrator/lib/
-mkdir -p com_claudecowork/administrator/lib/contracts
-cp -R lib/contracts/. com_claudecowork/administrator/lib/contracts/
+# 🔒 NO CONTRACT PROFILE TRAVELS IN THE PACKAGE (TCH #1568). All 225 of them were 529 MB unpacked and a
+# 70 MB zip, and every site kept every one (a webroot measured going from 182 MB to 628 MB). Each
+# profile is a release asset of its own, dist/contracts/<id with "/" as "--">.zip; the component
+# carries only the index of them, lib/contracts.json (id → asset, sha256, bytes), and a site fetches
+# the one it is held to and checks it against that index (lib/ContractFetch.php). lib/contracts/
+# holds nothing else the engine reads: its README is for this repository.
+node ../../scripts/contract-assets.mjs lib/contracts dist/contracts com_claudecowork/administrator/lib/contracts.json
 # The language-pack catalog is receiver-wide, not part of any contract, so it is copied beside the
 # engine rather than swept up by the contracts copy above. Named explicitly because a file the
 # package forgets is a receiver that reports every locale as unverified, with no error anywhere.
@@ -56,3 +61,4 @@ cp com_claudecowork/administrator/tracy-release.json dist/tracy-release.json
 
 echo "dist/pkg_claudecowork.zip  ($(du -h dist/pkg_claudecowork.zip | cut -f1))"
 echo "dist/tracy-release.json    (attach to the release as its own asset)"
+echo "dist/contracts/*.zip       ($(ls dist/contracts | wc -l | tr -d ' ') profiles; attach every one to the release)"
