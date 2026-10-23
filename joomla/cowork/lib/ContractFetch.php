@@ -23,9 +23,34 @@ require_once __DIR__ . '/PackageDownload.php';
  * folders with plain names, so nothing can land outside the profile folder. It is unpacked into a
  * temporary folder beside the target and renamed into place, so a reader never sees half a profile.
  *
+ * ## Where a profile goes: lib/contracts/, else the spare folder under tmp_path
+ *
+ * A profile is read from `<lib>/contracts/<id>` when it is there: a site imported with its profile
+ * in place, and a site updated from a package that carried profiles, keep reading theirs. A fetch
+ * writes there too when the PHP user can. On a site whose component folder belongs to another user
+ * it cannot: Tracy installs the package as root after handing the webroot to www-data, so 0.24.55
+ * refused every new quickstart site with "cannot create …/lib/contracts/<slug>/<platform>". Such a
+ * profile goes to the SPARE folder, `<tmp_path>/com_claudecowork/contracts/<id>`, and is read from
+ * there. directory() is the one answer to "where is profile <id>": EngineFactory hands it to
+ * QuickstartContract, named() reads through it, and script.php prunes and removes both folders.
+ *
+ * Why Joomla's tmp_path. It is the folder Joomla itself needs the PHP user to write: every install
+ * and update from the administrator unpacks there, Extensions → Warnings complains when it is not
+ * writable, System Information lists it among the folders that must be. And nothing in Joomla empties
+ * it: "Clear Cache" and `cache:clean` purge the cache folders only (`cache/`, `administrator/cache/`),
+ * and the installer and Joomla Update delete only the package files they put there themselves
+ * (read in Joomla 6.1.4: com_cache, InstallerHelper::cleanupInstall, com_joomlaupdate). The cache
+ * folders are purged, and `images/` and `media/` belong to the site's content, so none fits. A host that empties tmp costs a fetch, not the profile: it is fetched
+ * again, checked against the same index. tmp_path may be served by the web server, which shows
+ * nothing new: a profile is a public release asset, byte for byte.
+ *
+ * When lib/contracts/ is writable the fetch still writes there, as 0.24.55 did: that folder is
+ * part of the component, so no host's tmp cleaner touches it, and every site that works today
+ * stays exactly as it is. The spare folder is only where a fetch could not otherwise land.
+ *
  * ## When it fails
  *
- * A marker `<version>.fetch-failed` beside the profile folder holds the reason, and no new
+ * A marker `<version>.fetch-failed` beside the profile folder it tried holds the reason, and no new
  * attempt is made for BACKOFF seconds: a site that cannot reach GitHub must not spend TIMEOUT
  * seconds of every request finding that out again. The caller appends the reason to its
  * "does not carry" refusal.
@@ -55,7 +80,11 @@ final class ContractFetch
     public const MAX_UNPACKED = 128 * 1024 * 1024;
     public const MAX_ENTRIES = 256;
 
+    /** Where the spare folder is, under Joomla's tmp_path: {@see spareOf()}. script.php keeps a copy. */
+    public const SPARE = 'com_claudecowork/contracts';
+
     private string $lib;
+    private ?string $spare;
     private ?string $release;
     /** @var callable(string,string,int,string):array{ok:bool,error:?string} */
     private $download;
@@ -68,10 +97,12 @@ final class ContractFetch
      * @param string|null $release the release's asset folder with a trailing slash, or null when the
      *                             installed version is unknown (nothing can then be fetched)
      * @param callable|null $download fn(url, target, bytes, sha256): PackageDownload::toFile's answer
+     * @param string|null $spare   the spare folder ({@see spareOf()}), or null for lib/contracts/ alone
      */
-    public function __construct(string $lib, ?string $release, array $curlOptions = [], ?callable $download = null, ?callable $now = null)
+    public function __construct(string $lib, ?string $release, array $curlOptions = [], ?callable $download = null, ?callable $now = null, ?string $spare = null)
     {
         $this->lib = rtrim($lib, '/');
+        $this->spare = $spare === null ? null : rtrim($spare, '/');
         $this->release = $release;
         $this->download = $download ?? static function (string $url, string $target, int $bytes, string $sha256) use ($curlOptions): array {
             return \PackageDownload::toFile($url, $target, $bytes, $sha256, $curlOptions, null, self::TIMEOUT);
@@ -91,9 +122,27 @@ final class ContractFetch
         return $version !== null && preg_match('/^[0-9A-Za-z.+-]+$/D', $version) ? \PackageDownload::RELEASES . 'joomla-v' . $version . '/' : null;
     }
 
-    /** Where a profile lives on this site. */
+    /** The spare folder of a site: under Joomla's `tmp_path`, or the site's `tmp/` when none is set (Joomla's own default). */
+    public static function spareOf(?string $tmpPath, string $siteRoot): string
+    {
+        $tmp = trim((string) $tmpPath);
+        return rtrim($tmp !== '' ? $tmp : $siteRoot . '/tmp', '/') . '/' . self::SPARE;
+    }
+
+    /** The folders profiles are read from, in order: the component's own, then the spare one. */
+    public function roots(): array
+    {
+        return $this->spare === null ? [$this->lib . '/contracts'] : [$this->lib . '/contracts', $this->spare];
+    }
+
+    /**
+     * Where profile `$id` is on this site: the first folder holding its manifest, else where it
+     * belongs (lib/contracts/), which a reader then finds empty. Every reader asks here.
+     */
     public function directory(string $id): string
     {
+        foreach ($this->roots() as $root)
+            if (is_file($root . '/' . $id . '/manifest.json')) return $root . '/' . $id;
         return $this->lib . '/contracts/' . $id;
     }
 
@@ -134,8 +183,7 @@ final class ContractFetch
     private function one(string $id): ?string
     {
         if (!preg_match(self::ID, $id)) return self::UNKNOWN;
-        $target = $this->directory($id);
-        if (is_file($target . '/manifest.json')) return null;
+        if (is_file($this->directory($id) . '/manifest.json')) return null;
 
         $index = $this->index();
         if ($index === null) return 'contracts.json is unreadable';
@@ -146,20 +194,41 @@ final class ContractFetch
             || $entry['bytes'] <= 0 || $entry['bytes'] > self::MAX_ZIP_BYTES)
             return 'contracts.json lists it malformed';
 
-        $marker = $target . '.fetch-failed';
-        $previous = is_file($marker) ? json_decode((string) @file_get_contents($marker), true) : null;
-        if (is_array($previous) && is_int($previous['at'] ?? null) && ($this->now)() - $previous['at'] < self::BACKOFF)
-            return 'fetch failed: ' . (is_string($previous['reason'] ?? null) ? $previous['reason'] : 'unknown') . ' (retried after ' . self::BACKOFF . ' s)';
+        foreach ($this->roots() as $root) {
+            $previous = is_file($marker = $root . '/' . $id . '.fetch-failed') ? json_decode((string) @file_get_contents($marker), true) : null;
+            if (is_array($previous) && is_int($previous['at'] ?? null) && ($this->now)() - $previous['at'] < self::BACKOFF)
+                return 'fetch failed: ' . (is_string($previous['reason'] ?? null) ? $previous['reason'] : 'unknown') . ' (retried after ' . self::BACKOFF . ' s)';
+        }
 
+        // Nowhere to write costs no download, and leaves no marker: there is no place for one.
+        $unwritable = null;
+        $target = $this->place($id, $unwritable);
+        if ($target === null) return 'fetch failed: ' . $unwritable;
         $reason = $this->fetch($id, $entry, $target);
         if ($reason === null) {
-            @unlink($marker);
+            foreach ($this->roots() as $root) @unlink($root . '/' . $id . '.fetch-failed');
             return null;
         }
         // The marker goes beside the profile even when the fetch failed before making its folder.
-        if (is_dir(dirname($target)) || @mkdir(dirname($target), 0755, true))
-            @file_put_contents($marker, json_encode(['at' => ($this->now)(), 'reason' => $reason]));
+        @file_put_contents($target . '.fetch-failed', json_encode(['at' => ($this->now)(), 'reason' => $reason]));
         return 'fetch failed: ' . $reason;
+    }
+
+    /**
+     * Where a fetch of `$id` lands: under the first root whose `<slug>/<platform>/` folder exists or
+     * can be made, and is writable. Null when none, with `$why` naming every folder tried.
+     */
+    private function place(string $id, ?string &$why): ?string
+    {
+        $failed = [];
+        foreach ($this->roots() as $root) {
+            $parent = dirname($root . '/' . $id);
+            if (!is_dir($parent) && !@mkdir($parent, 0755, true) && !is_dir($parent)) $failed[] = 'cannot create ' . $this->shown($parent);
+            elseif (!is_writable($parent)) $failed[] = $this->shown($parent) . ' is not writable';
+            else return $root . '/' . $id;
+        }
+        $why = implode('; ', $failed);
+        return null;
     }
 
     /** @return string|null why the profile is not on disk, or null when it now is */
@@ -167,8 +236,6 @@ final class ContractFetch
     {
         if ($this->release === null) return 'the installed version is unknown';
         $parent = dirname($target);
-        if (!is_dir($parent) && !@mkdir($parent, 0755, true) && !is_dir($parent)) return 'cannot create ' . self::shown($parent);
-        if (!is_writable($parent)) return self::shown($parent) . ' is not writable';
 
         $temp = $parent . '/.' . basename($target) . '.' . bin2hex(random_bytes(6));
         $zip = $temp . '.zip';
@@ -189,7 +256,7 @@ final class ContractFetch
                 // A folder without a manifest is half of something; it is set aside, never read.
                 if (is_file($target . '/manifest.json')) return null;
                 $aside = $temp . '.aside';
-                if (!@rename($target, $aside)) return 'cannot replace ' . self::shown($target);
+                if (!@rename($target, $aside)) return 'cannot replace ' . $this->shown($target);
                 self::remove($aside);
             }
             if (!@rename($temp, $target) && !is_file($target . '/manifest.json')) return 'cannot move the profile into place';
@@ -292,9 +359,13 @@ final class ContractFetch
         return strlen($reason) > $max ? substr($reason, 0, $max - 3) . '...' : $reason;
     }
 
-    /** A folder as the site knows it, from `administrator/` on: a refusal never shows the server's own path. */
-    private static function shown(string $path): string
+    /**
+     * A folder as the site knows it: from `administrator/` on, or from `tmp_path/` on in the spare
+     * folder. A refusal never shows the server's own path.
+     */
+    private function shown(string $path): string
     {
+        if ($this->spare !== null && strpos($path . '/', $this->spare . '/') === 0) return 'tmp_path/' . self::SPARE . substr($path, strlen($this->spare));
         $at = strpos($path, '/administrator/');
         return $at === false ? basename($path) : substr($path, $at + 1);
     }

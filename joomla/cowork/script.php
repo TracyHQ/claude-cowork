@@ -47,7 +47,10 @@ use Joomla\CMS\Factory;
  * all of them unless something removes them: {@see pruneContracts()}, on install and update alike.
  * It keeps the profile the site is held to, resolved as EngineFactory resolves it, and the
  * profiles that one names in `quickstart.contract`. When anything is unclear it deletes nothing:
- * an extra profile costs disk, a missing one only a fetch.
+ * an extra profile costs disk, a missing one only a fetch. It prunes both folders a profile can be
+ * in: `lib/contracts/`, and the spare folder under Joomla's tmp_path where a site whose component
+ * folder it cannot write keeps them (ContractFetch, "Where a profile goes"). Uninstalling the
+ * package removes the spare folder, which Joomla does not know is the component's.
  *
  * Named class rather than `return new class`, like the component's script: Joomla 3 resolves the
  * script by this exact name. Nothing here loads the component's lib: in the same request the
@@ -67,6 +70,9 @@ class pkg_claudecoworkInstallerScript
 
     /** Where the component keeps its contract profiles, relative to the site root. */
     public const CONTRACTS = 'administrator/components/com_claudecowork/lib/contracts';
+
+    /** The spare folder under tmp_path (ContractFetch::SPARE, copied: this script loads no lib; tests/contract-fetch.php compares them). */
+    public const SPARE = 'com_claudecowork/contracts';
 
     /** A profile id as EngineFactory and ContractFetch accept it (copied: this script loads no lib). */
     public const PROFILE_ID = '~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\\.[0-9]+\\.[0-9]+$~D';
@@ -99,7 +105,7 @@ class pkg_claudecoworkInstallerScript
 
         try {
             if (\defined('JPATH_ROOT')) {
-                self::pruneContracts(Factory::getDbo(), JPATH_ROOT);
+                self::pruneContracts(Factory::getDbo(), JPATH_ROOT, self::tmpPath());
             }
         } catch (\Throwable $e) {
             // Swallowed, and nothing was deleted past the failure: extra profiles are harmless.
@@ -108,13 +114,46 @@ class pkg_claudecoworkInstallerScript
         return true;
     }
 
+    public function uninstall($parent)
+    {
+        try {
+            if (\defined('JPATH_ROOT')) {
+                $spare = self::spare(self::tmpPath(), JPATH_ROOT);
+                self::remove($spare);
+                @rmdir(\dirname($spare));
+            }
+        } catch (\Throwable $e) {
+            // Swallowed: an uninstall must finish; what is left is public release bytes.
+        }
+
+        return true;
+    }
+
+    /** The spare folder, as ContractFetch::spareOf() names it: under tmp_path, else the site's tmp/. */
+    public static function spare(?string $tmpPath, string $root): string
+    {
+        $tmp = trim((string) $tmpPath);
+
+        return rtrim($tmp !== '' ? $tmp : $root . '/tmp', '/') . '/' . self::SPARE;
+    }
+
+    /** Joomla's configured tmp_path, or null when there is no application to ask. */
+    private static function tmpPath(): ?string
+    {
+        try {
+            return (string) Factory::getApplication()->get('tmp_path');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     /**
      * Reads what the site is held to and prunes the rest. Throws when the database cannot be read,
      * before anything is deleted.
      *
      * @return string[]|null the ids deleted, or null when nothing was pruned because the binding is unclear
      */
-    public static function pruneContracts($db, string $root): ?array
+    public static function pruneContracts($db, string $root, ?string $tmpPath = null): ?array
     {
         $derived = $db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE(' . $db->quote(self::DERIVED_MARK) . ', binding) > 0')->loadResult();
         $params = $db->setQuery(
@@ -126,7 +165,7 @@ class pkg_claudecoworkInstallerScript
         )->loadResult();
         $held = self::heldProfiles($derived === null ? null : (string) $derived, $params === null ? null : (string) $params);
 
-        return $held === null ? null : self::prune($root . '/' . self::CONTRACTS, $held);
+        return $held === null ? null : self::prune([$root . '/' . self::CONTRACTS, self::spare($tmpPath, $root)], $held);
     }
 
     /**
@@ -171,26 +210,37 @@ class pkg_claudecoworkInstallerScript
     }
 
     /**
-     * Deletes every profile folder `<slug>/<platform>/<version>/` under `$contracts` except `$held`
-     * and the profiles they name in `quickstart.contract` (followed four deep). Anything else there —
+     * Deletes every profile folder `<slug>/<platform>/<version>/` under each of `$contracts` except
+     * `$held` and the profiles they name in `quickstart.contract` (followed four deep), read from
+     * the first folder holding them, as ContractFetch::directory() reads them. Anything else there —
      * files, folders of another shape, symlinks, a fetch's temporary folders — is left alone. When a
      * kept profile's manifest is on disk but cannot be read, nothing is deleted.
      *
-     * @param string[] $held
+     * @param string|string[] $contracts lib/contracts/, then the spare folder
+     * @param string[]        $held
      *
-     * @return string[] the ids deleted
+     * @return string[] the ids deleted (an id deleted from both folders, once)
      */
-    public static function prune(string $contracts, array $held): array
+    public static function prune($contracts, array $held): array
     {
-        if (!is_dir($contracts) || is_link($contracts)) {
-            return [];
+        $roots = [];
+        foreach ((array) $contracts as $folder) {
+            if (is_dir($folder) && !is_link($folder)) {
+                $roots[] = $folder;
+            }
         }
         $keep = [];
         foreach ($held as $id) {
             for ($depth = 0; $depth < 5 && \is_string($id) && preg_match(self::PROFILE_ID, $id) && !isset($keep[$id]); $depth++) {
                 $keep[$id] = true;
-                $file = $contracts . '/' . $id . '/manifest.json';
-                if (!is_file($file)) {
+                $file = null;
+                foreach ($roots as $folder) {
+                    if (is_file($folder . '/' . $id . '/manifest.json')) {
+                        $file = $folder . '/' . $id . '/manifest.json';
+                        break;
+                    }
+                }
+                if ($file === null) {
                     break;
                 }
                 $manifest = json_decode((string) @file_get_contents($file), true);
@@ -211,19 +261,21 @@ class pkg_claudecoworkInstallerScript
             return $out;
         };
         $deleted = [];
-        foreach ($folders($contracts) as $slug) {
-            foreach ($folders($contracts . '/' . $slug) as $platform) {
-                foreach ($folders($contracts . '/' . $slug . '/' . $platform) as $version) {
-                    $id = $slug . '/' . $platform . '/' . $version;
-                    if (isset($keep[$id]) || !preg_match(self::PROFILE_ID, $id)) {
-                        continue;
+        foreach ($roots as $contracts) {
+            foreach ($folders($contracts) as $slug) {
+                foreach ($folders($contracts . '/' . $slug) as $platform) {
+                    foreach ($folders($contracts . '/' . $slug . '/' . $platform) as $version) {
+                        $id = $slug . '/' . $platform . '/' . $version;
+                        if (isset($keep[$id]) || !preg_match(self::PROFILE_ID, $id)) {
+                            continue;
+                        }
+                        self::remove($contracts . '/' . $id);
+                        $deleted[$id] = $id;
                     }
-                    self::remove($contracts . '/' . $id);
-                    $deleted[] = $id;
+                    @rmdir($contracts . '/' . $slug . '/' . $platform);
                 }
-                @rmdir($contracts . '/' . $slug . '/' . $platform);
+                @rmdir($contracts . '/' . $slug);
             }
-            @rmdir($contracts . '/' . $slug);
         }
         sort($deleted);
 

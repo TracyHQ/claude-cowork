@@ -132,38 +132,45 @@ final class EngineFactory
         // contract handed back refuses, so a receiver older than the site's profile cannot read as
         // an unbound site.
         $valid = preg_match('~^[a-z][a-z0-9-]{1,40}/[a-z][a-z0-9]{0,9}/[0-9]+\.[0-9]+\.[0-9]+$~D', $configured) === 1;
-        $directory = self::libDir() . '/contracts/' . ($valid ? $configured : 'unconfigured');
         // The package carries no profile since TCH #1568: the one this site is held to is fetched
-        // from the release's assets the first time it is needed, before it is read.
-        $missing = $valid ? self::ensureContract($configured) : null;
+        // from the release's assets the first time it is needed, before it is read, and read from
+        // wherever it is (lib/contracts/, or the spare folder under tmp_path).
+        [$directory, $missing] = $valid ? self::ensureContract($configured) : [self::libDir() . '/contracts/unconfigured', null];
         $writer = self::buildWriter();
         if (!$writer) return null;
         $db = Factory::getContainer()->get(DatabaseInterface::class);
-        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory, $missing))
+        return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory, $missing, self::libDir()))
             ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
     }
 
     /**
      * Contract profile `$id` on disk (and the profiles it names), fetched from this release's assets
-     * when it is not: the one place a profile folder comes from (lib/ContractFetch.php). Null when
-     * it is there; otherwise why not, for the "does not carry" refusal (empty: the release does not
-     * list it, refused as before).
+     * when it is not: the one place a profile folder comes from (lib/ContractFetch.php). Answers
+     * `[folder, missing]`: the folder ContractFetch::directory() names for it, and null when it is
+     * there; otherwise why not, for the "does not carry" refusal (empty: the release does not list
+     * it, refused as before).
+     *
+     * @return array{0:string,1:?string}
      */
-    private static function ensureContract(string $id): ?string
+    private static function ensureContract(string $id): array
     {
         try {
             require_once self::libDir() . '/ContractFetch.php';
             $proxy = [];
+            $tmpPath = null;
             try {
                 $app = Factory::getApplication();
                 $proxy = \PackageDownload::proxyOptions($app->get('proxy_enable'), $app->get('proxy_host'), $app->get('proxy_port'), $app->get('proxy_user'), $app->get('proxy_pass'));
+                $tmpPath = (string) $app->get('tmp_path');
             } catch (\Throwable $e) {
-                // No application to ask (a CLI caller): no proxy.
+                // No application to ask (a CLI caller): no proxy, and the site's own tmp/.
             }
-            return (new \ContractFetch(self::libDir(), \ContractFetch::releaseOf(self::installedVersion()), $proxy))->ensure($id);
+            $fetch = new \ContractFetch(self::libDir(), \ContractFetch::releaseOf(self::installedVersion()), $proxy, null, null, \ContractFetch::spareOf($tmpPath, JPATH_ROOT));
+            $missing = $fetch->ensure($id);
+            return [$fetch->directory($id), $missing];
         } catch (\Throwable $e) {
             self::logFailure('ensureContract', $e);
-            return 'fetch failed: ' . get_class($e);
+            return [self::libDir() . '/contracts/' . $id, 'fetch failed: ' . get_class($e)];
         }
     }
 

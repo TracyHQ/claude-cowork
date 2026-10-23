@@ -61,7 +61,8 @@ final class ContractFetchSlowStream
         $site = function (array $assets) use ($tmp, $zip): array {
             static $n = 0;
             $root = $tmp . '/site' . (++$n);
-            mkdir($root . '/lib', 0777, true);
+            $lib = $root . '/administrator/components/com_claudecowork/lib';
+            mkdir($lib, 0777, true);
             mkdir($root . '/release', 0777, true);
             $index = [];
             foreach ($assets as $id => $asset) {
@@ -70,17 +71,17 @@ final class ContractFetchSlowStream
                 $index[$id] = ['asset' => ContractFetch::asset($id), 'sha256' => $asset['sha256'] ?? hash('sha256', $bytes), 'bytes' => $asset['bytes'] ?? strlen($bytes)];
             }
             ksort($index);
-            file_put_contents($root . '/lib/contracts.json', json_encode(['contracts' => $index]));
-            return [$root . '/lib', $root . '/release'];
+            file_put_contents($lib . '/contracts.json', json_encode(['contracts' => $index]));
+            return [$lib, $root . '/release'];
         };
         $calls = [];
         // The real downloader (PackageDownload, stream copy) reading the release folder in place of GitHub.
-        $fetcher = static function (string $lib, string $release, ?callable $now = null) use (&$calls): ContractFetch {
+        $fetcher = static function (string $lib, string $release, ?callable $now = null, ?string $spare = null) use (&$calls): ContractFetch {
             $base = 'https://github.example/releases/download/joomla-v1.2.3/';
             return new ContractFetch($lib, $base, [], static function (string $url, string $target, int $bytes, string $sha256) use (&$calls, $base, $release): array {
                 $calls[] = $url;
                 return PackageDownload::toFile($release . '/' . substr($url, strlen($base)), $target, $bytes, $sha256, [], false, ContractFetch::TIMEOUT);
-            }, $now);
+            }, $now, $spare);
         };
 
         check('fetch: the asset of a profile is its id with "/" as "--"', ContractFetch::asset('tracy-business/j6/1.2.6'), 'tracy-business--j6--1.2.6.zip');
@@ -189,6 +190,63 @@ final class ContractFetchSlowStream
         file_put_contents($lib . '/contracts/acme/j6/1.0.0/content-map.json', 'half');
         check('fetch: a half folder is replaced by the whole profile', [$fetcher($lib, $release)->ensure('acme/j6/1.0.0'), file_get_contents($lib . '/contracts/acme/j6/1.0.0/content-map.json')], [null, '{}']);
 
+        // A component folder the PHP user cannot write: installed as root, served as www-data (Tracy's
+        // quickstart sites since 0.24.55). The profile goes to the spare folder under Joomla's tmp_path,
+        // and is read from there. Root writes anywhere, so this needs a non-root PHP.
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            echo "  skip unwritable lib/: running as root, which writes anywhere (run the suite as another user)\n";
+        } else {
+            $profiles = [
+                'acme/j6/1.1.0' => ['files' => ['manifest.json' => $manifest('acme/j6/1.1.0', 'acme/j6/1.0.0'), 'content-map.json' => '{"a":1}']],
+                'acme/j6/1.0.0' => ['files' => ['manifest.json' => $manifest('acme/j6/1.0.0')]],
+                'other/j6/1.0.0' => ['files' => ['manifest.json' => $manifest('other/j6/1.0.0')]],
+            ];
+            $locked = [];
+            try {
+                // lib/ itself read-only (no contracts/ yet), and lib/contracts/ read-only: the same answer.
+                foreach (['lib/' => false, 'lib/contracts/' => true] as $what => $withFolder) {
+                    [$lib, $release] = $site($profiles);
+                    $spare = ContractFetch::spareOf(null, dirname($lib, 4));
+                    if ($withFolder) mkdir($lib . '/contracts', 0777);
+                    chmod($locked[] = $withFolder ? $lib . '/contracts' : $lib, 0555);
+                    $calls = [];
+                    $f = $fetcher($lib, $release, null, $spare);
+                    check("unwritable {$what}: the profile is fetched into the spare folder under tmp_path", $f->ensure('acme/j6/1.1.0'), null);
+                    check("unwritable {$what}: it and the one it names land there whole, and nothing in lib/", [$list($spare), $list($lib . '/contracts'), count($calls)],
+                        [['acme', 'acme/j6', 'acme/j6/1.0.0', 'acme/j6/1.0.0/manifest.json', 'acme/j6/1.1.0', 'acme/j6/1.1.0/content-map.json', 'acme/j6/1.1.0/manifest.json'], [], 2]);
+                    check("unwritable {$what}: every reader is pointed there", [$f->directory('acme/j6/1.1.0'), $f->named('acme/j6/1.1.0'), $fetcher($lib, $release, null, $spare)->directory('acme/j6/1.0.0')],
+                        [$spare . '/acme/j6/1.1.0', 'acme/j6/1.0.0', $spare . '/acme/j6/1.0.0']);
+                    $calls = [];
+                    check("unwritable {$what}: and it is not fetched again", [$fetcher($lib, $release, null, $spare)->ensure('acme/j6/1.1.0'), $calls], [null, []]);
+                }
+                // A profile already in lib/contracts/ (an imported copy, an older package) is read where it is.
+                [$lib, $release] = $site($profiles);
+                $spare = ContractFetch::spareOf(null, dirname($lib, 4));
+                mkdir($lib . '/contracts/other/j6/1.0.0', 0777, true);
+                file_put_contents($lib . '/contracts/other/j6/1.0.0/manifest.json', $manifest('other/j6/1.0.0'));
+                foreach (['/contracts/other/j6/1.0.0', '/contracts/other/j6', '/contracts/other', '/contracts', ''] as $folder) chmod($locked[] = $lib . $folder, 0555);
+                $calls = [];
+                $f = $fetcher($lib, $release, null, $spare);
+                check('unwritable: a profile already in lib/contracts/ is used there: no fetch, no write',
+                    [$f->ensure('other/j6/1.0.0'), $f->directory('other/j6/1.0.0'), $calls, file_exists($spare)], [null, $lib . '/contracts/other/j6/1.0.0', [], false]);
+                // Neither place writable: the refusal names both, and nothing is downloaded.
+                [$lib, $release] = $site($profiles);
+                $spare = ContractFetch::spareOf(null, dirname($lib, 4));
+                mkdir(dirname($spare, 2), 0777, true);
+                chmod($locked[] = $lib, 0555);
+                chmod($locked[] = dirname($spare, 2), 0555);
+                $calls = [];
+                check('unwritable: when neither place can be written the refusal names both',
+                    [$fetcher($lib, $release, null, $spare)->ensure('acme/j6/1.0.0'), $calls],
+                    ['fetch failed: cannot create administrator/components/com_claudecowork/lib/contracts/acme/j6; cannot create tmp_path/com_claudecowork/contracts/acme/j6', []]);
+            } finally {
+                foreach ($locked as $folder) @chmod($folder, 0777);
+            }
+        }
+        check('spare: under the configured tmp_path, else the site\'s tmp/',
+            [ContractFetch::spareOf('/srv/joomla-tmp/', '/var/www/html'), ContractFetch::spareOf('  ', '/var/www/html'), ContractFetch::spareOf(null, '/var/www/html')],
+            ['/srv/joomla-tmp/com_claudecowork/contracts', '/var/www/html/tmp/com_claudecowork/contracts', '/var/www/html/tmp/com_claudecowork/contracts']);
+
         // ── prune ────────────────────────────────────────────────────────────────────────────────
         $P = 'pkg_claudecoworkInstallerScript';
         check('prune: a derived binding holds no profile, whatever the params name',
@@ -269,8 +327,31 @@ final class ContractFetchSlowStream
             $P::pruneContracts($db(static function () { return null; }, ''), $root), ['acme/j6/0.9.0', 'acme/j6/1.0.0', 'acme/j6/1.1.0', 'other/j5/2.0.0', 'other/j6/1.0.0']);
         $root = $tree();
         check('prune: no component row deletes nothing', [$P::pruneContracts($db(null, null), $root), $list($root . '/' . $P::CONTRACTS)], [null, $whole]);
-        checkTrue('prune: postflight runs it, after the receipt and on its own guard',
-            strpos(file_get_contents(__DIR__ . '/../script.php'), 'self::pruneContracts(Factory::getDbo(), JPATH_ROOT);') !== false);
+        checkTrue('prune: postflight runs it, after the receipt and on its own guard, over the spare folder too',
+            strpos(file_get_contents(__DIR__ . '/../script.php'), 'self::pruneContracts(Factory::getDbo(), JPATH_ROOT, self::tmpPath());') !== false);
+
+        // The spare folder under tmp_path (a component folder the PHP user cannot write): the script
+        // names it as ContractFetch does, prunes it with lib/contracts/, and reads kept manifests there.
+        check('spare: the installer script names the folder ContractFetch writes',
+            [$P::SPARE, $P::spare('/srv/t/', '/var/www/html'), $P::spare(null, '/var/www/html'), $P::spare('', '/x')],
+            [ContractFetch::SPARE, ContractFetch::spareOf('/srv/t/', '/var/www/html'), ContractFetch::spareOf(null, '/var/www/html'), ContractFetch::spareOf('', '/x')]);
+        $root = $tmp . '/prune-spare';
+        $lib = $root . '/' . $P::CONTRACTS;
+        $spare = $P::spare($root . '/custom-tmp', $root);
+        foreach ([$spare . '/acme/j6/1.1.0' => $manifest('acme/j6/1.1.0', 'acme/j6/1.0.0'), $spare . '/acme/j6/1.0.0' => $manifest('acme/j6/1.0.0'),
+                  $spare . '/other/j6/1.0.0' => $manifest('other/j6/1.0.0'), $lib . '/old/j6/1.0.0' => $manifest('old/j6/1.0.0')] as $folder => $json) {
+            mkdir($folder, 0777, true);
+            file_put_contents($folder . '/manifest.json', $json);
+        }
+        check('prune: the spare folder is pruned with lib/contracts/, the held profile and the one it names kept from there',
+            [$P::pruneContracts($db(null, '{"contract":"acme/j6/1.1.0"}'), $root, $root . '/custom-tmp'), $list($spare), $list($lib)],
+            [['old/j6/1.0.0', 'other/j6/1.0.0'], ['acme', 'acme/j6', 'acme/j6/1.0.0', 'acme/j6/1.0.0/manifest.json', 'acme/j6/1.1.0', 'acme/j6/1.1.0/manifest.json'], []]);
+        check('prune: an id in both folders is reported once', (static function () use ($P, $lib, $spare, $manifest): array {
+            foreach ([$lib, $spare] as $folder) { mkdir($folder . '/zz/j6/1.0.0', 0777, true); file_put_contents($folder . '/zz/j6/1.0.0/manifest.json', $manifest('zz/j6/1.0.0')); }
+            return $P::prune([$lib, $spare], ['acme/j6/1.1.0']);
+        })(), ['zz/j6/1.0.0']);
+        checkTrue('spare: uninstalling the package removes the spare folder',
+            strpos(file_get_contents(__DIR__ . '/../script.php'), 'self::remove($spare);') !== false);
 
         // One deadline for the whole download, the open included; past it the download failed.
         stream_wrapper_register('cfslow', ContractFetchSlowStream::class);
