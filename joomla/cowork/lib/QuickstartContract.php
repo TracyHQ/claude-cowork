@@ -894,7 +894,8 @@ final class QuickstartContract
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
             'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null,
-            'showcaseNav'=>$binding['showcaseNav']['status']??null];
+            // A finished revert's record only answers that revert again: no showcase navigation is applied.
+            'showcaseNav'=>($binding['showcaseNav']['status']??null)==='reverted'?null:($binding['showcaseNav']['status']??null)];
     }
 
     /**
@@ -1323,7 +1324,8 @@ final class QuickstartContract
      * values its writes moved, so the rows it took out of navigation are what is protected from then
      * on and nothing else is.
      *
-     * @param list<array{key:string,kind:string,exists:bool,value:mixed}> $moved what each written row now holds
+     * @param list<array{key:string,kind:string,exists:bool,value:mixed,blank?:bool}> $moved what each written row now holds;
+     *        `blank` when the row's params column is empty text again
      */
     public function bindingWithShowcaseNav(?array $record, array $moved = []): array {
         $binding=$this->store->load();
@@ -1333,9 +1335,11 @@ final class QuickstartContract
             if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
             if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
             $params=$binding['presentation'][$row['key']]['params']??null;
+            // An empty column is held as its text, as the row reads it: Joomla's {} and back again.
+            if($params==='')$params=[];
             if(!is_array($params))throw new RuntimeException('The baseline holds no params for '.$row['key']);
             if($row['exists'])$params[ShowcaseNavProfile::MENU_PARAM]=$row['value'];else unset($params[ShowcaseNavProfile::MENU_PARAM]);
-            $binding['presentation'][$row['key']]['params']=$params;
+            $binding['presentation'][$row['key']]['params']=($row['blank']??false)&&$params===[]?'':$params;
         }
         return $binding;
     }

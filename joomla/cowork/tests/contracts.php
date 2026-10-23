@@ -118,9 +118,20 @@ final class ContractTestWriter extends FakeSiteWriter {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
         parent::setVisibility($kind,$id,$column,$value);
     }
-    public function replaceMenuItemParams(int $id,string $expected,string $params):void {
+    /**
+     * Run just before a compare-and-set reaches the row, with this writer and the row's [kind, id]:
+     * a save that lands between the caller's read and its write.
+     */
+    public $beforeCas=null;
+    public function setVisibilityIf(string $kind,int $id,string $column,string $expected,string $value):bool {
+        if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
+        if($this->beforeCas)($this->beforeCas)($this,$kind,$id);
+        return parent::setVisibilityIf($kind,$id,$column,$expected,$value);
+    }
+    public function replaceMenuItemParams(int $id,string $expected,string $params):bool {
         if($this->failOn===['menuItem',$id])throw new RuntimeException('The site refused menuItem '.$id);
-        parent::replaceMenuItemParams($id,$expected,$params);
+        if($this->beforeCas)($this->beforeCas)($this,'menuItem',$id);
+        return parent::replaceMenuItemParams($id,$expected,$params);
     }
     /** Whether a transaction is open right now: work that must follow the commit can say it did. */
     public bool $open=false;

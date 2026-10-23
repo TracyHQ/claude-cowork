@@ -909,7 +909,8 @@ $w = __WRITER__ ? new class implements SiteWriter, SearchableSiteWriter {
     public function setVisibility(string $kind, int $id, string $column, string $value): void {}
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void {}
     public function realiasMenuItem(int $id, string $alias): void {}
-    public function replaceMenuItemParams(int $id, string $expected, string $params): void {}
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool { return false; }
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool { return false; }
     public function relabelLanguage(string $from, string $to, ?array $label = null): array { return []; }
     public function swapLanguage(string $from, string $to, ?array $label = null): array { return []; }
     public function writeModuleTitles(array $titles): void {}

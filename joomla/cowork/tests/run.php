@@ -968,6 +968,12 @@ class FakeSiteWriterBase implements SiteWriter
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
         $this->store[$kind][$id][$column] = $value;
     }
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool
+    {
+        if (!isset($this->store[$kind][$id]) || (string) ($this->store[$kind][$id][$column] ?? '') !== $expected) return false;
+        $this->store[$kind][$id][$column] = $value;
+        return true;
+    }
     /** Every setVisibilityMany() call as [kind, ids, column, value], so a test can show a pass was written in bulk. */
     public array $bulkVisibility = [];
     /**
@@ -1057,11 +1063,11 @@ class FakeSiteWriterBase implements SiteWriter
             $this->store['module'][(int) $id]['params'] = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
     }
-    public function replaceMenuItemParams(int $id, string $expected, string $params): void
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool
     {
-        if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
-        if ((string) ($this->store['menuItem'][$id]['params'] ?? '') !== $expected) throw new RuntimeException('The params of menu item ' . $id . ' changed since they were read');
+        if (!isset($this->store['menuItem'][$id]) || (string) ($this->store['menuItem'][$id]['params'] ?? '') !== $expected) return false;
         $this->store['menuItem'][$id]['params'] = $params;
+        return true;
     }
     public function realiasMenuItem(int $id, string $alias): void
     {

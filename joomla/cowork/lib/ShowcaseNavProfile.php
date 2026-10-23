@@ -69,7 +69,9 @@ final class ShowcaseNavProfile
                 $from = $row['from'] ?? null;
                 if ($from !== '1' && $from !== null) throw new RuntimeException('Showcase-navigation operation must start from a shown entry: ' . $key);
                 // The locked value is what the map says it starts from: absent for null, "1" (string or number) for "1".
-                $params = json_decode((string) ($locked['params'] ?? ''), true);
+                // An empty column is Joomla's {}: no params, so no menu_show either.
+                $text = (string) ($locked['params'] ?? '');
+                $params = trim($text) === '' ? [] : json_decode($text, true);
                 if (!is_array($params)) throw new RuntimeException('Showcase-navigation operation names a menu item without params: ' . $key);
                 $lockedShow = array_key_exists(self::MENU_PARAM, $params) ? (string) $params[self::MENU_PARAM] : null;
                 if ($lockedShow !== $from) throw new RuntimeException('Showcase-navigation operation does not start from the locked value of ' . $key);

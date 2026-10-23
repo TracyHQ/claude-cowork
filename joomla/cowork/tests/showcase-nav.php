@@ -78,9 +78,25 @@ function snavRewrite(string $dir, callable $edit): void {
     $file = $dir . '/showcase-nav-map.json';
     file_put_contents($file, json_encode($edit(json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR))));
 }
+/** The lock at `$dir`, edited, and every profile pinned to the edited copy. */
+function snavRelock(string $dir, callable $edit): void {
+    $file = $dir . '/presentation-lock.json';
+    file_put_contents($file, json_encode($edit(json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR))));
+    $base = hash('sha256', implode('', array_map(fn ($n) => $n . ':' . hash_file('sha256', $dir . '/' . $n) . "\n", ['manifest.json', 'content-map.json', 'presentation-lock.json'])));
+    foreach (glob($dir . '/*-map.json') ?: [] as $profile)
+        if (basename($profile) !== 'content-map.json') file_put_contents($profile, json_encode(['baseHash' => $base] + json_decode(file_get_contents($profile), true, 512, JSON_THROW_ON_ERROR)));
+}
 function snavClean(string $label, QuickstartContract $contract): void {
     try { $contract->inspect(); check($label, $contract->driftWarnings(), []); }
     catch (Throwable $e) { check($label, 'refused: ' . $e->getMessage(), 'clean'); }
+}
+/** The rows inspect reports drifted, by key. */
+function snavDrifted(QuickstartContract $contract): array {
+    try { $contract->inspect(); } catch (Throwable $e) { return ['refused: ' . $e->getMessage()]; }
+    $keys = [];
+    foreach ($contract->driftWarnings() as $warning) if (preg_match('/drift: (\S+) /', $warning, $m)) $keys[] = $m[1];
+    sort($keys);
+    return array_values(array_unique($keys));
 }
 $snavShow = fn (ContractTestWriter $w, int $id) => JsonObjectKey::get((string) $w->store['menuItem'][$id]['params'], 'menu_show');
 
@@ -174,10 +190,27 @@ check('revert brings the showcase back', [$back['ok'], $back['status'], $back['m
 check('and names the entry the customer changed', array_keys($back['conflicts']), ['menuItem-' . $pink]);
 check("the customer's own value is left as they wrote it", $w->store['menuItem'][$pink]['params'], $customer);
 foreach ($hidden as $title => $id) if ($id !== $pink) check("$title has exactly its params back", $w->store['menuItem'][$id]['params'], $original[$id]);
-check('and leaves no showcase navigation on record', [isset($store->binding['showcaseNav']), $contract->inspect()['showcaseNav']], [false, null]);
+$pinkStatus = $call(['operation' => 'showcaseNav.status']);
+check('and leaves no showcase navigation applied, only the conflict on record', [$store->binding['showcaseNav']['status'], array_keys($store->binding['showcaseNav']['receipts']), $contract->inspect()['showcaseNav'], $pinkStatus['status'], array_keys($pinkStatus['conflicts'])],
+    ['reverted', ['menuItem-' . $pink], null, 'none', ['menuItem-' . $pink]]);
+// The baseline moved only for the rows the revert wrote: the row it left is still held to what the
+// apply wrote, and the customer's own change to it is reported, even put back as the lock had it.
+check("the customer's change is not adopted as the baseline", snavDrifted($contract), ['menuItem-' . $pink]);
 $w->store['menuItem'][$pink]['params'] = $original[$pink];
+check('nor is putting it back by hand', snavDrifted($contract), ['menuItem-' . $pink]);
+$retried = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1']);
+check('the same revert after a lost answer gets the committed answer', [$retried['ok'], $retried['status'], $retried['remaining'], $retried['alreadyReverted'], array_keys($retried['conflicts'])], [true, 'reverted', 0, true, ['menuItem-' . $pink]]);
+check('and writes nothing', $w->store['menuItem'][$pink]['params'], $original[$pink]);
+check('the reverted apply request cannot apply again', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1'])['error'], 'conflict');
+// A new revert request looks at the conflict again: put back by hand, it is restored with nothing written.
+$again = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo2', 'request_id' => 'u2']);
+check('a later revert takes the row put back by hand', [$again['ok'], $again['status'], $again['moved'], $again['conflicts'], $w->store['menuItem'][$pink]['params']], [true, 'reverted', 1, [], $original[$pink]]);
 snavClean('the reverted site inspects clean', $contract);
-check('revert with nothing applied says so', $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo2', 'request_id' => 'u2'])['error'], 'contract_failed');
+check('with nothing left to bring back, a revert says so', $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo3', 'request_id' => 'u3'])['error'], 'contract_failed');
+check('both reverts still answer their retries', [
+    array_keys($call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1'])['conflicts']),
+    $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo2', 'request_id' => 'u2'])['conflicts'],
+], [['menuItem-' . $pink], []]);
 
 // A row someone already hid, or moved elsewhere, is not written; its receipt says why.
 $w->store['menuItem'][$hidden['Login']]['params'] = JsonObjectKey::set($original[$hidden['Login']], 'menu_show', '0');
@@ -186,7 +219,7 @@ $skip = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-d', 'requ
 check('rows not where the map starts are skipped, by name', [$skip['status'], $skip['moved'], $skip['skipped']],
     ['completed', 13, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
 check('the skipped rows were not written', [JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal'], JsonObjectKey::get($w->store['menuItem'][$hidden['Registration']]['params'], 'menu_show')['literal']], ['0', '"maybe"']);
-$skipBack = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo3', 'request_id' => 'u3']);
+$skipBack = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo4', 'request_id' => 'u4']);
 check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 13, '0']);
 
 // ------------------------------------------------------------------ a module, through the visibility column
@@ -205,6 +238,126 @@ snavClean('the site with the module hidden inspects clean', $mContract);
 $mBack = $mCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-mu', 'request_id' => 'm2']);
 check('and is published again by the revert', [$mBack['status'], $mw->store['module'][$mid]['published']], ['reverted', '1']);
 snavClean('the reverted module site inspects clean', $mContract);
+
+// ------------------------------------------------------------------ a revert's conflicts, looked at again
+
+// 🔒 A ROW A REVERT LEFT IS RECOVERED, NEVER OVERWRITTEN. A later revert request looks at those rows
+// only: one already holding, byte for byte, what the apply found is restored with nothing written; one
+// holding what the apply wrote is put back by the same compare-and-set; anything else stays the customer's.
+[, $cStore, $cw, $cContract, $cCall] = snavSite($snavSource);
+$cOriginal = array_map(fn ($row) => $row['params'] ?? null, $cw->store['menuItem']);
+check('the conflicts site applies', $cCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-c', 'request_id' => 'c1'])['status'], 'completed');
+[$cFound, $cHidden, $cOther] = [$hidden['Home - Red'], $hidden['Home - Green'], $hidden['Home - Blue']];
+foreach ([$cFound => '"1"', $cHidden => '"maybe"', $cOther => '"1"'] as $id => $literal)
+    $cw->store['menuItem'][$id]['params'] = JsonObjectKey::set((string) $cw->store['menuItem'][$id]['params'], 'menu_show', $literal);
+$cFirst = $cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu', 'request_id' => 'c2']);
+$cWant = ['menuItem-' . $cFound, 'menuItem-' . $cHidden, 'menuItem-' . $cOther];
+sort($cWant);
+$cKeys = fn (array $answer) => (function ($k) { sort($k); return $k; })(array_keys($answer['conflicts'] ?? []));
+check('the first revert leaves three rows', [$cFirst['status'], $cKeys($cFirst)], ['reverted', $cWant]);
+check('the lock says what each row started from', JsonObjectKey::get($snavLock['entities']['menuItem-' . $cFound]['params'], 'menu_show')['literal'], '1');
+// One is put back by hand exactly, one is hidden again as the apply left it, one stays the customer's;
+// a kept page drifts too, and is no row of the revert.
+$cw->store['menuItem'][$cFound]['params'] = $cOriginal[$cFound];
+$cw->store['menuItem'][$cHidden]['params'] = JsonObjectKey::set((string) $cw->store['menuItem'][$cHidden]['params'], 'menu_show', '0');
+$cOtherSaved = $cw->store['menuItem'][$cOther]['params'];
+$cOffers = (string) $cw->store['menuItem'][141]['params'];
+$cw->store['menuItem'][141]['params'] = JsonObjectKey::set($cOffers, array_key_first(array_diff_key(json_decode($cOffers, true), ['menu_show' => 1])), '"drifted"');
+$cWrites = [];
+$cw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$cWrites) { $cWrites[] = $kind . '-' . $id; };
+$cSecond = $cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu2', 'request_id' => 'c3']);
+$cw->beforeCas = null;
+check('a later revert takes two rows back and leaves the third', [$cSecond['ok'], $cSecond['status'], $cSecond['moved'], array_keys($cSecond['conflicts'])], [true, 'reverted', 2, ['menuItem-' . $cOther]]);
+check('it writes only the row that held what the apply wrote', $cWrites, ['menuItem-' . $cHidden]);
+check('the row put back by hand keeps its bytes', $cw->store['menuItem'][$cFound]['params'], $cOriginal[$cFound]);
+check('the row the apply left gets exactly its params back', $cw->store['menuItem'][$cHidden]['params'], $cOriginal[$cHidden]);
+check("the customer's row is untouched", $cw->store['menuItem'][$cOther]['params'], $cOtherSaved);
+check('the baseline followed the two rows and nothing else', snavDrifted($cContract), ['menuItem-141', 'menuItem-' . $cOther]);
+check('the retried later revert gets its own answer', [$cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu2', 'request_id' => 'c3'])['alreadyReverted'] ?? null, $cKeys($cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu2', 'request_id' => 'c3']))], [true, ['menuItem-' . $cOther]]);
+check('the retried first revert still gets its own', $cKeys($cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu', 'request_id' => 'c2'])), $cWant);
+$cw->store['menuItem'][$cOther]['params'] = $cOriginal[$cOther];
+$cw->store['menuItem'][141]['params'] = $cOffers;
+$cLast = $cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu3', 'request_id' => 'c4']);
+check('once every row is back the revert ends with no conflict', [$cLast['status'], $cLast['moved'], $cLast['conflicts'], $cStore->binding['showcaseNav']['receipts']], ['reverted', 1, [], []]);
+check('every row has exactly its params back', array_map(fn ($row) => $row['params'] ?? null, $cw->store['menuItem']), $cOriginal);
+snavClean('the site inspects clean', $cContract);
+check('and a revert has nothing more to bring back', $cCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-cu4', 'request_id' => 'c5'])['error'], 'contract_failed');
+
+// ------------------------------------------------------------------ a save between the read and the write
+
+// 🔒 EVERY WRITE IS A COMPARE-AND-SET, module or menu item. A save that lands after the row was read
+// (here: the same value in other bytes, so the site itself is not drift) is left as it was saved and
+// named a conflict; the rest of the batch goes on.
+[, $rStore, $rw, $rContract, $rCall] = snavSite($snavSource, fn ($dir) => snavRewrite($dir, function ($m) use ($snavModule) {
+    $m['operations'][] = ['op' => 'module.published', 'key' => $snavModule['key'], 'identity' => $snavModule['identity'], 'field' => 'published', 'from' => '1', 'to' => '0', 'rule' => 'test', 'reason' => 'a showcase module'];
+    return $m;
+}));
+$rTypo = $hidden['Typography'];
+$rRaced = JsonObjectKey::set((string) $rw->store['menuItem'][$rTypo]['params'], 'menu_show', '"1"');
+$rw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use ($rTypo, $mid, $rRaced) {
+    if ($kind === 'menuItem' && $id === $rTypo) $writer->store['menuItem'][$id]['params'] = $rRaced;
+    if ($kind === 'module' && $id === $mid) $writer->store['module'][$id]['published'] = '01';
+};
+$rApplied = $rCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-r', 'request_id' => 'race1']);
+$rReceipts = $rStore->binding['showcaseNav']['receipts'] ?? [];
+check('a raced apply goes on with the other rows', [$rApplied['ok'], $rApplied['status'] ?? null, $rApplied['moved'] ?? null], [true, 'completed', 14]);
+check('and names both raced rows a conflict', [$rReceipts['menuItem-' . $rTypo]['outcome'] ?? null, $rReceipts[$snavModule['key']]['outcome'] ?? null], ['conflict', 'conflict']);
+check('neither raced row is overwritten', [$rw->store['menuItem'][$rTypo]['params'], $rw->store['module'][$mid]['published']], [$rRaced, '01']);
+$rw->beforeCas = null;
+snavClean('the raced site inspects clean', $rContract);
+// The revert's writes are compare-and-sets too: a row saved after its check is not restored over.
+$rRed = $hidden['Home - Red'];
+$rRedSaved = JsonObjectKey::set((string) $rw->store['menuItem'][$rRed]['params'], 'menu_show', '"0"');
+$rw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use ($rRed, $rRedSaved) {
+    if ($kind === 'menuItem' && $id === $rRed) $writer->store['menuItem'][$id]['params'] = $rRedSaved;
+};
+$rBack = $rCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-ru', 'request_id' => 'race2']);
+check('a raced revert names the row and leaves it as saved', [$rBack['status'] ?? $rBack, array_keys($rBack['conflicts'] ?? []), $rw->store['menuItem'][$rRed]['params']], ['reverted', ['menuItem-' . $rRed], $rRedSaved]);
+$rw->beforeCas = null;
+
+// ------------------------------------------------------------------ drift the apply did not make stays drift
+
+// 🔒 THE BASELINE MOVES ONLY WHERE A ROW WAS WRITTEN. A kept page and a listed entry that already
+// differ from the lock before the apply are still reported after it, and after its revert.
+[, , $dw, $dContract, $dCall] = snavSite($snavSource);
+check('a bound site', $dCall(['operation' => 'bind'])['ok'], true);
+$dOffers = (string) $dw->store['menuItem'][141]['params'];
+$dKey = array_key_first(array_diff_key(json_decode($dOffers, true), ['menu_show' => 1]));
+$dw->store['menuItem'][141]['params'] = JsonObjectKey::set($dOffers, $dKey, '"drifted"');
+$dGreen = $hidden['Home - Green'];
+$dw->store['menuItem'][$dGreen]['params'] = JsonObjectKey::set((string) $dw->store['menuItem'][$dGreen]['params'], $dKey, '"drifted"');
+$dWant = ['menuItem-141', 'menuItem-' . $dGreen];
+sort($dWant);
+check('the drift is reported before the apply', snavDrifted($dContract), $dWant);
+$dApplied = $dCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-dr', 'request_id' => 'd1']);
+check('the apply still runs', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied], [true, 15]);
+check('and the drift it did not make is still reported after it', snavDrifted($dContract), $dWant);
+$dBack = $dCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-dru', 'request_id' => 'd2']);
+check('the revert still runs', [$dBack['ok'], $dBack['moved'] ?? $dBack], [true, 15]);
+check('and the drift is still reported after it', snavDrifted($dContract), $dWant);
+$dw->store['menuItem'][141]['params'] = $dOffers;
+check('and a row put back is no longer reported', snavDrifted($dContract), ['menuItem-' . $dGreen]);
+
+// ------------------------------------------------------------------ an empty params column
+
+// A menu item saved with no params at all holds "" (Joomla reads it as {}): `from: null` hides it with
+// the one key the admin form would write, and the revert hands the column back empty.
+$bId = $hidden['Typography'];
+[, , $bw, $bContract, $bCall] = snavSite($snavSource, function ($dir) use ($bId) {
+    snavRelock($dir, function ($lock) use ($bId) { $lock['entities']['menuItem-' . $bId]['params'] = ''; return $lock; });
+    snavRewrite($dir, function ($m) use ($bId) {
+        foreach ($m['operations'] as &$op) if ($op['key'] === 'menuItem-' . $bId) $op['from'] = null;
+        return $m;
+    });
+});
+check('the empty column is what the site holds', $bw->store['menuItem'][$bId]['params'], '');
+snavClean('and the site inspects clean with it', $bContract);
+$bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'b1']);
+check('an empty params column is hidden from null', [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 15, '{"menu_show":"0"}']);
+snavClean('the site with it hidden inspects clean', $bContract);
+$bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
+check('the revert hands the column back empty', [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 15, '']);
+snavClean('the site with it back inspects clean', $bContract);
 
 // ------------------------------------------------------------------ an absent key, beside a demo trim
 

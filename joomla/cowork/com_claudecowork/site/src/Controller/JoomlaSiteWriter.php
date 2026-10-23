@@ -599,6 +599,23 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $this->setVisibilityMany($kind, [$id], $column, $value);
     }
 
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool
+    {
+        if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
+        if ($kind === 'article') throw new \RuntimeException('An article\'s state is not written by compare-and-set');
+        if ($id <= 0) return false;
+        $col = $this->db->quoteName($column);
+        // One raw UPDATE of one column, as setVisibilityMany(): the check is in its WHERE.
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName($this->tableFor($kind)))
+            ->set($col . ' = ' . (int) $value)
+            ->where($this->db->quoteName($this->pkFor($kind)) . ' = ' . $id)
+            ->where($col . ' = ' . (int) $expected);
+        $this->applyScope($kind, $query);
+        $this->db->setQuery($query)->execute();
+        return $this->db->getAffectedRows() === 1;
+    }
+
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void
     {
         if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
@@ -807,22 +824,23 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         return ['title' => $name, 'title_native' => $native, 'image' => strtolower(str_replace('-', '_', $tag))];
     }
 
-    public function replaceMenuItemParams(int $id, string $expected, string $params): void
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool
     {
-        if ($id <= 0) throw new \RuntimeException('target does not exist in this scope');
+        if ($id <= 0) return false;
         $db = $this->db;
+        // 🔒 BYTES, NOT THE COLLATION. `params` is text under the site's collation — utf8mb4_unicode_ci
+        // on Joomla 4/5/6 — where `=` ignores case (and trailing spaces under PAD SPACE): a customer's
+        // "A" to "a" in another param would still match and be overwritten. CAST(... AS BINARY) on
+        // both sides compares bytes on MySQL 5.6–9 and MariaDB alike (the bare BINARY operator is
+        // deprecated from MySQL 8.0.27).
         $query = $db->getQuery(true)
             ->update($db->quoteName('#__menu'))
             ->set($db->quoteName('params') . ' = ' . $db->quote($params))
             ->where($db->quoteName('id') . ' = ' . (int) $id)
-            ->where($db->quoteName('params') . ' = ' . $db->quote($expected));
+            ->where('CAST(' . $db->quoteName('params') . ' AS BINARY) = CAST(' . $db->quote($expected) . ' AS BINARY)');
         $this->applyScope('menuItem', $query);
         $db->setQuery($query)->execute();
-        if ($db->getAffectedRows() === 1) return;
-        // Nothing written: say which of the two reasons it was.
-        $row = $this->read('menuItem', $id);
-        if (!$row) throw new \RuntimeException('target does not exist in this scope');
-        throw new \RuntimeException('The params of menu item ' . $id . ' changed since they were read');
+        return $db->getAffectedRows() === 1;
     }
 
     public function realiasMenuItem(int $id, string $alias): void

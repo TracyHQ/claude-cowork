@@ -13,8 +13,14 @@
 #    for byte, and the home page no longer links the hidden entries. Inspect is clean; a
 #    second apply is a no-op.
 # 3. the customer shows Home - Pink again; revert restores every other params text byte for byte and
-#    names Home - Pink as a conflict, leaving it as the customer set it.
-# 4. with Home - Pink put back, the site inspects clean and has no showcase navigation on record.
+#    names Home - Pink as a conflict, leaving it as the customer set it. The same revert retried
+#    gets the committed answer.
+# 4. the customer's change is not adopted: put back by hand, Home - Pink is still reported, until a
+#    new revert request finds it as the apply found it, restores it with nothing written, and the site
+#    inspects clean with no showcase navigation applied. Both reverts still answer their retries.
+# 5. the writer's compare-and-sets on this MariaDB: params that differ from what was read only in
+#    letter case (equal under the site's collation) are not overwritten, nor is a module whose
+#    published is not the one expected.
 set -euo pipefail
 E2E_NAME=snav
 : "${DINER_QUICKSTART:?set DINER_QUICKSTART to the ja-diner/j6 1.0.4 release folder}"
@@ -87,13 +93,57 @@ expect "and names Home - Pink as a conflict" "$(node -e 'process.stdout.write(Ob
 expect "every other entry has exactly its params back" "$(changed "$HIDDEN")" 146
 expect "Home - Pink stays as the customer set it" "$(shows 146)" "146:1:1"
 expect "the home page links the showcase again" "$(links)" "typography:1 login:1 offers:1 our-blog:1"
+contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
+expect "the same revert retried gets the committed answer" "$(field status) $(field alreadyReverted) $(field remaining)" "reverted true 0"
 
-say "4. Home - Pink put back"
+say "4. the customer's change is not adopted"
+drifted() { node -e 'process.stdout.write((JSON.parse(process.argv[1]).warnings || []).map((w) => (w.message.match(/drift: (\S+) /) || [])[1]).join(","))' "$ANSWER"; }
 qs_sql "UPDATE ${QS}menu m JOIN snav_original o ON o.id=m.id SET m.params=o.params WHERE m.id=146"
+contract '{"operation":"inspect"}'
+expect "Home - Pink put back by hand is still reported" "$(drifted)" menuItem-146
+contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo2","request_id":"e2e-4"}'
+expect "a new revert request restores it with nothing written" "$(field status) $(field moved) $(field conflicts) $(changed "$HIDDEN")" "reverted 1 [] none"
 contract '{"operation":"inspect"}'
 expect "the reverted site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.status"}'
-expect "and has no showcase navigation on record" "$(field status)" none
+expect "and has no showcase navigation applied" "$(field status) $(field conflicts)" "none []"
+contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
+expect "the first revert still answers its retry" "$(field alreadyReverted) $(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]).conflicts).join(","))' "$ANSWER")" "true menuItem-146"
+contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo2","request_id":"e2e-4"}'
+expect "and so does the second" "$(field alreadyReverted) $(field conflicts)" "true []"
 qs_sql "DROP TABLE snav_original"
+
+say "5. compare-and-set by bytes"
+docker exec -i -u www-data "$P-joomla" php <<'PHP' > /dev/null
+<?php
+define('_JEXEC', 1);
+define('JPATH_BASE', '/var/www/html');
+require JPATH_BASE . '/includes/defines.php';
+require JPATH_BASE . '/includes/framework.php';
+$db = Joomla\CMS\Factory::getContainer()->get(Joomla\Database\DatabaseInterface::class);
+foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'ChangeStamp', 'CoreUpgrader', 'FilesRestorer', 'Token', 'Engine', 'MysqliRowSource', 'Door'] as $f)
+    require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib/' . $f . '.php';
+require_once JPATH_SITE . '/components/com_claudecowork/src/Controller/JoomlaSiteWriter.php';
+$w = new Tracy\Component\ClaudeCowork\Site\Controller\JoomlaSiteWriter($db);
+$read = fn () => (string) $db->setQuery('SELECT params FROM #__menu WHERE id = 141')->loadResult();
+$params = $read();
+$folded = preg_replace_callback('/[a-z]/', fn ($m) => strtoupper($m[0]), $params, 1);
+$out = [
+    'collationFolds' => (int) $db->setQuery('SELECT COUNT(*) FROM #__menu WHERE id = 141 AND params = ' . $db->quote($folded))->loadResult(),
+    'caseOnly' => $w->replaceMenuItemParams(141, $folded, '{"overwritten":1}'),
+];
+$out['kept'] = $read() === $params;
+$module = (int) $db->setQuery('SELECT id FROM #__modules WHERE published = 1 AND client_id = 0 ORDER BY id LIMIT 1')->loadResult();
+$out['moduleWrongExpected'] = $w->setVisibilityIf('module', $module, 'published', '0', '1');
+$out['moduleKept'] = (int) $db->setQuery('SELECT published FROM #__modules WHERE id = ' . $module)->loadResult();
+$out['exact'] = $w->replaceMenuItemParams(141, $params, $params . ' ');
+$out['exactBack'] = $w->replaceMenuItemParams(141, $params . ' ', $params) && $read() === $params;
+file_put_contents('/tmp/snav-cas.json', json_encode($out));
+PHP
+ANSWER=$(docker exec "$P-joomla" sh -c 'cat /tmp/snav-cas.json && rm -f /tmp/snav-cas.json')
+expect "the site's collation folds case, so a text compare would match" "$(field collationFolds)" 1
+expect "params that differ only in case are not overwritten" "$(field caseOnly) $(field kept)" "false true"
+expect "a module whose published is not the one expected is not written" "$(field moduleWrongExpected) $(field moduleKept)" "false 1"
+expect "the exact bytes are written, and back" "$(field exact) $(field exactBack)" "true true"
 
 finish

@@ -2791,6 +2791,8 @@ final class Engine
 
     /** Rows moved per committed call of showcaseNav.apply and .revert. */
     private const SHOWCASE_NAV_BATCH = 100;
+    /** Why a row was left alone when its compare-and-set found it changed between the read and the write. */
+    private const SHOWCASE_NAV_RACED = 'it changed while it was being written';
 
     /**
      * Taking a quickstart's TEMPLATE SHOWCASE out of a bound site's menus, and putting it back.
@@ -2816,6 +2818,11 @@ final class Engine
             $nav = $this->contract->showcaseNav();
         } catch (Throwable $error) { return $this->contractFailed($error); }
         $record = $binding['showcaseNav'] ?? null;
+        // A finished revert leaves only what it could not put back (the receipts of its conflicts) and
+        // the answer of each revert request: no row is expected moved, the same revert retried after a
+        // lost answer gets its answer again, and a new revert request looks at the conflicts once more.
+        $reverted = ($record['status'] ?? null) === 'reverted' ? $record : null;
+        if ($reverted !== null) $record = null;
         $usable = $nav !== null && $nav->covered();
         $unsupported = function () use ($nav) {
             if ($nav === null && $this->contract->showcaseNavProblem() !== null)
@@ -2834,6 +2841,8 @@ final class Engine
                     'hides' => $usable ? $nav->counts() : [],
                     'remaining' => count($this->showcaseNavPending($state, $record, ($record['status'] ?? 'applying') !== 'reverting')),
                     'skipped' => $this->showcaseNavSkipped($receipts),
+                    // Rows a finished revert left as the customer set them; a new revert request looks again.
+                    'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
                     'applyId' => $record['applyId'] ?? null,
                     'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
                     // A map published after this site's apply lists rows its receipts do not; a revert then an apply takes it.
@@ -2855,6 +2864,8 @@ final class Engine
             return $this->err('contract_failed', 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
         try {
             if ($hide) {
+                if ($reverted !== null && $reverted['requestId'] === $request)
+                    return $this->err('conflict', 'Request ' . $request . ' applied showcase navigation that has since been reverted; a new apply needs a new request_id');
                 if (($record['status'] ?? null) === 'complete')
                     return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyApplied' => true, 'applyId' => $record['applyId'],
                         'skipped' => $this->showcaseNavSkipped($record['receipts']),
@@ -2866,10 +2877,23 @@ final class Engine
                 $next = $record ?? ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
                     'profileHash' => $nav->hash(), 'profileVersion' => $nav->version(), 'at' => gmdate('c'), 'receipts' => []];
             } else {
-                if ($record === null) return $this->err('contract_failed', 'This site has no showcase menu entries to bring back');
-                if ($record['status'] === 'reverting' && $record['revert']['requestId'] !== $request)
+                if ($record === null && isset($reverted['answers'][$request]))
+                    return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true] + $reverted['answers'][$request]);
+                // 🔒 A CONFLICT IS LOOKED AT AGAIN, NEVER OVERWRITTEN. A new request takes the rows the last
+                // revert left — and only those — through the same per-row rules: put back by hand, put back
+                // by the same compare-and-set, or still the customer's, untouched.
+                if ($record === null && !empty($reverted['receipts'])) {
+                    $receipts = [];
+                    foreach ($reverted['receipts'] as $key => $receipt) { unset($receipt['reverted'], $receipt['revertWhy']); $receipts[$key] = $receipt; }
+                    $record = ['status' => 'reverting', 'applyId' => $reverted['applyId'], 'requestId' => $reverted['requestId'],
+                        'profileHash' => $reverted['profileHash'] ?? null, 'revert' => ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')],
+                        'receipts' => $receipts, 'answers' => $reverted['answers'] ?? []];
+                    $next = $record;
+                    $record = null;
+                } elseif ($record === null) return $this->err('contract_failed', 'This site has no showcase menu entries to bring back');
+                if ($record !== null && $record['status'] === 'reverting' && $record['revert']['requestId'] !== $request)
                     return $this->err('conflict', 'A showcase-navigation revert is already running under request ' . $record['revert']['requestId']);
-                $next = ['status' => 'reverting', 'revert' => $record['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $record;
+                if ($record !== null) $next = ['status' => 'reverting', 'revert' => $record['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $record;
             }
             // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit, and not under an open editor:
             // the rows this call would move are checked first, so a refused call leaves the site — and
@@ -2900,18 +2924,26 @@ final class Engine
                 foreach ($batch as $key => $row) {
                     $receipt = $hide ? $this->showcaseNavHide($state, $key, $row) : $this->showcaseNavRestore($state, $key, $row);
                     if ($hide) $record['receipts'][$key] = $receipt['receipt'];
-                    else $record['receipts'][$key]['reverted'] = $receipt['receipt']['reverted'];
+                    else $record['receipts'][$key] = $receipt['receipt'] + $record['receipts'][$key];
                     if ($receipt['moved'] !== null) $moved[] = $receipt['moved'];
                     $this->log->record($log, ['op' => 'showcaseNav', 'key' => $key, 'direction' => $hide ? 'hide' : 'restore'] + $receipt['receipt']);
                 }
                 $remaining = count($pending) - count($batch);
                 $skipped = $this->showcaseNavSkipped($record['receipts'], !$hide);
                 if ($remaining === 0 && $hide) { $record['status'] = 'complete'; $record['completedAt'] = gmdate('c'); }
-                // A finished revert leaves no record — as if the apply never happened.
-                $this->contract->rebind($this->contract->bindingWithShowcaseNav($remaining === 0 && !$hide ? null : $record, $moved));
-                // Proven, then stored: the full read checks every row against the baseline just
-                // derived, and only a site that passes it becomes the next baseline.
-                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                // A finished revert keeps the receipts of its conflicts only — the rows a later revert may
+                // still put back — and what each revert request is answered when it is retried.
+                if ($remaining === 0 && !$hide)
+                    $record = ['status' => 'reverted', 'applyId' => $record['applyId'], 'requestId' => $record['requestId'],
+                        'profileHash' => $record['profileHash'] ?? null, 'revert' => $record['revert'] + ['completedAt' => gmdate('c')],
+                        'receipts' => array_intersect_key($record['receipts'], $skipped),
+                        'answers' => ($record['answers'] ?? []) + [$record['revert']['requestId'] => ['applyId' => $record['revert']['applyId'], 'conflicts' => $skipped]]];
+                // 🔒 ONLY THE ROWS THIS BATCH WROTE MOVE IN THE BASELINE. The observed snapshot is never
+                // stored: it would adopt whatever else already differs on the site, and inspect would
+                // stop reporting it. The full read still runs, and refuses any difference this batch
+                // made that the baseline does not now expect.
+                $this->contract->rebind($this->contract->bindingWithShowcaseNav($record, $moved));
+                $this->contract->inspect();
                 return ['remaining' => $remaining, 'moved' => count($moved), 'skipped' => $skipped];
             });
             $this->batching = false;
@@ -2986,12 +3018,15 @@ final class Engine
             $published = (string) ($current['published'] ?? '');
             if ($published === '0') return ['receipt' => $base + ['outcome' => 'already', 'why' => 'already unpublished'], 'moved' => null];
             if ($published !== '1') return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'published is ' . $published . ', not 1'], 'moved' => null];
-            $this->writer->setVisibility('module', $id, 'published', '0');
+            if (!$this->writer->setVisibilityIf('module', $id, 'published', '1', '0'))
+                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
             return ['receipt' => $base + ['outcome' => 'written', 'existed' => true, 'before' => '1', 'after' => '0'],
                 'moved' => ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => '0']];
         }
         $params = (string) ($current['params'] ?? '');
-        try { $found = JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
+        // An empty column holds no params at all: Joomla reads it as {}, and writes {"menu_show":"0"} into it.
+        $blank = trim($params) === '';
+        try { $found = $blank ? ['exists' => false, 'literal' => null, 'value' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
         catch (Throwable $error) { return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params are not a JSON object'], 'moved' => null]; }
         $value = $found['value'];
         // Absent is shown: Joomla reads a missing menu_show as 1.
@@ -3001,13 +3036,20 @@ final class Engine
         if (!$shown) return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'menu_show is ' . $found['literal'] . ', not shown'], 'moved' => null];
         // The value keeps the type the row already gives it; a new key is written as the admin form writes it.
         $after = $found['exists'] && is_int($value) ? '0' : '"0"';
-        $this->writer->replaceMenuItemParams($id, $params, JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $after));
-        return ['receipt' => $base + ['outcome' => 'written', 'existed' => $found['exists'], 'before' => $found['literal'], 'after' => $after],
-            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true)]];
+        $written = $blank ? '{' . json_encode(ShowcaseNavProfile::MENU_PARAM) . ':' . $after . '}' : JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $after);
+        if (!$this->writer->replaceMenuItemParams($id, $params, $written))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
+        $receipt = ['outcome' => 'written', 'existed' => $found['exists'], 'before' => $found['literal'], 'after' => $after];
+        // The column's own text, when it held none: a revert that leaves nothing else hands it back empty.
+        if ($blank) $receipt['blank'] = $params;
+        return ['receipt' => $base + $receipt,
+            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true), 'blank' => $blank]];
     }
 
     /**
-     * Put back one row this apply hid, only while it still holds what the apply wrote.
+     * Put back one row this apply hid: written only while it still holds what the apply wrote; already
+     * holding, byte for byte, what the apply found, it is restored with nothing written; anything else
+     * is the customer's, and left.
      *
      * @return array{receipt:array{reverted:string}, moved:?array}
      */
@@ -3018,17 +3060,30 @@ final class Engine
         $conflict = fn (string $why) => ['receipt' => ['reverted' => 'conflict', 'revertWhy' => $why], 'moved' => null];
         if ($current === null || (int) ($state['ids'][$key] ?? 0) !== $row['id']) return $conflict('the row is gone from this site');
         if ($row['kind'] === 'module') {
-            if ((string) ($current['published'] ?? '') !== $receipt['after']) return $conflict('published was changed since it was hidden');
-            $this->writer->setVisibility('module', $row['id'], 'published', $receipt['before']);
-            return ['receipt' => ['reverted' => 'restored'], 'moved' => ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => $receipt['before']]];
+            $moved = ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => $receipt['before']];
+            $published = (string) ($current['published'] ?? '');
+            // Put back already (by the customer, or by hand): the baseline follows; nothing is written.
+            if ($published === $receipt['before']) return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => $moved];
+            if ($published !== $receipt['after']) return $conflict('published was changed since it was hidden');
+            if (!$this->writer->setVisibilityIf('module', $row['id'], 'published', $receipt['after'], $receipt['before'])) return $conflict(self::SHOWCASE_NAV_RACED);
+            return ['receipt' => ['reverted' => 'restored'], 'moved' => $moved];
         }
         $params = (string) ($current['params'] ?? '');
-        try { $found = JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
+        $before = ['key' => $key, 'kind' => 'menuItem', 'exists' => $receipt['existed'], 'value' => $receipt['existed'] ? json_decode($receipt['before'], true) : null];
+        if (isset($receipt['blank']) && $params === $receipt['blank'])
+            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => true] + $before];
+        try { $found = trim($params) === '' ? ['exists' => false, 'literal' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
         catch (Throwable $error) { return $conflict('its params are no longer a JSON object'); }
+        // menu_show already what the apply found — the same literal, or absent as it was — so the baseline follows; nothing is written.
+        if ($found['exists'] === $receipt['existed'] && (!$found['exists'] || $found['literal'] === $receipt['before']))
+            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => false] + $before];
         if (!$found['exists'] || $found['literal'] !== $receipt['after']) return $conflict('menu_show was changed since it was hidden');
-        $this->writer->replaceMenuItemParams($row['id'], $params, JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $receipt['existed'] ? $receipt['before'] : null));
-        return ['receipt' => ['reverted' => 'restored'],
-            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => $receipt['existed'], 'value' => $receipt['existed'] ? json_decode($receipt['before'], true) : null]];
+        $restored = JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $receipt['existed'] ? $receipt['before'] : null);
+        // Back to the empty column it was, unless someone has given the row other params since.
+        $blank = isset($receipt['blank']) && json_decode($restored, true) === [];
+        if ($blank) $restored = $receipt['blank'];
+        if (!$this->writer->replaceMenuItemParams($row['id'], $params, $restored)) return $conflict(self::SHOWCASE_NAV_RACED);
+        return ['receipt' => ['reverted' => 'restored'], 'moved' => ['blank' => $blank] + $before];
     }
 
     /**
