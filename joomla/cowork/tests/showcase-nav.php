@@ -340,24 +340,27 @@ check('and a row put back is no longer reported', snavDrifted($dContract), ['men
 
 // ------------------------------------------------------------------ an empty params column
 
-// A menu item saved with no params at all holds "" (Joomla reads it as {}): `from: null` hides it with
-// the one key the admin form would write, and the revert hands the column back empty.
+// A menu item saved with no params at all holds "" or only whitespace (Joomla reads either as {}):
+// `from: null` hides it with the one key the admin form would write, and the revert hands the column
+// back exactly as it was.
 $bId = $hidden['Typography'];
-[, , $bw, $bContract, $bCall] = snavSite($snavSource, function ($dir) use ($bId) {
-    snavRelock($dir, function ($lock) use ($bId) { $lock['entities']['menuItem-' . $bId]['params'] = ''; return $lock; });
-    snavRewrite($dir, function ($m) use ($bId) {
-        foreach ($m['operations'] as &$op) if ($op['key'] === 'menuItem-' . $bId) $op['from'] = null;
-        return $m;
+foreach (['empty' => '', 'whitespace-only' => " \n"] as $bName => $bText) {
+    [, , $bw, $bContract, $bCall] = snavSite($snavSource, function ($dir) use ($bId, $bText) {
+        snavRelock($dir, function ($lock) use ($bId, $bText) { $lock['entities']['menuItem-' . $bId]['params'] = $bText; return $lock; });
+        snavRewrite($dir, function ($m) use ($bId) {
+            foreach ($m['operations'] as &$op) if ($op['key'] === 'menuItem-' . $bId) $op['from'] = null;
+            return $m;
+        });
     });
-});
-check('the empty column is what the site holds', $bw->store['menuItem'][$bId]['params'], '');
-snavClean('and the site inspects clean with it', $bContract);
-$bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'b1']);
-check('an empty params column is hidden from null', [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 15, '{"menu_show":"0"}']);
-snavClean('the site with it hidden inspects clean', $bContract);
-$bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
-check('the revert hands the column back empty', [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 15, '']);
-snavClean('the site with it back inspects clean', $bContract);
+    check("the $bName column is what the site holds", $bw->store['menuItem'][$bId]['params'], $bText);
+    snavClean("and the site inspects clean with the $bName column", $bContract);
+    $bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'b1']);
+    check("the $bName params column is hidden from null", [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 15, '{"menu_show":"0"}']);
+    snavClean("the site with the $bName row hidden inspects clean", $bContract);
+    $bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
+    check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 15, $bText]);
+    snavClean("the site with the $bName row back inspects clean", $bContract);
+}
 
 // ------------------------------------------------------------------ an absent key, beside a demo trim
 

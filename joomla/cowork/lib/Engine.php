@@ -3043,7 +3043,7 @@ final class Engine
         // The column's own text, when it held none: a revert that leaves nothing else hands it back empty.
         if ($blank) $receipt['blank'] = $params;
         return ['receipt' => $base + $receipt,
-            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true), 'blank' => $blank]];
+            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true), 'blank' => $blank ? $params : false]];
     }
 
     /**
@@ -3071,7 +3071,7 @@ final class Engine
         $params = (string) ($current['params'] ?? '');
         $before = ['key' => $key, 'kind' => 'menuItem', 'exists' => $receipt['existed'], 'value' => $receipt['existed'] ? json_decode($receipt['before'], true) : null];
         if (isset($receipt['blank']) && $params === $receipt['blank'])
-            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => true] + $before];
+            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => $receipt['blank']] + $before];
         try { $found = trim($params) === '' ? ['exists' => false, 'literal' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
         catch (Throwable $error) { return $conflict('its params are no longer a JSON object'); }
         // menu_show already what the apply found — the same literal, or absent as it was — so the baseline follows; nothing is written.
@@ -3083,7 +3083,7 @@ final class Engine
         $blank = isset($receipt['blank']) && json_decode($restored, true) === [];
         if ($blank) $restored = $receipt['blank'];
         if (!$this->writer->replaceMenuItemParams($row['id'], $params, $restored)) return $conflict(self::SHOWCASE_NAV_RACED);
-        return ['receipt' => ['reverted' => 'restored'], 'moved' => ['blank' => $blank] + $before];
+        return ['receipt' => ['reverted' => 'restored'], 'moved' => ['blank' => $blank ? $receipt['blank'] : false] + $before];
     }
 
     /**

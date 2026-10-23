@@ -1325,7 +1325,7 @@ final class QuickstartContract
      * on and nothing else is.
      *
      * @param list<array{key:string,kind:string,exists:bool,value:mixed,blank?:bool}> $moved what each written row now holds;
-     *        `blank` when the row's params column is empty text again
+     *        `blank` the row's empty or whitespace-only params text when it holds that again
      */
     public function bindingWithShowcaseNav(?array $record, array $moved = []): array {
         $binding=$this->store->load();
@@ -1335,11 +1335,12 @@ final class QuickstartContract
             if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
             if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
             $params=$binding['presentation'][$row['key']]['params']??null;
-            // An empty column is held as its text, as the row reads it: Joomla's {} and back again.
-            if($params==='')$params=[];
+            // An empty or whitespace-only column is held as its text, as the row reads it: Joomla's {} and back again.
+            if(is_string($params)&&trim($params)==='')$params=[];
             if(!is_array($params))throw new RuntimeException('The baseline holds no params for '.$row['key']);
             if($row['exists'])$params[ShowcaseNavProfile::MENU_PARAM]=$row['value'];else unset($params[ShowcaseNavProfile::MENU_PARAM]);
-            $binding['presentation'][$row['key']]['params']=($row['blank']??false)&&$params===[]?'':$params;
+            $blank=$row['blank']??false;
+            $binding['presentation'][$row['key']]['params']=is_string($blank)&&$params===[]?$blank:$params;
         }
         return $binding;
     }
