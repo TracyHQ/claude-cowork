@@ -859,6 +859,21 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         return $db->getAffectedRows() === 1;
     }
 
+    public function lockMenuChildren(int $parent): array
+    {
+        if ($parent <= 0) return [];
+        $db = $this->db;
+        // A LOCKING read: the latest committed rows, not this transaction's snapshot, and a gap lock on the
+        // (client_id, parent_id, …) unique index so a child inserted under $parent waits for our commit.
+        $query = $db->getQuery(true)
+            ->select($db->quoteName(['id', 'parent_id', 'menutype', 'language', 'published', 'params']))
+            ->from($db->quoteName('#__menu'))
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where($db->quoteName('parent_id') . ' = ' . (int) $parent)
+            ->order($db->quoteName('id') . ' ASC');
+        return $db->setQuery((string) $query . ' FOR UPDATE')->loadAssocList() ?? [];
+    }
+
     public function realiasMenuItem(int $id, string $alias): void
     {
         $row = $id > 0 ? $this->read('menuItem', $id) : null;

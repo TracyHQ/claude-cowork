@@ -523,6 +523,24 @@ $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lv',
 check('a shown child the customer added under Home keeps its sub in every style, and says why', [$lApplied['status'], $lApplied['moved'], $lApplied['skipped']],
     ['completed', 15, array_fill_keys(array_keys($styles), 'kept the mega-menu sub of menuItem-101: its child menu item 9001 is still shown on this site')]);
 check('and no style is written', $tParams($lw), $lBefore);
+// A child another connection committed after this batch's snapshot: only the locking read, in the batch's
+// own transaction, sees it — and seeing it keeps the sub.
+[, , $lw, , $lCall] = snavSite($snavSource);
+$lBefore = $tParams($lw);
+$lw->lateChildren = fn (int $parent) => $parent === 101 ? [['id' => 9002, 'parent_id' => 101, 'menutype' => 'mainmenu', 'language' => '*', 'published' => '1', 'params' => '{}']] : [];
+$lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lt', 'request_id' => 'lt1']);
+check('a shown child committed after the snapshot is seen by the locking read, and keeps the sub', [$lApplied['moved'], $tParams($lw), array_unique($lw->lockedParents), array_unique($lw->lockedOpen)],
+    [15, $lBefore, [101], [true]]);
+// With innodb_snapshot_isolation ON, MariaDB refuses that locking read (error 1020): the batch rolls back
+// whole, and the same request run again completes.
+[, , $lw, , $lCall] = snavSite($snavSource);
+$lBefore = $tParams($lw);
+$lMenu = array_map(fn ($row) => $row['params'] ?? null, $lw->store['menuItem']);
+$lw->lateChildren = function () use ($lw) { $lw->lateChildren = null; throw new RuntimeException('Record has changed since last read in table'); };
+$lFailed = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lr', 'request_id' => 'lr1']);
+check('a refused locking read rolls the batch back: no menu item, no style written', [$lFailed['ok'], $tParams($lw), array_map(fn ($row) => $row['params'] ?? null, $lw->store['menuItem'])], [false, $lBefore, $lMenu]);
+$lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lr', 'request_id' => 'lr1']);
+check('and the same request run again completes', [$lApplied['status'], $lApplied['moved'], array_values($tHash($lw))], ['completed', 20, array_values($tFinal)]);
 foreach (['another language' => ['language' => 'fr-FR'], 'a row naming another menu' => ['menutype' => 'joomla-pages']] as $what => $more) {
     [$lw, $lCall] = $tAdded('{}', '1', $more);
     $lBefore = $tParams($lw);

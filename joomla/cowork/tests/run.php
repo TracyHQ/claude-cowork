@@ -1075,6 +1075,16 @@ class FakeSiteWriterBase implements SiteWriter
         $this->store['templateStyle'][$id]['params'] = $params;
         return true;
     }
+    /** @var list<int> the parents lockMenuChildren() was asked for, in order */
+    public array $lockedParents = [];
+    public function lockMenuChildren(int $parent): array
+    {
+        $this->lockedParents[] = $parent;
+        $out = [];
+        foreach ($this->store['menuItem'] ?? [] as $id => $row)
+            if ((int) ($row['parent_id'] ?? 0) === $parent && (int) ($row['client_id'] ?? 0) === 0) $out[] = ['id' => $id] + $row;
+        return $out;
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');

@@ -250,6 +250,18 @@ interface SiteWriter
     public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool;
 
     /**
+     * The site menu items whose parent is `$parent`, read with a LOCKING read (`FOR UPDATE`) inside the
+     * caller's transaction: the latest committed rows rather than its snapshot, with the gap under that
+     * parent locked so a child another connection adds waits until the caller commits. Each row carries
+     * id, parent_id, menutype, language, published and params. On MariaDB with innodb_snapshot_isolation
+     * ON, a child committed since the snapshot makes the read throw (error 1020) instead: the caller's
+     * transaction rolls back with nothing written.
+     *
+     * @return list<array<string,?scalar>>
+     */
+    public function lockMenuChildren(int $parent): array;
+
+    /**
      * Give the site's source language another tag of the same language — every row that carries the
      * old tag, the content language's own row (its `sef`, and so every URL and every `tb-main-<sef>`
      * menu, unchanged), a template style set per language, and the tag index `#__ucm_content`.

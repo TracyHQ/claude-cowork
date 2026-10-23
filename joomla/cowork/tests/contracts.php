@@ -138,6 +138,15 @@ final class ContractTestWriter extends FakeSiteWriter {
         if($this->beforeCas)($this->beforeCas)($this,'templateStyle',$id);
         return parent::replaceTemplateStyleParams($id,$expected,$params);
     }
+    /** Rows another connection committed after this transaction's snapshot: only a locking read sees them. */
+    public ?Closure $lateChildren=null;
+    /** @var list<bool> whether a transaction was open at each lockMenuChildren() */
+    public array $lockedOpen=[];
+    public function lockMenuChildren(int $parent):array {
+        $this->lockedOpen[]=$this->open;
+        $rows=parent::lockMenuChildren($parent);
+        return $this->lateChildren?array_merge($rows,($this->lateChildren)($parent)):$rows;
+    }
     /** Whether a transaction is open right now: work that must follow the commit can say it did. */
     public bool $open=false;
     public function transaction(callable $work):array {

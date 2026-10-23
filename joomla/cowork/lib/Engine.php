@@ -3085,8 +3085,9 @@ final class Engine
         $kept = null;
         // 🔒 THE LIVE MENU HAS THE LAST WORD. The map knows the children the release shipped; the site may
         // have more — a page the customer added under the item, in any language and whatever menu its row
-        // names — and one of them still shown keeps the sub, so the dropdown opens on it. Read now, after this batch's hides.
-        $menu = null;
+        // names — and one of them still shown keeps the sub, so the dropdown opens on it. Read now, after
+        // this batch's hides, with a LOCKING read: this transaction's snapshot would miss a child committed
+        // since its first read, and the lock holds a new one back until the style write commits.
         foreach ($steps as $n => $step) {
             foreach ($step['children'] as $child)
                 if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true)) {
@@ -3094,8 +3095,7 @@ final class Engine
                     break;
                 }
             if ($kept === null) {
-                $menu ??= (new ContractRows($this->writer))->all('menuItem');
-                foreach ($menu as $child)
+                foreach ($this->writer->lockMenuChildren($step['item']) as $child)
                     if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child)) {
                         $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
                         break;
