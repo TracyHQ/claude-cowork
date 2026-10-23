@@ -807,6 +807,24 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         return ['title' => $name, 'title_native' => $native, 'image' => strtolower(str_replace('-', '_', $tag))];
     }
 
+    public function replaceMenuItemParams(int $id, string $expected, string $params): void
+    {
+        if ($id <= 0) throw new \RuntimeException('target does not exist in this scope');
+        $db = $this->db;
+        $query = $db->getQuery(true)
+            ->update($db->quoteName('#__menu'))
+            ->set($db->quoteName('params') . ' = ' . $db->quote($params))
+            ->where($db->quoteName('id') . ' = ' . (int) $id)
+            ->where($db->quoteName('params') . ' = ' . $db->quote($expected));
+        $this->applyScope('menuItem', $query);
+        $db->setQuery($query)->execute();
+        if ($db->getAffectedRows() === 1) return;
+        // Nothing written: say which of the two reasons it was.
+        $row = $this->read('menuItem', $id);
+        if (!$row) throw new \RuntimeException('target does not exist in this scope');
+        throw new \RuntimeException('The params of menu item ' . $id . ' changed since they were read');
+    }
+
     public function realiasMenuItem(int $id, string $alias): void
     {
         $row = $id > 0 ? $this->read('menuItem', $id) : null;

@@ -7,6 +7,8 @@ require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ShowcaseNavProfile.php';
+require_once __DIR__ . '/JsonObjectKey.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
@@ -62,6 +64,9 @@ final class QuickstartContract
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
     private ?DemoTrimProfile $demoTrim = null;
+    private ?ShowcaseNavProfile $showcaseNav = null;
+    /** Why this contract's showcase-navigation map could not be used, when it ships one that does not load. */
+    private ?string $showcaseNavProblem = null;
     /**
      * The receiver's reviewed ACM layouts (`lib/link-layouts.json`): layout sha256 => link field => what an
      * empty one renders ('hidden': the element is not drawn; 'plain': its words stay, unlinked). Null when
@@ -165,6 +170,24 @@ final class QuickstartContract
             $raw = file_get_contents($trimFile);
             $this->demoTrim = new DemoTrimProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw);
         }
+        // 🔒 THE SHOWCASE MAP IS OPTIONAL, AND A BAD ONE CLOSES ONLY ITSELF. A profile fetched before the
+        // map existed has none and keeps working; one whose map does not load answers showcaseNav.*
+        // with the reason, and every other operation — inspect included — goes on as before. What a
+        // site already had applied is read from its own receipts, never from the map.
+        $navFile = $directory . '/showcase-nav-map.json';
+        if (is_file($navFile)) {
+            try {
+                $raw = (string) file_get_contents($navFile);
+                $nav = new ShowcaseNavProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw, (string) ($this->manifest['id'] ?? ''));
+                // The two profiles must not move the same column of the same row, or one revert would undo the other.
+                foreach ($nav->operations() as $key => $row)
+                    if ($row['kind'] === 'module' && $this->demoTrim && $this->demoTrim->row($key))
+                        throw new RuntimeException('The showcase-navigation map and the demo-trim profile both hide ' . $key);
+                $this->showcaseNav = $nav;
+            } catch (Throwable $error) {
+                $this->showcaseNavProblem = $error->getMessage();
+            }
+        }
     }
     /**
      * A DERIVED contract: an imported site's own rows are the map (DerivedMap), there is no design to
@@ -243,6 +266,10 @@ final class QuickstartContract
         if (!$this->demoTrim) throw new RuntimeException('This contract has no demo-trim profile');
         return $this->demoTrim;
     }
+    /** THIS SITE's showcase-navigation map, or null when its profile ships none (or one that does not load). */
+    public function showcaseNav(): ?ShowcaseNavProfile { $this->ready(); return $this->showcaseNav; }
+    /** Why the shipped showcase-navigation map was refused, or null. */
+    public function showcaseNavProblem(): ?string { return $this->showcaseNavProblem; }
     /** The stored baseline, or null on an unbound site. Read-only: only a validated apply replaces it. */
     public function binding(): ?array { $this->ready(); return $this->store->load(); }
     public function catalog(): LanguagePackCatalog {
@@ -845,6 +872,7 @@ final class QuickstartContract
         // Carried through every rebind, or the next content edit would store a baseline that no
         // longer knows the demo was hidden — and the one after that would call it drift.
         if(isset($binding['demoTrim']))$snapshot['demoTrim']=$binding['demoTrim'];
+        if(isset($binding['showcaseNav']))$snapshot['showcaseNav']=$binding['showcaseNav'];
         if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
@@ -865,7 +893,8 @@ final class QuickstartContract
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
-            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null];
+            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null,
+            'showcaseNav'=>$binding['showcaseNav']['status']??null];
     }
 
     /**
@@ -1284,6 +1313,30 @@ final class QuickstartContract
         if(!$binding)throw new RuntimeException('A revert needs a bound site');
         foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['from'];
         unset($binding['demoTrim']);
+        return $binding;
+    }
+
+    /* ------------------------------------------------------------ showcase navigation */
+
+    /**
+     * The baseline with the showcase-navigation record — or none, when `$record` is null — and the
+     * values its writes moved, so the rows it took out of navigation are what is protected from then
+     * on and nothing else is.
+     *
+     * @param list<array{key:string,kind:string,exists:bool,value:mixed}> $moved what each written row now holds
+     */
+    public function bindingWithShowcaseNav(?array $record, array $moved = []): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('Showcase navigation needs a bound site');
+        if($record===null)unset($binding['showcaseNav']);else $binding['showcaseNav']=$record;
+        foreach($moved as $row) {
+            if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
+            if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
+            $params=$binding['presentation'][$row['key']]['params']??null;
+            if(!is_array($params))throw new RuntimeException('The baseline holds no params for '.$row['key']);
+            if($row['exists'])$params[ShowcaseNavProfile::MENU_PARAM]=$row['value'];else unset($params[ShowcaseNavProfile::MENU_PARAM]);
+            $binding['presentation'][$row['key']]['params']=$params;
+        }
         return $binding;
     }
 

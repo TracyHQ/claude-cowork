@@ -1,0 +1,366 @@
+{
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "profileVersion": "1.0.0",
+  "contract": "ja-conf/j6/1.0.3",
+  "baseHash": "675f39cfe0575064d6cc24b966b0b9d9ce27ea899879f41954c3b36b2a28244f",
+  "baseFiles": {
+    "manifest.json": "612b0c2efc52af382c99680507b466b0338aa17b2ee38fe3b148f93ed3f10d4c",
+    "content-map.json": "b3b8b22870fd9db8678d1dad6b00b15e8aab8bfc53ff3a5e0e5c2e1b21afc913",
+    "presentation-lock.json": "6d986ef91b089908fd31100cc1a815e59abe386361fd8ccde7a64bb46e66649a"
+  },
+  "inputs": {},
+  "decisionsHash": "72a75f3b49401811d80e10deae6fdb94cb8891595e44b7ee54976df59633694c",
+  "status": "checked",
+  "operations": [
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-103",
+      "identity": {
+        "path": "j-pages",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "J! Pages",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-104",
+      "identity": {
+        "path": "other-pages",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Other Pages",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-106",
+      "identity": {
+        "path": "j-pages/login",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Login",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-107",
+      "identity": {
+        "path": "j-pages/registration",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Registration",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-108",
+      "identity": {
+        "path": "j-pages/user-profile",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "User Profile",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-109",
+      "identity": {
+        "path": "j-pages/edit-user-profile",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Edit User Profile",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-111",
+      "identity": {
+        "path": "other-pages/smart-search",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Smart Search",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-112",
+      "identity": {
+        "path": "other-pages/404-page",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "404 Page",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-113",
+      "identity": {
+        "path": "other-pages/offline-page",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Offline Page",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-114",
+      "identity": {
+        "path": "joomla-content/featured-article",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Featured Article",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-116",
+      "identity": {
+        "path": "joomla-content/single-article",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Single Article",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-168",
+      "identity": {
+        "path": "home/home-brutalism",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Home - Brutalism",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-169",
+      "identity": {
+        "path": "home/home-dark",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Home - Dark",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-170",
+      "identity": {
+        "path": "home/home-minimal",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Home - Minimal",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-171",
+      "identity": {
+        "path": "home/home-purple",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Home - Purple",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-172",
+      "identity": {
+        "path": "home/home-retro",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Home - Retro",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-174",
+      "identity": {
+        "path": "joomla-content/typography",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Typography",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-177",
+      "identity": {
+        "path": "pages/typography",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Typography",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.kit-screen",
+      "reason": "the template's own \"Typography\" screen"
+    }
+  ],
+  "kept": [
+    {
+      "key": "menuItem-101",
+      "label": "Home",
+      "where": "mainmenu/home",
+      "rule": "keep.homepage",
+      "reason": "home page"
+    },
+    {
+      "key": "menuItem-102",
+      "label": "Pages",
+      "where": "mainmenu/pages",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-115",
+      "label": "Tagged Items",
+      "where": "joomla-pages/joomla-content/tagged-items",
+      "rule": "keep.functional-default",
+      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-117",
+      "label": "Events",
+      "where": "mainmenu/pages/events",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-118",
+      "label": "Blogs",
+      "where": "mainmenu/blogs",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-127",
+      "label": "Speaker",
+      "where": "mainmenu/pages/speaker",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-128",
+      "label": "Contact Us",
+      "where": "mainmenu/contact-us",
+      "rule": "keep.functional-default",
+      "reason": "opens com_contact (view=contact): a working feature stays unless decided"
+    },
+    {
+      "key": "module-139",
+      "label": "Bonus Pages",
+      "where": "mod_menu@off-canvas",
+      "rule": "keep.default",
+      "reason": "renders joomla-pages: 2 entries stay"
+    }
+  ],
+  "unresolved": [
+    {
+      "key": "menuItem-105",
+      "label": "Joomla Content",
+      "where": "joomla-pages/joomla-content",
+      "rule": "unresolved.decision-conflict",
+      "reason": "decided hidden, but it holds menuItem-115, which stays"
+    },
+    {
+      "key": "menuItem-115",
+      "label": "Tagged Items",
+      "where": "joomla-pages/joomla-content/tagged-items",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    }
+  ],
+  "counts": {
+    "menuItems": 18,
+    "modules": 0,
+    "kept": 8,
+    "unresolved": 2
+  }
+}

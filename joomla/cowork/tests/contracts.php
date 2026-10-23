@@ -118,6 +118,10 @@ final class ContractTestWriter extends FakeSiteWriter {
         if($this->failOn===[$kind,$id])throw new RuntimeException('The site refused '.$kind.' '.$id);
         parent::setVisibility($kind,$id,$column,$value);
     }
+    public function replaceMenuItemParams(int $id,string $expected,string $params):void {
+        if($this->failOn===['menuItem',$id])throw new RuntimeException('The site refused menuItem '.$id);
+        parent::replaceMenuItemParams($id,$expected,$params);
+    }
     /** Whether a transaction is open right now: work that must follow the commit can say it did. */
     public bool $open=false;
     public function transaction(callable $work):array {
@@ -466,6 +470,17 @@ foreach(glob($bundledRoot.'/*/j6/*',GLOB_ONLYDIR) as $dir){
         }catch(Throwable $e){$loaded=$e->getMessage();}
         check("$id demo-trim map is one this receiver can load",$loaded,true);
         $trimmed[]=$id;
+    }
+    if(is_file("$dir/showcase-nav-map.json")) {
+        $raw=file_get_contents("$dir/showcase-nav-map.json");
+        $loaded=null;
+        try{
+            new ShowcaseNavProfile(json_decode($raw,true,512,JSON_THROW_ON_ERROR),
+                json_decode(file_get_contents("$dir/content-map.json"),true,512,JSON_THROW_ON_ERROR),
+                json_decode(file_get_contents("$dir/presentation-lock.json"),true,512,JSON_THROW_ON_ERROR),$dir,$raw,$id);
+            $loaded=true;
+        }catch(Throwable $e){$loaded=$e->getMessage();}
+        check("$id showcase-navigation map is one this receiver can load",$loaded,true);
     }
     if(!is_file("$dir/multilingual-map.json"))continue;
     $raw=file_get_contents("$dir/multilingual-map.json");

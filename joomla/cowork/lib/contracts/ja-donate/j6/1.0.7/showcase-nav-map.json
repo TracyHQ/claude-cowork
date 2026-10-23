@@ -1,0 +1,334 @@
+{
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "profileVersion": "1.0.0",
+  "contract": "ja-donate/j6/1.0.7",
+  "baseHash": "44ff2b847b154278ac1ac325ea7056f6d0a17927923839c09dac7e830e55a1ba",
+  "baseFiles": {
+    "manifest.json": "f1e83deba56f7f66207ecd55d02212ca92d687ad62b081044e37f0b7ebf695f7",
+    "content-map.json": "446cd56dbe9605c2e9848dc285f819aed75a6740193e7581c0b9071872978f1f",
+    "presentation-lock.json": "29e2c2a0595b00994fe540d6a34d8c58ad42a9633d1fa4ecf371a0537b6e1e40"
+  },
+  "inputs": {},
+  "decisionsHash": "b5e0a85fd837e95ffaca6e3c4ece5b6eee6ed495eec103598c2a6b700ba35119",
+  "status": "checked",
+  "operations": [
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-101",
+      "identity": {
+        "path": "home/donate-orange",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Donate - Orange",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-130",
+      "identity": {
+        "path": "pages/joomla-content/featured-articles",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Featured Articles",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-132",
+      "identity": {
+        "path": "pages/other-pages/error-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Error Page",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.kit-screen",
+      "reason": "the template's own \"Error Page\" screen"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-133",
+      "identity": {
+        "path": "pages/other-pages/offline-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Offline Page",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.kit-screen",
+      "reason": "the template's own \"Offline Page\" screen"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-150",
+      "identity": {
+        "path": "pages/joomla-content/typography",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Typography",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-151",
+      "identity": {
+        "path": "home/donate-green",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Donate - Green",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-153",
+      "identity": {
+        "path": "home/homeless-red",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Homeless - Red",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page: under mainmenu/home"
+    }
+  ],
+  "kept": [
+    {
+      "key": "menuItem-102",
+      "label": "Login",
+      "where": "menu-topbar/login-topbar",
+      "rule": "keep.functional-default",
+      "reason": "opens com_users (view=login): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-103",
+      "label": "Careers",
+      "where": "menu-topbar/careers",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-104",
+      "label": "Volunteer",
+      "where": "menu-topbar/volunteer",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-105",
+      "label": "Donate Now!",
+      "where": "head-action/donate-now",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-106",
+      "label": "About Us",
+      "where": "mainmenu/about-us",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-107",
+      "label": "Contact Us",
+      "where": "mainmenu/contact-us",
+      "rule": "keep.functional-default",
+      "reason": "opens com_contact (view=contact): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-108",
+      "label": "Blog",
+      "where": "mainmenu/our-blog",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-117",
+      "label": "Pages",
+      "where": "mainmenu/pages",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-118",
+      "label": "Login",
+      "where": "mainmenu/pages/j-pages/login",
+      "rule": "keep.functional-default",
+      "reason": "opens com_users (view=login): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-119",
+      "label": "Registration",
+      "where": "mainmenu/pages/j-pages/registration",
+      "rule": "keep.functional-default",
+      "reason": "opens com_users (view=registration): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-120",
+      "label": "User Profile",
+      "where": "mainmenu/pages/j-pages/user-profile",
+      "rule": "keep.functional-default",
+      "reason": "opens com_users (view=profile): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-121",
+      "label": "Edit User Profile",
+      "where": "mainmenu/pages/j-pages/edit-user-profile",
+      "rule": "keep.functional-default",
+      "reason": "opens com_users (view=profile): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-123",
+      "label": "Smart Search",
+      "where": "mainmenu/pages/other-pages/smart-search",
+      "rule": "keep.functional-default",
+      "reason": "opens com_finder (view=search): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-127",
+      "label": "Other Pages",
+      "where": "mainmenu/pages/other-pages",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-129",
+      "label": "All Categories",
+      "where": "mainmenu/pages/joomla-content/all-categories",
+      "rule": "keep.only-route-to-content",
+      "reason": "the only menu route to category:9, category:10, category:11: a branch hide may not take real content along"
+    },
+    {
+      "key": "menuItem-131",
+      "label": "Tagged Items",
+      "where": "mainmenu/pages/joomla-content/tagged-items",
+      "rule": "keep.functional-default",
+      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-152",
+      "label": "Home",
+      "where": "mainmenu/home",
+      "rule": "keep.homepage",
+      "reason": "home page"
+    },
+    {
+      "key": "module-89",
+      "label": "Menu Topbar",
+      "where": "mod_menu@topbar-right",
+      "rule": "keep.default",
+      "reason": "renders menu-topbar: 3 entries stay"
+    },
+    {
+      "key": "module-90",
+      "label": "Head Action",
+      "where": "mod_menu@navbar-action",
+      "rule": "keep.default",
+      "reason": "renders head-action: 1 entry stays"
+    },
+    {
+      "key": "module-105",
+      "label": "Menu Footer",
+      "where": "mod_menu@menu-footer",
+      "rule": "keep.default",
+      "reason": "renders mainmenu: 5 entries stay"
+    },
+    {
+      "key": "module-125",
+      "label": "Main menu",
+      "where": "mod_menu@off-canvas",
+      "rule": "keep.default",
+      "reason": "renders mainmenu: 15 entries stay"
+    },
+    {
+      "key": "module-126",
+      "label": "Head Action",
+      "where": "mod_menu@off-canvas",
+      "rule": "keep.default",
+      "reason": "renders head-action: 1 entry stays"
+    }
+  ],
+  "unresolved": [
+    {
+      "key": "menuItem-118",
+      "label": "Login",
+      "where": "mainmenu/pages/j-pages/login",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_users (view=login) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "menuItem-119",
+      "label": "Registration",
+      "where": "mainmenu/pages/j-pages/registration",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_users (view=registration) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "menuItem-120",
+      "label": "User Profile",
+      "where": "mainmenu/pages/j-pages/user-profile",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_users (view=profile) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "menuItem-121",
+      "label": "Edit User Profile",
+      "where": "mainmenu/pages/j-pages/edit-user-profile",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_users (view=profile) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "menuItem-126",
+      "label": "J! Pages",
+      "where": "mainmenu/pages/j-pages",
+      "rule": "unresolved.decision-conflict",
+      "reason": "decided hidden, but it holds menuItem-118, which stays"
+    },
+    {
+      "key": "menuItem-128",
+      "label": "Joomla Content",
+      "where": "mainmenu/pages/joomla-content",
+      "rule": "unresolved.decision-conflict",
+      "reason": "decided hidden, but it holds menuItem-131, which stays"
+    },
+    {
+      "key": "menuItem-131",
+      "label": "Tagged Items",
+      "where": "mainmenu/pages/joomla-content/tagged-items",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    }
+  ],
+  "counts": {
+    "menuItems": 7,
+    "modules": 0,
+    "kept": 22,
+    "unresolved": 7
+  }
+}

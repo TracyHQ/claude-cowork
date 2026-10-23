@@ -215,6 +215,19 @@ interface SiteWriter
     public function realiasMenuItem(int $id, string $alias): void;
 
     /**
+     * Replace the `params` of one existing front-end menu item, and nothing else, only while the column
+     * still holds `$expected` byte for byte — a compare-and-set in the UPDATE itself, so a save that
+     * lands between the caller's read and this write is never overwritten.
+     *
+     * Like setVisibility, not the Table: the Table's store would re-decide `home`, rebuild the
+     * nested-set path and stamp the row. The caller has already proven `$params` differs from
+     * `$expected` in exactly the one key it means to move (JsonObjectKey).
+     *
+     * @throws RuntimeException when the row is not in scope or its params changed since they were read
+     */
+    public function replaceMenuItemParams(int $id, string $expected, string $params): void;
+
+    /**
      * Give the site's source language another tag of the same language — every row that carries the
      * old tag, the content language's own row (its `sef`, and so every URL and every `tb-main-<sef>`
      * menu, unchanged), a template style set per language, and the tag index `#__ucm_content`.

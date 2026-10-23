@@ -34,7 +34,7 @@ function gateContractCopy(string $source): string {
         fn ($n) => $n . ':' . hash_file('sha256', $dir . '/' . $n) . "\n",
         ['manifest.json', 'content-map.json', 'presentation-lock.json']
     )));
-    foreach (['multilingual-map', 'demo-trim-map', 'editions'] as $name) {
+    foreach (['multilingual-map', 'demo-trim-map', 'showcase-nav-map', 'editions'] as $name) {
         if (!is_file($source . '/' . $name . '.json')) continue;
         $profile = json_decode(file_get_contents($source . '/' . $name . '.json'), true, 512, JSON_THROW_ON_ERROR);
         $profile['baseHash'] = $base;

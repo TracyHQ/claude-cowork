@@ -1057,6 +1057,12 @@ class FakeSiteWriterBase implements SiteWriter
             $this->store['module'][(int) $id]['params'] = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
     }
+    public function replaceMenuItemParams(int $id, string $expected, string $params): void
+    {
+        if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
+        if ((string) ($this->store['menuItem'][$id]['params'] ?? '') !== $expected) throw new RuntimeException('The params of menu item ' . $id . ' changed since they were read');
+        $this->store['menuItem'][$id]['params'] = $params;
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');
@@ -2158,6 +2164,7 @@ require __DIR__ . "/language-overrides-plugins-dates.php";
 require __DIR__ . "/language-overrides-literals.php";
 require __DIR__ . "/language-overrides-english-pack.php";
 require __DIR__ . "/multilingual-contracts.php";
+require __DIR__ . "/showcase-nav.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/contract-atomic.php";

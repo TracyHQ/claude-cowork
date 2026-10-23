@@ -1,0 +1,366 @@
+{
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "profileVersion": "1.0.0",
+  "contract": "ja-rent/j6/1.0.5",
+  "baseHash": "b6a01c4c7f604836727a7eb51ace00b868e2d29226684babd36e176c268f89c1",
+  "baseFiles": {
+    "manifest.json": "867ffe4dfe4f54160bc0aba30003e2a1e93883bc9e7aa603cfe65aa58920243b",
+    "content-map.json": "7cc7e6e3d1a0f2a354f87c2cbb7df413c5e9e658115859a5932c1be756a58b8c",
+    "presentation-lock.json": "056b29de1d363afc2d45bca2864fc92c8e7f3d8ddd11ccd08f4806a51a5f6bf1"
+  },
+  "inputs": {},
+  "decisionsHash": "728744a22d2bef03e4086dbdb91bd4d6b7d45cfc1dff9d107b646ee7b6f67ccf",
+  "status": "checked",
+  "operations": [
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-126",
+      "identity": {
+        "path": "explore/joomla-pages/login-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Login Page",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-142",
+      "identity": {
+        "path": "explore/joomla-pages/404-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "404 page",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-143",
+      "identity": {
+        "path": "explore/joomla-pages/offline-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Offline Page",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-144",
+      "identity": {
+        "path": "explore/features/shortcodes",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Shortcodes",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Shortcodes\" demonstrates the template's content shortcodes; it is not a page of the business"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-151",
+      "identity": {
+        "path": "explore/joomla-pages/registration-page",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Registration Page",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "Joomla sample screen inside the template's sample-pages drawer; the page and its URL keep working"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-156",
+      "identity": {
+        "path": "user-site-showcase",
+        "menutype": "usefull-links",
+        "language": "*"
+      },
+      "label": "User site showcase",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"User site showcase\" links to JoomlArt's gallery of other customers' sites, not to this business"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-171",
+      "identity": {
+        "path": "explore/colors",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Colors",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Colors\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-172",
+      "identity": {
+        "path": "explore/colors/orange-color",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Orange Color",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Colors\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-173",
+      "identity": {
+        "path": "explore/colors/green-color",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Green Color",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Colors\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-174",
+      "identity": {
+        "path": "explore/colors/yellow-color",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Yellow Color",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Colors\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-175",
+      "identity": {
+        "path": "explore/colors/default-color",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Default Color",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Colors\" lists the template's colour variants of the home page"
+    }
+  ],
+  "kept": [
+    {
+      "key": "menuItem-101",
+      "label": "Home",
+      "where": "mainmenu/home",
+      "rule": "keep.homepage",
+      "reason": "home page"
+    },
+    {
+      "key": "menuItem-122",
+      "label": "Blog",
+      "where": "mainmenu/explore/features/joomla-blog-style-1",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-133",
+      "label": "Tagged Items",
+      "where": "mainmenu/explore/joomla-pages/tagged-items",
+      "rule": "keep.functional-default",
+      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-134",
+      "label": "Template Info",
+      "where": "usefull-links/template-info",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-135",
+      "label": "Support Forum",
+      "where": "usefull-links/support-forum",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-136",
+      "label": "T3 Framework",
+      "where": "usefull-links/t3-framework",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-137",
+      "label": "Template Preview",
+      "where": "usefull-links/template-preview",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-138",
+      "label": "Documentation",
+      "where": "usefull-links/documentation",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-141",
+      "label": "About us",
+      "where": "mainmenu/explore/features/about-us",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-145",
+      "label": "About us",
+      "where": "footnav-1/foot-about-us",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-146",
+      "label": "Privacy policy",
+      "where": "footnav-1/privacy-policy",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-147",
+      "label": "Terms and Conditions",
+      "where": "footnav-1/terms-and-conditions",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-149",
+      "label": "Careers",
+      "where": "footnav-1/careers",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-155",
+      "label": "Buy now",
+      "where": "usefull-links/buy-now",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-167",
+      "label": "Features",
+      "where": "mainmenu/explore/features",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-170",
+      "label": "Contact Us",
+      "where": "mainmenu/contact-us",
+      "rule": "keep.functional-default",
+      "reason": "opens com_contact (view=contact): a working feature stays unless decided"
+    },
+    {
+      "key": "menuItem-178",
+      "label": "Explore",
+      "where": "mainmenu/explore",
+      "rule": "keep.default",
+      "reason": "no rule hides it"
+    },
+    {
+      "key": "menuItem-367",
+      "label": "Smart Search",
+      "where": "mainmenu/explore/features/smart-search",
+      "rule": "keep.functional-default",
+      "reason": "opens com_finder (view=search): a working feature stays unless decided"
+    },
+    {
+      "key": "module-113",
+      "label": "Usefull Links",
+      "where": "mod_menu@footer-3",
+      "rule": "keep.default",
+      "reason": "renders usefull-links: 6 entries stay"
+    },
+    {
+      "key": "module-114",
+      "label": "JA Rent",
+      "where": "mod_menu@footer-1",
+      "rule": "keep.default",
+      "reason": "renders footnav-1: 4 entries stay"
+    },
+    {
+      "key": "module-115",
+      "label": "Off Canvas",
+      "where": "mod_menu@off-canvas",
+      "rule": "keep.default",
+      "reason": "renders mainmenu: 10 entries stay"
+    },
+    {
+      "key": "module-143",
+      "label": "Error menu",
+      "where": "mod_menu@error-menu",
+      "rule": "keep.default",
+      "reason": "renders mainmenu: 3 entries stay"
+    }
+  ],
+  "unresolved": [
+    {
+      "key": "menuItem-128",
+      "label": "Joomla! Pages",
+      "where": "mainmenu/explore/joomla-pages",
+      "rule": "unresolved.decision-conflict",
+      "reason": "decided hidden, but it holds menuItem-133, which stays"
+    },
+    {
+      "key": "menuItem-133",
+      "label": "Tagged Items",
+      "where": "mainmenu/explore/joomla-pages/tagged-items",
+      "rule": "unresolved.functional-in-hidden-branch",
+      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "menuItem-157",
+      "label": "J! Blog Style 2",
+      "where": "mainmenu/explore/features/joomla-blog-style-2",
+      "rule": "unresolved.showcase-word",
+      "reason": "\"J! Blog Style 2\" names a showcase branch"
+    }
+  ],
+  "counts": {
+    "menuItems": 11,
+    "modules": 0,
+    "kept": 22,
+    "unresolved": 3
+  }
+}
