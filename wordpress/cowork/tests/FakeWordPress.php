@@ -739,10 +739,16 @@ final class WP_Fake_Db
     public array $queries = [];
     /** What GET_LOCK answers: 1 is the lock taken, 0 is another writer holding it. */
     public int $lockAnswer = 1;
+    public string $last_error = '';
+    /** @var callable|null run inside a compare-and-set UPDATE, before its compare: a customer saving the row at that instant */
+    public $beforeSwap = null;
+    /** @var array{0:string,1:array}|null the last statement prepared and its arguments, so query() can run it byte-exactly */
+    private ?array $lastPrepared = null;
 
     public function prepare(string $query, ...$args): string
     {
         if (count($args) === 1 && is_array($args[0])) $args = $args[0];
+        $this->lastPrepared = [$query, $args];
         foreach ($args as $arg) {
             $query = preg_replace('/%[sd]/', is_int($arg) ? (string) $arg : "'" . (string) $arg . "'", $query, 1);
         }
@@ -821,6 +827,21 @@ final class WP_Fake_Db
     public function query(string $query)
     {
         $this->queries[] = $query;
+        // The compare-and-set of `replacePostContentIf`: run against WP_Fake::$posts on the bytes it was given.
+        if ($this->lastPrepared !== null && strpos($this->lastPrepared[0], 'CAST(post_content AS BINARY)') !== false
+            && strpos($this->lastPrepared[0], 'UPDATE ' . $this->posts . ' SET post_content') === 0) {
+            [$content, $modified, $modifiedGmt, $id, $type, $expected] = $this->lastPrepared[1];
+            $this->lastPrepared = null;
+            if ($this->beforeSwap !== null) {
+                ($this->beforeSwap)((int) $id);
+            }
+            $row = WP_Fake::$posts[(int) $id] ?? null;
+            if ($row === null || ($row['post_type'] ?? '') !== $type || (string) ($row['post_content'] ?? '') !== $expected) {
+                return 0;
+            }
+            WP_Fake::$posts[(int) $id] = ['post_content' => $content, 'post_modified' => $modified, 'post_modified_gmt' => $modifiedGmt] + $row;
+            return 1;
+        }
         return 1;
     }
 }

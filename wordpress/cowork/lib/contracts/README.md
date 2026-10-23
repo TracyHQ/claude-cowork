@@ -12,6 +12,7 @@ one thing Tracy refuses.
 | `content-map.json` | yes | The entities (options, pages, template parts) and the text slots inside them — the fast, reversible road for a visitor's words. |
 | `presentation-lock.json` | yes | The presentation as shipped: theme file hashes, pinned options, template-part hashes, each page's skeleton. A difference is reported as a drift warning, not refused. |
 | `demo-trim-map.json` | no | The vendor's demo posts a bound site may hide, pinned to the three files above by `baseHash`. |
+| `showcase-nav-map.json` | no | The template showcase a bound site may take out of its navigation (`showcaseNav.*`): byte-range edits of `wp_navigation` posts and template parts, each with the sha256 of the owner's whole content before and after, pinned to the three files above by `baseHash`. Generated and reviewed in TCH; copied here byte for byte. A map the receiver refuses leaves the contract usable. |
 | `editions.json` | no | Which Polylang languages the release ships copies for, and the post id of each copy. |
 | `superseded.json` | no | Earlier base hashes of this same profile a bound site may still carry (a released profile corrected in place). Accepted only while `presentation-lock.json` is the same bytes; a binding moves to the current hash on its next validated write. Generated in TCH by `scripts/build-wordpress-superseded.mjs`. |
 

@@ -48,7 +48,7 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `media.delete` | write | ok | ok; refuses a picture that is the current value of a bound image slot |
 | `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
-| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `showcaseNav.status`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `showcaseNav.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
 | `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
 | `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
 
@@ -80,7 +80,7 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
 - `content.contract` takes `operation`:
-  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, showcaseNav, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme
     file changed or added under `fileRoots`, a pinned option, a template part, an entity
     missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
@@ -115,6 +115,20 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
     `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
     reported; refused while the site has a Polylang language the profile ships no edition for.
+  - `showcaseNav.status | apply | revert` (prefix `snav-`, a `request_id` the same on a retry) —
+    take the template showcase (home-page variants, the kit's sample pages) out of the navigation,
+    as reviewed in `showcase-nav-map.json`: an entry leaves a `wp_navigation` post, a template part's
+    navigation block is repointed, or the one block of a showcase drawer goes. Pages stay published.
+    Each owner is rewritten whole, by byte range, only while it holds the map's `before` sha256 and
+    only with bytes whose sha256 is the map's `after` (a compare-and-set); one the customer already
+    changed is skipped and reported, never forced. Two owners per call (`running` until done); the
+    receipt (the bytes found) lands before each write, so the same request resumes a call that died.
+    A template part with no row is written as a new override of the active theme, and revert deletes
+    it only while it still holds what was written. `revert` puts each owner back while it holds what
+    the apply wrote; one changed since is a conflict, left as it is, which a later revert request
+    looks at again. Inspect stops reporting a template part only at the bytes this job wrote. A
+    missing, refused or not-covered map is `unsupported` (the contract still serves); a site with a
+    second Polylang language is refused (`contract_failed`).
   - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's
     locale (`en_US` → `en_GB`, `en_AU`, `en_CA`, `en_NZ`) in Polylang and `WPLANG`.
   - `siteLanguage.plan | set | revert` (prefix `slang-`) — which edition is the site's DEFAULT

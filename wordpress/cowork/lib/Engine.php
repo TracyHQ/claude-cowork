@@ -238,10 +238,10 @@ final class Engine
                 }
             }
             if ($action === 'apply.revert') {
-                // A contract apply, a trim, a language step or a relabel is taken back through the
+                // A contract apply, a trim, a showcase-navigation step, a language step or a relabel is taken back through the
                 // contract; any other receipt takes the ordinary revert below.
                 $ops = $this->log === null ? [] : array_column($this->log->entries((string) ($params['apply_id'] ?? '')), 'op');
-                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale']) !== []) {
+                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale', 'showcaseNav']) !== []) {
                     return $this->contractRevert($params);
                 }
             }
@@ -400,6 +400,9 @@ final class Engine
             }
             if (strpos($operation, 'demoTrim.') === 0) {
                 return $this->demoTrim($p, substr($operation, strlen('demoTrim.')));
+            }
+            if (strpos($operation, 'showcaseNav.') === 0) {
+                return $this->showcaseNav($p, substr($operation, strlen('showcaseNav.')));
             }
             if (strpos($operation, 'sourceLanguage.') === 0) {
                 return $this->sourceLanguage($p, substr($operation, strlen('sourceLanguage.')));
@@ -884,7 +887,7 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
+            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, showcase navigation, source relabels, retired editions and the site language have their own way back (demoTrim.revert, showcaseNav.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
         }
         try {
             $state = $this->contract->inspect();
@@ -1066,6 +1069,371 @@ final class Engine
             'status' => $pending === 0 ? ($hide ? 'completed' : 'reverted') : 'running',
             'moved' => $moved, 'remaining' => $pending, 'skipped' => $skipped, 'applyId' => $apply,
         ]);
+    }
+
+    /** Owners (one navigation or template part each, written whole) edited per call of showcaseNav.apply and .revert. */
+    private const SHOWCASE_NAV_BATCH = 2;
+    /** Why an owner was left alone when its compare-and-set found it changed between the read and the write. */
+    private const SHOWCASE_NAV_RACED = 'it changed while it was being written';
+
+    /**
+     * Taking a quickstart's TEMPLATE SHOWCASE out of a bound site's navigation, and putting it back.
+     *
+     * `status` reads, `apply` edits a batch of owners per call until nothing is left, `revert` puts
+     * back exactly what its apply changed. What is taken out is decided in review, in the contract's
+     * `showcase-nav-map.json`; a request names nothing. Only navigation markup moves: an entry leaves
+     * a `wp_navigation` post, or a template part's navigation block points at another one, or the one
+     * block that opened the showcase drawer goes. Every page stays published.
+     *
+     * 🔒 EVERY WRITE IS A COMPARE-AND-SET ON THE WHOLE CONTENT, AND ITS RECEIPT IS THE REVERT. An owner is
+     * written only while it holds the bytes the map starts from (`before`), with the bytes the map ends
+     * with (`after`), produced here by byte range and proven by sha256 before the write. One the customer
+     * already changed is left alone and reported. The bytes found are kept in the receipt, which lands
+     * BEFORE the write (outcome `writing`), so a call that dies mid-write is settled by its retry from
+     * what the row holds; a revert puts those bytes back, or, when the customer changed the row since,
+     * leaves it and says so. The map is not read again to revert.
+     */
+    private function showcaseNav(array $p, string $operation): array
+    {
+        if (!in_array($operation, ['status', 'apply', 'revert'], true)) {
+            return $this->err('bad_params', 'Unknown showcaseNav operation: ' . $operation);
+        }
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'Showcase navigation needs a bound site');
+        }
+        $nav = $this->contract->showcaseNav();
+        $record = $this->contract->binding()['showcaseNav'] ?? null;
+        // A finished revert leaves only what it could not put back (the receipts of its conflicts) and
+        // the answer of each revert request: nothing is expected moved, the same revert retried after a
+        // lost answer gets its answer again, and a new revert request looks at the conflicts once more.
+        $reverted = ($record['status'] ?? null) === 'reverted' ? $record : null;
+        if ($reverted !== null) {
+            $record = null;
+        }
+        $usable = $nav !== null && $nav->covered();
+        $unsupported = function () use ($nav): array {
+            $problem = $this->contract->showcaseNavProblem();
+            if ($nav === null && $problem !== null) {
+                return $this->err('unsupported', 'This quickstart contract ships a showcase-navigation map this receiver refuses (' . $problem . '). Nothing has been written.');
+            }
+            if ($nav === null) {
+                return $this->err('unsupported', 'This quickstart contract carries no showcase-navigation map; its showcase navigation entries cannot be hidden by this receiver');
+            }
+            return $this->err('unsupported', 'The showcase-navigation map does not cover this design' . ($nav->reason() !== '' ? ' (' . $nav->reason() . ')' : '') . '; nothing can be hidden by it');
+        };
+        if ($operation === 'status') {
+            if (!$usable && $record === null) {
+                return $unsupported();
+            }
+            $this->contract->inspect();
+            return $this->ok([
+                'status' => $record['status'] ?? 'none',
+                'hides' => $usable ? $nav->counts() : [],
+                'remaining' => count($this->showcaseNavPending($record, ($record['status'] ?? 'applying') !== 'reverting')),
+                'skipped' => $this->showcaseNavSkipped($record['receipts'] ?? []),
+                // Owners a finished revert left as the customer set them; a new revert request looks again.
+                'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
+                'applyId' => $record['applyId'] ?? null,
+                'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
+                // A map published after this site's apply edits what its receipts do not; a revert then an apply takes it.
+                'profileChanged' => $record !== null && (!$usable || !hash_equals((string) $record['profileHash'], $nav->hash())),
+            ]);
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null || strpos($apply, 'snav-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "snav-"');
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        $hide = $operation === 'apply';
+        if ($hide && !$usable) {
+            return $unsupported();
+        }
+        // 🔒 A TRANSLATED SITE IS REFUSED, NOT HALF-HIDDEN. Each language has its own navigation posts,
+        // which this map does not list: hiding the source's entries would leave the translated menus
+        // showing them. Both directions, before any write.
+        if (count(QuickstartContract::languages()) > 1) {
+            return $this->err('contract_failed', 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
+        }
+        $this->contract->inspectClean();
+        if ($hide) {
+            if ($reverted !== null && $reverted['requestId'] === $request) {
+                return $this->err('conflict', 'Request ' . $request . ' applied showcase navigation that has since been reverted; a new apply needs a new request_id');
+            }
+            if (($record['status'] ?? null) === 'complete') {
+                return $this->ok(['status' => 'completed', 'moved' => 0, 'remaining' => 0, 'alreadyApplied' => true, 'applyId' => $record['applyId'],
+                    'skipped' => $this->showcaseNavSkipped($record['receipts']),
+                    'profileChanged' => !hash_equals((string) $record['profileHash'], $nav->hash())]);
+            }
+            if ($record !== null && ($record['status'] !== 'applying' || $record['requestId'] !== $request)) {
+                return $this->err('conflict', 'Showcase navigation is already ' . $record['status'] . ' under request '
+                    . ($record['status'] === 'reverting' ? $record['revert']['requestId'] : $record['requestId']));
+            }
+            if ($record !== null && !hash_equals((string) $record['profileHash'], $nav->hash())) {
+                return $this->err('conflict', 'The showcase-navigation map changed while it was being applied; revert what was applied, then apply again');
+            }
+            $next = $record ?? ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
+                'profileHash' => $nav->hash(), 'profileVersion' => $nav->version(), 'at' => gmdate('c'), 'receipts' => []];
+        } else {
+            if ($record === null && isset($reverted['answers'][$request])) {
+                return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true] + $reverted['answers'][$request]);
+            }
+            if ($record === null && !empty($reverted['receipts'])) {
+                // 🔒 A CONFLICT IS LOOKED AT AGAIN, NEVER OVERWRITTEN. A new request takes the owners the
+                // last revert left — and only those — through the same rules: put back by hand, put back
+                // by the same compare-and-set, or still the customer's, untouched.
+                $receipts = [];
+                foreach ($reverted['receipts'] as $key => $receipt) {
+                    unset($receipt['reverted'], $receipt['revertWhy']);
+                    $receipts[$key] = $receipt;
+                }
+                $next = ['status' => 'reverting', 'applyId' => $reverted['applyId'], 'requestId' => $reverted['requestId'],
+                    'profileHash' => $reverted['profileHash'] ?? null, 'revert' => ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')],
+                    'receipts' => $receipts, 'answers' => $reverted['answers'] ?? []];
+            } elseif ($record === null) {
+                return $this->err('contract_failed', 'This site has no showcase navigation entries to bring back');
+            } elseif ($record['status'] === 'reverting' && $record['revert']['requestId'] !== $request) {
+                return $this->err('conflict', 'A showcase-navigation revert is already running under request ' . $record['revert']['requestId']);
+            } else {
+                $next = ['status' => 'reverting', 'revert' => $record['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $record;
+            }
+            $record = $record !== null && $record['status'] === 'reverting' ? $record : null;
+        }
+
+        // What this call will look at, decided before anything is written, so an owner someone has
+        // open in the editor refuses the whole call while the site is still as it was.
+        $pending = $this->showcaseNavPending($next, $hide);
+        $batch = array_slice($pending, 0, self::SHOWCASE_NAV_BATCH, true);
+        $ids = [];
+        foreach ($batch as $key => $owner) {
+            $ids[] = $owner['kind'] === 'navigation' ? $owner['id'] : (int) ($this->writer->read('templatePart', 0, $owner['slug'])['id'] ?? 0);
+        }
+        $this->contract->refuseEditLocked($ids);
+        // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES: a call that dies mid-batch leaves a site that says
+        // a job is in flight, so the same request resumes it rather than being refused as drift.
+        if ($record === null || $record['status'] !== $next['status']) {
+            $this->contract->record('showcaseNav', $next);
+        }
+        $record = $next;
+        $log = $hide ? $record['applyId'] : $record['revert']['applyId'];
+        $moved = 0;
+        foreach ($batch as $key => $owner) {
+            $receipt = $hide ? $this->showcaseNavHide($record, $key, $owner) : $this->showcaseNavRestore($key, $owner['receipt']);
+            $record['receipts'][$key] = $hide ? $receipt['receipt'] : $receipt['receipt'] + $record['receipts'][$key];
+            $moved += $receipt['moved'] ? 1 : 0;
+            $this->log->record($log, ['op' => 'showcaseNav', 'key' => $key, 'direction' => $hide ? 'hide' : 'restore']
+                + array_diff_key($record['receipts'][$key], ['content' => true]));
+            $this->contract->record('showcaseNav', $record);
+        }
+        $remaining = count($pending) - count($batch);
+        $skipped = $this->showcaseNavSkipped($record['receipts'], !$hide);
+        if ($remaining === 0 && $hide) {
+            $record['status'] = 'complete';
+            $record['completedAt'] = gmdate('c');
+        }
+        if ($remaining === 0 && !$hide) {
+            // A finished revert keeps the receipts of its conflicts only — the owners a later revert may
+            // still put back — and what each revert request is answered when it is retried.
+            $record = ['status' => 'reverted', 'applyId' => $record['applyId'], 'requestId' => $record['requestId'],
+                'profileHash' => $record['profileHash'] ?? null, 'revert' => $record['revert'] + ['completedAt' => gmdate('c')],
+                'receipts' => array_intersect_key($record['receipts'], $skipped),
+                'answers' => ($record['answers'] ?? []) + [$record['revert']['requestId'] => ['applyId' => $record['revert']['applyId'], 'conflicts' => $skipped]]];
+        }
+        $this->contract->record('showcaseNav', $record);
+        // Proven after the write: what this job wrote is clean (the receipts say so), anything else
+        // that differs is not its doing and is still drift.
+        $this->contract->rebind($this->contract->inspectClean());
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        if ($moved > 0) {
+            $this->stamped('content');
+        }
+        return $this->ok([
+            'status' => $remaining === 0 ? ($hide ? 'completed' : 'reverted') : 'running',
+            'moved' => $moved, 'remaining' => $remaining, 'applyId' => $apply,
+            ($hide ? 'skipped' : 'conflicts') => $skipped,
+        ]);
+    }
+
+    /**
+     * What the next showcase-navigation step still has to look at: on apply, every owner of the map
+     * with no settled receipt (none, or one whose write may not have landed); on revert, every owner
+     * the apply wrote, or began to write, that has not been looked at again.
+     *
+     * @return array<string,array{kind:string,id:int,slug:string,owner:?array,receipt:?array}>
+     */
+    private function showcaseNavPending(?array $record, bool $hide): array
+    {
+        $out = [];
+        if ($hide) {
+            $nav = $this->contract->showcaseNav();
+            foreach ($nav === null ? [] : $nav->owners() as $key => $owner) {
+                $receipt = $record['receipts'][$key] ?? null;
+                if ($receipt === null || $receipt['outcome'] === 'writing') {
+                    $out[$key] = ['kind' => $owner['kind'], 'id' => $owner['id'], 'slug' => $owner['slug'], 'owner' => $owner, 'receipt' => $receipt];
+                }
+            }
+            return $out;
+        }
+        foreach ($record['receipts'] ?? [] as $key => $receipt) {
+            if (in_array($receipt['outcome'], ['written', 'writing'], true) && !isset($receipt['reverted'])) {
+                $out[$key] = ['kind' => $receipt['kind'], 'id' => (int) $receipt['id'], 'slug' => (string) $receipt['slug'], 'owner' => null, 'receipt' => $receipt];
+            }
+        }
+        return $out;
+    }
+
+    /** Owners an apply left alone, with why. On a revert, the owners it could not put back. */
+    private function showcaseNavSkipped(array $receipts, bool $revert = false): array
+    {
+        $out = [];
+        foreach ($receipts as $key => $receipt) {
+            if ($revert) {
+                if (($receipt['reverted'] ?? null) === 'conflict') {
+                    $out[$key] = $receipt['revertWhy'] ?? 'changed since it was hidden';
+                }
+            } elseif ($receipt['outcome'] !== 'written') {
+                $out[$key] = $receipt['why'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * An owner as it stands: its row id and content, or the active theme's file when a template part
+     * has no row (`existed` false). Null when there is neither, or a navigation id is not a navigation.
+     *
+     * @return array{id:int,content:string,existed:bool,area:string}|null
+     */
+    private function showcaseNavRead(string $kind, int $id, string $slug): ?array
+    {
+        if ($kind === 'navigation') {
+            $post = $this->writer->read('post', $id);
+            return $post === null || ($post['post_type'] ?? '') !== 'wp_navigation' ? null
+                : ['id' => $id, 'content' => (string) $post['post_content'], 'existed' => true, 'area' => ''];
+        }
+        $part = $this->writer->read('templatePart', 0, $slug);
+        if ($part !== null) {
+            return ['id' => (int) $part['id'], 'content' => (string) $part['content'], 'existed' => true, 'area' => (string) ($part['area'] ?? '')];
+        }
+        $file = method_exists($this->writer, 'themeTemplatePart') ? $this->writer->themeTemplatePart($slug) : null;
+        return $file === null ? null : ['id' => 0, 'content' => (string) $file['content'], 'existed' => false, 'area' => (string) ($file['area'] ?? '')];
+    }
+
+    /** One owner's whole content replaced, only while it still holds `$expected`. */
+    private function showcaseNavSwap(string $kind, int $id, string $expected, string $content): bool
+    {
+        if (!method_exists($this->writer, 'replacePostContentIf')) {
+            throw new RuntimeException('This site writer cannot compare-and-set a post; nothing has been written');
+        }
+        return $this->writer->replacePostContentIf($id, $kind === 'navigation' ? 'wp_navigation' : 'wp_template_part', $expected, $content);
+    }
+
+    /**
+     * Edit one owner of the map, if it still holds the bytes the map starts from.
+     *
+     * @return array{receipt:array,moved:bool}
+     */
+    private function showcaseNavHide(array &$record, string $key, array $pending): array
+    {
+        $owner = $pending['owner'];
+        $kind = $owner['kind'];
+        $base = ['kind' => $kind, 'id' => $owner['id'], 'slug' => $owner['slug'], 'before' => $owner['before'], 'after' => $owner['after']];
+        $leave = static fn(string $outcome, string $why, array $more = []): array => ['receipt' => $base + $more + ['outcome' => $outcome, 'why' => $why], 'moved' => false];
+        $live = $this->showcaseNavRead($kind, $owner['id'], $owner['slug']);
+        $earlier = $pending['receipt'];
+        if ($earlier !== null) {
+            // A write this job began and did not see land: what the row holds says whether it did.
+            $sha = $live === null ? null : hash('sha256', $live['content']);
+            if ($sha === $owner['after'] && ($live['existed'] && (!$earlier['created'] || $live['id'] === (int) $earlier['id']))) {
+                return ['receipt' => ['outcome' => 'written', 'why' => '', 'id' => $live['id']] + $earlier, 'moved' => true];
+            }
+            if ($earlier['created'] && $live !== null && $live['existed']) {
+                return $leave('conflict', 'a template part override appeared while this one was being created');
+            }
+        }
+        if ($live === null) {
+            return $leave('conflict', $kind === 'navigation' ? 'the navigation is gone from this site' : 'neither the site nor its theme holds this template part');
+        }
+        $sha = hash('sha256', $live['content']);
+        if ($sha === $owner['after']) {
+            return $leave('already', 'already as the map leaves it', ['id' => $live['id']]);
+        }
+        if ($sha !== $owner['before']) {
+            return $leave('conflict', 'edited on this site since the quickstart shipped it; left as it is', ['id' => $live['id']]);
+        }
+        foreach ($owner['operations'] as $op) {
+            if ($op['op'] === 'templatePart.setNavigationRef' && $this->showcaseNavRead('navigation', $op['to'], '') === null) {
+                return $leave('conflict', 'the navigation it would point at (' . $op['to'] . ') is gone from this site', ['id' => $live['id']]);
+            }
+        }
+        $content = ShowcaseNavProfile::edit($owner, $live['content']);
+        if ($content === null || !hash_equals($owner['after'], hash('sha256', $content))) {
+            return $leave('conflict', 'the map does not land on these bytes; left as it is', ['id' => $live['id']]);
+        }
+        // The receipt, with the bytes found, lands before the write it describes.
+        $receipt = $base + ['id' => $live['id'], 'existed' => $live['existed'], 'created' => !$live['existed'],
+            'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
+        $record['receipts'][$key] = $receipt;
+        $this->contract->record('showcaseNav', $record);
+        if ($live['existed']) {
+            if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {
+                return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
+            }
+            return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
+        }
+        // No row: the theme file is in charge, and the override is created the way every other
+        // template-part write of this plugin creates one (active theme, area, published).
+        if ($this->writer->read('templatePart', 0, $owner['slug']) !== null) {
+            return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
+        }
+        $id = $this->writer->write('templatePart', 0, ['content' => $content, 'area' => $live['area']], $owner['slug']);
+        return ['receipt' => ['outcome' => 'written', 'id' => $id] + $receipt, 'moved' => true];
+    }
+
+    /**
+     * Put back one owner an apply wrote, if it still holds what the apply wrote.
+     *
+     * @return array{receipt:array,moved:bool}
+     */
+    private function showcaseNavRestore(string $key, array $receipt): array
+    {
+        $restored = ['receipt' => ['reverted' => 'restored'], 'moved' => false];
+        $conflict = static fn(string $why): array => ['receipt' => ['reverted' => 'conflict', 'revertWhy' => $why], 'moved' => false];
+        $live = $this->showcaseNavRead($receipt['kind'], (int) $receipt['id'], (string) $receipt['slug']);
+        if (!empty($receipt['created'])) {
+            // The override this job created: gone, or the theme file in charge again, is restored.
+            if ($live === null || !$live['existed']) {
+                return $restored;
+            }
+            if ($live['id'] !== (int) $receipt['id'] || hash('sha256', $live['content']) !== $receipt['after']) {
+                return $conflict('the template part override was edited since it was created; left as it is');
+            }
+            $this->writer->delete('templatePart', 0, (string) $receipt['slug']);
+            return ['receipt' => ['reverted' => 'restored'], 'moved' => true];
+        }
+        if ($live === null || !$live['existed']) {
+            return $conflict($receipt['kind'] === 'navigation' ? 'the navigation is gone from this site' : 'the template part override is gone from this site');
+        }
+        $sha = hash('sha256', $live['content']);
+        if ($sha === $receipt['before']) {
+            return $restored; // put back already, by hand or by a write that never landed
+        }
+        if ($sha !== $receipt['after']) {
+            return $conflict('changed on this site since it was hidden; left as it is');
+        }
+        $found = base64_decode((string) $receipt['content'], true);
+        if (!is_string($found) || hash('sha256', $found) !== $receipt['before']) {
+            throw new RuntimeException('The receipt of ' . $key . ' does not hold the bytes it found');
+        }
+        if (!$this->showcaseNavSwap($receipt['kind'], $live['id'], $live['content'], $found)) {
+            return $conflict(self::SHOWCASE_NAV_RACED);
+        }
+        return ['receipt' => ['reverted' => 'restored'], 'moved' => true];
     }
 
     /**
