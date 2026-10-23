@@ -17,7 +17,7 @@
 #    gets the committed answer.
 # 4. the customer's change is not adopted: put back by hand, Home - Pink is still reported, until a
 #    new revert request finds it as the apply found it, restores it with nothing written, and the site
-#    inspects clean with no showcase navigation applied. Both reverts still answer their retries.
+#    inspects clean; status says reverted, nothing remaining. Both reverts still answer their retries.
 # 5. the writer's compare-and-sets on this MariaDB: params that differ from what was read only in
 #    letter case (equal under the site's collation) are not overwritten, nor is a module whose
 #    published is not the one expected.
@@ -106,7 +106,7 @@ expect "a new revert request restores it with nothing written" "$(field status) 
 contract '{"operation":"inspect"}'
 expect "the reverted site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.status"}'
-expect "and has no showcase navigation applied" "$(field status) $(field conflicts)" "none []"
+expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 15"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the first revert still answers its retry" "$(field alreadyReverted) $(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]).conflicts).join(","))' "$ANSWER")" "true menuItem-146"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo2","request_id":"e2e-4"}'

@@ -641,7 +641,7 @@ final class QuickstartContract
         // part edited after its write no longer matches either end.
         $navWritten = [];
         foreach (self::showcaseNavRecord($binding)['receipts'] ?? [] as $receipt) {
-            if (is_array($receipt) && ($receipt['kind'] ?? '') === 'templatePart' && in_array($receipt['outcome'] ?? '', ['written', 'already', 'writing'], true)) {
+            if (is_array($receipt) && ($receipt['kind'] ?? '') === 'templatePart' && in_array($receipt['outcome'] ?? '', ['written', 'writing'], true)) {
                 $navWritten[(string) ($receipt['slug'] ?? '')] = (string) ($receipt['after'] ?? '');
             }
         }

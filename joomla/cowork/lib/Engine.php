@@ -2837,13 +2837,16 @@ final class Engine
                 $state = $this->contract->inspect();
                 $receipts = $state['binding']['showcaseNav']['receipts'] ?? [];
                 return $this->ok([
-                    'status' => $record['status'] ?? 'none',
+                    // A finished revert is a finished job: `reverted`, nothing remaining. What an apply
+                    // would look at is `owners`, in every state.
+                    'status' => $reverted !== null ? 'reverted' : ($record['status'] ?? 'none'),
                     'hides' => $usable ? $nav->counts() : [],
-                    'remaining' => count($this->showcaseNavPending($state, $record, ($record['status'] ?? 'applying') !== 'reverting')),
+                    'owners' => $usable ? count($nav->operations()) : 0,
+                    'remaining' => $reverted !== null ? 0 : count($this->showcaseNavPending($state, $record, ($record['status'] ?? 'applying') !== 'reverting')),
                     'skipped' => $this->showcaseNavSkipped($receipts),
                     // Rows a finished revert left as the customer set them; a new revert request looks again.
                     'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
-                    'applyId' => $record['applyId'] ?? null,
+                    'applyId' => $record['applyId'] ?? $reverted['applyId'] ?? null,
                     'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
                     // A map published after this site's apply lists rows its receipts do not; a revert then an apply takes it.
                     'profileChanged' => $record !== null && (!$usable || !hash_equals((string) $record['profileHash'], $nav->hash())),

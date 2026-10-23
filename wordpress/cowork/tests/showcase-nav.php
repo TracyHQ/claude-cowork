@@ -208,7 +208,9 @@ WP_Fake::$posts[96]['post_content'] = $applied; // the customer takes their edit
 check('the header as the apply left it is clean while the conflict is on record', $drift($V), []);
 $recover = $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r2', 'request_id' => 'v2']);
 check('a later revert puts it back', [$recover['status'], $recover['moved'], $recover['conflicts'], $sha(96)], ['reverted', 1, [], $F['templatePart-96']['before']]);
-check('and nothing is left on record to revert', $sdoor($V, 'showcaseNav.status')['conflicts'], []);
+$after = $sdoor($V, 'showcaseNav.status');
+check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
+    ['reverted', 0, [], 3, 'snav-1']);
 
 // ── an editor open on an owner refuses the call before anything moves ───────────────────────
 
@@ -239,7 +241,7 @@ check('Restaurant: the Explore branch leaves the drawer', [$tDone['status'], $sh
 $sdoor($t['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 check('Restaurant: and comes back', $sha(133), $RF['navigation-133']['before']);
 
-// ── no row for the template part: the theme file is in charge ───────────────────────────────
+// ── no row for the template part: the theme file is in charge, and is never written ────────
 
 $themeDir = sys_get_temp_dir() . '/snav-theme-' . bin2hex(random_bytes(4));
 try {
@@ -249,29 +251,73 @@ try {
     $f = snavSite($DINER, $snavContracts, ['themeFileOnly' => true, 'themeDir' => $themeDir]);
     $sdoor($f['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
     $fDone = $sdoor($f['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-    $created = $f['writer']->read('templatePart', 0, 'header');
-    check('the override is created, with the bytes the map ends with', [$fDone['status'], $created !== null, hash('sha256', (string) ($created['content'] ?? ''))],
-        ['completed', true, $F['templatePart-96']['after']]);
-    check('in the active theme and the area the theme gives the file', [WP_Fake::$terms[$created['id'] . ':wp_theme'] ?? null, WP_Fake::$terms[$created['id'] . ':wp_template_part_area'] ?? null],
-        [['quickstart-theme'], [$f['writer']->themeTemplatePart('header')['area']]]);
-    check('and is clean to inspect', $drift($f['engine']), []);
+    check('a header only the theme file holds is a conflict for that owner, and nothing is created', [$fDone['status'], $fDone['skipped'], $f['writer']->read('templatePart', 0, 'header')],
+        ['completed', ['templatePart-96' => 'the header comes from the theme file; this receiver only edits a saved template part'], null]);
+    check('the theme file is untouched, the navigations are edited', [hash('sha256', (string) file_get_contents($themeDir . '/parts/header.html')), $sha(93), $sha(278)],
+        [$F['templatePart-96']['before'], $F['navigation-93']['after'], $F['navigation-278']['after']]);
     $sdoor($f['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
     $fRev = $sdoor($f['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
-    check('revert removes the override it created; the theme file is in charge again', [$fRev['status'], $f['writer']->read('templatePart', 0, 'header')], ['reverted', null]);
-
-    $g = snavSite($DINER, $snavContracts, ['themeFileOnly' => true, 'themeDir' => $themeDir]);
-    $sdoor($g['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-    $sdoor($g['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-    $part = $g['writer']->read('templatePart', 0, 'header');
-    WP_Fake::$posts[$part['id']]['post_content'] .= "\n<!-- wp:separator /-->";
-    $sdoor($g['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
-    $gRev = $sdoor($g['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
-    check('an override the customer edited since is kept, and reported', [array_keys($gRev['conflicts']), $g['writer']->read('templatePart', 0, 'header') !== null], [['templatePart-96'], true]);
+    check('revert puts back the navigations and creates nothing either', [$fRev['status'], $fRev['conflicts'], $sha(93), $sha(278), $f['writer']->read('templatePart', 0, 'header')],
+        ['reverted', [], $F['navigation-93']['before'], $F['navigation-278']['before'], null]);
 } finally {
     @unlink($themeDir . '/parts/header.html');
     @rmdir($themeDir . '/parts');
     @rmdir($themeDir);
 }
+
+// ── only this job's writes move the baseline ────────────────────────────────────────────────
+
+$a = snavSite($DINER, $snavContracts);
+$sdoor($a['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$sdoor($a['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$afterBytes = [93 => WP_Fake::$posts[93]['post_content'], 96 => WP_Fake::$posts[96]['post_content']];
+
+// The customer set the header and navigation 93 to the map's end bytes themselves, before any apply.
+$s = snavSite($DINER, $snavContracts);
+WP_Fake::$posts[93]['post_content'] = $afterBytes[93];
+WP_Fake::$posts[96]['post_content'] = $afterBytes[96];
+check('a header the customer set to the map\'s end bytes is drift', $drift($s['engine']), ['Template part header was edited']);
+$sdoor($s['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$sDone = $sdoor($s['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('an apply finds them already there and writes nothing to them', [$sDone['status'], $sDone['skipped']],
+    ['completed', ['templatePart-96' => 'already as the map leaves it', 'navigation-93' => 'already as the map leaves it']]);
+check('the customer\'s header is still drift after the apply', $drift($s['engine']), ['Template part header was edited']);
+$sdoor($s['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+$sRev = $sdoor($s['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('revert puts back only what the apply wrote', [$sRev['status'], $sRev['conflicts'], $sha(278), WP_Fake::$posts[93]['post_content'] === $afterBytes[93], WP_Fake::$posts[96]['post_content'] === $afterBytes[96]],
+    ['reverted', [], $F['navigation-278']['before'], true, true]);
+
+// A write that landed but whose answer was lost: its `writing` receipt and the end bytes make it this job's.
+$w = snavSite($DINER, $snavContracts);
+$GLOBALS['wpdb']->beforeSwap = static function (int $id) use ($afterBytes): void {
+    if (isset($afterBytes[$id])) {
+        WP_Fake::$posts[$id]['post_content'] = $afterBytes[$id]; // the UPDATE ran ...
+        throw new RuntimeException('the answer was lost'); // ... and its answer never came back
+    }
+};
+$lostHeader = $sdoor($w['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$GLOBALS['wpdb']->beforeSwap = null;
+check('the lost write leaves a writing receipt', [$lostHeader['ok'], $sdoor($w['engine'], 'inspect')['showcaseNav']['receipts']['templatePart-96']['outcome']], [false, 'writing']);
+check('and the header it wrote is not drift', $drift($w['engine']), []);
+$GLOBALS['wpdb']->beforeSwap = static function (int $id) use ($afterBytes): void {
+    if (isset($afterBytes[$id])) {
+        WP_Fake::$posts[$id]['post_content'] = $afterBytes[$id];
+        throw new RuntimeException('the answer was lost');
+    }
+};
+$lostNav = $sdoor($w['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$GLOBALS['wpdb']->beforeSwap = null;
+check('so does a lost navigation write', [$lostNav['ok'], $sdoor($w['engine'], 'inspect')['showcaseNav']['receipts']['navigation-93']['outcome']], [false, 'writing']);
+$wDone = $sdoor($w['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$wDone = $wDone['status'] === 'running' ? $sdoor($w['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $wDone;
+$wReceipts = $sdoor($w['engine'], 'inspect')['showcaseNav']['receipts'];
+check('the same request resumes and counts them as written', [$wDone['status'], $wDone['skipped'], $wReceipts['templatePart-96']['outcome'], $wReceipts['navigation-93']['outcome']],
+    ['completed', [], 'written', 'written']);
+check('the site inspects clean', $drift($w['engine']), []);
+$sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+$wRev = $sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('and revert puts them back', [$wRev['status'], $sha(93), $sha(96), $sha(278)],
+    ['reverted', $F['navigation-93']['before'], $F['templatePart-96']['before'], $F['navigation-278']['before']]);
 
 // ── maps that cannot be used ────────────────────────────────────────────────────────────────
 

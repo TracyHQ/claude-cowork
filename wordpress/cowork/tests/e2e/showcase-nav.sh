@@ -19,7 +19,7 @@
 # 3. the customer edits navigation 93; revert restores 278 and 96 byte for byte, names 93 as a
 #    conflict and leaves the customer's bytes. The same revert retried gets the committed answer.
 # 4. the customer puts 93 back as the apply left it; a new revert request restores it, and every
-#    owner holds the release's bytes again. The site inspects clean, with no showcase navigation applied.
+#    owner holds the release's bytes again. The site inspects clean; status says reverted, nothing remaining.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COWORK="$(cd "$HERE/../.." && pwd)"
@@ -216,7 +216,7 @@ expect "every owner holds the release's bytes" "$(changed) $(shas)" "none $(fina
 contract '{"operation":"inspect"}'
 expect "the reverted site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.status"}'
-expect "and has no showcase navigation applied" "$(field status) $(field conflicts)" "none []"
+expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 3"
 expect "the header drawer links the showcase again" "$(showcase_in drawer) / $(showcase_in header)" "Error Page|Offline Page|Typography / $SHOWCASE_LABELS"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the first revert still answers its retry" "$(field alreadyReverted) $(keys conflicts)" "true navigation-93"

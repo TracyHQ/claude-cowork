@@ -123,10 +123,13 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     only with bytes whose sha256 is the map's `after` (a compare-and-set); one the customer already
     changed is skipped and reported, never forced. Two owners per call (`running` until done); the
     receipt (the bytes found) lands before each write, so the same request resumes a call that died.
-    A template part with no row is written as a new override of the active theme, and revert deletes
-    it only while it still holds what was written. `revert` puts each owner back while it holds what
-    the apply wrote; one changed since is a conflict, left as it is, which a later revert request
-    looks at again. Inspect stops reporting a template part only at the bytes this job wrote. A
+    A template part with no row (the theme file in charge) is a conflict for that owner: nothing is
+    created, because creating an override cannot be compared-and-set. An owner found already at the
+    map's `after` bytes is `already`: not written, not reverted. `revert` puts each owner back while
+    it holds what the apply wrote; one changed since is a conflict, left as it is, which a later revert
+    request looks at again. Inspect stops reporting a template part only at the bytes this job wrote
+    (a write whose answer was lost included), never for one it found already there. After a finished
+    revert `status` is `reverted` with `remaining` 0; `owners` is the map's owner count. A
     missing, refused or not-covered map is `unsupported` (the contract still serves); a site with a
     second Polylang language is refused (`contract_failed`).
   - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's

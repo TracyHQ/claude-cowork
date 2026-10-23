@@ -1127,13 +1127,16 @@ final class Engine
             }
             $this->contract->inspect();
             return $this->ok([
-                'status' => $record['status'] ?? 'none',
+                // A finished revert is a finished job: `reverted`, nothing remaining. What an apply would
+                // look at is `owners`, in every state.
+                'status' => $reverted !== null ? 'reverted' : ($record['status'] ?? 'none'),
                 'hides' => $usable ? $nav->counts() : [],
-                'remaining' => count($this->showcaseNavPending($record, ($record['status'] ?? 'applying') !== 'reverting')),
+                'owners' => $usable ? count($nav->owners()) : 0,
+                'remaining' => $reverted !== null ? 0 : count($this->showcaseNavPending($record, ($record['status'] ?? 'applying') !== 'reverting')),
                 'skipped' => $this->showcaseNavSkipped($record['receipts'] ?? []),
                 // Owners a finished revert left as the customer set them; a new revert request looks again.
                 'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
-                'applyId' => $record['applyId'] ?? null,
+                'applyId' => $record['applyId'] ?? $reverted['applyId'] ?? null,
                 'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
                 // A map published after this site's apply edits what its receipts do not; a revert then an apply takes it.
                 'profileChanged' => $record !== null && (!$usable || !hash_equals((string) $record['profileHash'], $nav->hash())),
@@ -1304,24 +1307,20 @@ final class Engine
     }
 
     /**
-     * An owner as it stands: its row id and content, or the active theme's file when a template part
-     * has no row (`existed` false). Null when there is neither, or a navigation id is not a navigation.
+     * An owner as it stands: its row id and content. Null when it has no row (a template part the
+     * active theme's file is in charge of), or a navigation id is not a navigation.
      *
-     * @return array{id:int,content:string,existed:bool,area:string}|null
+     * @return array{id:int,content:string}|null
      */
     private function showcaseNavRead(string $kind, int $id, string $slug): ?array
     {
         if ($kind === 'navigation') {
             $post = $this->writer->read('post', $id);
             return $post === null || ($post['post_type'] ?? '') !== 'wp_navigation' ? null
-                : ['id' => $id, 'content' => (string) $post['post_content'], 'existed' => true, 'area' => ''];
+                : ['id' => $id, 'content' => (string) $post['post_content']];
         }
         $part = $this->writer->read('templatePart', 0, $slug);
-        if ($part !== null) {
-            return ['id' => (int) $part['id'], 'content' => (string) $part['content'], 'existed' => true, 'area' => (string) ($part['area'] ?? '')];
-        }
-        $file = method_exists($this->writer, 'themeTemplatePart') ? $this->writer->themeTemplatePart($slug) : null;
-        return $file === null ? null : ['id' => 0, 'content' => (string) $file['content'], 'existed' => false, 'area' => (string) ($file['area'] ?? '')];
+        return $part === null ? null : ['id' => (int) $part['id'], 'content' => (string) $part['content']];
     }
 
     /** One owner's whole content replaced, only while it still holds `$expected`. */
@@ -1348,19 +1347,20 @@ final class Engine
         $earlier = $pending['receipt'];
         if ($earlier !== null) {
             // A write this job began and did not see land: what the row holds says whether it did.
-            $sha = $live === null ? null : hash('sha256', $live['content']);
-            if ($sha === $owner['after'] && ($live['existed'] && (!$earlier['created'] || $live['id'] === (int) $earlier['id']))) {
-                return ['receipt' => ['outcome' => 'written', 'why' => '', 'id' => $live['id']] + $earlier, 'moved' => true];
-            }
-            if ($earlier['created'] && $live !== null && $live['existed']) {
-                return $leave('conflict', 'a template part override appeared while this one was being created');
+            // The `after` bytes under this job's own `writing` receipt are its write, whose answer was lost.
+            if ($live !== null && $live['id'] === (int) $earlier['id'] && hash('sha256', $live['content']) === $owner['after']) {
+                return ['receipt' => ['outcome' => 'written', 'why' => ''] + $earlier, 'moved' => true];
             }
         }
         if ($live === null) {
-            return $leave('conflict', $kind === 'navigation' ? 'the navigation is gone from this site' : 'neither the site nor its theme holds this template part');
+            // 🔒 NO ROW, NO WRITE. Creating an override cannot be compared-and-set against a customer
+            // saving one at the same moment, nor deleted again on revert without the same race.
+            return $leave('conflict', $kind === 'navigation' ? 'the navigation is gone from this site'
+                : 'the ' . $owner['slug'] . ' comes from the theme file; this receiver only edits a saved template part');
         }
         $sha = hash('sha256', $live['content']);
         if ($sha === $owner['after']) {
+            // Not this job's write: the receipt says so, and the baseline does not move for it.
             return $leave('already', 'already as the map leaves it', ['id' => $live['id']]);
         }
         if ($sha !== $owner['before']) {
@@ -1376,23 +1376,13 @@ final class Engine
             return $leave('conflict', 'the map does not land on these bytes; left as it is', ['id' => $live['id']]);
         }
         // The receipt, with the bytes found, lands before the write it describes.
-        $receipt = $base + ['id' => $live['id'], 'existed' => $live['existed'], 'created' => !$live['existed'],
-            'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
+        $receipt = $base + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
         $record['receipts'][$key] = $receipt;
         $this->contract->record('showcaseNav', $record);
-        if ($live['existed']) {
-            if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {
-                return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
-            }
-            return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
-        }
-        // No row: the theme file is in charge, and the override is created the way every other
-        // template-part write of this plugin creates one (active theme, area, published).
-        if ($this->writer->read('templatePart', 0, $owner['slug']) !== null) {
+        if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {
             return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
         }
-        $id = $this->writer->write('templatePart', 0, ['content' => $content, 'area' => $live['area']], $owner['slug']);
-        return ['receipt' => ['outcome' => 'written', 'id' => $id] + $receipt, 'moved' => true];
+        return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
     }
 
     /**
@@ -1405,19 +1395,8 @@ final class Engine
         $restored = ['receipt' => ['reverted' => 'restored'], 'moved' => false];
         $conflict = static fn(string $why): array => ['receipt' => ['reverted' => 'conflict', 'revertWhy' => $why], 'moved' => false];
         $live = $this->showcaseNavRead($receipt['kind'], (int) $receipt['id'], (string) $receipt['slug']);
-        if (!empty($receipt['created'])) {
-            // The override this job created: gone, or the theme file in charge again, is restored.
-            if ($live === null || !$live['existed']) {
-                return $restored;
-            }
-            if ($live['id'] !== (int) $receipt['id'] || hash('sha256', $live['content']) !== $receipt['after']) {
-                return $conflict('the template part override was edited since it was created; left as it is');
-            }
-            $this->writer->delete('templatePart', 0, (string) $receipt['slug']);
-            return ['receipt' => ['reverted' => 'restored'], 'moved' => true];
-        }
-        if ($live === null || !$live['existed']) {
-            return $conflict($receipt['kind'] === 'navigation' ? 'the navigation is gone from this site' : 'the template part override is gone from this site');
+        if ($live === null || $live['id'] !== (int) $receipt['id']) {
+            return $conflict($receipt['kind'] === 'navigation' ? 'the navigation is gone from this site' : 'the template part it edited is gone from this site');
         }
         $sha = hash('sha256', $live['content']);
         if ($sha === $receipt['before']) {

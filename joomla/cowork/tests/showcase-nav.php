@@ -167,6 +167,7 @@ $again = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-c', 'req
 check('asking again is a no-op, not a second apply', [$again['status'], $again['alreadyApplied'], $again['applyId']], ['completed', true, 'snav-a']);
 $lost = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1']);
 check('the same request after a lost answer gets the same answer', [$lost['ok'], $lost['status']], [true, 'completed']);
+snavClean('the rows that answer wrote are this job\'s: the site still inspects clean', $contract);
 check('the generic revert does not take it apart', $engine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'snav-a']])['error'], 'bad_params');
 
 // Drift: an entry put back in the menu is reported; so is any other param of a hidden row.
@@ -192,7 +193,7 @@ check("the customer's own value is left as they wrote it", $w->store['menuItem']
 foreach ($hidden as $title => $id) if ($id !== $pink) check("$title has exactly its params back", $w->store['menuItem'][$id]['params'], $original[$id]);
 $pinkStatus = $call(['operation' => 'showcaseNav.status']);
 check('and leaves no showcase navigation applied, only the conflict on record', [$store->binding['showcaseNav']['status'], array_keys($store->binding['showcaseNav']['receipts']), $contract->inspect()['showcaseNav'], $pinkStatus['status'], array_keys($pinkStatus['conflicts'])],
-    ['reverted', ['menuItem-' . $pink], null, 'none', ['menuItem-' . $pink]]);
+    ['reverted', ['menuItem-' . $pink], null, 'reverted', ['menuItem-' . $pink]]);
 // The baseline moved only for the rows the revert wrote: the row it left is still held to what the
 // apply wrote, and the customer's own change to it is reported, even put back as the lock had it.
 check("the customer's change is not adopted as the baseline", snavDrifted($contract), ['menuItem-' . $pink]);
@@ -206,6 +207,9 @@ check('the reverted apply request cannot apply again', $call(['operation' => 'sh
 $again = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo2', 'request_id' => 'u2']);
 check('a later revert takes the row put back by hand', [$again['ok'], $again['status'], $again['moved'], $again['conflicts'], $w->store['menuItem'][$pink]['params']], [true, 'reverted', 1, [], $original[$pink]]);
 snavClean('the reverted site inspects clean', $contract);
+$after = $call(['operation' => 'showcaseNav.status']);
+check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
+    ['reverted', 0, [], 15, 'snav-a']);
 check('with nothing left to bring back, a revert says so', $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo3', 'request_id' => 'u3'])['error'], 'contract_failed');
 check('both reverts still answer their retries', [
     array_keys($call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1'])['conflicts']),
@@ -218,9 +222,14 @@ $w->store['menuItem'][$hidden['Registration']]['params'] = JsonObjectKey::set($o
 $skip = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-d', 'request_id' => 'r4']);
 check('rows not where the map starts are skipped, by name', [$skip['status'], $skip['moved'], $skip['skipped']],
     ['completed', 13, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
+$skipDrift = ['menuItem-' . $hidden['Login'], 'menuItem-' . $hidden['Registration']];
+sort($skipDrift);
+// 🔒 A row found already where the map leaves it was not this job's write: the baseline does not move for it.
+check('a row the customer already hid is still drift after the apply', snavDrifted($contract), $skipDrift);
 check('the skipped rows were not written', [JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal'], JsonObjectKey::get($w->store['menuItem'][$hidden['Registration']]['params'], 'menu_show')['literal']], ['0', '"maybe"']);
 $skipBack = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo4', 'request_id' => 'u4']);
 check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 13, '0']);
+check('and still drift after it', snavDrifted($contract), $skipDrift);
 
 // ------------------------------------------------------------------ a module, through the visibility column
 
