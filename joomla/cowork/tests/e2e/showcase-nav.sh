@@ -148,10 +148,26 @@ contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_
 expect "the first revert still answers its retry" "$(field alreadyReverted) $(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]).conflicts).join(","))' "$ANSWER")" "true menuItem-146"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo2","request_id":"e2e-4"}'
 expect "and so does the second" "$(field alreadyReverted) $(field conflicts)" "true []"
+
+say "5. a page the customer added under Home keeps the dropdown"
+# A child the map never saw, shown: the sub stays in every style and the dropdown opens on it.
+qs_sql "INSERT INTO ${QS}menu (menutype,title,alias,note,path,link,type,published,parent_id,level,component_id,checked_out,browserNav,access,img,template_style_id,params,lft,rgt,home,language,client_id)
+  SELECT menutype,'Our own home','our-own-home','','home/our-own-home',link,type,1,101,2,component_id,checked_out,browserNav,access,img,0,'{}',
+    (SELECT MAX(rgt)+1 FROM ${QS}menu),(SELECT MAX(rgt)+2 FROM ${QS}menu),0,language,client_id FROM ${QS}menu WHERE id=145"
+ADDED=$(qs_sql "SELECT id FROM ${QS}menu WHERE alias='our-own-home' AND parent_id=101")
+contract '{"operation":"showcaseNav.apply","apply_id":"snav-e2e-live","request_id":"e2e-5"}'
+expect "the apply hides the showcase and keeps every style's sub, saying why" \
+  "$(field status) $(field moved) $(node -e 'const s = JSON.parse(process.argv[1]).skipped; process.stdout.write(Object.keys(s).filter((k) => k.startsWith("templateStyle-") && s[k].includes("menu item " + process.argv[2] + " is still shown")).join(","))' "$ANSWER" "$ADDED")" \
+  "completed 15 templateStyle-9,templateStyle-10,templateStyle-11,templateStyle-12,templateStyle-13"
+expect "no style is written" "$(styles_changed)" none
+expect "and the desktop menu still opens the dropdown under Home" "$(home_menu)" "$HOME_BEFORE"
+contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-live-undo","request_id":"e2e-6"}'
+expect "its revert brings the showcase back" "$(field status) $(field moved) $(changed "$HIDDEN")" "reverted 15 none"
+qs_sql "DELETE FROM ${QS}menu WHERE id=$ADDED"
 qs_sql "DROP TABLE snav_original"
 qs_sql "DROP TABLE snav_styles"
 
-say "5. compare-and-set by bytes"
+say "6. compare-and-set by bytes"
 docker exec -i -u www-data "$P-joomla" php <<'PHP' > /dev/null
 <?php
 define('_JEXEC', 1);

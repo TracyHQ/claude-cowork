@@ -141,9 +141,16 @@ final class ShowcaseNavProfile
             throw new RuntimeException('Showcase-navigation operation names a menu item outside the contract: ' . $key);
         if (isset($this->operations[$itemKey]) && $this->operations[$itemKey]['kind'] === 'menuItem')
             throw new RuntimeException('Showcase-navigation operation removes the sub of an item the map hides: ' . $key);
+        // 🔒 EVERY CHILD GOES, NOT ONE. A child of the item (by parent, whatever menu its row names) is either hidden by this map or
+        // already out of the menu in the lock (unpublished, or menu_show "0"); one still shown keeps the sub.
         $children = [];
-        foreach ($this->operations as $k => $op)
-            if ($op['kind'] === 'menuItem' && (string) ($lock['entities'][$k]['parent_id'] ?? '') === (string) $item) $children[] = $k;
+        foreach ($lock['entities'] as $k => $child) {
+            if (($entities[$k]['kind'] ?? null) !== 'menuItem' || !is_array($child)) continue;
+            if ((string) ($child['parent_id'] ?? '') !== (string) $item) continue;
+            if (isset($this->operations[$k]) && $this->operations[$k]['kind'] === 'menuItem') $children[] = $k;
+            elseif (self::shown($child))
+                throw new RuntimeException('Showcase-navigation operation removes the sub of an item whose child ' . $k . ' stays in the menu: ' . $key);
+        }
         if (!$children) throw new RuntimeException('Showcase-navigation operation removes the sub of an item the map empties of nothing: ' . $key);
         // 🔒 THE CHAIN, REPLAYED. The first link starts from the locked column; each next one from the last one's bytes.
         $previous = $this->operations[$key] ?? null;
@@ -162,6 +169,19 @@ final class ShowcaseNavProfile
         $this->operations[$key] = $previous === null
             ? ['key' => $key, 'op' => self::MEGA_SUB, 'kind' => 'templateStyle', 'from' => $row['before'], 'to' => $row['after'], 'reason' => $row['reason'], 'steps' => [$step]]
             : ['to' => $row['after'], 'steps' => array_merge($previous['steps'], [$step])] + $previous;
+    }
+
+    /**
+     * Whether a menu item row is in the menu: published, and its menu_show not "0". Params that do not
+     * read as an object count as shown, so a row this cannot read never empties an item.
+     */
+    public static function shown(array $row): bool
+    {
+        if ((string) ($row['published'] ?? '') !== '1') return false;
+        $text = (string) ($row['params'] ?? '');
+        if (trim($text) === '') return true;
+        $params = json_decode($text, true);
+        return !is_array($params) || !array_key_exists(self::MENU_PARAM, $params) || !in_array($params[self::MENU_PARAM], ['0', 0, false], true);
     }
 
     public function hash(): string { return $this->hash; }

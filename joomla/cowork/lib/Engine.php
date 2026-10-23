@@ -3083,12 +3083,24 @@ final class Engine
         $steps = $row['steps'];
         $take = count($steps);
         $kept = null;
+        // 🔒 THE LIVE MENU HAS THE LAST WORD. The map knows the children the release shipped; the site may
+        // have more — a page the customer added under the item, in any language and whatever menu its row
+        // names — and one of them still shown keeps the sub, so the dropdown opens on it. Read now, after this batch's hides.
+        $menu = null;
         foreach ($steps as $n => $step) {
             foreach ($step['children'] as $child)
                 if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true)) {
                     $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
                     break;
                 }
+            if ($kept === null) {
+                $menu ??= (new ContractRows($this->writer))->all('menuItem');
+                foreach ($menu as $child)
+                    if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child)) {
+                        $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
+                        break;
+                    }
+            }
             if ($kept !== null) { $take = $n; break; }
         }
         $params = (string) ($current['params'] ?? '');

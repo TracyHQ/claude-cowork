@@ -408,6 +408,20 @@ check('a sub removed twice from one style is refused', $snavLoads($tTwice), 'ref
 $tNoChildren = $snavMap;
 $tNoChildren['operations'] = array_values(array_filter($snavMap['operations'], fn ($op) => !in_array($op['key'], ['menuItem-145', 'menuItem-146', 'menuItem-147', 'menuItem-148'], true)));
 check('a sub removed from an item whose children the map keeps is refused', $snavLoads($tNoChildren), 'refused');
+// Every child of the item goes, not one: a map that leaves Home - Red in the menu may not drop the sub,
+// unless the lock already has that child out of the menu.
+$tOneKept = $snavMap;
+$tOneKept['operations'] = array_values(array_filter($snavMap['operations'], fn ($op) => $op['key'] !== 'menuItem-145'));
+check('a sub removed from an item one of whose shown children the map keeps is refused', $snavLoads($tOneKept), 'refused');
+$tLoadsWith = function (callable $lockEdit) use ($tOneKept, $snavSource, $snavContent, $snavLock) {
+    $lock = $snavLock;
+    $lock['entities']['menuItem-145'] = $lockEdit($lock['entities']['menuItem-145']);
+    try { new ShowcaseNavProfile($tOneKept, $snavContent, $lock, $snavSource, json_encode($tOneKept), 'ja-diner/j6/1.0.4'); return 'loaded'; }
+    catch (RuntimeException $e) { return 'refused'; }
+};
+check('a child the lock has unpublished needs no hide', $tLoadsWith(fn ($row) => ['published' => '0'] + $row), 'loaded');
+check('nor one the lock has out of the menu', $tLoadsWith(fn ($row) => ['params' => JsonObjectKey::set((string) $row['params'], 'menu_show', '"0"')] + $row), 'loaded');
+check('one the lock shows with an unreadable menu_show still keeps the sub', $tLoadsWith(fn ($row) => ['params' => JsonObjectKey::set((string) $row['params'], 'menu_show', '"maybe"')] + $row), 'refused');
 
 // The diner, applied and reverted.
 [, $tStore, $tw, $tContract, $tCall] = snavSite($snavSource);
@@ -493,6 +507,34 @@ check('a child left in the menu keeps its item\'s sub, and says why', [$cApplied
     ['completed', 14, ['menuItem-' . $cRed => 'menu_show is "maybe", not shown'] + array_fill_keys(array_keys($styles), $cWhy)]);
 check('no style is written', $tParams($cw2), $cBefore);
 check('the skipped styles have nothing to revert', [$cCall2(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-chu', 'request_id' => 'ch2'])['moved'], $tParams($cw2)], [14, $cBefore]);
+
+// 🔒 THE LIVE MENU HAS THE LAST WORD: a page the customer added under Home after the install is a child
+// the map never saw. Shown, it keeps the dropdown in every style; out of the menu, the sub goes.
+$tAdded = function (string $params, string $published = '1', array $more = []) use ($snavSource, $cRed) {
+    [, , $w, $c, $call] = snavSite($snavSource);
+    $w->store['menuItem'][9001] = ['id' => 9001, 'title' => 'Our own home', 'alias' => 'our-own-home', 'path' => 'home/our-own-home',
+        'published' => $published, 'parent_id' => 101, 'params' => $params] + $more + $w->store['menuItem'][$cRed];
+    $c->bind($c->inspect()['snapshot']);
+    return [$w, $call];
+};
+[$lw, $lCall] = $tAdded('{"menu_show":"1"}');
+$lBefore = $tParams($lw);
+$lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lv', 'request_id' => 'lv1']);
+check('a shown child the customer added under Home keeps its sub in every style, and says why', [$lApplied['status'], $lApplied['moved'], $lApplied['skipped']],
+    ['completed', 15, array_fill_keys(array_keys($styles), 'kept the mega-menu sub of menuItem-101: its child menu item 9001 is still shown on this site')]);
+check('and no style is written', $tParams($lw), $lBefore);
+foreach (['another language' => ['language' => 'fr-FR'], 'a row naming another menu' => ['menutype' => 'joomla-pages']] as $what => $more) {
+    [$lw, $lCall] = $tAdded('{}', '1', $more);
+    $lBefore = $tParams($lw);
+    $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lo', 'request_id' => 'lo1']);
+    check("a shown child in $what keeps the sub too", [$lApplied['moved'], $tParams($lw)], [15, $lBefore]);
+}
+foreach (['{"menu_show":"0"}' => ['1', 'out of the menu'], '{}' => ['0', 'unpublished']] as $params => [$published, $what]) {
+    [$lw, $lCall] = $tAdded($params, $published);
+    $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lh', 'request_id' => 'lh1']);
+    check("a child the customer added $what lets every sub go", [$lApplied['status'], $lApplied['moved'], $lApplied['skipped'], array_values($tHash($lw))],
+        ['completed', 20, [], array_values($tFinal)]);
+}
 
 // Listed first in the map, the styles still wait for the hides of their item's children.
 [, , $ow, , $oCall] = snavSite($snavSource, fn ($dir) => snavRewrite($dir, function ($m) {
