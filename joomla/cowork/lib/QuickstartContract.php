@@ -471,14 +471,15 @@ final class QuickstartContract
         $slots=$this->slotsOf($key, $meta);
         $filtered=$this->changeRow($filtered,$slots,array_fill_keys(array_column($slots,'key'),MultilingualProfile::CONTENT_SLOT));
         // Compare semantic JSON, independent of whitespace or key serialization used by Joomla.
-        foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='') {
-            $decoded=json_decode($filtered[$col],true);
-            if(is_array($decoded)) {
-                if(isset($decoded['jatools-config']))$decoded['jatools-config']=json_decode($decoded['jatools-config'],true,512,JSON_THROW_ON_ERROR);
-                $filtered[$col]=$decoded;
-            }
-        }
+        foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='')$filtered[$col]=$this->column($filtered[$col]);
         return $filtered;
+    }
+    /** A JSON column as the baseline holds it: decoded when it is an object or list, else its text. */
+    private function column($text) {
+        $decoded=json_decode((string)$text,true);
+        if(!is_array($decoded))return $text;
+        if(isset($decoded['jatools-config']))$decoded['jatools-config']=json_decode($decoded['jatools-config'],true,512,JSON_THROW_ON_ERROR);
+        return $decoded;
     }
     private function generatedCache(string $path): bool {
         // T4 produces these from the separately hash-locked sources when a route is first viewed.
@@ -1334,6 +1335,8 @@ final class QuickstartContract
         foreach($moved as $row) {
             if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
             if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
+            // A template style's whole column, as this job wrote or found it.
+            if($row['kind']==='templateStyle'){$binding['presentation'][$row['key']]['params']=$this->column((string)$row['raw']);continue;}
             $params=$binding['presentation'][$row['key']]['params']??null;
             // An empty or whitespace-only column is held as its text, as the row reads it: Joomla's {} and back again.
             if(is_string($params)&&trim($params)==='')$params=[];

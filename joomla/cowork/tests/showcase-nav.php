@@ -39,7 +39,8 @@ $snavLoads = function (array $profile) use ($snavSource, $snavContent, $snavLock
 };
 check('the shipped diner map loads', $snavLoads($snavMap), 'loaded');
 $snavBad = [
-    'another schema' => fn ($m) => ['schemaVersion' => 'tracy-quickstart-showcase-nav/joomla/v2'] + $m,
+    'another schema' => fn ($m) => ['schemaVersion' => 'tracy-quickstart-showcase-nav/joomla/v3'] + $m,
+    'a style operation under v1' => fn ($m) => ['schemaVersion' => 'tracy-quickstart-showcase-nav/joomla/v1'] + $m,
     'another contract' => fn ($m) => ['contract' => 'ja-diner/j6/1.0.3'] + $m,
     'another base' => fn ($m) => ['baseHash' => str_repeat('0', 64)] + $m,
     'an unknown status' => fn ($m) => ['status' => 'draft'] + $m,
@@ -115,7 +116,11 @@ check('a refused map is unsupported, not a broken contract', [$badCall(['operati
 
 [$dir, $store, $w, $contract, $call, $engine] = snavSite($snavSource);
 $hidden = [];
-foreach ($snavMap['operations'] as $op) foreach ($snavContent['entities'] as $entity) if ($entity['key'] === $op['key']) $hidden[$op['label']] = (int) $entity['sourceId'];
+$styles = [];
+foreach ($snavMap['operations'] as $op) foreach ($snavContent['entities'] as $entity) if ($entity['key'] === $op['key']) {
+    if ($op['op'] === 'menuItem.param') $hidden[$op['label']] = (int) $entity['sourceId'];
+    else $styles[$op['key']] = (int) $entity['sourceId'];
+}
 $kept = ['Home' => 101, 'Our Blog' => 108, 'Contact Us' => 117, 'Offers' => 141, 'About Us' => 142, 'Reservation' => 144];
 check('the diner map hides the J! Pages drawer and the Home colour variants', array_keys($hidden),
     ['J! Pages', 'Login', 'Registration', 'User Profile', 'Edit User Profile', 'Other Pages', 'Smart Search', 'Fetured Articles', 'Error Page', 'Offline Page', 'Typography', 'Home - Red', 'Home - Pink', 'Home - Green', 'Home - Blue']);
@@ -123,7 +128,7 @@ foreach ($kept as $title => $id) check("the diner's $title is the entry the test
 $original = array_map(fn ($row) => $row['params'] ?? null, $w->store['menuItem']);
 
 $status = $call(['operation' => 'showcaseNav.status']);
-check('status says what an apply would hide, before anything is written', [$status['ok'], $status['status'], $status['hides'], $status['remaining']], [true, 'none', ['menuItem' => 15], 15]);
+check('status says what an apply would hide, before anything is written', [$status['ok'], $status['status'], $status['hides'], $status['remaining']], [true, 'none', ['menuItem' => 15, 'templateStyle' => 5], 20]);
 check('an apply without the snav- prefix is refused by name', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1'])['message'], 'apply_id must start with "snav-"');
 check('an apply without a request_id is refused', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a'])['error'], 'bad_params');
 check('an unknown operation is refused', $call(['operation' => 'showcaseNav.hideAll'])['error'], 'bad_params');
@@ -147,7 +152,7 @@ snavClean('mid-apply, the site still inspects clean', $contract);
 check('a different request cannot take over an apply in flight', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'r2'])['error'], 'conflict');
 
 $done = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1']);
-check('the retried apply completes', [$done['ok'], $done['status'], $done['moved'], $done['remaining'], $done['skipped']], [true, 'completed', 15, 0, []]);
+check('the retried apply completes', [$done['ok'], $done['status'], $done['moved'], $done['remaining'], $done['skipped']], [true, 'completed', 20, 0, []]);
 foreach ($hidden as $title => $id) {
     $before = json_decode($original[$id], true);
     $after = json_decode((string) $w->store['menuItem'][$id]['params'], true);
@@ -187,7 +192,7 @@ $pink = $hidden['Home - Pink'];
 $w->store['menuItem'][$pink]['params'] = JsonObjectKey::set($w->store['menuItem'][$pink]['params'], 'menu_show', '"1"');
 $customer = $w->store['menuItem'][$pink]['params'];
 $back = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1']);
-check('revert brings the showcase back', [$back['ok'], $back['status'], $back['moved'], $back['remaining']], [true, 'reverted', 14, 0]);
+check('revert brings the showcase back', [$back['ok'], $back['status'], $back['moved'], $back['remaining']], [true, 'reverted', 19, 0]);
 check('and names the entry the customer changed', array_keys($back['conflicts']), ['menuItem-' . $pink]);
 check("the customer's own value is left as they wrote it", $w->store['menuItem'][$pink]['params'], $customer);
 foreach ($hidden as $title => $id) if ($id !== $pink) check("$title has exactly its params back", $w->store['menuItem'][$id]['params'], $original[$id]);
@@ -209,7 +214,7 @@ check('a later revert takes the row put back by hand', [$again['ok'], $again['st
 snavClean('the reverted site inspects clean', $contract);
 $after = $call(['operation' => 'showcaseNav.status']);
 check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
-    ['reverted', 0, [], 15, 'snav-a']);
+    ['reverted', 0, [], 20, 'snav-a']);
 check('with nothing left to bring back, a revert says so', $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo3', 'request_id' => 'u3'])['error'], 'contract_failed');
 check('both reverts still answer their retries', [
     array_keys($call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1'])['conflicts']),
@@ -221,14 +226,14 @@ $w->store['menuItem'][$hidden['Login']]['params'] = JsonObjectKey::set($original
 $w->store['menuItem'][$hidden['Registration']]['params'] = JsonObjectKey::set($original[$hidden['Registration']], 'menu_show', '"maybe"');
 $skip = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-d', 'request_id' => 'r4']);
 check('rows not where the map starts are skipped, by name', [$skip['status'], $skip['moved'], $skip['skipped']],
-    ['completed', 13, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
+    ['completed', 18, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
 $skipDrift = ['menuItem-' . $hidden['Login'], 'menuItem-' . $hidden['Registration']];
 sort($skipDrift);
 // 🔒 A row found already where the map leaves it was not this job's write: the baseline does not move for it.
 check('a row the customer already hid is still drift after the apply', snavDrifted($contract), $skipDrift);
 check('the skipped rows were not written', [JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal'], JsonObjectKey::get($w->store['menuItem'][$hidden['Registration']]['params'], 'menu_show')['literal']], ['0', '"maybe"']);
 $skipBack = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo4', 'request_id' => 'u4']);
-check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 13, '0']);
+check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 18, '0']);
 check('and still drift after it', snavDrifted($contract), $skipDrift);
 
 // ------------------------------------------------------------------ a module, through the visibility column
@@ -242,7 +247,7 @@ foreach ($snavContent['entities'] as $entity)
 }));
 $mid = (int) $snavModule['sourceId'];
 $mApplied = $mCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-m', 'request_id' => 'm1']);
-check('a listed module is unpublished with the menu entries', [$mApplied['status'], $mApplied['moved'], $mw->store['module'][$mid]['published']], ['completed', 16, '0']);
+check('a listed module is unpublished with the menu entries', [$mApplied['status'], $mApplied['moved'], $mw->store['module'][$mid]['published']], ['completed', 21, '0']);
 snavClean('the site with the module hidden inspects clean', $mContract);
 $mBack = $mCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-mu', 'request_id' => 'm2']);
 check('and is published again by the revert', [$mBack['status'], $mw->store['module'][$mid]['published']], ['reverted', '1']);
@@ -309,7 +314,7 @@ $rw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) us
 };
 $rApplied = $rCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-r', 'request_id' => 'race1']);
 $rReceipts = $rStore->binding['showcaseNav']['receipts'] ?? [];
-check('a raced apply goes on with the other rows', [$rApplied['ok'], $rApplied['status'] ?? null, $rApplied['moved'] ?? null], [true, 'completed', 14]);
+check('a raced apply goes on with the other rows', [$rApplied['ok'], $rApplied['status'] ?? null, $rApplied['moved'] ?? null], [true, 'completed', 19]);
 check('and names both raced rows a conflict', [$rReceipts['menuItem-' . $rTypo]['outcome'] ?? null, $rReceipts[$snavModule['key']]['outcome'] ?? null], ['conflict', 'conflict']);
 check('neither raced row is overwritten', [$rw->store['menuItem'][$rTypo]['params'], $rw->store['module'][$mid]['published']], [$rRaced, '01']);
 $rw->beforeCas = null;
@@ -339,10 +344,10 @@ $dWant = ['menuItem-141', 'menuItem-' . $dGreen];
 sort($dWant);
 check('the drift is reported before the apply', snavDrifted($dContract), $dWant);
 $dApplied = $dCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-dr', 'request_id' => 'd1']);
-check('the apply still runs', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied], [true, 15]);
+check('the apply still runs', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied], [true, 20]);
 check('and the drift it did not make is still reported after it', snavDrifted($dContract), $dWant);
 $dBack = $dCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-dru', 'request_id' => 'd2']);
-check('the revert still runs', [$dBack['ok'], $dBack['moved'] ?? $dBack], [true, 15]);
+check('the revert still runs', [$dBack['ok'], $dBack['moved'] ?? $dBack], [true, 20]);
 check('and the drift is still reported after it', snavDrifted($dContract), $dWant);
 $dw->store['menuItem'][141]['params'] = $dOffers;
 check('and a row put back is no longer reported', snavDrifted($dContract), ['menuItem-' . $dGreen]);
@@ -364,13 +369,153 @@ foreach (['empty' => '', 'whitespace-only' => " \n"] as $bName => $bText) {
     check("the $bName column is what the site holds", $bw->store['menuItem'][$bId]['params'], $bText);
     snavClean("and the site inspects clean with the $bName column", $bContract);
     $bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'b1']);
-    check("the $bName params column is hidden from null", [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 15, '{"menu_show":"0"}']);
+    check("the $bName params column is hidden from null", [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 20, '{"menu_show":"0"}']);
     snavClean("the site with the $bName row hidden inspects clean", $bContract);
     $bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
-    check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 15, $bText]);
+    check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 20, $bText]);
     snavClean("the site with the $bName row back inspects clean", $bContract);
 }
 
+// ------------------------------------------------------------------ the T3 mega-menu sub of an emptied item
+
+// 🔒 V2: every child of Home leaves the menu, so each T3 style drops `mm_config.mainmenu.item-101.sub`
+// — the whole column a byte-exact compare-and-set, the edit made by the engine and proven by the map's
+// hash, run only after the children's hides, and put back byte for byte by the revert.
+$tFinal = $tSteps = [];
+foreach ($snavMap['operations'] as $op) if ($op['op'] === 'templateStyle.megaSubRemove') { $tFinal[$op['key']] = $op['after']; $tSteps[$op['key']][] = $op['item']; }
+check('the diner map removes one sub from each of its five T3 styles', [$tSteps, array_values($styles)],
+    [array_fill_keys(['templateStyle-9', 'templateStyle-10', 'templateStyle-11', 'templateStyle-12', 'templateStyle-13'], [101]), [9, 10, 11, 12, 13]]);
+$tSub = fn (string $params) => array_key_exists('sub', json_decode(json_decode($params, true)['mm_config'], true)['mainmenu']['item-101'] ?? []);
+$tHome = fn (ContractTestWriter $w) => array_map(fn ($id) => $tSub((string) $w->store['templateStyle'][$id]['params']), $styles);
+$tHash = fn (ContractTestWriter $w) => array_map(fn ($id) => hash('sha256', (string) $w->store['templateStyle'][$id]['params']), $styles);
+$tParams = fn (ContractTestWriter $w) => array_map(fn ($id) => (string) $w->store['templateStyle'][$id]['params'], $styles);
+$tProfile = function (callable $edit) use ($snavMap, $snavLoads) { $m = $snavMap; foreach ($m['operations'] as $n => $op) if ($op['op'] === 'templateStyle.megaSubRemove') { $m['operations'][$n] = $edit($op); break; } return $snavLoads($m); };
+foreach ([
+    'another style id' => fn ($op) => ['style' => ['id' => 10, 'template' => 'ja_diner']] + $op,
+    'another template' => fn ($op) => ['style' => ['id' => 9, 'template' => 'ja_resort']] + $op,
+    'another menutype' => fn ($op) => ['menutype' => 'joomla-pages'] + $op,
+    'an item outside the contract' => fn ($op) => ['item' => 99999, 'path' => 'mm_config.mainmenu.item-99999.sub'] + $op,
+    'an item the map does not empty' => fn ($op) => ['item' => 108, 'path' => 'mm_config.mainmenu.item-108.sub'] + $op,
+    'another path' => fn ($op) => ['path' => 'mm_config.mainmenu.item-101.class'] + $op,
+    'a before the lock does not hold' => fn ($op) => ['before' => str_repeat('a', 64)] + $op,
+    'an after the edit does not reach' => fn ($op) => ['after' => str_repeat('a', 64)] + $op,
+    'an extra field' => fn ($op) => $op + ['from' => '1'],
+    'no reason' => fn ($op) => ['reason' => ''] + $op,
+] as $what => $edit) check("a megaSubRemove with $what is refused", $tProfile($edit), 'refused');
+$tTwice = $snavMap;
+foreach ($snavMap['operations'] as $op) if ($op['key'] === 'templateStyle-9') $tTwice['operations'][] = ['before' => $op['after']] + $op;
+check('a sub removed twice from one style is refused', $snavLoads($tTwice), 'refused');
+$tNoChildren = $snavMap;
+$tNoChildren['operations'] = array_values(array_filter($snavMap['operations'], fn ($op) => !in_array($op['key'], ['menuItem-145', 'menuItem-146', 'menuItem-147', 'menuItem-148'], true)));
+check('a sub removed from an item whose children the map keeps is refused', $snavLoads($tNoChildren), 'refused');
+
+// The diner, applied and reverted.
+[, $tStore, $tw, $tContract, $tCall] = snavSite($snavSource);
+$tOriginal = $tParams($tw);
+check('every diner style keeps a sub for Home before the apply', array_values($tHome($tw)), [true, true, true, true, true]);
+$tWrites = [];
+$tw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$tWrites) { $tWrites[] = $kind; };
+$tApplied = $tCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-t', 'request_id' => 't1']);
+$tw->beforeCas = null;
+check('the apply removes the sub from every style', [$tApplied['status'], $tApplied['moved'], $tApplied['skipped'], array_values($tHome($tw))], ['completed', 20, [], [false, false, false, false, false]]);
+check('each style holds exactly the bytes the map names', $tHash($tw), $tFinal);
+check('the styles are written after every hide of their item', array_slice($tWrites, -5), array_fill(0, 5, 'templateStyle'));
+foreach ($styles as $key => $id) {
+    $was = json_decode($tOriginal[$key], true);
+    $now = json_decode((string) $tw->store['templateStyle'][$id]['params'], true);
+    $wasMm = json_decode($was['mm_config'], true);
+    unset($wasMm['mainmenu']['item-101']['sub']);
+    check("$key changes no other param", array_diff_key($now, ['mm_config' => 1]), array_diff_key($was, ['mm_config' => 1]));
+    check("$key changes no other mega-menu setting", json_decode($now['mm_config'], true), $wasMm);
+}
+$tReceipt = $tStore->binding['showcaseNav']['receipts']['templateStyle-9'];
+check('the style receipt holds the column found and the hash written', [$tReceipt['outcome'], $tReceipt['kind'], $tReceipt['before'], $tReceipt['after'], $tReceipt['items']],
+    ['written', 'templateStyle', $tOriginal['templateStyle-9'], $tFinal['templateStyle-9'], ['menuItem-101']]);
+snavClean('the site with the subs removed inspects clean', $tContract);
+// Another param of a style moved since: reported, as before the apply.
+$tBlue = $styles['templateStyle-12'];
+$tw->store['templateStyle'][$tBlue]['params'] = JsonObjectKey::set((string) $tw->store['templateStyle'][$tBlue]['params'], 'devmode', '"1"');
+check('another change to a style is still drift after the apply', snavDrifted($tContract), ['templateStyle-12']);
+$tw->store['templateStyle'][$tBlue]['params'] = JsonObjectKey::set((string) $tw->store['templateStyle'][$tBlue]['params'], 'devmode', '"0"');
+snavClean('and is clean once it is back', $tContract);
+$tLost = $tCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-t', 'request_id' => 't1']);
+check('the same apply after a lost answer writes nothing more', [$tLost['status'], $tHash($tw)], ['completed', $tFinal]);
+// The customer edits one style after the apply, and puts the sub back by hand in another.
+$tRed = $styles['templateStyle-10'];
+$tPink = $styles['templateStyle-11'];
+$tw->store['templateStyle'][$tRed]['params'] = JsonObjectKey::set((string) $tw->store['templateStyle'][$tRed]['params'], 'devmode', '"1"');
+$tRedSaved = $tw->store['templateStyle'][$tRed]['params'];
+$tw->store['templateStyle'][$tPink]['params'] = $tOriginal['templateStyle-11'];
+$tWrites = [];
+$tw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$tWrites) { if ($kind === 'templateStyle') $tWrites[] = $id; };
+$tBack = $tCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-tu', 'request_id' => 't2']);
+$tw->beforeCas = null;
+check('the revert puts the subs back and leaves the edited style', [$tBack['status'], $tBack['moved'], $tBack['conflicts']],
+    ['reverted', 19, ['templateStyle-10' => 'its params were changed since the mega-menu sub was removed']]);
+check('it writes only the styles that held what the apply wrote', $tWrites, [9, 12, 13]);
+check('every other style has exactly its bytes back', array_diff_key($tParams($tw), ['templateStyle-10' => 1]), array_diff_key($tOriginal, ['templateStyle-10' => 1]));
+check("the customer's style is left as they saved it", $tw->store['templateStyle'][$tRed]['params'], $tRedSaved);
+check('and is still drift: the baseline holds what the apply wrote', snavDrifted($tContract), ['templateStyle-10']);
+// Put back by hand as the apply left it: a later revert takes it back by the same compare-and-set.
+$tw->store['templateStyle'][$tRed]['params'] = JsonObjectKey::set($tRedSaved, 'devmode', '"0"');
+$tAgain = $tCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-tu2', 'request_id' => 't3']);
+check('a later revert recovers the style', [$tAgain['status'], $tAgain['moved'], $tAgain['conflicts'], $tParams($tw)], ['reverted', 1, [], $tOriginal]);
+snavClean('the reverted styles inspect clean', $tContract);
+
+// A style the customer edited before the apply is a conflict; the others go on.
+[, $eStore, $ew, $eContract, $eCall] = snavSite($snavSource);
+check('a bound site for the edited style', $eCall(['operation' => 'bind'])['ok'], true);
+$ew->store['templateStyle'][$tRed]['params'] = JsonObjectKey::set((string) $ew->store['templateStyle'][$tRed]['params'], 'devmode', '"1"');
+$eSaved = $ew->store['templateStyle'][$tRed]['params'];
+$eApplied = $eCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-e', 'request_id' => 'e1']);
+check('an edited style is skipped as a conflict', [$eApplied['status'], $eApplied['moved'], $eApplied['skipped']], ['completed', 19, ['templateStyle-10' => 'its params differ from the release']]);
+check('and not written', [$ew->store['templateStyle'][$tRed]['params'], array_values(array_diff_key($tHome($ew), ['templateStyle-10' => 1]))], [$eSaved, [false, false, false, false]]);
+check('it is still drift after the apply', snavDrifted($eContract), ['templateStyle-10']);
+check('and after the revert', [$eCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-eu', 'request_id' => 'e2'])['moved'], snavDrifted($eContract)], [19, ['templateStyle-10']]);
+
+// A style already as the map leaves it: nothing written, and — not this job's write — the baseline does not move.
+[, , $aw, $aContract, $aCall] = snavSite($snavSource);
+check('a bound site for the style already edited', $aCall(['operation' => 'bind'])['ok'], true);
+$aAfter = T3MegaSub::remove((string) $aw->store['templateStyle'][$tRed]['params'], 'mainmenu', 101)['raw'];
+$aw->store['templateStyle'][$tRed]['params'] = $aAfter;
+$aApplied = $aCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-al', 'request_id' => 'al1']);
+check('a style already without the sub is left', [$aApplied['moved'], $aApplied['skipped'], $aw->store['templateStyle'][$tRed]['params']], [19, ['templateStyle-10' => 'the mega-menu sub is already gone'], $aAfter]);
+check('and stays drift', snavDrifted($aContract), ['templateStyle-10']);
+
+// A child of Home still in the menu: its item keeps the dropdown, in every style.
+[, $kStore2, $cw2, $cContract2, $cCall2] = snavSite($snavSource);
+$cRed = $hidden['Home - Red'];
+$cw2->store['menuItem'][$cRed]['params'] = JsonObjectKey::set((string) $cw2->store['menuItem'][$cRed]['params'], 'menu_show', '"maybe"');
+$cBefore = $tParams($cw2);
+$cApplied = $cCall2(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-ch', 'request_id' => 'ch1']);
+$cWhy = 'kept the mega-menu sub of menuItem-101: its child menuItem-' . $cRed . ' stays in the menu (menu_show is "maybe", not shown)';
+check('a child left in the menu keeps its item\'s sub, and says why', [$cApplied['status'], $cApplied['moved'], $cApplied['skipped']],
+    ['completed', 14, ['menuItem-' . $cRed => 'menu_show is "maybe", not shown'] + array_fill_keys(array_keys($styles), $cWhy)]);
+check('no style is written', $tParams($cw2), $cBefore);
+check('the skipped styles have nothing to revert', [$cCall2(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-chu', 'request_id' => 'ch2'])['moved'], $tParams($cw2)], [14, $cBefore]);
+
+// Listed first in the map, the styles still wait for the hides of their item's children.
+[, , $ow, , $oCall] = snavSite($snavSource, fn ($dir) => snavRewrite($dir, function ($m) {
+    usort($m['operations'], fn ($a, $b) => ($b['op'] === 'templateStyle.megaSubRemove') <=> ($a['op'] === 'templateStyle.megaSubRemove'));
+    return $m;
+}));
+$oWrites = [];
+$ow->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$oWrites) { $oWrites[] = $kind; };
+check('styles listed first are still applied', $oCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-o', 'request_id' => 'o1'])['moved'], 20);
+check('after every hide', array_slice($oWrites, -5), array_fill(0, 5, 'templateStyle'));
+
+// A crash on a style rolls the batch back; the same request resumes it. A save between the read and the write is a conflict.
+[, $xStore, $xw, $xContract, $xCall] = snavSite($snavSource);
+$xw->failOn = ['templateStyle', $tPink];
+check('a style that fails fails the batch', $xCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-x', 'request_id' => 'x1'])['ok'], false);
+check('and nothing is written', [$tParams($xw), $xStore->binding['showcaseNav']['receipts']], [$tOriginal, []]);
+$xw->failOn = null;
+$xRaced = JsonObjectKey::set((string) $xw->store['templateStyle'][$tPink]['params'], 'devmode', '"0"');
+$xw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use ($tPink, $xRaced) { if ($kind === 'templateStyle' && $id === $tPink) $writer->store['templateStyle'][$id]['params'] = $xRaced . ' '; };
+$xDone = $xCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-x', 'request_id' => 'x1']);
+$xw->beforeCas = null;
+check('the retried apply completes, the raced style a conflict', [$xDone['status'], $xDone['moved'], $xDone['skipped'], $xw->store['templateStyle'][$tPink]['params']],
+    ['completed', 19, ['templateStyle-11' => 'it changed while it was being written'], $xRaced . ' ']);
 // ------------------------------------------------------------------ an absent key, beside a demo trim
 
 // Kinetic's showcase items carry no menu_show at all (`from: null`): the apply adds the key, the

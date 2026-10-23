@@ -7,14 +7,16 @@
 #
 # <folder> is the published release folder of ja-diner/j6 1.0.4: it holds ja-diner-j6-quickstart-1.0.4.zip.
 #
-# 1. bind, then status: 15 entries to hide, none hidden.
+# 1. bind, then status: 15 entries to hide and 5 T3 styles to edit, none done.
 # 2. apply: the J! Pages drawer and the Home colour variants carry menu_show 0 in #__menu, still
 #    published; Home, Our Blog, Contact Us, Offers, About Us and Reservation keep their params byte
-#    for byte, and the home page no longer links the hidden entries. Inspect is clean; a
+#    for byte, and the home page no longer links the hidden entries. Every child of Home is gone, so
+#    each of the styles 9–13 has lost `mm_config.mainmenu.item-101.sub` and holds exactly the bytes
+#    the map names; the desktop menu draws Home without a caret or a dropdown. Inspect is clean; a
 #    second apply is a no-op.
-# 3. the customer shows Home - Pink again; revert restores every other params text byte for byte and
-#    names Home - Pink as a conflict, leaving it as the customer set it. The same revert retried
-#    gets the committed answer.
+# 3. the customer shows Home - Pink again; revert restores every other params text, menu items and
+#    styles, byte for byte, and names Home - Pink as a conflict, leaving it as the customer set it.
+#    The same revert retried gets the committed answer.
 # 4. the customer's change is not adopted: put back by hand, Home - Pink is still reported, until a
 #    new revert request finds it as the apply found it, restores it with nothing written, and the site
 #    inspects clean; status says reverted, nothing remaining. Both reverts still answer their retries.
@@ -56,13 +58,22 @@ docker cp "$COWORK/lib/contracts/ja-diner/j6/1.0.4" "$P-joomla:$CON/1.0.4"
 docker exec "$P-joomla" chown -R www-data:www-data "$CON"
 qs_sql "UPDATE ${QS}extensions SET params=JSON_SET(params,'\$.contract','ja-diner/j6/1.0.4') WHERE element='com_claudecowork' AND type='component'"
 qs_sql "CREATE TABLE snav_original AS SELECT id, params FROM ${QS}menu WHERE id IN ($HIDDEN,$KEPT)"
+STYLES="9,10,11,12,13"
+qs_sql "CREATE TABLE snav_styles AS SELECT id, params FROM ${QS}template_styles WHERE id IN ($STYLES)"
+styles_changed() { qs_sql "SELECT COALESCE(GROUP_CONCAT(s.id ORDER BY s.id),'none') FROM ${QS}template_styles s JOIN snav_styles o ON o.id=s.id WHERE BINARY s.params<>BINARY o.params"; }
+styles_hash() { qs_sql "SELECT GROUP_CONCAT(CONCAT(id,':',SHA2(params,256)) ORDER BY id) FROM ${QS}template_styles WHERE id IN ($STYLES)"; }
+# What the map says each style ends as: the `after` of its last megaSubRemove.
+FINALS=$(node -e '
+  const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const out = {};
+  for (const op of m.operations) if (op.op === "templateStyle.megaSubRemove") out[op.style.id] = op.after;
+  process.stdout.write(Object.keys(out).sort((a, b) => a - b).map((id) => `${id}:${out[id]}`).join(","));' "$COWORK/lib/contracts/ja-diner/j6/1.0.4/showcase-nav-map.json")
 changed() { qs_sql "SELECT COALESCE(GROUP_CONCAT(m.id ORDER BY m.id),'none') FROM ${QS}menu m JOIN snav_original o ON o.id=m.id WHERE BINARY m.params<>BINARY o.params AND m.id IN ($1)"; }
 shows() { qs_sql "SELECT GROUP_CONCAT(CONCAT(id,':',COALESCE(JSON_VALUE(params,'\$.menu_show'),'-'),':',published) ORDER BY id) FROM ${QS}menu WHERE id IN ($1)"; }
 
 say "1. bind and status"
 contract '{"operation":"bind"}'
 contract '{"operation":"showcaseNav.status"}'
-expect "status: 15 entries to hide, none hidden" "$(field status) $(field hides.menuItem) $(field remaining)" "none 15 15"
+expect "status: 15 entries to hide, 5 styles to edit, none done" "$(field status) $(field hides.menuItem) $(field hides.templateStyle) $(field remaining)" "none 15 5 20"
 
 # How many links the home page has to each of four entries: two the map hides, two it keeps.
 links() {
@@ -73,13 +84,37 @@ links() {
 }
 expect "before an apply the home page links the showcase and the customer's pages" "$(links)" "typography:1 login:1 offers:1 our-blog:1"
 
+# How the desktop mega menu draws Home (item-101): its <li> classes say dropdown, a caret follows its
+# link, a dropdown-menu child opens under it. One line per menu that draws item-101.
+home_menu() {
+  docker exec "$P-joomla" curl -fsS http://localhost/ | node -e '
+    const html = require("fs").readFileSync(0, "utf8");
+    const out = [];
+    // T3 marks a menu item by data-id (no item-<id> class) inside its megamenu.
+    for (const m of html.matchAll(/<li\b[^>]*\bdata-id="101"[^>]*>/g)) {
+      const cls = (/\bclass="([^"]*)"/.exec(m[0]) || [, ""])[1];
+      // Up to the first closing </li>: a Home with a dropdown closes a child first, one without closes itself.
+      const rest = html.slice(m.index + m[0].length, html.indexOf("</li>", m.index));
+      out.push(`dropdown:${/\bdropdown\b/.test(cls) ? 1 : 0} caret:${/class="caret"/.test(rest) ? 1 : 0} child:${/dropdown-menu/.test(rest) ? 1 : 0}`);
+    }
+    process.stdout.write(out.join(" | ") || "no item-101");'
+}
+HOME_BEFORE=$(home_menu)
+expect "before an apply the desktop menu opens a dropdown under Home" "$(echo "$HOME_BEFORE" | grep -c 'dropdown:1 caret:1 child:1')" 1
+
 say "2. apply"
 contract '{"operation":"showcaseNav.apply","apply_id":"snav-e2e","request_id":"e2e-1"}'
-expect "apply completes in one call" "$(field status) $(field moved) $(field remaining)" "completed 15 0"
+expect "apply completes in one call" "$(field status) $(field moved) $(field remaining) $(field skipped)" "completed 20 0 []"
 expect "every listed entry is out of the menu, still published" "$(shows "$HIDDEN")" \
   "118:0:1,119:0:1,120:0:1,121:0:1,122:0:1,123:0:1,125:0:1,128:0:1,130:0:1,131:0:1,132:0:1,145:0:1,146:0:1,147:0:1,148:0:1"
 expect "the customer's own pages keep their params byte for byte" "$(changed "$KEPT")" none
 expect "the home page's menu drops the showcase links, and only them" "$(links)" "typography:0 login:0 offers:1 our-blog:1"
+expect "styles 9-13 hold exactly the bytes the map names" "$(styles_hash)" "$FINALS"
+expect "and none still keeps a sub for Home" "$(qs_sql "SELECT COUNT(*) FROM ${QS}template_styles WHERE id IN ($STYLES) AND JSON_EXISTS(JSON_VALUE(params,'\$.mm_config'),'\$.mainmenu.\"item-101\".sub')")" 0
+HOME_AFTER=$(home_menu)
+echo "       home menu before: $HOME_BEFORE"
+echo "       home menu after : $HOME_AFTER"
+expect "the desktop menu draws Home with no dropdown: no caret, no dropdown-menu child" "$(echo "$HOME_AFTER" | grep -cE 'caret:1|child:1|dropdown:1')" 0
 contract '{"operation":"inspect"}'
 expect "the applied site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.apply","apply_id":"snav-e2e2","request_id":"e2e-2"}'
@@ -88,10 +123,12 @@ expect "a second apply is a no-op" "$(field status) $(field alreadyApplied)" "co
 say "3. the customer shows Home - Pink again; revert"
 qs_sql "UPDATE ${QS}menu SET params=JSON_SET(params,'\$.menu_show','1') WHERE id=146"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
-expect "revert brings the others back" "$(field status) $(field moved) $(field remaining)" "reverted 14 0"
+expect "revert brings the others back" "$(field status) $(field moved) $(field remaining)" "reverted 19 0"
 expect "and names Home - Pink as a conflict" "$(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]).conflicts).join(","))' "$ANSWER")" menuItem-146
 expect "every other entry has exactly its params back" "$(changed "$HIDDEN")" 146
 expect "Home - Pink stays as the customer set it" "$(shows 146)" "146:1:1"
+expect "every style has exactly its params bytes back" "$(styles_changed)" none
+expect "and the desktop menu draws Home as before" "$(home_menu)" "$HOME_BEFORE"
 expect "the home page links the showcase again" "$(links)" "typography:1 login:1 offers:1 our-blog:1"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the same revert retried gets the committed answer" "$(field status) $(field alreadyReverted) $(field remaining)" "reverted true 0"
@@ -106,12 +143,13 @@ expect "a new revert request restores it with nothing written" "$(field status) 
 contract '{"operation":"inspect"}'
 expect "the reverted site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.status"}'
-expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 15"
+expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 20"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the first revert still answers its retry" "$(field alreadyReverted) $(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]).conflicts).join(","))' "$ANSWER")" "true menuItem-146"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo2","request_id":"e2e-4"}'
 expect "and so does the second" "$(field alreadyReverted) $(field conflicts)" "true []"
 qs_sql "DROP TABLE snav_original"
+qs_sql "DROP TABLE snav_styles"
 
 say "5. compare-and-set by bytes"
 docker exec -i -u www-data "$P-joomla" php <<'PHP' > /dev/null

@@ -240,6 +240,16 @@ interface SiteWriter
     public function replaceMenuItemParams(int $id, string $expected, string $params): bool;
 
     /**
+     * Replace the `params` of one site template style, and nothing else, only while the column still
+     * holds `$expected` byte for byte — the compare-and-set of replaceMenuItemParams, on
+     * `#__template_styles`. The caller has already proven `$params` is `$expected` with exactly the
+     * one T3 mega-menu key it means to move (T3MegaSub).
+     *
+     * @return bool false, and nothing written, when the style no longer holds `$expected`
+     */
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool;
+
+    /**
      * Give the site's source language another tag of the same language — every row that carries the
      * old tag, the content language's own row (its `sef`, and so every URL and every `tb-main-<sef>`
      * menu, unchanged), a template style set per language, and the tag index `#__ucm_content`.

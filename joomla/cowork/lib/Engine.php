@@ -2923,15 +2923,20 @@ final class Engine
                 $pending = $this->showcaseNavPending($state, $record, $hide);
                 $batch = array_slice($pending, 0, self::SHOWCASE_NAV_BATCH, true);
                 $moved = [];
+                $done = 0;
                 $log = $hide ? $record['applyId'] : $record['revert']['applyId'];
                 foreach ($batch as $key => $row) {
-                    $receipt = $hide ? $this->showcaseNavHide($state, $key, $row) : $this->showcaseNavRestore($state, $key, $row);
+                    // 🔒 A STYLE WAITS FOR THE HIDES OF ITS ITEM'S CHILDREN: their receipts decide whether its sub goes.
+                    if ($hide && $row['kind'] === 'templateStyle' && !$this->showcaseNavChildrenDone($record, $row)) break;
+                    $done++;
+                    $receipt = !$hide ? $this->showcaseNavRestore($state, $key, $row)
+                        : ($row['kind'] === 'templateStyle' ? $this->showcaseNavStyle($state, $key, $row, $record) : $this->showcaseNavHide($state, $key, $row));
                     if ($hide) $record['receipts'][$key] = $receipt['receipt'];
                     else $record['receipts'][$key] = $receipt['receipt'] + $record['receipts'][$key];
                     if ($receipt['moved'] !== null) $moved[] = $receipt['moved'];
                     $this->log->record($log, ['op' => 'showcaseNav', 'key' => $key, 'direction' => $hide ? 'hide' : 'restore'] + $receipt['receipt']);
                 }
-                $remaining = count($pending) - count($batch);
+                $remaining = count($pending) - $done;
                 $skipped = $this->showcaseNavSkipped($record['receipts'], !$hide);
                 if ($remaining === 0 && $hide) { $record['status'] = 'complete'; $record['completedAt'] = gmdate('c'); }
                 // A finished revert keeps the receipts of its conflicts only — the rows a later revert may
@@ -2977,7 +2982,7 @@ final class Engine
             $nav = $this->contract->showcaseNav();
             if ($nav === null) return [];
             foreach ($nav->operations() as $key => $row)
-                if (!isset($record['receipts'][$key])) $out[$key] = ['kind' => $row['kind'], 'id' => (int) ($state['ids'][$key] ?? 0), 'receipt' => null];
+                if (!isset($record['receipts'][$key])) $out[$key] = ['kind' => $row['kind'], 'id' => (int) ($state['ids'][$key] ?? 0), 'receipt' => null, 'steps' => $row['steps'] ?? []];
             return $out;
         }
         foreach ($record['receipts'] ?? [] as $key => $receipt)
@@ -3002,6 +3007,7 @@ final class Engine
         foreach ($receipts as $key => $receipt) {
             if ($revert) { if (($receipt['reverted'] ?? null) === 'conflict') $out[$key] = $receipt['revertWhy'] ?? 'changed since it was hidden'; }
             elseif ($receipt['outcome'] !== 'written') $out[$key] = $receipt['why'];
+            elseif (isset($receipt['kept'])) $out[$key] = $receipt['kept'];
         }
         return $out;
     }
@@ -3049,6 +3055,65 @@ final class Engine
             'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true), 'blank' => $blank ? $params : false]];
     }
 
+    /** Whether every child hide a style's steps wait on has its receipt. */
+    private function showcaseNavChildrenDone(array $record, array $row): bool
+    {
+        foreach ($row['steps'] as $step)
+            foreach ($step['children'] as $child) if (!isset($record['receipts'][$child])) return false;
+        return true;
+    }
+
+    /**
+     * Drop the T3 mega-menu subs a style keeps for the items this apply emptied, if its params still
+     * stand, byte for byte, where the map says they start.
+     *
+     * 🔒 THE MAP NAMES THE BYTES, THE ENGINE MAKES THEM. Each step is computed here from the live column
+     * (T3MegaSub) and written only when the result hashes to the map's `after`; the whole column is one
+     * compare-and-set. A step whose item kept a child in the menu (its hide a conflict) is not taken, nor
+     * any after it: the next step's bytes start from this one's, so only the prefix is proven.
+     *
+     * @return array{receipt:array, moved:?array}
+     */
+    private function showcaseNavStyle(array $state, string $key, array $row, array $record): array
+    {
+        $id = $row['id'];
+        $base = ['kind' => 'templateStyle', 'id' => $id];
+        $current = $id > 0 ? ($state['rows'][$key] ?? null) : null;
+        if ($current === null) return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'the row is gone from this site'], 'moved' => null];
+        $steps = $row['steps'];
+        $take = count($steps);
+        $kept = null;
+        foreach ($steps as $n => $step) {
+            foreach ($step['children'] as $child)
+                if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true)) {
+                    $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+                    break;
+                }
+            if ($kept !== null) { $take = $n; break; }
+        }
+        $params = (string) ($current['params'] ?? '');
+        $live = hash('sha256', $params);
+        // Already where the steps it may take end — or further, by hand: the sub is gone, nothing is written.
+        foreach (array_slice($steps, max($take, 1) - 1) as $step)
+            if (hash_equals($step['after'], $live))
+                return ['receipt' => $base + ['outcome' => 'already', 'why' => 'the mega-menu sub is already gone'], 'moved' => null];
+        if ($take === 0) return ['receipt' => $base + ['outcome' => 'skipped', 'why' => $kept], 'moved' => null];
+        if (!hash_equals($steps[0]['before'], $live))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params differ from the release'], 'moved' => null];
+        $written = $params;
+        foreach (array_slice($steps, 0, $take) as $step) {
+            $edit = T3MegaSub::remove($written, $step['menutype'], $step['item']);
+            if (!isset($edit['raw']) || !hash_equals($step['after'], hash('sha256', $edit['raw'])))
+                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'removing the mega-menu sub of ' . $step['itemKey'] . ' does not give the bytes the map names'], 'moved' => null];
+            $written = $edit['raw'];
+        }
+        if (!$this->writer->replaceTemplateStyleParams($id, $params, $written))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
+        $receipt = ['outcome' => 'written', 'before' => $params, 'after' => hash('sha256', $written), 'items' => array_column(array_slice($steps, 0, $take), 'itemKey')];
+        if ($kept !== null) $receipt['kept'] = $kept;
+        return ['receipt' => $base + $receipt, 'moved' => ['key' => $key, 'kind' => 'templateStyle', 'raw' => $written]];
+    }
+
     /**
      * Put back one row this apply hid: written only while it still holds what the apply wrote; already
      * holding, byte for byte, what the apply found, it is restored with nothing written; anything else
@@ -3069,6 +3134,14 @@ final class Engine
             if ($published === $receipt['before']) return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => $moved];
             if ($published !== $receipt['after']) return $conflict('published was changed since it was hidden');
             if (!$this->writer->setVisibilityIf('module', $row['id'], 'published', $receipt['after'], $receipt['before'])) return $conflict(self::SHOWCASE_NAV_RACED);
+            return ['receipt' => ['reverted' => 'restored'], 'moved' => $moved];
+        }
+        if ($row['kind'] === 'templateStyle') {
+            $params = (string) ($current['params'] ?? '');
+            $moved = ['key' => $key, 'kind' => 'templateStyle', 'raw' => $receipt['before']];
+            if ($params === $receipt['before']) return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => $moved];
+            if (!hash_equals($receipt['after'], hash('sha256', $params))) return $conflict('its params were changed since the mega-menu sub was removed');
+            if (!$this->writer->replaceTemplateStyleParams($row['id'], $params, $receipt['before'])) return $conflict(self::SHOWCASE_NAV_RACED);
             return ['receipt' => ['reverted' => 'restored'], 'moved' => $moved];
         }
         $params = (string) ($current['params'] ?? '');

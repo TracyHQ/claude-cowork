@@ -843,6 +843,22 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         return $db->getAffectedRows() === 1;
     }
 
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool
+    {
+        if ($id <= 0) return false;
+        $db = $this->db;
+        // Bytes, not the collation: see replaceMenuItemParams.
+        $query = $db->getQuery(true)
+            ->update($db->quoteName('#__template_styles'))
+            ->set($db->quoteName('params') . ' = ' . $db->quote($params))
+            ->where($db->quoteName('id') . ' = ' . (int) $id)
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where('CAST(' . $db->quoteName('params') . ' AS BINARY) = CAST(' . $db->quote($expected) . ' AS BINARY)');
+        $this->applyScope('templateStyle', $query);
+        $db->setQuery($query)->execute();
+        return $db->getAffectedRows() === 1;
+    }
+
     public function realiasMenuItem(int $id, string $alias): void
     {
         $row = $id > 0 ? $this->read('menuItem', $id) : null;

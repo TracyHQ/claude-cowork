@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-smallbiz/j6/1.0.4",
   "baseHash": "2cfe5ddc3cdde150508a09a01c0242c9691e58cecd99b0f4ecd16167c759fa4c",
@@ -266,6 +266,90 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_smallbiz - Default",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Default · Home",
+      "style": {
+        "id": 10,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "5dc20ae4fc40e2388e35373b1f74247830da60aeb1ca2951b3af913b6a407518",
+      "after": "a1644f844e3979130f16b4a24fc54117e68b1f29b223117e919c5221efba3d44",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "ja_smallbiz - Car",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Car · Home",
+      "style": {
+        "id": 11,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "f2695279635569da1bb05d572b483a610c2a647ecfd307510544ab8f1c4e660d",
+      "after": "6183779f74dbc6dc7771b851808144aaa696ed25fcb37630367c020420fe30ef",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "ja_smallbiz - Gym",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Gym · Home",
+      "style": {
+        "id": 12,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "b088f1be686e794ec335f406eb98356f2f04a0e43f24eb77fea1f7ed9cb4cde1",
+      "after": "ce41a9b555b1e48e4191809d99d77e7e68dd7943a091f3db72908fe66d501c22",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-13",
+      "identity": {
+        "title": "ja_smallbiz - Wedding",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Wedding · Home",
+      "style": {
+        "id": 13,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "59861d81b5ec74849216be412d5bf16836bebb9e42712d455867301d760e0562",
+      "after": "911247aa819dc6c922509ed598c4d5edd7b0e58966f902bbb0294f644a9e37a7",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
     }
   ],
   "kept": [
@@ -366,6 +450,7 @@
   "counts": {
     "menuItems": 17,
     "modules": 0,
+    "megaSubs": 4,
     "kept": 11,
     "unresolved": 2
   }

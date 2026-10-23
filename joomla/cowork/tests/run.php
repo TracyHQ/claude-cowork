@@ -1069,6 +1069,12 @@ class FakeSiteWriterBase implements SiteWriter
         $this->store['menuItem'][$id]['params'] = $params;
         return true;
     }
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool
+    {
+        if (!isset($this->store['templateStyle'][$id]) || (string) ($this->store['templateStyle'][$id]['params'] ?? '') !== $expected) return false;
+        $this->store['templateStyle'][$id]['params'] = $params;
+        return true;
+    }
     public function realiasMenuItem(int $id, string $alias): void
     {
         if (!isset($this->store['menuItem'][$id])) throw new RuntimeException('target does not exist in this scope');

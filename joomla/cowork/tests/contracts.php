@@ -133,6 +133,11 @@ final class ContractTestWriter extends FakeSiteWriter {
         if($this->beforeCas)($this->beforeCas)($this,'menuItem',$id);
         return parent::replaceMenuItemParams($id,$expected,$params);
     }
+    public function replaceTemplateStyleParams(int $id,string $expected,string $params):bool {
+        if($this->failOn===['templateStyle',$id])throw new RuntimeException('The site refused templateStyle '.$id);
+        if($this->beforeCas)($this->beforeCas)($this,'templateStyle',$id);
+        return parent::replaceTemplateStyleParams($id,$expected,$params);
+    }
     /** Whether a transaction is open right now: work that must follow the commit can say it did. */
     public bool $open=false;
     public function transaction(callable $work):array {

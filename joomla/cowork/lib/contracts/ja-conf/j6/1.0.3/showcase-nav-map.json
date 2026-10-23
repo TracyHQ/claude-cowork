@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-conf/j6/1.0.3",
   "baseHash": "675f39cfe0575064d6cc24b966b0b9d9ce27ea899879f41954c3b36b2a28244f",
@@ -281,6 +281,132 @@
       "to": "0",
       "rule": "hide.kit-screen",
       "reason": "the template's own \"Typography\" screen"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "ja_conf - Default",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Default · Home",
+      "style": {
+        "id": 9,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "f08fc0190ae48b51e2cd58432200bd8a67fbc3d9e0324f321ddde3e916661488",
+      "after": "2921f32ba600c6740c91a360300863a681ab1ea118827c7bc547f3555ce4ed5f",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_conf - Brutalism",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Brutalism · Home",
+      "style": {
+        "id": 10,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "7607ad165f9c19cc8ec26b4f25364ef9c04a4468ed1fb9b9c22887719a271fcd",
+      "after": "97fea9ce8c512a3c74d60cbf069548ec322b39afb0f1b23d9f75ac457f30a53a",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "ja_conf - Dark",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Dark · Home",
+      "style": {
+        "id": 11,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "d2f0d1b01502414b6ef3f94e088c3f010fd275ddf1679c35aeb9858286e4aabf",
+      "after": "02f0e48000000c825d7f3ee6291136ae5fc7a08fe8c30129171a1af569fa6478",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "ja_conf - Minimal",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Minimal · Home",
+      "style": {
+        "id": 12,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "76c17da86db94a64fa1dce67ebdcf3da45548f7253b3903114b2d11d54a2ea85",
+      "after": "12914bbd68f6b7841aa2a6339c7b679b2282c5b4e22219447b7542315591a746",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-13",
+      "identity": {
+        "title": "ja_conf - Purple",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Purple · Home",
+      "style": {
+        "id": 13,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "c60517a7ce7d37d03ea67cb68cd029efebc5fc2c52de2f0ce57e0271a995d364",
+      "after": "e087c732a811d6c5112fb4f276c99a1e2f29039f95a69ed626eb67ae37e81c0f",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaSubRemove",
+      "key": "templateStyle-14",
+      "identity": {
+        "title": "ja_conf - Retro",
+        "template": "ja_conf",
+        "client_id": "0"
+      },
+      "label": "ja_conf - Retro · Home",
+      "style": {
+        "id": 14,
+        "template": "ja_conf"
+      },
+      "menutype": "mainmenu",
+      "item": 101,
+      "path": "mm_config.mainmenu.item-101.sub",
+      "before": "3178ed6b62c464c68208ed0a362375f53d1a6d6fb15a193122e82661f4feedc0",
+      "after": "bd6ffb5b942105a60e61019760fcb0a1a824bda9284d673c05295ebd1c576348",
+      "rule": "hide.mega-sub-of-emptied-item",
+      "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
     }
   ],
   "kept": [
@@ -360,6 +486,7 @@
   "counts": {
     "menuItems": 18,
     "modules": 0,
+    "megaSubs": 6,
     "kept": 8,
     "unresolved": 2
   }
