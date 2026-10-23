@@ -31,6 +31,8 @@ OTHER=ja-fresco/j6/1.0.3
 RELEASE=https://github.com/TracyHQ/claude-cowork/releases/download
 
 say "the released packages"
+# RELEASES_DIR is a cache the caller keeps: zips found there are reused and missing ones are downloaded
+# into it and left for the next run. Without it the zips go to $WORK, removed with the run.
 REL="${RELEASES_DIR:-$WORK/releases}"
 for v in 0.24.54 0.24.55 0.24.56; do
   [ -f "$REL/pkg_claudecowork-$v.zip" ] || gh release download -R TracyHQ/claude-cowork "joomla-v$v" -p "pkg_claudecowork-$v.zip" -D "$REL"
@@ -193,6 +195,7 @@ if want 6; then
   begin 6 "a 0.24.54 site (every profile inside) bound to one, updated to 0.24.56"
   provision_as_root 0.24.54
   n=$(in_j "find $CON -name manifest.json | wc -l")
+  expect "0.24.54 carries more profiles than the two the update must keep" "$([ "$n" -gt 2 ] && echo more)" more
   bind_param tracy-business/j6/1.2.6
   door
   expect "0.24.54 reads its bundled profile" "$READ" read
