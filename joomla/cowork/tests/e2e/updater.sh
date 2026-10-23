@@ -66,7 +66,7 @@ say() { printf '\n== %s\n' "$*"; }
 variant() {
   local version=$1 probe=$2 dir="$WORK/src-$1"
   mkdir -p "$dir/joomla" "$dir/scripts"
-  cp "$REPO/scripts/release-manifest.mjs" "$dir/scripts/"
+  cp "$REPO/scripts/contract-assets.mjs" "$REPO/scripts/release-manifest.mjs" "$dir/scripts/"
   rsync -a --exclude build --exclude dist --exclude 'com_claudecowork/administrator/lib' \
     --exclude 'com_claudecowork/administrator/tracy-release.json' --exclude tests "$COWORK/" "$dir/joomla/cowork/"
   local c="$dir/joomla/cowork"

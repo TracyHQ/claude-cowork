@@ -72,6 +72,7 @@ tests/e2e/updater.sh                          # the self-updater on a real Jooml
 tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
 tests/e2e/module-ordering.sh                  # a module ends with the ordering a write names, 0 included, on a real Joomla (docker)
 tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
+tests/e2e/contract-fetch.sh                   # the contract profile fetch on every road a site takes: root/www-data installs, updates from 0.24.54/55, cache, tmp, no network (docker, gh; CASES="2 4 6" JOOMLA_IMAGE=…)
 T4_INSTALLER=<zip> tests/e2e/article-create.sh   # an article created through the door has an author and keeps a T4 home page up (unreleased)
 T4_QUICKSTART=<folder> tests/e2e/share-image.sh  # and on a T4 quickstart restored over it, only where a page has none
 docker run --rm -v "$PWD/../..":/w -w /w/joomla/cowork php:8.3-cli php tests/run.php
