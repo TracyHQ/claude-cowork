@@ -156,6 +156,7 @@ namespace {
                     'fileProofs' => $efuProperty($efuContract, 'proofs') !== null,
                 ];
                 $efuOut['unavailable'] = $efuContract === null ? null : $efuProperty($efuContract, 'unavailable');
+                $efuOut['catalog'] = $efuContract === null ? null : $efuProperty($efuContract, 'packs') !== null;
             } catch (Throwable $e) {
                 $efuOut['threw'] = get_class($e);
             }
@@ -286,6 +287,27 @@ namespace {
                     [$built($answer)['refuses'] ?? null, $answer['unavailable'] ?? null], [true, $carry . ' (fetch failed: the installed version is unknown)']);
                 check('fetch: and the failure is remembered beside it, so the next request does not try again',
                     is_file($component . '/lib/contracts/efu-fetch/j6/1.0.0.fetch-failed'), true);
+
+                // A profile fetched into the spare folder (the component folder belongs to root, PHP runs
+                // as www-data): the site's tmp/ when there is no application to ask for tmp_path. The
+                // factory reads it from there, with the receiver's catalogs still read from lib/.
+                $spare = $root . '/site/tmp/com_claudecowork/contracts/efu-spare/j6/1.0.0';
+                mkdir($spare, 0700, true);
+                foreach (['content-map', 'presentation-lock'] as $name)
+                    copy($source . '/lib/contracts/tracy-apple/j6/1.1.0/' . $name . '.json', $spare . '/' . $name . '.json');
+                $apple = json_decode(file_get_contents($source . '/lib/contracts/tracy-apple/j6/1.1.0/manifest.json'), true);
+                file_put_contents($spare . '/manifest.json', json_encode(['id' => 'efu-spare/j6/1.0.0'] + $apple));
+                $answer = $contract(['contract' => 'efu-spare/j6/1.0.0']);
+                check('spare: a profile in the spare folder under tmp/ is the one the site is held to',
+                    [$built($answer), $answer['catalog'] ?? null],
+                    [['class' => 'QuickstartContract', 'id' => 'efu-spare/j6/1.0.0', 'refuses' => false, 'derived' => false, 'fileProofs' => true], true]);
+                // The same id in lib/contracts/ wins: a profile already in the component is read where it is.
+                mkdir($component . '/lib/contracts/efu-spare/j6/1.0.0', 0700, true);
+                foreach (scandir($spare) as $entry)
+                    if ($entry[0] !== '.') copy($spare . '/' . $entry, $component . '/lib/contracts/efu-spare/j6/1.0.0/' . $entry);
+                file_put_contents($spare . '/manifest.json', '{"id":');
+                check('spare: the same profile in lib/contracts/ is read there first (the spare copy here is not JSON)',
+                    $built($contract(['contract' => 'efu-spare/j6/1.0.0']))['id'] ?? null, 'efu-spare/j6/1.0.0');
 
                 // A derived binding wins over any param, the empty one included.
                 $derived = json_encode(['mode' => 'derived', 'contract' => 'derived/northwind-import']);

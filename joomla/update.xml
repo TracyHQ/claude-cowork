@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>a site whose component folder belongs to another user (Tracy installs the package as root) fetches its contract profile into a folder under Joomla tmp_path instead of failing with contract_unavailable; profiles already in lib/contracts are read there as before</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.56</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.56</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.56/pkg_claudecowork-0.24.56.zip</downloadurl>
+        </downloads>
+        <sha256>657e9bb7c17259fada73bb187cd132fd13cf345c04da740a24a3534fe845bf2d</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>the package no longer carries the quickstart contract profiles (70 MB to under 1 MB): each is a release asset listed with its sha256 in lib/contracts.json, the component fetches the one the site is bound to, and an update removes the profiles no longer used</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

@@ -114,9 +114,15 @@ final class QuickstartContract
         if ($new) throw new ContractProblem('PRESENTATION_DRIFT', $new[0]);
     }
 
-    /** `$missing`: why the profile could not be fetched (ContractFetch), appended when it is not on disk. */
-    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory, ?string $missing = null) {
+    /**
+     * `$missing`: why the profile could not be fetched (ContractFetch), appended when it is not on disk.
+     * `$lib`: the engine's lib/, where the receiver-wide catalogs are; by default the one the profile
+     * folder sits in (`lib/contracts/<id>`). A profile in the spare folder under tmp_path
+     * (ContractFetch) is not inside lib/, so the factory names it.
+     */
+    public function __construct(SiteWriter $writer, ContractStore $store, string $root, string $directory, ?string $missing = null, ?string $lib = null) {
         $this->writer=$writer;$this->store=$store;$this->root=$root;
+        $lib = $lib ?? dirname($directory, 4);
         foreach (['manifest','content-map','presentation-lock'] as $name) {
             $file = $directory . '/' . $name . '.json';
             if (!is_file($file)) { $this->unavailable = 'This site names a content contract this receiver does not carry' . ($missing !== null && $missing !== '' ? ' (' . $missing . ')' : ''); return; }
@@ -135,7 +141,7 @@ final class QuickstartContract
         // verifies nothing about the site, so it sits beside the engine instead. Keeping it in a
         // profile directory would have made the contract gate demand it be pinned as contract
         // bytes, which would be the gate telling the reader something untrue.
-        $catalogFile = dirname($directory, 4) . '/language-packs.json';
+        $catalogFile = $lib . '/language-packs.json';
         if (is_file($profileFile)) {
             $raw = file_get_contents($profileFile);
             $this->multilingual = new MultilingualProfile(
@@ -153,7 +159,7 @@ final class QuickstartContract
         // published before it keeps working, and a receiver carrying the code claims nothing for a
         // contract that ships no list of what its demo is.
         $this->syncSourceRelabel();
-        $this->linkLayouts = self::loadLinkLayouts(dirname($directory, 4) . '/link-layouts.json');
+        $this->linkLayouts = self::loadLinkLayouts($lib . '/link-layouts.json');
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
