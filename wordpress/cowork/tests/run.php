@@ -453,6 +453,74 @@ exec('tar -tf ' . escapeshellarg($tarFile) . ' 2>&1', $listed, $status);
 check('a growing file does not corrupt the archive', $status, 0);
 check('every entry survives', count(array_filter($listed, fn($l) => strpos($l, 'tar:') !== 0)), 2);
 
+// ── files.pack inline, and cut to `paths` ───────────────────────────────────────────────────
+//
+// "Sync from live" reads a live site straight onto Tracy's host: the part comes back in the answer
+// (`inline`, no uploader and no store), and a sync that knows which files moved takes the ones
+// file.read will not serve (too large) without the rest of the tree (`paths`). The Joomla engine's
+// two roads (0.8.22, and its cut of 22/10/2026), on this engine.
+$inlineEngine = new Engine('a-token-at-least-16', [], null, new FileWalker($growTmp), null);
+$noWay = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['put_url' => 'https://example.test/p']]);
+check('without an uploader the direct road is unavailable, as before', $noWay['error'] ?? null, 'unavailable');
+$untar = function (string $bytes) use ($growTmp): array {
+    $file = "$growTmp-cut.tar";
+    file_put_contents($file, $bytes);
+    $names = [];
+    exec('tar -tf ' . escapeshellarg($file) . ' 2>&1', $names, $code);
+    $out = [];
+    exec('tar -xOf ' . escapeshellarg($file) . ' zz-after.txt 2>/dev/null', $out);
+    unlink($file);
+    return ['code' => $code, 'names' => $names, 'after' => implode("\n", $out)];
+};
+$whole = '';
+$cursor = [];
+for ($i = 0; $i < 5; $i++) {
+    $r = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack',
+        'params' => ['inline' => true, 'target_bytes' => 5 * 1024 * 1024] + $cursor]);
+    checkTrue("inline part $i needs no uploader", $r['ok'] === true);
+    check("inline part $i: base64 of the tar bytes, etag left to the caller",
+        [strlen(base64_decode($r['part_b64'], true)) === $r['bytes'], $r['etag'], hash('sha256', base64_decode($r['part_b64'])) === $r['sha256']],
+        [true, '', true]);
+    $whole .= base64_decode($r['part_b64']);
+    if ($r['done']) {
+        break;
+    }
+    $cursor = ['path' => $r['next_path'], 'offset' => $r['next_offset'], 'size' => $r['next_size']];
+}
+$got = $untar($whole);
+check('the inline parts make one archive of the whole tree', [$got['code'], $got['names']], [0, ['big.bin', 'zz-after.txt']]);
+
+$cut = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => [
+    'inline' => true, 'paths' => ['zz-after.txt', 'gone.txt'],
+]]);
+checkTrue('a pack cut to paths succeeds in one part', $cut['ok'] === true && $cut['done'] === true);
+$got = $untar(base64_decode($cut['part_b64']));
+check('it carries exactly the listed files asked for', [$got['code'], $got['names'], $got['after']], [0, ['zz-after.txt'], 'the entry that gets lost']);
+check('the answer counts them', $cut['files'], 1);
+$parts = '';
+$cursor = [];
+for ($i = 0; $i < 5; $i++) {
+    $r = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => [
+        'inline' => true, 'target_bytes' => 5 * 1024 * 1024, 'paths' => ['zz-after.txt', 'big.bin'],
+    ] + $cursor]);
+    checkTrue("cut part $i succeeded", $r['ok'] === true);
+    $parts .= base64_decode($r['part_b64']);
+    if ($r['done']) {
+        break;
+    }
+    $cursor = ['path' => $r['next_path'], 'offset' => $r['next_offset'], 'size' => $r['next_size']];
+}
+check('a cut spanning parts takes two of them', $i, 1);
+$got = $untar($parts);
+check('the parts make one archive of the named files, in the walk order', [$got['code'], $got['names']], [0, ['big.bin', 'zz-after.txt']]);
+$bad = fn(array $params) => $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'files.pack', 'params' => ['inline' => true] + $params]);
+check('an empty paths list is refused', $bad(['paths' => []])['error'] ?? null, 'bad_params');
+check('a path that is not a string is refused', $bad(['paths' => [7]])['error'] ?? null, 'bad_params');
+check('more paths than one pack takes are refused', $bad(['paths' => array_map(fn($n) => "f$n", range(1, 2001))])['error'] ?? null, 'bad_params');
+check('a cursor outside the paths is refused', $bad(['paths' => ['zz-after.txt'], 'path' => 'big.bin'])['error'] ?? null, 'bad_params');
+$packInfo = $inlineEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'info']);
+check('info names the inline road and the cut bound', $packInfo['info']['files_pack'] ?? null, ['inline' => true, 'max_paths' => 2000]);
+
 // And the other direction: a file TRUNCATED mid-pack. Stopping short would shift the archive
 // exactly as growing does, so the remainder is zero-filled to the size the header declared.
 $shrinkTmp = sys_get_temp_dir() . '/tracy_pack_shrink_' . bin2hex(random_bytes(4));

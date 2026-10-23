@@ -116,6 +116,8 @@ final class Engine
     private const READ_CHUNK = 1048576;
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
+    /** files.pack `paths`: the files one pack may be cut to. */
+    private const MAX_PACK_PATHS = 2000;
     /** The ceiling on a file carried inline as base64. Anything larger belongs on the signed-URL path. */
     private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
     /**
@@ -251,10 +253,15 @@ final class Engine
             case 'info':
                 // What the engine itself can do rides beside what the host says, so a caller can tell a
                 // site that takes db.dump_many from an older one and fall back to db.dump there.
+                // files.pack also hands a part back inline and cuts a pack to named files ("Sync from
+                // live" reads a live site through both).
                 return $this->ok(['info' => $this->info + ['db_dump_many' => [
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ], 'files_pack' => [
+                    'inline' => true,
+                    'max_paths' => self::MAX_PACK_PATHS,
                 ]]]);
             case 'site.stats':
                 return $this->siteStats();
@@ -1985,12 +1992,20 @@ final class Engine
         if ($this->walker === null) {
             return $this->err('unavailable', 'file walk not wired');
         }
-        if ($this->uploader === null) {
-            return $this->err('unavailable', 'uploader not wired');
-        }
+        // Two ways out for a part. `put_url`: this host PUTs it to the store itself, the usual way.
+        // `inline`: the part comes back in the answer, base64, and the caller stores it — the road
+        // the database has always taken, for a host that cannot open an outbound connection, and for
+        // "Sync from live", whose host reads the live site straight onto its own disk (the Joomla
+        // engine's, 0.8.22).
+        $inline = !empty($p['inline']);
         $putUrl = isset($p['put_url']) && is_string($p['put_url']) ? $p['put_url'] : '';
-        if ($putUrl === '') {
-            return $this->err('bad_params', 'put_url required');
+        if (!$inline) {
+            if ($this->uploader === null) {
+                return $this->err('unavailable', 'uploader not wired');
+            }
+            if ($putUrl === '') {
+                return $this->err('bad_params', 'put_url required');
+            }
         }
 
         $target = (int) ($p['target_bytes'] ?? self::MIN_PART_BYTES);
@@ -2001,15 +2016,43 @@ final class Engine
         $entryOffset = max(0, (int) ($p['offset'] ?? 0));
         // The size that entry's header declared, handed back with the rest of the cursor.
         $declared = max(0, (int) ($p['size'] ?? 0));
+        // `paths` (1..MAX_PACK_PATHS relative paths) cuts the pack to those files, in the walk's
+        // order; the cursor then moves through them alone. The same files and bytes a whole pack
+        // would carry: a sync that knows which files moved takes the ones file.read will not serve
+        // (one too large) without the rest of the tree.
+        $only = null;
+        if (array_key_exists('paths', $p)) {
+            $asked = $p['paths'];
+            if (!is_array($asked) || $asked === []) {
+                return $this->err('bad_params', 'paths must be a non-empty list of relative paths');
+            }
+            if (count($asked) > self::MAX_PACK_PATHS) {
+                return $this->err('bad_params', 'at most ' . self::MAX_PACK_PATHS . ' paths per pack');
+            }
+            foreach ($asked as $one) {
+                if (!is_string($one) || $one === '') {
+                    return $this->err('bad_params', 'every path must be a non-empty string');
+                }
+            }
+        }
 
         try {
             // Fetched once and walked in memory. The loop used to ask the walker for "the next
             // file" per file, and each of those was a search across the whole list — quadratic.
             // On a real webroot of 19,971 files PHP hit its thirty-second limit during the first
             // part. A fixture of five files never came close.
-            $queue = $path === ''
-                ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
-                : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            if (isset($asked)) {
+                $only = $this->walker->listedPaths(array_values($asked));
+                $at = $path === '' ? 0 : array_search($path, $only, true);
+                if ($at === false) {
+                    return $this->err('bad_params', 'the cursor names a path outside paths');
+                }
+                $queue = array_slice($only, $at);
+            } else {
+                $queue = $path === ''
+                    ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
+                    : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            }
             $qi = 0;
 
             $buf   = '';
@@ -2114,7 +2157,7 @@ final class Engine
                 $declared    = 0;
                 // The look-ahead ran out but the tree has not: ask for more, starting after the
                 // file just finished.
-                if ($qi >= count($queue)) {
+                if ($only === null && $qi >= count($queue)) {
                     $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
                     if ($more !== []) {
                         $queue = $more;
@@ -2133,18 +2176,26 @@ final class Engine
         }
 
         $sha = hash('sha256', $buf);
-        $put = $this->uploader->put($putUrl, $buf);
-        if (!$put['ok']) {
-            // The cursor does not move when the upload fails: the caller signs a fresh URL and
-            // asks for this same part again.
-            return $this->err('upload_failed', $put['error']);
+        $etag = '';
+        $partB64 = null;
+        if ($inline) {
+            $partB64 = base64_encode($buf);
+        } else {
+            $put = $this->uploader->put($putUrl, $buf);
+            if (!$put['ok']) {
+                // The cursor does not move when the upload fails: the caller signs a fresh URL and
+                // asks for this same part again.
+                return $this->err('upload_failed', $put['error']);
+            }
+            $etag = $put['etag'];
         }
 
         return $this->ok([
             'bytes'       => strlen($buf),
             'files'       => $files,
             'sha256'      => $sha,
-            'etag'        => $put['etag'],
+            'etag'        => $etag,
+            'part_b64'    => $partB64,
             'next_path'   => $path,
             'next_offset' => $entryOffset,
             // Only meaningful mid-entry, which is the only time the caller must hand it back.

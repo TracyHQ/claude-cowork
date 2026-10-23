@@ -250,6 +250,25 @@ final class FileWalker
     }
 
     /**
+     * The paths of `$paths` this walk lists, in the walk's own order: what files.pack packs when it
+     * is handed `paths`. One the walk does not list (gone since, or under a skipped directory) is
+     * left out, never an error — the same tree a whole pack would have taken, cut to the names asked.
+     *
+     * @param string[] $paths
+     * @return string[]
+     */
+    public function listedPaths(array $paths): array
+    {
+        $want = [];
+        foreach ($paths as $path) {
+            $want[(string) $path] = true;
+        }
+        return array_values(array_filter($this->allPaths(), static function (string $path) use ($want): bool {
+            return isset($want[$path]);
+        }));
+    }
+
+    /**
      * Paths only, after the cursor. No stat, no sha1.
      *
      * listBatch() hashes every file, which means reading all of it just to hash it. That is what
