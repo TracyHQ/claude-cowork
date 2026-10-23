@@ -1326,7 +1326,7 @@ final class QuickstartContract
      * on and nothing else is.
      *
      * @param list<array{key:string,kind:string,exists:bool,value:mixed,blank?:bool}> $moved what each written row now holds;
-     *        `blank` the row's empty or whitespace-only params text when it holds that again
+     *        `blank` the row's empty, whitespace-only or `[]` params text when it holds that again
      */
     public function bindingWithShowcaseNav(?array $record, array $moved = []): array {
         $binding=$this->store->load();
@@ -1343,7 +1343,8 @@ final class QuickstartContract
             if(!is_array($params))throw new RuntimeException('The baseline holds no params for '.$row['key']);
             if($row['exists'])$params[ShowcaseNavProfile::MENU_PARAM]=$row['value'];else unset($params[ShowcaseNavProfile::MENU_PARAM]);
             $blank=$row['blank']??false;
-            $binding['presentation'][$row['key']]['params']=is_string($blank)&&$params===[]?$blank:$params;
+            // Held as presentation() reads that text: `[]` decodes to an empty list, a blank column stays text.
+            $binding['presentation'][$row['key']]['params']=is_string($blank)&&$params===[]?$this->column($blank):$params;
         }
         return $binding;
     }

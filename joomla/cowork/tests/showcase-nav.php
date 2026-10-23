@@ -354,11 +354,11 @@ check('and a row put back is no longer reported', snavDrifted($dContract), ['men
 
 // ------------------------------------------------------------------ an empty params column
 
-// A menu item saved with no params at all holds "" or only whitespace (Joomla reads either as {}):
+// A menu item saved with no params at all holds "", only whitespace or `[]` (Joomla reads each as {}):
 // `from: null` hides it with the one key the admin form would write, and the revert hands the column
 // back exactly as it was.
 $bId = $hidden['Typography'];
-foreach (['empty' => '', 'whitespace-only' => " \n"] as $bName => $bText) {
+foreach (['empty' => '', 'whitespace-only' => " \n", '[]' => '[]'] as $bName => $bText) {
     [, , $bw, $bContract, $bCall] = snavSite($snavSource, function ($dir) use ($bId, $bText) {
         snavRelock($dir, function ($lock) use ($bId, $bText) { $lock['entities']['menuItem-' . $bId]['params'] = $bText; return $lock; });
         snavRewrite($dir, function ($m) use ($bId) {
@@ -374,6 +374,36 @@ foreach (['empty' => '', 'whitespace-only' => " \n"] as $bName => $bText) {
     $bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
     check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 20, $bText]);
     snavClean("the site with the $bName row back inspects clean", $bContract);
+}
+
+// 🔒 `[]` EXACTLY, as tracy-business 1.2.6 ships its kit screens (404, Style guide): the apply retried
+// after a lost answer gets the committed one, a row put back to `[]` by hand is restored with nothing
+// written, and any other list is still not a params object.
+[, , $bw, $bContract, $bCall] = snavSite($snavSource, function ($dir) use ($bId) {
+    snavRelock($dir, function ($lock) use ($bId) { $lock['entities']['menuItem-' . $bId]['params'] = '[]'; return $lock; });
+    snavRewrite($dir, function ($m) use ($bId) {
+        foreach ($m['operations'] as &$op) if ($op['key'] === 'menuItem-' . $bId) $op['from'] = null;
+        return $m;
+    });
+});
+$bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-bl', 'request_id' => 'bl1']);
+$bAgain = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-bl', 'request_id' => 'bl1']);
+check('a [] row: the apply retried gets the committed answer', [$bApplied['skipped'], $bAgain['status'], $bAgain['alreadyApplied'] ?? null, $bw->store['menuItem'][$bId]['params']],
+    [[], 'completed', true, '{"menu_show":"0"}']);
+$bw->store['menuItem'][$bId]['params'] = '[]';
+$bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-blu', 'request_id' => 'bl2']);
+check('a [] row put back by hand is restored with nothing written', [$bBack['status'], $bBack['conflicts'], $bw->store['menuItem'][$bId]['params']], ['reverted', [], '[]']);
+snavClean('and the site inspects clean', $bContract);
+foreach (['[ ]', '[1]'] as $bText) {
+    [, , $bw, , $bCall] = snavSite($snavSource, function ($dir) use ($bId, $bText) {
+        snavRelock($dir, function ($lock) use ($bId, $bText) { $lock['entities']['menuItem-' . $bId]['params'] = $bText; return $lock; });
+        snavRewrite($dir, function ($m) use ($bId) {
+            foreach ($m['operations'] as &$op) if ($op['key'] === 'menuItem-' . $bId) $op['from'] = null;
+            return $m;
+        });
+    });
+    $bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-bo', 'request_id' => 'bo1']);
+    check("a $bText row is still not a params object", [$bApplied['skipped']['menuItem-' . $bId] ?? null, $bw->store['menuItem'][$bId]['params']], ['its params are not a JSON object', $bText]);
 }
 
 // ------------------------------------------------------------------ the T3 mega-menu sub of an emptied item

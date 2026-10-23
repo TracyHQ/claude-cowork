@@ -3033,8 +3033,9 @@ final class Engine
                 'moved' => ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => '0']];
         }
         $params = (string) ($current['params'] ?? '');
-        // An empty column holds no params at all: Joomla reads it as {}, and writes {"menu_show":"0"} into it.
-        $blank = trim($params) === '';
+        // An empty column, or exactly `[]` (what an empty PHP array encodes to), holds no params at all:
+        // Joomla's Registry reads either as {}, and writes {"menu_show":"0"} into it.
+        $blank = trim($params) === '' || $params === '[]';
         try { $found = $blank ? ['exists' => false, 'literal' => null, 'value' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
         catch (Throwable $error) { return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params are not a JSON object'], 'moved' => null]; }
         $value = $found['value'];
