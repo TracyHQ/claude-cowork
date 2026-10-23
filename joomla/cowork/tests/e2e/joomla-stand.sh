@@ -8,6 +8,7 @@
 #
 #   JOOMLA_IMAGE=joomla:5-apache <script>     # another Joomla (joomla:3.10-php7.4-apache: Joomla 3)
 #   KEEP=1 <script>                           # leave the containers up to look around
+#   STAND_NO_PACKAGE=1 (set by the caller)    # neither build nor install the package: the caller does
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COWORK="$(cd "$HERE/../.." && pwd)"
@@ -32,12 +33,14 @@ trap cleanup EXIT
 
 say() { printf '\n== %s\n' "$*"; }
 
+if [ "${STAND_NO_PACKAGE:-}" != 1 ]; then
 say "building this checkout"
 mkdir -p "$WORK/src/joomla" "$WORK/src/scripts"
 cp "$REPO/scripts/release-manifest.mjs" "$WORK/src/scripts/"
 rsync -a --exclude build --exclude dist --exclude 'com_claudecowork/administrator/lib' \
   --exclude 'com_claudecowork/administrator/tracy-release.json' --exclude tests "$COWORK/" "$WORK/src/joomla/cowork/"
 ( cd "$WORK/src/joomla/cowork" && ./build.sh >/dev/null )
+fi
 
 say "network, database, Joomla ($IMAGE)"
 docker network create --subnet "${E2E_SUBNET:-10.251.78.0/24}" "$NET" >/dev/null
@@ -68,6 +71,7 @@ else
 fi
 docker exec "$P-joomla" test -f configuration.php || { echo "Joomla did not install itself" >&2; docker logs --tail 30 "$P-joomla" >&2; exit 1; }
 
+if [ "${STAND_NO_PACKAGE:-}" != 1 ]; then
 say "installing the package"
 docker cp "$WORK/src/joomla/cowork/dist/pkg_claudecowork.zip" "$P-joomla:/tmp/pkg_claudecowork.zip"
 if [ "$JOOMLA3" = 1 ]; then
@@ -92,6 +96,7 @@ else
 fi
 TOKEN=$(sql "SELECT JSON_VALUE(params,'\$.token') FROM jos_extensions WHERE element='com_claudecowork'")
 [ -n "$TOKEN" ] && [ "$TOKEN" != NULL ] || { echo "the install wrote no token" >&2; exit 1; }
+fi
 
 # One door call: action and params (a JSON object) in, the answer's JSON in $ANSWER. Fails the run
 # when the answer is not ok, printing it. Not called inside $(…): an exit there would end only the
