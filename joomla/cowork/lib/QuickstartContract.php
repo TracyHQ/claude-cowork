@@ -563,27 +563,29 @@ final class QuickstartContract
     }
     /** Where Joomla keeps this plugin's manifest once installed (element `claudecoworkapi`, group `system`). */
     private const OWN_PLUGIN_MANIFEST = 'plugins/system/claudecoworkapi/claudecoworkapi.xml';
-    /** @var list<string>|null path prefixes under `media/` the installed plugin manifest ships */
-    private ?array $ownMediaPrefixes = null;
+    /**
+     * The media this plugin version ships, by webroot path, with the sha256 of its bytes. Held in the
+     * engine's code rather than read from the site: the installed manifest, or tracy-release.json,
+     * is a file the site can edit, and a list the site writes would exempt whatever it lists.
+     * tests/contracts.php holds this to the files the plugin's manifest `<media>` installs.
+     */
+    private const OWN_MEDIA = [
+        'media/plg_system_claudecoworkapi/js/t3-offcanvas-a11y.js' => 'b5177a14204e14e4f43e0c2eb361a3d7fa9ed77375b2d9361e4b7477e5cda916',
+    ];
+    private ?bool $ownPluginInstalled = null;
     private function ownMedia(string $path): bool {
         // This plugin's own assets (the T3 off-canvas keyboard script) land under `media/`, which T3
-        // locks list as a file root, so every T3 site warned about them right after install. Only the
-        // folders and files the installed manifest's <media> declares are exempt; never a PHP file.
-        if($this->ownMediaPrefixes===null) {
-            $this->ownMediaPrefixes=[];
+        // locks list as a file root, so every T3 site warned about them right after install. Exempt
+        // is only a file this version ships, while its bytes are the shipped ones and the plugin is
+        // installed: a foreign or edited file in the plugin's media folder is drift. Never a PHP file.
+        if(!isset(self::OWN_MEDIA[$path]) || preg_match('~\.(php[0-9]*|phtml|phar)$~i',$path))return false;
+        if($this->ownPluginInstalled===null) {
             $file=$this->root.'/'.self::OWN_PLUGIN_MANIFEST;
-            $xml=is_file($file) && !is_link($file) && filesize($file)<=1048576 ? (string)@file_get_contents($file) : '';
-            $name='[A-Za-z0-9_][A-Za-z0-9_.-]*';
-            if(preg_match('~<media\b[^>]*\bdestination="('.$name.')"[^>]*>(.*?)</media>~s',$xml,$media)) {
-                preg_match_all('~<(folder|filename)>\s*('.$name.')\s*</\1>~',$media[2],$entries,PREG_SET_ORDER);
-                foreach($entries as [,$kind,$entry])
-                    if(!str_contains($entry,'..'))$this->ownMediaPrefixes[]='media/'.$media[1].'/'.$entry.($kind==='folder'?'/':'');
-            }
+            $this->ownPluginInstalled=is_file($file) && !is_link($file);
         }
-        if(str_contains($path,'/../') || preg_match('~\.(php[0-9]*|phtml|phar)$~i',$path))return false;
-        foreach($this->ownMediaPrefixes as $prefix)
-            if(str_ends_with($prefix,'/') ? str_starts_with($path,$prefix) : $path===$prefix)return true;
-        return false;
+        if(!$this->ownPluginInstalled)return false;
+        $sum=@hash_file('sha256',$this->root.'/'.$path);
+        return is_string($sum) && hash_equals(self::OWN_MEDIA[$path],$sum);
     }
     private function unlistedStyleCache(string $path): bool {
         // A fresh T4 site compiles its main style CSS on first view too (JA Resort: 9.css, 10.css).
@@ -650,19 +652,35 @@ final class QuickstartContract
         if($this->proofs && $remember!=$known)try{$this->proofs->save($remember);}catch(Throwable $ignored){}
         Timing::count('filesHashed',$hashed);
         foreach($this->lock['fileRoots'] as $prefix) {
+            // A linked root would be walked as its target: files outside the webroot, each one no link.
+            $linked=$this->linkedFolder($prefix);
+            if($linked!==null){$this->drift('Presentation folder is a link: '.$linked.($linked===$prefix?'':' (holds '.$prefix.')'));continue;}
             // A folder removed through Joomla is a difference like any other (Tracy ADR 0022).
             if(!is_dir($this->root.'/'.$prefix)){$this->drift('Presentation folder missing: '.$prefix);continue;}
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
-            foreach($iterator as $file)if($file->isFile()) {
+            // The iterator does not descend into a linked folder, and a link is never followed or hashed
+            // here: a link the lock does not list, to a file or to a folder, is unexpected as a file is.
+            foreach($iterator as $file)if($file->isLink() || $file->isFile()) {
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
-                if(($this->generatedCache($relative) || $this->unlistedStyleCache($relative)) && !$file->isLink())continue;
-                if(TemplateSiteSettings::isDoorFile($relative) && !$file->isLink())continue;
-                if($this->ownMedia($relative) && !$file->isLink())continue;
+                $link=$file->isLink();
+                if(!$link && ($this->generatedCache($relative) || $this->unlistedStyleCache($relative)))continue;
+                if(!$link && TemplateSiteSettings::isDoorFile($relative))continue;
+                if(!$link && $this->ownMedia($relative))continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }
         Timing::end('files',$t);
         if($this->filesProved===false)$this->filesProved=true;
+    }
+
+    /** The first folder of a locked root, from the webroot down to the root itself, that is a link. */
+    private function linkedFolder(string $prefix): ?string {
+        $path='';
+        foreach(explode('/',trim($prefix,'/')) as $part) {
+            $path.=($path===''?'':'/').$part;
+            if(is_link($this->root.'/'.$path))return $path;
+        }
+        return null;
     }
 
     /**

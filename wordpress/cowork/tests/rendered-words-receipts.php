@@ -278,6 +278,33 @@ check('revert: an edit that kept the revision is a conflict, and the edit stays'
     [true, 'conflict', true]);
 WP_Fake::$options[$rdKey] = $rdWritten;
 check('revert: with the option back as the apply wrote it, the revert goes through', [$rdCall('apply.revert', ['apply_id' => 'rw-6'])['ok'] ?? null, WP_Fake::$options[$rdKey] === $rdKept], [true, true]);
+check('revert: a clean revert answers reverted and nothing else', [array_keys($rdRevB), $rdRevB['reverted'] ?? null], [['ok', 'reverted'], 1]);
+
+// The rules are back but the receipt cannot say so: the revert answer is the one place that says status may be stale.
+$rdBeforeR = WP_Fake::$options[$rdKey];
+$rdR = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-7', 'req-7', [['new' => '+84 7'] + $rdGood[0]]);
+$rdWriter->fail = true;
+$rdRevR = $rdCall('apply.revert', ['apply_id' => 'rw-7']);
+$rdWriter->fail = false;
+check('revert, no receipt: the rules are back, and the answer warns that status may be stale',
+    [$rdR['ok'] ?? $rdR, $rdRevR['ok'] ?? $rdRevR, $rdRevR['reverted'] ?? null, WP_Fake::$options[$rdKey] === $rdBeforeR,
+        is_string($rdRevR['warning'] ?? null) && strpos($rdRevR['warning'], 'req-7') !== false && strpos($rdRevR['warning'], 'database refused the write') !== false],
+    [true, true, 1, true, true]);
+check('revert, no receipt: the stored receipt still says applied', json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true)['req-7']['state'] ?? null, 'applied');
+$rdLateR = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-7', 'req-7', [['new' => '+84 7'] + $rdGood[0]]);
+check('revert, no receipt: a retry is answered from the receipt and writes nothing', [$rdLateR['replayed'] ?? $rdLateR, WP_Fake::$options[$rdKey] === $rdBeforeR], [true, true]);
+
+// An applied request whose log row is gone (trimmed, cleaned, lost) is still applied: an empty log proves no revert.
+$rdInLost = $rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]);
+$rdLost = $rdApply($rdInLost, 'rw-lost', 'req-lost', [['new' => '+84 lost'] + $rdGood[0]]);
+$rdLostRules = WP_Fake::$options[$rdKey];
+$rdLog->clear('rw-lost');
+$rdLostStatus = $rdDoor('status', ['request_id' => 'req-lost']);
+$rdLostReplay = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-lost', 'req-lost', [['new' => '+84 lost'] + $rdGood[0]], $rdInLost['revision']);
+check('a lost log row: status and a retry still say applied, the rules untouched',
+    [$rdLost['ok'] ?? $rdLost, $rdLostStatus['request']['state'] ?? $rdLostStatus, array_column($rdLostStatus['receipts'] ?? [], 'state', 'request_id')['req-lost'] ?? null,
+        $rdLostReplay['replayed'] ?? $rdLostReplay, $rdLostReplay['state'] ?? null, $rdLostReplay['revision'] ?? null, WP_Fake::$options[$rdKey] === $rdLostRules],
+    [true, 'applied', 'applied', true, 'applied', $rdLost['revision'] ?? -1, true]);
 
 // Receipts are never dropped: a request_id answered long ago still replays, and a full store refuses new requests.
 $rdAll = json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true);

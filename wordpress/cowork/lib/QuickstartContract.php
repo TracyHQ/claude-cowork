@@ -395,6 +395,16 @@ final class QuickstartContract
         return $this->showcaseNav;
     }
 
+    /**
+     * The address the quickstart was packed with (`quickstart.placeholderUrl`, no trailing slash),
+     * which provisioning rewrote to the site's own; null when the manifest names none.
+     */
+    public function placeholderUrl(): ?string
+    {
+        $url = $this->manifest['quickstart']['placeholderUrl'] ?? null;
+        return is_string($url) && preg_match('~^https?://[^/\s]+~', $url) ? rtrim($url, '/') : null;
+    }
+
     public function showcaseNavProblem(): ?string
     {
         return $this->showcaseNavProblem;
@@ -904,13 +914,22 @@ final class QuickstartContract
         }
         foreach ((array) ($this->lock['fileRoots'] ?? []) as $prefix) {
             $dir = $this->root . '/' . $prefix;
+            // A linked root would be walked as its target: files outside the webroot, each one no link.
+            $linked = $this->linkedFolder((string) $prefix);
+            if ($linked !== null) {
+                $problems[] = 'Theme folder is a link: ' . $linked . ($linked === $prefix ? '' : ' (holds ' . $prefix . ')');
+                continue;
+            }
             if (!is_dir($dir)) {
                 $problems[] = 'Theme folder missing: ' . $prefix;
                 continue;
             }
             $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
             foreach ($iterator as $file) {
-                if (!$file->isFile()) {
+                // The iterator does not descend into a linked folder, and a link is never followed or
+                // hashed here: a link the lock does not list, to a file or to a folder, is unexpected
+                // as a file is.
+                if (!$file->isLink() && !$file->isFile()) {
                     continue;
                 }
                 $relative = substr($file->getPathname(), strlen($this->root) + 1);
@@ -920,6 +939,19 @@ final class QuickstartContract
             }
         }
         return $problems;
+    }
+
+    /** The first folder of a locked root, from the webroot down to the root itself, that is a link. */
+    private function linkedFolder(string $prefix): ?string
+    {
+        $path = '';
+        foreach (explode('/', trim($prefix, '/')) as $part) {
+            $path .= ($path === '' ? '' : '/') . $part;
+            if (is_link($this->root . '/' . $path)) {
+                return $path;
+            }
+        }
+        return null;
     }
 
     /**

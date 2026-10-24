@@ -3173,12 +3173,12 @@ final class Engine
         return ['receipt' => $base + $receipt, 'moved' => ['key' => $key, 'kind' => 'templateStyle', 'raw' => $written]];
     }
 
-    /** Why a megaSubRemove step is not taken — a child of its item still in the menu — or null. */
+    /** Why a megaSubRemove step is not taken — a child of its item this job did not hide, or one still shown — or null. */
     private function showcaseNavSubKept(array $record, array $step): ?string
     {
         foreach ($step['children'] as $child)
             if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
-                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' was not hidden by this job (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
         foreach ($this->writer->lockMenuChildren($step['item']) as $child)
             if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child))
                 return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
@@ -3196,7 +3196,7 @@ final class Engine
         $what = 'kept the mega-menu column ' . $step['column'] . ' of ' . $step['itemKey'];
         foreach ($step['children'] as $child)
             if ((int) substr($child, strlen('menuItem-')) === $step['column'] && !in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
-                return $what . ': its head ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+                return $what . ': its head ' . $child . ' was not hidden by this job (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
         $live = array_values(array_filter($this->writer->lockMenuChildren($step['item']), fn ($child) => (int) ($child['parent_id'] ?? 0) === $step['item']));
         usort($live, fn ($a, $b) => [(int) ($a['lft'] ?? 0), (int) ($a['id'] ?? 0)] <=> [(int) ($b['lft'] ?? 0), (int) ($b['id'] ?? 0)]);
         $ids = array_map(fn ($child) => (string) (int) ($child['id'] ?? 0), $live);

@@ -39,6 +39,10 @@ cp lib/link-layouts.json com_claudecowork/administrator/lib/
 # anything is zipped. It ships inside the component (administrator/components/com_claudecowork/
 # tracy-release.json) and beside the zip in dist/, to be attached to the release as its own asset.
 node ../../scripts/release-manifest.mjs joomla-package . com_claudecowork/administrator/tracy-release.json
+# 🔒 The engine exempts the API door plugin's own media from inspect only by the hashes it holds
+# (QuickstartContract::OWN_MEDIA). A script changed without them would make every T3 site warn about
+# it after the update, so a package whose hashes are not the ones it ships is not built.
+node ../../scripts/joomla-own-media.mjs com_claudecowork/administrator/lib/QuickstartContract.php com_claudecowork/administrator/tracy-release.json
 
 ( cd com_claudecowork && zip -qr ../build/packages/com_claudecowork.zip . -x '*.DS_Store' )
 # The auto-login system plugin ships in the SAME package as the component (ADR 0085): one upgrade

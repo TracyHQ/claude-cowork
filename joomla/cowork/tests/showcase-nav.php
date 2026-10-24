@@ -534,11 +534,20 @@ $cRed = $hidden['Home - Red'];
 $cw2->store['menuItem'][$cRed]['params'] = JsonObjectKey::set((string) $cw2->store['menuItem'][$cRed]['params'], 'menu_show', '"maybe"');
 $cBefore = $tParams($cw2);
 $cApplied = $cCall2(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-ch', 'request_id' => 'ch1']);
-$cWhy = 'kept the mega-menu sub of menuItem-101: its child menuItem-' . $cRed . ' stays in the menu (menu_show is "maybe", not shown)';
+$cWhy = 'kept the mega-menu sub of menuItem-101: its child menuItem-' . $cRed . ' was not hidden by this job (menu_show is "maybe", not shown)';
 check('a child left in the menu keeps its item\'s sub, and says why', [$cApplied['status'], $cApplied['moved'], $cApplied['skipped']],
     ['completed', 18, ['menuItem-' . $cRed => 'menu_show is "maybe", not shown'] + array_fill_keys(array_keys($styles), $cWhy)]);
 check('no style is written', $tParams($cw2), $cBefore);
 check('the skipped styles have nothing to revert', [$cCall2(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-chu', 'request_id' => 'ch2'])['moved'], $tParams($cw2)], [18, $cBefore]);
+// A child the owner deleted is not in the menu either, and its sub still stays: the reason says what is known.
+[, , $gw, , $gCall] = snavSite($snavSource);
+check('a bound site for the deleted child', $gCall(['operation' => 'bind'])['ok'], true);
+unset($gw->store['menuItem'][$cRed]);
+$gBefore = $tParams($gw);
+$gApplied = $gCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gone', 'request_id' => 'gone1']);
+check('a deleted child keeps its item\'s sub, and the reason does not say it stays in the menu', [$gApplied['skipped']['menuItem-' . $cRed] ?? null, array_values(array_unique(array_intersect_key($gApplied['skipped'] ?? [], $styles)))],
+    ['the row is gone from this site', ['kept the mega-menu sub of menuItem-101: its child menuItem-' . $cRed . ' was not hidden by this job (the row is gone from this site)']]);
+check('and no style is written for it', $tParams($gw), $gBefore);
 
 // 🔒 THE LIVE MENU HAS THE LAST WORD: a page the customer added under Home after the install is a child
 // the map never saw. Shown, it keeps the dropdown in every style; out of the menu, the sub goes.
@@ -836,7 +845,7 @@ check('before the head of the first column it is in that column', $saCall(['oper
 [, , $shw, , $shCall] = snavSite($spSource);
 $shw->store['menuItem'][109]['params'] = JsonObjectKey::set((string) $shw->store['menuItem'][109]['params'], 'menu_show', '"maybe"');
 check('a head left in the menu keeps its column', $shCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sh', 'request_id' => 'sh1'])['skipped']['templateStyle-9'] ?? null,
-    'kept the mega-menu column 109 of menuItem-108: its head menuItem-109 stays in the menu (menu_show is "maybe", not shown)');
+    'kept the mega-menu column 109 of menuItem-108: its head menuItem-109 was not hidden by this job (menu_show is "maybe", not shown)');
 
 // ja-smallbiz 1.0.4: one style chains a whole sub (Home, 101, every child gone) and two columns (Pages,
 // 103, its 104 and 121 columns). The sub is a megaSubRemove — no column path — and each column starts
