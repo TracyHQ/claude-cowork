@@ -1585,6 +1585,33 @@
       "sourceId": 5103
     },
     {
+      "key": "userProfile-4200",
+      "kind": "userProfile",
+      "identity": {
+        "field": "aboutme",
+        "user_id": "42"
+      },
+      "sourceId": 4200
+    },
+    {
+      "key": "userProfile-4201",
+      "kind": "userProfile",
+      "identity": {
+        "field": "user_jobtitle",
+        "user_id": "42"
+      },
+      "sourceId": 4201
+    },
+    {
+      "key": "userProfile-4203",
+      "kind": "userProfile",
+      "identity": {
+        "field": "user_avatar",
+        "user_id": "42"
+      },
+      "sourceId": 4203
+    },
+    {
       "key": "languageString-231238131",
       "kind": "languageString",
       "identity": {
@@ -1753,6 +1780,26 @@
         "language": "en-GB"
       },
       "sourceId": 256948293
+    },
+    {
+      "key": "siteSetting-257986166",
+      "kind": "siteSetting",
+      "identity": {
+        "template": "ja_boxing",
+        "profile": "default",
+        "key": "site_logo"
+      },
+      "sourceId": 257986166
+    },
+    {
+      "key": "siteSetting-211586990",
+      "kind": "siteSetting",
+      "identity": {
+        "template": "ja_boxing",
+        "profile": "default",
+        "key": "site_logo_dark"
+      },
+      "sourceId": 211586990
     }
   ],
   "slots": [
@@ -20839,6 +20886,100 @@
       "customize": "keep"
     },
     {
+      "key": "userProfile-4200.0",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Darlene Robertson has a lot of energy and loves to share it with everyone! A fan of boxing, kickboxing and Muay Thai, Kino was first introduced to the fighting arts with Taekwondo as a child. His interest in Muay Thai led him to learn from Kru Ash, a renowned coach who worked with George St-Pierre and Patrick Côté. ",
+      "maxCharacters": 654,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/p[1]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4200.1",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Kino stepped in the ring several times, accumulating a record of only 2 defeats out of 15 fights, in kickboxing and Muay Thai matches! Kino's classes will be filled with great vibes, high energy and challenging workouts!",
+      "maxCharacters": 460,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/p[2]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4200.2",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Loves to dance",
+      "maxCharacters": 48,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/ul/li[1]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4200.3",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Muay thai specialist",
+      "maxCharacters": 60,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/ul/li[2]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4200.4",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Loves Footing",
+      "maxCharacters": 46,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/ul/li[3]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4200.5",
+      "entity": "userProfile-4200",
+      "column": "value",
+      "type": "text",
+      "sample": "Bring CHURROS!",
+      "maxCharacters": 48,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/ul/li[4]/text()",
+      "label": "Admin / aboutme",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4201.0",
+      "entity": "userProfile-4201",
+      "column": "value",
+      "type": "text",
+      "sample": "Boxer",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "Admin / user_jobtitle",
+      "customize": "keep"
+    },
+    {
+      "key": "userProfile-4203.0",
+      "entity": "userProfile-4203",
+      "column": "value",
+      "type": "image",
+      "sample": "images/joomlart/author/pic-1.jpg#joomlaImage://local-images/joomlart/author/pic-1.jpg?width=800&height=800",
+      "maxCharacters": 255,
+      "requiresEvidence": false,
+      "label": "Admin / user_avatar",
+      "customize": "keep"
+    },
+    {
       "key": "languageString-231238131.0",
       "entity": "languageString-231238131",
       "column": "value",
@@ -21036,6 +21177,28 @@
       "maxCharacters": 42,
       "requiresEvidence": false,
       "label": "TPL_TRY_CLASS (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "siteSetting-257986166.0",
+      "entity": "siteSetting-257986166",
+      "column": "value",
+      "type": "image",
+      "sample": "images/joomlart/logo/item-2.png#joomlaImage://local-images/joomlart/logo/item-2.png?width=175&height=56",
+      "maxCharacters": 255,
+      "requiresEvidence": false,
+      "label": "site_logo (site settings, profile default)",
+      "customize": "keep"
+    },
+    {
+      "key": "siteSetting-211586990.0",
+      "entity": "siteSetting-211586990",
+      "column": "value",
+      "type": "image",
+      "sample": "images/joomlart/logo/item-1.png#joomlaImage://local-images/joomlart/logo/item-1.png?width=175&height=56",
+      "maxCharacters": 255,
+      "requiresEvidence": false,
+      "label": "site_logo_dark (site settings, profile default)",
       "customize": "keep"
     }
   ],

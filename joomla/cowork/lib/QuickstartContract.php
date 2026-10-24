@@ -2,6 +2,7 @@
 require_once __DIR__ . '/ContentSlots.php';
 require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/LanguageStrings.php';
+require_once __DIR__ . '/SiteSettingRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/JoomlaLocks.php';
@@ -485,13 +486,37 @@ final class QuickstartContract
     }
     /** This call's rows (see ContractRows), the template language strings the contract names among them. */
     private function contractRows(): ContractRows {
-        return new ContractRows($this->writer, fn(): array => $this->languageStringRows());
+        return new ContractRows($this->writer, fn(): array => $this->languageStringRows(), fn(): array => $this->siteSettingRows());
     }
     /** The `languageString` rows of every string the contract names, by id (lib/LanguageStrings.php). */
     private function languageStringRows(): array {
         $wanted=[];
         foreach($this->baseEntities() as $entity)if($entity['kind']===LanguageStrings::KIND)$wanted[]=$entity['identity'];
         return $wanted ? (new LanguageStrings($this->root))->rows($wanted) : [];
+    }
+    /** The T4 profile files, read where T4 reads them; a contract needs no style to name a profile. */
+    private function siteSettingFiles(): TemplateSiteFiles {
+        return new TemplateSiteFiles($this->root, static fn(string $template): array => []);
+    }
+    /** The `siteSetting` rows of every logo the contract names, by id (lib/SiteSettingRows.php). */
+    private function siteSettingRows(): array {
+        $wanted=[];
+        foreach($this->baseEntities() as $entity)if($entity['kind']===SiteSettingRows::KIND)$wanted[]=$entity['identity'];
+        return $wanted ? (new SiteSettingRows($this->siteSettingFiles()))->rows($wanted) : [];
+    }
+    /**
+     * The profile file change a contract apply makes for one `siteSetting` operation, checked against the value the plan
+     * read (`expected`): written to the profile's `local/` copy, never the template's file. Null when nothing changes.
+     *
+     * @return array{change:?array{path:string,before:?string,after:string}}
+     */
+    public function siteSettingChange(int $id, string $value, ?array $expected): array {
+        $this->ready();
+        $row=$this->siteSettingRows()[$id]??null;
+        if($row===null)throw new RuntimeException('Not a site setting of this contract: '.$id);
+        if($expected!==null && array_key_exists('value',$expected) && (string)$expected['value']!==$row['value'])
+            throw new ContractProblem('CONFLICT','conflict: the site setting '.$row['key'].' changed');
+        return ['change'=>(new SiteSettingRows($this->siteSettingFiles()))->change($row,$value)];
     }
     /**
      * The override file change a contract apply makes for one `languageString` operation, checked against the
@@ -929,8 +954,8 @@ final class QuickstartContract
         $counts=array_map('count',$lists);
         // Accounts are not quickstart inventory: every provision adds the owner's own (an author's name and
         // picture are slots, the people on the site are not counted), unless the lock counts them itself.
-        // A template's language strings are not rows at all (lib/LanguageStrings.php): only the keys the contract names are read.
-        foreach(['user','userProfile',LanguageStrings::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
+        // A template's language strings and T4 logos are not rows at all (lib/LanguageStrings.php, lib/SiteSettingRows.php): only the keys the contract names are read.
+        foreach(['user','userProfile',LanguageStrings::KIND,SiteSettingRows::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
         // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
         // design-system slot puts a system on a site as one mod_custom it writes through content.update
         // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart

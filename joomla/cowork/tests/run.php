@@ -2204,6 +2204,7 @@ require __DIR__ . "/contract-cost.php";
 require __DIR__ . "/contract-json-columns.php";
 require __DIR__ . "/contract-authors.php";
 require __DIR__ . "/contract-language-strings.php";
+require __DIR__ . "/contract-site-settings.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";

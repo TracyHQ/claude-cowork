@@ -2350,6 +2350,15 @@
     "userProfile-5103": {
       "value": "images/joomlart/author/pic-6.jpg#joomlaImage://local-images/joomlart/author/pic-6.jpg?width=800&height=800"
     },
+    "userProfile-4200": {
+      "value": "<p>Darlene Robertson has a lot of energy and loves to share it with everyone! A fan of boxing, kickboxing and Muay Thai, Kino was first introduced to the fighting arts with Taekwondo as a child. His interest in Muay Thai led him to learn from Kru Ash, a renowned coach who worked with George St-Pierre and Patrick Côté. </p>\r\n<p>Kino stepped in the ring several times, accumulating a record of only 2 defeats out of 15 fights, in kickboxing and Muay Thai matches! Kino's classes will be filled with great vibes, high energy and challenging workouts!</p>\r\n<ul class=\"has-icon\">\r\n<li>Loves to dance</li>\r\n<li>Muay thai specialist</li>\r\n<li>Loves Footing</li>\r\n<li>Bring CHURROS!</li>\r\n</ul>"
+    },
+    "userProfile-4201": {
+      "value": "Boxer"
+    },
+    "userProfile-4203": {
+      "value": "images/joomlart/author/pic-1.jpg#joomlaImage://local-images/joomlart/author/pic-1.jpg?width=800&height=800"
+    },
     "languageString-231238131": {
       "extension": "tpl_ja_boxing",
       "key": "T4_OFF_CANVAS_TITLE",
@@ -2451,6 +2460,18 @@
       "key": "TPL_TRY_CLASS",
       "language": "en-GB",
       "value": "Try a class"
+    },
+    "siteSetting-257986166": {
+      "template": "ja_boxing",
+      "profile": "default",
+      "key": "site_logo",
+      "value": "images/joomlart/logo/item-2.png#joomlaImage://local-images/joomlart/logo/item-2.png?width=175&height=56"
+    },
+    "siteSetting-211586990": {
+      "template": "ja_boxing",
+      "profile": "default",
+      "key": "site_logo_dark",
+      "value": "images/joomlart/logo/item-1.png#joomlaImage://local-images/joomlart/logo/item-1.png?width=175&height=56"
     }
   },
   "assignments": [
@@ -13882,6 +13903,7 @@
     "media/system/scss/system-site-offline.scss": "826aa30c5a93e741d9669aa72184b1f6b80202bc59f1f77e3cbd2b305acce2ed",
     "media/t4/author/default.jpg": "eb760767256b89d9392974d95a1710dea3794c9c61ff0f5cd870074b98f2fe01",
     "media/t4/css/12.css": "4cb60ad4e798266cb1048cfc3ecb282df8b5650a7770b5a56660de58c949a6df",
+    "media/t4/css/13-sub.css": "0ee9081a9d258fbcba88eaea5cdb76769ebf6e1fef68e7f98d859676b672b788",
     "media/t4/css/13.css": "0ee9081a9d258fbcba88eaea5cdb76769ebf6e1fef68e7f98d859676b672b788",
     "media/templates/administrator/atum/css/system/searchtools/searchtools.css": "627160258e4ca9595286af665723ce26b8da435aee5a3c32e450e2d171c8558c",
     "media/templates/administrator/atum/css/system/searchtools/searchtools.min.css": "4a6eadf524dad4563e1f0707b73bf5f4b4803ed7a0b519eb8aecb1a9de61baf6",

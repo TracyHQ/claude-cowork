@@ -36,6 +36,7 @@ require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
 require_once __DIR__ . '/LanguageOverrides.php';
 require_once __DIR__ . '/LanguageStrings.php';
+require_once __DIR__ . '/SiteSettingRows.php';
 
 final class Engine
 {
@@ -299,6 +300,9 @@ final class Engine
 
     /** The override files a content batch wrote (each write's undo rows), restored when the batch fails. */
     private array $batchFiles = [];
+
+    /** The T4 profile files a content batch wrote (each write's undo rows), restored when the batch fails. */
+    private array $batchSiteFiles = [];
 
     /** The site's language override files (`template.languageOverrides`); null answers 'unavailable'. */
     private ?LanguageOverrides $overrides = null;
@@ -3762,6 +3766,7 @@ final class Engine
         try { $fresh = $this->log->entries($apply) === []; } catch (Throwable $error) { $fresh = false; }
         $this->inFlight = null;
         $this->batchFiles = [];
+        $this->batchSiteFiles = [];
         try {
             $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
@@ -3783,6 +3788,15 @@ final class Engine
                         $key = $step['key'] ?? (string) $index;
                         if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
                         $ids[$key] = $this->writeLanguageString($apply, (int) ($step['id'] ?? 0), (string) $step['fields']['value'], is_array($step['expected'] ?? null) ? $step['expected'] : null);
+                        continue;
+                    }
+                    // A T4 logo is a key of a profile file, not a row: only the content contract writes it here
+                    // (template.siteSettings is its own door), and only its `value`.
+                    if ($kind === SiteSettingRows::KIND) {
+                        if ($verify === null || !is_array($step['fields']) || array_keys($step['fields']) !== ['value']) throw new RuntimeException('kind not allowed in a content batch');
+                        $key = $step['key'] ?? (string) $index;
+                        if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
+                        $ids[$key] = $this->writeSiteSetting($apply, (int) ($step['id'] ?? 0), (string) $step['fields']['value'], is_array($step['expected'] ?? null) ? $step['expected'] : null);
                         continue;
                     }
                     // Identity and installed executable settings require their own privileged door. One exception: the
@@ -3841,6 +3855,14 @@ final class Engine
             } catch (Throwable $e) {
                 $fileLeft = $e->getMessage();
             }
+            // The T4 profile files this batch wrote go back too.
+            $siteFiles = $this->batchSiteFiles;
+            $this->batchSiteFiles = [];
+            try {
+                if ($siteFiles !== [] && $this->templateSite !== null) $this->templateSite->restore(array_merge(...$siteFiles));
+            } catch (Throwable $e) {
+                $fileLeft = ($fileLeft === null ? '' : $fileLeft . '; ') . 'T4 site profile file: ' . $e->getMessage();
+            }
             $undo = $fresh ? $this->undoFailedBatch($apply) : null;
             if ($fileLeft !== null) $undo = array_merge($undo ?? [], ['language override file: ' . $fileLeft]);
             if ($undo === []) {
@@ -3854,6 +3876,7 @@ final class Engine
         } finally {
             $this->inFlight = null;
             $this->batchFiles = [];
+            $this->batchSiteFiles = [];
         }
     }
 
@@ -3870,6 +3893,23 @@ final class Engine
         $files = $this->overrides->write($planned['change']);
         $this->batchFiles[] = $files;
         $this->log->record($apply, ['op' => 'languageOverrides', 'locale' => $planned['locale'], 'files' => $files]);
+        return $id;
+    }
+
+    /**
+     * Write one T4 site setting (a logo) of a contract apply into the profile's `local/` copy, and record the files' previous
+     * bytes under the apply_id like the `template.siteSettings` door does (op `siteSettings`: apply.revert puts them back,
+     * deleting a file, and the folders, that did not exist). Answers the setting's row id.
+     */
+    private function writeSiteSetting(string $apply, int $id, string $value, ?array $expected): int
+    {
+        if ($this->templateSite === null) throw new RuntimeException('template site settings not wired');
+        $planned = $this->contract->siteSettingChange($id, $value, $expected);
+        if ($planned['change'] === null) return $id;
+        $files = $this->templateSite->write([$planned['change']]);
+        $this->batchSiteFiles[] = $files;
+        $this->log->record($apply, ['op' => 'siteSettings', 'files' => $files]);
+        $this->templateSite->clearOptimize();
         return $id;
     }
 
