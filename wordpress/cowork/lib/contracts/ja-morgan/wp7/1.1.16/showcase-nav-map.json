@@ -12,43 +12,9 @@
     "navigation-source.json": "208635a15613c3fd689d2b616102948fc775654d174472eb88b46fa4b66e24a3",
     "inventory.json": "6f07af63edfe5ef6bcdff72b7863706062e0a93bebb604a3f8856547b35af4e1"
   },
-  "decisionsHash": "3dc5c0f04108f1de8df8dd5f3355d6757e16c6de79cb127f206f71cd786a498e",
+  "decisionsHash": "8e7406d5fd5128e1dddbd00d71452352060956d43900dec6ad3239e56d5149b8",
   "status": "checked",
   "operations": [
-    {
-      "op": "templatePart.removeBlock",
-      "templatePart": {
-        "id": 166,
-        "slug": "header"
-      },
-      "label": "sidebar toggle",
-      "block": {
-        "name": "core/html",
-        "contains": "aria-controls=\"jm-off-canvas\""
-      },
-      "rule": "remove-block.decision",
-      "reason": "the header button that opens the \"Site Pages\" drawer; with the drawer gone it would open nothing (the theme script skips the drawer when either is missing)",
-      "key": "templatePart-166",
-      "before": "465b8d722cb79337243cd81a0f3f76002187b844651ef9843bd02107cbf5f220",
-      "after": "0899776b6561e4171250e16b3bf6bfd2e476bb16dba357d695e999872bc63c45"
-    },
-    {
-      "op": "templatePart.removeBlock",
-      "templatePart": {
-        "id": 166,
-        "slug": "header"
-      },
-      "label": "Site Pages drawer",
-      "block": {
-        "name": "core/group",
-        "anchor": "jm-off-canvas"
-      },
-      "rule": "remove-block.decision",
-      "reason": "the off-canvas drawer lists only navigation 160 \"joomla-pages\", the template's sample pages (login, typography, error/offline, sample content views); small screens keep the main menu, which collapses into WordPress's own overlay (overlayMenu \"mobile\", opened below 992 px by the theme)",
-      "key": "templatePart-166",
-      "before": "0899776b6561e4171250e16b3bf6bfd2e476bb16dba357d695e999872bc63c45",
-      "after": "0cc7664f3f69095e74e2dd025d791f936b17fb839a51c12af76f86af7b7fa398"
-    },
     {
       "op": "navigation.removeLink",
       "navigation": {
@@ -188,6 +154,94 @@
         "slug": "joomla-pages"
       },
       "link": {
+        "label": "List All Categories",
+        "pageId": 149
+      },
+      "label": "List All Categories",
+      "path": [
+        "Content",
+        "List All Categories"
+      ],
+      "contains": [],
+      "rule": "hide.decision",
+      "reason": "Joomla sample listing screen in the drawer's \"Content\" branch: its text is the names and descriptions of the post categories, and its links go to the category archives, which the cards of Tagged Items (kept) and News & Update link too; the header drawer keeps its account pages (Login, published with a core/loginout block, Registration, the profile pages) and Smart Search, which are real on a customer site",
+      "key": "navigation-160",
+      "before": "795dc5c58b09ea36f6db9085d0d36eae7f531b5b45c502bffec6393895b4e3da",
+      "after": "48f833c644a27d2fa8b5dd092cc3a58114970fb858372912f77f6f7ec55840bf"
+    },
+    {
+      "op": "navigation.removeLink",
+      "navigation": {
+        "id": 160,
+        "slug": "joomla-pages"
+      },
+      "link": {
+        "label": "Featured Articles",
+        "pageId": 145
+      },
+      "label": "Featured Articles",
+      "path": [
+        "Content",
+        "Featured Articles"
+      ],
+      "contains": [],
+      "rule": "hide.decision",
+      "reason": "Joomla sample listing screen in the drawer's \"Content\" branch: the page holds no text and no listing; the header drawer keeps its account pages (Login, published with a core/loginout block, Registration, the profile pages) and Smart Search, which are real on a customer site",
+      "key": "navigation-160",
+      "before": "48f833c644a27d2fa8b5dd092cc3a58114970fb858372912f77f6f7ec55840bf",
+      "after": "f234db237e8a67d60e7ca137b02faa8440faea349ff4335b35d9fe36c603ca2e"
+    },
+    {
+      "op": "navigation.removeLink",
+      "navigation": {
+        "id": 160,
+        "slug": "joomla-pages"
+      },
+      "link": {
+        "label": "Category Blog",
+        "pageId": 154
+      },
+      "label": "Category Blog",
+      "path": [
+        "Content",
+        "Category Blog"
+      ],
+      "contains": [],
+      "rule": "hide.decision",
+      "reason": "second link to page 154, which the main menu opens as \"News & Update\"; the header drawer keeps its account pages (Login, published with a core/loginout block, Registration, the profile pages) and Smart Search, which are real on a customer site",
+      "key": "navigation-160",
+      "before": "f234db237e8a67d60e7ca137b02faa8440faea349ff4335b35d9fe36c603ca2e",
+      "after": "b370a4f3d745ce4844ad2a7b48a819c996d5085095b7866a630a914bda8d1c05"
+    },
+    {
+      "op": "navigation.removeLink",
+      "navigation": {
+        "id": 160,
+        "slug": "joomla-pages"
+      },
+      "link": {
+        "label": "Single Article",
+        "pageId": 204
+      },
+      "label": "Single Article",
+      "path": [
+        "Content",
+        "Single Article"
+      ],
+      "contains": [],
+      "rule": "hide.decision",
+      "reason": "Joomla sample \"single article\" view: a link to one post, which Tagged Items (kept) lists with every other post; the header drawer keeps its account pages (Login, published with a core/loginout block, Registration, the profile pages) and Smart Search, which are real on a customer site",
+      "key": "navigation-160",
+      "before": "b370a4f3d745ce4844ad2a7b48a819c996d5085095b7866a630a914bda8d1c05",
+      "after": "b0a4ccedb0c7e070497a61b96113a5cc0a4b52dd01fa86c8e7c90b491b94a42a"
+    },
+    {
+      "op": "navigation.removeLink",
+      "navigation": {
+        "id": 160,
+        "slug": "joomla-pages"
+      },
+      "link": {
         "label": "Typography",
         "pageId": 147
       },
@@ -200,8 +254,8 @@
       "rule": "hide.kit-screen",
       "reason": "\"Typography\" is one of the template's own screens",
       "key": "navigation-160",
-      "before": "795dc5c58b09ea36f6db9085d0d36eae7f531b5b45c502bffec6393895b4e3da",
-      "after": "a3e11ce05d70fcc44e392244739229be36235edaca652286c163d7a2bd2b3e70"
+      "before": "b0a4ccedb0c7e070497a61b96113a5cc0a4b52dd01fa86c8e7c90b491b94a42a",
+      "after": "7997e4507b3b2464d48ad2085d5e7cd756da6ef147a4cbc5e0046db7eb29a4c0"
     }
   ],
   "finals": [
@@ -213,12 +267,7 @@
     {
       "key": "navigation-160",
       "before": "1fcf15ca886c7cabefd79a9bf21f4165333415bebf23bd28effdf0427594d4b2",
-      "after": "a3e11ce05d70fcc44e392244739229be36235edaca652286c163d7a2bd2b3e70"
-    },
-    {
-      "key": "templatePart-166",
-      "before": "465b8d722cb79337243cd81a0f3f76002187b844651ef9843bd02107cbf5f220",
-      "after": "0cc7664f3f69095e74e2dd025d791f936b17fb839a51c12af76f86af7b7fa398"
+      "after": "7997e4507b3b2464d48ad2085d5e7cd756da6ef147a4cbc5e0046db7eb29a4c0"
     }
   ],
   "kept": [
@@ -428,62 +477,14 @@
     {
       "key": "navigation-160",
       "where": "wp_navigation 160 (joomla-pages)",
-      "label": "List All Categories",
-      "path": [
-        "Content",
-        "List All Categories"
-      ],
-      "pageId": 149,
-      "rule": "keep.default",
-      "reason": "not a showcase entry by any rule"
-    },
-    {
-      "key": "navigation-160",
-      "where": "wp_navigation 160 (joomla-pages)",
-      "label": "Featured Articles",
-      "path": [
-        "Content",
-        "Featured Articles"
-      ],
-      "pageId": 145,
-      "rule": "keep.default",
-      "reason": "not a showcase entry by any rule"
-    },
-    {
-      "key": "navigation-160",
-      "where": "wp_navigation 160 (joomla-pages)",
-      "label": "Category Blog",
-      "path": [
-        "Content",
-        "Category Blog"
-      ],
-      "pageId": 154,
-      "rule": "keep.default",
-      "reason": "not a showcase entry by any rule"
-    },
-    {
-      "key": "navigation-160",
-      "where": "wp_navigation 160 (joomla-pages)",
-      "label": "Single Article",
-      "path": [
-        "Content",
-        "Single Article"
-      ],
-      "pageId": 204,
-      "rule": "keep.default",
-      "reason": "not a showcase entry by any rule"
-    },
-    {
-      "key": "navigation-160",
-      "where": "wp_navigation 160 (joomla-pages)",
       "label": "Tagged Items",
       "path": [
         "Content",
         "Tagged Items"
       ],
       "pageId": 155,
-      "rule": "keep.default",
-      "reason": "not a showcase entry by any rule"
+      "rule": "keep.decision",
+      "reason": "its query lists every post; no other menu entry lists the posts outside the Investment Managment category, so it is their only route from the menus"
     },
     {
       "key": "navigation-161",
@@ -741,9 +742,9 @@
   ],
   "unresolved": [],
   "counts": {
-    "links": 7,
-    "templateParts": 2,
-    "kept": 46,
+    "links": 11,
+    "templateParts": 0,
+    "kept": 42,
     "unresolved": 0
   }
 }
