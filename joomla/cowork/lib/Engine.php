@@ -35,6 +35,7 @@ require_once __DIR__ . '/SiteIdentity.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
 require_once __DIR__ . '/LanguageOverrides.php';
+require_once __DIR__ . '/LanguageStrings.php';
 
 final class Engine
 {
@@ -295,6 +296,9 @@ final class Engine
         $this->templateSite = $files;
         return $this;
     }
+
+    /** The override files a content batch wrote (each write's undo rows), restored when the batch fails. */
+    private array $batchFiles = [];
 
     /** The site's language override files (`template.languageOverrides`); null answers 'unavailable'. */
     private ?LanguageOverrides $overrides = null;
@@ -3757,6 +3761,7 @@ final class Engine
         // Whether this apply_id holds nothing yet: then every entry found after a failure is this batch's.
         try { $fresh = $this->log->entries($apply) === []; } catch (Throwable $error) { $fresh = false; }
         $this->inFlight = null;
+        $this->batchFiles = [];
         try {
             $result = $this->writer->transaction(function () use ($apply, $request, $steps, $hash, $verify) {
                 foreach ($this->log->entries($apply) as $entry) {
@@ -3771,6 +3776,15 @@ final class Engine
                 foreach ($steps as $index => $step) {
                     if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
                     $kind = $step['kind'];
+                    // A template's language string is a line of the override file, not a row: only the content contract
+                    // writes it here (template.languageOverrides is its own door), and only its `value`.
+                    if ($kind === LanguageStrings::KIND) {
+                        if ($verify === null || !is_array($step['fields']) || array_keys($step['fields']) !== ['value']) throw new RuntimeException('kind not allowed in a content batch');
+                        $key = $step['key'] ?? (string) $index;
+                        if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
+                        $ids[$key] = $this->writeLanguageString($apply, (int) ($step['id'] ?? 0), (string) $step['fields']['value'], is_array($step['expected'] ?? null) ? $step['expected'] : null);
+                        continue;
+                    }
                     // Identity and installed executable settings require their own privileged door. One exception: the
                     // content contract (it alone passes $verify) writes an author's display NAME, a slot the profile
                     // declares because visitors read it under every post; never another column of the account.
@@ -3817,7 +3831,18 @@ final class Engine
             $this->batching = false;
             $message = $error->getMessage();
             $errors = $verify ? ContractProblem::errorsOf($error) : [];
+            // A file is outside the database transaction: the override lines this batch wrote go back first,
+            // whatever the rollback kept of their undo records.
+            $files = $this->batchFiles;
+            $this->batchFiles = [];
+            $fileLeft = null;
+            try {
+                if ($files !== [] && $this->overrides !== null) $this->overrides->restore(array_merge(...$files));
+            } catch (Throwable $e) {
+                $fileLeft = $e->getMessage();
+            }
             $undo = $fresh ? $this->undoFailedBatch($apply) : null;
+            if ($fileLeft !== null) $undo = array_merge($undo ?? [], ['language override file: ' . $fileLeft]);
             if ($undo === []) {
                 $message .= '; every write of this batch was taken back';
             } elseif ($undo !== null) {
@@ -3828,7 +3853,24 @@ final class Engine
             return $this->err('batch_failed', $message, $verify ? ['errors' => $errors] : []);
         } finally {
             $this->inFlight = null;
+            $this->batchFiles = [];
         }
+    }
+
+    /**
+     * Write one template language string of a contract apply into its language's override file, and record the
+     * file's previous bytes under the apply_id like any undo (op `languageOverrides`: apply.revert puts them back,
+     * deleting a file that did not exist). Answers the string's row id.
+     */
+    private function writeLanguageString(string $apply, int $id, string $value, ?array $expected): int
+    {
+        if ($this->overrides === null) throw new RuntimeException('language overrides not wired');
+        $planned = $this->contract->languageStringChange($id, $value, $expected);
+        if ($planned['change'] === null) return $id;
+        $files = $this->overrides->write($planned['change']);
+        $this->batchFiles[] = $files;
+        $this->log->record($apply, ['op' => 'languageOverrides', 'locale' => $planned['locale'], 'files' => $files]);
+        return $id;
     }
 
     /**

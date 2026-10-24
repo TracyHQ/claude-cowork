@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
 require_once __DIR__ . '/ContractRows.php';
+require_once __DIR__ . '/LanguageStrings.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/JoomlaLocks.php';
@@ -482,6 +483,30 @@ final class QuickstartContract
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
         return $value;
     }
+    /** This call's rows (see ContractRows), the template language strings the contract names among them. */
+    private function contractRows(): ContractRows {
+        return new ContractRows($this->writer, fn(): array => $this->languageStringRows());
+    }
+    /** The `languageString` rows of every string the contract names, by id (lib/LanguageStrings.php). */
+    private function languageStringRows(): array {
+        $wanted=[];
+        foreach($this->baseEntities() as $entity)if($entity['kind']===LanguageStrings::KIND)$wanted[]=$entity['identity'];
+        return $wanted ? (new LanguageStrings($this->root))->rows($wanted) : [];
+    }
+    /**
+     * The override file change a contract apply makes for one `languageString` operation, checked against the
+     * value the plan read (`expected`): the door writes it, never a language file. Null when nothing changes.
+     *
+     * @return array{locale:string,change:?array{path:string,before:?string,after:string}}
+     */
+    public function languageStringChange(int $id, string $value, ?array $expected): array {
+        $this->ready();
+        $row=$this->languageStringRows()[$id]??null;
+        if($row===null)throw new RuntimeException('Not a language string of this contract: '.$id);
+        if($expected!==null && array_key_exists('value',$expected) && (string)$expected['value']!==$row['value'])
+            throw new ContractProblem('CONFLICT','conflict: the language string '.$row['key'].' changed');
+        return ['locale'=>$row['language'],'change'=>(new LanguageStrings($this->root))->change($row,$value)];
+    }
     /** @param array<string,mixed> $meta the record from {@see inventoryKeys} */
     private function presentation(string $key, array $row, array $meta): array {
         $fields=$this->lock['entities'][$meta['lockKey']]; $filtered=[];
@@ -732,7 +757,7 @@ final class QuickstartContract
         $switcher = $binding['multilingual']['switcher'] ?? null;
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
         // A derived map is rebuilt from the rows it names, so its entities resolve by their own ids.
-        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $this->derivedMode ? ['ids'=>$this->sourceIds()] : $binding, $languages, $switcher);
+        $resolved = $this->resolveRows($this->contractRows(), $keys, $this->derivedMode ? ['ids'=>$this->sourceIds()] : $binding, $languages, $switcher);
         foreach ($resolved['missing'] as $gone) unset($keys[$gone]);
         unset($resolved['missing']);
         $slots = [];
@@ -753,7 +778,7 @@ final class QuickstartContract
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
         // This call's rows, read in bulk and dropped when it returns (see ContractRows).
-        $source = new ContractRows($this->writer);
+        $source = $this->contractRows();
         $languages = $this->effectiveLanguages($binding, $job);
         $switcher = $binding['multilingual']['switcher'] ?? ($job['switcher'] ?? null);
         // A taken edition creates no rows, so a half-run job of one leaves none unnamed behind it.
@@ -904,7 +929,8 @@ final class QuickstartContract
         $counts=array_map('count',$lists);
         // Accounts are not quickstart inventory: every provision adds the owner's own (an author's name and
         // picture are slots, the people on the site are not counted), unless the lock counts them itself.
-        foreach(['user','userProfile'] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
+        // A template's language strings are not rows at all (lib/LanguageStrings.php): only the keys the contract names are read.
+        foreach(['user','userProfile',LanguageStrings::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
         // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
         // design-system slot puts a system on a site as one mod_custom it writes through content.update
         // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart
@@ -968,7 +994,7 @@ final class QuickstartContract
         $binding=$this->store->load();
         if($binding && ($binding['contractHash']??null)!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $keys=$this->inventoryKeys([],null);
-        ['ids'=>$ids,'rows'=>$rows,'missing'=>$missing]=$this->resolveRows(new ContractRows($this->writer),$keys,['ids'=>$this->sourceIds()],[],null);
+        ['ids'=>$ids,'rows'=>$rows,'missing'=>$missing]=$this->resolveRows($this->contractRows(),$keys,['ids'=>$this->sourceIds()],[],null);
         foreach($missing as $gone){unset($keys[$gone]);$this->drift('Derived entity disappeared: '.$gone);}
         $this->settleDrift();
         $slots=[];$slotValues=[];$revisionRows=[];

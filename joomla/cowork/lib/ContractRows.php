@@ -26,10 +26,18 @@ final class ContractRows
     /** @var array<string,array<int,?array>> kind => id => row or null, for ids fetched by readMany */
     private array $known = [];
 
-    public function __construct(SiteWriter $writer)
+    /** @var (callable(): array<int,array>)|null the `languageString` rows a contract names (LanguageStrings::rows) */
+    private $languageStrings;
+
+    /**
+     * @param (callable(): array<int,array>)|null $languageStrings the rows of kind `languageString`, by id: they are
+     * strings of language files, not rows of the writer's tables (lib/LanguageStrings.php). Without it the kind has none.
+     */
+    public function __construct(SiteWriter $writer, ?callable $languageStrings = null)
     {
         $this->writer = $writer;
         $this->bulk = $writer instanceof BulkSiteReader;
+        $this->languageStrings = $languageStrings;
     }
 
     /**
@@ -41,7 +49,10 @@ final class ContractRows
     {
         if (!isset($this->all[$kind])) {
             $rows = [];
-            if ($kind === 'userProfile') {
+            if ($kind === 'languageString') {
+                // Read whole from the files at once (a few dozen strings); never from the writer.
+                foreach ($this->languageStrings ? ($this->languageStrings)() : [] as $id => $row) $rows[(int) $id] = $row;
+            } elseif ($kind === 'userProfile') {
                 // Never read whole (it is one value per author and key): its list rows name the author
                 // (`user_id`) and the field, which is what a contract entity is matched by.
                 for ($offset = 0; $offset < self::LIMIT; $offset += 100) {
@@ -76,7 +87,7 @@ final class ContractRows
      */
     public function summaries(string $kind): array
     {
-        if ($this->bulk) {
+        if ($this->bulk || $kind === 'languageString') {
             $this->all($kind);
             $rows = [];
             // A list row always names its id; a full row does too on Joomla, and keeps its own.
@@ -97,6 +108,7 @@ final class ContractRows
     /** Fetch many ids of one kind in one round trip, so the `row()` calls that follow cost nothing. */
     public function prefetch(string $kind, array $ids): void
     {
+        if ($kind === 'languageString') { $this->all($kind); return; }
         if (!$this->bulk) return;
         $missing = [];
         foreach ($ids as $id) {
@@ -112,6 +124,7 @@ final class ContractRows
     /** What `read($kind, $id)` answers, from memory when this call already holds it. */
     public function row(string $kind, int $id): ?array
     {
+        if ($kind === 'languageString') { $this->all($kind); return $this->all[$kind][$id] ?? null; }
         if ($this->bulk) {
             // A kind read whole is the complete in-scope set: an id outside it is one `read()`
             // would also answer null for, because both apply the same scope.
