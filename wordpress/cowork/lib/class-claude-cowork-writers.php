@@ -911,6 +911,35 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		}
 	}
 
+	/**
+	 * Replace one post's content only while it still holds `$expected`, byte for byte: one UPDATE
+	 * whose WHERE is the compare, so a customer save landing between the read and the write leaves
+	 * the row as the customer saved it and this answers false. The content goes in raw, not through
+	 * `wp_update_post`: no filter, kses or slashing may change a byte of what the caller fingerprinted.
+	 */
+	public function replacePostContentIf( int $id, string $postType, string $expected, string $content ): bool {
+		global $wpdb;
+		$now = function_exists( 'current_time' ) ? (string) current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' );
+		$gmt = function_exists( 'current_time' ) ? (string) current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
+		$done = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->posts} SET post_content = %s, post_modified = %s, post_modified_gmt = %s WHERE ID = %d AND post_type = %s AND CAST(post_content AS BINARY) = CAST(%s AS BINARY)",
+				$content,
+				$now,
+				$gmt,
+				$id,
+				$postType,
+				$expected
+			)
+		);
+		if ( false === $done ) {
+			throw new RuntimeException( 'WordPress could not write post ' . $id . ': ' . (string) $wpdb->last_error );
+		}
+		clean_post_cache( $id );
+		$this->touched[ $id ] = $id;
+		return 1 === (int) $done;
+	}
+
 	public function purgeCache(): void {
 		foreach ( $this->touched as $post_id ) {
 			clean_post_cache( $post_id );

@@ -19,4 +19,20 @@
         <!-- Joomla 3 loads a system plugin from this file and nothing else; Joomla 4+ uses services/. -->
         <filename>claudecoworkapi.php</filename>
     </files>
+    <media folder="media" destination="plg_system_claudecoworkapi">
+        <folder>js</folder>
+    </media>
+    <config>
+        <fields name="params">
+            <fieldset name="basic">
+                <!-- Off (0): no page gets the T3 off-canvas keyboard; the drawer is what T3 draws. -->
+                <field name="t3_offcanvas_a11y" type="radio" default="1" layout="joomla.form.field.radio.switcher"
+                    label="Keyboard for T3 off-canvas drawers"
+                    description="ESC closes a T3 template's off-canvas drawer, focus stays in it while it is open and goes back to its button when it closes, and its close button is announced.">
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+            </fieldset>
+        </fields>
+    </config>
 </extension>

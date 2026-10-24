@@ -968,6 +968,12 @@ class FakeSiteWriterBase implements SiteWriter
         if (!isset($this->store[$kind][$id])) throw new RuntimeException('target does not exist in this scope');
         $this->store[$kind][$id][$column] = $value;
     }
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool
+    {
+        if (!isset($this->store[$kind][$id]) || (string) ($this->store[$kind][$id][$column] ?? '') !== $expected) return false;
+        $this->store[$kind][$id][$column] = $value;
+        return true;
+    }
     /** Every setVisibilityMany() call as [kind, ids, column, value], so a test can show a pass was written in bulk. */
     public array $bulkVisibility = [];
     /**
@@ -1056,6 +1062,28 @@ class FakeSiteWriterBase implements SiteWriter
             foreach ($params as $name => $text) $decoded[(string) $name] = (string) $text;
             $this->store['module'][(int) $id]['params'] = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
+    }
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool
+    {
+        if (!isset($this->store['menuItem'][$id]) || (string) ($this->store['menuItem'][$id]['params'] ?? '') !== $expected) return false;
+        $this->store['menuItem'][$id]['params'] = $params;
+        return true;
+    }
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool
+    {
+        if (!isset($this->store['templateStyle'][$id]) || (string) ($this->store['templateStyle'][$id]['params'] ?? '') !== $expected) return false;
+        $this->store['templateStyle'][$id]['params'] = $params;
+        return true;
+    }
+    /** @var list<int> the parents lockMenuChildren() was asked for, in order */
+    public array $lockedParents = [];
+    public function lockMenuChildren(int $parent): array
+    {
+        $this->lockedParents[] = $parent;
+        $out = [];
+        foreach ($this->store['menuItem'] ?? [] as $id => $row)
+            if ((int) ($row['parent_id'] ?? 0) === $parent && (int) ($row['client_id'] ?? 0) === 0) $out[] = ['id' => $id] + $row;
+        return $out;
     }
     public function realiasMenuItem(int $id, string $alias): void
     {
@@ -2149,6 +2177,7 @@ require __DIR__ . "/written-source-language.php";
 require __DIR__ . "/site-identity.php";
 // The home tab reads the site name alone (lib/HomeTitle.php).
 require __DIR__ . "/home-title.php";
+require __DIR__ . "/t3-offcanvas.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
 require __DIR__ . "/template-site-settings.php";
 // template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.
@@ -2158,6 +2187,7 @@ require __DIR__ . "/language-overrides-plugins-dates.php";
 require __DIR__ . "/language-overrides-literals.php";
 require __DIR__ . "/language-overrides-english-pack.php";
 require __DIR__ . "/multilingual-contracts.php";
+require __DIR__ . "/showcase-nav.php";
 require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/contract-atomic.php";

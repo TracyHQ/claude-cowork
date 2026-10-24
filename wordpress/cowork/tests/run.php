@@ -1831,6 +1831,8 @@ require_once __DIR__ . '/identity-option.php';
 require_once __DIR__ . '/superseded-profile.php';
 // Retiring editions on a sealed multilingual site, and the front-end hooks that go with it.
 require_once __DIR__ . '/multilingual.php';
+// Template showcase out of a sealed site's navigation, and back (showcaseNav.*), over the released maps.
+require_once __DIR__ . '/showcase-nav.php';
 require_once __DIR__ . '/source-locale.php';
 require_once __DIR__ . '/unpublished-address.php';
 require_once __DIR__ . '/unpublished-term.php';

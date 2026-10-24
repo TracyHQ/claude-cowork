@@ -7,6 +7,8 @@ require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/LanguagePackCatalog.php';
 require_once __DIR__ . '/MultilingualApply.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ShowcaseNavProfile.php';
+require_once __DIR__ . '/JsonObjectKey.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
@@ -62,6 +64,9 @@ final class QuickstartContract
     private ?MultilingualProfile $multilingual = null;
     private ?LanguagePackCatalog $packs = null;
     private ?DemoTrimProfile $demoTrim = null;
+    private ?ShowcaseNavProfile $showcaseNav = null;
+    /** Why this contract's showcase-navigation map could not be used, when it ships one that does not load. */
+    private ?string $showcaseNavProblem = null;
     /**
      * The receiver's reviewed ACM layouts (`lib/link-layouts.json`): layout sha256 => link field => what an
      * empty one renders ('hidden': the element is not drawn; 'plain': its words stay, unlinked). Null when
@@ -165,6 +170,24 @@ final class QuickstartContract
             $raw = file_get_contents($trimFile);
             $this->demoTrim = new DemoTrimProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw);
         }
+        // 🔒 THE SHOWCASE MAP IS OPTIONAL, AND A BAD ONE CLOSES ONLY ITSELF. A profile fetched before the
+        // map existed has none and keeps working; one whose map does not load answers showcaseNav.*
+        // with the reason, and every other operation — inspect included — goes on as before. What a
+        // site already had applied is read from its own receipts, never from the map.
+        $navFile = $directory . '/showcase-nav-map.json';
+        if (is_file($navFile)) {
+            try {
+                $raw = (string) file_get_contents($navFile);
+                $nav = new ShowcaseNavProfile(json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $this->map, $this->lock, $directory, $raw, (string) ($this->manifest['id'] ?? ''));
+                // The two profiles must not move the same column of the same row, or one revert would undo the other.
+                foreach ($nav->operations() as $key => $row)
+                    if ($row['kind'] === 'module' && $this->demoTrim && $this->demoTrim->row($key))
+                        throw new RuntimeException('The showcase-navigation map and the demo-trim profile both hide ' . $key);
+                $this->showcaseNav = $nav;
+            } catch (Throwable $error) {
+                $this->showcaseNavProblem = $error->getMessage();
+            }
+        }
     }
     /**
      * A DERIVED contract: an imported site's own rows are the map (DerivedMap), there is no design to
@@ -243,6 +266,10 @@ final class QuickstartContract
         if (!$this->demoTrim) throw new RuntimeException('This contract has no demo-trim profile');
         return $this->demoTrim;
     }
+    /** THIS SITE's showcase-navigation map, or null when its profile ships none (or one that does not load). */
+    public function showcaseNav(): ?ShowcaseNavProfile { $this->ready(); return $this->showcaseNav; }
+    /** Why the shipped showcase-navigation map was refused, or null. */
+    public function showcaseNavProblem(): ?string { return $this->showcaseNavProblem; }
     /** The stored baseline, or null on an unbound site. Read-only: only a validated apply replaces it. */
     public function binding(): ?array { $this->ready(); return $this->store->load(); }
     public function catalog(): LanguagePackCatalog {
@@ -444,14 +471,15 @@ final class QuickstartContract
         $slots=$this->slotsOf($key, $meta);
         $filtered=$this->changeRow($filtered,$slots,array_fill_keys(array_column($slots,'key'),MultilingualProfile::CONTENT_SLOT));
         // Compare semantic JSON, independent of whitespace or key serialization used by Joomla.
-        foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='') {
-            $decoded=json_decode($filtered[$col],true);
-            if(is_array($decoded)) {
-                if(isset($decoded['jatools-config']))$decoded['jatools-config']=json_decode($decoded['jatools-config'],true,512,JSON_THROW_ON_ERROR);
-                $filtered[$col]=$decoded;
-            }
-        }
+        foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='')$filtered[$col]=$this->column($filtered[$col]);
         return $filtered;
+    }
+    /** A JSON column as the baseline holds it: decoded when it is an object or list, else its text. */
+    private function column($text) {
+        $decoded=json_decode((string)$text,true);
+        if(!is_array($decoded))return $text;
+        if(isset($decoded['jatools-config']))$decoded['jatools-config']=json_decode($decoded['jatools-config'],true,512,JSON_THROW_ON_ERROR);
+        return $decoded;
     }
     private function generatedCache(string $path): bool {
         // T4 produces these from the separately hash-locked sources when a route is first viewed.
@@ -461,6 +489,30 @@ final class QuickstartContract
         // Tracy locks list two or three, the JoomlArt ones none — so the first customer to open any
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
+    }
+    /** Where Joomla keeps this plugin's manifest once installed (element `claudecoworkapi`, group `system`). */
+    private const OWN_PLUGIN_MANIFEST = 'plugins/system/claudecoworkapi/claudecoworkapi.xml';
+    /** @var list<string>|null path prefixes under `media/` the installed plugin manifest ships */
+    private ?array $ownMediaPrefixes = null;
+    private function ownMedia(string $path): bool {
+        // This plugin's own assets (the T3 off-canvas keyboard script) land under `media/`, which T3
+        // locks list as a file root, so every T3 site warned about them right after install. Only the
+        // folders and files the installed manifest's <media> declares are exempt; never a PHP file.
+        if($this->ownMediaPrefixes===null) {
+            $this->ownMediaPrefixes=[];
+            $file=$this->root.'/'.self::OWN_PLUGIN_MANIFEST;
+            $xml=is_file($file) && !is_link($file) && filesize($file)<=1048576 ? (string)@file_get_contents($file) : '';
+            $name='[A-Za-z0-9_][A-Za-z0-9_.-]*';
+            if(preg_match('~<media\b[^>]*\bdestination="('.$name.')"[^>]*>(.*?)</media>~s',$xml,$media)) {
+                preg_match_all('~<(folder|filename)>\s*('.$name.')\s*</\1>~',$media[2],$entries,PREG_SET_ORDER);
+                foreach($entries as [,$kind,$entry])
+                    if(!str_contains($entry,'..'))$this->ownMediaPrefixes[]='media/'.$media[1].'/'.$entry.($kind==='folder'?'/':'');
+            }
+        }
+        if(str_contains($path,'/../') || preg_match('~\.(php[0-9]*|phtml|phar)$~i',$path))return false;
+        foreach($this->ownMediaPrefixes as $prefix)
+            if(str_ends_with($prefix,'/') ? str_starts_with($path,$prefix) : $path===$prefix)return true;
+        return false;
     }
     private function unlistedStyleCache(string $path): bool {
         // A fresh T4 site compiles its main style CSS on first view too (JA Resort: 9.css, 10.css).
@@ -534,6 +586,7 @@ final class QuickstartContract
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if(($this->generatedCache($relative) || $this->unlistedStyleCache($relative)) && !$file->isLink())continue;
                 if(TemplateSiteSettings::isDoorFile($relative) && !$file->isLink())continue;
+                if($this->ownMedia($relative) && !$file->isLink())continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }
@@ -692,15 +745,24 @@ final class QuickstartContract
                     throw new RuntimeException('The installed multilingual profile changed');
         }
         $trim = $binding['demoTrim'] ?? null;
+        // A finished revert's record only answers that revert again: no demo row is hidden by it.
+        if (($trim['status'] ?? null) === 'reverted') $trim = null;
         if ($trim !== null) {
             if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the receiver carries no demo-trim profile');
             if (!hash_equals((string) $trim['profileHash'], $this->demoTrim->hash())) throw new RuntimeException('The installed demo-trim profile changed');
         }
-        // While a trim or its revert is in flight, a listed row may stand at either end of its move:
+        // While a trim is in flight, a listed row may stand at either end of its move:
         // a batch is bounded, not atomic (Joomla's nested tables commit implicitly), so the site can
         // genuinely be half-moved. Only the listed rows, only on their visibility column, and only
         // between the two values the profile names — everything else is held exactly as before.
-        $trimMoving = $trim !== null && in_array($trim['status'] ?? null, ['applying', 'reverting'], true);
+        // A record that names its rows owns only those: a row the customer had already moved is not
+        // the trim's, and stays drift. A record from before rows were named owns every listed row.
+        // 🔒 NOT WHILE A REVERT IS: an apply's finish expects every row it owns hidden, so a half-moved
+        // row is the apply's either way, but a revert rebases only the rows each of its calls wrote. A
+        // row shown that no call of it wrote is drift from the moment it differs — held back until the
+        // revert finished, it would read as a difference that last call made, and refuse it.
+        $trimMoving = $trim !== null && ($trim['status'] ?? null) === 'applying';
+        $trimOwned = isset($trim['rows']) ? array_flip($trim['rows']) : null;
         // The one phase in which a translated source row may legitimately still be at `*`: the
         // retag is chunked, so mid-phase the site is genuinely half-moved. Every other phase, and
         // every state with no job at all, demands the finished answer.
@@ -753,7 +815,7 @@ final class QuickstartContract
                     $allowed=$transitional?['*',$this->multilingual->sourceLanguage()]:($retagged?[$this->multilingual->sourceLanguage()]:['*']);
                     if(in_array((string)$actual['language'],$allowed,true))$expected['language']=(string)$actual['language'];
                 }
-                $trimRow = $trimMoving ? $this->demoTrim->row($key) : null;
+                $trimRow = $trimMoving && ($trimOwned === null || isset($trimOwned[$key])) ? $this->demoTrim->row($key) : null;
                 if ($trimRow !== null && in_array((string) ($actual[$trimRow['field']] ?? ''), [$trimRow['from'], $trimRow['to']], true))
                     $expected[$trimRow['field']] = (string) $actual[$trimRow['field']];
                 if(!$binding)foreach(['template_style_id'=>'templateStyle','catid'=>'category','parent_id'=>$meta['kind']==='category'?'category':'menuItem'] as $field=>$kind) {
@@ -845,6 +907,7 @@ final class QuickstartContract
         // Carried through every rebind, or the next content edit would store a baseline that no
         // longer knows the demo was hidden — and the one after that would call it drift.
         if(isset($binding['demoTrim']))$snapshot['demoTrim']=$binding['demoTrim'];
+        if(isset($binding['showcaseNav']))$snapshot['showcaseNav']=$binding['showcaseNav'];
         if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         $revisionRows=[];
@@ -865,7 +928,9 @@ final class QuickstartContract
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
-            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null];
+            'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null,
+            // A finished revert's record only answers that revert again: no showcase navigation is applied.
+            'showcaseNav'=>($binding['showcaseNav']['status']??null)==='reverted'?null:($binding['showcaseNav']['status']??null)];
     }
 
     /**
@@ -1262,28 +1327,49 @@ final class QuickstartContract
 
     /* ------------------------------------------------------------ demo trim */
 
-    /** The baseline with a trim on record, before or while rows move. */
-    public function bindingWithTrim(array $record): array {
+    /**
+     * The baseline with the trim's record and the values its writes moved: only the rows the trim
+     * wrote, with the values it wrote, become what is protected from then on. Every other row keeps
+     * the baseline it had, so a change the customer made is still reported.
+     *
+     * @param array<string, array{0: string, 1: string}> $moved key => [field, value]
+     */
+    public function bindingWithTrim(array $record, array $moved = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A demo trim needs a bound site');
         $binding['demoTrim']=$record;
+        foreach($moved as $key=>[$field,$value])$binding['presentation'][$key][$field]=$value;
         return $binding;
     }
-    /** Every listed row expected hidden from now on. Derived from the profile, never read back from the site. */
-    public function bindingAfterTrim(): array {
+
+    /* ------------------------------------------------------------ showcase navigation */
+
+    /**
+     * The baseline with the showcase-navigation record — or none, when `$record` is null — and the
+     * values its writes moved, so the rows it took out of navigation are what is protected from then
+     * on and nothing else is.
+     *
+     * @param list<array{key:string,kind:string,exists:bool,value:mixed,blank?:bool}> $moved what each written row now holds;
+     *        `blank` the row's empty, whitespace-only or `[]` params text when it holds that again
+     */
+    public function bindingWithShowcaseNav(?array $record, array $moved = []): array {
         $binding=$this->store->load();
-        if(!$binding || !isset($binding['demoTrim']))throw new RuntimeException('No demo trim is on record');
-        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['to'];
-        $binding['demoTrim']['status']='complete';
-        $binding['demoTrim']['completedAt']=gmdate('c');
-        return $binding;
-    }
-    /** Every listed row expected at its locked value again, and no trim on record — as if it never happened. */
-    public function bindingAfterTrimRevert(): array {
-        $binding=$this->store->load();
-        if(!$binding)throw new RuntimeException('A revert needs a bound site');
-        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['from'];
-        unset($binding['demoTrim']);
+        if(!$binding)throw new RuntimeException('Showcase navigation needs a bound site');
+        if($record===null)unset($binding['showcaseNav']);else $binding['showcaseNav']=$record;
+        foreach($moved as $row) {
+            if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
+            if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
+            // A template style's whole column, as this job wrote or found it.
+            if($row['kind']==='templateStyle'){$binding['presentation'][$row['key']]['params']=$this->column((string)$row['raw']);continue;}
+            $params=$binding['presentation'][$row['key']]['params']??null;
+            // An empty or whitespace-only column is held as its text, as the row reads it: Joomla's {} and back again.
+            if(is_string($params)&&trim($params)==='')$params=[];
+            if(!is_array($params))throw new RuntimeException('The baseline holds no params for '.$row['key']);
+            if($row['exists'])$params[ShowcaseNavProfile::MENU_PARAM]=$row['value'];else unset($params[ShowcaseNavProfile::MENU_PARAM]);
+            $blank=$row['blank']??false;
+            // Held as presentation() reads that text: `[]` decodes to an empty list, a blank column stays text.
+            $binding['presentation'][$row['key']]['params']=is_string($blank)&&$params===[]?$this->column($blank):$params;
+        }
         return $binding;
     }
 

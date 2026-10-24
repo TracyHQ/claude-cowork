@@ -23,6 +23,8 @@
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/IdentityTokens.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
+require_once __DIR__ . '/ShowcaseNavMarkup.php';
+require_once __DIR__ . '/ShowcaseNavProfile.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
@@ -103,6 +105,9 @@ final class QuickstartContract
     private array $lock = [];
     private string $contractHash = '';
     private ?DemoTrimProfile $demoTrim = null;
+    private ?ShowcaseNavProfile $showcaseNav = null;
+    /** Why the contract's showcase-navigation map was refused; the contract itself still serves. */
+    private ?string $showcaseNavProblem = null;
     private ?array $editions = null;
     /** Base hashes of earlier bytes of THIS profile a binding may still name (superseded.json). */
     private array $acceptedBases = [];
@@ -261,6 +266,8 @@ final class QuickstartContract
         $this->derivedBuilt = null;
         $this->contractHash = DemoTrimProfile::baseHash($directory);
         $this->demoTrim = null;
+        $this->showcaseNav = null;
+        $this->showcaseNavProblem = null;
         $this->editions = null;
         $this->acceptedBases = [];
         $this->acceptedTrims = [];
@@ -275,6 +282,24 @@ final class QuickstartContract
                 $this->demoTrim = new DemoTrimProfile(self::json($raw, 'demo-trim-map.json'), $directory, $raw);
             } catch (RuntimeException $e) {
                 throw new ContractUnavailable($id . ': ' . $e->getMessage());
+            }
+        }
+        // Unlike the two above, a showcase-navigation map the receiver refuses leaves the contract
+        // whole: it only edits rows the seal does not govern, so `showcaseNav.*` answers `unsupported`
+        // with the reason and every other operation is as it was.
+        $navFile = $directory . '/showcase-nav-map.json';
+        if (is_file($navFile)) {
+            $raw = (string) file_get_contents($navFile);
+            try {
+                $governed = [];
+                foreach ($this->map['entities'] as $entity) {
+                    if (is_array($entity) && ($entity['kind'] ?? '') === 'templatePart') {
+                        $governed[] = (string) ($entity['identity']['slug'] ?? '');
+                    }
+                }
+                $this->showcaseNav = new ShowcaseNavProfile(self::json($raw, 'showcase-nav-map.json'), $directory, $raw, $id, $this->lock, $governed);
+            } catch (Throwable $e) {
+                $this->showcaseNavProblem = $e->getMessage();
             }
         }
         $editionsFile = $directory . '/editions.json';
@@ -362,6 +387,17 @@ final class QuickstartContract
             throw new RuntimeException('This contract has no demo-trim profile');
         }
         return $this->demoTrim;
+    }
+
+    /** The contract's showcase-navigation map, or null when it ships none or ships one this receiver refuses. */
+    public function showcaseNav(): ?ShowcaseNavProfile
+    {
+        return $this->showcaseNav;
+    }
+
+    public function showcaseNavProblem(): ?string
+    {
+        return $this->showcaseNavProblem;
     }
 
     /** Polylang slugs this contract ships an edition for; the source alone when there is no editions profile. */
@@ -600,15 +636,28 @@ final class QuickstartContract
                 $governedParts[(string) ($entity['identity']['slug'] ?? '')] = true;
             }
         }
+        // 🔒 ONLY WHAT A SHOWCASE-NAVIGATION APPLY WROTE MOVES THE BASELINE, and only to the bytes it
+        // wrote: a part it found already edited (its receipt says conflict) is still reported, and a
+        // part edited after its write no longer matches either end.
+        $navWritten = [];
+        foreach (self::showcaseNavRecord($binding)['receipts'] ?? [] as $receipt) {
+            if (is_array($receipt) && ($receipt['kind'] ?? '') === 'templatePart' && in_array($receipt['outcome'] ?? '', ['written', 'writing'], true)) {
+                $navWritten[(string) ($receipt['slug'] ?? '')] = (string) ($receipt['after'] ?? '');
+            }
+        }
         $templateParts = $this->lock['templateParts'] ?? [];
         foreach (is_array($templateParts) ? $templateParts : [] as $slug => $pin) {
             if (isset($governedParts[$slug])) {
                 continue; // held by its skeleton below, not by a whole-content hash
             }
             $part = $this->writer->read('templatePart', 0, (string) $slug);
+            $sha = $part === null ? null : hash('sha256', (string) $part['content']);
+            if ($sha !== null && isset($navWritten[$slug]) && hash_equals($navWritten[$slug], $sha)) {
+                continue; // the bytes a showcase-navigation apply wrote here, and its receipt holds what it found
+            }
             if ($part === null) {
                 $drift[] = 'Template part ' . $slug . ' is missing (the theme file is in charge)';
-            } elseif (!hash_equals((string) ($pin['sha256'] ?? ''), hash('sha256', (string) $part['content']))) {
+            } elseif (!hash_equals((string) ($pin['sha256'] ?? ''), $sha)) {
                 $drift[] = 'Template part ' . $slug . ' was edited';
             }
         }
@@ -739,6 +788,7 @@ final class QuickstartContract
             'imageSlots' => $imageSlots,
             'rows' => $rows,
             'demoTrim' => $trim,
+            'showcaseNav' => self::showcaseNavRecord($binding),
             'sourceLanguage' => isset($binding['sourceLanguage']) && is_array($binding['sourceLanguage']) ? $binding['sourceLanguage'] : null,
             'multilingual' => self::multilingualState($binding),
             'siteLanguage' => self::siteLanguageState($binding),
@@ -747,6 +797,11 @@ final class QuickstartContract
             'drift' => $drift,
             'missing' => $missing,
         ];
+    }
+
+    private static function showcaseNavRecord(?array $binding): ?array
+    {
+        return isset($binding['showcaseNav']) && is_array($binding['showcaseNav']) ? $binding['showcaseNav'] : null;
     }
 
     /**
@@ -1495,6 +1550,8 @@ final class QuickstartContract
         $this->lock = [];
         $this->contractHash = self::derivedHash($algorithm);
         $this->demoTrim = null;
+        $this->showcaseNav = null;
+        $this->showcaseNavProblem = null;
         $this->editions = null;
         $this->acceptedBases = [];
         $this->acceptedTrims = [];

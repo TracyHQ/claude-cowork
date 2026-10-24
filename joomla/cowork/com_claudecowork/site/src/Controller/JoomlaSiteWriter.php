@@ -599,6 +599,23 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $this->setVisibilityMany($kind, [$id], $column, $value);
     }
 
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool
+    {
+        if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
+        if ($kind === 'article') throw new \RuntimeException('An article\'s state is not written by compare-and-set');
+        if ($id <= 0) return false;
+        $col = $this->db->quoteName($column);
+        // One raw UPDATE of one column, as setVisibilityMany(): the check is in its WHERE.
+        $query = $this->db->getQuery(true)
+            ->update($this->db->quoteName($this->tableFor($kind)))
+            ->set($col . ' = ' . (int) $value)
+            ->where($this->db->quoteName($this->pkFor($kind)) . ' = ' . $id)
+            ->where($col . ' = ' . (int) $expected);
+        $this->applyScope($kind, $query);
+        $this->db->setQuery($query)->execute();
+        return $this->db->getAffectedRows() === 1;
+    }
+
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void
     {
         if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
@@ -805,6 +822,56 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $name = $xml !== false && isset($xml->name) ? (string) $xml->name : $tag;
         $native = $xml !== false && isset($xml->metadata->nativeName) ? (string) $xml->metadata->nativeName : $name;
         return ['title' => $name, 'title_native' => $native, 'image' => strtolower(str_replace('-', '_', $tag))];
+    }
+
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool
+    {
+        if ($id <= 0) return false;
+        $db = $this->db;
+        // 🔒 BYTES, NOT THE COLLATION. `params` is text under the site's collation — utf8mb4_unicode_ci
+        // on Joomla 4/5/6 — where `=` ignores case (and trailing spaces under PAD SPACE): a customer's
+        // "A" to "a" in another param would still match and be overwritten. CAST(... AS BINARY) on
+        // both sides compares bytes on MySQL 5.6–9 and MariaDB alike (the bare BINARY operator is
+        // deprecated from MySQL 8.0.27).
+        $query = $db->getQuery(true)
+            ->update($db->quoteName('#__menu'))
+            ->set($db->quoteName('params') . ' = ' . $db->quote($params))
+            ->where($db->quoteName('id') . ' = ' . (int) $id)
+            ->where('CAST(' . $db->quoteName('params') . ' AS BINARY) = CAST(' . $db->quote($expected) . ' AS BINARY)');
+        $this->applyScope('menuItem', $query);
+        $db->setQuery($query)->execute();
+        return $db->getAffectedRows() === 1;
+    }
+
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool
+    {
+        if ($id <= 0) return false;
+        $db = $this->db;
+        // Bytes, not the collation: see replaceMenuItemParams.
+        $query = $db->getQuery(true)
+            ->update($db->quoteName('#__template_styles'))
+            ->set($db->quoteName('params') . ' = ' . $db->quote($params))
+            ->where($db->quoteName('id') . ' = ' . (int) $id)
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where('CAST(' . $db->quoteName('params') . ' AS BINARY) = CAST(' . $db->quote($expected) . ' AS BINARY)');
+        $this->applyScope('templateStyle', $query);
+        $db->setQuery($query)->execute();
+        return $db->getAffectedRows() === 1;
+    }
+
+    public function lockMenuChildren(int $parent): array
+    {
+        if ($parent <= 0) return [];
+        $db = $this->db;
+        // A LOCKING read: the latest committed rows, not this transaction's snapshot, and a gap lock on the
+        // (client_id, parent_id, …) unique index so a child inserted under $parent waits for our commit.
+        $query = $db->getQuery(true)
+            ->select($db->quoteName(['id', 'parent_id', 'lft', 'menutype', 'language', 'published', 'params']))
+            ->from($db->quoteName('#__menu'))
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where($db->quoteName('parent_id') . ' = ' . (int) $parent)
+            ->order($db->quoteName('id') . ' ASC');
+        return $db->setQuery((string) $query . ' FOR UPDATE')->loadAssocList() ?? [];
     }
 
     public function realiasMenuItem(int $id, string $alias): void
