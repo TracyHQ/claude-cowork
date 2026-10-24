@@ -16,12 +16,14 @@
   var FOCUSABLE = 'a[href], area[href], button, input, select, textarea, iframe, summary, [tabindex], [contenteditable="true"]';
 
   function start() {
-    var toggles = [].slice.call(document.querySelectorAll('.off-canvas-toggle[data-nav]'));
+    var toggles = [];
     var drawers = [];
-    toggles.forEach(function (toggle) {
+    [].slice.call(document.querySelectorAll('.off-canvas-toggle[data-nav]')).forEach(function (toggle) {
       var drawer = document.querySelector(toggle.getAttribute('data-nav'));
-      // Only the drawer T3 draws: anything else is not what this script was checked against.
-      if (!drawer || !drawer.classList.contains('t3-off-canvas')) return;
+      // Only the drawer T3 draws, with the × T3 closes it by: ESC has no other way to close it, so a
+      // drawer without one is left as T3 leaves it — no trap, no ESC taken from the page.
+      if (!drawer || !drawer.classList.contains('t3-off-canvas') || !drawer.querySelector('.close')) return;
+      toggles.push(toggle);
       if (drawers.indexOf(drawer) === -1) drawers.push(drawer);
       if (!toggle.getAttribute('aria-label') && !toggle.textContent.trim()) toggle.setAttribute('aria-label', options.open || 'Toggle Navigation');
       if (drawer.id) toggle.setAttribute('aria-controls', drawer.id);
@@ -31,7 +33,6 @@
     document.body.setAttribute('data-cowork-offcanvas', '');
     drawers.forEach(function (drawer) {
       var close = drawer.querySelector('.close');
-      if (!close) return;
       // The × is a real button that shows and works; aria-hidden only kept it from being announced.
       close.removeAttribute('aria-hidden');
       if (!close.getAttribute('aria-label')) close.setAttribute('aria-label', options.close || 'Close');
@@ -43,14 +44,17 @@
     var openedAt = 0;
     document.addEventListener('click', function (e) {
       var toggle = e.target && e.target.closest && e.target.closest('.off-canvas-toggle[data-nav]');
-      if (toggle && !isOpen()) { opener = toggle; openedAt = Date.now(); }
+      if (toggle && toggles.indexOf(toggle) !== -1 && !isOpen()) { opener = toggle; openedAt = Date.now(); }
     }, true);
 
+    // A drawer its × did not close: from then on it is left to T3 alone, untrapped, ESC the page's.
+    var stuck = [];
     function current() {
       for (var i = 0; i < drawers.length; i++) if (drawers[i].classList.contains('off-canvas-current')) return drawers[i];
       return null;
     }
     function isOpen() { return document.body.classList.contains('off-canvas-open') && current() !== null; }
+    function held() { return isOpen() && stuck.indexOf(current()) === -1; }
     function visible(el) {
       if (el.disabled || el.getAttribute('tabindex') === '-1' || el.closest('[inert]')) return false;
       var style = window.getComputedStyle(el);
@@ -91,15 +95,19 @@
         if (tries > 0 && Date.now() - openedAt < 400) closing = setTimeout(function () { shut(tries - 1); }, 60);
         return;
       }
-      var close = drawer.querySelector('.close');
-      if (close) close.click();
-      if (tries > 0) closing = setTimeout(function () { if (isOpen()) shut(tries - 1); }, 150);
+      drawer.querySelector('.close').click();
+      closing = setTimeout(function () {
+        closing = null;
+        if (!isOpen()) return;
+        if (tries > 0) shut(tries - 1);
+        else if (stuck.indexOf(drawer) === -1) stuck.push(drawer);
+      }, 150);
     }
 
     document.addEventListener('keydown', function (e) {
       var drawer = current();
-      var open = isOpen();
-      if ((e.key === 'Escape' || e.key === 'Esc') && !e.defaultPrevented && (open || Date.now() - openedAt < 400)) {
+      var open = held();
+      if ((e.key === 'Escape' || e.key === 'Esc') && !e.defaultPrevented && (open || (!isOpen() && Date.now() - openedAt < 400))) {
         // A dialog of its own inside the drawer keeps its ESC.
         var dialog = e.target && e.target.closest ? e.target.closest('[role="dialog"], dialog, .modal') : null;
         if (dialog && drawer && drawer.contains(dialog)) return;
@@ -121,7 +129,7 @@
     // Focus that lands outside an open drawer some other way is brought back to it.
     document.addEventListener('focusin', function (e) {
       var drawer = current();
-      if (isOpen() && drawer && !drawer.contains(e.target)) into(drawer);
+      if (held() && drawer && !drawer.contains(e.target)) into(drawer);
     });
   }
 

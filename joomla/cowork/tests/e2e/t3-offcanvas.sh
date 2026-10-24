@@ -13,6 +13,8 @@
 #    and reach the ×, which is a button named "Close" and not hidden from screen readers; ESC closes
 #    it — right after opening too — and focus is back on ☰, from where Tab goes where it went before
 #    the drawer was ever opened. The × and a click on the page behind close it as before, focus back on ☰.
+#    A drawer the adapter cannot close — its × taken out, or a × that never reaches T3 — is not trapped
+#    and keeps ESC for the page: Tab leaves it, and ESC is taken at most while the × is being tried.
 # 2. the switch off: the page carries no adapter, and the drawer does what T3 alone does (ESC does nothing).
 # 3. a site on Cassiopeia (not T3): the page is the same bytes with the switch on and off, and has no adapter.
 # T3's and the template's files are the bytes the quickstart shipped, before and after.
@@ -55,7 +57,7 @@ docker run -d --name "$P-proxy" --network "$NET" -p 127.0.0.1::80 -v "$WORK/prox
 URL="http://$(docker port "$P-proxy" 80/tcp | head -1)/"
 for _ in $(seq 1 30); do curl -fsS -o /dev/null "$URL" 2>/dev/null && break; sleep 1; done
 
-browse() { node "$HERE/t3-offcanvas.mjs" "$URL" "$PLAYWRIGHT_CORE"; }
+browse() { node "$HERE/t3-offcanvas.mjs" "$URL" "$PLAYWRIGHT_CORE" "$@"; }
 # One field of the line for one width.
 at() { node -e 'const [w, k, text] = process.argv.slice(1); const line = text.split("\n").map((l) => JSON.parse(l)).find((l) => l.width === +w);
   const v = line?.[k]; process.stdout.write(typeof v === "object" ? JSON.stringify(v) : String(v))' "$1" "$2" "$3"; }
@@ -85,6 +87,18 @@ for w in 390 768 1440; do
   expect "$w: the page scrolls again, and no script error" "$(at $w scrollLocked "$ON") $(at $w errors "$ON")" "false []"
 done
 PAGE_ON=$(curl -fsS "$URL")
+
+say "1b. drawers the adapter cannot close"
+NOCLOSE=$(browse noclose)
+echo "$NOCLOSE"
+DEADCLOSE=$(browse deadclose)
+echo "$DEADCLOSE"
+for w in 390 768 1440; do
+  expect "$w: no ×: the drawer opens, ESC stays the page's, Tab leaves it" \
+    "$(at $w closeCount "$NOCLOSE") $(at $w opened "$NOCLOSE") $(at $w escTaken "$NOCLOSE") $([ "$(at $w tabLeaves "$NOCLOSE")" -gt 0 ] && echo leaves) $(at $w errors "$NOCLOSE")" "0 true [false,false] leaves []"
+  expect "$w: a × that does not close: tried once, then ESC is the page's and Tab leaves it" \
+    "$(at $w closeCount "$DEADCLOSE") $(at $w stillOpen "$DEADCLOSE") $(at $w escTaken "$DEADCLOSE") $([ "$(at $w tabLeaves "$DEADCLOSE")" -gt 0 ] && echo leaves) $(at $w errors "$DEADCLOSE")" "1 true [true,false] leaves []"
+done
 
 say "2. the switch off"
 switch 0

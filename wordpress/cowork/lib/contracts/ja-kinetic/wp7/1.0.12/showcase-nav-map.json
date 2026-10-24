@@ -67,13 +67,47 @@
       "key": "templatePart-1777",
       "before": "d7372881c638632f075aeffa69090377f4a48923597f6f1648bf4cc743383e33",
       "after": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d"
+    },
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 1777,
+        "slug": "header"
+      },
+      "label": "Blueprint",
+      "block": {
+        "name": "core/list-item",
+        "contains": "href=\"/home-menu/home-blueprint\""
+      },
+      "rule": "hide.alias-of-hidden",
+      "reason": "another link to \"Blueprint\", which leaves the navigation (Home › Blueprint)",
+      "key": "templatePart-1777",
+      "before": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d",
+      "after": "8b90ccde7d08af9b1cc2b214724de2e9d1d851fed4e846af9d5f3d4cf59a3dbd"
+    },
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 1777,
+        "slug": "header"
+      },
+      "label": "Signal",
+      "block": {
+        "name": "core/list-item",
+        "contains": "href=\"/home-menu/home-signal\""
+      },
+      "rule": "hide.alias-of-hidden",
+      "reason": "another link to \"Signal\", which leaves the navigation (Home › Signal)",
+      "key": "templatePart-1777",
+      "before": "8b90ccde7d08af9b1cc2b214724de2e9d1d851fed4e846af9d5f3d4cf59a3dbd",
+      "after": "dd43a46af328e9ef1ad79c4ce90c2f720cb5507ee33cb90672325a199c98d7a9"
     }
   ],
   "finals": [
     {
       "key": "templatePart-1777",
       "before": "2d4ba41f179a7c59dd3c9692175edd23f36f4f4ec4160cedd53a655f37a1f693",
-      "after": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d"
+      "after": "dd43a46af328e9ef1ad79c4ce90c2f720cb5507ee33cb90672325a199c98d7a9"
     }
   ],
   "kept": [
@@ -587,7 +621,7 @@
   "unresolved": [],
   "counts": {
     "links": 2,
-    "templateParts": 0,
+    "templateParts": 2,
     "kept": 44,
     "unresolved": 0
   }

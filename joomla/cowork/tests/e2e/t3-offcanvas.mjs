@@ -1,11 +1,14 @@
 // The T3 off-canvas drawer, driven from the keyboard in a real browser: what t3-offcanvas.sh asserts.
 //
-//   node t3-offcanvas.mjs <site URL> <playwright-core folder>
+//   node t3-offcanvas.mjs <site URL> <playwright-core folder> [variant]
 //
 // Prints one JSON line per viewport (390, 768, 1440): what the page has and what each key did.
+// A variant is a drawer the adapter cannot close, where it has to leave the keyboard to T3 and the page:
+//   noclose    the drawer's × is taken out of the page T3 draws
+//   deadclose  the × is there, but a click on it never reaches T3
 import { createRequire } from 'node:module';
 
-const [url, core] = process.argv.slice(2);
+const [url, core, variant] = process.argv.slice(2);
 const { chromium } = createRequire(import.meta.url)(core);
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -20,11 +23,40 @@ const focused = (page) => page.evaluate(() => {
 });
 const isOpen = (page) => page.evaluate(() => document.body.classList.contains('off-canvas-open'));
 
+// What became of the drawer's keys on a page whose × the adapter cannot use.
+async function stranded(page, toggle, out) {
+  // Whether anything took ESC from the page: read last, after every listener had its turn.
+  await page.evaluate(() => { window.escTaken = []; window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.escTaken.push(e.defaultPrevented); }); });
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await pause(400);
+  out.opened = await isOpen(page);
+  out.focusOnOpen = await focused(page);
+  await page.keyboard.press('Escape');
+  // Every retry the adapter may make, and then some.
+  await pause(2500);
+  out.stillOpen = await isOpen(page);
+  await page.keyboard.press('Escape');
+  out.escTaken = await page.evaluate(() => window.escTaken);
+  const tabs = [];
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Tab'); tabs.push(await focused(page)); }
+  out.tabLeaves = tabs.filter((f) => !f.startsWith('drawer:')).length;
+}
+
 const browser = await chromium.launch();
 try {
   for (const width of [390, 768, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
     const page = await context.newPage();
+    if (variant === 'noclose') await page.route(url, async (route) => {
+      const response = await route.fetch();
+      const html = (await response.text()).replace(/<button\b[^>]*\bclass="[^"]*\bclose\b[^"]*"[^>]*>[\s\S]*?<\/button>/g, '');
+      await route.fulfill({ response, body: html });
+    });
+    // Ahead of every script of the page, so the click stops before T3's own listener on the ×.
+    if (variant === 'deadclose') await page.addInitScript(() => window.addEventListener('click', (e) => {
+      if (e.target instanceof Element && e.target.closest('.t3-off-canvas .close')) e.stopImmediatePropagation();
+    }, true));
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(url, { waitUntil: 'load' });
@@ -39,6 +71,14 @@ try {
     await toggle.focus();
     await page.keyboard.press('Tab');
     out.afterToggle = await focused(page);
+    if (variant) {
+      out.closeCount = await page.evaluate(() => document.querySelectorAll('.t3-off-canvas .close').length);
+      await stranded(page, toggle, out);
+      out.errors = errors;
+      console.log(JSON.stringify(out));
+      await context.close();
+      continue;
+    }
 
     // Open from the keyboard.
     await toggle.focus();

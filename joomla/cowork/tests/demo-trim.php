@@ -191,3 +191,14 @@ check('answering its retry', $oCall(['operation' => 'demoTrim.revert', 'apply_id
 $oAgain = $oCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-o2', 'request_id' => 'o2']);
 check('a new request trims a reverted site again', [$oAgain['status'] ?? $oAgain, $ow->store['article'][202]['state'], $oStore->binding['demoTrim']['applyId']], ['completed', '0', 'dtrim-o2']);
 
+
+// 🔒 THE REVERT REBASES ONLY WHAT IT WROTE. A trimmed row the customer showed again after the trim is
+// theirs: the revert does not write it, its baseline stays hidden, and it is still reported after.
+[$uStore, $uw, $uContract, $uCall] = $trimSite();
+check('a trimmed site', $uCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-u', 'request_id' => 'u1'])['status'] ?? null, 'completed');
+$uw->store['article'][202]['state'] = '1';
+check('the customer showing a trimmed row again is drift', $trimDrifted($uContract), ['article-post']);
+$uBack = $uCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-uu', 'request_id' => 'u2']);
+check('the revert writes only the rows still hidden', [$uBack['status'] ?? $uBack, $uBack['moved'] ?? null, $uw->store['article'][203]['state'], $uw->store['menuItem'][330]['published']], ['reverted', 2, '1', '1']);
+check('and leaves the row the customer showed where its baseline was', [$uStore->binding['presentation']['article-post']['state'], $uStore->binding['presentation']['article-old']['state']], ['0', '1']);
+check('so the customer change is still reported after the revert', $trimDrifted($uContract), ['article-post']);

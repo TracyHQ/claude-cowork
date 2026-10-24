@@ -2253,6 +2253,10 @@ final class Engine
                     // 🔒 THE TRIM OWNS ONLY THE ROWS IT FINDS WHERE THE LOCK HAS THEM. A listed row the
                     // customer already hid is theirs: it is not written, not rebased, and not shown on revert.
                     if ($hide) $record['rows'] = array_keys($this->demoTrimPending($state, true, null));
+                    // 🔒 THE REVERT OWNS ONLY THE TRIM'S ROWS IT FINDS STILL HIDDEN. One the customer showed
+                    // again after the trim is theirs: it is not written, and its baseline stays the hidden
+                    // value, so the change is still reported after the revert.
+                    else $record['revert']['rows'] = array_keys($this->demoTrimPending($state, false, $record));
                     $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
                     if (!$state['binding']) $this->contract->bind($state['snapshot']);
                     $this->contract->rebind($this->contract->bindingWithTrim($record));
@@ -2281,7 +2285,7 @@ final class Engine
                 if ($remaining === 0) {
                     // Every row the trim owns is expected at this direction's end, derived from the
                     // profile and the record, never read back from the site.
-                    foreach ($this->demoTrimOwned($record) as $key => $row) $moved[$key] = [$row['field'], $hide ? $row['to'] : $row['from']];
+                    foreach ($this->demoTrimOwned($record, $hide) as $key => $row) $moved[$key] = [$row['field'], $hide ? $row['to'] : $row['from']];
                     if ($hide) $record = ['status' => 'complete', 'completedAt' => gmdate('c')] + $record;
                     else $record = ['status' => 'reverted', 'revert' => ['completedAt' => gmdate('c')] + ($record['revert'] ?? [])] + $record;
                 }
@@ -2808,7 +2812,7 @@ final class Engine
     {
         $out = [];
         $named = $record === null || isset($record['rows']);
-        foreach ($this->demoTrimOwned($record) as $key => $row) {
+        foreach ($this->demoTrimOwned($record, $hide) as $key => $row) {
             $want = $hide ? $row['to'] : $row['from'];
             $actual = (string) ($state['rows'][$key][$row['field']] ?? '');
             if ($named ? $actual === ($hide ? $row['from'] : $row['to']) : $actual !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
@@ -2816,11 +2820,16 @@ final class Engine
         return $out;
     }
 
-    /** The listed rows a trim record owns: those it names, or every listed row for a record that names none. */
-    private function demoTrimOwned(?array $record): array
+    /**
+     * The listed rows a trim record owns: those it names, or every listed row for a record that names none.
+     * A revert owns those of them it named when it began; one begun before reverts named rows owns them all.
+     */
+    private function demoTrimOwned(?array $record, bool $hide = true): array
     {
         $rows = $this->contract->demoTrim()->rows();
-        return isset($record['rows']) ? array_intersect_key($rows, array_flip($record['rows'])) : $rows;
+        if (isset($record['rows'])) $rows = array_intersect_key($rows, array_flip($record['rows']));
+        if (!$hide && isset($record['revert']['rows'])) $rows = array_intersect_key($rows, array_flip($record['revert']['rows']));
+        return $rows;
     }
 
     /** Rows moved per committed call of showcaseNav.apply and .revert. */
