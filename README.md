@@ -6,7 +6,8 @@ token-authenticated endpoint.
 
 **Every action is named and bounded.** There is no shell, no arbitrary file write, and nothing the
 extension does not implement by hand. Most of the surface reads. The write side installs a plugin,
-theme or extension, edits a post or an option, and puts a file into the media library — nothing
+theme or extension, edits a post or an option, puts a file into the media library, and writes a
+file of the site's own template or theme over the exact bytes the caller says are there — nothing
 else.
 
 **Every change can be taken back.** Each edit is recorded under the caller's `apply_id`, so one

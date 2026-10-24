@@ -1896,6 +1896,8 @@ require __DIR__ . '/block-words.php';
 require __DIR__ . '/revert-span.php';
 // A page's search title and meta description: the SEO plugin's keys, or with none the plugin's own meta it prints.
 require __DIR__ . '/seo-fields.php';
+// template.files.*: the files of the active theme and its parent, written compare-and-set and taken back the same way.
+require __DIR__ . '/template-files.php';
 require __DIR__ . '/share-preview.php';
 require __DIR__ . '/glyph-fallback.php';
 // usermeta: an author's bio and job title, the fields a visitor reads, listed, written and taken back (lib/AuthorMeta.php).

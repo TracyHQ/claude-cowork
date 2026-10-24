@@ -305,6 +305,8 @@ final class EngineFactory
         $engine->templateSiteSettings(self::buildTemplateSiteSettings());
         // `template.languageOverrides`: the site's language override files, for the strings that read in en-GB.
         $engine->languageOverrides(new \LanguageOverrides(JPATH_ROOT));
+        // `template.files.*`: the files of the installed site templates, unless the owner switched it off in Options.
+        $engine->templateFiles(self::buildTemplateFiles($params));
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $quickstart = $contract !== '';
         $baseline = self::constructionBaseline();
@@ -538,6 +540,68 @@ final class EngineFactory
         } catch (\Throwable $e) {
             self::logFailure('buildTemplateSiteSettings', $e);
             return null;
+        }
+    }
+
+    /**
+     * `template.files.*`: the files of each installed site template — `templates/<name>/`, where PHP
+     * may be written (overrides, the layout), and its assets in `media/templates/site/<name>/`, where
+     * it may not — as `#__extensions` lists them. The Options switch `template_files` turns the door
+     * off (null: the actions answer 'unavailable' and `info` leaves it out). After a change T4's
+     * combined CSS is emptied, and every write and undo goes into Joomla's User Actions Log.
+     */
+    private static function buildTemplateFiles($params): ?\TemplateFiles
+    {
+        if ((string) $params->get('template_files', '1') !== '1') return null;
+        try {
+            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            return new \TemplateFiles(JPATH_ROOT, static function () use ($db): array {
+                $query = $db->getQuery(true)
+                    ->select($db->quoteName('element'))
+                    ->from($db->quoteName('#__extensions'))
+                    ->where($db->quoteName('type') . ' = ' . $db->quote('template'))
+                    ->where($db->quoteName('client_id') . ' = 0');
+                $roots = [];
+                foreach ($db->setQuery($query)->loadColumn() ?: [] as $name) {
+                    if (!\is_string($name) || !preg_match('~^[A-Za-z0-9_-]+$~D', $name)) continue;
+                    $roots[] = ['path' => 'templates/' . $name, 'kind' => 'template', 'name' => $name, 'php' => true];
+                    $roots[] = ['path' => 'media/templates/site/' . $name, 'kind' => 'template-media', 'name' => $name, 'php' => false];
+                }
+                return $roots;
+            }, static function (array $paths): void {
+                JoomlaDerivedRows::clearOptimize(JPATH_ROOT);
+            }, static function (array $event): void {
+                self::logTemplateFiles($event);
+            });
+        } catch (\Throwable $e) {
+            self::logFailure('buildTemplateFiles', $e);
+            return null;
+        }
+    }
+
+    /**
+     * One row of Joomla's User Actions Log (Users › User Actions Log) for a template file write or
+     * undo: what the administrator sees of it, with the ids that take it back. Best-effort: a site
+     * whose action log cannot be reached still has the Apply log.
+     */
+    private static function logTemplateFiles(array $event): void
+    {
+        try {
+            $app = Factory::getApplication();
+            if (!method_exists($app, 'bootComponent')) return;
+            $model = $app->bootComponent('com_actionlogs')->getMVCFactory()->createModel('Actionlog', 'Administrator', ['ignore_request' => true]);
+            if (!$model || !method_exists($model, 'addLog')) return;
+            $files = array_map(static fn($f): string => (string) ($f['path'] ?? '') . ' (' . (string) ($f['op'] ?? '') . ')', (array) ($event['files'] ?? []));
+            $undo = ($event['action'] ?? '') === 'template.files.undo';
+            $model->addLog([[
+                'count'    => (string) \count($files),
+                'files'    => implode(', ', \array_slice($files, 0, 20)) . (\count($files) > 20 ? ', ...' : ''),
+                'apply_id' => (string) ($event['apply_id'] ?? ''),
+                'undo_id'  => (string) ($event['undo_id'] ?? ''),
+                'kept'     => (string) ($event['kept'] ?? 0),
+            ]], $undo ? 'COM_CLAUDECOWORK_ACTIONLOG_TEMPLATE_FILES_UNDO' : 'COM_CLAUDECOWORK_ACTIONLOG_TEMPLATE_FILES_WRITE', 'com_claudecowork.template.files', 0);
+        } catch (\Throwable $e) {
+            self::logFailure('logTemplateFiles', $e);
         }
     }
 

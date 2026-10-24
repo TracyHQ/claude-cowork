@@ -35,6 +35,7 @@ require_once __DIR__ . '/SiteIdentity.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
 require_once __DIR__ . '/LanguageOverrides.php';
+require_once __DIR__ . '/TemplateFiles.php';
 
 final class Engine
 {
@@ -306,6 +307,16 @@ final class Engine
         return $this;
     }
 
+    /** The files of the site's installed templates (`template.files.*`); null answers 'unavailable'. */
+    private ?TemplateFiles $templateFiles = null;
+
+    /** Let `template.files.*` read and write the files of the site's templates (lib/TemplateFiles.php). */
+    public function templateFiles(?TemplateFiles $files): self
+    {
+        $this->templateFiles = $files;
+        return $this;
+    }
+
     /** Mark this receiver as serving a site under construction (no contract, a baseline profile). */
     public function underConstruction(string $baseline): self
     {
@@ -360,7 +371,7 @@ final class Engine
         }
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
-            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'media.delete', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore'], true)
+            ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'media.delete', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore', 'template.files.write', 'template.files.undo'], true)
             || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
@@ -451,7 +462,7 @@ final class Engine
                     'max_paths' => self::MAX_HASH_PATHS,
                 ], 'files_pack' => [
                     'max_paths' => self::MAX_PACK_PATHS,
-                ]]]);
+                ]] + ($this->templateFiles === null ? [] : ['template_files' => $this->templateFiles->info()])]);
             case 'site.stats':
                 return $this->siteStats();
             case 'site.fingerprint':
@@ -518,6 +529,10 @@ final class Engine
                 return $this->templateSiteSettingsDoor($params);
             case 'template.languageOverrides':
                 return $this->languageOverridesDoor($params);
+            case 'template.files.status':
+            case 'template.files.write':
+            case 'template.files.undo':
+                return $this->templateFilesDoor($action, $params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -4213,6 +4228,12 @@ final class Engine
                 return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)], 'next' => 'Move the conflicting file, then apply.revert again.']);
             }
         }
+        // A template file goes back only where the live file still holds what the write left there.
+        if ($this->templateFiles !== null && ($blocked = $this->templateFiles->revertBlocked($entries)) !== []) {
+            $message = 'Template files changed on the site since they were written: ' . implode(', ', array_column($blocked, 'path')) . '. Nothing was reverted.';
+            return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)], 'kept' => $blocked,
+                'next' => 'template.files.undo puts back the files that can go back and names the rest.']);
+        }
         // Taking a change back is a write too: not under an open editor, and not half of it.
         if (($refusal = $this->lockRefusal($this->undoRows($entries))) !== null) return $refusal;
 
@@ -4307,6 +4328,10 @@ final class Engine
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
                 $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
+            } elseif ($op === TemplateFiles::LOG_OP) {
+                $step['path'] = $entry['path'] ?? null;
+                $step['undo_id'] = $entry['undo_id'] ?? null;
+                $step['deleted'] = ($entry['after'] ?? null) === null;
             } elseif ($op === 'siteSettings' || $op === 'languageOverrides') {
                 // Which files, never their bytes; created when none of them existed before.
                 $files = is_array($entry['files'] ?? null) ? $entry['files'] : [];
@@ -4401,6 +4426,13 @@ final class Engine
             $this->overrides->restore(is_array($entry['files'] ?? null) ? $entry['files'] : []);
             return;
         }
+        if ($op === TemplateFiles::LOG_OP) {
+            if ($this->templateFiles === null) {
+                throw new RuntimeException('template files not wired');
+            }
+            $this->templateFiles->revertEntry($entry);
+            return;
+        }
         if ($op === 'siteSettings') {
             if ($this->templateSite === null) {
                 throw new RuntimeException('template site settings not wired');
@@ -4411,6 +4443,26 @@ final class Engine
             return;
         }
         throw new RuntimeException("unknown step: {$op}");
+    }
+
+    /**
+     * `template.files.status`, `template.files.write`, `template.files.undo` — the files of the
+     * site's installed templates (lib/TemplateFiles.php). A write and an undo run under the write
+     * lock (handle()), need an `apply_id`, and record in the Apply log; status only reads.
+     */
+    private function templateFilesDoor(string $action, array $p): array
+    {
+        if ($this->templateFiles === null) return $this->err('unavailable', 'template files are not wired on this site');
+        if ($action === 'template.files.status') return $this->templateFiles->status($p);
+        if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $answer = $action === 'template.files.write' ? $this->templateFiles->write($p, $applyId, $this->log) : $this->templateFiles->undo($p, $applyId, $this->log);
+        if (($answer['ok'] ?? false) && (!empty($answer['changed']) || !empty($answer['restored'])) && empty($answer['dry_run'])) {
+            try { if ($this->writer) $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('template');
+        }
+        return $answer;
     }
 
     /**

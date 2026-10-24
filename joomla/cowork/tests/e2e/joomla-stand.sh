@@ -37,8 +37,8 @@ say() { printf '\n== %s\n' "$*"; }
 if [ "${STAND_NO_PACKAGE:-}" != 1 ]; then
 say "building this checkout"
 mkdir -p "$WORK/src/joomla" "$WORK/src/scripts"
-# build.sh runs both: the contract-asset index (since 0.24.55) and the release manifest.
-cp "$REPO/scripts/contract-assets.mjs" "$REPO/scripts/release-manifest.mjs" "$WORK/src/scripts/"
+# build.sh runs all three: the contract-asset index (since 0.24.55), the release manifest and the own-media hash check.
+cp "$REPO/scripts/contract-assets.mjs" "$REPO/scripts/release-manifest.mjs" "$REPO/scripts/joomla-own-media.mjs" "$WORK/src/scripts/"
 rsync -a --exclude build --exclude dist --exclude 'com_claudecowork/administrator/lib' \
   --exclude 'com_claudecowork/administrator/tracy-release.json' --exclude tests "$COWORK/" "$WORK/src/joomla/cowork/"
 ( cd "$WORK/src/joomla/cowork" && ./build.sh >/dev/null )
