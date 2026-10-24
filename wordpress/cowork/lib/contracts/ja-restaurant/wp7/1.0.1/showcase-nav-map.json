@@ -9,9 +9,10 @@
     "presentation-lock.json": "b08cf515fdb57e491c25899eeeace02877d4ab136630c9b77403d889bf579d14"
   },
   "inputs": {
-    "navigation-source.json": "664f48568f914ac56e1353ae0f382c52b08a5d14239c56fee21380a11006765d"
+    "navigation-source.json": "5df8be8ec3a189bac0aaf94b1d3a032fa8e0f1914acfed5668261af3d3178734",
+    "inventory.json": "77c607fc866d41258535ff6120f883ff8fbc6dd6ec7c62b7a9f4838ae481470d"
   },
-  "decisionsHash": "d3f2501f31d6f9bee6bb8565196ff461691c10f35a952ed943a53be73d933a42",
+  "decisionsHash": "d11e530a4b937e267a79a41f647d0d2cf4254d21d0b0ae067c3363d8c6913a45",
   "status": "checked",
   "operations": [
     {

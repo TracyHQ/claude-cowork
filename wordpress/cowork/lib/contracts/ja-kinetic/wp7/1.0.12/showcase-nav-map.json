@@ -9,7 +9,8 @@
     "presentation-lock.json": "a456ca5f780c319c271c81cddbac313affe819a582544bbfb243fd7a09396da8"
   },
   "inputs": {
-    "navigation-source.json": "d4d9a231a93c15a1d8f7a64cf850381c2129ea01c91f9989561841bf14d4089e"
+    "navigation-source.json": "13c55385bb3257c0909743b40a06afeacee703458c5e4e62fa13edb2ef753673",
+    "inventory.json": "827ceb5d46a998271194e2825accf1df37b611068a7b7ab8263fa62991b74cd1"
   },
   "decisionsHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
   "status": "checked",
@@ -36,7 +37,7 @@
       ],
       "contains": [],
       "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "reason": "a copy of the home page (the same block skeleton, other words), under \"Home\"",
       "key": "templatePart-1777",
       "before": "2d4ba41f179a7c59dd3c9692175edd23f36f4f4ec4160cedd53a655f37a1f693",
       "after": "d7372881c638632f075aeffa69090377f4a48923597f6f1648bf4cc743383e33"
@@ -63,7 +64,7 @@
       ],
       "contains": [],
       "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "reason": "a copy of the home page (the same block skeleton, other words), under \"Home\"",
       "key": "templatePart-1777",
       "before": "d7372881c638632f075aeffa69090377f4a48923597f6f1648bf4cc743383e33",
       "after": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d"
@@ -77,7 +78,7 @@
       "label": "Blueprint",
       "block": {
         "name": "core/list-item",
-        "contains": "href=\"/home-menu/home-blueprint\""
+        "contains": "<a href=\"/home-menu/home-blueprint\">"
       },
       "rule": "hide.alias-of-hidden",
       "reason": "another link to \"Blueprint\", which leaves the navigation (Home › Blueprint)",
@@ -94,7 +95,7 @@
       "label": "Signal",
       "block": {
         "name": "core/list-item",
-        "contains": "href=\"/home-menu/home-signal\""
+        "contains": "<a href=\"/home-menu/home-signal\">"
       },
       "rule": "hide.alias-of-hidden",
       "reason": "another link to \"Signal\", which leaves the navigation (Home › Signal)",

@@ -9,9 +9,10 @@
     "presentation-lock.json": "ad85d865baf697ba4fa07025ccec94fc1a8ad1f27c2c448d67411211df8a309a"
   },
   "inputs": {
-    "navigation-source.json": "16b819dde282404a4c363db941bd9f77b95a94d6f6f30fa4506304888eaf08ef"
+    "navigation-source.json": "208635a15613c3fd689d2b616102948fc775654d174472eb88b46fa4b66e24a3",
+    "inventory.json": "6f07af63edfe5ef6bcdff72b7863706062e0a93bebb604a3f8856547b35af4e1"
   },
-  "decisionsHash": "15a81e0633102dc61c0987d94f438108efd8066989a5f1cee826c48bd8d8d72d",
+  "decisionsHash": "3dc5c0f04108f1de8df8dd5f3355d6757e16c6de79cb127f206f71cd786a498e",
   "status": "checked",
   "operations": [
     {
@@ -64,8 +65,8 @@
         "Home Style 1"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its block skeleton differs from the front page (136 blocks): another layout of the same demo; no submenu or child page under it, and no other entry links it",
       "key": "navigation-158",
       "before": "e9b37551847b6db30a66decb3bb5a0c182c39c867fc738594432a407e5c603cc",
       "after": "13afaf3cad74e169e3bbdb927412b5c5a8abdfdac1aa9fa4afc03d639b06e455"
@@ -86,8 +87,8 @@
         "Home Style 2"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its block skeleton differs from the front page (135 blocks): another layout of the same demo; no submenu or child page under it, and no other entry links it",
       "key": "navigation-158",
       "before": "13afaf3cad74e169e3bbdb927412b5c5a8abdfdac1aa9fa4afc03d639b06e455",
       "after": "75b8a0eb3679a980addad4ed1cd1a01c1a63aadde298fef72cd54b82b342a933"
@@ -108,8 +109,8 @@
         "Home Style 3"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its block skeleton differs from the front page (108 blocks): another layout of the same demo; no submenu or child page under it, and no other entry links it",
       "key": "navigation-158",
       "before": "75b8a0eb3679a980addad4ed1cd1a01c1a63aadde298fef72cd54b82b342a933",
       "after": "19295a9c1a41fbc20baf0443c977d179c2e326b09f8de02fcc161e2755aaa3c7"
@@ -130,8 +131,8 @@
         "Home Style 4"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its block skeleton differs from the front page (76 blocks; its query lists posts that Category Blog and News list too): another layout of the same demo; no submenu or child page under it, and no other entry links it",
       "key": "navigation-158",
       "before": "19295a9c1a41fbc20baf0443c977d179c2e326b09f8de02fcc161e2755aaa3c7",
       "after": "eb5e40d724782b60e4911f6f71aaab58b66251e1f58081e4b51a5b963e40b9a5"

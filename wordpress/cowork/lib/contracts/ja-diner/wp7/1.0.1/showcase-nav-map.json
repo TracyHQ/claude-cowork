@@ -9,7 +9,8 @@
     "presentation-lock.json": "e17873f139d2ce0ef91be648347a448d5b0ed641e2d985578905556cc856497b"
   },
   "inputs": {
-    "navigation-source.json": "78f936d71516baa05910928bf61b96645fc2c037efba278b088e83d69662e4ce"
+    "navigation-source.json": "aa908a6dd6d66d0684b66e7764671665624748c6b69a485d0f216853847f77f5",
+    "inventory.json": "acdb931d5d02bb31299aab992cfda62cbb14af708a402db0d07c46151998a2d7"
   },
   "decisionsHash": "6972b981a042b0f1164bd92a9f29ace90159925f180227d3ab06d6c42b200926",
   "status": "checked",

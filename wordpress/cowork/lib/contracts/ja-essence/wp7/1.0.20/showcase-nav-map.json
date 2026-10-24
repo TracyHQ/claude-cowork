@@ -9,9 +9,9 @@
     "presentation-lock.json": "1bc5fbfabd49f60418e8072b790b2e0e5cdc3a57259c727d3749fb21f5dceec2"
   },
   "inputs": {
-    "navigation-source.json": "1a6c5ebbade87c76398d2b4ffef7c0bd8950396ed58b764afe1e6cc6787b0038"
+    "navigation-source.json": "a385f2fbc1cf403b14bcd908fbec38140f63234df0b0e3397115b974171bef89"
   },
-  "decisionsHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "decisionsHash": "f8b0e94772a24d799f587964806e5e5f24cd4f0962e3b813b953c685159851a7",
   "status": "checked",
   "operations": [
     {
@@ -30,8 +30,8 @@
         "Home 1"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its query block lists posts that the front page (a query too) and the kept category entries also list; no submenu or child page under it, and no other entry links it",
       "key": "navigation-155",
       "before": "659ba62e4cfe367a324c844b5459b01980dad2ec6c8ff9269d4958c3bee06190",
       "after": "c00c6bc3adf1d31fb2a263fb89e3d38e05065df0b6458cb34eac8a9b893943ed"
@@ -52,8 +52,8 @@
         "Home 2"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its query block lists posts that the front page (a query too) and the kept category entries also list; no submenu or child page under it, and no other entry links it",
       "key": "navigation-155",
       "before": "c00c6bc3adf1d31fb2a263fb89e3d38e05065df0b6458cb34eac8a9b893943ed",
       "after": "88591ef454e42311207ab1804bbf3bb3b93ecf57d991c5f6eee1f54fb22f0219"
@@ -96,8 +96,8 @@
         "Home 4"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its blocks are images, buttons, groups and a pattern, with no heading, text or post list of its own; no submenu or child page under it, and no other entry links it",
       "key": "navigation-155",
       "before": "67b54ebe9fa12fdba21a551e790f174399ca4cddf18641ce9e683d817d9dbc8c",
       "after": "dc873f3648ff6c995b2e6bc7120d75eca81146232d99708f30d7eb7d3da9595a"
@@ -118,8 +118,8 @@
         "Home 5"
       ],
       "contains": [],
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page, under \"Home\"",
+      "rule": "hide.decision",
+      "reason": "an alternative demo home layout under \"Home\", beside the front page; its query block lists posts that the front page (a query too) and the kept category entries also list; no submenu or child page under it, and no other entry links it",
       "key": "navigation-155",
       "before": "dc873f3648ff6c995b2e6bc7120d75eca81146232d99708f30d7eb7d3da9595a",
       "after": "4bc552eef980afe7eac013c4a4e9623740bb8a7a0e4418610fcbf50b7848b162"
