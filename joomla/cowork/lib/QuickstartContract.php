@@ -902,6 +902,9 @@ final class QuickstartContract
         Timing::end('access',$t);
         $t=Timing::begin();
         $counts=array_map('count',$lists);
+        // Accounts are not quickstart inventory: every provision adds the owner's own (an author's name and
+        // picture are slots, the people on the site are not counted), unless the lock counts them itself.
+        foreach(['user','userProfile'] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
         // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
         // design-system slot puts a system on a site as one mod_custom it writes through content.update
         // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart

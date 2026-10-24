@@ -3771,8 +3771,11 @@ final class Engine
                 foreach ($steps as $index => $step) {
                     if (!is_array($step) || !isset($step['kind'], $step['fields'])) throw new RuntimeException("invalid operation {$index}");
                     $kind = $step['kind'];
-                    // Identity and installed executable settings require their own privileged door.
-                    if (in_array($kind, ['user', 'extensionParams'], true)) throw new RuntimeException('kind not allowed in a content batch');
+                    // Identity and installed executable settings require their own privileged door. One exception: the
+                    // content contract (it alone passes $verify) writes an author's display NAME, a slot the profile
+                    // declares because visitors read it under every post; never another column of the account.
+                    $authorName = $kind === 'user' && $verify !== null && is_array($step['fields']) && array_keys($step['fields']) === ['name'];
+                    if (in_array($kind, ['user', 'extensionParams'], true) && !$authorName) throw new RuntimeException('kind not allowed in a content batch');
                     $id = $step['id'] ?? 0;
                     if (is_string($id) && str_starts_with($id, '$')) $id = $ids[substr($id, 1)] ?? -1;
                     if (!is_numeric($id) || (int) $id < 0) throw new RuntimeException('unresolved id');

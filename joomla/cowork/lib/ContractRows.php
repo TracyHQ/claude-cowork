@@ -41,7 +41,15 @@ final class ContractRows
     {
         if (!isset($this->all[$kind])) {
             $rows = [];
-            if ($this->bulk) {
+            if ($kind === 'userProfile') {
+                // Never read whole (it is one value per author and key): its list rows name the author
+                // (`user_id`) and the field, which is what a contract entity is matched by.
+                for ($offset = 0; $offset < self::LIMIT; $offset += 100) {
+                    $page = $this->writer->list($kind, $offset, 100);
+                    foreach ($page as $item) $rows[(int) $item['id']] = $item;
+                    if (count($page) < 100) break;
+                }
+            } elseif ($this->bulk) {
                 // The same refusal as the paged walk, which threw on a full page at offset 19,900 —
                 // that is, at 20,000 rows or more, so a result filling the limit is refused too.
                 foreach ($this->writer->readAll($kind, self::LIMIT) as $id => $row) $rows[(int) $id] = $row;
