@@ -1801,13 +1801,16 @@ final class Engine
      * The ways of reading an owner's live bytes against the map: as they are, then with the site's own
      * address folded back to the placeholder the quickstart was packed with (provisioning ran
      * `wp search-replace <placeholderUrl> <site url>` before any map was applied, so a navigation that
-     * links absolutely no longer holds the bytes the map hashed). Each fold is a list of
-     * live spelling => packed spelling, plain and JSON-escaped, for `home` and `siteurl`.
+     * links absolutely no longer holds the bytes the map hashed). Which spelling of the address that
+     * run was given is not on record, so each one it may have been is its own fold, tried in turn:
+     * `home` and `siteurl`, with and without a trailing slash (the slash first: it is the longer), under
+     * either scheme. A fold is live spelling => packed spelling, plain and JSON-escaped.
      *
      * 🔒 A FOLD IS OFFERED ONLY WHEN IT IS EXACTLY UNDONE BY ITS INVERSE. Bytes that already hold a
-     * packed spelling next to the live one it would fold (the customer pasted the placeholder, or a
+     * packed spelling outside the live ones it would fold (the customer pasted the placeholder, or a
      * second search-replace ran halfway) cannot be told apart once folded: they are read as they are,
-     * and the map's hashes decide, as before.
+     * and the map's hashes decide, as before. A placeholder that is only the start of the site's own
+     * address (`https://quickstart.invalid.example`) is the address, not a placeholder.
      *
      * @return list<array<string,string>> folds, the first one empty (the bytes as they are)
      */
@@ -1818,17 +1821,27 @@ final class Engine
         if ($placeholder === null) {
             return $folds;
         }
+        $spellings = [];
         foreach (['home', 'siteurl'] as $option) {
             $url = rtrim((string) ($this->writer->read('option', 0, $option)['value'] ?? ''), '/');
-            if (!preg_match('~^https?://[^/\s]+~', $url) || $url === $placeholder) {
+            if (!preg_match('~^(https?)(://[^/\s]+.*)$~s', $url, $m)) {
                 continue;
             }
+            foreach ([$url, ($m[1] === 'https' ? 'http' : 'https') . $m[2]] as $address) {
+                $spellings[] = $address . '/';
+                $spellings[] = $address;
+            }
+        }
+        foreach (array_unique($spellings) as $address) {
+            if (rtrim($address, '/') === $placeholder) {
+                continue; // a site still at the placeholder: its bytes are read as they are
+            }
             $fold = [];
-            foreach ([[$url, $placeholder], [str_replace('/', '\\/', $url), str_replace('/', '\\/', $placeholder)]] as [$live, $packed]) {
+            foreach ([[$address, $placeholder], [str_replace('/', '\\/', $address), str_replace('/', '\\/', $placeholder)]] as [$live, $packed]) {
                 if (strpos($content, $live) === false) {
                     continue;
                 }
-                if (strpos($content, $packed) !== false) {
+                if (strpos(strtr($content, [$live => "\0"]), $packed) !== false) {
                     continue 2;
                 }
                 $fold[$live] = $packed;

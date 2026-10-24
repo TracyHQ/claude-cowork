@@ -147,8 +147,9 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     only with bytes whose sha256 is the map's `after` (a compare-and-set); one the customer already
     changed is skipped and reported, never forced. A provisioned site holds its own address where the
     quickstart was packed with the manifest's `placeholderUrl` (`wp search-replace` ran first): an
-    owner is compared and edited with the `home`/`siteurl` address (plain and `\/`-escaped) folded
-    back to the placeholder, and written with it unfolded, so the site keeps its address and the
+    owner is compared and edited with the `home`/`siteurl` address (with or without a trailing
+    slash, either scheme, plain and `\/`-escaped; each spelling tried on its own) folded back to the
+    placeholder, and written with it unfolded, so the site keeps its address and the
     receipt holds the live bytes; owner bytes that already hold the placeholder next to the address
     are compared exactly. Two owners per call (`running` until done); the
     receipt (the bytes found) lands before each write, so the same request resumes a call that died.
