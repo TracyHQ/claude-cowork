@@ -31,6 +31,8 @@ final class RenderedWordsHooks
     private string $key;
     /** Set once output left the buffer before the page ended: the rest passes through. */
     private bool $passing = false;
+    /** @var array{list:callable,sent:callable,remove:callable}|null the response-header functions; null for PHP's own */
+    private static ?array $headerIo = null;
 
     private function __construct(array $set, string $key)
     {
@@ -100,6 +102,15 @@ final class RenderedWordsHooks
         ob_start([$hooks, 'filter'], RenderedWords::MAX_HTML);
     }
 
+    /**
+     * Stand-ins for headers_list, headers_sent and header_remove. For tests only: PHP's CLI keeps no
+     * response headers, so the Content-Length handling cannot be seen there otherwise.
+     */
+    public static function useHeaderFunctions(callable $list, callable $sent, callable $remove): void
+    {
+        self::$headerIo = ['list' => $list, 'sent' => $sent, 'remove' => $remove];
+    }
+
     /** Whether this request is the door's own signed probe. @param array<string,mixed> $server */
     public static function probed(array $server): bool
     {
@@ -128,7 +139,8 @@ final class RenderedWordsHooks
             $this->noteDrift(['the page was sent before it ended (flushed, or larger than ' . RenderedWords::MAX_HTML . ' bytes)']);
             return $buffer;
         }
-        if (!self::htmlAnswer(function_exists('http_response_code') ? http_response_code() : false, headers_list())
+        $headers = self::$headerIo === null ? headers_list() : (array) (self::$headerIo['list'])();
+        if (!self::htmlAnswer(function_exists('http_response_code') ? http_response_code() : false, $headers)
             || strncmp($buffer, "\x1f\x8b", 2) === 0) {
             return $buffer;
         }
@@ -137,7 +149,29 @@ final class RenderedWordsHooks
             $this->noteDrift($result['problems']);
             return $buffer;
         }
+        if ($result['html'] !== $buffer && self::header($headers, 'content-length') !== null) {
+            // The length was declared for the page as printed. Dropped, the server frames the new body
+            // itself; when the headers are already out it cannot be, so the page goes as printed.
+            if (self::$headerIo === null ? headers_sent() : (bool) (self::$headerIo['sent'])()) {
+                $this->noteDrift(['the page declared its Content-Length before its headers were sent']);
+                return $buffer;
+            }
+            self::$headerIo === null ? header_remove('Content-Length') : (self::$headerIo['remove'])('Content-Length');
+        }
         return $result['html'];
+    }
+
+    /** The value of a response header (the last one sent by that name), or null. @param list<string> $headers */
+    private static function header(array $headers, string $name): ?string
+    {
+        $value = null;
+        foreach ($headers as $line) {
+            $colon = strpos((string) $line, ':');
+            if ($colon !== false && strtolower(trim(substr((string) $line, 0, $colon))) === $name) {
+                $value = trim(substr((string) $line, $colon + 1));
+            }
+        }
+        return $value;
     }
 
     /** A 200 HTML answer, the only kind rules apply to. @param int|false $code @param list<string> $headers */
@@ -146,12 +180,17 @@ final class RenderedWordsHooks
         if ($code !== 200) {
             return false;
         }
-        foreach ($headers as $line) {
-            if (stripos($line, 'content-type:') === 0) {
-                return stripos($line, 'text/html') !== false;
-            }
+        // An encoded body is not the HTML a rule was matched against.
+        $encoding = self::header($headers, 'content-encoding');
+        if ($encoding !== null && strtolower($encoding) !== 'identity') {
+            return false;
         }
-        return true;   // PHP's own default is text/html
+        $type = self::header($headers, 'content-type');
+        if ($type === null) {
+            return true;   // PHP's own default is text/html
+        }
+        // The media type itself, before any parameter: `application/json; profile=text/html` is JSON.
+        return strtolower(trim(explode(';', $type, 2)[0])) === 'text/html';
     }
 
     /** Remember the latest drift of this scope, at most once per DRIFT_SECONDS. @param list<string> $problems */

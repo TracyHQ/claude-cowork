@@ -65,7 +65,8 @@ final class RenderedWords
     public const MAX_SCOPE_BYTES = 131072;
     public const MAX_SITE_BYTES = 4194304;
     public const MAX_MATCHES = 64;
-    public const MAX_RECEIPTS = 200;
+    /** Requests a site keeps a receipt of. Never evicted (a forgotten request_id could apply twice): past it, new applies are refused. */
+    public const MAX_RECEIPTS = 1000;
     /** How long an inspection's proof and a probe header are good for, in seconds. */
     public const PROOF_SECONDS = 900;
     public const PROBE_SECONDS = 120;

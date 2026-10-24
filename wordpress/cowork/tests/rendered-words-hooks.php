@@ -56,13 +56,13 @@ function rhRequest(array $options, string $page, string $extra = '', array $serv
         . $print
         . 'while (ob_get_level() > $base) { ob_end_flush(); }'
         . '$sent = ob_get_clean();'
-        . 'echo json_encode([$opened, base64_encode($sent), array_values($GLOBALS["transients"])[0]["problems"] ?? null, $GLOBALS["nocache"] ?? false]);';
+        . 'echo json_encode([$opened, base64_encode($sent), array_values($GLOBALS["transients"])[0]["problems"] ?? null, $GLOBALS["nocache"] ?? false, $GLOBALS["removed"] ?? []]);';
     $out = (string) shell_exec(PHP_BINARY . ' -d display_errors=1 -d output_buffering=0 -r ' . escapeshellarg($code) . ' 2>&1');
     $got = json_decode($out, true);
     if (!is_array($got)) {
         return ['error' => substr($out, 0, 400)];
     }
-    return [$got[0], base64_decode($got[1]), $got[2], $got[3]];
+    return [$got[0], base64_decode($got[1]), $got[2], $got[3], $got[4]];
 }
 
 $rhOptions = ['blog_charset' => 'UTF-8', 'claude_cowork_token' => $WTOKEN];
@@ -105,3 +105,23 @@ check('a forged probe is an ordinary visitor: the rules apply', [$opened, $sent 
 [$opened, $sent, , $nocache] = rhRequest(['claude_cowork_token' => 'short'] + $rhOptions + [$rhKey => $rhSet($rhTheme)], $rhPage, '',
     ['HTTP_X_TRACY_RENDERED_WORDS_PROBE' => RenderedWords::probeValue(RenderedWords::key('short'), time())]);
 check('a probe on a site whose token is too short to sign with is an ordinary visitor', [$opened, $nocache], [1, false]);
+
+// The answer's headers: the media type itself, the last header of a name, no encoded body.
+check('a JSON answer that names text/html in a parameter is not HTML', RenderedWordsHooks::htmlAnswer(200, ['Content-Type: application/json; profile=text/html']), false);
+check('text/html in any case, with parameters, is HTML', RenderedWordsHooks::htmlAnswer(200, ['content-type:  TEXT/HTML ; charset=UTF-8']), true);
+check('the last Content-Type sent is the one that counts', [RenderedWordsHooks::htmlAnswer(200, ['Content-Type: text/html', 'Content-Type: text/plain']),
+    RenderedWordsHooks::htmlAnswer(200, ['Content-Type: text/plain', 'Content-Type: text/html'])], [false, true]);
+check('an encoded body is not rewritten; identity is no encoding', [RenderedWordsHooks::htmlAnswer(200, ['Content-Type: text/html', 'Content-Encoding: br']),
+    RenderedWordsHooks::htmlAnswer(200, ['Content-Encoding: identity'])], [false, true]);
+
+// A declared Content-Length is for the page as printed: dropped when the rules change the body, or the page goes as printed.
+$rhHeaders = static fn(string $headers, string $sent): string => 'RenderedWordsHooks::useHeaderFunctions(static fn() => ' . $headers . ', static fn() => ' . $sent
+    . ', static function ($n) { $GLOBALS["removed"][] = $n; }); echo $page;';
+[$opened, $sent, $drift, , $removed] = rhRequest($rhOptions + [$rhKey => $rhSet($rhTheme)], $rhPage, '', [], $rhHeaders('["Content-Type: text/html", "Content-Length: ' . strlen($rhPage) . '"]', 'false'));
+check('Content-Length declared, headers not sent: the rules apply and the length is dropped', [$sent === $rhWant, $removed, $drift], [true, ['Content-Length'], null]);
+[$opened, $sent, $drift, , $removed] = rhRequest($rhOptions + [$rhKey => $rhSet($rhTheme)], $rhPage, '', [], $rhHeaders('["content-length: ' . strlen($rhPage) . '"]', 'true'));
+check('Content-Length declared, headers already sent: the page as printed, the drift noted', [$sent === $rhPage, $removed, is_array($drift)], [true, [], true]);
+[$opened, $sent, $drift, , $removed] = rhRequest($rhOptions + [$rhKey => $rhSet($rhTheme)], $rhPage, '', [], $rhHeaders('["Content-Type: text/html"]', 'false'));
+check('no Content-Length: the rules apply, no header touched', [$sent === $rhWant, $removed], [true, []]);
+[$opened, $sent, , , $removed] = rhRequest($rhOptions + [$rhKey => $rhSet($rhTheme)], $rhPage, '', [], $rhHeaders('["Content-Type: application/json; profile=text/html"]', 'false'));
+check('a JSON answer whose body matches the rules goes as printed', [$sent === $rhPage, $removed], [true, []]);

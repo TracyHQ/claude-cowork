@@ -580,12 +580,15 @@ A page with no rules for its scope gets no output buffer and goes out byte for b
   `new` equals `old` drops it. The merged set must apply whole to the page as it renders now, or nothing
   is written (`drift`). After the write, the page caches are purged and the page is read as a visitor:
   `render` is `verified`, `cache_verification_failed` or `not_verified`. Sending the same `request_id`
-  again returns the first answer with `replayed: true`. The same `request_id` with a different request
-  is a `conflict`.
+  again returns the first answer, without its `rules`, with `replayed: true`. The same `request_id` with a
+  different request is a `conflict`. If the stored rules changed since the inspection, even at the same
+  revision, the apply is a `conflict`. A site keeps the receipt of every request it answered and never
+  drops one, so a `request_id` cannot apply twice. After 1000 receipts, new requests are refused
+  (`too_large`, code `RECEIPTS_FULL`); retries of known requests are still answered.
 - `status {request_id}` or `status {post, locale}`: the scope's rules, revision, receipts and the last
   `drift` the front end saw.
-- `apply.revert {apply_id}`: puts the scope's option back as it was before. If a later apply on the same
-  page still stands, the revert is a `conflict`.
+- `apply.revert {apply_id}`: puts the scope's option back as it was before. The option must still hold
+  exactly what that apply wrote. If a later apply or any other edit changed it, the revert is a `conflict`.
 
 Only text inside one text node and the whole value of an `<a href>` are matched. The scanner never reads
 or writes `head`, `form`, `script`, `style`, `textarea`, controls, `svg`, comments or any other attribute,
@@ -597,7 +600,9 @@ cases:
 - two rules overlap;
 - the markup cannot be followed;
 - the page is over 2 MiB or flushed early;
-- the answer is not a 200 HTML page;
+- the answer is not a 200 `text/html` page (the media type itself, not a parameter), or its body is encoded;
+- the page declared a `Content-Length` and its headers were already sent. When the headers are not yet
+  sent, the stale `Content-Length` is dropped and the server frames the new body itself;
 - the active theme changed.
 
 `content.update` and `content.delete` refuse these options.

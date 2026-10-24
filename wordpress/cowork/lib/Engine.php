@@ -804,6 +804,12 @@ final class Engine
         return $set === [] ? null : $set;
     }
 
+    /** What a scope's option holds, as one value: none and every byte of it, so any edit is seen, not only a new revision. */
+    private static function renderedWordsDigest(?array $row): string
+    {
+        return $row === null ? 'none' : hash('sha256', (string) ($row['value'] ?? ''));
+    }
+
     /** @return array<string,array<string,mixed>> */
     private function renderedWordsReceipts(?array &$before = null): array
     {
@@ -848,7 +854,7 @@ final class Engine
             return $this->err('unsupported', 'The page is larger than ' . RenderedWords::MAX_HTML . ' bytes or its markup could not be followed');
         }
         try {
-            $set = $this->renderedWordsSet(RenderedWords::optionKey($page['post'], $page['locale']));
+            $set = $this->renderedWordsSet(RenderedWords::optionKey($page['post'], $page['locale']), $row);
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
@@ -856,8 +862,10 @@ final class Engine
             return $this->err('conflict', 'The stored rendered-words rules of this page cannot be read');
         }
         $revision = (int) ($set['revision'] ?? 0);
+        // The proof holds the rules it was answered with: an apply merges onto exactly those, or conflicts.
         $proof = RenderedWords::sign(RenderedWords::key($this->token), ['v' => 1, 'path' => $path, 'post' => $page['post'],
-            'locale' => $page['locale'], 'revision' => $revision, 'theme' => $page['theme'], 'exp' => time() + RenderedWords::PROOF_SECONDS]);
+            'locale' => $page['locale'], 'revision' => $revision, 'digest' => self::renderedWordsDigest($row), 'theme' => $page['theme'],
+            'exp' => time() + RenderedWords::PROOF_SECONDS]);
         return $this->ok(['scope' => ['entity' => ['kind' => 'post', 'id' => $page['post']], 'locale' => $page['locale']], 'path' => $path,
             'revision' => $revision, 'targets' => $found, 'rules' => self::renderedWordsRuleList($set['rules'] ?? []),
             'proof' => $proof, 'expires_in' => RenderedWords::PROOF_SECONDS]);
@@ -922,6 +930,11 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
+        // Every request_id this site answered stays known, so none can apply twice: a full store refuses new requests.
+        if (count($receipts) >= RenderedWords::MAX_RECEIPTS) {
+            return $this->err('too_large', 'This site already answered ' . RenderedWords::MAX_RECEIPTS . ' rendered-words requests; it takes no new one',
+                ['code' => 'RECEIPTS_FULL']);
+        }
         $proof = RenderedWords::verify(RenderedWords::key($this->token), $p['proof'] ?? null, time());
         if ($proof === null || !is_string($proof['path'] ?? null) || !is_int($proof['post'] ?? null) || !RenderedWords::validLocale($proof['locale'] ?? null)) {
             return $this->err('stale_proof', 'proof is missing, expired or not from this site: inspect the page again');
@@ -941,6 +954,9 @@ final class Engine
         $revision = (int) ($set['revision'] ?? 0);
         if ($revision !== $expected || ($proof['revision'] ?? null) !== $expected) {
             return $this->err('conflict', 'The rules of this page are at revision ' . $revision . ', not ' . $expected . ': inspect the page again', ['code' => 'CONFLICT', 'revision' => $revision]);
+        }
+        if (($proof['digest'] ?? null) !== self::renderedWordsDigest($before)) {
+            return $this->err('conflict', 'The rules of this page were changed since the inspection: inspect the page again', ['code' => 'CONFLICT', 'revision' => $revision]);
         }
         $merged = RenderedWords::merge($set['rules'] ?? [], $rules, $apply);
         $next = ['schema' => RenderedWords::SCHEMA, 'post' => $proof['post'], 'locale' => $proof['locale'], 'revision' => $revision + 1,
@@ -971,7 +987,7 @@ final class Engine
             $this->writer->write('option', 0, ['value' => $encoded], $key);
             try {
                 $this->log->record($apply, ['op' => 'content', 'kind' => 'option', 'id' => 0, 'key' => $key, 'before' => $before,
-                    'renderedWords' => ['request' => $request, 'afterRevision' => $revision + 1]]);
+                    'renderedWords' => ['request' => $request, 'afterRevision' => $revision + 1, 'afterDigest' => hash('sha256', $encoded)]]);
             } catch (Throwable $e) {
                 $this->rollbackContent('option', 0, $key, $before);
                 throw $e;
@@ -983,10 +999,9 @@ final class Engine
         $answer = ['apply_id' => $apply, 'request_id' => $request, 'stored' => true, 'revision' => $revision + 1,
             'scope' => ['entity' => ['kind' => 'post', 'id' => $proof['post']], 'locale' => $proof['locale']], 'path' => $proof['path'],
             'rules' => self::renderedWordsRuleList($merged), 'render' => $render, 'written' => $written];
-        $receipts[$request] = ['hash' => $hash, 'apply_id' => $apply, 'key' => $key, 'state' => 'applied', 'at' => time(), 'answer' => $answer];
-        if (count($receipts) > RenderedWords::MAX_RECEIPTS) {
-            $receipts = array_slice($receipts, -RenderedWords::MAX_RECEIPTS, null, true);
-        }
+        // The receipt keeps the answer without its rules (status reads those): small enough that none is ever dropped.
+        $receipts[$request] = ['hash' => $hash, 'apply_id' => $apply, 'key' => $key, 'state' => 'applied', 'at' => time(),
+            'answer' => array_diff_key($answer, ['rules' => true])];
         try {
             $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
         } catch (Throwable $e) {
@@ -1098,10 +1113,11 @@ final class Engine
             }
             $set = $now === null ? [] : RenderedWords::decodeSet($now['value'] ?? '');
             $after = (int) ($entry['renderedWords']['afterRevision'] ?? -1);
-            if ($set === [] || $set['revision'] !== $after) {
+            // The option must hold exactly what this apply wrote: a later apply, or any edit that kept the revision, conflicts.
+            if (!is_string($entry['renderedWords']['afterDigest'] ?? null) || $entry['renderedWords']['afterDigest'] !== self::renderedWordsDigest($now)) {
                 return $this->conflict(
                     'The rendered words of this page were changed since this apply (it wrote revision ' . $after . ', the page is at '
-                        . ($set === [] ? 'none' : $set['revision']) . '); nothing was reverted',
+                        . ($set === [] ? 'none' : $set['revision']) . ($set !== [] && $set['revision'] === $after ? ' with other rules' : '') . '); nothing was reverted',
                     'Revert the later rendered-words apply of this page first, newest first; or inspect and apply the words wanted now.',
                     $entry,
                     ['reason' => 'later']

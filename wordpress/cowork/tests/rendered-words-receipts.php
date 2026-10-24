@@ -177,7 +177,7 @@ check('apply: the set holds the scope, the theme and both rules under this apply
     [41, 'en_US', 'theme-diner-1', ['rw-1', 'rw-1'], ['+84 28 3822 0000', 'tel:+842838220000']]);
 check('apply: the rules option is not autoloaded', WP_Fake::$autoload[$rdKey] ?? 'unset', false);
 check('apply: one log step, with the before-image (none) and the revision it wrote', [count($rdLog->entries('rw-1')), array_key_exists('before', $rdLog->entries('rw-1')[0]) ? $rdLog->entries('rw-1')[0]['before'] : 'x', $rdLog->entries('rw-1')[0]['renderedWords'] ?? null],
-    [1, null, ['request' => 'req-1', 'afterRevision' => 1]]);
+    [1, null, ['request' => 'req-1', 'afterRevision' => 1, 'afterDigest' => hash('sha256', (string) WP_Fake::$options[$rdKey])]]);
 $rdVisitor = $rdSite->visit('/contact-us/')['body'];
 check('the visitor\'s page: the phone and the four links replaced, the form untouched',
     [substr_count($rdVisitor, '+84 28 3822 0000'), substr_count($rdVisitor, 'href="tel:+842838220000"'), strpos($rdVisitor, substr($rdPage, (int) strpos($rdPage, '<form'), 200)) !== false],
@@ -256,3 +256,47 @@ check('no receipt: write_failed, the page\'s rules as they were, no log step',
     [$rdE['error'] ?? null, WP_Fake::$options[$rdKey] === $rdBeforeE, $rdLog->entries('rw-5')], ['write_failed', true, []]);
 $rdF = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-5', 'req-5', [['new' => '+84 5'] + $rdGood[0]]);
 check('no receipt: a retry of the same request then applies once', [$rdF['ok'] ?? $rdF, $rdF['replayed'] ?? false, $rdF['revision'] ?? null], [true, false, 4]);
+
+// An edit that keeps the revision (a rule's words changed in the database by hand) is still a later edit.
+$rdIn6 = $rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]);
+$rdKept = WP_Fake::$options[$rdKey];
+$rdHand = RenderedWords::decodeSet($rdKept);
+$rdHand['rules'][0]['new'] = '+84 hand edit';
+$rdHandValue = RenderedWords::encodeSet($rdHand);
+WP_Fake::$options[$rdKey] = $rdHandValue;
+check('apply: rules changed since the inspection at the same revision are a conflict, nothing written',
+    [$rdApply($rdIn6, 'rw-6', 'req-6', [['new' => '+84 6'] + $rdGood[0]])['error'] ?? null, WP_Fake::$options[$rdKey] === $rdHandValue, $rdLog->entries('rw-6')], ['conflict', true, []]);
+WP_Fake::$options[$rdKey] = $rdKept;
+$rdG = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-6', 'req-6b', [['new' => '+84 6'] + $rdGood[0]]);
+$rdWritten = WP_Fake::$options[$rdKey];
+$rdHand = RenderedWords::decodeSet($rdWritten);
+$rdHand['rules'][0]['new'] = '+84 hand edit';
+$rdHandValue = RenderedWords::encodeSet($rdHand);
+WP_Fake::$options[$rdKey] = $rdHandValue;
+$rdRevHand = $rdCall('apply.revert', ['apply_id' => 'rw-6']);
+check('revert: an edit that kept the revision is a conflict, and the edit stays', [$rdG['ok'] ?? $rdG, $rdRevHand['error'] ?? 'reverted', WP_Fake::$options[$rdKey] === $rdHandValue],
+    [true, 'conflict', true]);
+WP_Fake::$options[$rdKey] = $rdWritten;
+check('revert: with the option back as the apply wrote it, the revert goes through', [$rdCall('apply.revert', ['apply_id' => 'rw-6'])['ok'] ?? null, WP_Fake::$options[$rdKey] === $rdKept], [true, true]);
+
+// Receipts are never dropped: a request_id answered long ago still replays, and a full store refuses new requests.
+$rdAll = json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true);
+$rdFiller = $rdAll['req-5'];
+check('receipts: a site keeps 1000', RenderedWords::MAX_RECEIPTS, 1000);
+for ($i = count($rdAll); $i < 999; $i++) {
+    $rdAll['filler-' . $i] = ['request_id' => 'filler-' . $i] + $rdFiller;
+}
+WP_Fake::$options[RenderedWords::RECEIPTS_OPTION] = json_encode($rdAll, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+$rdIn8 = $rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]);
+$rdLast = $rdApply($rdIn8, 'rw-8', 'req-8', [['new' => '+84 8'] + $rdGood[0]]);
+$rdOld = $rdApply($rdIn2, 'rw-1', 'req-1', $rdGood, 0);
+check('receipts: the last free place takes a request, and the oldest reverted one still replays (written nothing)',
+    [$rdLast['ok'] ?? $rdLast, $rdOld['replayed'] ?? null, $rdOld['state'] ?? null, count(json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true))],
+    [true, true, 'reverted', 1000]);
+$rdBeforeFull = WP_Fake::$options[$rdKey];
+$rdFull = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-9', 'req-9', [['new' => '+84 9'] + $rdGood[0]]);
+check('receipts: a full store refuses a new request, nothing written', [$rdFull['error'] ?? null, $rdFull['code'] ?? null, WP_Fake::$options[$rdKey] === $rdBeforeFull, $rdLog->entries('rw-9')],
+    ['too_large', 'RECEIPTS_FULL', true, []]);
+check('receipts: a full store still answers a retry of a known request', $rdApply($rdIn8, 'rw-8', 'req-8', [['new' => '+84 8'] + $rdGood[0]])['replayed'] ?? null, true);
+check('receipts: a receipt keeps no rules, so a full store stays under 1 MiB', [isset($rdAll['req-5']['answer']['rules']), strlen((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION]) < 1048576],
+    [false, true]);
