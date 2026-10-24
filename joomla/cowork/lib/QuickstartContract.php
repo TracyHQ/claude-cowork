@@ -425,13 +425,26 @@ final class QuickstartContract
                 try { $row[$col]=LeafCodec::set((string)$row[$col],$slot['leaf'],(string)$value); }
                 catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot cannot be rewritten in place: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
             }
-            elseif (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
+            // A JSON slot is a string at `jsonPath`, inside the nested JSON `nestedJson` names (an ACM's
+            // `jatools-config`) or, without one, in the column's own JSON (an article's `images` and
+            // `attribs`, a module's template fields, a menu item's page title). With `xpath` as well, that
+            // string is HTML and the slot is one text or attribute in it (a textarea field holding markup).
             elseif (isset($slot['jsonPath'])) {
                 $data=$json[$col]??json_decode($row[$col],true,512,JSON_THROW_ON_ERROR);
-                $inner=$slot['nestedJson']; $body=json_decode($data[$inner],true,512,JSON_THROW_ON_ERROR);
-                $data[$inner]=json_encode(ContentSlots::jsonPatch($body,$slot['jsonPath'],$value),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                $patch=static function(array $body) use ($slot,$value): array {
+                    if(!isset($slot['xpath']))return ContentSlots::jsonPatch($body,$slot['jsonPath'],$value);
+                    $leaf=$body; foreach($slot['jsonPath'] as $key){ if(!is_array($leaf)||!array_key_exists($key,$leaf))throw new RuntimeException('JSON slot is missing'); $leaf=$leaf[$key]; }
+                    if(!is_string($leaf))throw new RuntimeException('JSON slot is not text');
+                    return ContentSlots::jsonPatch($body,$slot['jsonPath'],ContentSlots::htmlPatch($leaf,[['xpath'=>$slot['xpath'],'value'=>$value]]));
+                };
+                if(isset($slot['nestedJson'])) {
+                    $inner=$slot['nestedJson']; $body=json_decode($data[$inner],true,512,JSON_THROW_ON_ERROR);
+                    $data[$inner]=json_encode($patch($body),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                } else $data=$patch($data);
                 $json[$col]=$data;
-            } else $row[$col]=$value;
+            }
+            elseif (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
+            else $row[$col]=$value;
         }
         foreach($html as $col=>$changes)$row[$col]=ContentSlots::htmlPatch($row[$col],$changes);
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
@@ -448,15 +461,23 @@ final class QuickstartContract
             try { return LeafCodec::get((string)$value,$slot['leaf']); }
             catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot is missing from its column: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
         }
-        if(isset($slot['xpath'])) {
+        if(isset($slot['jsonPath'])) {
+            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=isset($slot['nestedJson'])
+                ? ($parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR))
+                : $outer;
+            foreach($slot['jsonPath'] as $key)$value=is_array($value)&&array_key_exists($key,$value)?$value[$key]:null;
+            if(isset($slot['xpath'])) {
+                if(!is_string($value))throw new RuntimeException('Content slot is not text');
+                $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+                if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+                return $nodes->item(0)->nodeValue;
+            }
+        }
+        elseif(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
             return $nodes->item(0)->nodeValue;
-        }
-        if(isset($slot['jsonPath'])) {
-            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
-            $value=$parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
-            foreach($slot['jsonPath'] as $key)$value=$value[$key];
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
         return $value;
