@@ -960,12 +960,7 @@ final class Engine
                 return $this->err('conflict', 'request_id ' . $request . ' was already used for a different request', ['code' => 'CONFLICT']);
             }
             // The same request again: its first answer, never a second write (a reverted one stays reverted).
-            try {
-                $state = $this->renderedWordsState($seen);
-            } catch (Throwable $e) {
-                return $this->err('read_failed', $e->getMessage());
-            }
-            return $this->ok((is_array($seen['answer'] ?? null) ? $seen['answer'] : []) + ['replayed' => true, 'state' => $state]);
+            return $this->ok((is_array($seen['answer'] ?? null) ? $seen['answer'] : []) + ['replayed' => true, 'state' => $seen['state'] ?? 'applied']);
         }
         try {
             if ($this->log->entries($apply) !== []) {
@@ -1105,7 +1100,6 @@ final class Engine
                     return $this->err('not_found', 'No rendered-words request with that request_id on this site');
                 }
                 $set = $this->renderedWordsSet((string) $seen['key']);
-                $seenState = $this->renderedWordsState($seen);
             } else {
                 $post = $p['post'] ?? null;
                 $locale = $p['locale'] ?? null;
@@ -1123,13 +1117,9 @@ final class Engine
         $key = isset($seen) ? (string) $seen['key'] : RenderedWords::optionKey($post, $locale);
         $mine = array_filter($receipts, static fn($r): bool => is_array($r) && ($r['key'] ?? null) === $key);
         $list = [];
-        try {
-            foreach (array_slice($mine, -20, null, true) as $id => $r) {
-                $list[] = ['request_id' => (string) $id, 'apply_id' => $r['apply_id'] ?? null, 'state' => $this->renderedWordsState($r), 'at' => $r['at'] ?? null,
-                    'revision' => $r['answer']['revision'] ?? null, 'render' => $r['answer']['render'] ?? null];
-            }
-        } catch (Throwable $e) {
-            return $this->err('read_failed', $e->getMessage());
+        foreach (array_slice($mine, -20, null, true) as $id => $r) {
+            $list[] = ['request_id' => (string) $id, 'apply_id' => $r['apply_id'] ?? null, 'state' => $r['state'] ?? null, 'at' => $r['at'] ?? null,
+                'revision' => $r['answer']['revision'] ?? null, 'render' => $r['answer']['render'] ?? null];
         }
         $answer = ['key' => $key, 'revision' => (int) ($set['revision'] ?? 0), 'rules' => self::renderedWordsRuleList($set['rules'] ?? []),
             'theme_matches' => $set === [] ? null : $set['theme'] === $this->renderedSite->theme(), 'receipts' => $list];
@@ -1138,7 +1128,7 @@ final class Engine
             $answer['drift'] = $this->renderedSite->drift($set['post'], $set['locale']);
         }
         if (isset($seen)) {
-            $answer['request'] = ['request_id' => $p['request_id'], 'apply_id' => $seen['apply_id'] ?? null, 'state' => $seenState];
+            $answer['request'] = ['request_id' => $p['request_id'], 'apply_id' => $seen['apply_id'] ?? null, 'state' => $seen['state'] ?? null];
         }
         return $this->ok($answer);
     }
@@ -1177,24 +1167,14 @@ final class Engine
     }
 
     /**
-     * A receipt's state as the site holds it. A revert writes `reverted` into the receipt; when that write
-     * failed, the receipt still says `applied` while its apply was undone and its log cleared. An applied
-     * receipt whose apply holds no step is that revert.
-     *
-     * @param array<string,mixed> $receipt
-     */
-    private function renderedWordsState(array $receipt): ?string
-    {
-        $state = $receipt['state'] ?? null;
-        if ($state === 'applied' && $this->log !== null && is_string($receipt['apply_id'] ?? null) && $this->log->entries($receipt['apply_id']) === []) {
-            return 'reverted';
-        }
-        return $state;
-    }
-
-    /**
      * After a revert: the receipts of its requests say reverted (so a late retry does not write again), and
      * the page caches drop. Answers why the receipts could not be written, or null.
+     *
+     * 🔒 A RECEIPT THAT DID NOT MOVE STAYS STALE. Status and a retry of the request then still say
+     * `applied` over rules that are gone, and nothing the site holds can correct them: an empty apply
+     * log is also what a trimmed or lost log row leaves, and the live rules cannot say it either (a
+     * later apply takes over a rule by its place, and an apply that drops rules leaves none of its own).
+     * So the revert answer carries the warning, the one place the caller learns it.
      */
     private function renderedWordsReverted(array $entries): ?string
     {
@@ -1237,7 +1217,7 @@ final class Engine
             }
         }
         return $failed === null ? null : 'The rules were reverted, but the receipt of rendered-words request ' . implode(', ', array_unique($requests))
-            . ' could not be marked reverted: ' . $failed;
+            . ' could not be marked reverted (' . $failed . '): rendered-words status and a retry of the request may still say applied';
     }
 
     /**
@@ -4917,10 +4897,6 @@ final class Engine
                 $this->log->clear($applyId);
             } catch (Throwable $e) {
                 // The site is back; a log row that would not clear is the caller's to reconcile.
-                // A receipt left at applied is read as reverted only once its apply holds no step.
-                if ($warning !== null) {
-                    $warning .= '; the apply log could not be cleared either, so status may still say applied';
-                }
             }
             return $this->ok(['reverted' => $reverted] + ($warning === null ? [] : ['warning' => $warning]));
         }
