@@ -145,7 +145,13 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
     navigation block is repointed, or the one block of a showcase drawer goes. Pages stay published.
     Each owner is rewritten whole, by byte range, only while it holds the map's `before` sha256 and
     only with bytes whose sha256 is the map's `after` (a compare-and-set); one the customer already
-    changed is skipped and reported, never forced. Two owners per call (`running` until done); the
+    changed is skipped and reported, never forced. A provisioned site holds its own address where the
+    quickstart was packed with the manifest's `placeholderUrl` (`wp search-replace` ran first): an
+    owner is compared and edited with the `home`/`siteurl` address (with or without a trailing
+    slash, under the option's own scheme, plain and `\/`-escaped; each spelling tried on its own) folded back to the
+    placeholder, and written with it unfolded, so the site keeps its address and the
+    receipt holds the live bytes; owner bytes that already hold the placeholder next to the address
+    are compared exactly. Two owners per call (`running` until done); the
     receipt (the bytes found) lands before each write, so the same request resumes a call that died.
     A template part with no row (the theme file in charge) is a conflict for that owner: nothing is
     created, because creating an override cannot be compared-and-set. An owner found already at the

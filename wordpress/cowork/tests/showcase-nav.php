@@ -24,10 +24,18 @@ function snavSite(string $contractId, string $contractsDir, array $options = [])
 {
     WP_Fake::reset();
     WP_Fake::$stylesheet = 'quickstart-theme';
-    WP_Fake::$options = ['home' => 'http://test.local'];
+    WP_Fake::$options = ['home' => $options['home'] ?? 'http://test.local'] + (isset($options['siteurl']) ? ['siteurl' => $options['siteurl']] : []);
     $GLOBALS['wpdb']->beforeSwap = null;
     $fixture = __DIR__ . '/fixtures/showcase-nav/' . explode('/', $contractId)[0] . '.json';
     $source = is_file($fixture) ? json_decode((string) file_get_contents($fixture), true) : ['navigations' => [], 'templateParts' => []];
+    if (isset($options['home'])) {
+        // Provisioned: `wp search-replace <placeholderUrl> <site url>` ran before anything else.
+        foreach (['navigations', 'templateParts'] as $group) {
+            foreach ($source[$group] as $i => $row) {
+                $source[$group][$i]['content'] = str_replace('https://quickstart.invalid', $options['rewrite'] ?? rtrim($options['home'], '/'), $row['content']);
+            }
+        }
+    }
     foreach ($source['navigations'] as $nav) {
         WP_Fake::$posts[$nav['id']] = ['ID' => $nav['id'], 'post_type' => 'wp_navigation', 'post_name' => $nav['slug'], 'post_status' => 'publish', 'post_parent' => 0, 'post_title' => $nav['slug'], 'post_content' => $nav['content']];
     }
@@ -424,6 +432,121 @@ $sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id'
 $wRev = $sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 check('and revert puts them back', [$wRev['status'], $sha(93), $sha(96), $sha(278)],
     ['reverted', $P['navigation-93']['before'], $P['templatePart-96']['before'], $P['navigation-278']['before']]);
+
+// ── a provisioned site: the placeholder address was rewritten to the site's own ────────────
+
+$HOME = 'https://diner.example.test';
+$fold = static fn(string $bytes): string => str_replace($HOME, 'https://quickstart.invalid', $bytes);
+$u = snavSite($DINER, $snavFixtures, ['home' => $HOME . '/']);
+$uSource = $contents([93, 278, 96]);
+check('the provisioned navigations hold the site address, not the placeholder', [strpos($uSource[0], $HOME . '/') !== false, strpos($uSource[0], 'quickstart.invalid')], [true, false]);
+$uFirst = $sdoor($u['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$uFirst = $uFirst['status'] === 'running' ? $sdoor($u['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $uFirst;
+check('a rewritten site hides what the packed site hides', [$uFirst['status'], $uFirst['skipped'], $labels(93), strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":93') !== false],
+    ['completed', [], ['Home', 'About Us', 'Reservation', 'Offers', 'Our Blog', 'Contact Us'], true]);
+check('with the site address kept: folded back, the bytes are the map\'s end', [hash('sha256', $fold($contents([93])[0])), hash('sha256', $fold($contents([278])[0])), $sha(96), strpos($contents([93])[0], 'quickstart.invalid')],
+    [$P['navigation-93']['after'], $P['navigation-278']['after'], $P['templatePart-96']['after'], false]);
+check('the rewritten site inspects clean', $drift($u['engine']), []);
+$uAgain = $sdoor($u['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-2', 'request_id' => 'n2']);
+check('applying again writes nothing', [$uAgain['ok'], $uAgain['alreadyApplied'] ?? null], [true, true]);
+$sdoor($u['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+$uRev = $sdoor($u['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('revert puts the site\'s own bytes back, byte for byte', [$uRev['status'], $uRev['conflicts'], $contents([93, 278, 96]) === $uSource], ['reverted', [], true]);
+$uNew = $sdoor($u['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-3', 'request_id' => 'n3']);
+$uNew = $uNew['status'] === 'running' ? $sdoor($u['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-3', 'request_id' => 'n3']) : $uNew;
+check('and a new request hides them again', [$uNew['status'], $uNew['skipped'], hash('sha256', $fold($contents([278])[0]))], ['completed', [], $P['navigation-278']['after']]);
+
+// The customer edited one rewritten navigation: still theirs.
+$ue = snavSite($DINER, $snavContracts, ['home' => $HOME]);
+WP_Fake::$posts[278]['post_content'] = str_replace('Smart Search', 'Search', (string) WP_Fake::$posts[278]['post_content']);
+$ueEdited = WP_Fake::$posts[278]['post_content'];
+$ueDone = $sdoor($ue['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a navigation the customer edited on a rewritten site is left alone', [$ueDone['status'], $ueDone['skipped'], WP_Fake::$posts[278]['post_content'] === $ueEdited, hash('sha256', $fold($contents([93])[0]))],
+    ['completed', ['navigation-278' => 'edited on this site since the quickstart shipped it; left as it is'], true, $F['navigation-93']['after']]);
+
+// The placeholder itself is still in the live bytes next to the site address: folding would be a guess.
+$up = snavSite($DINER, $snavContracts, ['home' => $HOME]);
+$upMixed = preg_replace('~' . preg_quote($HOME, '~') . '~', 'https://quickstart.invalid', $up['source']['navigations'][0]['content'], 1);
+WP_Fake::$posts[93]['post_content'] = $upMixed;
+check('(the mixed bytes fold to the map\'s start)', hash('sha256', $fold($upMixed)), $F['navigation-93']['before']);
+$upDone = $sdoor($up['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a navigation already holding the placeholder is compared exactly, and left alone', [$upDone['status'], $upDone['skipped'], WP_Fake::$posts[93]['post_content'] === $upMixed],
+    ['completed', ['navigation-93' => 'edited on this site since the quickstart shipped it; left as it is'], true]);
+
+// A write on a rewritten site that landed but whose answer was lost is still this job's.
+$ua = snavSite($DINER, $snavContracts, ['home' => $HOME]);
+$sdoor($ua['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$uaAfter = WP_Fake::$posts[93]['post_content'];
+$ul = snavSite($DINER, $snavContracts, ['home' => $HOME]);
+$GLOBALS['wpdb']->beforeSwap = static function (int $id) use ($uaAfter): void {
+    if ($id === 93) {
+        WP_Fake::$posts[93]['post_content'] = $uaAfter; // the UPDATE ran ...
+        throw new RuntimeException('the answer was lost'); // ... and its answer never came back
+    }
+};
+$ulLost = $sdoor($ul['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$GLOBALS['wpdb']->beforeSwap = null;
+$ulReceipt = $sdoor($ul['engine'], 'inspect')['showcaseNav']['receipts']['navigation-93'];
+check('(the write landed, with the site address)', [$ulLost['ok'], $ulReceipt['outcome'], hash('sha256', $fold($contents([93])[0]))], [false, 'writing', $F['navigation-93']['after']]);
+$ulDone = $sdoor($ul['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$ulReceipts = $sdoor($ul['engine'], 'inspect')['showcaseNav']['receipts'];
+check('the same request counts it as written', [$ulDone['status'], $ulDone['skipped'], $ulReceipts['navigation-93']['outcome']], ['completed', [], 'written']);
+$sdoor($ul['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('and revert puts the site\'s own bytes back', $contents([93, 278]), array_column($ul['source']['navigations'], 'content'));
+
+// However search-replace spelled the site address, the same battery: apply hides what the packed
+// site hides, a second apply changes nothing, revert is byte for byte; a URL the owner changed is
+// still a conflict; a real placeholder next to the address keeps the exact comparison.
+$snavRewritten = static function (string $label, array $site) use ($DINER, $snavContracts, $sdoor, $contents, $labels, $F): void {
+    $target = $site['rewrite'] ?? rtrim($site['home'], '/');
+    $fold = static fn(string $bytes): string => str_replace($target, 'https://quickstart.invalid', $bytes);
+    $x = snavSite($DINER, $snavContracts, $site);
+    $source = $contents([93, 278]);
+    $first = $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+    check($label . ': apply hides what the packed site hides', [$first['status'], $first['moved'], $first['skipped'], $labels(93),
+        hash('sha256', $fold($contents([93])[0])), hash('sha256', $fold($contents([278])[0])), strpos($contents([93])[0], $target) !== false],
+        ['completed', 2, [], ['Home', 'About Us', 'Reservation', 'Offers', 'Our Blog', 'Contact Us'], $F['navigation-93']['after'], $F['navigation-278']['after'], true]);
+    $applied = $contents([93, 278]);
+    $again = $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-2', 'request_id' => 'n2']);
+    check($label . ': a second apply changes nothing', [$again['alreadyApplied'] ?? null, $contents([93, 278]) === $applied], [true, true]);
+    $rev = $sdoor($x['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+    check($label . ': revert is byte for byte', [$rev['status'], $rev['conflicts'], $contents([93, 278]) === $source], ['reverted', [], true]);
+
+    $x = snavSite($DINER, $snavContracts, $site);
+    $moved = preg_replace('~' . preg_quote($target, '~') . '~', 'https://elsewhere.example.test', (string) WP_Fake::$posts[278]['post_content'], 1);
+    WP_Fake::$posts[278]['post_content'] = $moved;
+    $done = $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+    check($label . ': a URL the owner changed is still a conflict', [$done['skipped'], WP_Fake::$posts[278]['post_content'] === $moved, hash('sha256', $fold($contents([93])[0]))],
+        [['navigation-278' => 'edited on this site since the quickstart shipped it; left as it is'], true, $F['navigation-93']['after']]);
+
+    $x = snavSite($DINER, $snavContracts, $site);
+    $mixed = preg_replace('~' . preg_quote($target, '~') . '~', 'https://quickstart.invalid', (string) WP_Fake::$posts[93]['post_content'], 1);
+    WP_Fake::$posts[93]['post_content'] = $mixed;
+    $done = $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+    check($label . ': a real placeholder next to the address is compared exactly', [hash('sha256', $fold($mixed)) === $F['navigation-93']['before'], $done['skipped'], WP_Fake::$posts[93]['post_content'] === $mixed],
+        [true, ['navigation-93' => 'edited on this site since the quickstart shipped it; left as it is'], true]);
+};
+// A site still at the placeholder address folds nothing: an extra slash is not the placeholder.
+$xp = snavSite($DINER, $snavContracts, ['home' => 'https://quickstart.invalid/']);
+WP_Fake::$posts[93]['post_content'] = str_replace('https://quickstart.invalid/', 'https://quickstart.invalid//', (string) WP_Fake::$posts[93]['post_content']);
+$xpBytes = WP_Fake::$posts[93]['post_content'];
+$xpDone = $sdoor($xp['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a site at the placeholder address compares its bytes as they are', [$xpDone['skipped'], WP_Fake::$posts[93]['post_content'] === $xpBytes, $sha(278)],
+    [['navigation-93' => 'edited on this site since the quickstart shipped it; left as it is'], true, $F['navigation-278']['after']]);
+// The placeholder is a prefix of the site's own address.
+$snavRewritten('an address the placeholder begins', ['home' => 'https://quickstart.invalid.example']);
+// `wp search-replace` given the address with its trailing slash; `home` holds it without.
+$snavRewritten('a target with a trailing slash', ['home' => 'https://site.example.test', 'rewrite' => 'https://site.example.test/']);
+// siteurl rather than home.
+$snavRewritten('siteurl, not home', ['home' => 'https://www.example.test', 'siteurl' => 'https://site.example.test/wp', 'rewrite' => 'https://site.example.test/wp']);
+
+// The owner moved one navigation's links to the other scheme: their edit, not provisioning's, so a conflict.
+$xs = snavSite($DINER, $snavContracts, ['home' => 'https://site.example.test']);
+$xsMoved = str_replace('https://site.example.test', 'http://site.example.test', (string) WP_Fake::$posts[278]['post_content']);
+WP_Fake::$posts[278]['post_content'] = $xsMoved;
+$xsDone = $sdoor($xs['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('links the owner moved to the other scheme are a conflict, not folded', [$xsDone['skipped'], WP_Fake::$posts[278]['post_content'] === $xsMoved, $xsMoved !== $xs['source']['navigations'][1]['content']],
+    [['navigation-278' => 'edited on this site since the quickstart shipped it; left as it is'], true, true]);
 
 // ── maps that cannot be used ────────────────────────────────────────────────────────────────
 

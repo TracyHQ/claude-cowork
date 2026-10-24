@@ -7,6 +7,12 @@
 #   wordpress/cowork/tests/e2e/showcase-nav.sh
 #   DINER_RELEASE=<folder> wordpress/cowork/tests/e2e/showcase-nav.sh   # parts already downloaded
 #   KEEP=1 ...                                                           # leave the stand up
+#   PROVISION=0 ...                                                      # keep the packed placeholder address
+#
+# As provisioning does (`wp search-replace <placeholderUrl> <site url>`), the placeholder address the
+# release was packed with is rewritten to the site's own in every post's content before the bind, so
+# the owners hold http://localhost where the map hashed https://quickstart.invalid. Their sha256 are
+# compared with the map with the site address folded back to the placeholder.
 #
 # Without DINER_RELEASE the two parts are downloaded with `gh release download` (the release is
 # private: gh must be signed in with read access to it). Either way both sha256 are checked first.
@@ -92,6 +98,12 @@ docker exec "$P-wp" sed -i -e "s/{{DB_NAME}}/quickstart/" -e "s/{{DB_USER}}/root
   -e "s/{{DB_HOST}}/$P-db/" /var/www/html/wp-config.php
 docker exec "$P-wp" sh -c 'chown -R www-data:www-data /var/www/html/wp-content/uploads /var/www/html/wp-config.php 2>/dev/null || true'
 sql "UPDATE ${QS}options SET option_value='http://localhost' WHERE option_name IN ('siteurl','home')"
+PLACEHOLDER=$(part placeholderUrl)
+if [ "${PROVISION:-1}" = 1 ]; then
+  sql "UPDATE ${QS}posts SET post_content=REPLACE(post_content, '$PLACEHOLDER', 'http://localhost')"
+  expect "the owners hold the site address, not the placeholder" \
+    "$(sql "SELECT COUNT(*) FROM ${QS}posts WHERE ID IN (93,278) AND LOCATE('http://localhost/', post_content) > 0 AND LOCATE('$PLACEHOLDER', post_content) = 0")" 2
+fi
 for _ in $(seq 1 60); do docker exec "$P-wp" curl -fsS -o /dev/null http://localhost/ >/dev/null 2>&1 && break; sleep 1; done
 expect "the restored site answers its home page" "$(docker exec "$P-wp" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" 200
 expect "it runs the WordPress the release was made on" "$(docker exec "$P-wp" php -r 'include "/var/www/html/wp-includes/version.php"; echo $wp_version;')" "$(part platformVersion)"
@@ -136,7 +148,8 @@ run_job() {
 OWNERS="93,96,278"
 MAP="$COWORK/lib/contracts/$CONTRACT/showcase-nav-map.json"
 final() { node -e 'const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.stdout.write(["navigation-93", "navigation-278"].map((k) => m.finals.find((f) => f.key === k)[process.argv[2]]).join(","))' "$MAP" "$1"; }
-shas() { sql "SELECT GROUP_CONCAT(SHA2(post_content,256) ORDER BY ID) FROM ${QS}posts WHERE ID IN (93,278)"; }
+# With the site address folded back to the placeholder: the bytes the map hashed.
+shas() { sql "SELECT GROUP_CONCAT(SHA2(REPLACE(post_content, 'http://localhost', '$PLACEHOLDER'),256) ORDER BY ID) FROM ${QS}posts WHERE ID IN (93,278)"; }
 changed() { sql "SELECT COALESCE(GROUP_CONCAT(p.ID ORDER BY p.ID),'none') FROM ${QS}posts p JOIN snav_original o ON o.ID=p.ID WHERE BINARY p.post_content<>BINARY o.post_content"; }
 sql "CREATE TABLE snav_original AS SELECT ID, post_content FROM ${QS}posts WHERE ID IN ($OWNERS)"
 expect "the release ships 93 and 278 as the map starts from" "$(shas)" "$(final before)"
@@ -188,6 +201,8 @@ say "2. apply"
 run_job '{"operation":"showcaseNav.apply","apply_id":"snav-e2e","request_id":"e2e-1"}'
 expect "apply completes" "$(field status) $MOVED $(field remaining) $(field skipped)" "completed 2 0 []"
 expect "93 and 278 hold the map's finals" "$(shas)" "$(final after)"
+expect "and keep the address they were found with" \
+  "$(sql "SELECT COUNT(*) FROM ${QS}posts p JOIN snav_original o ON o.ID=p.ID WHERE p.ID IN (93,278) AND (LOCATE('$PLACEHOLDER', p.post_content) > 0) = (LOCATE('$PLACEHOLDER', o.post_content) > 0)")" 2
 expect "the header part keeps the release's bytes" "$(changed)" "93,278"
 expect "the header drawer still opens site-pages" \
   "$(sql "SELECT LOCATE('\"ref\":278', post_content) > 0 FROM ${QS}posts WHERE ID=96")" 1
