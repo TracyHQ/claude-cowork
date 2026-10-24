@@ -664,9 +664,10 @@ final class WordPressDerivedRows
      *
      * @param array<string,string> $headers
      * @param string|null $resolve `name:port:127.0.0.1` for the https route, null for plain http
+     * @param array<string,string>|null $received when given, the answer's headers, lower-case names (RenderedWords' probe reads its scope there)
      * @return array{code:int,body:string} code 0 when nothing answered or nothing was sent
      */
-    public static function httpGet(string $url, array $headers, int $timeout, ?string $resolve): array
+    public static function httpGet(string $url, array $headers, int $timeout, ?string $resolve, ?array &$received = null): array
     {
         $none = ['code' => 0, 'body' => ''];
         if (!function_exists('curl_init') || !defined('CURLOPT_RESOLVE')) {
@@ -708,6 +709,16 @@ final class WordPressDerivedRows
             CURLOPT_CONNECTTIMEOUT => max(1, $timeout),
             CURLOPT_TIMEOUT => max(1, $timeout),
         ];
+        if (func_num_args() > 4) {
+            $received = [];
+            $options[CURLOPT_HEADERFUNCTION] = static function ($handle, string $line) use (&$received): int {
+                if (strpos($line, ':') !== false && count($received) < 100) {
+                    [$name, $value] = explode(':', $line, 2);
+                    $received[strtolower(trim($name))] = trim($value);
+                }
+                return strlen($line);
+            };
+        }
         try {
             if (!curl_setopt_array($handle, $options)) {
                 return $none;

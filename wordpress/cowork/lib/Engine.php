@@ -27,6 +27,7 @@ require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/StringOverrides.php';
 require_once __DIR__ . '/DateFormats.php';
 require_once __DIR__ . '/BlockWords.php';
+require_once __DIR__ . '/RenderedWords.php';
 
 final class Engine
 {
@@ -61,6 +62,8 @@ final class Engine
     private $derivePurge = null;
     /** `fn(string $kind, int $id, array $identity): ?string` the page a derived row's words show on, or null. */
     private $deriveOwnerUrl = null;
+    /** The page a `content.renderedWords` door inspects, checks and verifies; null leaves that door closed. */
+    private ?RenderedWordsSite $renderedSite = null;
     /** Pages the render check after a derived apply may fetch: it runs under the write lock. */
     private const RENDER_CHECK_PAGES = 3;
     /** Options a content.update or content.delete may never touch: the contract's own records. */
@@ -95,7 +98,7 @@ final class Engine
     private const CONTRACT_RULED = ['media.upload', 'media.delete', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
     private const SERIALIZED = [
-        'content.contract', 'content.update', 'content.delete', 'content.language',
+        'content.contract', 'content.update', 'content.delete', 'content.language', 'content.renderedWords',
         'media.upload', 'media.delete', 'apply.revert', 'db.cleanup', 'db.restore', 'db.purge',
     ];
     /** The only path an image may take onto a sealed site: content-addressed, under one folder. */
@@ -165,6 +168,13 @@ final class Engine
         return $this;
     }
 
+    /** Open `content.renderedWords` on this site (the plugin wires its loopback and options; tests a fake). */
+    public function renderedWordsSite(RenderedWordsSite $site): self
+    {
+        $this->renderedSite = $site;
+        return $this;
+    }
+
     /**
      * @param array<string,mixed> $req  {token, action, params:{}}
      * @return array<string,mixed>
@@ -217,6 +227,10 @@ final class Engine
             && in_array((string) ($params['key'] ?? ''), self::CONTRACT_OPTIONS, true)) {
             return $this->err('bad_params', "This option is the contract's own record; it changes only through content.contract");
         }
+        if (in_array($action, ['content.update', 'content.delete'], true) && ($params['kind'] ?? '') === 'option'
+            && RenderedWords::isOption((string) ($params['key'] ?? ''))) {
+            return $this->err('bad_params', 'This option holds rendered-words rules and their receipts; it changes only through content.renderedWords');
+        }
         // A contract RECOMMENDS how to keep the quickstart's design; it locks nothing (Tracy ADR 0022,
         // 26/09/2026). A bound site takes every action an unbound one does; the contract's own rules
         // stay on its own door and on the picture folder its image slots use.
@@ -255,7 +269,15 @@ final class Engine
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
-                ]]]);
+                ]] + ($this->renderedSite === null ? [] : ['rendered_words' => [
+                    'schema' => RenderedWords::SCHEMA,
+                    'operations' => ['inspect', 'apply', 'status'],
+                    'targets' => ['text', 'attribute:href'],
+                    'max_rules_request' => RenderedWords::MAX_RULES_REQUEST,
+                    'max_rules_scope' => RenderedWords::MAX_RULES_SCOPE,
+                    'max_text_bytes' => RenderedWords::MAX_TEXT,
+                    'max_url_bytes' => RenderedWords::MAX_URL,
+                ]])]);
             case 'site.stats':
                 return $this->siteStats();
             case 'db.tables':
@@ -318,6 +340,8 @@ final class Engine
                 return $this->applyList($params);
             case 'content.contract':
                 return $this->contentContract($params);
+            case 'content.renderedWords':
+                return $this->renderedWords($params);
             default:
                 return $this->err('bad_action', "unknown action: {$action}");
         }
@@ -729,6 +753,395 @@ final class Engine
             foreach (glob($theme . '/' . $folder . '/*.{html,php}', GLOB_BRACE) ?: [] as $file) {
                 if (is_file($file) && !is_link($file) && filesize($file) <= 1048576) {
                     yield (string) @file_get_contents($file);
+                }
+            }
+        }
+    }
+
+    // ---- Rendered words ---------------------------------------------------------------------
+    //
+    // Words a theme prints at render time that no stored record holds (RenderedWords). `inspect`
+    // reads the page as an anonymous visitor's, through the site's own signed probe; `apply` stores
+    // a page's rules under an apply_id and a request_id; `status` reads them back with the drift the
+    // front end saw. One option per page and locale, so pages revert independently.
+
+    private function renderedWords(array $p): array
+    {
+        if ($this->renderedSite === null || $this->writer === null || $this->log === null || $this->token === null) {
+            return $this->err('unavailable', 'rendered words are not wired on this receiver');
+        }
+        $operation = $p['operation'] ?? null;
+        if ($operation === 'inspect') {
+            return $this->renderedWordsInspect($p);
+        }
+        if ($operation === 'apply') {
+            return $this->renderedWordsApply($p);
+        }
+        if ($operation === 'status') {
+            return $this->renderedWordsStatus($p);
+        }
+        return $this->err('bad_params', 'operation is inspect, apply or status');
+    }
+
+    /** A page address on this site: a path from its root, no scheme, host or fragment. */
+    private static function renderedWordsPath($path): ?string
+    {
+        if (!is_string($path) || $path === '' || $path[0] !== '/' || ($path[1] ?? '') === '/' || strlen($path) > 512
+            || preg_match('/[\x00-\x20\x7F#\\\\]/', $path) === 1 || preg_match('//u', $path) !== 1) {
+            return null;
+        }
+        return $path;
+    }
+
+    /** The scope's stored set, `[]` when it has none; null when an option is there that does not read as one. */
+    private function renderedWordsSet(string $key, ?array &$before = null): ?array
+    {
+        $before = $this->writer->read('option', 0, $key);
+        if ($before === null) {
+            return [];
+        }
+        $set = RenderedWords::decodeSet($before['value'] ?? '');
+        return $set === [] ? null : $set;
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    private function renderedWordsReceipts(?array &$before = null): array
+    {
+        $before = $this->writer->read('option', 0, RenderedWords::RECEIPTS_OPTION);
+        $all = is_string($before['value'] ?? null) ? json_decode($before['value'], true) : null;
+        return is_array($all) ? $all : [];
+    }
+
+    /** @param list<array<string,mixed>> $rules */
+    private static function renderedWordsRuleList(array $rules): array
+    {
+        return array_map(static fn(array $r): array => array_intersect_key($r, array_flip(['id', 'kind', 'name', 'anchor', 'old', 'new', 'expected_matches', 'apply_id'])), $rules);
+    }
+
+    private function renderedWordsInspect(array $p): array
+    {
+        $path = self::renderedWordsPath($p['path'] ?? null);
+        if ($path === null) {
+            return $this->err('bad_params', 'path is the page address from the site root, e.g. /contact-us/');
+        }
+        $targets = $p['targets'] ?? null;
+        if (!is_array($targets) || $targets === [] || count($targets) > RenderedWords::MAX_RULES_REQUEST || array_keys($targets) !== range(0, count($targets) - 1)) {
+            return $this->err('bad_params', 'targets is a list of 1 to ' . RenderedWords::MAX_RULES_REQUEST . ' {kind, name?, old}');
+        }
+        foreach ($targets as $i => $target) {
+            // A target is a rule without its destination: checked as one, with old words standing in.
+            $probe = is_array($target) ? array_intersect_key($target, array_flip(['kind', 'name', 'old'])) + ['anchor' => str_repeat('0', 16), 'expected_matches' => 1] : null;
+            $why = $probe === null ? 'a target is an object' : RenderedWords::ruleRefusal($probe + ['new' => $probe['old'] ?? '']);
+            if ($why !== null || array_diff(array_keys($target), ['kind', 'name', 'old']) !== []) {
+                return $this->err('bad_params', "targets[{$i}]: " . ($why ?? 'a target holds kind, name and old only'));
+            }
+        }
+        $page = $this->renderedSite->probe($path);
+        if ($page['code'] !== 200) {
+            return $this->err('unsupported', 'The page did not answer 200 to the site\'s own anonymous request (answered ' . $page['code'] . ')');
+        }
+        if ($page['post'] <= 0 || !RenderedWords::validLocale($page['locale'])) {
+            return $this->err('unsupported', 'The page is not a single published post or page this site scopes rendered words to');
+        }
+        $found = RenderedWords::candidates($page['body'], $targets);
+        if ($found === null) {
+            return $this->err('unsupported', 'The page is larger than ' . RenderedWords::MAX_HTML . ' bytes or its markup could not be followed');
+        }
+        try {
+            $set = $this->renderedWordsSet(RenderedWords::optionKey($page['post'], $page['locale']));
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($set === null) {
+            return $this->err('conflict', 'The stored rendered-words rules of this page cannot be read');
+        }
+        $revision = (int) ($set['revision'] ?? 0);
+        $proof = RenderedWords::sign(RenderedWords::key($this->token), ['v' => 1, 'path' => $path, 'post' => $page['post'],
+            'locale' => $page['locale'], 'revision' => $revision, 'theme' => $page['theme'], 'exp' => time() + RenderedWords::PROOF_SECONDS]);
+        return $this->ok(['scope' => ['entity' => ['kind' => 'post', 'id' => $page['post']], 'locale' => $page['locale']], 'path' => $path,
+            'revision' => $revision, 'targets' => $found, 'rules' => self::renderedWordsRuleList($set['rules'] ?? []),
+            'proof' => $proof, 'expires_in' => RenderedWords::PROOF_SECONDS]);
+    }
+
+    private function renderedWordsApply(array $p): array
+    {
+        $apply = $this->applyId($p);
+        if ($apply === null || strpos($apply, 'contract-') === 0) {
+            return $this->err('bad_params', 'apply_id required, and not a contract- one');
+        }
+        $request = $p['request_id'] ?? null;
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: letters, digits and ._:- only, at most 100');
+        }
+        $expected = $p['expected_revision'] ?? null;
+        if (!is_int($expected) || $expected < 0) {
+            return $this->err('bad_params', 'expected_revision is the revision an inspection answered');
+        }
+        $rules = $p['rules'] ?? null;
+        if (!is_array($rules) || $rules === [] || count($rules) > RenderedWords::MAX_RULES_REQUEST || array_keys($rules) !== range(0, count($rules) - 1)) {
+            return $this->err('bad_params', 'rules is a list of 1 to ' . RenderedWords::MAX_RULES_REQUEST . ' rules');
+        }
+        $ids = [];
+        foreach ($rules as $i => $rule) {
+            $why = RenderedWords::ruleRefusal($rule);
+            if ($why === null && (isset($rule['id']) || isset($rule['apply_id']))) {
+                $why = 'a rule holds kind, name, anchor, old, new, expected_matches and rule_id only';
+            }
+            if ($why !== null) {
+                return $this->err('bad_params', "rules[{$i}]: {$why}");
+            }
+            $id = RenderedWords::ruleId($rule);
+            if (isset($ids[$id])) {
+                return $this->err('bad_params', "rules[{$i}]: the same place and words twice in one request");
+            }
+            $ids[$id] = true;
+        }
+        // What the request asks, without its proof: a retry that inspected again is the same request.
+        $claimed = is_string($p['proof'] ?? null) ? json_decode((string) base64_decode(strtr((string) strtok($p['proof'], '.'), '-_', '+/'), true), true) : null;
+        $hash = hash('sha256', (string) json_encode([$apply, $expected, array_map(static function (array $r): array {
+            ksort($r);
+            return $r;
+        }, $rules), [$claimed['path'] ?? null, $claimed['post'] ?? null, $claimed['locale'] ?? null]]));
+        try {
+            $receipts = $this->renderedWordsReceipts($receiptsBefore);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if (isset($receipts[$request])) {
+            $seen = $receipts[$request];
+            if (($seen['hash'] ?? null) !== $hash) {
+                return $this->err('conflict', 'request_id ' . $request . ' was already used for a different request', ['code' => 'CONFLICT']);
+            }
+            // The same request again: its first answer, never a second write (a reverted one stays reverted).
+            return $this->ok((is_array($seen['answer'] ?? null) ? $seen['answer'] : []) + ['replayed' => true, 'state' => $seen['state'] ?? 'applied']);
+        }
+        try {
+            if ($this->log->entries($apply) !== []) {
+                return $this->err('bad_params', 'apply_id ' . $apply . ' already holds steps; a rendered-words apply takes a fresh one');
+            }
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $proof = RenderedWords::verify(RenderedWords::key($this->token), $p['proof'] ?? null, time());
+        if ($proof === null || !is_string($proof['path'] ?? null) || !is_int($proof['post'] ?? null) || !RenderedWords::validLocale($proof['locale'] ?? null)) {
+            return $this->err('stale_proof', 'proof is missing, expired or not from this site: inspect the page again');
+        }
+        if ($this->renderedSite->theme() !== ($proof['theme'] ?? null)) {
+            return $this->err('conflict', 'The active theme changed since the inspection: inspect the page again', ['code' => 'CONFLICT']);
+        }
+        $key = RenderedWords::optionKey($proof['post'], $proof['locale']);
+        try {
+            $set = $this->renderedWordsSet($key, $before);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($set === null) {
+            return $this->err('conflict', 'The stored rendered-words rules of this page cannot be read', ['code' => 'CONFLICT']);
+        }
+        $revision = (int) ($set['revision'] ?? 0);
+        if ($revision !== $expected || ($proof['revision'] ?? null) !== $expected) {
+            return $this->err('conflict', 'The rules of this page are at revision ' . $revision . ', not ' . $expected . ': inspect the page again', ['code' => 'CONFLICT', 'revision' => $revision]);
+        }
+        $merged = RenderedWords::merge($set['rules'] ?? [], $rules, $apply);
+        $next = ['schema' => RenderedWords::SCHEMA, 'post' => $proof['post'], 'locale' => $proof['locale'], 'revision' => $revision + 1,
+            'theme' => (string) $proof['theme'], 'rules' => $merged];
+        $encoded = RenderedWords::encodeSet($next);
+        if (count($merged) > RenderedWords::MAX_RULES_SCOPE || strlen($encoded) > RenderedWords::MAX_SCOPE_BYTES) {
+            return $this->err('too_large', 'A page holds at most ' . RenderedWords::MAX_RULES_SCOPE . ' rules in ' . RenderedWords::MAX_SCOPE_BYTES . ' bytes');
+        }
+        try {
+            $stored = $this->renderedSite->storedBytes() - strlen((string) ($before['value'] ?? '')) + strlen($encoded);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($stored > RenderedWords::MAX_SITE_BYTES) {
+            return $this->err('too_large', 'This site holds at most ' . RenderedWords::MAX_SITE_BYTES . ' bytes of rendered-words rules');
+        }
+        // The page as it renders now, without rules: every rule of the new set must apply to it whole.
+        $page = $this->renderedSite->probe($proof['path']);
+        if ($page['code'] !== 200 || $page['post'] !== $proof['post'] || $page['locale'] !== $proof['locale']) {
+            return $this->err('drift', 'The page no longer answers as the inspection saw it: inspect it again');
+        }
+        $dry = RenderedWords::render($page['body'], $merged);
+        if ($merged !== [] && !$dry['applied']) {
+            return $this->err('drift', 'These rules would not apply to the page as it renders now; nothing was written', ['problems' => $dry['problems']]);
+        }
+        $written = [['kind' => 'option', 'id' => 0, 'key' => $key]];
+        try {
+            $this->writer->write('option', 0, ['value' => $encoded], $key);
+            try {
+                $this->log->record($apply, ['op' => 'content', 'kind' => 'option', 'id' => 0, 'key' => $key, 'before' => $before,
+                    'renderedWords' => ['request' => $request, 'afterRevision' => $revision + 1]]);
+            } catch (Throwable $e) {
+                $this->rollbackContent('option', 0, $key, $before);
+                throw $e;
+            }
+        } catch (Throwable $e) {
+            return $this->err('write_failed', 'The rules were not written: ' . $e->getMessage());
+        }
+        $render = $this->renderedWordsPurgeAndVerify($key, $proof['path'], $merged);
+        $answer = ['apply_id' => $apply, 'request_id' => $request, 'stored' => true, 'revision' => $revision + 1,
+            'scope' => ['entity' => ['kind' => 'post', 'id' => $proof['post']], 'locale' => $proof['locale']], 'path' => $proof['path'],
+            'rules' => self::renderedWordsRuleList($merged), 'render' => $render, 'written' => $written];
+        $receipts[$request] = ['hash' => $hash, 'apply_id' => $apply, 'key' => $key, 'state' => 'applied', 'at' => time(), 'answer' => $answer];
+        if (count($receipts) > RenderedWords::MAX_RECEIPTS) {
+            $receipts = array_slice($receipts, -RenderedWords::MAX_RECEIPTS, null, true);
+        }
+        try {
+            $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
+        } catch (Throwable $e) {
+            // No receipt, no write: a retry must find the page as it was.
+            try {
+                $this->rollbackContent('option', 0, $key, $before);
+                $this->log->clear($apply);
+                $this->renderedWordsPurgeAndVerify($key, $proof['path'], []);
+            } catch (Throwable $ignored) {
+            }
+            return $this->err('write_failed', 'The receipt could not be written, so the rules were taken back: ' . $e->getMessage());
+        }
+        $this->stamped('content');
+        return $this->ok($answer);
+    }
+
+    /**
+     * Drop the caches the page may be served from, then read it as a visitor: `verified` when every
+     * rule's new words are there, `cache_verification_failed` when the page still is not what the
+     * rules make it, `not_verified` when it did not answer.
+     *
+     * @param list<array<string,mixed>> $rules
+     */
+    private function renderedWordsPurgeAndVerify(string $key, string $path, array $rules): string
+    {
+        try {
+            $this->writer->purgeCache();
+            $this->renderedSite->purge($key);
+            $page = $this->renderedSite->visit($path);
+        } catch (Throwable $e) {
+            return 'not_verified';
+        }
+        if ($page['code'] !== 200) {
+            return 'not_verified';
+        }
+        foreach ($rules as $rule) {
+            $target = ['kind' => $rule['kind'], 'old' => $rule['new']] + ($rule['kind'] === 'attribute' ? ['name' => 'href'] : []);
+            $seen = RenderedWords::candidates($page['body'], [$target]);
+            $count = 0;
+            foreach ($seen[0]['candidates'] ?? [] as $candidate) {
+                $count += $candidate['anchor'] === $rule['anchor'] ? $candidate['count'] : 0;
+            }
+            if ($count < (int) $rule['expected_matches']) {
+                return 'cache_verification_failed';
+            }
+        }
+        return 'verified';
+    }
+
+    private function renderedWordsStatus(array $p): array
+    {
+        try {
+            $receipts = $this->renderedWordsReceipts();
+            if (isset($p['request_id'])) {
+                $seen = is_string($p['request_id']) ? ($receipts[$p['request_id']] ?? null) : null;
+                if ($seen === null) {
+                    return $this->err('not_found', 'No rendered-words request with that request_id on this site');
+                }
+                $set = $this->renderedWordsSet((string) $seen['key']);
+            } else {
+                $post = $p['post'] ?? null;
+                $locale = $p['locale'] ?? null;
+                if (!is_int($post) || $post <= 0 || !RenderedWords::validLocale($locale)) {
+                    return $this->err('bad_params', 'request_id, or post and locale (as an inspection answered them)');
+                }
+                $set = $this->renderedWordsSet(RenderedWords::optionKey($post, $locale));
+            }
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($set === null) {
+            return $this->err('conflict', 'The stored rendered-words rules of this page cannot be read');
+        }
+        $key = isset($seen) ? (string) $seen['key'] : RenderedWords::optionKey($post, $locale);
+        $mine = array_filter($receipts, static fn($r): bool => is_array($r) && ($r['key'] ?? null) === $key);
+        $list = [];
+        foreach (array_slice($mine, -20, null, true) as $id => $r) {
+            $list[] = ['request_id' => (string) $id, 'apply_id' => $r['apply_id'] ?? null, 'state' => $r['state'] ?? null, 'at' => $r['at'] ?? null,
+                'revision' => $r['answer']['revision'] ?? null, 'render' => $r['answer']['render'] ?? null];
+        }
+        $answer = ['key' => $key, 'revision' => (int) ($set['revision'] ?? 0), 'rules' => self::renderedWordsRuleList($set['rules'] ?? []),
+            'theme_matches' => $set === [] ? null : $set['theme'] === $this->renderedSite->theme(), 'receipts' => $list];
+        if ($set !== []) {
+            $answer['scope'] = ['entity' => ['kind' => 'post', 'id' => $set['post']], 'locale' => $set['locale']];
+            $answer['drift'] = $this->renderedSite->drift($set['post'], $set['locale']);
+        }
+        if (isset($seen)) {
+            $answer['request'] = ['request_id' => $p['request_id'], 'apply_id' => $seen['apply_id'] ?? null, 'state' => $seen['state'] ?? null];
+        }
+        return $this->ok($answer);
+    }
+
+    /**
+     * Before a revert puts a page's rules back: the page must still be at the revision this receipt
+     * wrote. A later apply on the same page is reverted first; other pages are their own options.
+     *
+     * @param array<int,array<string,mixed>> $entries
+     */
+    private function renderedWordsRevertConflict(array $entries): ?array
+    {
+        foreach ($entries as $entry) {
+            if (!is_array($entry['renderedWords'] ?? null)) {
+                continue;
+            }
+            try {
+                $now = $this->writer->read('option', 0, (string) ($entry['key'] ?? ''));
+            } catch (Throwable $e) {
+                return $this->err('revert_failed', $e->getMessage());
+            }
+            $set = $now === null ? [] : RenderedWords::decodeSet($now['value'] ?? '');
+            $after = (int) ($entry['renderedWords']['afterRevision'] ?? -1);
+            if ($set === [] || $set['revision'] !== $after) {
+                return $this->conflict(
+                    'The rendered words of this page were changed since this apply (it wrote revision ' . $after . ', the page is at '
+                        . ($set === [] ? 'none' : $set['revision']) . '); nothing was reverted',
+                    'Revert the later rendered-words apply of this page first, newest first; or inspect and apply the words wanted now.',
+                    $entry,
+                    ['reason' => 'later']
+                );
+            }
+        }
+        return null;
+    }
+
+    /** After a revert: the receipts of its requests say reverted (so a late retry does not write again), and the page caches drop. */
+    private function renderedWordsReverted(array $entries): void
+    {
+        $keys = [];
+        $requests = [];
+        foreach ($entries as $entry) {
+            if (is_array($entry['renderedWords'] ?? null)) {
+                $keys[] = (string) ($entry['key'] ?? '');
+                $requests[] = (string) ($entry['renderedWords']['request'] ?? '');
+            }
+        }
+        if ($keys === []) {
+            return;
+        }
+        try {
+            $receipts = $this->renderedWordsReceipts();
+            foreach ($requests as $request) {
+                if (isset($receipts[$request])) {
+                    $receipts[$request]['state'] = 'reverted';
+                    $receipts[$request]['reverted_at'] = time();
+                }
+            }
+            $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
+        } catch (Throwable $ignored) {
+            // The rules are back; a receipt that did not move still names the request, so a retry is answered, not written.
+        }
+        if ($this->renderedSite !== null) {
+            foreach (array_unique($keys) as $key) {
+                try {
+                    $this->renderedSite->purge($key);
+                } catch (Throwable $ignored) {
                 }
             }
         }
@@ -3765,6 +4178,10 @@ final class Engine
                 return $locked;
             }
         }
+        $conflict = $this->renderedWordsRevertConflict($entries);
+        if ($conflict !== null) {
+            return $conflict;
+        }
         // And every content step must still be undoable ALONE, checked before anything moves.
         $conflict = $this->revertConflict($applyId, $entries);
         if ($conflict !== null) {
@@ -3795,6 +4212,7 @@ final class Engine
         }
 
         if ($failed === []) {
+            $this->renderedWordsReverted($entries);
             try {
                 $this->log->clear($applyId);
             } catch (Throwable $e) {

@@ -562,6 +562,46 @@ without the option, while an SEO plugin runs, or when the head already holds an 
  "key": "tracy_share_image", "fields": {"value": 461}}}
 ```
 
+## Words a theme prints at render time: `content.renderedWords`
+
+Some sample words live in no stored record: a pattern that a `the_content` filter injects (JA Diner's
+`/contact-us/` phone, street, lorem paragraph and `http://joomlart.com` links), or a literal in a
+template. `lib/RenderedWords.php` replaces them in the finished HTML of one page, and
+`lib/RenderedWordsHooks.php` applies them at `template_redirect` (priority `PHP_INT_MAX`). The rules
+are kept per page and locale, in option `claude_cowork_rendered_words_<post>_<locale>` (not autoloaded).
+A page with no rules for its scope gets no output buffer and goes out byte for byte as printed.
+
+- `inspect {path, targets: [{kind: "text"|"attribute", name?: "href", old}]}`: the page is fetched through
+  the site's own loopback without rules, using a signed probe that keeps it out of page caches. The answer
+  gives each target's `candidates` (`anchor`, `count`, `where`, `excerpt`), the page's `scope`, its current
+  `revision` and `rules`, and a `proof` that is valid for 15 minutes.
+- `apply {apply_id (not contract-), request_id, expected_revision, proof, rules: [{kind, name?, anchor, old,
+  new, expected_matches}]}`: the rules merge into the scope's set by place and old words. A rule whose
+  `new` equals `old` drops it. The merged set must apply whole to the page as it renders now, or nothing
+  is written (`drift`). After the write, the page caches are purged and the page is read as a visitor:
+  `render` is `verified`, `cache_verification_failed` or `not_verified`. Sending the same `request_id`
+  again returns the first answer with `replayed: true`. The same `request_id` with a different request
+  is a `conflict`.
+- `status {request_id}` or `status {post, locale}`: the scope's rules, revision, receipts and the last
+  `drift` the front end saw.
+- `apply.revert {apply_id}`: puts the scope's option back as it was before. If a later apply on the same
+  page still stands, the revert is a `conflict`.
+
+Only text inside one text node and the whole value of an `<a href>` are matched. The scanner never reads
+or writes `head`, `form`, `script`, `style`, `textarea`, controls, `svg`, comments or any other attribute,
+so a form's nonce and fields stay exactly as printed. A new `href` must be `http(s)` with a host, `tel:`,
+`mailto:`, `/path` or `#fragment`. The front end leaves a page as printed, and notes the drift, in these
+cases:
+
+- a rule's count no longer matches;
+- two rules overlap;
+- the markup cannot be followed;
+- the page is over 2 MiB or flushed early;
+- the answer is not a 200 HTML page;
+- the active theme changed.
+
+`content.update` and `content.delete` refuse these options.
+
 ## Layout
 
 | Path | What |
