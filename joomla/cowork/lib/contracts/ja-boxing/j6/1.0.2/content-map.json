@@ -7035,6 +7035,56 @@
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
+      "sample": "Group ",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/text()",
+      "label": "Group Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-2.8",
+      "entity": "article-2",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Boxing",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/span/text()",
+      "label": "Group Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-2.9",
+      "entity": "article-2",
+      "column": "attribs",
+      "type": "text",
+      "sample": "#",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-signup"],
+      "label": "Group Boxing / classes-signup",
+      "customize": "keep"
+    },
+    {
+      "key": "article-2.10",
+      "entity": "article-2",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Includes 2 fixed calendars:",
+      "maxCharacters": 74,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-type"],
+      "label": "Group Boxing / classes-type",
+      "customize": "keep"
+    },
+    {
+      "key": "article-2.11",
+      "entity": "article-2",
+      "column": "attribs",
+      "type": "text",
       "sample": "MONDAY + WEDNESDAY + FRIDAY",
       "maxCharacters": 74,
       "requiresEvidence": false,
@@ -7043,7 +7093,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.8",
+      "key": "article-2.12",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7055,7 +7105,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.9",
+      "key": "article-2.13",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7067,7 +7117,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.10",
+      "key": "article-2.14",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7079,7 +7129,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.11",
+      "key": "article-2.15",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7091,7 +7141,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.12",
+      "key": "article-2.16",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7103,7 +7153,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.13",
+      "key": "article-2.17",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7116,7 +7166,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.14",
+      "key": "article-2.18",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7129,7 +7179,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.15",
+      "key": "article-2.19",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7141,7 +7191,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.16",
+      "key": "article-2.20",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7153,7 +7203,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.17",
+      "key": "article-2.21",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7165,7 +7215,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.18",
+      "key": "article-2.22",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7177,7 +7227,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.19",
+      "key": "article-2.23",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7189,7 +7239,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.20",
+      "key": "article-2.24",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7201,7 +7251,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.21",
+      "key": "article-2.25",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7213,7 +7263,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.22",
+      "key": "article-2.26",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7225,7 +7275,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.23",
+      "key": "article-2.27",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7237,7 +7287,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.24",
+      "key": "article-2.28",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7249,7 +7299,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.25",
+      "key": "article-2.29",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7261,7 +7311,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.26",
+      "key": "article-2.30",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7273,7 +7323,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.27",
+      "key": "article-2.31",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7285,7 +7335,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.28",
+      "key": "article-2.32",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7297,7 +7347,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.29",
+      "key": "article-2.33",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7309,7 +7359,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.30",
+      "key": "article-2.34",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7321,7 +7371,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.31",
+      "key": "article-2.35",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7333,7 +7383,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.32",
+      "key": "article-2.36",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7346,7 +7396,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.33",
+      "key": "article-2.37",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7359,7 +7409,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.34",
+      "key": "article-2.38",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7371,7 +7421,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.35",
+      "key": "article-2.39",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7383,7 +7433,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.36",
+      "key": "article-2.40",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7395,7 +7445,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.37",
+      "key": "article-2.41",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7407,7 +7457,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.38",
+      "key": "article-2.42",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7420,7 +7470,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.39",
+      "key": "article-2.43",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7433,7 +7483,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.40",
+      "key": "article-2.44",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7446,7 +7496,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.41",
+      "key": "article-2.45",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7459,7 +7509,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.42",
+      "key": "article-2.46",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7471,7 +7521,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.43",
+      "key": "article-2.47",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7483,7 +7533,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.44",
+      "key": "article-2.48",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7495,7 +7545,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.45",
+      "key": "article-2.49",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7508,7 +7558,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.46",
+      "key": "article-2.50",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7521,7 +7571,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.47",
+      "key": "article-2.51",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7534,7 +7584,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.48",
+      "key": "article-2.52",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7546,7 +7596,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.49",
+      "key": "article-2.53",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7558,7 +7608,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.50",
+      "key": "article-2.54",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7570,7 +7620,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.51",
+      "key": "article-2.55",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7583,7 +7633,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.52",
+      "key": "article-2.56",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7596,7 +7646,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.53",
+      "key": "article-2.57",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7609,7 +7659,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.54",
+      "key": "article-2.58",
       "entity": "article-2",
       "column": "attribs",
       "type": "image",
@@ -7621,7 +7671,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.55",
+      "key": "article-2.59",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7633,7 +7683,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.56",
+      "key": "article-2.60",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7645,7 +7695,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.57",
+      "key": "article-2.61",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7658,7 +7708,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.58",
+      "key": "article-2.62",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7671,7 +7721,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.59",
+      "key": "article-2.63",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7684,7 +7734,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.60",
+      "key": "article-2.64",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -7697,7 +7747,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-2.61",
+      "key": "article-2.65",
       "entity": "article-2",
       "column": "attribs",
       "type": "text",
@@ -9981,6 +10031,44 @@
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
+      "sample": "Beginner ",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/text()",
+      "label": "Beginner Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-14.8",
+      "entity": "article-14",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Boxing",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/span/text()",
+      "label": "Beginner Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-14.9",
+      "entity": "article-14",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Includes 1 fixed calendars:",
+      "maxCharacters": 74,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-type"],
+      "label": "Beginner Boxing / classes-type",
+      "customize": "keep"
+    },
+    {
+      "key": "article-14.10",
+      "entity": "article-14",
+      "column": "attribs",
+      "type": "text",
       "sample": "MONDAY + WEDNESDAY + FRIDAY",
       "maxCharacters": 74,
       "requiresEvidence": false,
@@ -9989,7 +10077,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.8",
+      "key": "article-14.11",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10001,7 +10089,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.9",
+      "key": "article-14.12",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10013,7 +10101,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.10",
+      "key": "article-14.13",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10025,7 +10113,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.11",
+      "key": "article-14.14",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10038,7 +10126,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.12",
+      "key": "article-14.15",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10051,7 +10139,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.13",
+      "key": "article-14.16",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10063,7 +10151,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.14",
+      "key": "article-14.17",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10075,7 +10163,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.15",
+      "key": "article-14.18",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10087,7 +10175,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.16",
+      "key": "article-14.19",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10099,7 +10187,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.17",
+      "key": "article-14.20",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10111,7 +10199,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.18",
+      "key": "article-14.21",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10123,7 +10211,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.19",
+      "key": "article-14.22",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10135,7 +10223,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.20",
+      "key": "article-14.23",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10147,7 +10235,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.21",
+      "key": "article-14.24",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10159,7 +10247,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.22",
+      "key": "article-14.25",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10171,7 +10259,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.23",
+      "key": "article-14.26",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10183,7 +10271,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.24",
+      "key": "article-14.27",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10195,7 +10283,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.25",
+      "key": "article-14.28",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10207,7 +10295,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.26",
+      "key": "article-14.29",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10219,7 +10307,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.27",
+      "key": "article-14.30",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10231,7 +10319,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.28",
+      "key": "article-14.31",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10243,7 +10331,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.29",
+      "key": "article-14.32",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10255,7 +10343,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.30",
+      "key": "article-14.33",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10268,7 +10356,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.31",
+      "key": "article-14.34",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10281,7 +10369,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.32",
+      "key": "article-14.35",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10293,7 +10381,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.33",
+      "key": "article-14.36",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10305,7 +10393,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.34",
+      "key": "article-14.37",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10317,7 +10405,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.35",
+      "key": "article-14.38",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10329,7 +10417,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.36",
+      "key": "article-14.39",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10342,7 +10430,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.37",
+      "key": "article-14.40",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10355,7 +10443,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.38",
+      "key": "article-14.41",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10368,7 +10456,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.39",
+      "key": "article-14.42",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10381,7 +10469,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.40",
+      "key": "article-14.43",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10393,7 +10481,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.41",
+      "key": "article-14.44",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10405,7 +10493,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.42",
+      "key": "article-14.45",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10417,7 +10505,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.43",
+      "key": "article-14.46",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10430,7 +10518,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.44",
+      "key": "article-14.47",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10443,7 +10531,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.45",
+      "key": "article-14.48",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10456,7 +10544,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.46",
+      "key": "article-14.49",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10468,7 +10556,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.47",
+      "key": "article-14.50",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10480,7 +10568,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.48",
+      "key": "article-14.51",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10492,7 +10580,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.49",
+      "key": "article-14.52",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10505,7 +10593,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.50",
+      "key": "article-14.53",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10518,7 +10606,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.51",
+      "key": "article-14.54",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10531,7 +10619,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.52",
+      "key": "article-14.55",
       "entity": "article-14",
       "column": "attribs",
       "type": "image",
@@ -10543,7 +10631,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.53",
+      "key": "article-14.56",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10555,7 +10643,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.54",
+      "key": "article-14.57",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10567,7 +10655,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.55",
+      "key": "article-14.58",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10580,7 +10668,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.56",
+      "key": "article-14.59",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10593,7 +10681,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.57",
+      "key": "article-14.60",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10606,7 +10694,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.58",
+      "key": "article-14.61",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10619,7 +10707,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-14.59",
+      "key": "article-14.62",
       "entity": "article-14",
       "column": "attribs",
       "type": "text",
@@ -10713,6 +10801,44 @@
       "key": "article-15.7",
       "entity": "article-15",
       "column": "attribs",
+      "type": "text",
+      "sample": "Private ",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/text()",
+      "label": "Private Training / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-15.8",
+      "entity": "article-15",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Training",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/span/text()",
+      "label": "Private Training / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-15.9",
+      "entity": "article-15",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Available throughout the day. Click TRY A CLASS to schedule a session",
+      "maxCharacters": 158,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-type"],
+      "label": "Private Training / classes-type",
+      "customize": "keep"
+    },
+    {
+      "key": "article-15.10",
+      "entity": "article-15",
+      "column": "attribs",
       "type": "image",
       "sample": "images/joomlart/classes/detail-video-2.jpg#joomlaImage://local-images/joomlart/classes/detail-video-2.jpg?width=2028&height=1141",
       "maxCharacters": 255,
@@ -10722,7 +10848,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.8",
+      "key": "article-15.11",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10734,7 +10860,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.9",
+      "key": "article-15.12",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10747,7 +10873,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.10",
+      "key": "article-15.13",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10760,7 +10886,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.11",
+      "key": "article-15.14",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10772,7 +10898,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.12",
+      "key": "article-15.15",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10784,7 +10910,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.13",
+      "key": "article-15.16",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10796,7 +10922,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.14",
+      "key": "article-15.17",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10808,7 +10934,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.15",
+      "key": "article-15.18",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10820,7 +10946,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.16",
+      "key": "article-15.19",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10832,7 +10958,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.17",
+      "key": "article-15.20",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10844,7 +10970,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.18",
+      "key": "article-15.21",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10856,7 +10982,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.19",
+      "key": "article-15.22",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10868,7 +10994,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.20",
+      "key": "article-15.23",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10880,7 +11006,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.21",
+      "key": "article-15.24",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10892,7 +11018,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.22",
+      "key": "article-15.25",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10904,7 +11030,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.23",
+      "key": "article-15.26",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10916,7 +11042,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.24",
+      "key": "article-15.27",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10928,7 +11054,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.25",
+      "key": "article-15.28",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -10940,7 +11066,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.26",
+      "key": "article-15.29",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10952,7 +11078,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.27",
+      "key": "article-15.30",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10964,7 +11090,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.28",
+      "key": "article-15.31",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10977,7 +11103,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.29",
+      "key": "article-15.32",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -10990,7 +11116,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.30",
+      "key": "article-15.33",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11002,7 +11128,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.31",
+      "key": "article-15.34",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -11014,7 +11140,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.32",
+      "key": "article-15.35",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11026,7 +11152,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.33",
+      "key": "article-15.36",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11038,7 +11164,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.34",
+      "key": "article-15.37",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11051,7 +11177,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.35",
+      "key": "article-15.38",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11064,7 +11190,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.36",
+      "key": "article-15.39",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11077,7 +11203,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.37",
+      "key": "article-15.40",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11090,7 +11216,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.38",
+      "key": "article-15.41",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -11102,7 +11228,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.39",
+      "key": "article-15.42",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11114,7 +11240,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.40",
+      "key": "article-15.43",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11126,7 +11252,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.41",
+      "key": "article-15.44",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11139,7 +11265,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.42",
+      "key": "article-15.45",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11152,7 +11278,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.43",
+      "key": "article-15.46",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11165,7 +11291,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.44",
+      "key": "article-15.47",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -11177,7 +11303,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.45",
+      "key": "article-15.48",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11189,7 +11315,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.46",
+      "key": "article-15.49",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11201,7 +11327,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.47",
+      "key": "article-15.50",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11214,7 +11340,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.48",
+      "key": "article-15.51",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11227,7 +11353,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.49",
+      "key": "article-15.52",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11240,7 +11366,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.50",
+      "key": "article-15.53",
       "entity": "article-15",
       "column": "attribs",
       "type": "image",
@@ -11252,7 +11378,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.51",
+      "key": "article-15.54",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11264,7 +11390,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.52",
+      "key": "article-15.55",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11276,7 +11402,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.53",
+      "key": "article-15.56",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11289,7 +11415,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.54",
+      "key": "article-15.57",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11302,7 +11428,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.55",
+      "key": "article-15.58",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11315,7 +11441,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.56",
+      "key": "article-15.59",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11328,7 +11454,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-15.57",
+      "key": "article-15.60",
       "entity": "article-15",
       "column": "attribs",
       "type": "text",
@@ -11423,6 +11549,44 @@
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
+      "sample": "Advanced",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/text()",
+      "label": "Advanced Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-16.8",
+      "entity": "article-16",
+      "column": "attribs",
+      "type": "text",
+      "sample": " Boxing ",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-title"],
+      "xpath": "/html/body/div/span/text()",
+      "label": "Advanced Boxing / classes-title",
+      "customize": "keep"
+    },
+    {
+      "key": "article-16.9",
+      "entity": "article-16",
+      "column": "attribs",
+      "type": "text",
+      "sample": "Includes 1 fixed calendars:",
+      "maxCharacters": 74,
+      "requiresEvidence": false,
+      "jsonPath": ["classes-type"],
+      "label": "Advanced Boxing / classes-type",
+      "customize": "keep"
+    },
+    {
+      "key": "article-16.10",
+      "entity": "article-16",
+      "column": "attribs",
+      "type": "text",
       "sample": "SATURDAY + SUNDAY",
       "maxCharacters": 54,
       "requiresEvidence": false,
@@ -11431,7 +11595,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.8",
+      "key": "article-16.11",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11443,7 +11607,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.9",
+      "key": "article-16.12",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11455,7 +11619,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.10",
+      "key": "article-16.13",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11467,7 +11631,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.11",
+      "key": "article-16.14",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11480,7 +11644,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.12",
+      "key": "article-16.15",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11493,7 +11657,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.13",
+      "key": "article-16.16",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11505,7 +11669,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.14",
+      "key": "article-16.17",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11517,7 +11681,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.15",
+      "key": "article-16.18",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11529,7 +11693,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.16",
+      "key": "article-16.19",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11541,7 +11705,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.17",
+      "key": "article-16.20",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11553,7 +11717,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.18",
+      "key": "article-16.21",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11565,7 +11729,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.19",
+      "key": "article-16.22",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11577,7 +11741,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.20",
+      "key": "article-16.23",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11589,7 +11753,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.21",
+      "key": "article-16.24",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11601,7 +11765,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.22",
+      "key": "article-16.25",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11613,7 +11777,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.23",
+      "key": "article-16.26",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11625,7 +11789,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.24",
+      "key": "article-16.27",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11637,7 +11801,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.25",
+      "key": "article-16.28",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11649,7 +11813,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.26",
+      "key": "article-16.29",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11661,7 +11825,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.27",
+      "key": "article-16.30",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11673,7 +11837,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.28",
+      "key": "article-16.31",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11685,7 +11849,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.29",
+      "key": "article-16.32",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11697,7 +11861,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.30",
+      "key": "article-16.33",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11710,7 +11874,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.31",
+      "key": "article-16.34",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11723,7 +11887,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.32",
+      "key": "article-16.35",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11735,7 +11899,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.33",
+      "key": "article-16.36",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11747,7 +11911,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.34",
+      "key": "article-16.37",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11759,7 +11923,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.35",
+      "key": "article-16.38",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11771,7 +11935,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.36",
+      "key": "article-16.39",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11784,7 +11948,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.37",
+      "key": "article-16.40",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11797,7 +11961,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.38",
+      "key": "article-16.41",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11810,7 +11974,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.39",
+      "key": "article-16.42",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11823,7 +11987,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.40",
+      "key": "article-16.43",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11835,7 +11999,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.41",
+      "key": "article-16.44",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11847,7 +12011,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.42",
+      "key": "article-16.45",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11859,7 +12023,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.43",
+      "key": "article-16.46",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11872,7 +12036,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.44",
+      "key": "article-16.47",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11885,7 +12049,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.45",
+      "key": "article-16.48",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11898,7 +12062,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.46",
+      "key": "article-16.49",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11910,7 +12074,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.47",
+      "key": "article-16.50",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11922,7 +12086,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.48",
+      "key": "article-16.51",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11934,7 +12098,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.49",
+      "key": "article-16.52",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11947,7 +12111,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.50",
+      "key": "article-16.53",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11960,7 +12124,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.51",
+      "key": "article-16.54",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11973,7 +12137,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.52",
+      "key": "article-16.55",
       "entity": "article-16",
       "column": "attribs",
       "type": "image",
@@ -11985,7 +12149,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.53",
+      "key": "article-16.56",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -11997,7 +12161,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.54",
+      "key": "article-16.57",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -12009,7 +12173,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.55",
+      "key": "article-16.58",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -12022,7 +12186,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.56",
+      "key": "article-16.59",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -12035,7 +12199,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.57",
+      "key": "article-16.60",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -12048,7 +12212,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.58",
+      "key": "article-16.61",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
@@ -12061,7 +12225,7 @@
       "customize": "keep"
     },
     {
-      "key": "article-16.59",
+      "key": "article-16.62",
       "entity": "article-16",
       "column": "attribs",
       "type": "text",
