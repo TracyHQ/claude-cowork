@@ -50,6 +50,8 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `media.delete` | write | ok | ok; refuses a picture that is the current value of a bound image slot |
 | `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
+| `template.files.status` (unreleased), see [A theme's own files](#a-themes-own-files-templatefiles-unreleased) | read | ok | ok |
+| `template.files.write`, `template.files.undo` (unreleased) | write | ok | ok |
 | `content.contract` | read (`inspect`, `demoTrim.plan`, `showcaseNav.status`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `showcaseNav.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
 | `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
 | `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
@@ -89,6 +91,89 @@ If the picture and sizes exceed the cap, the write refuses with `too_large` and 
 The successful answer reports `storageDeleted`, `filesLeft`, the search scope and a CDN/browser
 cache note; it does not claim that a cached URL is dead. The Apply log holds the original bytes and
 attachment database state; `apply.revert {apply_id}` restores them under the same attachment id.
+
+## A theme's own files: `template.files.*` (unreleased)
+
+The one way a file of the site's own look reaches it: what an agent changed on a copy of the site
+(a stylesheet, a script, a template override) put on the live site, and taken off again. The
+same door, in the same shape, on both platforms (`lib/TemplateFiles.php`, one file kept in step
+by hand), so one caller ("Sync to live") reads both.
+
+**Where it writes, decided by the site.** Only under a root: the active theme (`get_stylesheet_directory()`) and, for a child theme, its parent (`get_template_directory()`), each as a path under `ABSPATH`; PHP may be written in both, once the owner allows it. A root is checked on every
+call: a real folder under the site root, reached through no symbolic link. A path is site-relative
+(`wp-content/themes/my-child/style.css`), made of plain segments (`[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*`, at most 16, 512 bytes),
+with no `..` or `.`, no leading slash, no backslash, no dotfile or dot-folder, no symbolic link
+anywhere from the site root to the leaf, and the leaf a regular file or absent. Its extension is
+one of css, scss, sass, less, js, mjs, json, map, php, html, htm, svg, png, jpg, jpeg, gif, webp,
+avif, ico, woff, woff2, ttf, otf, eot; never `configuration.php`, `wp-config.php`,
+`wp-config-sample.php`, `.htaccess`, `.htpasswd`, `.user.ini`, `php.ini` or `web.config`; never a
+double extension a server could run (`x.php.css`).
+
+**`template.files.status {paths?}`** (read, no lock): `roots` (`{path, kind, name, php}`), and for
+each path (at most 500) `{path, exists, sha1, blob, sha256, bytes, root}` — `blob` is git's
+`hash-object` — or `{path, refused: <reason>}`; `php` whether PHP may be written, `php_lint` how it is checked, `swept`
+the leftovers removed (below).
+
+**`template.files.write {apply_id, files, dry_run?}`** (write, under the write lock). Each file is
+`{path, expected_sha1 | expected_blob, content_b64, sha256}`, or `{path, delete: true,
+expected_sha1 | expected_blob}`: exactly one expectation, the hash of what the live site must
+hold now, or null for "no file there" (a delete needs a hash). At most 100 files and 8 MiB a call,
+2 MiB a file (and a file on the site past 2 MiB is not replaced: its undo copy, one Apply log row,
+must fit an older MySQL's 4 MiB `max_allowed_packet`).
+In this order, and the first that fails ends the call with nothing written:
+
+1. the request: shapes, sizes, each `sha256` against the decoded bytes (`corrupt_upload`);
+2. every path (`refused`, each `{path, reason}`: `bad_path`, `absolute`, `traversal`, `dotfile`,
+   `denied`, `executable`, `extension`, `not_in_scope`, `php_not_allowed`, `php_disabled` (PHP is
+   switched off on this site; the answer's `next` says the owner can switch it on), `symlink`, `not_a_file`);
+3. every expectation against the live file (`conflict`, `code: CONFLICT`, each `{path, expected,
+   actual: {sha1, blob} | null}`). A file that already holds the new bytes (or a delete whose file
+   is gone) is `unchanged`, whatever was expected, so a call retried after a lost answer lands nothing twice;
+4. each PHP file parses on this site's PHP (`php_lint_failed`, each `{path, message, line}`, and
+   `lint_mode`): `php -l` run by the PHP command line of the same major.minor version as the PHP
+   serving the site (`-n`, the site's `short_open_tag`), when PHP may start a process; otherwise
+   this PHP's own parser (`token_get_all` with `TOKEN_PARSE`). Neither: `php_lint_unavailable`;
+5. the batch: every new content to a temporary file beside its target, then each renamed into
+   place, a deleted file renamed aside until the end; a rename that fails puts back every move
+   already made (`write_failed`, `rolled_back`, `not_restored`);
+6. one Apply log step per changed file under the `apply_id` (its previous bytes, or absent, and the
+   sha1 it left); a log that refuses takes the batch back (`write_failed`). PHP's opcache forgets
+   each PHP file written.
+
+`dry_run: true` runs 1–4 and answers what would happen, and changes nothing on disk. The answer: `{apply_id, undo_id, changed,
+files: [{path, op: created|updated|deleted|unchanged, before, after}], lint, undo}` — `before` and
+`after` are `{sha1, blob, sha256, bytes}` or null, `undo_id` is null when nothing changed, and `undo`
+is the call that takes it back.
+
+**Leftovers.** A request that dies between its temporary file and its rename leaves a
+`.tracy-tf-<16 hex>.tmp` (or a parked `.del`). `status` and every `write` but a dry run first
+remove the ones older than an hour, by that exact name only, inside the roots only, without
+following a link or entering a dot-folder; both answer how many as `swept`.
+
+**`template.files.undo {apply_id, undo_id?}`** (write, under the write lock): each file of that write
+(without `undo_id`: of every write of the Apply, newest first) goes back to what it was — only
+where the live file still holds what the write left (a reverse compare-and-set): `restored`
+(`op: restored|removed`, a folder the write made removed again when empty), `already` (it already
+holds what it held before), `kept` (`reason: changed-on-live|gone-on-live|exists-on-live|out-of-scope`
+— with `detail`, e.g. `php_disabled` — `|disabled`,
+and the sha1 it holds). `complete` is true when nothing is kept; an Apply made only of template file
+writes, all back, is forgotten. `apply.revert` takes the same steps back, but all or none: one
+file the site changed since refuses the whole revert (`conflict`, `kept`). `apply.list` shows each
+step (`op: templateFiles`, `path`, `undo_id`, `created`, `deleted`).
+
+Two switches on Settings › Claude Cowork. **Theme files** (option `claude_cowork_template_files`, on
+by default) turns the door off: the three actions answer `disabled`, `apply.revert` keeps their
+steps (`kept`, `reason: disabled`) and `info.template_files` is `{version: 1, enabled: false}`, so a
+caller can tell the owner where to switch it on. **Allow PHP in theme files** (option
+`claude_cowork_template_files_php`, off by default) lets PHP be written at all: while it is off every
+`.php` path is refused `php_disabled`, an undo keeps a PHP file as it is, and
+`info.template_files.php` is false. The same page lists the latest 50 writes and undos (option `claude_cowork_template_files_log`) with the ids that take them back. After a change the page caches are emptied.
+
+`info.template_files`: `{version: 1, enabled: true, php, actions, max_file_bytes: 2097152,
+max_bytes: 8388608, max_files: 100, max_status_paths: 500, extensions, php_lint: cli|tokens|null}` —
+`php_lint` says how PHP would be checked, as far as the site can tell without starting anything —
+or `{version: 1, enabled: false}`.
+
 
 ## The content contract
 
@@ -689,6 +774,12 @@ wp plugin activate claude-cowork                           # which is also what 
 TOKEN=$(wp option get claude_cowork_token)
 curl -s -X POST 'http://localhost:8899/wp-admin/admin-ajax.php?action=claude_cowork' \
   -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\",\"action\":\"site.stats\"}"
+```
+
+`template.files.*` on a child theme of Twenty Twenty-Five (roots, lint, undo, the settings switch):
+
+```bash
+tests/e2e/template-files.sh                                 # docker, node; WORDPRESS_IMAGE, KEEP=1
 ```
 
 Mount `claude-cowork/` straight into `wp-content/plugins/` — the plugin needs no build step of

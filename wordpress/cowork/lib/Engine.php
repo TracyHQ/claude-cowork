@@ -28,6 +28,7 @@ require_once __DIR__ . '/StringOverrides.php';
 require_once __DIR__ . '/DateFormats.php';
 require_once __DIR__ . '/BlockWords.php';
 require_once __DIR__ . '/RenderedWords.php';
+require_once __DIR__ . '/TemplateFiles.php';
 
 final class Engine
 {
@@ -100,6 +101,7 @@ final class Engine
     private const SERIALIZED = [
         'content.contract', 'content.update', 'content.delete', 'content.language', 'content.renderedWords',
         'media.upload', 'media.delete', 'apply.revert', 'db.cleanup', 'db.restore', 'db.purge',
+        'template.files.write', 'template.files.undo',
     ];
     /** The only path an image may take onto a sealed site: content-addressed, under one folder. */
     private const CONTRACT_MEDIA_PATH = '~^wp-content/uploads/tracy-content/[a-f0-9]{64}\.(png|jpg|webp)$~D';
@@ -182,6 +184,16 @@ final class Engine
         $this->deriveFetch = $fetch;
         $this->derivePurge = $purge;
         $this->deriveOwnerUrl = $ownerUrl;
+        return $this;
+    }
+
+    /** The files of the active theme and its parent (`template.files.*`); null answers 'unavailable'. */
+    private ?TemplateFiles $templateFiles = null;
+
+    /** Let `template.files.*` read and write the files of the active theme and its parent (lib/TemplateFiles.php). */
+    public function templateFiles(?TemplateFiles $files): self
+    {
+        $this->templateFiles = $files;
         return $this;
     }
 
@@ -309,7 +321,7 @@ final class Engine
                     'max_rules_scope' => RenderedWords::MAX_RULES_SCOPE,
                     'max_text_bytes' => RenderedWords::MAX_TEXT,
                     'max_url_bytes' => RenderedWords::MAX_URL,
-                ]])]);
+                ]]) + ($this->templateFiles === null ? [] : ['template_files' => $this->templateFiles->info()])]);
             case 'site.stats':
                 return $this->siteStats();
             case 'site.fingerprint':
@@ -376,6 +388,10 @@ final class Engine
                 return $this->applyList($params);
             case 'content.contract':
                 return $this->contentContract($params);
+            case 'template.files.status':
+            case 'template.files.write':
+            case 'template.files.undo':
+                return $this->templateFilesDoor($action, $params);
             case 'content.renderedWords':
                 return $this->renderedWords($params);
             default:
@@ -4862,6 +4878,16 @@ final class Engine
         if ($conflict !== null) {
             return $conflict;
         }
+        // A theme file goes back only where the live file still holds what the write left there.
+        if ($this->templateFiles !== null && ($blocked = $this->templateFiles->revertBlocked($entries)) !== []) {
+            $message = 'Theme files changed on the site since they were written: ' . implode(', ', array_column($blocked, 'path')) . '. Nothing was reverted.';
+            return $this->err('conflict', $message) + [
+                'code' => 'CONFLICT',
+                'errors' => [ContractProblem::entry('CONFLICT', $message)],
+                'kept' => $blocked,
+                'next' => 'template.files.undo puts back the files that can go back and names the rest.',
+            ];
+        }
         // And every content step must still be undoable ALONE, checked before anything moves.
         $conflict = $this->revertConflict($applyId, $entries);
         if ($conflict !== null) {
@@ -4945,6 +4971,10 @@ final class Engine
                 $step['column'] = $entry['column'] ?? null;
             } elseif ($op === 'sourceLocale') {
                 $step['slug'] = $entry['slug'] ?? null;
+            } elseif ($op === TemplateFiles::LOG_OP) {
+                $step['path'] = $entry['path'] ?? null;
+                $step['undo_id'] = $entry['undo_id'] ?? null;
+                $step['deleted'] = ($entry['after'] ?? null) === null;
             }
             return $step;
         }, $entries);
@@ -4967,6 +4997,26 @@ final class Engine
         if ($this->stamp !== null) {
             $this->stamp->touch($reason);
         }
+    }
+
+    /**
+     * `template.files.status`, `template.files.write`, `template.files.undo` — the files of the
+     * active theme and its parent (lib/TemplateFiles.php). A write and an undo run under the write
+     * lock (handle()), need an `apply_id`, and record in the Apply log; status only reads.
+     */
+    private function templateFilesDoor(string $action, array $p): array
+    {
+        if ($this->templateFiles === null) return $this->err('unavailable', 'template files are not wired on this site');
+        if ($action === 'template.files.status' || !$this->templateFiles->isEnabled()) return $this->templateFiles->status($p);
+        if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
+        $applyId = $this->applyId($p);
+        if ($applyId === null) return $this->err('bad_params', 'apply_id required');
+        $answer = $action === 'template.files.write' ? $this->templateFiles->write($p, $applyId, $this->log) : $this->templateFiles->undo($p, $applyId, $this->log);
+        if (($answer['ok'] ?? false) && (!empty($answer['changed']) || !empty($answer['restored'])) && empty($answer['dry_run'])) {
+            try { if ($this->writer !== null) $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('theme');
+        }
+        return $answer;
     }
 
     /** @param array<string,mixed> $entry */
@@ -5044,6 +5094,13 @@ final class Engine
         }
         if ($op === 'siteLanguage') {
             $this->restoreSiteLanguage(is_array($entry['before'] ?? null) ? $entry['before'] : []);
+            return;
+        }
+        if ($op === TemplateFiles::LOG_OP) {
+            if ($this->templateFiles === null) {
+                throw new RuntimeException('template files not wired');
+            }
+            $this->templateFiles->revertEntry($entry);
             return;
         }
         throw new RuntimeException("unknown step: {$op}");

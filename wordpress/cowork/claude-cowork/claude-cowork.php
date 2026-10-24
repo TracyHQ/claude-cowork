@@ -4,8 +4,8 @@
  * Plugin Name: Tracy Claude Cowork
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
- * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, or add a file to your media. Edits to posts and media are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.29
+ * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, add a file to your media, or change a file of your theme. Edits to posts, media and theme files are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
+ * Version:     0.18.30
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
@@ -101,6 +101,12 @@ GlyphFallback::register();
 
 const CLAUDE_COWORK_ACTION = 'claude_cowork';
 const CLAUDE_COWORK_TOKEN_OPTION = 'claude_cowork_token';
+/** '1' (the default) lets `template.files.*` write the theme's files; '0' refuses every one. */
+const CLAUDE_COWORK_TEMPLATE_FILES_OPTION = 'claude_cowork_template_files';
+/** '1' also lets it write the theme's PHP; '0' (the default) refuses every `.php` path. */
+const CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION = 'claude_cowork_template_files_php';
+/** The latest template file writes and undos, newest first, for the settings page. */
+const CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION = 'claude_cowork_template_files_log';
 
 /**
  * `lib/` is plain PHP with no namespace, so it is required rather than autoloaded, and only on
@@ -394,6 +400,8 @@ function claude_cowork_exec(): void
     if ($token !== '') {
         $engine->renderedWordsSite(new WordPressRenderedWordsSite($token));
     }
+    // `template.files.*`: the active theme's files and its parent's, unless the owner switched it off.
+    $engine->templateFiles(claude_cowork_template_files());
 
     $answer = $engine->handle($request);
 
@@ -519,10 +527,60 @@ add_action('init', 'claude_cowork_content_json', 0);
 add_action('wp_ajax_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 add_action('wp_ajax_nopriv_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 
+/**
+ * `template.files.*`: the folders it may write are the active theme and, for a child theme, its
+ * parent — each as a path under ABSPATH (a theme folder reached through a link, or outside ABSPATH,
+ * is no root at all). Two switches on the settings page: Theme files (on unless switched off) — off,
+ * the actions answer 'disabled' and `info` says `enabled: false`; Allow PHP (off unless switched
+ * on) — off, every `.php` path is refused `php_disabled`. PHP that may be written is linted first.
+ */
+function claude_cowork_template_files(): TemplateFiles
+{
+    $root = rtrim(ABSPATH, '/\\');
+    return (new TemplateFiles($root, static function () use ($root): array {
+        $site = realpath($root);
+        $roots = [];
+        foreach (['theme' => get_stylesheet_directory(), 'parent-theme' => get_template_directory()] as $kind => $dir) {
+            $real = realpath((string) $dir);
+            if ($site === false || $real === false || strpos($real, $site . '/') !== 0) {
+                continue;
+            }
+            $path = substr($real, strlen($site) + 1);
+            if (!isset($roots[$path])) {
+                $roots[$path] = ['path' => $path, 'kind' => $kind, 'name' => basename($path), 'php' => true];
+            }
+        }
+        return array_values($roots);
+    }, null, 'claude_cowork_template_files_note'))
+        ->enabled((string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_OPTION, '1') === '1')
+        ->phpAllowed((string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, '0') === '1');
+}
+
+/**
+ * What the settings page lists: one line per template file write or undo, the latest 50. Kept in an
+ * option that is never autoloaded; the Apply log holds the bytes, this holds only what happened.
+ */
+function claude_cowork_template_files_note(array $event): void
+{
+    $log = get_option(CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION, []);
+    if (!is_array($log)) {
+        $log = [];
+    }
+    array_unshift($log, [
+        'at'       => (string) ($event['at'] ?? gmdate('Y-m-d\TH:i:s\Z')),
+        'action'   => (string) ($event['action'] ?? ''),
+        'apply_id' => (string) ($event['apply_id'] ?? ''),
+        'undo_id'  => (string) ($event['undo_id'] ?? ''),
+        'files'    => array_slice(array_values((array) ($event['files'] ?? [])), 0, 50),
+        'kept'     => (int) ($event['kept'] ?? 0),
+    ]);
+    update_option(CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION, array_slice($log, 0, 50), false);
+}
+
 /** The actions that keep an undo log, and so need the table it lives in. */
 function claude_cowork_is_write_action(string $action): bool
 {
-    foreach (['content.', 'media.', 'apply.'] as $prefix) {
+    foreach (['content.', 'media.', 'apply.', 'template.files.'] as $prefix) {
         if (strpos($action, $prefix) === 0) {
             return true;
         }
@@ -647,6 +705,23 @@ function claude_cowork_register_setting(): void
         // and a setting that can be read remotely is one more place it can leak from.
         'show_in_rest'      => false,
     ]);
+    // A box left unticked is posted as nothing, which options.php saves as null: that is '0'.
+    register_setting('claude_cowork', CLAUDE_COWORK_TEMPLATE_FILES_OPTION, [
+        'type'              => 'string',
+        'sanitize_callback' => static function ($value): string {
+            return $value === '1' ? '1' : '0';
+        },
+        'default'           => '1',
+        'show_in_rest'      => false,
+    ]);
+    register_setting('claude_cowork', CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, [
+        'type'              => 'string',
+        'sanitize_callback' => static function ($value): string {
+            return $value === '1' ? '1' : '0';
+        },
+        'default'           => '0',
+        'show_in_rest'      => false,
+    ]);
 }
 
 add_action('admin_init', 'claude_cowork_register_setting');
@@ -671,6 +746,10 @@ function claude_cowork_render_settings_page(): void
     }
 
     $token = (string) get_option(CLAUDE_COWORK_TOKEN_OPTION, '');
+    $templateFiles = (string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_OPTION, '1') === '1';
+    $templatePhp = (string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, '0') === '1';
+    $templateLog = get_option(CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION, []);
+    $templateLog = is_array($templateLog) ? $templateLog : [];
     ?>
     <div class="wrap">
         <h1>Tracy Claude Cowork</h1>
@@ -698,9 +777,55 @@ function claude_cowork_render_settings_page(): void
                             shorter one is treated as no token at all.</p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row">Theme files</th>
+                    <td>
+                        <label for="claude_cowork_template_files">
+                            <input type="checkbox" id="claude_cowork_template_files"
+                                   name="<?php echo esc_attr(CLAUDE_COWORK_TEMPLATE_FILES_OPTION); ?>"
+                                   value="1" <?php checked($templateFiles); ?>>
+                            Let Tracy put the theme files you approve (stylesheets, scripts, images, fonts) on this site
+                        </label>
+                        <br>
+                        <label for="claude_cowork_template_files_php">
+                            <input type="checkbox" id="claude_cowork_template_files_php"
+                                   name="<?php echo esc_attr(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION); ?>"
+                                   value="1" <?php checked($templatePhp); ?>>
+                            Allow PHP in theme files (functions.php, templates)
+                        </label>
+                        <p class="description">Only files of the active theme and its parent theme. Each
+                            write is checked against what the site holds, PHP is checked by this site's PHP
+                            before it is written, and every write is recorded so it can be taken back.
+                            Untick the first box to refuse every theme file write, the second to refuse
+                            every PHP file.</p>
+                    </td>
+                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
+        <h2>Theme file changes</h2>
+        <?php if ($templateLog === []) : ?>
+            <p>None yet.</p>
+        <?php else : ?>
+            <table class="widefat striped">
+                <thead><tr><th>When (UTC)</th><th>What</th><th>Files</th><th>Apply / undo id</th></tr></thead>
+                <tbody>
+                <?php foreach ($templateLog as $row) : ?>
+                    <tr>
+                        <td><?php echo esc_html((string) ($row['at'] ?? '')); ?></td>
+                        <td><?php echo esc_html(($row['action'] ?? '') === 'template.files.undo'
+                            ? 'Put back' . (!empty($row['kept']) ? ' (' . (int) $row['kept'] . ' changed since, left as they are)' : '')
+                            : 'Written'); ?></td>
+                        <td><?php echo esc_html(implode(', ', array_map(static function ($file): string {
+                            return (string) ($file['path'] ?? '') . ' (' . (string) ($file['op'] ?? '') . ')';
+                        }, (array) ($row['files'] ?? [])))); ?></td>
+                        <td><code><?php echo esc_html((string) ($row['apply_id'] ?? '')); ?></code>
+                            <?php if (($row['undo_id'] ?? '') !== '') : ?><br><code><?php echo esc_html((string) $row['undo_id']); ?></code><?php endif; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
     </div>
     <script>
         // No build step and no dependency for one button. The copy affordance is what makes the

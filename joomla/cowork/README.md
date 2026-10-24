@@ -28,6 +28,7 @@ an empty token refuses every request.
 | `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `template.languageOverrides` (unreleased) | The front-end language strings a site still shows in en-GB for one language — its template's own words (JA templates ship en-GB only), keys the language pack lacks or leaves in English (the en-GB words, or English reworded: vi-VN 4.2.2 "Show Profile" for en-GB "User Profile"), the column titles and captions of a T4 mega menu (`etc/navigation/*.json`, printed raw, offered as page literals), and pack strings whose translation is implausibly long for their words (vi-VN 4.2.2.1 gives "Details" the sentence of another string) — read, and set as Joomla language overrides in `language/overrides/<tag>.override.ini` under an `apply_id` so `apply.revert` takes them back. Only a key the read offers (from any page), one line of plain text with the en-GB placeholders; other override lines are kept. The read is ranked (`rank`: `template`, `used` — named by front-end code or a month/day name —, `core`, `other`) and paged (`offset`, `limit` ≤ 1500; `total`, `truncated`, `nextOffset`); `DATE_FORMAT_*` is never offered. |
+| `template.files.status`, `template.files.write`, `template.files.undo` (unreleased) | The files of the installed site templates (`templates/<name>/`, `media/templates/site/<name>/`): read their hashes, write a batch compare-and-set (each file names the hash the site must hold, PHP linted by the site's own PHP, all or nothing), and take it back only where the site still holds what was written. Off with Options › Template files; PHP only once Options › Allow PHP in template files is on (off by default). See "A template's own files" below. |
 | Contract profiles fetched, not shipped (unreleased) | The package carries no contract profile, only their index (`lib/contracts.json`). A site held to a profile fetches that one from the release it runs, checks it against the index's sha256 and size, and keeps it; installing or updating the package removes the profiles the site is not held to. See "Contract profiles: one release asset each" below. |
 | `extension.install` | One `https` `.zip` URL the site downloads itself and hands to Joomla's own installer. No uninstall and no way to name a local path: a caller holding the token can add to a site, never quietly remove from it. |
 | `extension.enable` | Switch one installed extension on or off — the `enabled` column nothing else in the catalog can reach (`extensionParams` writes `params` alone). Refuses a core row and refuses this component. **In** the undo log, unlike install: a switch is perfectly reversible. |
@@ -39,7 +40,9 @@ uninstall. `extension.list` reports what is already there, so a caller can tell 
 installed" from "installed in another version" without guessing.
 
 There is no shell, no arbitrary file write, and no action that is not named and bounded above.
-(`template.siteSettings` writes JSON files, but only one shape of path and only eight named keys.)
+(`template.siteSettings` writes JSON files, but only one shape of path and only eight named keys;
+`template.files.write` writes only inside an installed site template, only named extensions, and
+only over the bytes the caller says are there.)
 
 ## Deleting an image: `media.delete` (unreleased)
 
@@ -70,6 +73,7 @@ edit the copy — that is how the two silently diverge.
 node --test ../../scripts/release-manifest.test.mjs
 tests/e2e/updater.sh                          # the self-updater on a real Joomla (docker), see below
 tests/e2e/tags-kept.sh                        # a write silent about tags keeps an article's tags, on a real Joomla (docker)
+tests/e2e/template-files.sh                   # template.files.* on Cassiopeia: roots, lint, User Actions Log, undo, Options switch (docker)
 tests/e2e/module-ordering.sh                  # a module ends with the ordering a write names, 0 included, on a real Joomla (docker)
 tests/e2e/share-image.sh                      # a template without T4 prints the customer's og:image, on a real Joomla (docker)
 tests/e2e/contract-fetch.sh                   # the contract profile fetch on every road a site takes: root/www-data installs, updates from 0.24.54/55, cache, tmp, no network (docker, gh; CASES="2 4 6" JOOMLA_IMAGE=…)
@@ -634,6 +638,88 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   after this plugin's (measured on JA Spa, Joomla 6). `apply.revert` takes it back. Proven on JA Spa
   j6 1.0.1 by `T4_QUICKSTART=<folder> tests/e2e/share-image.sh`, T4's Open Graph off and on.
 - A plugin older than this answers `{error: "bad_action", message: "unknown action: template.siteSettings"}`.
+
+## A template's own files: `template.files.*` (unreleased)
+
+The one way a file of the site's own look reaches it: what an agent changed on a copy of the site
+(a stylesheet, a script, a template override) put on the live site, and taken off again. The
+same door, in the same shape, on both platforms (`lib/TemplateFiles.php`, one file kept in step
+by hand), so one caller ("Sync to live") reads both.
+
+**Where it writes, decided by the site.** Only under a root: each installed site template (`#__extensions`, type `template`, client 0): `templates/<name>/`, where PHP may be written once the owner allows it (overrides under `html/`, the layout), and `media/templates/site/<name>/`, its assets, where it may not (that folder is served as it is). A root is checked on every
+call: a real folder under the site root, reached through no symbolic link. A path is site-relative
+(`media/templates/site/cassiopeia/css/user.css`), made of plain segments (`[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*`, at most 16, 512 bytes),
+with no `..` or `.`, no leading slash, no backslash, no dotfile or dot-folder, no symbolic link
+anywhere from the site root to the leaf, and the leaf a regular file or absent. Its extension is
+one of css, scss, sass, less, js, mjs, json, map, php, html, htm, svg, png, jpg, jpeg, gif, webp,
+avif, ico, woff, woff2, ttf, otf, eot; never `configuration.php`, `wp-config.php`,
+`wp-config-sample.php`, `.htaccess`, `.htpasswd`, `.user.ini`, `php.ini` or `web.config`; never a
+double extension a server could run (`x.php.css`).
+
+**`template.files.status {paths?}`** (read, no lock): `roots` (`{path, kind, name, php}`), and for
+each path (at most 500) `{path, exists, sha1, blob, sha256, bytes, root}` — `blob` is git's
+`hash-object` — or `{path, refused: <reason>}`; `php` whether PHP may be written, `php_lint` how it is checked, `swept`
+the leftovers removed (below).
+
+**`template.files.write {apply_id, files, dry_run?}`** (write, under the write lock). Each file is
+`{path, expected_sha1 | expected_blob, content_b64, sha256}`, or `{path, delete: true,
+expected_sha1 | expected_blob}`: exactly one expectation, the hash of what the live site must
+hold now, or null for "no file there" (a delete needs a hash). At most 100 files and 8 MiB a call,
+2 MiB a file (and a file on the site past 2 MiB is not replaced: its undo copy, one Apply log row,
+must fit an older MySQL's 4 MiB `max_allowed_packet`).
+In this order, and the first that fails ends the call with nothing written:
+
+1. the request: shapes, sizes, each `sha256` against the decoded bytes (`corrupt_upload`);
+2. every path (`refused`, each `{path, reason}`: `bad_path`, `absolute`, `traversal`, `dotfile`,
+   `denied`, `executable`, `extension`, `not_in_scope`, `php_not_allowed`, `php_disabled` (PHP is
+   switched off on this site; the answer's `next` says the owner can switch it on), `symlink`, `not_a_file`);
+3. every expectation against the live file (`conflict`, `code: CONFLICT`, each `{path, expected,
+   actual: {sha1, blob} | null}`). A file that already holds the new bytes (or a delete whose file
+   is gone) is `unchanged`, whatever was expected, so a call retried after a lost answer lands nothing twice;
+4. each PHP file parses on this site's PHP (`php_lint_failed`, each `{path, message, line}`, and
+   `lint_mode`): `php -l` run by the PHP command line of the same major.minor version as the PHP
+   serving the site (`-n`, the site's `short_open_tag`), when PHP may start a process; otherwise
+   this PHP's own parser (`token_get_all` with `TOKEN_PARSE`). Neither: `php_lint_unavailable`;
+5. the batch: every new content to a temporary file beside its target, then each renamed into
+   place, a deleted file renamed aside until the end; a rename that fails puts back every move
+   already made (`write_failed`, `rolled_back`, `not_restored`);
+6. one Apply log step per changed file under the `apply_id` (its previous bytes, or absent, and the
+   sha1 it left); a log that refuses takes the batch back (`write_failed`). PHP's opcache forgets
+   each PHP file written.
+
+`dry_run: true` runs 1–4 and answers what would happen, and changes nothing on disk. The answer: `{apply_id, undo_id, changed,
+files: [{path, op: created|updated|deleted|unchanged, before, after}], lint, undo}` — `before` and
+`after` are `{sha1, blob, sha256, bytes}` or null, `undo_id` is null when nothing changed, and `undo`
+is the call that takes it back.
+
+**Leftovers.** A request that dies between its temporary file and its rename leaves a
+`.tracy-tf-<16 hex>.tmp` (or a parked `.del`). `status` and every `write` but a dry run first
+remove the ones older than an hour, by that exact name only, inside the roots only, without
+following a link or entering a dot-folder; both answer how many as `swept`.
+
+**`template.files.undo {apply_id, undo_id?}`** (write, under the write lock): each file of that write
+(without `undo_id`: of every write of the Apply, newest first) goes back to what it was — only
+where the live file still holds what the write left (a reverse compare-and-set): `restored`
+(`op: restored|removed`, a folder the write made removed again when empty), `already` (it already
+holds what it held before), `kept` (`reason: changed-on-live|gone-on-live|exists-on-live|out-of-scope`
+— with `detail`, e.g. `php_disabled` — `|disabled`,
+and the sha1 it holds). `complete` is true when nothing is kept; an Apply made only of template file
+writes, all back, is forgotten. `apply.revert` takes the same steps back, but all or none: one
+file the site changed since refuses the whole revert (`conflict`, `kept`). `apply.list` shows each
+step (`op: templateFiles`, `path`, `undo_id`, `created`, `deleted`).
+
+Two Options switches. **Template files** (`template_files`, on by default) turns the door off: the
+three actions answer `disabled`, `apply.revert` keeps their steps (`kept`, `reason: disabled`) and
+`info.template_files` is `{version: 1, enabled: false}`, so a caller can tell the owner where to
+switch it on. **Allow PHP in template files** (`template_files_php`, off by default) lets PHP be
+written at all: while it is off every `.php` path is refused `php_disabled`, an undo keeps a PHP
+file as it is, and `info.template_files.php` is false. Every write and undo is a row of Joomla's **User Actions Log** (Users › User Actions Log, extension `com_claudecowork.template.files`) naming the files and the ids that take it back. After a change T4's combined CSS (`media/t4/optimize`) and Joomla's cache are emptied.
+
+`info.template_files`: `{version: 1, enabled: true, php, actions, max_file_bytes: 2097152,
+max_bytes: 8388608, max_files: 100, max_status_paths: 500, extensions, php_lint: cli|tokens|null}` —
+`php_lint` says how PHP would be checked, as far as the site can tell without starting anything —
+or `{version: 1, enabled: false}`.
+
 
 ## Finding a row by its title: `content.list` `search` (unreleased)
 

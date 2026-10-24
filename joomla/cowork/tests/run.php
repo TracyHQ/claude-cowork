@@ -2180,6 +2180,8 @@ require __DIR__ . "/home-title.php";
 require __DIR__ . "/t3-offcanvas.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
 require __DIR__ . "/template-site-settings.php";
+// template.files.*: the files of the installed templates, written compare-and-set and taken back the same way.
+require __DIR__ . "/template-files.php";
 // template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.
 require __DIR__ . "/language-overrides.php";
 require __DIR__ . "/language-overrides-ranking.php";

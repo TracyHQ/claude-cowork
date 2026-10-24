@@ -21,5 +21,28 @@
             description="COM_CLAUDECOWORK_CONFIG_WEBROOT_DESC"
             default=""
         />
+        <field
+            name="template_files"
+            type="radio"
+            layout="joomla.form.field.radio.switcher"
+            label="COM_CLAUDECOWORK_CONFIG_TEMPLATE_FILES_LABEL"
+            description="COM_CLAUDECOWORK_CONFIG_TEMPLATE_FILES_DESC"
+            default="1"
+        >
+            <option value="0">JNO</option>
+            <option value="1">JYES</option>
+        </field>
+        <field
+            name="template_files_php"
+            type="radio"
+            layout="joomla.form.field.radio.switcher"
+            label="COM_CLAUDECOWORK_CONFIG_TEMPLATE_FILES_PHP_LABEL"
+            description="COM_CLAUDECOWORK_CONFIG_TEMPLATE_FILES_PHP_DESC"
+            default="0"
+            showon="template_files:1"
+        >
+            <option value="0">JNO</option>
+            <option value="1">JYES</option>
+        </field>
     </fieldset>
 </config>
