@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>template.files.status, write and undo: the files of an installed site template, written compare-and-set under the write lock, PHP linted by the site's own PHP and only once the owner allows it (Options: Allow PHP in template files), all or nothing, and taken back only where the site still holds what was written; every write in the User Actions Log</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.60</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.60</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.60/pkg_claudecowork-0.24.60.zip</downloadurl>
+        </downloads>
+        <sha256>4dde0d6049848cf1ed74fe2d7df2d9b8b5289010199426ff69d06c33e258101b</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>inspect reports a locked presentation folder that is itself a symlink as drift instead of walking its target; a mega-menu style kept because its child was not hidden says so</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
