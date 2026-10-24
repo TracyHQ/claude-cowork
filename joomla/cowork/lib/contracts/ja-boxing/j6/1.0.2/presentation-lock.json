@@ -2349,6 +2349,96 @@
     },
     "userProfile-5103": {
       "value": "images/joomlart/author/pic-6.jpg#joomlaImage://local-images/joomlart/author/pic-6.jpg?width=800&height=800"
+    },
+    "languageString-231238131": {
+      "extension": "tpl_ja_boxing",
+      "key": "T4_OFF_CANVAS_TITLE",
+      "language": "en-GB",
+      "value": "Sidebar Menu"
+    },
+    "languageString-76896395": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CLASSES_TRIAL",
+      "language": "en-GB",
+      "value": "Book your trial class now"
+    },
+    "languageString-169039348": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_EMAIL_FORM",
+      "language": "en-GB",
+      "value": "LEAVE US A MESSAGE"
+    },
+    "languageString-219823601": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_EMAIL_PLACEHOLDER",
+      "language": "en-GB",
+      "value": "Your email"
+    },
+    "languageString-58440578": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_ENTER_MESSAGE_PLACEHOLDER",
+      "language": "en-GB",
+      "value": "Your message"
+    },
+    "languageString-234398682": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_MESSAGE_SUBJECT_PLACEHOLDER",
+      "language": "en-GB",
+      "value": "Your subject"
+    },
+    "languageString-50724917": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_NAME_PLACEHOLDER",
+      "language": "en-GB",
+      "value": "Your name"
+    },
+    "languageString-139204367": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_SEND",
+      "language": "en-GB",
+      "value": "Submit"
+    },
+    "languageString-34322868": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_CONTACT_VISIT",
+      "language": "en-GB",
+      "value": "Visit"
+    },
+    "languageString-112732346": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_FOLLOW_US",
+      "language": "en-GB",
+      "value": "TPL_FOLLOW_US"
+    },
+    "languageString-182937349": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_LEARNING_LEAD_DESC",
+      "language": "en-GB",
+      "value": "All you need to know"
+    },
+    "languageString-46373076": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_LEARNING_LEAD_TITLE",
+      "language": "en-GB",
+      "value": "The 6 <span>punches</span>"
+    },
+    "languageString-37868544": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_NO_SUPPORT_GROUP",
+      "language": "en-GB",
+      "value": "The \"Article Grouping\" option is not supported for this layout"
+    },
+    "languageString-90793445": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_SEE_SCHEDULE",
+      "language": "en-GB",
+      "value": "See Schedule"
+    },
+    "languageString-256948293": {
+      "extension": "tpl_ja_boxing",
+      "key": "TPL_TRY_CLASS",
+      "language": "en-GB",
+      "value": "Try a class"
     }
   },
   "assignments": [

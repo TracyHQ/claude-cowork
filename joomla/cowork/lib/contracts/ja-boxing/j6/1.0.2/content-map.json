@@ -1583,6 +1583,156 @@
         "user_id": "user-51"
       },
       "sourceId": 5103
+    },
+    {
+      "key": "languageString-231238131",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "T4_OFF_CANVAS_TITLE",
+        "language": "en-GB"
+      },
+      "sourceId": 231238131
+    },
+    {
+      "key": "languageString-76896395",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CLASSES_TRIAL",
+        "language": "en-GB"
+      },
+      "sourceId": 76896395
+    },
+    {
+      "key": "languageString-169039348",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_EMAIL_FORM",
+        "language": "en-GB"
+      },
+      "sourceId": 169039348
+    },
+    {
+      "key": "languageString-219823601",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_EMAIL_PLACEHOLDER",
+        "language": "en-GB"
+      },
+      "sourceId": 219823601
+    },
+    {
+      "key": "languageString-58440578",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_ENTER_MESSAGE_PLACEHOLDER",
+        "language": "en-GB"
+      },
+      "sourceId": 58440578
+    },
+    {
+      "key": "languageString-234398682",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_MESSAGE_SUBJECT_PLACEHOLDER",
+        "language": "en-GB"
+      },
+      "sourceId": 234398682
+    },
+    {
+      "key": "languageString-50724917",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_NAME_PLACEHOLDER",
+        "language": "en-GB"
+      },
+      "sourceId": 50724917
+    },
+    {
+      "key": "languageString-139204367",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_SEND",
+        "language": "en-GB"
+      },
+      "sourceId": 139204367
+    },
+    {
+      "key": "languageString-34322868",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CONTACT_VISIT",
+        "language": "en-GB"
+      },
+      "sourceId": 34322868
+    },
+    {
+      "key": "languageString-112732346",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_FOLLOW_US",
+        "language": "en-GB"
+      },
+      "sourceId": 112732346
+    },
+    {
+      "key": "languageString-182937349",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_LEARNING_LEAD_DESC",
+        "language": "en-GB"
+      },
+      "sourceId": 182937349
+    },
+    {
+      "key": "languageString-46373076",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_LEARNING_LEAD_TITLE",
+        "language": "en-GB"
+      },
+      "sourceId": 46373076
+    },
+    {
+      "key": "languageString-37868544",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_NO_SUPPORT_GROUP",
+        "language": "en-GB"
+      },
+      "sourceId": 37868544
+    },
+    {
+      "key": "languageString-90793445",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_SEE_SCHEDULE",
+        "language": "en-GB"
+      },
+      "sourceId": 90793445
+    },
+    {
+      "key": "languageString-256948293",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_TRY_CLASS",
+        "language": "en-GB"
+      },
+      "sourceId": 256948293
     }
   ],
   "slots": [
@@ -1650,6 +1800,17 @@
       "maxCharacters": 40,
       "requiresEvidence": false,
       "label": "Login Form / title",
+      "customize": "keep"
+    },
+    {
+      "key": "module-17.0",
+      "entity": "module-17",
+      "column": "title",
+      "type": "text",
+      "sample": "Breadcrumbs",
+      "maxCharacters": 42,
+      "requiresEvidence": false,
+      "label": "Breadcrumbs / title",
       "customize": "keep"
     },
     {
@@ -4093,6 +4254,17 @@
       "label": "Credit Bundles / item-info"
     },
     {
+      "key": "module-167.24",
+      "entity": "module-167",
+      "column": "title",
+      "type": "text",
+      "sample": "Credit Bundles",
+      "maxCharacters": 48,
+      "requiresEvidence": false,
+      "label": "Credit Bundles / title",
+      "customize": "keep"
+    },
+    {
       "key": "module-168.0",
       "entity": "module-168",
       "column": "title",
@@ -6402,6 +6574,17 @@
       "label": "Memberships / item-info"
     },
     {
+      "key": "module-188.24",
+      "entity": "module-188",
+      "column": "title",
+      "type": "text",
+      "sample": "Memberships",
+      "maxCharacters": 42,
+      "requiresEvidence": false,
+      "label": "Memberships / title",
+      "customize": "keep"
+    },
+    {
       "key": "module-189.0",
       "entity": "module-189",
       "column": "params",
@@ -6688,6 +6871,17 @@
       "jsonPath": ["features-intro", "features-intro[item-info]", 3],
       "nestedJson": "jatools-config",
       "label": " Kids credits / item-info"
+    },
+    {
+      "key": "module-189.24",
+      "entity": "module-189",
+      "column": "title",
+      "type": "text",
+      "sample": " Kids credits",
+      "maxCharacters": 46,
+      "requiresEvidence": false,
+      "label": " Kids credits / title",
+      "customize": "keep"
     },
     {
       "key": "module-190.0",
@@ -20622,6 +20816,184 @@
       "maxCharacters": 255,
       "requiresEvidence": false,
       "label": "Gene Roberts / user_avatar",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-231238131.0",
+      "entity": "languageString-231238131",
+      "column": "value",
+      "type": "text",
+      "sample": "Sidebar Menu",
+      "maxCharacters": 44,
+      "requiresEvidence": false,
+      "label": "T4_OFF_CANVAS_TITLE (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-76896395.0",
+      "entity": "languageString-76896395",
+      "column": "value",
+      "type": "text",
+      "sample": "Book your trial class now",
+      "maxCharacters": 70,
+      "requiresEvidence": false,
+      "label": "TPL_CLASSES_TRIAL (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-169039348.0",
+      "entity": "languageString-169039348",
+      "column": "value",
+      "type": "text",
+      "sample": "LEAVE US A MESSAGE",
+      "maxCharacters": 56,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_EMAIL_FORM (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-219823601.0",
+      "entity": "languageString-219823601",
+      "column": "value",
+      "type": "text",
+      "sample": "Your email",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_EMAIL_PLACEHOLDER (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-58440578.0",
+      "entity": "languageString-58440578",
+      "column": "value",
+      "type": "text",
+      "sample": "Your message",
+      "maxCharacters": 44,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_ENTER_MESSAGE_PLACEHOLDER (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-234398682.0",
+      "entity": "languageString-234398682",
+      "column": "value",
+      "type": "text",
+      "sample": "Your subject",
+      "maxCharacters": 44,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_MESSAGE_SUBJECT_PLACEHOLDER (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-50724917.0",
+      "entity": "languageString-50724917",
+      "column": "value",
+      "type": "text",
+      "sample": "Your name",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_NAME_PLACEHOLDER (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-139204367.0",
+      "entity": "languageString-139204367",
+      "column": "value",
+      "type": "text",
+      "sample": "Submit",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_SEND (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-34322868.0",
+      "entity": "languageString-34322868",
+      "column": "value",
+      "type": "text",
+      "sample": "Visit",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_CONTACT_VISIT (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-112732346.0",
+      "entity": "languageString-112732346",
+      "column": "value",
+      "type": "text",
+      "sample": "TPL_FOLLOW_US",
+      "maxCharacters": 46,
+      "requiresEvidence": false,
+      "label": "TPL_FOLLOW_US (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-182937349.0",
+      "entity": "languageString-182937349",
+      "column": "value",
+      "type": "text",
+      "sample": "All you need to know",
+      "maxCharacters": 60,
+      "requiresEvidence": false,
+      "label": "TPL_LEARNING_LEAD_DESC (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-46373076.0",
+      "entity": "languageString-46373076",
+      "column": "value",
+      "type": "text",
+      "sample": "The 6 ",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/text()",
+      "label": "TPL_LEARNING_LEAD_TITLE (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-46373076.1",
+      "entity": "languageString-46373076",
+      "column": "value",
+      "type": "text",
+      "sample": "punches",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "xpath": "/html/body/div/span/text()",
+      "label": "TPL_LEARNING_LEAD_TITLE (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-37868544.0",
+      "entity": "languageString-37868544",
+      "column": "value",
+      "type": "text",
+      "sample": "The \"Article Grouping\" option is not supported for this layout",
+      "maxCharacters": 144,
+      "requiresEvidence": false,
+      "label": "TPL_NO_SUPPORT_GROUP (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-90793445.0",
+      "entity": "languageString-90793445",
+      "column": "value",
+      "type": "text",
+      "sample": "See Schedule",
+      "maxCharacters": 44,
+      "requiresEvidence": false,
+      "label": "TPL_SEE_SCHEDULE (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-256948293.0",
+      "entity": "languageString-256948293",
+      "column": "value",
+      "type": "text",
+      "sample": "Try a class",
+      "maxCharacters": 42,
+      "requiresEvidence": false,
+      "label": "TPL_TRY_CLASS (template string, en-GB)",
       "customize": "keep"
     }
   ],
