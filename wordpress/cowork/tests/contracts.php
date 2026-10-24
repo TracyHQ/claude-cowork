@@ -12,10 +12,24 @@ echo "\nContent contract\n";
 $FIXTURES = __DIR__ . '/fixtures/contracts';
 $SITE = json_decode((string) file_get_contents($FIXTURES . '/site.json'), true);
 
-/** A webroot holding exactly the theme files the fixture lock pins. */
+/** Removes a scratch webroot; a link in it is removed itself, never followed. */
+function contractRootRemove(string $root): void
+{
+    if (!is_dir($root) || is_link($root)) {
+        return;
+    }
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+    foreach ($it as $node) {
+        $node->isDir() && !$node->isLink() ? rmdir($node->getPathname()) : unlink($node->getPathname());
+    }
+    rmdir($root);
+}
+
+/** A webroot holding exactly the theme files the fixture lock pins, removed when the run ends, pass or fail. */
 function contractRoot(array $site): string
 {
     $root = sys_get_temp_dir() . '/cc-contract-' . bin2hex(random_bytes(4));
+    register_shutdown_function('contractRootRemove', $root);
     mkdir($root . '/wp-content/themes/test-theme', 0777, true);
     file_put_contents($root . '/wp-content/themes/test-theme/style.css', $site['style.css']);
     file_put_contents($root . '/wp-content/themes/test-theme/theme.json', $site['theme.json']);
@@ -333,6 +347,26 @@ $drifted('a drifted theme file', static function (array $t): void {
 $drifted('an unexpected theme file', static function (array $t): void {
     file_put_contents($t['root'] . '/wp-content/themes/test-theme/extra.php', '<?php');
 }, 'Unexpected theme file');
+// A link under a locked root is never followed: it is reported itself, whatever it points at.
+$drifted('a linked folder of foreign files', static function (array $t): void {
+    mkdir($t['root'] . '/outside');
+    file_put_contents($t['root'] . '/outside/foreign.php', '<?php');
+    symlink($t['root'] . '/outside', $t['root'] . '/wp-content/themes/test-theme/linked');
+}, 'Unexpected theme file: wp-content/themes/test-theme/linked');
+$drifted('a linked file', static function (array $t): void {
+    mkdir($t['root'] . '/outside');
+    file_put_contents($t['root'] . '/outside/foreign.css', '/* foreign */');
+    symlink($t['root'] . '/outside/foreign.css', $t['root'] . '/wp-content/themes/test-theme/linked.css');
+}, 'Unexpected theme file: wp-content/themes/test-theme/linked.css');
+$drifted('a file link to nothing', static function (array $t): void {
+    symlink($t['root'] . '/outside/missing.css', $t['root'] . '/wp-content/themes/test-theme/dangling.css');
+}, 'Unexpected theme file: wp-content/themes/test-theme/dangling.css');
+$linkedSite = contractSite($SITE, $FIXTURES);
+mkdir($linkedSite['root'] . '/outside');
+file_put_contents($linkedSite['root'] . '/outside/foreign.php', '<?php');
+symlink($linkedSite['root'] . '/outside', $linkedSite['root'] . '/wp-content/themes/test-theme/linked');
+$linkedAnswer = $door($linkedSite['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0']);
+checkTrue('a linked folder is not walked into', strpos(json_encode($linkedAnswer['warnings'] ?? [], JSON_UNESCAPED_SLASHES), 'linked/') === false);
 $drifted('an edited template part', static function (array $t): void {
     WP_Fake::$posts[71]['post_content'] = '<!-- wp:paragraph --><p>Edited footer</p><!-- /wp:paragraph -->';
 }, 'Template part footer was edited');

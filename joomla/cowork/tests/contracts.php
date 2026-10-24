@@ -302,14 +302,37 @@ checkTrue('without the plugin installed, its media folder is anyone\'s file',$ow
 mkdir($styleDir.'/plugins/system/claudecoworkapi',0777,true);
 copy(__DIR__.'/../plg_system_claudecoworkapi/claudecoworkapi.xml',$styleDir.'/plugins/system/claudecoworkapi/claudecoworkapi.xml');
 checkTrue('the plugin\'s own shipped media is not presentation drift',!$ownWarned($ownMedia));
-foreach(['media/plg_system_claudecoworkapi/js/evil.php','media/plg_system_claudecoworkapi/other/x.js','media/plg_system_claudecoworkapi/x.js','media/plg_system_claudecoworkapix/js/x.js','media/templates/site/x/js/x.js'] as $path) {
+foreach(['media/plg_system_claudecoworkapi/js/unshipped.js','media/plg_system_claudecoworkapi/js/evil.php','media/plg_system_claudecoworkapi/other/x.js','media/plg_system_claudecoworkapi/x.js','media/plg_system_claudecoworkapix/js/x.js','media/templates/site/x/js/x.js'] as $path) {
     @mkdir(dirname($styleDir.'/'.$path),0777,true);file_put_contents($styleDir.'/'.$path,'not shipped by the plugin');
     checkTrue('a file the plugin does not ship is still reported: '.$path,$ownWarned($path));
     unlink($styleDir.'/'.$path);
 }
+// Exempt are the bytes this version ships, not the file name: an edited copy is drift like any other.
+file_put_contents($styleDir.'/'.$ownMedia,"\n// edited on the site",FILE_APPEND);
+checkTrue('a changed copy of the plugin\'s shipped media is still reported',$ownWarned($ownMedia));
+// The list the engine holds is the media the plugin's manifest installs, file for file and byte for byte
+// (build.sh refuses a package on the same rule: scripts/joomla-own-media.mjs).
+$ownManifest=file_get_contents(__DIR__.'/../plg_system_claudecoworkapi/claudecoworkapi.xml');
+preg_match('~<media\b[^>]*\bfolder="([^"]+)"[^>]*\bdestination="([^"]+)"[^>]*>(.*?)</media>~s',$ownManifest,$ownMediaBlock);
+preg_match_all('~<(folder|filename)>\s*([^<\s]+)\s*</\1>~',$ownMediaBlock[3],$ownEntries,PREG_SET_ORDER);
+$ownShipped=[];$ownSource=__DIR__.'/../plg_system_claudecoworkapi/'.$ownMediaBlock[1];
+foreach($ownEntries as [,$kind,$entry]) {
+    $sources=$kind==='folder' ? iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($ownSource.'/'.$entry,FilesystemIterator::SKIP_DOTS))) : [new SplFileInfo($ownSource.'/'.$entry)];
+    foreach($sources as $source)if($source->isFile() && $source->getFilename()!=='.DS_Store')
+        $ownShipped['media/'.$ownMediaBlock[2].'/'.substr($source->getPathname(),strlen($ownSource)+1)]=hash_file('sha256',$source->getPathname());
+}
+ksort($ownShipped);
+checkTrue('the engine exempts exactly the media the plugin ships, with their current hashes',(new ReflectionClassConstant(QuickstartContract::class,'OWN_MEDIA'))->getValue()===$ownShipped);
 unlink($styleDir.'/'.$ownMedia);symlink($contractDir.'/assets/demo.css',$styleDir.'/'.$ownMedia);
 checkTrue('a link in the plugin\'s media folder is still reported',$ownWarned($ownMedia));
 unlink($styleDir.'/'.$ownMedia);
+// A linked folder is never walked into, so it is reported itself: whatever it holds is not the lock's.
+$ownLinkedDir='media/plg_system_claudecoworkapi/js/linked';
+symlink($contractDir.'/assets',$styleDir.'/'.$ownLinkedDir);
+checkTrue('a linked folder in the plugin\'s media folder is reported',$ownWarned($ownLinkedDir));
+$c=new QuickstartContract($styleWriter,$styleStore,$styleDir,$styleDir);$c->inspect();
+checkTrue('a linked folder is not walked into',!str_contains(implode(' ',$c->driftWarnings()),$ownLinkedDir.'/'));
+unlink($styleDir.'/'.$ownLinkedDir);
 rmdir($styleDir.'/media/plg_system_claudecoworkapi/other');rmdir($styleDir.'/media/plg_system_claudecoworkapi/js');rmdir($styleDir.'/media/plg_system_claudecoworkapi');
 rmdir($styleDir.'/media/plg_system_claudecoworkapix/js');rmdir($styleDir.'/media/plg_system_claudecoworkapix');
 rmdir($styleDir.'/media/templates/site/x/js');rmdir($styleDir.'/media/templates/site/x');rmdir($styleDir.'/media/templates/site');rmdir($styleDir.'/media/templates');
