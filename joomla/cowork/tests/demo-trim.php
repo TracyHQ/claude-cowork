@@ -120,8 +120,128 @@ check('the generic revert does not take a trim apart', $trimEngine->handle(['tok
 
 $back = $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo', 'request_id' => 'u1']);
 check('revert brings every hidden row back', [$back['ok'], $back['status'], $trimWriter->store['article'][202]['state'], $trimWriter->store['article'][203]['state'], $trimWriter->store['menuItem'][330]['published']], [true, 'reverted', '1', '1', '1']);
-check('and leaves no trim on record', [isset($trimStore->binding['demoTrim']), $trimStore->binding['presentation']['article-post']['state']], [false, '1']);
+check('and keeps the trim on record, marked reverted', [$trimStore->binding['demoTrim']['status'] ?? null, $trimStore->binding['presentation']['article-post']['state']], ['reverted', '1']);
+check('with its history: the apply and the revert that took it back', [$trimStore->binding['demoTrim']['applyId'] ?? null, $trimStore->binding['demoTrim']['requestId'] ?? null, $trimStore->binding['demoTrim']['revert']['requestId'] ?? null], ['dtrim-a', 'r1', 'u1']);
+check('plan says the trim was reverted, with nothing left to hide back', [$trimCall(['operation' => 'demoTrim.plan'])['status'], $trimContract->inspect()['demoTrim']], ['reverted', null]);
 $trimWriter->tableAssets = false;
 check('the customer copy survives the revert', $trimWriter->store['module'][110]['content'], '<h1>Customer title</h1>');
 check('the reverted site inspects clean', $trimContract->inspect()['contract'], 'trim/v1');
 check('revert with nothing trimmed says so', $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo2', 'request_id' => 'u2'])['error'], 'contract_failed');
+// 🔒 A LOST ANSWER IS ANSWERED AGAIN, NOT REFUSED: the same revert retried is already reverted and writes nothing.
+$trimRows0 = $trimWriter->store;
+$again = $trimCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-undo', 'request_id' => 'u1']);
+check('the same revert after a lost answer is already reverted', [$again['ok'] ?? null, $again['status'] ?? $again, $again['moved'] ?? null, $again['remaining'] ?? null, $again['alreadyReverted'] ?? null], [true, 'reverted', 0, 0, true]);
+check('and writes nothing', $trimWriter->store, $trimRows0);
+check('the reverted apply request cannot trim again', $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1'])['error'] ?? null, 'conflict');
+check('and nothing was hidden by it', $trimWriter->store, $trimRows0);
+
+// 🔒 THE BASELINE MOVES ONLY WHERE THE TRIM WROTE. A difference the customer made — before the trim, during
+// it or after it — is still reported after the apply and after the revert; a listed row the customer
+// already hid is not the trim's, so it is still drift, and the revert leaves it hidden.
+$trimSite = function () use ($trimRows, $trimDir, $WTOKEN) {
+    $store = new TestContractStore();
+    $log = new FakeApplyLog();
+    $writer = new ContractTestWriter($log, $store);
+    foreach ($trimRows as [$kind, , $installed, , $row]) $writer->store[$kind][$installed] = ['id' => (string) $installed] + $row;
+    $writer->store['moduleAssignment'][110] = ['menuids' => '[0]'];
+    $contract = new QuickstartContract($writer, $store, $trimDir, $trimDir);
+    $engine = new Engine($WTOKEN, [], null, null, null, null, $writer, null, $log, null, null, null, $contract);
+    return [$store, $writer, $contract, fn (array $params) => $engine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params])];
+};
+$trimDrifted = function (QuickstartContract $contract): array {
+    try { $contract->inspect(); } catch (Throwable $e) { return ['refused: ' . $e->getMessage()]; }
+    $keys = [];
+    foreach ($contract->driftWarnings() as $warning) if (preg_match('/drift: (\S+) /', $warning, $m)) $keys[] = $m[1];
+    sort($keys);
+    return array_values(array_unique($keys));
+};
+[$dStore, $dw, $dContract, $dCall] = $trimSite();
+check('a bound site', $dCall(['operation' => 'bind'])['ok'], true);
+$dw->store['article'][201]['access'] = '2';
+$dw->store['article'][203]['state'] = '0';
+check('the drift is reported before the trim', $trimDrifted($dContract), ['article-old', 'article-page']);
+$dApplied = $dCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-d', 'request_id' => 'd1']);
+check('the trim still runs, and writes only the rows still where the lock has them', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied, $dw->store['article'][202]['state'], $dw->store['menuItem'][330]['published']], [true, 2, '0', '0']);
+check('and the drift it did not make is still reported after it', $trimDrifted($dContract), ['article-old', 'article-page']);
+check('the baseline holds what the trim wrote, and only that', [$dStore->binding['presentation']['article-post']['state'], $dStore->binding['presentation']['article-old']['state'], $dStore->binding['presentation']['article-page']['access']], ['0', '1', '1']);
+$dw->store['article'][202]['access'] = '2';
+check('a change after the trim is drift too', $trimDrifted($dContract), ['article-old', 'article-page', 'article-post']);
+$dBack = $dCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-du', 'request_id' => 'd2']);
+check('the revert still runs, and shows only what the trim hid', [$dBack['ok'], $dBack['moved'] ?? $dBack, $dw->store['article'][202]['state'], $dw->store['article'][203]['state'], $dw->store['menuItem'][330]['published']], [true, 2, '1', '0', '1']);
+check('and every change the customer made is still reported after it', $trimDrifted($dContract), ['article-old', 'article-page', 'article-post']);
+
+// 🔒 AN OLD SITE: a record written before the trim kept its rows (no `rows`, no `revert`). Every listed row
+// is the trim's, as it was then: it completes, reports, and reverts as before.
+[$oStore, $ow, $oContract, $oCall] = $trimSite();
+$ow->failOn = ['article', 203];
+check('an old site: a trim in flight', $oCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-o', 'request_id' => 'o1'])['ok'], false);
+$ow->failOn = null;
+unset($oStore->binding['demoTrim']['rows']);
+$ow->store['article'][203]['state'] = '0';
+$oDone = $oCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-o', 'request_id' => 'o1']);
+check('an old record in flight completes under its own request', [$oDone['status'] ?? $oDone, $ow->store['article'][202]['state'], $ow->store['menuItem'][330]['published']], ['completed', '0', '0']);
+check('every listed row is its own, as before', [$oStore->binding['presentation']['article-old']['state'], $trimDrifted($oContract)], ['0', []]);
+check('its plan says it is complete', [$oCall(['operation' => 'demoTrim.plan'])['status'], $oCall(['operation' => 'demoTrim.plan'])['remaining']], ['complete', 0]);
+// A revert begun by the old receiver: the record names the revert's own request, and no `revert`.
+$oStore->binding['demoTrim'] = ['status' => 'reverting', 'applyId' => 'dtrim-ou', 'requestId' => 'ou1'] + $oStore->binding['demoTrim'];
+check('an old revert in flight is not taken over by another request', $oCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-ox', 'request_id' => 'ox1'])['error'] ?? null, 'conflict');
+$oBack = $oCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-ou', 'request_id' => 'ou1']);
+check('and completes under its own request', [$oBack['status'] ?? $oBack, $ow->store['article'][202]['state'], $ow->store['article'][203]['state'], $ow->store['menuItem'][330]['published'], $trimDrifted($oContract)], ['reverted', '1', '1', '1', []]);
+check('answering its retry', $oCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-ou', 'request_id' => 'ou1'])['alreadyReverted'] ?? null, true);
+$oAgain = $oCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-o2', 'request_id' => 'o2']);
+check('a new request trims a reverted site again', [$oAgain['status'] ?? $oAgain, $ow->store['article'][202]['state'], $oStore->binding['demoTrim']['applyId']], ['completed', '0', 'dtrim-o2']);
+
+
+// 🔒 THE REVERT REBASES ONLY WHAT IT WROTE. A trimmed row the customer showed again after the trim is
+// theirs: the revert does not write it, its baseline stays hidden, and it is still reported after.
+[$uStore, $uw, $uContract, $uCall] = $trimSite();
+check('a trimmed site', $uCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-u', 'request_id' => 'u1'])['status'] ?? null, 'completed');
+$uw->store['article'][202]['state'] = '1';
+check('the customer showing a trimmed row again is drift', $trimDrifted($uContract), ['article-post']);
+$uBack = $uCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-uu', 'request_id' => 'u2']);
+check('the revert writes only the rows still hidden', [$uBack['status'] ?? $uBack, $uBack['moved'] ?? null, $uw->store['article'][203]['state'], $uw->store['menuItem'][330]['published']], ['reverted', 2, '1', '1']);
+check('and leaves the row the customer showed where its baseline was', [$uStore->binding['presentation']['article-post']['state'], $uStore->binding['presentation']['article-old']['state']], ['0', '1']);
+check('so the customer change is still reported after the revert', $trimDrifted($uContract), ['article-post']);
+
+// 🔒 A REVERT REBASES EXACTLY WHAT EACH CALL WROTE. 301 hidden rows take two calls; a row the customer
+// shows between them is written by neither, so its baseline stays hidden and it is still reported.
+$bigDir = sys_get_temp_dir() . '/cowork-demo-trim-big-' . bin2hex(random_bytes(6));
+mkdir($bigDir);
+try {
+    $bigEntities = []; $bigLock = []; $bigHide = [];
+    for ($i = 1; $i <= 301; $i++) {
+        $bigEntities[] = ['key' => "post-$i", 'kind' => 'article', 'sourceId' => $i, 'identity' => ['alias' => "post-$i"]];
+        $bigLock["post-$i"] = ['title' => "Post $i", 'alias' => "post-$i", 'state' => '1', 'access' => '1', 'language' => '*'];
+        $bigHide[] = ['key' => "post-$i", 'kind' => 'article', 'field' => 'state', 'from' => '1', 'to' => '0', 'reason' => 'demo blog post'];
+    }
+    $bigStore = new TestContractStore();
+    $bigLog = new FakeApplyLog();
+    $bigWriter = new ContractTestWriter($bigLog, $bigStore);
+    foreach ($bigLock as $key => $row) $bigWriter->store['article'][1000 + (int) substr($key, 5)] = ['id' => (string) (1000 + (int) substr($key, 5))] + $row;
+    foreach (['manifest' => ['id' => 'trim-big/v1'], 'content-map' => ['entities' => $bigEntities, 'slots' => [], 'pages' => []],
+        'presentation-lock' => ['entities' => $bigLock, 'assignments' => [], 'fileRoots' => [], 'files' => [], 'inventoryCounts' => ['article' => 301], 'access' => $bigStore->acl]] as $name => $body)
+        file_put_contents("$bigDir/$name.json", json_encode($body));
+    $bigBase = '';
+    foreach (['manifest.json', 'content-map.json', 'presentation-lock.json'] as $name) $bigBase .= $name . ':' . hash_file('sha256', "$bigDir/$name") . "\n";
+    file_put_contents("$bigDir/demo-trim-map.json", json_encode(['schemaVersion' => 'tracy-quickstart-demo-trim/v1', 'extensionVersion' => '1.0.0', 'contract' => 'trim-big/v1',
+        'baseHash' => hash('sha256', $bigBase), 'hide' => $bigHide]));
+    $bigContract = new QuickstartContract($bigWriter, $bigStore, $bigDir, $bigDir);
+    $bigEngine = new Engine($WTOKEN, [], null, null, null, null, $bigWriter, null, $bigLog, null, null, null, $bigContract);
+    $bigCall = fn(array $params) => $bigEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
+    $bigApply = [$bigCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-b', 'request_id' => 'b1'])['status'] ?? null,
+        $bigCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-b', 'request_id' => 'b1'])['status'] ?? null];
+    check('301 rows are trimmed in two calls', $bigApply, ['running', 'completed']);
+    $bigFirst = $bigCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-bu', 'request_id' => 'b2']);
+    check('the first revert call leaves one row hidden', [$bigFirst['status'] ?? $bigFirst, $bigFirst['moved'] ?? null, $bigFirst['remaining'] ?? null], ['running', 300, 1]);
+    $bigLeft = array_keys(array_filter($bigWriter->store['article'], fn($row) => $row['state'] === '0'));
+    check('one row is still hidden', count($bigLeft), 1);
+    $bigKey = 'post-' . ($bigLeft[0] - 1000);
+    $bigWriter->store['article'][$bigLeft[0]]['state'] = '1';
+    $bigSecond = $bigCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-bu', 'request_id' => 'b2']);
+    check('the second call has nothing left to write, and finishes', [$bigSecond['status'] ?? $bigSecond, $bigSecond['moved'] ?? null], ['reverted', 0]);
+    check('the row the customer showed between the calls keeps its hidden baseline', $bigStore->binding['presentation'][$bigKey]['state'] ?? null, '0');
+    check('so it is still reported after the revert', $trimDrifted($bigContract), [$bigKey]);
+} finally {
+    foreach (glob("$bigDir/*") as $f) unlink($f);
+    rmdir($bigDir);
+}

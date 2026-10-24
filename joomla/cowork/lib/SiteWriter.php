@@ -189,6 +189,16 @@ interface SiteWriter
     public function setVisibility(string $kind, int $id, string $column, string $value): void;
 
     /**
+     * setVisibility() as a compare-and-set: write `$value` only while the row still holds `$expected`,
+     * the check in the UPDATE itself, so a save that lands between the caller's read and this write
+     * is never overwritten.
+     *
+     * @return bool false, and nothing written, when the row in scope no longer holds `$expected`
+     *              (changed, or gone since it was read)
+     */
+    public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool;
+
+    /**
      * setVisibility() for many rows of one kind: the same column, the same value, the same rules —
      * in a few statements instead of a read and an UPDATE (or two) per row.
      *
@@ -213,6 +223,43 @@ interface SiteWriter
      * row has no asset, and the Table's store would also re-decide `home`.
      */
     public function realiasMenuItem(int $id, string $alias): void;
+
+    /**
+     * Replace the `params` of one existing front-end menu item, and nothing else, only while the column
+     * still holds `$expected` byte for byte — a compare-and-set in the UPDATE itself, so a save that
+     * lands between the caller's read and this write is never overwritten. Byte for byte, not by the
+     * column's collation: under Joomla's case-insensitive utf8mb4 collations `{"a":"A"}` = `{"a":"a"}`.
+     *
+     * Like setVisibility, not the Table: the Table's store would re-decide `home`, rebuild the
+     * nested-set path and stamp the row. The caller has already proven `$params` differs from
+     * `$expected` in exactly the one key it means to move (JsonObjectKey).
+     *
+     * @return bool false, and nothing written, when the row in scope no longer holds `$expected`
+     *              (changed, or gone since it was read)
+     */
+    public function replaceMenuItemParams(int $id, string $expected, string $params): bool;
+
+    /**
+     * Replace the `params` of one site template style, and nothing else, only while the column still
+     * holds `$expected` byte for byte — the compare-and-set of replaceMenuItemParams, on
+     * `#__template_styles`. The caller has already proven `$params` is `$expected` with exactly the
+     * one T3 mega-menu key it means to move (T3MegaSub).
+     *
+     * @return bool false, and nothing written, when the style no longer holds `$expected`
+     */
+    public function replaceTemplateStyleParams(int $id, string $expected, string $params): bool;
+
+    /**
+     * The site menu items whose parent is `$parent`, read with a LOCKING read (`FOR UPDATE`) inside the
+     * caller's transaction: the latest committed rows rather than its snapshot, with the gap under that
+     * parent locked so a child another connection adds waits until the caller commits. Each row carries
+     * id, parent_id, lft (the menu order), menutype, language, published and params. On MariaDB with innodb_snapshot_isolation
+     * ON, a child committed since the snapshot makes the read throw (error 1020) instead: the caller's
+     * transaction rolls back with nothing written.
+     *
+     * @return list<array<string,?scalar>>
+     */
+    public function lockMenuChildren(int $parent): array;
 
     /**
      * Give the site's source language another tag of the same language — every row that carries the

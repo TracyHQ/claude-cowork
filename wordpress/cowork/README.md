@@ -25,9 +25,11 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `db.cleanup` | write | ok | ok |
 | `db.restore` | write | ok | ok |
 | `db.purge` | write | ok | ok |
-| `files.list` | read | ok | ok |
-| `files.pack` | read | ok | ok |
-| `file.read` | read | ok | ok |
+| `files.list` (`hash: false` answers `{path, size, mtime}` instead of the sha1, pages of up to 5000) | read | ok | ok |
+| `files.hash`: the sha1 of 1–500 named paths, null for a path that is missing, outside the walk or refused by `file.read` | read | ok | ok |
+| `site.fingerprint` (0.18.25), see [The cheap questions a sync asks first](#the-cheap-questions-a-sync-asks-first-sitefingerprint-fileslist-hash-false-fileshash) | read | ok | ok |
+| `files.pack` (`inline: true` hands the part back as `part_b64` instead of PUTting it to `put_url`; `paths`, 1–2000, cuts the pack to those files, in the walk's order) | read | ok | ok |
+| `file.read` (refuses the site's secrets — `wp-config.php` and its copies, `.env`, `.htpasswd` — with `refused: protected path`; `files.pack` still carries them) | read | ok | ok |
 | `plugin.list` | read | ok | ok |
 | `plugin.install` | write | ok | ok |
 | `plugin.activate` | write | ok | ok |
@@ -48,9 +50,31 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `media.delete` | write | ok | ok; refuses a picture that is the current value of a bound image slot |
 | `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
-| `content.contract` | read (`inspect`, `demoTrim.plan`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
+| `content.contract` | read (`inspect`, `demoTrim.plan`, `showcaseNav.status`, `sourceLanguage.plan`, `siteLanguage.plan`) or write (`bind`, `derive`, `apply`, `string`, `demoTrim.apply\|revert`, `showcaseNav.apply\|revert`, `sourceLanguage.set\|revert`, `siteLanguage.set\|revert`, `multilingual.retire\|restore`) | `inspect` and `bind` (with `contract`), `derive`, `string`; the rest need a bound site | every operation; `derive` refuses a quickstart binding (`conflict`) |
 | `content.read` | read (answered by the plugin, not the engine): the Content API v1 reader; `params` is the flat query, `contentPrincipal`/`contentScope` sit at the top level; the answer is the envelope or `{error}` with its HTTP status | ok | ok |
 | `content.identity` | write, opt-in: a content seed for the site and a content uid for every page, post, template part, synced pattern, navigation and attachment (post meta only); `{newSite: true, requestId}` is a fork | ok | ok |
+
+## The cheap questions a sync asks first: `site.fingerprint`, `files.list` `hash: false`, `files.hash`
+
+Tracy's "Sync from live" asks these before it reads anything, the Joomla engine's contract (its
+0.24.51, fingerprint version 2) in the same shape, so one caller reads both:
+
+- `site.fingerprint` answers, without copying a byte, one digest per page of the file walk — the
+  `files.list` walk and order, from the first path after `after`, `limit` paths (default 20000, at
+  most 50000; a fixed count, so the same tree cuts into the same pages), `digest` = sha1 over
+  `path NUL size NUL mtime LF`, with `count`, `bytes` and `next_after` — and `CHECKSUM TABLE` for
+  each table `db.tables` lists (or a `tables` subset), as strings, null where the server answers
+  NULL; `files: false` / `checksums: false` leave either half out. With `skip_columns` (up to 50
+  plain column names) every table is checksummed by its substance instead — `"<rows>:<xor>"`, the
+  XOR of a 64-bit MD5 per row over the columns left — and the names used come back sorted in
+  `fingerprint.skip_columns`. A WordPress table holds none of the Joomla names a sync sends, so it
+  is its whole substance; `wp_options` moves whenever WP-Cron or a transient writes it.
+- The protected files (`wp-config.php` and its copies, `.env`, `.htpasswd`) are in the walk: they
+  count in the digest and `files.list` lists them, so an edited configuration is seen. `files.hash`
+  answers null for them and `file.read` refuses them; their bytes leave only in the site's own
+  archive, `files.pack` (cut to them with `paths`).
+- `info` advertises all of it: `site_fingerprint {version, max_files}`, `files_list {stat,
+  max_stat_limit}`, `files_hash {max_paths}`, `files_pack {inline, max_paths}`.
 
 An install is deliberately **not** in the undo log: installing is additive, and WordPress owns the
 uninstall.
@@ -80,7 +104,7 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
 - `content.contract` takes `operation`:
-  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, sourceLanguage, multilingual, siteLanguage, problems: []}`.
+  - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, showcaseNav, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme
     file changed or added under `fileRoots`, a pinned option, a template part, an entity
     missing or ambiguous, its status, or its **skeleton** — the sha256 of its content with every
@@ -115,6 +139,23 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   - `demoTrim.plan | apply | revert` (prefix `dtrim-`) — hide the vendor's demo posts listed in
     `demo-trim-map.json`, at most 300 per call; a row the customer already moved is skipped and
     reported; refused while the site has a Polylang language the profile ships no edition for.
+  - `showcaseNav.status | apply | revert` (prefix `snav-`, a `request_id` the same on a retry) —
+    take the template showcase (home-page variants, the kit's sample pages) out of the navigation,
+    as reviewed in `showcase-nav-map.json`: an entry leaves a `wp_navigation` post, a template part's
+    navigation block is repointed, or the one block of a showcase drawer goes. Pages stay published.
+    Each owner is rewritten whole, by byte range, only while it holds the map's `before` sha256 and
+    only with bytes whose sha256 is the map's `after` (a compare-and-set); one the customer already
+    changed is skipped and reported, never forced. Two owners per call (`running` until done); the
+    receipt (the bytes found) lands before each write, so the same request resumes a call that died.
+    A template part with no row (the theme file in charge) is a conflict for that owner: nothing is
+    created, because creating an override cannot be compared-and-set. An owner found already at the
+    map's `after` bytes is `already`: not written, not reverted. `revert` puts each owner back while
+    it holds what the apply wrote; one changed since is a conflict, left as it is, which a later revert
+    request looks at again. Inspect stops reporting a template part only at the bytes this job wrote
+    (a write whose answer was lost included), never for one it found already there. After a finished
+    revert `status` is `reverted` with `remaining` 0; `owners` is the map's owner count. A
+    missing, refused or not-covered map is `unsupported` (the contract still serves); a site with a
+    second Polylang language is refused (`contract_failed`).
   - `sourceLanguage.plan | set | revert` (prefix `srclang-`) — respell the source edition's
     locale (`en_US` → `en_GB`, `en_AU`, `en_CA`, `en_NZ`) in Polylang and `WPLANG`.
   - `siteLanguage.plan | set | revert` (prefix `slang-`) — which edition is the site's DEFAULT

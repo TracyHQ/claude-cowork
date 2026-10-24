@@ -276,6 +276,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     public function onBeforeCompileHead(): void
     {
         $this->homeTitleAlone();
+        $this->t3OffCanvasKeyboard();
         try {
             $app = $this->getApplication();
             if (!$app->isClient('site') || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
@@ -306,6 +307,48 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         } catch (\Throwable $e) {
             // A favicon is never worth a page: the page keeps Joomla's own.
             Log::add('claudecoworkapi favicon: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
+    }
+
+    /**
+     * The keyboard for a T3 template's off-canvas drawer (`media/js/t3-offcanvas-a11y.js`): ESC closes
+     * it, focus goes into it and back to ☰, Tab stays inside while it is open, and the × is announced.
+     * Only where `T3OffCanvas::applies` (a T3 style with the drawer on, T3's off-canvas.js the bytes
+     * the script was checked against), and only while the plugin's `t3_offcanvas_a11y` is on: set to
+     * 0, every page is what it was without this. Independent of the favicon and of Tracy's proxy.
+     */
+    private function t3OffCanvasKeyboard(): void
+    {
+        try {
+            $app = $this->getApplication();
+            if (!$app->isClient('site') || !(int) $this->params->get('t3_offcanvas_a11y', 1) || !class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+                return;
+            }
+            $document = $app->getDocument();
+            if (!$document || $document->getType() !== 'html' || !method_exists($document, 'getWebAssetManager')) {
+                return;
+            }
+            $style = $app->getTemplate(true);
+            $params = $style->params ?? null;
+            EngineFactory::loadT3OffCanvas();
+            if (!\T3OffCanvas::applies(JPATH_ROOT, (string) ($style->template ?? ''), $params instanceof \Joomla\Registry\Registry ? $params->get('addon_offcanvas_enable') : null)) {
+                return;
+            }
+            // Joomla's own words, so every installed language pack says them: mod_menu's toggle and the core "Close".
+            $app->getLanguage()->load('mod_menu', JPATH_SITE);
+            $document->addScriptOptions('plg_system_claudecoworkapi.t3OffCanvas', [
+                'open' => \Joomla\CMS\Language\Text::_('MOD_MENU_TOGGLE'),
+                'close' => \Joomla\CMS\Language\Text::_('JCLOSE'),
+            ]);
+            $document->getWebAssetManager()->registerAndUseScript(
+                'plg_system_claudecoworkapi.t3-offcanvas-a11y',
+                'plg_system_claudecoworkapi/t3-offcanvas-a11y.js',
+                ['version' => 'auto'],
+                ['defer' => true]
+            );
+        } catch (\Throwable $e) {
+            // A keyboard aid is never worth a page: the drawer stays as T3 draws it.
+            Log::add('claudecoworkapi t3 off-canvas: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

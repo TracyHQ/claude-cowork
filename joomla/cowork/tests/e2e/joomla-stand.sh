@@ -25,7 +25,8 @@ cleanup() {
     echo "KEEP=1: containers $P-* and network $NET left up; work dir $WORK"
     return
   fi
-  docker rm -f "$P-joomla" "$P-db" >/dev/null 2>&1 || true
+  # -v: both images declare a volume (/var/www/html, /var/lib/mysql); without it each run leaves two behind.
+  docker rm -f -v "$P-joomla" "$P-db" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   rm -rf "$WORK"
 }

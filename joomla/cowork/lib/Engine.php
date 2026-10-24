@@ -399,8 +399,8 @@ final class Engine
         // A trim, a language step or a relabel has its own way back; the ordinary revert would take it
         // apart one row at a time and leave the baseline naming a state the site is no longer in.
         if ($contractBound && $action === 'apply.revert' && $this->log) {
-            $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias']);
-            if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a language step or a source relabel: take it back with its own operation (demoTrim.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
+            $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias', 'showcaseNav']);
+            if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a showcase-navigation change, a language step or a source relabel: take it back with its own operation (demoTrim.revert, showcaseNav.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
         }
         $contractReceipts = $contractBound && $action === 'apply.revert' && $this->log
             ? array_values(array_filter($this->log->entries($params['apply_id'] ?? ''), fn($e) => ($e['op'] ?? '') === 'contract'))
@@ -1925,6 +1925,7 @@ final class Engine
             }
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (strpos((string)($p['operation'] ?? ''), 'demoTrim.') === 0) return $this->demoTrim($p);
+            if (strpos((string)($p['operation'] ?? ''), 'showcaseNav.') === 0) return $this->showcaseNav($p);
             if (strpos((string)($p['operation'] ?? ''), 'siteLanguage.') === 0) return $this->siteLanguage($p);
             if (strpos((string)($p['operation'] ?? ''), 'sourceLanguage.') === 0) return $this->sourceLanguage($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
@@ -2196,8 +2197,9 @@ final class Engine
             try {
                 $state = $this->contract->inspect();
                 return $this->ok([
-                    'hides' => $this->contract->demoTrim()->counts(), 'status' => $state['demoTrim'] ?? 'none',
-                    'remaining' => count($this->demoTrimPending($state, true)),
+                    'hides' => $this->contract->demoTrim()->counts(),
+                    'status' => ($state['binding']['demoTrim']['status'] ?? null) === 'reverted' ? 'reverted' : ($state['demoTrim'] ?? 'none'),
+                    'remaining' => count($this->demoTrimPending($state, true, $state['demoTrim'] === null ? null : $state['binding']['demoTrim'])),
                     'profileVersion' => $this->contract->demoTrim()->version(), 'profileHash' => $this->contract->demoTrim()->hash(),
                 ]);
             } catch (Throwable $error) { return $this->contractFailed($error); }
@@ -2216,17 +2218,26 @@ final class Engine
             if (!empty($binding['multilingual']['languages']))
                 return $this->err('contract_failed', 'This site already has a second language; hiding its demo rows would leave the translated copies showing. Nothing has been written.');
             $trim = $binding['demoTrim'] ?? null;
-            $record = ['status' => $operation === 'apply' ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
-                'profileHash' => $this->contract->demoTrim()->hash(), 'profileVersion' => $this->contract->demoTrim()->version(), 'at' => gmdate('c')];
+            // A record written before a revert kept the apply it undid names the revert's own request.
+            $revertRequest = $trim['revert']['requestId'] ?? $trim['requestId'] ?? null;
             if ($operation === 'apply') {
                 if (($trim['status'] ?? null) === 'complete')
                     return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyTrimmed' => true, 'applyId' => $trim['applyId']]);
-                if ($trim !== null && ($trim['status'] !== 'applying' || $trim['requestId'] !== $request))
+                // A reverted trim's request is spent: hiding again is a different change, under a new one.
+                if ($trim !== null && ($trim['status'] === 'reverted' ? $trim['requestId'] === $request : ($trim['status'] !== 'applying' || $trim['requestId'] !== $request)))
                     return $this->err('conflict', 'A demo trim is already ' . $trim['status'] . ' under request ' . $trim['requestId']);
+                $record = ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
+                    'profileHash' => $this->contract->demoTrim()->hash(), 'profileVersion' => $this->contract->demoTrim()->version(), 'at' => gmdate('c')];
             } else {
-                if ($trim === null) return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
-                if ($trim['status'] === 'reverting' && $trim['requestId'] !== $request)
-                    return $this->err('conflict', 'A demo trim revert is already running under request ' . $trim['requestId']);
+                // 🔒 A REVERTED TRIM ANSWERS ITS OWN REVERT AGAIN, AND WRITES NOTHING: a retry after a
+                // lost answer is told it is done, not that there is nothing to bring back.
+                if (($trim['status'] ?? null) === 'reverted' && $revertRequest === $request)
+                    return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true, 'applyId' => $trim['revert']['applyId'] ?? $trim['applyId']]);
+                if ($trim === null || $trim['status'] === 'reverted') return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
+                if ($trim['status'] === 'reverting' && $revertRequest !== $request)
+                    return $this->err('conflict', 'A demo trim revert is already running under request ' . $revertRequest);
+                // The record keeps the apply it undoes: which rows were the trim's, and under which request.
+                $record = ['status' => 'reverting', 'revert' => $trim['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $trim;
             }
             // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit. A batch that dies after
             // Joomla committed some rows must leave a site that says a trim is in flight — otherwise
@@ -2236,10 +2247,17 @@ final class Engine
             // the site, and a trim in flight, exactly where they were, so the same request resumes.
             $hide = $operation === 'apply';
             $checked = false;
-            if ($trim === null || $trim['status'] !== $record['status'] || $trim['requestId'] !== $request) {
+            if ($trim === null || $trim['status'] !== $record['status']) {
                 $this->writer->transaction(function () use ($record, $hide) {
                     $state = $this->contract->inspect();
-                    $this->refuseLocked($this->demoTrimRows($state, $hide));
+                    // 🔒 THE TRIM OWNS ONLY THE ROWS IT FINDS WHERE THE LOCK HAS THEM. A listed row the
+                    // customer already hid is theirs: it is not written, not rebased, and not shown on revert.
+                    if ($hide) $record['rows'] = array_keys($this->demoTrimPending($state, true, null));
+                    // 🔒 THE REVERT OWNS ONLY THE TRIM'S ROWS IT FINDS STILL HIDDEN. One the customer showed
+                    // again after the trim is theirs: it is not written, and its baseline stays the hidden
+                    // value, so the change is still reported after the revert.
+                    else $record['revert']['rows'] = array_keys($this->demoTrimPending($state, false, $record));
+                    $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
                     if (!$state['binding']) $this->contract->bind($state['snapshot']);
                     $this->contract->rebind($this->contract->bindingWithTrim($record));
                     return [];
@@ -2249,9 +2267,11 @@ final class Engine
             $this->batching = true;
             $step = $this->writer->transaction(function () use ($hide, $apply, $checked) {
                 $state = $this->contract->inspect();
-                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide));
-                $pending = $this->demoTrimPending($state, $hide);
+                $record = $state['binding']['demoTrim'];
+                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
+                $pending = $this->demoTrimPending($state, $hide, $record);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
+                $moved = [];
                 foreach ($batch as $key => [$kind, $field, $value]) {
                     // One column, raw — never write(): Joomla's Table would mint `#__assets` rows
                     // for demo posts that ship without them, and move the ACL the contract holds.
@@ -2259,13 +2279,25 @@ final class Engine
                     $before = (string) ($state['rows'][$key][$field] ?? '');
                     $this->writer->setVisibility($kind, $id, $field, $value);
                     $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $field, 'before' => $before]);
+                    $moved[$key] = [$field, $value];
                 }
                 $remaining = count($pending) - count($batch);
-                if ($remaining === 0)
-                    $this->contract->rebind($hide ? $this->contract->bindingAfterTrim() : $this->contract->bindingAfterTrimRevert());
-                // Proven, then stored: the full read checks every row against the baseline just
-                // derived, and only a site that passes it becomes the next baseline.
-                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                if ($remaining === 0) {
+                    // A finished apply expects every row it owns hidden, derived from the profile and the
+                    // record, never read back from the site: a batch Joomla committed behind its own
+                    // rollback left rows hidden that no surviving call wrote.
+                    // 🔒 A REVERT REBASES ONLY THE ROWS THIS CALL WROTE, in $moved already. A row of the trim
+                    // the customer showed between two calls was written by neither: its baseline stays
+                    // hidden, and it is still reported.
+                    if ($hide) foreach ($this->demoTrimOwned($record) as $key => $row) $moved[$key] = [$row['field'], $row['to']];
+                    if ($hide) $record = ['status' => 'complete', 'completedAt' => gmdate('c')] + $record;
+                    else $record = ['status' => 'reverted', 'revert' => ['completedAt' => gmdate('c')] + ($record['revert'] ?? [])] + $record;
+                }
+                // 🔒 THE BASELINE MOVES ONLY WHERE THE TRIM WROTE, to the value it wrote — never a fresh
+                // snapshot, which would take a change the customer made into the baseline unseen.
+                $this->contract->rebind($this->contract->bindingWithTrim($record, $moved));
+                // Proven: the full read checks every row against the baseline just derived.
+                $this->contract->inspect();
                 return ['remaining' => $remaining, 'moved' => count($batch)];
             });
             $this->batching = false;
@@ -2765,27 +2797,460 @@ final class Engine
     }
 
     /** The rows the next demo-trim batch would move, as (kind, id). */
-    private function demoTrimRows(array $state, bool $hide): array
+    private function demoTrimRows(array $state, bool $hide, ?array $record): array
     {
         $rows = [];
-        foreach (array_slice($this->demoTrimPending($state, $hide), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
+        foreach (array_slice($this->demoTrimPending($state, $hide, $record), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
             $rows[] = [$kind, (int) $state['ids'][$key]];
         return $rows;
     }
 
     /**
-     * Listed rows not yet where this direction wants them, with the value each should get.
+     * The trim's rows still at the end this direction moves them from, with the value each should get.
+     * With no trim on record, the listed rows a new trim would own: those still where the lock has them.
+     * A record from before rows were named owns every listed row, and moves each not yet at its target.
      *
      * @return array<string,array{0:string,1:string,2:string}> key => [kind, field, value]
      */
-    private function demoTrimPending(array $state, bool $hide): array
+    private function demoTrimPending(array $state, bool $hide, ?array $record): array
     {
         $out = [];
-        foreach ($this->contract->demoTrim()->rows() as $key => $row) {
+        $named = $record === null || isset($record['rows']);
+        foreach ($this->demoTrimOwned($record, $hide) as $key => $row) {
             $want = $hide ? $row['to'] : $row['from'];
-            if ((string) ($state['rows'][$key][$row['field']] ?? '') !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
+            $actual = (string) ($state['rows'][$key][$row['field']] ?? '');
+            if ($named ? $actual === ($hide ? $row['from'] : $row['to']) : $actual !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
         }
         return $out;
+    }
+
+    /**
+     * The listed rows a trim record owns: those it names, or every listed row for a record that names none.
+     * A revert owns those of them it named when it began; one begun before reverts named rows owns them all.
+     */
+    private function demoTrimOwned(?array $record, bool $hide = true): array
+    {
+        $rows = $this->contract->demoTrim()->rows();
+        if (isset($record['rows'])) $rows = array_intersect_key($rows, array_flip($record['rows']));
+        if (!$hide && isset($record['revert']['rows'])) $rows = array_intersect_key($rows, array_flip($record['revert']['rows']));
+        return $rows;
+    }
+
+    /** Rows moved per committed call of showcaseNav.apply and .revert. */
+    private const SHOWCASE_NAV_BATCH = 100;
+    /** Why a row was left alone when its compare-and-set found it changed between the read and the write. */
+    private const SHOWCASE_NAV_RACED = 'it changed while it was being written';
+
+    /**
+     * Taking a quickstart's TEMPLATE SHOWCASE out of a bound site's menus, and putting it back.
+     *
+     * `status` reads, `apply` hides one committed batch per call until nothing is left, `revert` puts
+     * back exactly what its apply hid. What may be hidden is decided in review, in the contract's
+     * `showcase-nav-map.json`; a request names no rows. A menu item only loses "Display in Menu"
+     * (`menu_show` "0"): the page stays published, its URL keeps working, and no article, category or
+     * ACL is touched. A module listed there is unpublished on its visibility column, as a demo trim does.
+     *
+     * 🔒 EVERY WRITE IS A COMPARE-AND-SET, AND ITS RECEIPT IS THE REVERT. A row is written only from the
+     * value the map starts from; one the customer already moved is left alone and reported. The value
+     * found, and whether the key existed at all, is kept in the site's own baseline in the same commit
+     * as the write, so a revert puts back exactly that — or, when the customer changed the row since,
+     * leaves it and says so. The map is not read again to revert.
+     */
+    private function showcaseNav(array $p): array
+    {
+        $operation = substr((string) $p['operation'], strlen('showcaseNav.'));
+        if (!in_array($operation, ['status', 'apply', 'revert'], true)) return $this->err('bad_params', 'Unknown showcaseNav operation');
+        try {
+            $binding = $this->contract->binding();
+            $nav = $this->contract->showcaseNav();
+        } catch (Throwable $error) { return $this->contractFailed($error); }
+        $record = $binding['showcaseNav'] ?? null;
+        // A finished revert leaves only what it could not put back (the receipts of its conflicts) and
+        // the answer of each revert request: no row is expected moved, the same revert retried after a
+        // lost answer gets its answer again, and a new revert request looks at the conflicts once more.
+        $reverted = ($record['status'] ?? null) === 'reverted' ? $record : null;
+        if ($reverted !== null) $record = null;
+        $usable = $nav !== null && $nav->covered();
+        $unsupported = function () use ($nav) {
+            if ($nav === null && $this->contract->showcaseNavProblem() !== null)
+                return $this->err('unsupported', 'This quickstart contract ships a showcase-navigation map this receiver refuses (' . $this->contract->showcaseNavProblem() . '). Nothing has been written.');
+            if ($nav === null)
+                return $this->err('unsupported', 'This quickstart contract carries no showcase-navigation map; its showcase menu entries cannot be hidden by this receiver');
+            return $this->err('unsupported', 'The showcase-navigation map does not cover this design' . ($nav->reason() !== '' ? ' (' . $nav->reason() . ')' : '') . '; nothing can be hidden by it');
+        };
+        if ($operation === 'status') {
+            if (!$usable && $record === null) return $unsupported();
+            try {
+                $state = $this->contract->inspect();
+                $receipts = $state['binding']['showcaseNav']['receipts'] ?? [];
+                return $this->ok([
+                    // A finished revert is a finished job: `reverted`, nothing remaining. What an apply
+                    // would look at is `owners`, in every state.
+                    'status' => $reverted !== null ? 'reverted' : ($record['status'] ?? 'none'),
+                    'hides' => $usable ? $nav->counts() : [],
+                    'owners' => $usable ? count($nav->operations()) : 0,
+                    'remaining' => $reverted !== null ? 0 : count($this->showcaseNavPending($state, $record, ($record['status'] ?? 'applying') !== 'reverting')),
+                    'skipped' => $this->showcaseNavSkipped($receipts),
+                    // Rows a finished revert left as the customer set them; a new revert request looks again.
+                    'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
+                    'applyId' => $record['applyId'] ?? $reverted['applyId'] ?? null,
+                    'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
+                    // A map published after this site's apply lists rows its receipts do not; a revert then an apply takes it.
+                    'profileChanged' => $record !== null && (!$usable || !hash_equals((string) $record['profileHash'], $nav->hash())),
+                ]);
+            } catch (Throwable $error) { return $this->contractFailed($error); }
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if (!$apply || strpos($apply, 'snav-') !== 0) return $this->err('bad_params', 'apply_id must start with "snav-"');
+        if (!is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        $hide = $operation === 'apply';
+        if ($hide && !$usable) return $unsupported();
+        // 🔒 A TRANSLATED SITE IS REFUSED, NOT HALF-HIDDEN — as a demo trim is. A copy's menu row is
+        // derived from its source, so hiding a source entry would make every copy of it drift, and
+        // hiding the copies too is a rule this map does not carry. Both directions, before any write.
+        if (!empty($binding['multilingual']['languages']))
+            return $this->err('contract_failed', 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
+        try {
+            if ($hide) {
+                if ($reverted !== null && $reverted['requestId'] === $request)
+                    return $this->err('conflict', 'Request ' . $request . ' applied showcase navigation that has since been reverted; a new apply needs a new request_id');
+                if (($record['status'] ?? null) === 'complete')
+                    return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyApplied' => true, 'applyId' => $record['applyId'],
+                        'skipped' => $this->showcaseNavSkipped($record['receipts']),
+                        'profileChanged' => !hash_equals((string) $record['profileHash'], $nav->hash())]);
+                if ($record !== null && ($record['status'] !== 'applying' || $record['requestId'] !== $request))
+                    return $this->err('conflict', 'Showcase navigation is already ' . $record['status'] . ' under request ' . ($record['status'] === 'reverting' ? $record['revert']['requestId'] : $record['requestId']));
+                if ($record !== null && !hash_equals((string) $record['profileHash'], $nav->hash()))
+                    return $this->err('conflict', 'The showcase-navigation map changed while it was being applied; revert what was applied, then apply again');
+                $next = $record ?? ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
+                    'profileHash' => $nav->hash(), 'profileVersion' => $nav->version(), 'at' => gmdate('c'), 'receipts' => []];
+            } else {
+                if ($record === null && isset($reverted['answers'][$request]))
+                    return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true] + $reverted['answers'][$request]);
+                // 🔒 A CONFLICT IS LOOKED AT AGAIN, NEVER OVERWRITTEN. A new request takes the rows the last
+                // revert left — and only those — through the same per-row rules: put back by hand, put back
+                // by the same compare-and-set, or still the customer's, untouched.
+                if ($record === null && !empty($reverted['receipts'])) {
+                    $receipts = [];
+                    foreach ($reverted['receipts'] as $key => $receipt) { unset($receipt['reverted'], $receipt['revertWhy']); $receipts[$key] = $receipt; }
+                    $record = ['status' => 'reverting', 'applyId' => $reverted['applyId'], 'requestId' => $reverted['requestId'],
+                        'profileHash' => $reverted['profileHash'] ?? null, 'revert' => ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')],
+                        'receipts' => $receipts, 'answers' => $reverted['answers'] ?? []];
+                    $next = $record;
+                    $record = null;
+                } elseif ($record === null) return $this->err('contract_failed', 'This site has no showcase menu entries to bring back');
+                if ($record !== null && $record['status'] === 'reverting' && $record['revert']['requestId'] !== $request)
+                    return $this->err('conflict', 'A showcase-navigation revert is already running under request ' . $record['revert']['requestId']);
+                if ($record !== null) $next = ['status' => 'reverting', 'revert' => $record['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $record;
+            }
+            // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit, and not under an open editor:
+            // the rows this call would move are checked first, so a refused call leaves the site — and
+            // a phase in flight — exactly where they were, and the same request resumes it.
+            $checked = false;
+            if ($record === null || $record['status'] !== $next['status']) {
+                $this->writer->transaction(function () use ($next, $hide) {
+                    $state = $this->contract->inspect();
+                    if ($state['job'] !== null && ($state['job']['phase'] ?? '') !== 'completed')
+                        throw new RuntimeException('A language job is in flight on this site; showcase navigation waits until it is finished or reverted. Nothing has been written.');
+                    $this->refuseLocked($this->showcaseNavRows($state, $next, $hide));
+                    if (!$state['binding']) $this->contract->bind($state['snapshot']);
+                    $this->contract->rebind($this->contract->bindingWithShowcaseNav($next));
+                    return [];
+                });
+                $checked = true;
+            }
+            $this->batching = true;
+            $step = $this->writer->transaction(function () use ($hide, $checked) {
+                $state = $this->contract->inspect();
+                if ($state['languages']) throw new RuntimeException('This site gained a second language; showcase navigation stops here. Nothing more has been written.');
+                $record = $state['binding']['showcaseNav'];
+                if (!$checked) $this->refuseLocked($this->showcaseNavRows($state, $record, $hide));
+                $pending = $this->showcaseNavPending($state, $record, $hide);
+                $batch = array_slice($pending, 0, self::SHOWCASE_NAV_BATCH, true);
+                $moved = [];
+                $done = 0;
+                $log = $hide ? $record['applyId'] : $record['revert']['applyId'];
+                foreach ($batch as $key => $row) {
+                    // 🔒 A STYLE WAITS FOR THE HIDES OF ITS ITEM'S CHILDREN: their receipts decide whether its sub goes.
+                    if ($hide && $row['kind'] === 'templateStyle' && !$this->showcaseNavChildrenDone($record, $row)) break;
+                    $done++;
+                    $receipt = !$hide ? $this->showcaseNavRestore($state, $key, $row)
+                        : ($row['kind'] === 'templateStyle' ? $this->showcaseNavStyle($state, $key, $row, $record) : $this->showcaseNavHide($state, $key, $row));
+                    if ($hide) $record['receipts'][$key] = $receipt['receipt'];
+                    else $record['receipts'][$key] = $receipt['receipt'] + $record['receipts'][$key];
+                    if ($receipt['moved'] !== null) $moved[] = $receipt['moved'];
+                    $this->log->record($log, ['op' => 'showcaseNav', 'key' => $key, 'direction' => $hide ? 'hide' : 'restore'] + $receipt['receipt']);
+                }
+                $remaining = count($pending) - $done;
+                $skipped = $this->showcaseNavSkipped($record['receipts'], !$hide);
+                if ($remaining === 0 && $hide) { $record['status'] = 'complete'; $record['completedAt'] = gmdate('c'); }
+                // A finished revert keeps the receipts of its conflicts only — the rows a later revert may
+                // still put back — and what each revert request is answered when it is retried.
+                if ($remaining === 0 && !$hide)
+                    $record = ['status' => 'reverted', 'applyId' => $record['applyId'], 'requestId' => $record['requestId'],
+                        'profileHash' => $record['profileHash'] ?? null, 'revert' => $record['revert'] + ['completedAt' => gmdate('c')],
+                        'receipts' => array_intersect_key($record['receipts'], $skipped),
+                        'answers' => ($record['answers'] ?? []) + [$record['revert']['requestId'] => ['applyId' => $record['revert']['applyId'], 'conflicts' => $skipped]]];
+                // 🔒 ONLY THE ROWS THIS BATCH WROTE MOVE IN THE BASELINE. The observed snapshot is never
+                // stored: it would adopt whatever else already differs on the site, and inspect would
+                // stop reporting it. The full read still runs, and refuses any difference this batch
+                // made that the baseline does not now expect.
+                $this->contract->rebind($this->contract->bindingWithShowcaseNav($record, $moved));
+                $this->contract->inspect();
+                return ['remaining' => $remaining, 'moved' => count($moved), 'skipped' => $skipped];
+            });
+            $this->batching = false;
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('content');
+            $finished = $step['remaining'] === 0;
+            return $this->ok([
+                'status' => $finished ? ($hide ? 'completed' : 'reverted') : 'running',
+                'moved' => $step['moved'], 'remaining' => $step['remaining'], 'applyId' => $apply,
+                ($hide ? 'skipped' : 'conflicts') => $step['skipped'],
+            ]);
+        } catch (Throwable $error) {
+            $this->batching = false;
+            return $this->contractFailed($error);
+        }
+    }
+
+    /**
+     * What the next showcase-navigation step still has to look at: on apply, every listed row with no
+     * receipt yet; on revert, every row the apply wrote that has not been looked at again.
+     *
+     * @return array<string,array{kind:string,id:int,receipt:?array}>
+     */
+    private function showcaseNavPending(array $state, ?array $record, bool $hide): array
+    {
+        $out = [];
+        if ($hide) {
+            $nav = $this->contract->showcaseNav();
+            if ($nav === null) return [];
+            foreach ($nav->operations() as $key => $row)
+                if (!isset($record['receipts'][$key])) $out[$key] = ['kind' => $row['kind'], 'id' => (int) ($state['ids'][$key] ?? 0), 'receipt' => null, 'steps' => $row['steps'] ?? []];
+            return $out;
+        }
+        foreach ($record['receipts'] ?? [] as $key => $receipt)
+            if ($receipt['outcome'] === 'written' && !isset($receipt['reverted']))
+                $out[$key] = ['kind' => $receipt['kind'], 'id' => (int) $receipt['id'], 'receipt' => $receipt];
+        return $out;
+    }
+
+    /** The rows the next showcase-navigation batch would write, as (kind, id). */
+    private function showcaseNavRows(array $state, array $record, bool $hide): array
+    {
+        $rows = [];
+        foreach (array_slice($this->showcaseNavPending($state, $record, $hide), 0, self::SHOWCASE_NAV_BATCH, true) as $row)
+            if ($row['id'] > 0) $rows[] = [$row['kind'], $row['id']];
+        return $rows;
+    }
+
+    /** Rows an apply left alone, with why: key => already-hidden | conflict reason. On a revert, the rows it could not put back. */
+    private function showcaseNavSkipped(array $receipts, bool $revert = false): array
+    {
+        $out = [];
+        foreach ($receipts as $key => $receipt) {
+            if ($revert) { if (($receipt['reverted'] ?? null) === 'conflict') $out[$key] = $receipt['revertWhy'] ?? 'changed since it was hidden'; }
+            elseif ($receipt['outcome'] !== 'written') $out[$key] = $receipt['why'];
+            elseif (isset($receipt['kept'])) $out[$key] = $receipt['kept'];
+        }
+        return $out;
+    }
+
+    /**
+     * Hide one listed row, if it still stands where the map says it starts.
+     *
+     * @return array{receipt:array, moved:?array}
+     */
+    private function showcaseNavHide(array $state, string $key, array $row): array
+    {
+        $id = $row['id'];
+        $base = ['kind' => $row['kind'], 'id' => $id];
+        $current = $id > 0 ? ($state['rows'][$key] ?? null) : null;
+        if ($current === null) return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'the row is gone from this site'], 'moved' => null];
+        if ($row['kind'] === 'module') {
+            $published = (string) ($current['published'] ?? '');
+            if ($published === '0') return ['receipt' => $base + ['outcome' => 'already', 'why' => 'already unpublished'], 'moved' => null];
+            if ($published !== '1') return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'published is ' . $published . ', not 1'], 'moved' => null];
+            if (!$this->writer->setVisibilityIf('module', $id, 'published', '1', '0'))
+                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
+            return ['receipt' => $base + ['outcome' => 'written', 'existed' => true, 'before' => '1', 'after' => '0'],
+                'moved' => ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => '0']];
+        }
+        $params = (string) ($current['params'] ?? '');
+        // An empty column, or exactly `[]` (what an empty PHP array encodes to), holds no params at all:
+        // Joomla's Registry reads either as {}, and writes {"menu_show":"0"} into it.
+        $blank = trim($params) === '' || $params === '[]';
+        try { $found = $blank ? ['exists' => false, 'literal' => null, 'value' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
+        catch (Throwable $error) { return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params are not a JSON object'], 'moved' => null]; }
+        $value = $found['value'];
+        // Absent is shown: Joomla reads a missing menu_show as 1.
+        $shown = !$found['exists'] || (is_scalar($value) && (string) $value === '1');
+        if (!$shown && is_scalar($value) && (string) $value === '0')
+            return ['receipt' => $base + ['outcome' => 'already', 'why' => 'already out of the menu'], 'moved' => null];
+        if (!$shown) return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'menu_show is ' . $found['literal'] . ', not shown'], 'moved' => null];
+        // The value keeps the type the row already gives it; a new key is written as the admin form writes it.
+        $after = $found['exists'] && is_int($value) ? '0' : '"0"';
+        $written = $blank ? '{' . json_encode(ShowcaseNavProfile::MENU_PARAM) . ':' . $after . '}' : JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $after);
+        if (!$this->writer->replaceMenuItemParams($id, $params, $written))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
+        $receipt = ['outcome' => 'written', 'existed' => $found['exists'], 'before' => $found['literal'], 'after' => $after];
+        // The column's own text, when it held none: a revert that leaves nothing else hands it back empty.
+        if ($blank) $receipt['blank'] = $params;
+        return ['receipt' => $base + $receipt,
+            'moved' => ['key' => $key, 'kind' => 'menuItem', 'exists' => true, 'value' => json_decode($after, true), 'blank' => $blank ? $params : false]];
+    }
+
+    /** Whether every child hide a style's steps wait on has its receipt. */
+    private function showcaseNavChildrenDone(array $record, array $row): bool
+    {
+        foreach ($row['steps'] as $step)
+            foreach ($step['children'] as $child) if (!isset($record['receipts'][$child])) return false;
+        return true;
+    }
+
+    /**
+     * Drop the T3 mega-menu subs — or the columns of them — a style keeps for the items this apply
+     * emptied, if its params still stand, byte for byte, where the map says they start.
+     *
+     * 🔒 THE MAP NAMES THE BYTES, THE ENGINE MAKES THEM. Each step is computed here from the live column
+     * (T3MegaSub) and written only when the result hashes to the map's `after`; the whole column is one
+     * compare-and-set. A step whose item kept a child in the menu (its hide a conflict) is not taken, nor
+     * any after it: the next step's bytes start from this one's, so only the prefix is proven.
+     *
+     * @return array{receipt:array, moved:?array}
+     */
+    private function showcaseNavStyle(array $state, string $key, array $row, array $record): array
+    {
+        $id = $row['id'];
+        $base = ['kind' => 'templateStyle', 'id' => $id];
+        $current = $id > 0 ? ($state['rows'][$key] ?? null) : null;
+        if ($current === null) return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'the row is gone from this site'], 'moved' => null];
+        $steps = $row['steps'];
+        $take = count($steps);
+        $kept = null;
+        // 🔒 THE LIVE MENU HAS THE LAST WORD. The map knows the children the release shipped; the site may
+        // have more — a page the customer added under the item, in any language and whatever menu its row
+        // names — and one of them still shown keeps the sub, so the dropdown opens on it. Read now, after
+        // this batch's hides, with a LOCKING read: this transaction's snapshot would miss a child committed
+        // since its first read, and the lock holds a new one back until the style write commits.
+        foreach ($steps as $n => $step) {
+            $kept = ($step['column'] ?? null) === null ? $this->showcaseNavSubKept($record, $step) : $this->showcaseNavColumnKept($record, $step);
+            if ($kept !== null) { $take = $n; break; }
+        }
+        $params = (string) ($current['params'] ?? '');
+        $live = hash('sha256', $params);
+        // Already where the steps it may take end — or further, by hand: the sub is gone, nothing is written.
+        foreach (array_slice($steps, max($take, 1) - 1) as $step)
+            if (hash_equals($step['after'], $live))
+                return ['receipt' => $base + ['outcome' => 'already', 'why' => 'the mega-menu sub is already gone'], 'moved' => null];
+        if ($take === 0) return ['receipt' => $base + ['outcome' => 'skipped', 'why' => $kept], 'moved' => null];
+        if (!hash_equals($steps[0]['before'], $live))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params differ from the release'], 'moved' => null];
+        $written = $params;
+        foreach (array_slice($steps, 0, $take) as $step) {
+            $column = $step['column'] ?? null;
+            $edit = $column === null ? T3MegaSub::remove($written, $step['menutype'], $step['item']) : T3MegaSub::removeColumn($written, $step['menutype'], $step['item'], $column);
+            if (!isset($edit['raw']) || !hash_equals($step['after'], hash('sha256', $edit['raw'])))
+                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'removing the mega-menu ' . ($column === null ? 'sub' : 'column ' . $column) . ' of ' . $step['itemKey'] . ' does not give the bytes the map names'], 'moved' => null];
+            $written = $edit['raw'];
+        }
+        if (!$this->writer->replaceTemplateStyleParams($id, $params, $written))
+            return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
+        $taken = array_slice($steps, 0, $take);
+        $receipt = ['outcome' => 'written', 'before' => $params, 'after' => hash('sha256', $written), 'items' => array_column($taken, 'itemKey'), 'paths' => array_column($taken, 'path')];
+        if ($kept !== null) $receipt['kept'] = $kept;
+        return ['receipt' => $base + $receipt, 'moved' => ['key' => $key, 'kind' => 'templateStyle', 'raw' => $written]];
+    }
+
+    /** Why a megaSubRemove step is not taken — a child of its item still in the menu — or null. */
+    private function showcaseNavSubKept(array $record, array $step): ?string
+    {
+        foreach ($step['children'] as $child)
+            if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
+                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+        foreach ($this->writer->lockMenuChildren($step['item']) as $child)
+            if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child))
+                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
+        return null;
+    }
+
+    /**
+     * Why a megaColumnRemove step is not taken, or null. The column is read on the live menu as T3's
+     * `mega()` reads it: the item's children in menu order (`lft`), from the column's head — from the
+     * first child, for the first column of items — up to the head of the column after it in the sub. Every
+     * child in that range must be out of the menu, or the column still lists something and stays.
+     */
+    private function showcaseNavColumnKept(array $record, array $step): ?string
+    {
+        $what = 'kept the mega-menu column ' . $step['column'] . ' of ' . $step['itemKey'];
+        foreach ($step['children'] as $child)
+            if ((int) substr($child, strlen('menuItem-')) === $step['column'] && !in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
+                return $what . ': its head ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+        $live = array_values(array_filter($this->writer->lockMenuChildren($step['item']), fn ($child) => (int) ($child['parent_id'] ?? 0) === $step['item']));
+        usort($live, fn ($a, $b) => [(int) ($a['lft'] ?? 0), (int) ($a['id'] ?? 0)] <=> [(int) ($b['lft'] ?? 0), (int) ($b['id'] ?? 0)]);
+        $ids = array_map(fn ($child) => (string) (int) ($child['id'] ?? 0), $live);
+        $at = array_search((string) $step['column'], $step['heads'], true);
+        $head = array_search((string) $step['column'], $ids, true);
+        if ($at === false || $head === false) return $what . ': its head is no longer a child of the item on this site';
+        $from = $at === 0 ? 0 : $head;
+        $next = $step['heads'][$at + 1] ?? null;
+        $to = count($ids);
+        for ($i = $from + 1; $next !== null && $i < count($ids); $i++) if ($ids[$i] === $next) { $to = $i; break; }
+        for ($i = $from; $i < $to; $i++)
+            if (ShowcaseNavProfile::shown($live[$i]))
+                return $what . ': menu item ' . $ids[$i] . ' in that column is still shown on this site';
+        return null;
+    }
+
+    /**
+     * Put back one row this apply hid: written only while it still holds what the apply wrote; already
+     * holding, byte for byte, what the apply found, it is restored with nothing written; anything else
+     * is the customer's, and left.
+     *
+     * @return array{receipt:array{reverted:string}, moved:?array}
+     */
+    private function showcaseNavRestore(array $state, string $key, array $row): array
+    {
+        $receipt = $row['receipt'];
+        $current = $state['rows'][$key] ?? null;
+        $conflict = fn (string $why) => ['receipt' => ['reverted' => 'conflict', 'revertWhy' => $why], 'moved' => null];
+        if ($current === null || (int) ($state['ids'][$key] ?? 0) !== $row['id']) return $conflict('the row is gone from this site');
+        if ($row['kind'] === 'module') {
+            $moved = ['key' => $key, 'kind' => 'module', 'exists' => true, 'value' => $receipt['before']];
+            $published = (string) ($current['published'] ?? '');
+            // Put back already (by the customer, or by hand): the baseline follows; nothing is written.
+            if ($published === $receipt['before']) return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => $moved];
+            if ($published !== $receipt['after']) return $conflict('published was changed since it was hidden');
+            if (!$this->writer->setVisibilityIf('module', $row['id'], 'published', $receipt['after'], $receipt['before'])) return $conflict(self::SHOWCASE_NAV_RACED);
+            return ['receipt' => ['reverted' => 'restored'], 'moved' => $moved];
+        }
+        if ($row['kind'] === 'templateStyle') {
+            $params = (string) ($current['params'] ?? '');
+            $moved = ['key' => $key, 'kind' => 'templateStyle', 'raw' => $receipt['before']];
+            if ($params === $receipt['before']) return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => $moved];
+            if (!hash_equals($receipt['after'], hash('sha256', $params))) return $conflict('its params were changed since the mega-menu sub was removed');
+            if (!$this->writer->replaceTemplateStyleParams($row['id'], $params, $receipt['before'])) return $conflict(self::SHOWCASE_NAV_RACED);
+            return ['receipt' => ['reverted' => 'restored'], 'moved' => $moved];
+        }
+        $params = (string) ($current['params'] ?? '');
+        $before = ['key' => $key, 'kind' => 'menuItem', 'exists' => $receipt['existed'], 'value' => $receipt['existed'] ? json_decode($receipt['before'], true) : null];
+        if (isset($receipt['blank']) && $params === $receipt['blank'])
+            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => $receipt['blank']] + $before];
+        try { $found = trim($params) === '' ? ['exists' => false, 'literal' => null] : JsonObjectKey::get($params, ShowcaseNavProfile::MENU_PARAM); }
+        catch (Throwable $error) { return $conflict('its params are no longer a JSON object'); }
+        // menu_show already what the apply found — the same literal, or absent as it was — so the baseline follows; nothing is written.
+        if ($found['exists'] === $receipt['existed'] && (!$found['exists'] || $found['literal'] === $receipt['before']))
+            return ['receipt' => ['reverted' => 'restored', 'by' => 'found'], 'moved' => ['blank' => false] + $before];
+        if (!$found['exists'] || $found['literal'] !== $receipt['after']) return $conflict('menu_show was changed since it was hidden');
+        $restored = JsonObjectKey::set($params, ShowcaseNavProfile::MENU_PARAM, $receipt['existed'] ? $receipt['before'] : null);
+        // Back to the empty column it was, unless someone has given the row other params since.
+        $blank = isset($receipt['blank']) && json_decode($restored, true) === [];
+        if ($blank) $restored = $receipt['blank'];
+        if (!$this->writer->replaceMenuItemParams($row['id'], $params, $restored)) return $conflict(self::SHOWCASE_NAV_RACED);
+        return ['receipt' => ['reverted' => 'restored'], 'moved' => ['blank' => $blank ? $receipt['blank'] : false] + $before];
     }
 
     /**

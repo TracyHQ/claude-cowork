@@ -110,6 +110,21 @@ final class Engine
     private const EDITION_POST_TYPES = ['page', 'post', 'wp_navigation'];
     private const REQUEST_ID_SHAPE = '/^[a-zA-Z0-9._:-]{1,100}$/D';
     private const MAX_FILE_LIMIT = 500;
+    /** files.list without the sha1: a stat per file and no read, so a page can be ten times longer. */
+    private const MAX_FILE_STAT_LIMIT = 5000;
+    /** files.hash: the paths one call may ask about, each hashed in full. */
+    private const MAX_HASH_PATHS = 500;
+    /** site.fingerprint: the walk paths per page, by default and at most. A count, never a clock. */
+    private const FINGERPRINT_FILES = 20000;
+    private const MAX_FINGERPRINT_FILES = 50000;
+    /**
+     * The version of the fingerprint's shape: a digest kept under another version is not
+     * comparable. The Joomla engine's number, and its shape: one caller reads both.
+     */
+    private const FINGERPRINT_VERSION = 2;
+    /** site.fingerprint `skip_columns`: how many names, and the one shape a name may have. */
+    private const MAX_SKIP_COLUMNS = 50;
+    private const COLUMN_NAME = '/^[A-Za-z_][A-Za-z0-9_]{0,63}$/D';
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
     /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
     private const MIN_PART_BYTES = 5242880;
@@ -119,6 +134,8 @@ final class Engine
     private const READ_CHUNK = 1048576;
     /** How many paths to fetch at once, so the pack loop never asks the walker file by file. */
     private const PACK_LOOKAHEAD = 100000;
+    /** files.pack `paths`: the files one pack may be cut to. */
+    private const MAX_PACK_PATHS = 2000;
     /** The ceiling on a file carried inline as base64. Anything larger belongs on the signed-URL path. */
     private const MAX_MEDIA_BYTES = 8388608; // 8 MiB
     /**
@@ -252,10 +269,10 @@ final class Engine
                 }
             }
             if ($action === 'apply.revert') {
-                // A contract apply, a trim, a language step or a relabel is taken back through the
+                // A contract apply, a trim, a showcase-navigation step, a language step or a relabel is taken back through the
                 // contract; any other receipt takes the ordinary revert below.
                 $ops = $this->log === null ? [] : array_column($this->log->entries((string) ($params['apply_id'] ?? '')), 'op');
-                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale']) !== []) {
+                if (array_intersect($ops, ['contract', 'visibility', 'language', 'siteLanguage', 'sourceLocale', 'showcaseNav']) !== []) {
                     return $this->contractRevert($params);
                 }
             }
@@ -265,10 +282,25 @@ final class Engine
             case 'info':
                 // What the engine itself can do rides beside what the host says, so a caller can tell a
                 // site that takes db.dump_many from an older one and fall back to db.dump there.
+                // The same for the cheap questions a sync asks first: site.fingerprint, files.list
+                // without the sha1, and files.hash, in the Joomla engine's shape, so one caller reads
+                // both. files.pack also hands a part back inline and cuts a pack to named files ("Sync
+                // from live" reads a live site through both). An engine without an entry answers none of it.
                 return $this->ok(['info' => $this->info + ['db_dump_many' => [
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ], 'site_fingerprint' => [
+                    'version' => self::FINGERPRINT_VERSION,
+                    'max_files' => self::MAX_FINGERPRINT_FILES,
+                ], 'files_list' => [
+                    'stat' => true,
+                    'max_stat_limit' => self::MAX_FILE_STAT_LIMIT,
+                ], 'files_hash' => [
+                    'max_paths' => self::MAX_HASH_PATHS,
+                ], 'files_pack' => [
+                    'inline' => true,
+                    'max_paths' => self::MAX_PACK_PATHS,
                 ]] + ($this->renderedSite === null ? [] : ['rendered_words' => [
                     'schema' => RenderedWords::SCHEMA,
                     'operations' => ['inspect', 'apply', 'status'],
@@ -280,6 +312,8 @@ final class Engine
                 ]])]);
             case 'site.stats':
                 return $this->siteStats();
+            case 'site.fingerprint':
+                return $this->siteFingerprint($params);
             case 'db.tables':
                 return $this->dbTables();
             case 'db.dump':
@@ -288,6 +322,8 @@ final class Engine
                 return $this->dbDumpMany($params);
             case 'files.list':
                 return $this->filesList($params);
+            case 'files.hash':
+                return $this->filesHash($params);
             case 'files.pack':
                 return $this->filesPack($params);
             case 'file.read':
@@ -424,6 +460,9 @@ final class Engine
             }
             if (strpos($operation, 'demoTrim.') === 0) {
                 return $this->demoTrim($p, substr($operation, strlen('demoTrim.')));
+            }
+            if (strpos($operation, 'showcaseNav.') === 0) {
+                return $this->showcaseNav($p, substr($operation, strlen('showcaseNav.')));
             }
             if (strpos($operation, 'sourceLanguage.') === 0) {
                 return $this->sourceLanguage($p, substr($operation, strlen('sourceLanguage.')));
@@ -1313,7 +1352,7 @@ final class Engine
             }
         }
         if (count($receipts) !== 1) {
-            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, source relabels, retired editions and the site language have their own way back (demoTrim.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
+            return $this->err('bad_params', 'Only content-contract applies can be reverted through the contract; demo trims, showcase navigation, source relabels, retired editions and the site language have their own way back (demoTrim.revert, showcaseNav.revert, sourceLanguage.revert, multilingual.restore, siteLanguage.revert)');
         }
         try {
             $state = $this->contract->inspect();
@@ -1495,6 +1534,350 @@ final class Engine
             'status' => $pending === 0 ? ($hide ? 'completed' : 'reverted') : 'running',
             'moved' => $moved, 'remaining' => $pending, 'skipped' => $skipped, 'applyId' => $apply,
         ]);
+    }
+
+    /** Owners (one navigation or template part each, written whole) edited per call of showcaseNav.apply and .revert. */
+    private const SHOWCASE_NAV_BATCH = 2;
+    /** Why an owner was left alone when its compare-and-set found it changed between the read and the write. */
+    private const SHOWCASE_NAV_RACED = 'it changed while it was being written';
+
+    /**
+     * Taking a quickstart's TEMPLATE SHOWCASE out of a bound site's navigation, and putting it back.
+     *
+     * `status` reads, `apply` edits a batch of owners per call until nothing is left, `revert` puts
+     * back exactly what its apply changed. What is taken out is decided in review, in the contract's
+     * `showcase-nav-map.json`; a request names nothing. Only navigation markup moves: an entry leaves
+     * a `wp_navigation` post, or a template part's navigation block points at another one, or the one
+     * block that opened the showcase drawer goes. Every page stays published.
+     *
+     * 🔒 EVERY WRITE IS A COMPARE-AND-SET ON THE WHOLE CONTENT, AND ITS RECEIPT IS THE REVERT. An owner is
+     * written only while it holds the bytes the map starts from (`before`), with the bytes the map ends
+     * with (`after`), produced here by byte range and proven by sha256 before the write. One the customer
+     * already changed is left alone and reported. The bytes found are kept in the receipt, which lands
+     * BEFORE the write (outcome `writing`), so a call that dies mid-write is settled by its retry from
+     * what the row holds; a revert puts those bytes back, or, when the customer changed the row since,
+     * leaves it and says so. The map is not read again to revert.
+     */
+    private function showcaseNav(array $p, string $operation): array
+    {
+        if (!in_array($operation, ['status', 'apply', 'revert'], true)) {
+            return $this->err('bad_params', 'Unknown showcaseNav operation: ' . $operation);
+        }
+        if (!$this->contract->bound()) {
+            return $this->err('contract_failed', 'Showcase navigation needs a bound site');
+        }
+        $nav = $this->contract->showcaseNav();
+        $record = $this->contract->binding()['showcaseNav'] ?? null;
+        // A finished revert leaves only what it could not put back (the receipts of its conflicts) and
+        // the answer of each revert request: nothing is expected moved, the same revert retried after a
+        // lost answer gets its answer again, and a new revert request looks at the conflicts once more.
+        $reverted = ($record['status'] ?? null) === 'reverted' ? $record : null;
+        if ($reverted !== null) {
+            $record = null;
+        }
+        $usable = $nav !== null && $nav->covered();
+        $unsupported = function () use ($nav): array {
+            $problem = $this->contract->showcaseNavProblem();
+            if ($nav === null && $problem !== null) {
+                return $this->err('unsupported', 'This quickstart contract ships a showcase-navigation map this receiver refuses (' . $problem . '). Nothing has been written.');
+            }
+            if ($nav === null) {
+                return $this->err('unsupported', 'This quickstart contract carries no showcase-navigation map; its showcase navigation entries cannot be hidden by this receiver');
+            }
+            return $this->err('unsupported', 'The showcase-navigation map does not cover this design' . ($nav->reason() !== '' ? ' (' . $nav->reason() . ')' : '') . '; nothing can be hidden by it');
+        };
+        if ($operation === 'status') {
+            if (!$usable && $record === null) {
+                return $unsupported();
+            }
+            $this->contract->inspect();
+            return $this->ok([
+                // A finished revert is a finished job: `reverted`, nothing remaining. What an apply would
+                // look at is `owners`, in every state.
+                'status' => $reverted !== null ? 'reverted' : ($record['status'] ?? 'none'),
+                'hides' => $usable ? $nav->counts() : [],
+                'owners' => $usable ? count($nav->owners()) : 0,
+                'remaining' => $reverted !== null ? 0 : count($this->showcaseNavPending($record, ($record['status'] ?? 'applying') !== 'reverting')),
+                'skipped' => $this->showcaseNavSkipped($record['receipts'] ?? []),
+                // Owners a finished revert left as the customer set them; a new revert request looks again.
+                'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
+                'applyId' => $record['applyId'] ?? $reverted['applyId'] ?? null,
+                'profileVersion' => $usable ? $nav->version() : null, 'profileHash' => $usable ? $nav->hash() : null,
+                // A map published after this site's apply edits what its receipts do not; a revert then an apply takes it.
+                'profileChanged' => $record !== null && (!$usable || !hash_equals((string) $record['profileHash'], $nav->hash())),
+            ]);
+        }
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if ($apply === null || strpos($apply, 'snav-') !== 0) {
+            return $this->err('bad_params', 'apply_id must start with "snav-"');
+        }
+        if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
+            return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        }
+        $hide = $operation === 'apply';
+        if ($hide && !$usable) {
+            return $unsupported();
+        }
+        // 🔒 A TRANSLATED SITE IS REFUSED, NOT HALF-HIDDEN. Each language has its own navigation posts,
+        // which this map does not list: hiding the source's entries would leave the translated menus
+        // showing them. Both directions, before any write.
+        if (count(QuickstartContract::languages()) > 1) {
+            return $this->err('contract_failed', 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
+        }
+        $this->contract->inspectClean();
+        if ($hide) {
+            if ($reverted !== null && $reverted['requestId'] === $request) {
+                return $this->err('conflict', 'Request ' . $request . ' applied showcase navigation that has since been reverted; a new apply needs a new request_id');
+            }
+            if (($record['status'] ?? null) === 'complete') {
+                return $this->ok(['status' => 'completed', 'moved' => 0, 'remaining' => 0, 'alreadyApplied' => true, 'applyId' => $record['applyId'],
+                    'skipped' => $this->showcaseNavSkipped($record['receipts']),
+                    'profileChanged' => !hash_equals((string) $record['profileHash'], $nav->hash())]);
+            }
+            if ($record !== null && ($record['status'] !== 'applying' || $record['requestId'] !== $request)) {
+                return $this->err('conflict', 'Showcase navigation is already ' . $record['status'] . ' under request '
+                    . ($record['status'] === 'reverting' ? $record['revert']['requestId'] : $record['requestId']));
+            }
+            if ($record !== null && !hash_equals((string) $record['profileHash'], $nav->hash())) {
+                return $this->err('conflict', 'The showcase-navigation map changed while it was being applied; revert what was applied, then apply again');
+            }
+            $next = $record ?? ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
+                'profileHash' => $nav->hash(), 'profileVersion' => $nav->version(), 'at' => gmdate('c'), 'receipts' => []];
+        } else {
+            if ($record === null && isset($reverted['answers'][$request])) {
+                return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true] + $reverted['answers'][$request]);
+            }
+            if ($record === null && !empty($reverted['receipts'])) {
+                // 🔒 A CONFLICT IS LOOKED AT AGAIN, NEVER OVERWRITTEN. A new request takes the owners the
+                // last revert left — and only those — through the same rules: put back by hand, put back
+                // by the same compare-and-set, or still the customer's, untouched.
+                $receipts = [];
+                foreach ($reverted['receipts'] as $key => $receipt) {
+                    unset($receipt['reverted'], $receipt['revertWhy']);
+                    $receipts[$key] = $receipt;
+                }
+                $next = ['status' => 'reverting', 'applyId' => $reverted['applyId'], 'requestId' => $reverted['requestId'],
+                    'profileHash' => $reverted['profileHash'] ?? null, 'revert' => ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')],
+                    'receipts' => $receipts, 'answers' => $reverted['answers'] ?? []];
+            } elseif ($record === null) {
+                return $this->err('contract_failed', 'This site has no showcase navigation entries to bring back');
+            } elseif ($record['status'] === 'reverting' && $record['revert']['requestId'] !== $request) {
+                return $this->err('conflict', 'A showcase-navigation revert is already running under request ' . $record['revert']['requestId']);
+            } else {
+                $next = ['status' => 'reverting', 'revert' => $record['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $record;
+            }
+            $record = $record !== null && $record['status'] === 'reverting' ? $record : null;
+        }
+
+        // What this call will look at, decided before anything is written, so an owner someone has
+        // open in the editor refuses the whole call while the site is still as it was.
+        $pending = $this->showcaseNavPending($next, $hide);
+        $batch = array_slice($pending, 0, self::SHOWCASE_NAV_BATCH, true);
+        $ids = [];
+        foreach ($batch as $key => $owner) {
+            $ids[] = $owner['kind'] === 'navigation' ? $owner['id'] : (int) ($this->writer->read('templatePart', 0, $owner['slug'])['id'] ?? 0);
+        }
+        $this->contract->refuseEditLocked($ids);
+        // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES: a call that dies mid-batch leaves a site that says
+        // a job is in flight, so the same request resumes it rather than being refused as drift.
+        if ($record === null || $record['status'] !== $next['status']) {
+            $this->contract->record('showcaseNav', $next);
+        }
+        $record = $next;
+        $log = $hide ? $record['applyId'] : $record['revert']['applyId'];
+        $moved = 0;
+        foreach ($batch as $key => $owner) {
+            $receipt = $hide ? $this->showcaseNavHide($record, $key, $owner) : $this->showcaseNavRestore($key, $owner['receipt']);
+            $record['receipts'][$key] = $hide ? $receipt['receipt'] : $receipt['receipt'] + $record['receipts'][$key];
+            $moved += $receipt['moved'] ? 1 : 0;
+            $this->log->record($log, ['op' => 'showcaseNav', 'key' => $key, 'direction' => $hide ? 'hide' : 'restore']
+                + array_diff_key($record['receipts'][$key], ['content' => true]));
+            $this->contract->record('showcaseNav', $record);
+        }
+        $remaining = count($pending) - count($batch);
+        $skipped = $this->showcaseNavSkipped($record['receipts'], !$hide);
+        if ($remaining === 0 && $hide) {
+            $record['status'] = 'complete';
+            $record['completedAt'] = gmdate('c');
+        }
+        if ($remaining === 0 && !$hide) {
+            // A finished revert keeps the receipts of its conflicts only — the owners a later revert may
+            // still put back — and what each revert request is answered when it is retried.
+            $record = ['status' => 'reverted', 'applyId' => $record['applyId'], 'requestId' => $record['requestId'],
+                'profileHash' => $record['profileHash'] ?? null, 'revert' => $record['revert'] + ['completedAt' => gmdate('c')],
+                'receipts' => array_intersect_key($record['receipts'], $skipped),
+                'answers' => ($record['answers'] ?? []) + [$record['revert']['requestId'] => ['applyId' => $record['revert']['applyId'], 'conflicts' => $skipped]]];
+        }
+        $this->contract->record('showcaseNav', $record);
+        // Proven after the write: what this job wrote is clean (the receipts say so), anything else
+        // that differs is not its doing and is still drift.
+        $this->contract->rebind($this->contract->inspectClean());
+        try {
+            $this->writer->purgeCache();
+        } catch (Throwable $ignored) {
+        }
+        if ($moved > 0) {
+            $this->stamped('content');
+        }
+        return $this->ok([
+            'status' => $remaining === 0 ? ($hide ? 'completed' : 'reverted') : 'running',
+            'moved' => $moved, 'remaining' => $remaining, 'applyId' => $apply,
+            ($hide ? 'skipped' : 'conflicts') => $skipped,
+        ]);
+    }
+
+    /**
+     * What the next showcase-navigation step still has to look at: on apply, every owner of the map
+     * with no settled receipt (none, or one whose write may not have landed); on revert, every owner
+     * the apply wrote, or began to write, that has not been looked at again.
+     *
+     * @return array<string,array{kind:string,id:int,slug:string,owner:?array,receipt:?array}>
+     */
+    private function showcaseNavPending(?array $record, bool $hide): array
+    {
+        $out = [];
+        if ($hide) {
+            $nav = $this->contract->showcaseNav();
+            foreach ($nav === null ? [] : $nav->owners() as $key => $owner) {
+                $receipt = $record['receipts'][$key] ?? null;
+                if ($receipt === null || $receipt['outcome'] === 'writing') {
+                    $out[$key] = ['kind' => $owner['kind'], 'id' => $owner['id'], 'slug' => $owner['slug'], 'owner' => $owner, 'receipt' => $receipt];
+                }
+            }
+            return $out;
+        }
+        foreach ($record['receipts'] ?? [] as $key => $receipt) {
+            if (in_array($receipt['outcome'], ['written', 'writing'], true) && !isset($receipt['reverted'])) {
+                $out[$key] = ['kind' => $receipt['kind'], 'id' => (int) $receipt['id'], 'slug' => (string) $receipt['slug'], 'owner' => null, 'receipt' => $receipt];
+            }
+        }
+        return $out;
+    }
+
+    /** Owners an apply left alone, with why. On a revert, the owners it could not put back. */
+    private function showcaseNavSkipped(array $receipts, bool $revert = false): array
+    {
+        $out = [];
+        foreach ($receipts as $key => $receipt) {
+            if ($revert) {
+                if (($receipt['reverted'] ?? null) === 'conflict') {
+                    $out[$key] = $receipt['revertWhy'] ?? 'changed since it was hidden';
+                }
+            } elseif ($receipt['outcome'] !== 'written') {
+                $out[$key] = $receipt['why'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * An owner as it stands: its row id and content. Null when it has no row (a template part the
+     * active theme's file is in charge of), or a navigation id is not a navigation.
+     *
+     * @return array{id:int,content:string}|null
+     */
+    private function showcaseNavRead(string $kind, int $id, string $slug): ?array
+    {
+        if ($kind === 'navigation') {
+            $post = $this->writer->read('post', $id);
+            return $post === null || ($post['post_type'] ?? '') !== 'wp_navigation' ? null
+                : ['id' => $id, 'content' => (string) $post['post_content']];
+        }
+        $part = $this->writer->read('templatePart', 0, $slug);
+        return $part === null ? null : ['id' => (int) $part['id'], 'content' => (string) $part['content']];
+    }
+
+    /** One owner's whole content replaced, only while it still holds `$expected`. */
+    private function showcaseNavSwap(string $kind, int $id, string $expected, string $content): bool
+    {
+        if (!method_exists($this->writer, 'replacePostContentIf')) {
+            throw new RuntimeException('This site writer cannot compare-and-set a post; nothing has been written');
+        }
+        return $this->writer->replacePostContentIf($id, $kind === 'navigation' ? 'wp_navigation' : 'wp_template_part', $expected, $content);
+    }
+
+    /**
+     * Edit one owner of the map, if it still holds the bytes the map starts from.
+     *
+     * @return array{receipt:array,moved:bool}
+     */
+    private function showcaseNavHide(array &$record, string $key, array $pending): array
+    {
+        $owner = $pending['owner'];
+        $kind = $owner['kind'];
+        $base = ['kind' => $kind, 'id' => $owner['id'], 'slug' => $owner['slug'], 'before' => $owner['before'], 'after' => $owner['after']];
+        $leave = static fn(string $outcome, string $why, array $more = []): array => ['receipt' => $base + $more + ['outcome' => $outcome, 'why' => $why], 'moved' => false];
+        $live = $this->showcaseNavRead($kind, $owner['id'], $owner['slug']);
+        $earlier = $pending['receipt'];
+        if ($earlier !== null) {
+            // A write this job began and did not see land: what the row holds says whether it did.
+            // The `after` bytes under this job's own `writing` receipt are its write, whose answer was lost.
+            if ($live !== null && $live['id'] === (int) $earlier['id'] && hash('sha256', $live['content']) === $owner['after']) {
+                return ['receipt' => ['outcome' => 'written', 'why' => ''] + $earlier, 'moved' => true];
+            }
+        }
+        if ($live === null) {
+            // 🔒 NO ROW, NO WRITE. Creating an override cannot be compared-and-set against a customer
+            // saving one at the same moment, nor deleted again on revert without the same race.
+            return $leave('conflict', $kind === 'navigation' ? 'the navigation is gone from this site'
+                : 'the ' . $owner['slug'] . ' comes from the theme file; this receiver only edits a saved template part');
+        }
+        $sha = hash('sha256', $live['content']);
+        if ($sha === $owner['after']) {
+            // Not this job's write: the receipt says so, and the baseline does not move for it.
+            return $leave('already', 'already as the map leaves it', ['id' => $live['id']]);
+        }
+        if ($sha !== $owner['before']) {
+            return $leave('conflict', 'edited on this site since the quickstart shipped it; left as it is', ['id' => $live['id']]);
+        }
+        foreach ($owner['operations'] as $op) {
+            if ($op['op'] === 'templatePart.setNavigationRef' && $this->showcaseNavRead('navigation', $op['to'], '') === null) {
+                return $leave('conflict', 'the navigation it would point at (' . $op['to'] . ') is gone from this site', ['id' => $live['id']]);
+            }
+        }
+        $content = ShowcaseNavProfile::edit($owner, $live['content']);
+        if ($content === null || !hash_equals($owner['after'], hash('sha256', $content))) {
+            return $leave('conflict', 'the map does not land on these bytes; left as it is', ['id' => $live['id']]);
+        }
+        // The receipt, with the bytes found, lands before the write it describes.
+        $receipt = $base + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
+        $record['receipts'][$key] = $receipt;
+        $this->contract->record('showcaseNav', $record);
+        if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {
+            return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
+        }
+        return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
+    }
+
+    /**
+     * Put back one owner an apply wrote, if it still holds what the apply wrote.
+     *
+     * @return array{receipt:array,moved:bool}
+     */
+    private function showcaseNavRestore(string $key, array $receipt): array
+    {
+        $restored = ['receipt' => ['reverted' => 'restored'], 'moved' => false];
+        $conflict = static fn(string $why): array => ['receipt' => ['reverted' => 'conflict', 'revertWhy' => $why], 'moved' => false];
+        $live = $this->showcaseNavRead($receipt['kind'], (int) $receipt['id'], (string) $receipt['slug']);
+        if ($live === null || $live['id'] !== (int) $receipt['id']) {
+            return $conflict($receipt['kind'] === 'navigation' ? 'the navigation is gone from this site' : 'the template part it edited is gone from this site');
+        }
+        $sha = hash('sha256', $live['content']);
+        if ($sha === $receipt['before']) {
+            return $restored; // put back already, by hand or by a write that never landed
+        }
+        if ($sha !== $receipt['after']) {
+            return $conflict('changed on this site since it was hidden; left as it is');
+        }
+        $found = base64_decode((string) $receipt['content'], true);
+        if (!is_string($found) || hash('sha256', $found) !== $receipt['before']) {
+            throw new RuntimeException('The receipt of ' . $key . ' does not hold the bytes it found');
+        }
+        if (!$this->showcaseNavSwap($receipt['kind'], $live['id'], $live['content'], $found)) {
+            return $conflict(self::SHOWCASE_NAV_RACED);
+        }
+        return ['receipt' => ['reverted' => 'restored'], 'moved' => true];
     }
 
     /**
@@ -2375,20 +2758,169 @@ final class Engine
         ]);
     }
 
+    /**
+     * One page of the walk. `hash` (default true) is the sha1 of every file, which reads every byte;
+     * `hash: false` answers `{path, size, mtime}` instead — the same walk, order and cursor — at a stat
+     * per file, so its page may run to MAX_FILE_STAT_LIMIT paths.
+     */
     private function filesList(array $p): array
     {
         if ($this->walker === null) {
             return $this->err('unavailable', 'file walk not wired');
         }
+        $hash = $p['hash'] ?? true;
+        if (!is_bool($hash)) {
+            return $this->err('bad_params', 'hash must be true or false');
+        }
         $after = isset($p['after']) && is_string($p['after']) ? $p['after'] : '';
         $limit = (int) ($p['limit'] ?? 100);
-        $limit = max(1, min($limit, self::MAX_FILE_LIMIT));
+        $limit = max(1, min($limit, $hash ? self::MAX_FILE_LIMIT : self::MAX_FILE_STAT_LIMIT));
         try {
-            $batch = $this->walker->listBatch($after, $limit);
+            $batch = $hash ? $this->walker->listBatch($after, $limit) : $this->walker->statBatch($after, $limit);
         } catch (Throwable $e) {
             return $this->err('walk_failed', $e->getMessage());
         }
         return $this->ok($batch);
+    }
+
+    /**
+     * The sha1 of the files named — the expensive question, asked only for the paths a cheap one
+     * (files.list without hash, site.fingerprint) said may have changed.
+     *
+     * `paths` is 1..MAX_HASH_PATHS relative paths, as files.list names them. Each answers its sha1,
+     * or null where there is no file the walk lists and file.read would serve ({@see
+     * FileWalker::hashPaths}): one missing or refused path does not fail the rest. `hashes` is an
+     * object keyed by path, always — a path such as `0` must not turn it into a list.
+     */
+    private function filesHash(array $p): array
+    {
+        if ($this->walker === null) {
+            return $this->err('unavailable', 'file walk not wired');
+        }
+        $paths = $p['paths'] ?? null;
+        if (!is_array($paths) || $paths === []) {
+            return $this->err('bad_params', 'paths required: a list of relative paths');
+        }
+        if (count($paths) > self::MAX_HASH_PATHS) {
+            return $this->err('bad_params', 'at most ' . self::MAX_HASH_PATHS . ' paths per call');
+        }
+        foreach ($paths as $path) {
+            if (!is_string($path) || $path === '') {
+                return $this->err('bad_params', 'every path must be a non-empty string');
+            }
+        }
+        try {
+            $hashes = $this->walker->hashPaths(array_values($paths));
+        } catch (Throwable $e) {
+            return $this->err('walk_failed', $e->getMessage());
+        }
+        return $this->ok(['hashes' => (object) $hashes]);
+    }
+
+    /**
+     * The cheapest answer to "has this site changed since I last read it?": one digest per page of
+     * the file walk and one CHECKSUM TABLE value per table, and no byte of either copied.
+     *
+     * Files: the walk of files.list, from the first path after `after`, at most `limit` paths
+     * (default FINGERPRINT_FILES, at most MAX_FINGERPRINT_FILES) — a fixed count, so the same tree
+     * cuts into the same pages every time. `count` and `bytes` are the page's, `digest` is sha1 over
+     * `path NUL size NUL mtime LF` per path ({@see FileWalker::fingerprintPage}), and `next_after`
+     * the page's last path while more remain, else null. `files: false` leaves the walk out.
+     *
+     * Tables: CHECKSUM TABLE over the tables db.tables lists, or over `tables` (each of them in that
+     * list), in batches; a value is the checksum as a string, null where the server answers NULL.
+     * `checksums: false` leaves the database out. The tables are answered in full on every page;
+     * a caller paging the files asks for them once, with the first.
+     *
+     * `skip_columns` (version 2): up to MAX_SKIP_COLUMNS column names. Given and not empty, EVERY
+     * table of the call is checksummed by its substance instead ({@see
+     * RowSource::substanceChecksum}, "<rows>:<xor>"), those columns left out wherever they occur,
+     * so a hit counter or a last-visit date no longer reads as a change. The names used come back
+     * sorted as `fingerprint.skip_columns`; without them the answer is CHECKSUM TABLE's, as before.
+     */
+    private function siteFingerprint(array $p): array
+    {
+        $started = microtime(true);
+        $wantFiles = $p['files'] ?? true;
+        $wantSums = $p['checksums'] ?? true;
+        if (!is_bool($wantFiles) || !is_bool($wantSums)) {
+            return $this->err('bad_params', 'files and checksums must be true or false');
+        }
+        $after = isset($p['after']) && is_string($p['after']) ? $p['after'] : '';
+        $limit = (int) ($p['limit'] ?? self::FINGERPRINT_FILES);
+        $limit = max(1, min($limit, self::MAX_FINGERPRINT_FILES));
+        $skip = $p['skip_columns'] ?? [];
+        if (!is_array($skip) || count($skip) > self::MAX_SKIP_COLUMNS) {
+            return $this->err('bad_params', 'skip_columns must be a list of at most ' . self::MAX_SKIP_COLUMNS . ' column names');
+        }
+        foreach ($skip as $column) {
+            if (!is_string($column) || !preg_match(self::COLUMN_NAME, $column)) {
+                return $this->err('bad_params', 'every skip_columns entry must be a plain column name: a letter or _, then up to 63 letters, digits or _');
+            }
+        }
+        $skip = array_values(array_unique($skip));
+        sort($skip, SORT_STRING);
+        $only = $p['tables'] ?? null;
+        if ($only !== null) {
+            if (!is_array($only) || $only === []) {
+                return $this->err('bad_params', 'tables must be a non-empty list of names');
+            }
+            foreach ($only as $table) {
+                if (!is_string($table) || $table === '') {
+                    return $this->err('bad_params', 'every table must be a non-empty string');
+                }
+            }
+        }
+
+        $files = null;
+        if ($wantFiles) {
+            if ($this->walker === null) {
+                return $this->err('unavailable', 'file walk not wired');
+            }
+            try {
+                $files = $this->walker->fingerprintPage($after, $limit);
+            } catch (Throwable $e) {
+                return $this->err('walk_failed', $e->getMessage());
+            }
+        }
+
+        $tables = null;
+        if ($wantSums) {
+            if ($this->dumper === null) {
+                return $this->err('unavailable', 'db dump not wired');
+            }
+            try {
+                $known = $this->dumper->tables();
+            } catch (Throwable $e) {
+                return $this->err('dump_failed', $e->getMessage());
+            }
+            $names = $known;
+            if ($only !== null) {
+                $names = [];
+                foreach ($only as $table) {
+                    if (!in_array($table, $known, true)) {
+                        return $this->err('bad_params', "table {$table} is not one db.tables lists");
+                    }
+                    if (!in_array($table, $names, true)) {
+                        $names[] = $table;
+                    }
+                }
+            }
+            try {
+                $tables = (object) ($skip === []
+                    ? $this->dumper->checksums($names)
+                    : $this->dumper->substanceChecksums($names, $skip));
+            } catch (Throwable $e) {
+                return $this->err('checksum_failed', $e->getMessage());
+            }
+        }
+
+        $answer = ['version' => self::FINGERPRINT_VERSION, 'files' => $files, 'tables' => $tables];
+        if ($skip !== []) {
+            $answer['skip_columns'] = $skip;
+        }
+        $answer['seconds'] = round(microtime(true) - $started, 3);
+        return $this->ok(['fingerprint' => $answer]);
     }
 
     /**
@@ -2414,12 +2946,20 @@ final class Engine
         if ($this->walker === null) {
             return $this->err('unavailable', 'file walk not wired');
         }
-        if ($this->uploader === null) {
-            return $this->err('unavailable', 'uploader not wired');
-        }
+        // Two ways out for a part. `put_url`: this host PUTs it to the store itself, the usual way.
+        // `inline`: the part comes back in the answer, base64, and the caller stores it — the road
+        // the database has always taken, for a host that cannot open an outbound connection, and for
+        // "Sync from live", whose host reads the live site straight onto its own disk (the Joomla
+        // engine's, 0.8.22).
+        $inline = !empty($p['inline']);
         $putUrl = isset($p['put_url']) && is_string($p['put_url']) ? $p['put_url'] : '';
-        if ($putUrl === '') {
-            return $this->err('bad_params', 'put_url required');
+        if (!$inline) {
+            if ($this->uploader === null) {
+                return $this->err('unavailable', 'uploader not wired');
+            }
+            if ($putUrl === '') {
+                return $this->err('bad_params', 'put_url required');
+            }
         }
 
         $target = (int) ($p['target_bytes'] ?? self::MIN_PART_BYTES);
@@ -2430,15 +2970,43 @@ final class Engine
         $entryOffset = max(0, (int) ($p['offset'] ?? 0));
         // The size that entry's header declared, handed back with the rest of the cursor.
         $declared = max(0, (int) ($p['size'] ?? 0));
+        // `paths` (1..MAX_PACK_PATHS relative paths) cuts the pack to those files, in the walk's
+        // order; the cursor then moves through them alone. The same files and bytes a whole pack
+        // would carry: a sync that knows which files moved takes the ones file.read will not serve
+        // (one too large) without the rest of the tree.
+        $only = null;
+        if (array_key_exists('paths', $p)) {
+            $asked = $p['paths'];
+            if (!is_array($asked) || $asked === []) {
+                return $this->err('bad_params', 'paths must be a non-empty list of relative paths');
+            }
+            if (count($asked) > self::MAX_PACK_PATHS) {
+                return $this->err('bad_params', 'at most ' . self::MAX_PACK_PATHS . ' paths per pack');
+            }
+            foreach ($asked as $one) {
+                if (!is_string($one) || $one === '') {
+                    return $this->err('bad_params', 'every path must be a non-empty string');
+                }
+            }
+        }
 
         try {
             // Fetched once and walked in memory. The loop used to ask the walker for "the next
             // file" per file, and each of those was a search across the whole list — quadratic.
             // On a real webroot of 19,971 files PHP hit its thirty-second limit during the first
             // part. A fixture of five files never came close.
-            $queue = $path === ''
-                ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
-                : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            if (isset($asked)) {
+                $only = $this->walker->listedPaths(array_values($asked));
+                $at = $path === '' ? 0 : array_search($path, $only, true);
+                if ($at === false) {
+                    return $this->err('bad_params', 'the cursor names a path outside paths');
+                }
+                $queue = array_slice($only, $at);
+            } else {
+                $queue = $path === ''
+                    ? $this->walker->pathsAfter('', self::PACK_LOOKAHEAD)
+                    : array_merge([$path], $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD));
+            }
             $qi = 0;
 
             $buf   = '';
@@ -2466,7 +3034,8 @@ final class Engine
                     break;
                 }
 
-                $abs = $this->walker->absolutePath($path);
+                // For the ARCHIVE, not for a caller — see FileWalker::archivePath.
+                $abs = $this->walker->archivePath($path);
 
                 // A tar entry must be EXACTLY as long as its own header says, and the header for
                 // an entry spanning parts was written in an earlier request. A webroot is not
@@ -2543,7 +3112,7 @@ final class Engine
                 $declared    = 0;
                 // The look-ahead ran out but the tree has not: ask for more, starting after the
                 // file just finished.
-                if ($qi >= count($queue)) {
+                if ($only === null && $qi >= count($queue)) {
                     $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
                     if ($more !== []) {
                         $queue = $more;
@@ -2562,18 +3131,26 @@ final class Engine
         }
 
         $sha = hash('sha256', $buf);
-        $put = $this->uploader->put($putUrl, $buf);
-        if (!$put['ok']) {
-            // The cursor does not move when the upload fails: the caller signs a fresh URL and
-            // asks for this same part again.
-            return $this->err('upload_failed', $put['error']);
+        $etag = '';
+        $partB64 = null;
+        if ($inline) {
+            $partB64 = base64_encode($buf);
+        } else {
+            $put = $this->uploader->put($putUrl, $buf);
+            if (!$put['ok']) {
+                // The cursor does not move when the upload fails: the caller signs a fresh URL and
+                // asks for this same part again.
+                return $this->err('upload_failed', $put['error']);
+            }
+            $etag = $put['etag'];
         }
 
         return $this->ok([
             'bytes'       => strlen($buf),
             'files'       => $files,
             'sha256'      => $sha,
-            'etag'        => $put['etag'],
+            'etag'        => $etag,
+            'part_b64'    => $partB64,
             'next_path'   => $path,
             'next_offset' => $entryOffset,
             // Only meaningful mid-entry, which is the only time the caller must hand it back.
