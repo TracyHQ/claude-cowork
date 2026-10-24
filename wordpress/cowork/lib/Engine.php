@@ -1798,7 +1798,54 @@ final class Engine
     }
 
     /**
-     * Edit one owner of the map, if it still holds the bytes the map starts from.
+     * The ways of reading an owner's live bytes against the map: as they are, then with the site's own
+     * address folded back to the placeholder the quickstart was packed with (provisioning ran
+     * `wp search-replace <placeholderUrl> <site url>` before any map was applied, so a navigation that
+     * links absolutely no longer holds the bytes the map hashed). Each fold is a list of
+     * live spelling => packed spelling, plain and JSON-escaped, for `home` and `siteurl`.
+     *
+     * 🔒 A FOLD IS OFFERED ONLY WHEN IT IS EXACTLY UNDONE BY ITS INVERSE. Bytes that already hold a
+     * packed spelling next to the live one it would fold (the customer pasted the placeholder, or a
+     * second search-replace ran halfway) cannot be told apart once folded: they are read as they are,
+     * and the map's hashes decide, as before.
+     *
+     * @return list<array<string,string>> folds, the first one empty (the bytes as they are)
+     */
+    private function showcaseNavFolds(string $content): array
+    {
+        $folds = [[]];
+        $placeholder = $this->contract->placeholderUrl();
+        if ($placeholder === null) {
+            return $folds;
+        }
+        foreach (['home', 'siteurl'] as $option) {
+            $url = rtrim((string) ($this->writer->read('option', 0, $option)['value'] ?? ''), '/');
+            if (!preg_match('~^https?://[^/\s]+~', $url) || $url === $placeholder) {
+                continue;
+            }
+            $fold = [];
+            foreach ([[$url, $placeholder], [str_replace('/', '\\/', $url), str_replace('/', '\\/', $placeholder)]] as [$live, $packed]) {
+                if (strpos($content, $live) === false) {
+                    continue;
+                }
+                if (strpos($content, $packed) !== false) {
+                    continue 2;
+                }
+                $fold[$live] = $packed;
+            }
+            if ($fold !== [] && !in_array($fold, $folds, true) && strtr(strtr($content, $fold), array_flip($fold)) === $content) {
+                $folds[] = $fold;
+            }
+        }
+        return $folds;
+    }
+
+    /**
+     * Edit one owner of the map, if it still holds the bytes the map starts from — as they are, or with
+     * the site's own address folded back to the quickstart's placeholder (`showcaseNavFolds`). The map's
+     * edits run on the folded bytes; what is written is them unfolded, so the site keeps its address.
+     * The receipt's `before` and `after` are the hashes of the live bytes found and written: what the
+     * revert and inspect compare the row with.
      *
      * @return array{receipt:array,moved:bool}
      */
@@ -1813,7 +1860,7 @@ final class Engine
         if ($earlier !== null) {
             // A write this job began and did not see land: what the row holds says whether it did.
             // The `after` bytes under this job's own `writing` receipt are its write, whose answer was lost.
-            if ($live !== null && $live['id'] === (int) $earlier['id'] && hash('sha256', $live['content']) === $owner['after']) {
+            if ($live !== null && $live['id'] === (int) $earlier['id'] && hash('sha256', $live['content']) === $earlier['after']) {
                 return ['receipt' => ['outcome' => 'written', 'why' => ''] + $earlier, 'moved' => true];
             }
         }
@@ -1823,12 +1870,19 @@ final class Engine
             return $leave('conflict', $kind === 'navigation' ? 'the navigation is gone from this site'
                 : 'the ' . $owner['slug'] . ' comes from the theme file; this receiver only edits a saved template part');
         }
-        $sha = hash('sha256', $live['content']);
-        if ($sha === $owner['after']) {
-            // Not this job's write: the receipt says so, and the baseline does not move for it.
-            return $leave('already', 'already as the map leaves it', ['id' => $live['id']]);
+        $fold = null;
+        foreach ($this->showcaseNavFolds($live['content']) as $candidate) {
+            $sha = hash('sha256', strtr($live['content'], $candidate));
+            if ($sha === $owner['after']) {
+                // Not this job's write: the receipt says so, and the baseline does not move for it.
+                return $leave('already', 'already as the map leaves it', ['id' => $live['id']]);
+            }
+            if ($sha === $owner['before']) {
+                $fold = $candidate;
+                break;
+            }
         }
-        if ($sha !== $owner['before']) {
+        if ($fold === null) {
             return $leave('conflict', 'edited on this site since the quickstart shipped it; left as it is', ['id' => $live['id']]);
         }
         foreach ($owner['operations'] as $op) {
@@ -1836,12 +1890,14 @@ final class Engine
                 return $leave('conflict', 'the navigation it would point at (' . $op['to'] . ') is gone from this site', ['id' => $live['id']]);
             }
         }
-        $content = ShowcaseNavProfile::edit($owner, $live['content']);
-        if ($content === null || !hash_equals($owner['after'], hash('sha256', $content))) {
+        $edited = ShowcaseNavProfile::edit($owner, strtr($live['content'], $fold));
+        $content = $edited === null ? null : strtr($edited, array_flip($fold));
+        if ($content === null || !hash_equals($owner['after'], hash('sha256', $edited)) || strtr($content, $fold) !== $edited) {
             return $leave('conflict', 'the map does not land on these bytes; left as it is', ['id' => $live['id']]);
         }
         // The receipt, with the bytes found, lands before the write it describes.
-        $receipt = $base + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
+        $receipt = ['before' => hash('sha256', $live['content']), 'after' => hash('sha256', $content)] + $base
+            + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
         $record['receipts'][$key] = $receipt;
         $this->contract->record('showcaseNav', $record);
         if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {

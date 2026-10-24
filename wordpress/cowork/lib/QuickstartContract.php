@@ -395,6 +395,16 @@ final class QuickstartContract
         return $this->showcaseNav;
     }
 
+    /**
+     * The address the quickstart was packed with (`quickstart.placeholderUrl`, no trailing slash),
+     * which provisioning rewrote to the site's own; null when the manifest names none.
+     */
+    public function placeholderUrl(): ?string
+    {
+        $url = $this->manifest['quickstart']['placeholderUrl'] ?? null;
+        return is_string($url) && preg_match('~^https?://[^/\s]+~', $url) ? rtrim($url, '/') : null;
+    }
+
     public function showcaseNavProblem(): ?string
     {
         return $this->showcaseNavProblem;
