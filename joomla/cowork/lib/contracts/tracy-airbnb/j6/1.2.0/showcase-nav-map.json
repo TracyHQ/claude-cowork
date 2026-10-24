@@ -29,6 +29,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-242",
+      "identity": {
+        "path": "resources/colors",
+        "menutype": "tracy",
+        "language": "*"
+      },
+      "label": "Colour",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Colour\" reads as a home or colour demo and opens only sample content or what the home page opens (article:75)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-244",
       "identity": {
         "path": "resources/style-guide",
@@ -41,6 +56,21 @@
       "to": "0",
       "rule": "hide.kit-screen",
       "reason": "the template's own \"Design system\" screen"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-246",
+      "identity": {
+        "path": "resources/home-2",
+        "menutype": "tracy",
+        "language": "*"
+      },
+      "label": "Home — variant",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home — variant\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:1, article:3 (+15))"
     }
   ],
   "kept": [
@@ -231,29 +261,14 @@
       "label": "[Tracy Apple] Chrome - Mobile menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders tracy: 28 entries stay"
+      "reason": "renders tracy: 26 entries stay"
     }
   ],
-  "unresolved": [
-    {
-      "key": "menuItem-242",
-      "label": "Colour",
-      "where": "tracy/resources/colors",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Colour\" reads as a home or colour demo"
-    },
-    {
-      "key": "menuItem-246",
-      "label": "Home — variant",
-      "where": "tracy/resources/home-2",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home — variant\" reads as a home or colour demo"
-    }
-  ],
+  "unresolved": [],
   "counts": {
-    "menuItems": 2,
+    "menuItems": 4,
     "modules": 0,
     "kept": 27,
-    "unresolved": 2
+    "unresolved": 0
   }
 }

@@ -873,10 +873,13 @@ $kIds = [];
 foreach (json_decode(file_get_contents(__DIR__ . '/../lib/contracts/ja-kinetic/j6/1.0.10/content-map.json'), true)['entities'] as $entity)
     foreach ($kMap['operations'] as $op) if ($op['key'] === $entity['key']) $kIds[] = (int) $entity['sourceId'];
 $kOriginal = array_map(fn ($row) => $row['params'] ?? null, $kw->store['menuItem']);
-check('kinetic lists entries with no menu_show', array_map(fn ($id) => $snavShow($kw, $id)['exists'], $kIds), [false, false]);
+// Every entry the map hides here is one without the key (the home variants, and since the builder
+// counts the Pages branch as sample content, its Landing too): the map says so, and so does the site.
+check('kinetic hides entries whose menu_show the map names absent', [count($kIds) >= 2, count($kIds) === count($kMap['operations']), array_unique(array_column($kMap['operations'], 'from'))], [true, true, [null]]);
+check('kinetic lists entries with no menu_show', array_map(fn ($id) => $snavShow($kw, $id)['exists'], $kIds), array_fill(0, count($kIds), false));
 check('kinetic applies', $kCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-k', 'request_id' => 'k1'])['status'], 'completed');
-check('the absent key is added, as the admin form writes it', array_map(fn ($id) => $snavShow($kw, $id)['literal'], $kIds), ['"0"', '"0"']);
-check('its receipt says the key was not there', array_column(array_values($kStore->binding['showcaseNav']['receipts']), 'existed'), [false, false]);
+check('the absent key is added, as the admin form writes it', array_map(fn ($id) => $snavShow($kw, $id)['literal'], $kIds), array_fill(0, count($kIds), '"0"'));
+check('its receipt says the key was not there', array_column(array_values($kStore->binding['showcaseNav']['receipts']), 'existed'), array_fill(0, count($kIds), false));
 snavClean('kinetic inspects clean with the keys added', $kContract);
 $kTrim = $kCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-k', 'request_id' => 'k2']);
 check('a demo trim still runs beside it', [$kTrim['ok'], $kTrim['status'] ?? null, $kStore->binding['showcaseNav']['status']], [true, 'completed', 'complete']);

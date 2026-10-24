@@ -89,21 +89,6 @@
     },
     {
       "op": "menuItem.param",
-      "key": "menuItem-145",
-      "identity": {
-        "path": "homepage/home-navbar-horizontal",
-        "menutype": "mainmenu",
-        "language": "*"
-      },
-      "label": "Home - Navbar Horizontal",
-      "path": "menu_show",
-      "from": "1",
-      "to": "0",
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page: under mainmenu/homepage"
-    },
-    {
-      "op": "menuItem.param",
       "key": "menuItem-146",
       "identity": {
         "path": "homepage/home-navbar-vertical",
@@ -359,6 +344,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-145",
+      "label": "Home - Navbar Horizontal",
+      "where": "mainmenu/homepage/home-navbar-horizontal",
+      "rule": "keep.only-route-to-content",
+      "reason": "the only menu route to article:10, article:12: a showcase rule may not take real content along"
+    },
+    {
       "key": "menuItem-159",
       "label": "Username Reminder Request",
       "where": "usermenu/username-reminder-request",
@@ -377,7 +369,7 @@
       "label": "Main Menu",
       "where": "mod_menu@mainnav",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 15 entries stay"
+      "reason": "renders mainmenu: 16 entries stay"
     },
     {
       "key": "module-111",
@@ -405,7 +397,7 @@
       "label": "Main Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 15 entries stay"
+      "reason": "renders mainmenu: 16 entries stay"
     }
   ],
   "unresolved": [
@@ -418,9 +410,9 @@
     }
   ],
   "counts": {
-    "menuItems": 8,
+    "menuItems": 7,
     "modules": 0,
-    "kept": 39,
+    "kept": 40,
     "unresolved": 1
   }
 }

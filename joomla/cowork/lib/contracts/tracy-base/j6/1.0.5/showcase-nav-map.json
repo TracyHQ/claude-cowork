@@ -29,6 +29,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-242",
+      "identity": {
+        "path": "resources/colors",
+        "menutype": "tracy",
+        "language": "*"
+      },
+      "label": "Colour",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Colour\" reads as a home or colour demo and opens only sample content or what the home page opens (article:75)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-244",
       "identity": {
         "path": "resources/style-guide",
@@ -41,6 +56,21 @@
       "to": "0",
       "rule": "hide.kit-screen",
       "reason": "the template's own \"Design system\" screen"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-330",
+      "identity": {
+        "path": "resources/home-onepage",
+        "menutype": "tracy",
+        "language": "*"
+      },
+      "label": "Home - Onepage",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home - Onepage\" reads as a home or colour demo and opens only sample content or what the home page opens (article:78)"
     }
   ],
   "kept": [
@@ -329,7 +359,7 @@
       "label": "[Tracy Base] Chrome - Mobile menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders tracy: 34 entries stay"
+      "reason": "renders tracy: 32 entries stay"
     },
     {
       "key": "module-250",
@@ -348,13 +378,6 @@
       "reason": "\"Home variation\" reads as a home or colour demo"
     },
     {
-      "key": "menuItem-242",
-      "label": "Colour",
-      "where": "tracy/resources/colors",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Colour\" reads as a home or colour demo"
-    },
-    {
       "key": "menuItem-246",
       "label": "Home — variant",
       "where": "tracy/resources/home-2",
@@ -367,13 +390,6 @@
       "where": "tracy/resources/marketing-samples",
       "rule": "unresolved.showcase-word",
       "reason": "\"Marketing samples\" names a showcase branch"
-    },
-    {
-      "key": "menuItem-330",
-      "label": "Home - Onepage",
-      "where": "tracy/resources/home-onepage",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home - Onepage\" reads as a home or colour demo"
     },
     {
       "key": "menuItem-332",
@@ -412,9 +428,9 @@
     }
   ],
   "counts": {
-    "menuItems": 2,
+    "menuItems": 4,
     "modules": 0,
     "kept": 42,
-    "unresolved": 10
+    "unresolved": 8
   }
 }

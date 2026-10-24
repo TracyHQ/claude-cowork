@@ -131,6 +131,81 @@
       "to": "0",
       "rule": "hide.sample-listing",
       "reason": "a sample listing (com_content view=featured) in other-menu, the drawer menu of module-127"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-152",
+      "identity": {
+        "path": "home-frontend",
+        "menutype": "sample-sites",
+        "language": "*"
+      },
+      "label": "Home FrontEnd Developer",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home FrontEnd Developer\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:165, article:167 (+3))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-158",
+      "identity": {
+        "path": "home-yoga",
+        "menutype": "sample-sites",
+        "language": "*"
+      },
+      "label": "Home Yoga",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home Yoga\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:165, article:167 (+3))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-168",
+      "identity": {
+        "path": "home-singer-2",
+        "menutype": "sample-sites",
+        "language": "*"
+      },
+      "label": "Home Singer",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home Singer\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:165, article:167 (+3))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-171",
+      "identity": {
+        "path": "home-model",
+        "menutype": "sample-sites",
+        "language": "*"
+      },
+      "label": "Home Model",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home Model\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:165, article:167 (+3))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-174",
+      "identity": {
+        "path": "home-blogger-2",
+        "menutype": "sample-sites",
+        "language": "*"
+      },
+      "label": "Home Blogger",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.variant-opens-sample",
+      "reason": "\"Home Blogger\" reads as a home or colour demo and opens only sample content or what the home page opens (featured, article:165, article:167 (+3))"
     }
   ],
   "kept": [
@@ -244,7 +319,7 @@
       "label": "Sample Sites",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders sample-sites: 6 entries stay"
+      "reason": "renders sample-sites: 1 entry stays"
     },
     {
       "key": "module-177",
@@ -329,22 +404,22 @@
       "key": "menuItem-146",
       "label": "Photography",
       "where": "other-menu/content-page/all-category/photography",
-      "rule": "unresolved.drawer-menu",
-      "reason": "in other-menu, the drawer menu of module-127"
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Content Page\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
     },
     {
       "key": "menuItem-147",
       "label": "Designer",
       "where": "other-menu/content-page/all-category/designer",
-      "rule": "unresolved.drawer-menu",
-      "reason": "in other-menu, the drawer menu of module-127"
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Content Page\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
     },
     {
       "key": "menuItem-148",
       "label": "Entertainment",
       "where": "other-menu/content-page/all-category/entertainment",
-      "rule": "unresolved.drawer-menu",
-      "reason": "in other-menu, the drawer menu of module-127"
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Content Page\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
     },
     {
       "key": "menuItem-151",
@@ -352,13 +427,6 @@
       "where": "frontend-developer/home-frontend-developer",
       "rule": "unresolved.drawer-menu",
       "reason": "in frontend-developer, the drawer menu of module-178"
-    },
-    {
-      "key": "menuItem-152",
-      "label": "Home FrontEnd Developer",
-      "where": "sample-sites/home-frontend",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home FrontEnd Developer\" reads as a home or colour demo"
     },
     {
       "key": "menuItem-153",
@@ -394,13 +462,6 @@
       "where": "home-yoga/yoga",
       "rule": "unresolved.drawer-menu",
       "reason": "in home-yoga, the drawer menu of module-181"
-    },
-    {
-      "key": "menuItem-158",
-      "label": "Home Yoga",
-      "where": "sample-sites/home-yoga",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home Yoga\" reads as a home or colour demo"
     },
     {
       "key": "menuItem-160",
@@ -452,25 +513,11 @@
       "reason": "in singer, the drawer menu of module-180"
     },
     {
-      "key": "menuItem-168",
-      "label": "Home Singer",
-      "where": "sample-sites/home-singer-2",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home Singer\" reads as a home or colour demo"
-    },
-    {
       "key": "menuItem-170",
       "label": "Home",
       "where": "model/model",
       "rule": "unresolved.drawer-menu",
       "reason": "in model, the drawer menu of module-179"
-    },
-    {
-      "key": "menuItem-171",
-      "label": "Home Model",
-      "where": "sample-sites/home-model",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home Model\" reads as a home or colour demo"
     },
     {
       "key": "menuItem-172",
@@ -485,13 +532,6 @@
       "where": "blogger/home-blogger",
       "rule": "unresolved.drawer-menu",
       "reason": "in blogger, the drawer menu of module-177"
-    },
-    {
-      "key": "menuItem-174",
-      "label": "Home Blogger",
-      "where": "sample-sites/home-blogger-2",
-      "rule": "unresolved.variant-label",
-      "reason": "\"Home Blogger\" reads as a home or colour demo"
     },
     {
       "key": "menuItem-175",
@@ -579,9 +619,9 @@
     }
   ],
   "counts": {
-    "menuItems": 8,
+    "menuItems": 13,
     "modules": 0,
     "kept": 21,
-    "unresolved": 42
+    "unresolved": 37
   }
 }

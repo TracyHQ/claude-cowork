@@ -241,6 +241,22 @@ check('Restaurant: the Explore branch leaves the drawer', [$tDone['status'], $sh
 $sdoor($t['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 check('Restaurant: and comes back', $sha(133), $RF['navigation-133']['before']);
 
+// ── Kinetic 1.0.12: entries of the header's own (inline) navigation, found by path ──────────
+// The map names each entry's block (`core/navigation-link`) beside its path; the entry is found by
+// the path, as the builder's own replay finds it, and the sha256 chain proves every byte.
+
+$KINETIC = 'ja-kinetic/wp7/1.0.12';
+$KF = $finals($KINETIC);
+$k = snavSite($KINETIC, $snavContracts);
+$kHeader = static fn(): string => (string) WP_Fake::$posts[1777]['post_content'];
+$kBefore = $kHeader();
+$kDone = $sdoor($k['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('Kinetic: Blueprint and Signal leave the header, at the end bytes of the map', [$kDone['status'], $sha(1777), strpos($kHeader(), '"label":"Blueprint"'), strpos($kHeader(), '"label":"Signal"'), strpos($kHeader(), '"label":"Home"') !== false],
+    ['completed', $KF['templatePart-1777']['after'], false, false, true]);
+check('Kinetic: inspect finds the header where the job left it', $drift($k['engine']), []);
+$kBack = $sdoor($k['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('Kinetic: and the revert puts the header back, byte for byte', [$kBack['status'], $kBack['conflicts'], $kHeader() === $kBefore], ['reverted', [], true]);
+
 // ── no row for the template part: the theme file is in charge, and is never written ────────
 
 $themeDir = sys_get_temp_dir() . '/snav-theme-' . bin2hex(random_bytes(4));

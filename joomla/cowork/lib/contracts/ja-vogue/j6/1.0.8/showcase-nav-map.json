@@ -104,21 +104,6 @@
     },
     {
       "op": "menuItem.param",
-      "key": "menuItem-160",
-      "identity": {
-        "path": "home/home-4",
-        "menutype": "mainmenu",
-        "language": "*"
-      },
-      "label": "Home 4",
-      "path": "menu_show",
-      "from": "1",
-      "to": "0",
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page: under mainmenu/home"
-    },
-    {
-      "op": "menuItem.param",
       "key": "menuItem-162",
       "identity": {
         "path": "home/home-5",
@@ -241,6 +226,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-160",
+      "label": "Home 4",
+      "where": "mainmenu/home/home-4",
+      "rule": "keep.only-route-to-content",
+      "reason": "the only menu route to category:11, category:12, category:13 (+1): a showcase rule may not take real content along"
+    },
+    {
       "key": "menuItem-161",
       "label": "About Us",
       "where": "mainmenu/about",
@@ -259,7 +251,7 @@
       "label": "Main Menu",
       "where": "mod_menu@sidebar-right",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 24 entries stay"
+      "reason": "renders mainmenu: 25 entries stay"
     },
     {
       "key": "module-128",
@@ -273,7 +265,7 @@
       "label": "Offcanvas",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 24 entries stay"
+      "reason": "renders mainmenu: 25 entries stay"
     }
   ],
   "unresolved": [
@@ -363,9 +355,9 @@
     }
   ],
   "counts": {
-    "menuItems": 9,
+    "menuItems": 8,
     "modules": 0,
-    "kept": 18,
+    "kept": 19,
     "unresolved": 12
   }
 }

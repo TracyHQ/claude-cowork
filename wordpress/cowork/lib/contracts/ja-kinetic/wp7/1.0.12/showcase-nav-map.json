@@ -13,8 +13,69 @@
   },
   "decisionsHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
   "status": "checked",
-  "operations": [],
-  "finals": [],
+  "operations": [
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 1777,
+        "slug": "header"
+      },
+      "block": {
+        "name": "core/navigation-link",
+        "navigationBlock": 0,
+        "path": [
+          "Home",
+          "Blueprint"
+        ],
+        "pageId": null
+      },
+      "label": "Blueprint",
+      "path": [
+        "Home",
+        "Blueprint"
+      ],
+      "contains": [],
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page, under \"Home\"",
+      "key": "templatePart-1777",
+      "before": "2d4ba41f179a7c59dd3c9692175edd23f36f4f4ec4160cedd53a655f37a1f693",
+      "after": "d7372881c638632f075aeffa69090377f4a48923597f6f1648bf4cc743383e33"
+    },
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 1777,
+        "slug": "header"
+      },
+      "block": {
+        "name": "core/navigation-link",
+        "navigationBlock": 0,
+        "path": [
+          "Home",
+          "Signal"
+        ],
+        "pageId": null
+      },
+      "label": "Signal",
+      "path": [
+        "Home",
+        "Signal"
+      ],
+      "contains": [],
+      "rule": "hide.home-branch-variant",
+      "reason": "another demo of the home page, under \"Home\"",
+      "key": "templatePart-1777",
+      "before": "d7372881c638632f075aeffa69090377f4a48923597f6f1648bf4cc743383e33",
+      "after": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d"
+    }
+  ],
+  "finals": [
+    {
+      "key": "templatePart-1777",
+      "before": "2d4ba41f179a7c59dd3c9692175edd23f36f4f4ec4160cedd53a655f37a1f693",
+      "after": "1d33227203e1ff38511cbc50fd26ee697560a3eb8673821fadfe74c2d87d6a0d"
+    }
+  ],
   "kept": [
     {
       "key": "navigation-1772",
@@ -191,6 +252,18 @@
       "pageId": null,
       "rule": "keep.default",
       "reason": "not a showcase entry by any rule"
+    },
+    {
+      "key": "templatePart-1777",
+      "where": "template part 1777 (header), inline navigation 0",
+      "label": "Terminal",
+      "path": [
+        "Home",
+        "Terminal"
+      ],
+      "pageId": null,
+      "rule": "keep.homepage",
+      "reason": "the home page, the entry that makes \"Home\" its branch"
     },
     {
       "key": "templatePart-1777",
@@ -511,48 +584,11 @@
       "reason": "not a showcase entry by any rule"
     }
   ],
-  "unresolved": [
-    {
-      "key": "templatePart-1777",
-      "where": "template part 1777 (header), inline navigation 0",
-      "label": "Terminal",
-      "path": [
-        "Home",
-        "Terminal"
-      ],
-      "pageId": null,
-      "rule": "unresolved.variant-label",
-      "reason": "under \"Home\", which does not link the home page: may be another demo of it"
-    },
-    {
-      "key": "templatePart-1777",
-      "where": "template part 1777 (header), inline navigation 0",
-      "label": "Blueprint",
-      "path": [
-        "Home",
-        "Blueprint"
-      ],
-      "pageId": null,
-      "rule": "unresolved.variant-label",
-      "reason": "under \"Home\", which does not link the home page: may be another demo of it"
-    },
-    {
-      "key": "templatePart-1777",
-      "where": "template part 1777 (header), inline navigation 0",
-      "label": "Signal",
-      "path": [
-        "Home",
-        "Signal"
-      ],
-      "pageId": null,
-      "rule": "unresolved.variant-label",
-      "reason": "under \"Home\", which does not link the home page: may be another demo of it"
-    }
-  ],
+  "unresolved": [],
   "counts": {
-    "links": 0,
+    "links": 2,
     "templateParts": 0,
-    "kept": 43,
-    "unresolved": 3
+    "kept": 44,
+    "unresolved": 0
   }
 }

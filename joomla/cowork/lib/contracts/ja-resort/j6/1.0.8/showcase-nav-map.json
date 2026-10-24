@@ -119,6 +119,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-126",
+      "identity": {
+        "path": "pages/joomlart-content/featured-articles",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Featured Articles",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_content view=featured) in a showcase branch"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-128",
       "identity": {
         "path": "pages/joomlart-content/typography",
@@ -240,20 +255,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-125",
-      "label": "Category Blog",
-      "where": "mainmenu/pages/joomlart-content/category-blog",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-126",
-      "label": "Featured Articles",
-      "where": "mainmenu/pages/joomlart-content/featured-articles",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
       "key": "menuItem-127",
       "label": "Tagged Items",
       "where": "mainmenu/pages/joomlart-content/tagged-items",
@@ -265,14 +266,22 @@
       "label": "Offcanvas",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 12 entries stay"
+      "reason": "renders mainmenu: 11 entries stay"
     }
   ],
-  "unresolved": [],
+  "unresolved": [
+    {
+      "key": "menuItem-125",
+      "label": "Category Blog",
+      "where": "mainmenu/pages/joomlart-content/category-blog",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Joomlart Content\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    }
+  ],
   "counts": {
-    "menuItems": 8,
+    "menuItems": 9,
     "modules": 0,
-    "kept": 19,
-    "unresolved": 0
+    "kept": 17,
+    "unresolved": 1
   }
 }

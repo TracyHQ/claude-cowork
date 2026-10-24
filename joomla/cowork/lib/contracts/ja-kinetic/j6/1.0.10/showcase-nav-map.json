@@ -41,6 +41,21 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/home-menu"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-229",
+      "identity": {
+        "path": "pages/landing",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Landing",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_content view=featured) in a showcase branch"
     }
   ],
   "kept": [
@@ -139,20 +154,6 @@
       "key": "menuItem-228",
       "label": "Pages",
       "where": "mainmenu/pages",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-229",
-      "label": "Landing",
-      "where": "mainmenu/pages/landing",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-230",
-      "label": "Single Article",
-      "where": "mainmenu/pages/kineticql",
       "rule": "keep.default",
       "reason": "no rule hides it"
     },
@@ -311,20 +312,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-253",
-      "label": "Engineering",
-      "where": "mainmenu/pages/engineering",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-254",
-      "label": "Author",
-      "where": "mainmenu/pages/author",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
       "key": "menuItem-269",
       "label": "Privacy Policy",
       "where": "legal/privacy-policy",
@@ -343,7 +330,7 @@
       "label": "[Kinetic] Global - Main Menu",
       "where": "mod_menu@menu",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 28 entries stay"
+      "reason": "renders mainmenu: 27 entries stay"
     },
     {
       "key": "module-223",
@@ -371,14 +358,36 @@
       "label": "[Kinetic] Global - Off-canvas Menu",
       "where": "mod_menu@offcanvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 28 entries stay"
+      "reason": "renders mainmenu: 27 entries stay"
     }
   ],
-  "unresolved": [],
+  "unresolved": [
+    {
+      "key": "menuItem-230",
+      "label": "Single Article",
+      "where": "mainmenu/pages/kineticql",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-253",
+      "label": "Engineering",
+      "where": "mainmenu/pages/engineering",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-254",
+      "label": "Author",
+      "where": "mainmenu/pages/author",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    }
+  ],
   "counts": {
-    "menuItems": 2,
+    "menuItems": 3,
     "modules": 0,
-    "kept": 47,
-    "unresolved": 0
+    "kept": 43,
+    "unresolved": 3
   }
 }

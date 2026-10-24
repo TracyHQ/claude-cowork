@@ -14,6 +14,21 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-269",
+      "identity": {
+        "path": "pages/featured-articles",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Featured Articles",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_content view=featured) in a showcase branch"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-278",
       "identity": {
         "path": "home/home-2",
@@ -255,48 +270,6 @@
       "reason": "opens com_users (view=remind): a working feature stays unless decided"
     },
     {
-      "key": "menuItem-266",
-      "label": "Blog",
-      "where": "mainmenu/pages/blog",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-267",
-      "label": "Category List",
-      "where": "mainmenu/pages/category-list",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-268",
-      "label": "Single Article",
-      "where": "mainmenu/pages/single-article",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-269",
-      "label": "Featured Articles",
-      "where": "mainmenu/pages/featured-articles",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-270",
-      "label": "Author",
-      "where": "mainmenu/pages/writers",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-271",
-      "label": "Archive",
-      "where": "mainmenu/pages/archive",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
       "key": "menuItem-272",
       "label": "Tags",
       "where": "mainmenu/pages/tags-index",
@@ -316,20 +289,6 @@
       "where": "mainmenu/pages/contact",
       "rule": "keep.functional-default",
       "reason": "opens com_contact (view=contact): a working feature stays unless decided"
-    },
-    {
-      "key": "menuItem-276",
-      "label": "Landing",
-      "where": "mainmenu/pages/landing",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-277",
-      "label": "About",
-      "where": "mainmenu/pages/about",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
     },
     {
       "key": "menuItem-320",
@@ -437,13 +396,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-351",
-      "label": "Component Wrapper",
-      "where": "mainmenu/pages/component",
-      "rule": "keep.default",
-      "reason": "no rule hides it"
-    },
-    {
       "key": "menuItem-369",
       "label": "Journal",
       "where": "footer-explore/the-journal",
@@ -490,14 +442,71 @@
       "label": "[Global] Offcanvas Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 42 entries stay"
+      "reason": "renders mainmenu: 41 entries stay"
     }
   ],
-  "unresolved": [],
+  "unresolved": [
+    {
+      "key": "menuItem-266",
+      "label": "Blog",
+      "where": "mainmenu/pages/blog",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-267",
+      "label": "Category List",
+      "where": "mainmenu/pages/category-list",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-268",
+      "label": "Single Article",
+      "where": "mainmenu/pages/single-article",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-270",
+      "label": "Author",
+      "where": "mainmenu/pages/writers",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-271",
+      "label": "Archive",
+      "where": "mainmenu/pages/archive",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-276",
+      "label": "Landing",
+      "where": "mainmenu/pages/landing",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-277",
+      "label": "About",
+      "where": "mainmenu/pages/about",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    },
+    {
+      "key": "menuItem-351",
+      "label": "Component Wrapper",
+      "where": "mainmenu/pages/component",
+      "rule": "unresolved.stock-screens-branch",
+      "reason": "under \"Pages\", whose entries are mostly Joomla's stock screens (users, search, tags, sample listings)"
+    }
+  ],
   "counts": {
-    "menuItems": 2,
+    "menuItems": 3,
     "modules": 0,
-    "kept": 64,
-    "unresolved": 0
+    "kept": 55,
+    "unresolved": 8
   }
 }

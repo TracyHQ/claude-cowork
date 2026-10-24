@@ -136,8 +136,12 @@ final class ShowcaseNavProfile
         } else {
             $block = $row['block'] ?? null;
             if (is_array($block) && array_key_exists('path', $block)) {
+                // An entry of an inline navigation is found by its path (and page): the builder names the
+                // entry's block (`core/navigation-link`, `core/navigation-submenu`) only to say what it is,
+                // and its own replay selects by path alone — so does this one, and the sha256 chain proves the bytes.
                 $ok = $path($block['path']) && is_int($block['navigationBlock'] ?? null) && $block['navigationBlock'] >= 0 && $pageId($block)
-                    && array_diff(array_keys($block), ['navigationBlock', 'path', 'pageId', 'label']) === [];
+                    && (!array_key_exists('name', $block) || $text($block['name']))
+                    && array_diff(array_keys($block), ['name', 'navigationBlock', 'path', 'pageId', 'label']) === [];
             } elseif (is_array($block)) {
                 // A block removed by name alone would be any block of that name: one more selector is required.
                 $ok = $text($block['name'] ?? null) && array_diff(array_keys($block), ['name', 'ref', 'anchor', 'className', 'contains']) === []

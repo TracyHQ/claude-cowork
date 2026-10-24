@@ -134,21 +134,6 @@
     },
     {
       "op": "menuItem.param",
-      "key": "menuItem-133",
-      "identity": {
-        "path": "home/home-2-minimal",
-        "menutype": "mainmenu",
-        "language": "*"
-      },
-      "label": "Home 2 - Minimal",
-      "path": "menu_show",
-      "from": "1",
-      "to": "0",
-      "rule": "hide.home-branch-variant",
-      "reason": "another demo of the home page: under mainmenu/home"
-    },
-    {
-      "op": "menuItem.param",
       "key": "menuItem-142",
       "identity": {
         "path": "pages/j-content/author-listing",
@@ -327,6 +312,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-133",
+      "label": "Home 2 - Minimal",
+      "where": "mainmenu/home/home-2-minimal",
+      "rule": "keep.only-route-to-content",
+      "reason": "the only menu route to category:16, category:17, category:18 (+2): a showcase rule may not take real content along"
+    },
+    {
       "key": "menuItem-134",
       "label": "Presentation",
       "where": "mainmenu/our-work/presentation",
@@ -443,7 +435,7 @@
       "label": "Offcanvas",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 25 entries stay"
+      "reason": "renders mainmenu: 26 entries stay"
     },
     {
       "key": "module-149",
@@ -470,9 +462,9 @@
     }
   ],
   "counts": {
-    "menuItems": 11,
+    "menuItems": 10,
     "modules": 0,
-    "kept": 39,
+    "kept": 40,
     "unresolved": 2
   }
 }
