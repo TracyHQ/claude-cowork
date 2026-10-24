@@ -24,7 +24,8 @@
 # 4. configuration.php, .htaccess, PHP under media/ and a template that is not installed are refused;
 # 5. a stale expectation is a conflict and writes nothing; PHP that does not parse is refused;
 # 6. undo puts back what the write left and keeps the file the owner changed since;
-# 7. apply.revert takes a write back; 8. the Options switch takes the door away.
+# 7. apply.revert takes a write back; 8. the Options switch takes the door away (info: enabled false);
+# 9. a stale temporary is swept. PHP is refused (php_disabled) until Options › Allow PHP is switched on.
 set -euo pipefail
 E2E_NAME=tfiles
 # shellcheck source=joomla-stand.sh
@@ -63,6 +64,12 @@ say "1. info"
 call info '{}'
 expect "info advertises template_files version 1" "$(field info.template_files.version)" "1"
 expect "PHP is linted by the site's own command line" "$(field info.template_files.php_lint)" "cli"
+expect "and PHP is off until the owner switches it on" "$(field info.template_files.php)" "false"
+refused template.files.write "$(write_params e2e-tf-x "templates/cassiopeia/html/mod_custom/default.php" null '<?php echo 1;')"
+expect "a PHP file is refused php_disabled meanwhile" "$REFUSED $(field refused.0.reason)" "refused php_disabled"
+sql "UPDATE jos_extensions SET params=JSON_SET(params, '\$.template_files_php', '1') WHERE element='com_claudecowork'"
+call info '{}'
+expect "switched on in Options, info says PHP may be written" "$(field info.template_files.php)" "true"
 
 say "2. status"
 CSS_SHA=$(sha1_of $MEDIA/css/template.css)
@@ -128,8 +135,15 @@ expect "apply.revert takes the write back" "$(sha1_of $MEDIA/css/template.css)" 
 say "8. the Options switch"
 sql "UPDATE jos_extensions SET params=JSON_SET(params, '\$.template_files', '0') WHERE element='com_claudecowork'"
 call info '{}'
-expect "info no longer advertises the door" "$(field info.template_files)" "undefined"
+expect "info names the door as switched off" "$(field info.template_files)" '{"version":1,"enabled":false}'
 refused template.files.write "$(write_params e2e-tf-3 "$MEDIA/css/template.css" "$CSS_SHA" "body{}")"
-expect "a write answers unavailable" "$REFUSED" "unavailable"
+expect "a write answers disabled" "$REFUSED" "disabled"
+
+say "9. leftovers of a request that died"
+sql "UPDATE jos_extensions SET params=JSON_SET(params, '\$.template_files', '1') WHERE element='com_claudecowork'"
+in_site "printf x > $MEDIA/css/.tracy-tf-0123456789abcdef.tmp && touch -d '2 hours ago' $MEDIA/css/.tracy-tf-0123456789abcdef.tmp && printf x > $MEDIA/css/.tracy-tf-1111111111111111.tmp"
+call template.files.status '{}'
+expect "status sweeps the stale temporary and keeps the fresh one" "$(field swept) $(in_site "ls -A $MEDIA/css | grep -c '^.tracy-tf-'")" "1 1"
+in_site "rm -f $MEDIA/css/.tracy-tf-1111111111111111.tmp"
 
 finish

@@ -305,7 +305,7 @@ final class EngineFactory
         $engine->templateSiteSettings(self::buildTemplateSiteSettings());
         // `template.languageOverrides`: the site's language override files, for the strings that read in en-GB.
         $engine->languageOverrides(new \LanguageOverrides(JPATH_ROOT));
-        // `template.files.*`: the files of the installed site templates, unless the owner switched it off in Options.
+        // `template.files.*`: the files of the installed site templates, as the owner's two Options switches allow.
         $engine->templateFiles(self::buildTemplateFiles($params));
         $contract = trim((string) ComponentHelper::getParams('com_claudecowork')->get('contract', ''));
         $quickstart = $contract !== '';
@@ -546,16 +546,17 @@ final class EngineFactory
     /**
      * `template.files.*`: the files of each installed site template — `templates/<name>/`, where PHP
      * may be written (overrides, the layout), and its assets in `media/templates/site/<name>/`, where
-     * it may not — as `#__extensions` lists them. The Options switch `template_files` turns the door
-     * off (null: the actions answer 'unavailable' and `info` leaves it out). After a change T4's
-     * combined CSS is emptied, and every write and undo goes into Joomla's User Actions Log.
+     * it may not — as `#__extensions` lists them. Two Options switches: `template_files` (on unless
+     * switched off) turns the door off — the actions answer 'disabled' and `info` says
+     * `enabled: false`; `template_files_php` (off unless switched on) lets PHP be written at all.
+     * After a change T4's combined CSS is emptied, and every write and undo goes into Joomla's User
+     * Actions Log.
      */
     private static function buildTemplateFiles($params): ?\TemplateFiles
     {
-        if ((string) $params->get('template_files', '1') !== '1') return null;
         try {
             $db = Factory::getContainer()->get(DatabaseInterface::class);
-            return new \TemplateFiles(JPATH_ROOT, static function () use ($db): array {
+            return (new \TemplateFiles(JPATH_ROOT, static function () use ($db): array {
                 $query = $db->getQuery(true)
                     ->select($db->quoteName('element'))
                     ->from($db->quoteName('#__extensions'))
@@ -572,7 +573,8 @@ final class EngineFactory
                 JoomlaDerivedRows::clearOptimize(JPATH_ROOT);
             }, static function (array $event): void {
                 self::logTemplateFiles($event);
-            });
+            }))->enabled((string) $params->get('template_files', '1') === '1')
+                ->phpAllowed((string) $params->get('template_files_php', '0') === '1');
         } catch (\Throwable $e) {
             self::logFailure('buildTemplateFiles', $e);
             return null;

@@ -24,7 +24,8 @@
 # 3. wp-config.php, a plugin, uploads, an inactive theme and .htaccess are refused;
 # 4. a stale expectation is a conflict; a functions.php that does not parse is refused and the site still answers;
 # 5. undo puts back what the write left and keeps the file the owner changed since;
-# 6. apply.revert takes a write back; 7. the settings switch takes the door away.
+# 6. apply.revert takes a write back; 7. the settings switch takes the door away (info: enabled false);
+# 8. a stale parked file is swept. PHP is refused (php_disabled) until "Allow PHP" is ticked.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COWORK="$(cd "$HERE/../.." && pwd)"
@@ -115,6 +116,12 @@ say "1. info and status"
 call info '{}'
 expect "info advertises template_files version 1" "$(field info.template_files.version)" "1"
 expect "PHP is linted by the site's own command line" "$(field info.template_files.php_lint)" "cli"
+expect "and PHP is off until the owner ticks it" "$(field info.template_files.php)" "false"
+refused template.files.write "$(write_params e2e-tf-x "$CHILD/functions.php" "$(sha1_of $CHILD/functions.php)" '<?php echo 1;')"
+expect "functions.php is refused php_disabled meanwhile" "$REFUSED $(field refused.0.reason)" "refused php_disabled"
+wp option update claude_cowork_template_files_php 1 >/dev/null
+call info '{}'
+expect "ticked, info says PHP may be written" "$(field info.template_files.php)" "true"
 call template.files.status "{\"paths\":[\"$CHILD/style.css\"]}"
 expect "the roots are the child theme and its parent" "$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).roots.map(r => r.path + ":" + r.kind).join(","))' "$ANSWER")" \
   "$CHILD:theme,$PARENT:parent-theme"
@@ -143,9 +150,9 @@ expect "no temporary file is left" "$(in_site "find wp-content/themes -name '.tr
 expect "the next page runs the new functions.php" "$(in_site "curl -fsS http://localhost/ | grep -c 'tracy-e2e' || true")" "1"
 expect "the write is listed for the administrator" "$(wp option get claude_cowork_template_files_log --format=json | node -e 'const l = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(l[0].action + " " + l[0].undo_id + " " + l[0].files.length)')" \
   "template.files.write $UNDO1 4"
-expect "Settings > Claude Cowork shows the switch on and the write with its undo id" \
-  "$(wp eval 'wp_set_current_user(1); claude_cowork_render_settings_page();' | node -e 'const h = require("fs").readFileSync(0, "utf8"); process.stdout.write([/name="claude_cowork_template_files"\s+value="1"\s+checked/.test(h), h.includes("Theme file changes"), h.includes(process.argv[1]), h.includes("e2e-child/functions.php (updated)")].join(" "))' "$UNDO1")" \
-  "true true true true"
+expect "Settings > Claude Cowork shows both switches on and the write with its undo id" \
+  "$(wp eval 'wp_set_current_user(1); claude_cowork_render_settings_page();' | node -e 'const h = require("fs").readFileSync(0, "utf8"); process.stdout.write([/name="claude_cowork_template_files"\s+value="1"\s+checked/.test(h), /name="claude_cowork_template_files_php"\s+value="1"\s+checked/.test(h), h.includes("Theme file changes"), h.includes(process.argv[1]), h.includes("e2e-child/functions.php (updated)")].join(" "))' "$UNDO1")" \
+  "true true true true true"
 
 say "3. refusals"
 for case in "wp-config.php:denied" "wp-content/plugins/akismet/akismet.php:not_in_scope" "wp-content/plugins/hello.php:not_in_scope" \
@@ -180,9 +187,15 @@ expect "apply.revert takes the write back" "$(sha1_of $CHILD/style.css)" "$STYLE
 say "7. the settings switch"
 wp option update claude_cowork_template_files 0 >/dev/null
 call info '{}'
-expect "info no longer advertises the door" "$(field info.template_files)" "undefined"
+expect "info names the door as switched off" "$(field info.template_files)" '{"version":1,"enabled":false}'
 refused template.files.write "$(write_params e2e-tf-3 "$CHILD/style.css" "$STYLE_SHA" "body{}")"
-expect "a write answers unavailable" "$REFUSED" "unavailable"
+expect "a write answers disabled" "$REFUSED" "disabled"
+
+say "8. leftovers of a request that died"
+wp option update claude_cowork_template_files 1 >/dev/null
+in_site "printf x > $CHILD/.tracy-tf-0123456789abcdef.del && touch -d '2 hours ago' $CHILD/.tracy-tf-0123456789abcdef.del && printf x > $CHILD/.tracy-tf-1111111111111111.tmp"
+call template.files.status '{}'
+expect "status sweeps the stale parked file and keeps the fresh temporary" "$(field swept) $(in_site "ls -A $CHILD | grep -c '^.tracy-tf-'")" "1 1"
 
 say "result"
 if [ "$FAILED" -gt 0 ]; then echo "$FAILED check(s) failed"; exit 1; fi

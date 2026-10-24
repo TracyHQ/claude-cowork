@@ -47,8 +47,11 @@ final class TemplateFiles
 {
     /** The shape of the three actions; a caller reads it from `info.template_files.version`. */
     public const VERSION = 1;
-    /** One file, as media.upload takes it inline. Its previous bytes go into the Apply log too. */
-    public const MAX_FILE_BYTES = 8388608; // 8 MiB
+    /**
+     * One file. Its previous bytes go into one Apply log row (base64 of a serialized entry, about
+     * 1.4 times the bytes), which must fit the database's max_allowed_packet: 4 MiB on older MySQL.
+     */
+    public const MAX_FILE_BYTES = 2097152; // 2 MiB
     /** Every file of one call, decoded. One request body carries them all, base64 (a third more). */
     public const MAX_BYTES = 8388608; // 8 MiB
     public const MAX_FILES = 100;
@@ -67,6 +70,10 @@ final class TemplateFiles
     private const UNDO_ID = '~^[a-f0-9]{24}$~D';
     /** Temporary and parked files: a dotfile, so no rule of this door ever names one. */
     private const TEMP_PREFIX = '.tracy-tf-';
+    /** Exactly the names this door gives its temporaries and parked files, and nothing else. */
+    private const TEMP_NAME = '~^\.tracy-tf-[a-f0-9]{16}\.(tmp|del)$~D';
+    /** A temporary or parked file older than this was left by a request that died: it is swept. */
+    private const STALE_SECONDS = 3600;
     /** The Apply log step this door records, one per file. */
     public const LOG_OP = 'templateFiles';
 
@@ -85,6 +92,10 @@ final class TemplateFiles
     private ?array $resolved = null;
     /** null: not looked for yet; '': none usable. */
     private ?string $cli = null;
+    /** The owner's main switch: off, every action answers `disabled` and `info` says `enabled: false`. */
+    private bool $enabled = true;
+    /** The owner's PHP switch, off unless set: every `.php` path is refused `php_disabled`. */
+    private bool $phpAllowed = false;
 
     /**
      * @param string $root the site root (JPATH_ROOT, ABSPATH)
@@ -101,6 +112,25 @@ final class TemplateFiles
         $this->rename = static function (string $from, string $to): bool { return @rename($from, $to); };
     }
 
+    /** The owner's main switch (Joomla Options › Template files, WordPress Settings › Claude Cowork). */
+    public function enabled(bool $enabled): self
+    {
+        $this->enabled = $enabled;
+        return $this;
+    }
+
+    /** The owner's PHP switch (Allow PHP in template files); off by default. */
+    public function phpAllowed(bool $allowed): self
+    {
+        $this->phpAllowed = $allowed;
+        return $this;
+    }
+
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
     /** Tests only: the rename every move goes through, so a failure halfway through a batch can be staged. */
     public function renameWith(callable $rename): self
     {
@@ -108,11 +138,17 @@ final class TemplateFiles
         return $this;
     }
 
-    /** What `info` advertises. */
+    /**
+     * What `info` advertises: `{version, enabled: false}` when the owner switched the door off, so a
+     * caller can tell them where to switch it on; else its limits and whether PHP may be written.
+     */
     public function info(): array
     {
+        if (!$this->enabled) return ['version' => self::VERSION, 'enabled' => false];
         return [
             'version' => self::VERSION,
+            'enabled' => true,
+            'php' => $this->phpAllowed,
             'actions' => ['template.files.status', 'template.files.write', 'template.files.undo'],
             'max_file_bytes' => self::MAX_FILE_BYTES,
             'max_bytes' => self::MAX_BYTES,
@@ -131,6 +167,8 @@ final class TemplateFiles
      */
     public function status(array $p): array
     {
+        if (!$this->enabled) return self::disabled();
+        $swept = $this->sweep();
         $paths = $p['paths'] ?? [];
         if (!is_array($paths) || ($paths !== [] && array_values($paths) !== $paths)) return self::err('bad_params', 'paths must be a list of site-relative paths');
         if (count($paths) > self::MAX_STATUS_PATHS) return self::err('too_large', 'at most ' . self::MAX_STATUS_PATHS . ' paths a call');
@@ -147,7 +185,7 @@ final class TemplateFiles
             }
             $files[] = ['path' => $path, 'exists' => $live !== null] + ($live === null ? [] : self::shown($live)) + ['root' => $where['root']['path']];
         }
-        return ['ok' => true, 'roots' => array_values($this->roots()), 'files' => $files, 'php_lint' => $this->lintModeNow(false)];
+        return ['ok' => true, 'roots' => array_values($this->roots()), 'files' => $files, 'php' => $this->phpAllowed, 'php_lint' => $this->lintModeNow(false), 'swept' => $swept];
     }
 
     /**
@@ -157,10 +195,13 @@ final class TemplateFiles
      */
     public function write(array $p, string $applyId, ApplyLog $log): array
     {
+        if (!$this->enabled) return self::disabled();
         $files = $p['files'] ?? null;
         if (!is_array($files) || $files === [] || array_values($files) !== $files) return self::err('bad_params', 'files must be a non-empty list');
         if (count($files) > self::MAX_FILES) return self::err('too_large', 'at most ' . self::MAX_FILES . ' files a call; send the rest in another call', ['max_files' => self::MAX_FILES]);
         $dryRun = ($p['dry_run'] ?? false) === true;
+        // A dry run changes nothing on disk, not even the leftovers of a request that died.
+        $swept = $dryRun ? 0 : $this->sweep();
 
         // ── the request itself: shapes, sizes, checksums ──
         $items = [];
@@ -204,8 +245,10 @@ final class TemplateFiles
             $items[$k]['abs'] = $where['abs'];
             $items[$k]['php'] = self::extension($item['path']) === 'php';
         }
+        if (array_filter($refused, static fn($r) => $r['reason'] === 'php_disabled') !== [])
+            $refusedNext = ['next' => 'PHP files are switched off on this site: its owner can allow them (Allow PHP in template files) and the write be sent again.'];
         if ($refused !== [])
-            return self::err('refused', 'This door does not write ' . implode(', ', array_map(static fn($r) => $r['path'] . ' (' . $r['reason'] . ')', $refused)) . '. Nothing was written', ['refused' => $refused]);
+            return self::err('refused', 'This door does not write ' . implode(', ', array_map(static fn($r) => $r['path'] . ' (' . $r['reason'] . ')', $refused)) . '. Nothing was written', ['refused' => $refused] + ($refusedNext ?? []));
 
         // ── what the site holds now (compare-and-set) ──
         $conflicts = [];
@@ -252,7 +295,7 @@ final class TemplateFiles
         }, $items);
         $changing = array_values(array_filter($items, static fn($item) => $item['op'] !== 'unchanged'));
         if ($dryRun) return ['ok' => true, 'dry_run' => true, 'apply_id' => $applyId, 'undo_id' => null, 'changed' => count($changing), 'files' => $answerFiles, 'lint' => $lint];
-        if ($changing === []) return ['ok' => true, 'apply_id' => $applyId, 'undo_id' => null, 'changed' => 0, 'files' => $answerFiles, 'lint' => $lint];
+        if ($changing === []) return ['ok' => true, 'apply_id' => $applyId, 'undo_id' => null, 'changed' => 0, 'files' => $answerFiles, 'lint' => $lint, 'swept' => $swept];
 
         // ── the batch: every file to a temporary beside it, then each renamed into place ──
         $ops = array_map(static fn($item) => ['path' => $item['path'], 'abs' => $item['abs'], 'bytes' => $item['delete'] ? null : $item['bytes'],
@@ -278,7 +321,7 @@ final class TemplateFiles
         $this->finish($done);
         $this->tell(['action' => 'template.files.write', 'apply_id' => $applyId, 'undo_id' => $undoId,
             'files' => array_map(static fn($item) => ['path' => $item['path'], 'op' => $item['op']], $changing)]);
-        return ['ok' => true, 'apply_id' => $applyId, 'undo_id' => $undoId, 'changed' => count($changing), 'files' => $answerFiles, 'lint' => $lint,
+        return ['ok' => true, 'apply_id' => $applyId, 'undo_id' => $undoId, 'changed' => count($changing), 'files' => $answerFiles, 'lint' => $lint, 'swept' => $swept,
             'undo' => ['action' => 'template.files.undo', 'params' => ['apply_id' => $applyId, 'undo_id' => $undoId]]];
     }
 
@@ -290,6 +333,7 @@ final class TemplateFiles
      */
     public function undo(array $p, string $applyId, ApplyLog $log): array
     {
+        if (!$this->enabled) return self::disabled();
         $undoId = $p['undo_id'] ?? null;
         if ($undoId !== null && (!is_string($undoId) || !preg_match(self::UNDO_ID, $undoId))) return self::err('bad_params', 'undo_id is the 24 hex characters template.files.write answered');
         try {
@@ -386,7 +430,8 @@ final class TemplateFiles
         $after = $record['after'] ?? null;
         if (($before !== null && !is_string($before)) || ($after !== null && (!is_string($after) || !preg_match(self::HASH, $after))))
             return ['kept' => ['reason' => 'unreadable-undo-step']];
-        // An undo row is data: the path is checked again, as if it were asked for now.
+        if (!$this->enabled) return ['kept' => ['reason' => 'disabled']];
+        // An undo row is data: the path is checked again, as if it were asked for now (PHP switched off included).
         $where = $this->check($path);
         if (isset($where['reason'])) return ['kept' => ['reason' => 'out-of-scope', 'detail' => $where['reason']]];
         if ($simulated !== null && array_key_exists($path, $simulated)) {
@@ -437,7 +482,7 @@ final class TemplateFiles
     /**
      * Where one path lands, or why it may not: `['abs', 'root']`, or `['reason']`, one of
      * bad_path, absolute, traversal, dotfile, denied, executable, extension, not_in_scope,
-     * php_not_allowed, symlink, not_a_file.
+     * php_not_allowed, php_disabled, symlink, not_a_file.
      */
     public function check($path): array
     {
@@ -459,6 +504,7 @@ final class TemplateFiles
             if (strpos($path, $candidate['path'] . '/') === 0 && ($root === null || strlen($candidate['path']) > strlen($root['path']))) $root = $candidate;
         if ($root === null) return ['reason' => 'not_in_scope'];
         if ($extension === 'php' && !$root['php']) return ['reason' => 'php_not_allowed'];
+        if ($extension === 'php' && !$this->phpAllowed) return ['reason' => 'php_disabled'];
         if ($this->linkOnWay($path)) return ['reason' => 'symlink'];
         $abs = $this->root . '/' . $path;
         if (file_exists($abs) && !is_file($abs)) return ['reason' => 'not_a_file'];
@@ -754,12 +800,48 @@ final class TemplateFiles
         return [proc_close($process), $output];
     }
 
+    // ── leftovers ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Remove what a request that died left behind: files named exactly as this door names its
+     * temporaries and parked files ({@see TEMP_NAME}), older than an hour, inside the roots. The walk
+     * never follows a link and never enters a dot-folder; a link with such a name is left alone.
+     * Answers how many went.
+     */
+    private function sweep(): int
+    {
+        $swept = 0;
+        $before = time() - self::STALE_SECONDS;
+        foreach ($this->roots() as $root) {
+            try {
+                $walk = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+                    new RecursiveDirectoryIterator($this->root . '/' . $root['path'], FilesystemIterator::SKIP_DOTS),
+                    static function (SplFileInfo $item): bool {
+                        if ($item->isLink()) return false;
+                        return $item->isDir() ? $item->getFilename()[0] !== '.' : (bool) preg_match(self::TEMP_NAME, $item->getFilename());
+                    }));
+                foreach ($walk as $item) {
+                    if ($item->isLink() || !$item->isFile() || $item->getMTime() >= $before) continue;
+                    if (@unlink($item->getPathname())) $swept++;
+                }
+            } catch (Throwable $ignored) {
+                // A folder that cannot be read keeps its leftovers; the write itself is not refused for it.
+            }
+        }
+        return $swept;
+    }
+
     // ── telling ───────────────────────────────────────────────────────────────────────────────
 
     private function tell(array $event): void
     {
         if ($this->audit === null) return;
         try { ($this->audit)($event + ['at' => gmdate('Y-m-d\TH:i:s\Z')]); } catch (Throwable $ignored) {}
+    }
+
+    private static function disabled(): array
+    {
+        return self::err('disabled', 'Template files are switched off on this site: its owner can switch them on (Template files) in the Claude Cowork settings');
     }
 
     private static function err(string $code, string $message, array $extra = []): array

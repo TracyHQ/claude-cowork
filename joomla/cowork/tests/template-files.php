@@ -44,9 +44,10 @@ if (function_exists('check')) {
     ];
     $tfAudit = [];
     $tfChanged = [];
-    $tfMake = static function (?string $lint = null) use ($tfRoot, $tfRoots, &$tfAudit, &$tfChanged): TemplateFiles {
-        return new TemplateFiles($tfRoot, $tfRoots, static function (array $paths) use (&$tfChanged): void { $tfChanged[] = $paths; },
-            static function (array $event) use (&$tfAudit): void { $tfAudit[] = $event; }, $lint);
+    // PHP allowed: the owner switched it on. The switch itself is tested below.
+    $tfMake = static function (?string $lint = null, bool $php = true) use ($tfRoot, $tfRoots, &$tfAudit, &$tfChanged): TemplateFiles {
+        return (new TemplateFiles($tfRoot, $tfRoots, static function (array $paths) use (&$tfChanged): void { $tfChanged[] = $paths; },
+            static function (array $event) use (&$tfAudit): void { $tfAudit[] = $event; }, $lint))->phpAllowed($php);
     };
     $tfFiles = $tfMake();
     $tfLog = new FakeApplyLog();
@@ -68,9 +69,9 @@ if (function_exists('check')) {
 
     // ---- info -----------------------------------------------------------------------------------
     $tfInfo = $tfCall($tfEngine, 'info', [])['info']['template_files'] ?? null;
-    check('info advertises the door: its version, actions and limits',
-        [$tfInfo['version'] ?? null, $tfInfo['actions'] ?? null, $tfInfo['max_file_bytes'] ?? null, $tfInfo['max_bytes'] ?? null, $tfInfo['max_files'] ?? null],
-        [1, ['template.files.status', 'template.files.write', 'template.files.undo'], 8388608, 8388608, 100]);
+    check('info advertises the door: its version, that it is on, that PHP may be written, its actions and limits',
+        [$tfInfo['version'] ?? null, $tfInfo['enabled'] ?? null, $tfInfo['php'] ?? null, $tfInfo['actions'] ?? null, $tfInfo['max_file_bytes'] ?? null, $tfInfo['max_bytes'] ?? null, $tfInfo['max_files'] ?? null],
+        [1, true, true, ['template.files.status', 'template.files.write', 'template.files.undo'], 2097152, 8388608, 100]);
     checkTrue('info names how PHP is checked here', in_array($tfInfo['php_lint'] ?? 'x', ['cli', 'tokens'], true));
     $tfBare = new Engine($tfToken, [], null, null, null, null, $tfWriter, null, $tfLog);
     check('an engine without the door does not advertise it', array_key_exists('template_files', $tfCall($tfBare, 'info', [])['info']), false);
@@ -147,8 +148,9 @@ if (function_exists('check')) {
     check('a delete names the hash of the file it removes', $tfWrite([['path' => 'templates/ja_test/js/a.js', 'delete' => true, 'expected_sha1' => null]])['error'], 'bad_params');
     $tfBig = str_repeat('a', TemplateFiles::MAX_FILE_BYTES + 1);
     check('a file past the size cap is refused', $tfWrite([$tfFile('templates/ja_test/css/big.css', $tfBig, null)])['error'], 'too_large');
-    $tfHalf = str_repeat('b', intdiv(TemplateFiles::MAX_BYTES, 2) + 1);
-    check('files past the call cap together are refused', $tfWrite([$tfFile('templates/ja_test/css/h1.css', $tfHalf, null), $tfFile('templates/ja_test/css/h2.css', $tfHalf, null)])['error'], 'too_large');
+    $tfHalf = str_repeat('b', TemplateFiles::MAX_FILE_BYTES);
+    $tfCap = $tfWrite(array_map(static fn($i) => $tfFile("templates/ja_test/css/h$i.css", $tfHalf, null), range(1, intdiv(TemplateFiles::MAX_BYTES, TemplateFiles::MAX_FILE_BYTES) + 1)));
+    check('files each under the file cap but past the call cap together are refused', [$tfCap['error'], $tfCap['max_bytes'] ?? null], ['too_large', TemplateFiles::MAX_BYTES]);
     unset($tfBig, $tfHalf);
     check('more files than a call takes are refused', $tfWrite(array_map(static fn($i) => $tfFile("templates/ja_test/css/m$i.css", 'm', null), range(1, TemplateFiles::MAX_FILES + 1)))['error'], 'too_large');
     check('nothing of those was written', [$tfGet('templates/ja_test/css/n.css'), $tfGet('templates/ja_test/css/h1.css'), $tfGet('templates/ja_test/css/m1.css'), $tfTemps()], [null, null, null, []]);
@@ -306,6 +308,62 @@ if (function_exists('check')) {
     // ---- the delete op on a file the site never had, and a stale delete ------------------------------------------
     check('deleting a file that is not there is already done', array_column($tfWrite([['path' => 'templates/ja_test/js/none.js', 'delete' => true, 'expected_sha1' => sha1('x')]], 'push-4')['files'], 'op'), ['unchanged']);
     check('deleting a file that changed is a conflict', $tfWrite([['path' => 'templates/ja_test/js/a.js', 'delete' => true, 'expected_sha1' => sha1('old')]], 'push-4')['error'], 'conflict');
+
+    // ---- the owner's PHP switch, off unless switched on ----------------------------------------------------------
+    $tfNoPhp = (new Engine($tfToken, [], null, null, null, null, $tfWriter, null, $tfLog))->templateFiles($tfMake(null, false));
+    check('with PHP switched off info says so', $tfCall($tfNoPhp, 'info', [])['info']['template_files']['php'], false);
+    check('and a new door has PHP off', (new TemplateFiles($tfRoot, $tfRoots))->info()['php'], false);
+    $tfPhpOff = $tfCall($tfNoPhp, 'template.files.write', ['apply_id' => 'push-nophp', 'files' => [
+        $tfFile('templates/ja_test/css/nophp.css', 'css', null), $tfFile('templates/ja_test/html/new.php', "<?php\n", null)]]);
+    check('every .php entry is refused php_disabled, the call with it, and the answer says how to switch it on',
+        [$tfPhpOff['error'], $tfPhpOff['refused'], isset($tfPhpOff['next']), $tfGet('templates/ja_test/css/nophp.css')],
+        ['refused', [['path' => 'templates/ja_test/html/new.php', 'reason' => 'php_disabled']], true, null]);
+    check('status names the reason too', $tfCall($tfNoPhp, 'template.files.status', ['paths' => ['templates/ja_test/html/com_content/article/default.php']])['files'][0], ['path' => 'templates/ja_test/html/com_content/article/default.php', 'refused' => 'php_disabled']);
+    check('a write without PHP lands', $tfCall($tfNoPhp, 'template.files.write', ['apply_id' => 'push-nophp', 'files' => [$tfFile('templates/ja_test/css/nophp.css', 'css', null)]])['changed'], 1);
+    $tfPhpWrite = $tfWrite([$tfFile('templates/ja_test/html/com_content/article/default.php', "<?php\necho 'v2';\n", sha1($tfPhp))], 'push-php');
+    $tfPhpUndo = $tfCall($tfNoPhp, 'template.files.undo', ['apply_id' => 'push-php']);
+    check('with PHP switched off an undo keeps a PHP file as it is, naming why', [$tfPhpUndo['kept'][0]['reason'], $tfPhpUndo['kept'][0]['detail'], $tfGet('templates/ja_test/html/com_content/article/default.php')],
+        ['out-of-scope', 'php_disabled', "<?php\necho 'v2';\n"]);
+    check('switched on again, it goes back', [$tfCall($tfEngine, 'template.files.undo', ['apply_id' => 'push-php'])['complete'], $tfGet('templates/ja_test/html/com_content/article/default.php')], [true, $tfPhp]);
+
+    // ---- the owner's main switch ---------------------------------------------------------------------------------
+    $tfOff = (new Engine($tfToken, [], null, null, null, null, $tfWriter, null, $tfLog))->templateFiles($tfMake()->enabled(false));
+    check('switched off, info still names the door, as off', $tfCall($tfOff, 'info', [])['info']['template_files'], ['version' => 1, 'enabled' => false]);
+    check('and every action answers disabled, even one that names no apply_id',
+        [$tfCall($tfOff, 'template.files.status', [])['error'], $tfCall($tfOff, 'template.files.write', ['files' => [$tfFile('templates/ja_test/css/off.css', 'x', null)]])['error'],
+            $tfCall($tfOff, 'template.files.undo', ['apply_id' => 'push-nophp'])['error'], $tfGet('templates/ja_test/css/off.css')], ['disabled', 'disabled', 'disabled', null]);
+    $tfOffRevert = $tfCall($tfOff, 'apply.revert', ['apply_id' => 'push-nophp']);
+    check('apply.revert of template files is refused too, and changes nothing', [$tfOffRevert['error'], $tfOffRevert['kept'][0]['reason'], $tfGet('templates/ja_test/css/nophp.css')], ['conflict', 'disabled', 'css']);
+
+    // ---- leftovers of a request that died: swept after an hour, only by their exact name, never through a link ------
+    $tfStale = static function (string $relative, int $age) use ($tfRoot): void {
+        if (!is_dir(dirname($tfRoot . '/' . $relative))) mkdir(dirname($tfRoot . '/' . $relative), 0777, true);
+        file_put_contents($tfRoot . '/' . $relative, 'left');
+        touch($tfRoot . '/' . $relative, time() - $age);
+    };
+    $tfStale('templates/ja_test/css/.tracy-tf-0123456789abcdef.tmp', 7200);
+    $tfStale('templates/ja_test/js/deep/.tracy-tf-fedcba9876543210.del', 7200);
+    $tfStale('templates/ja_test/css/.tracy-tf-1111111111111111.tmp', 60);
+    $tfStale('templates/ja_test/css/.tracy-tf-notours.tmp', 7200);
+    $tfStale('templates/ja_test/css/x.tracy-tf-2222222222222222.tmp', 7200);
+    $tfStale('templates/ja_test/.git/.tracy-tf-3333333333333333.tmp', 7200);
+    file_put_contents($tfOutside . '/.tracy-tf-4444444444444444.tmp', 'outside'); touch($tfOutside . '/.tracy-tf-4444444444444444.tmp', time() - 7200);
+    symlink($tfRoot . '/configuration.php', $tfRoot . '/templates/ja_test/css/.tracy-tf-5555555555555555.del');
+    $tfStale('templates/ja_test/../.tracy-tf-6666666666666666.tmp', 7200);
+    $tfLeft = static fn(): array => array_map(static fn($p) => is_link($tfRoot . '/' . $p) || file_exists($tfRoot . '/' . $p), [
+        'templates/ja_test/css/.tracy-tf-0123456789abcdef.tmp', 'templates/ja_test/js/deep/.tracy-tf-fedcba9876543210.del', 'templates/ja_test/css/.tracy-tf-1111111111111111.tmp',
+        'templates/ja_test/css/.tracy-tf-notours.tmp', 'templates/ja_test/css/x.tracy-tf-2222222222222222.tmp', 'templates/ja_test/.git/.tracy-tf-3333333333333333.tmp',
+        'templates/ja_test/css/.tracy-tf-5555555555555555.del', 'templates/ja_test/../.tracy-tf-6666666666666666.tmp']);
+    $tfDry = $tfWrite([$tfFile('templates/ja_test/css/swept.css', 's', null)], 'push-sweep', ['dry_run' => true]);
+    check('a dry run sweeps nothing', [$tfDry['ok'], $tfLeft()], [true, [true, true, true, true, true, true, true, true]]);
+    $tfSwept = $tfCall($tfEngine, 'template.files.status', []);
+    check('status sweeps the stale ones of this door\'s names, in the roots', $tfSwept['swept'], 2);
+    check('and leaves a fresh one, other names, a dot-folder, a link, and anything outside the roots',
+        [$tfLeft(), file_exists($tfOutside . '/.tracy-tf-4444444444444444.tmp'), is_file($tfRoot . '/configuration.php')], [[false, false, true, true, true, true, true, true], true, true]);
+    $tfStale('templates/ja_test/css/.tracy-tf-7777777777777777.tmp', 7200);
+    $tfSweptWrite = $tfWrite([$tfFile('templates/ja_test/css/swept.css', 's', null)], 'push-sweep');
+    check('a write sweeps too, before it writes', [$tfSweptWrite['swept'], $tfSweptWrite['changed'], file_exists($tfRoot . '/templates/ja_test/css/.tracy-tf-7777777777777777.tmp')], [1, 1, false]);
+    unlink($tfRoot . '/templates/ja_test/../.tracy-tf-6666666666666666.tmp');
 
     // ---- clean up ------------------------------------------------------------------------------------------------
     $tfRm = static function (string $dir) use (&$tfRm): void {

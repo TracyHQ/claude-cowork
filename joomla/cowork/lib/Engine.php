@@ -4453,7 +4453,7 @@ final class Engine
     private function templateFilesDoor(string $action, array $p): array
     {
         if ($this->templateFiles === null) return $this->err('unavailable', 'template files are not wired on this site');
-        if ($action === 'template.files.status') return $this->templateFiles->status($p);
+        if ($action === 'template.files.status' || !$this->templateFiles->isEnabled()) return $this->templateFiles->status($p);
         if ($this->log === null) return $this->err('unavailable', 'apply log not wired');
         $applyId = $this->applyId($p);
         if ($applyId === null) return $this->err('bad_params', 'apply_id required');

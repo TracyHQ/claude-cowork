@@ -103,6 +103,8 @@ const CLAUDE_COWORK_ACTION = 'claude_cowork';
 const CLAUDE_COWORK_TOKEN_OPTION = 'claude_cowork_token';
 /** '1' (the default) lets `template.files.*` write the theme's files; '0' refuses every one. */
 const CLAUDE_COWORK_TEMPLATE_FILES_OPTION = 'claude_cowork_template_files';
+/** '1' also lets it write the theme's PHP; '0' (the default) refuses every `.php` path. */
+const CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION = 'claude_cowork_template_files_php';
 /** The latest template file writes and undos, newest first, for the settings page. */
 const CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION = 'claude_cowork_template_files_log';
 
@@ -528,16 +530,14 @@ add_action('wp_ajax_nopriv_' . CLAUDE_COWORK_ACTION, 'claude_cowork_exec');
 /**
  * `template.files.*`: the folders it may write are the active theme and, for a child theme, its
  * parent — each as a path under ABSPATH (a theme folder reached through a link, or outside ABSPATH,
- * is no root at all). PHP may be written there, linted first. Null when the owner switched the
- * door off on the settings page: the actions answer 'unavailable' and `info` leaves it out.
+ * is no root at all). Two switches on the settings page: Theme files (on unless switched off) — off,
+ * the actions answer 'disabled' and `info` says `enabled: false`; Allow PHP (off unless switched
+ * on) — off, every `.php` path is refused `php_disabled`. PHP that may be written is linted first.
  */
-function claude_cowork_template_files(): ?TemplateFiles
+function claude_cowork_template_files(): TemplateFiles
 {
-    if ((string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_OPTION, '1') !== '1') {
-        return null;
-    }
     $root = rtrim(ABSPATH, '/\\');
-    return new TemplateFiles($root, static function () use ($root): array {
+    return (new TemplateFiles($root, static function () use ($root): array {
         $site = realpath($root);
         $roots = [];
         foreach (['theme' => get_stylesheet_directory(), 'parent-theme' => get_template_directory()] as $kind => $dir) {
@@ -551,7 +551,9 @@ function claude_cowork_template_files(): ?TemplateFiles
             }
         }
         return array_values($roots);
-    }, null, 'claude_cowork_template_files_note');
+    }, null, 'claude_cowork_template_files_note'))
+        ->enabled((string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_OPTION, '1') === '1')
+        ->phpAllowed((string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, '0') === '1');
 }
 
 /**
@@ -712,6 +714,14 @@ function claude_cowork_register_setting(): void
         'default'           => '1',
         'show_in_rest'      => false,
     ]);
+    register_setting('claude_cowork', CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, [
+        'type'              => 'string',
+        'sanitize_callback' => static function ($value): string {
+            return $value === '1' ? '1' : '0';
+        },
+        'default'           => '0',
+        'show_in_rest'      => false,
+    ]);
 }
 
 add_action('admin_init', 'claude_cowork_register_setting');
@@ -737,6 +747,7 @@ function claude_cowork_render_settings_page(): void
 
     $token = (string) get_option(CLAUDE_COWORK_TOKEN_OPTION, '');
     $templateFiles = (string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_OPTION, '1') === '1';
+    $templatePhp = (string) get_option(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION, '0') === '1';
     $templateLog = get_option(CLAUDE_COWORK_TEMPLATE_FILES_LOG_OPTION, []);
     $templateLog = is_array($templateLog) ? $templateLog : [];
     ?>
@@ -773,12 +784,20 @@ function claude_cowork_render_settings_page(): void
                             <input type="checkbox" id="claude_cowork_template_files"
                                    name="<?php echo esc_attr(CLAUDE_COWORK_TEMPLATE_FILES_OPTION); ?>"
                                    value="1" <?php checked($templateFiles); ?>>
-                            Let Tracy put the theme files you approve (CSS, JavaScript, template PHP) on this site
+                            Let Tracy put the theme files you approve (stylesheets, scripts, images, fonts) on this site
+                        </label>
+                        <br>
+                        <label for="claude_cowork_template_files_php">
+                            <input type="checkbox" id="claude_cowork_template_files_php"
+                                   name="<?php echo esc_attr(CLAUDE_COWORK_TEMPLATE_FILES_PHP_OPTION); ?>"
+                                   value="1" <?php checked($templatePhp); ?>>
+                            Allow PHP in theme files (functions.php, templates)
                         </label>
                         <p class="description">Only files of the active theme and its parent theme. Each
-                            write is checked against what the site holds, PHP is checked before it is
-                            written, and every write is recorded so it can be taken back. Untick to
-                            refuse every theme file write.</p>
+                            write is checked against what the site holds, PHP is checked by this site's PHP
+                            before it is written, and every write is recorded so it can be taken back.
+                            Untick the first box to refuse every theme file write, the second to refuse
+                            every PHP file.</p>
                     </td>
                 </tr>
             </table>
