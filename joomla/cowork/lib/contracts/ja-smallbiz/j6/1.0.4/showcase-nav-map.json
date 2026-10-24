@@ -289,6 +289,28 @@
       "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
     },
     {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_smallbiz - Default",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Default · Pages · column 104",
+      "style": {
+        "id": 10,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 103,
+      "column": 104,
+      "path": "mm_config.mainmenu.item-103.sub.rows[item=104]",
+      "before": "a1644f844e3979130f16b4a24fc54117e68b1f29b223117e919c5221efba3d44",
+      "after": "b99ff38513fb13a6567e387f6b13b9c4452f225e21f50c9a267d9532ab581a03",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-104 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
       "op": "templateStyle.megaSubRemove",
       "key": "templateStyle-11",
       "identity": {
@@ -308,6 +330,28 @@
       "after": "6183779f74dbc6dc7771b851808144aaa696ed25fcb37630367c020420fe30ef",
       "rule": "hide.mega-sub-of-emptied-item",
       "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "ja_smallbiz - Car",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Car · Pages · column 104",
+      "style": {
+        "id": 11,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 103,
+      "column": 104,
+      "path": "mm_config.mainmenu.item-103.sub.rows[item=104]",
+      "before": "6183779f74dbc6dc7771b851808144aaa696ed25fcb37630367c020420fe30ef",
+      "after": "718a8cfe041408131598440b7d5ac44bc4f74b1e2f6e35d66d3adddeb438764c",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-104 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     },
     {
       "op": "templateStyle.megaSubRemove",
@@ -331,6 +375,28 @@
       "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
     },
     {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "ja_smallbiz - Gym",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Gym · Pages · column 104",
+      "style": {
+        "id": 12,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 103,
+      "column": 104,
+      "path": "mm_config.mainmenu.item-103.sub.rows[item=104]",
+      "before": "ce41a9b555b1e48e4191809d99d77e7e68dd7943a091f3db72908fe66d501c22",
+      "after": "2b8b8ece08e6a8946b5543e15e13fce130f553c3f98cf257a6d8d5370aea28bf",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-104 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
       "op": "templateStyle.megaSubRemove",
       "key": "templateStyle-13",
       "identity": {
@@ -350,6 +416,28 @@
       "after": "911247aa819dc6c922509ed598c4d5edd7b0e58966f902bbb0294f644a9e37a7",
       "rule": "hide.mega-sub-of-emptied-item",
       "reason": "every child of \"Home\" in mainmenu leaves the navigation; T3 builds a dropdown from this sub whatever the children, so it would open empty"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-13",
+      "identity": {
+        "title": "ja_smallbiz - Wedding",
+        "template": "ja_smallbiz",
+        "client_id": "0"
+      },
+      "label": "ja_smallbiz - Wedding · Pages · column 104",
+      "style": {
+        "id": 13,
+        "template": "ja_smallbiz"
+      },
+      "menutype": "mainmenu",
+      "item": 103,
+      "column": 104,
+      "path": "mm_config.mainmenu.item-103.sub.rows[item=104]",
+      "before": "911247aa819dc6c922509ed598c4d5edd7b0e58966f902bbb0294f644a9e37a7",
+      "after": "59d7df252014346506d415f76fac53734a47aea26133af51b17afb329f7fbf2e",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-104 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     }
   ],
   "kept": [
@@ -445,13 +533,42 @@
       "where": "mainmenu/pages/joomla-content/tagged-items",
       "rule": "unresolved.functional-in-hidden-branch",
       "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "templateStyle-10",
+      "label": "ja_smallbiz - Default",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-124 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-11",
+      "label": "ja_smallbiz - Car",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-124 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-12",
+      "label": "ja_smallbiz - Gym",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-124 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-13",
+      "label": "ja_smallbiz - Wedding",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-124 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     }
   ],
   "counts": {
     "menuItems": 17,
     "modules": 0,
     "megaSubs": 4,
+    "megaColumns": 4,
     "kept": 11,
-    "unresolved": 2
+    "unresolved": 6
   }
 }

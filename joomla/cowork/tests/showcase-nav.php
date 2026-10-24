@@ -606,6 +606,147 @@ $xDone = $xCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-x', 're
 $xw->beforeCas = null;
 check('the retried apply completes, the raced style a conflict', [$xDone['status'], $xDone['moved'], $xDone['skipped'], $xw->store['templateStyle'][$tPink]['params']],
     ['completed', 19, ['templateStyle-11' => 'it changed while it was being written'], $xRaced . ' ']);
+// ------------------------------------------------------------------ a T3 mega-menu column whose items all leave
+
+// T3MegaSub::removeColumn on its own: every entry of the column goes, a row it empties goes with it, a
+// row that was already empty stays, a module column naming the same id is not that column.
+$cCol = fn (array $rows) => json_encode(['mm_config' => json_encode(['mainmenu' => ['item-7' => ['sub' => ['rows' => $rows]]]])]);
+$cRows = fn (array $edit) => isset($edit['raw']) ? json_decode(json_decode($edit['raw'], true)['mm_config'], true)['mainmenu']['item-7']['sub']['rows'] : $edit;
+check('removeColumn drops the column in every row, and a row it empties',
+    $cRows(T3MegaSub::removeColumn($cCol([[['item' => 8, 'width' => 6], ['item' => '9']], [['item' => 8]], [], [['position' => 8, 'item' => 8]]]), 'mainmenu', 7, 8)),
+    [[['item' => '9']], [], [['position' => 8, 'item' => 8]]]);
+check('a column the sub does not hold is absent', T3MegaSub::removeColumn($cCol([[['item' => 9]]]), 'mainmenu', 7, 8), ['absent' => true]);
+check('nor is a boolean or a float an item: nothing is edited', [isset(T3MegaSub::removeColumn($cCol([[['item' => true]]]), 'mainmenu', 7, 1)['raw']), isset(T3MegaSub::removeColumn(str_replace(':8}', ':8.0}', $cCol([[['item' => 8]]])), 'mainmenu', 7, 8)['raw'])], [false, false]);
+$cSlashes = '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"sub\":{\"rows\":[[{\"item\":8,\"class\":\"a\\\\\/b\"},{\"item\":9}]]}}}}","z":1}';
+check('the column is re-encoded the way it was stored, every other byte kept', T3MegaSub::removeColumn($cSlashes, 'mainmenu', 7, 8)['raw'] ?? null,
+    '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"sub\":{\"rows\":[[{\"item\":9}]]}}}}","z":1}');
+
+// 🔒 ja-space 1.0.7: the map hides "J! Pages" (109), the head of the first column of "Pages" (108),
+// while "Other Pages" and "Joomla Content" stay. T3 would start the first column at Other Pages and run
+// it to the end, listing both columns twice: each style drops the 109 column and nothing else.
+$spSource = __DIR__ . '/../lib/contracts/ja-space/j6/1.0.7';
+$spMap = json_decode(file_get_contents($spSource . '/showcase-nav-map.json'), true, 512, JSON_THROW_ON_ERROR);
+$spContent = json_decode(file_get_contents($spSource . '/content-map.json'), true, 512, JSON_THROW_ON_ERROR);
+$spLock = json_decode(file_get_contents($spSource . '/presentation-lock.json'), true, 512, JSON_THROW_ON_ERROR);
+$spLoads = function (array $profile, ?array $lock = null) use ($spSource, $spContent, $spLock) {
+    try { new ShowcaseNavProfile($profile, $spContent, $lock ?? $spLock, $spSource, json_encode($profile), 'ja-space/j6/1.0.7'); return 'loaded'; }
+    catch (RuntimeException $e) { return 'refused'; }
+};
+$spOps = array_values(array_filter($spMap['operations'], fn ($op) => $op['op'] === 'templateStyle.megaColumnRemove'));
+check('the space map removes column 109 of Pages from both T3 styles', [$spLoads($spMap), array_map(fn ($op) => [$op['key'], $op['item'], $op['column']], $spOps)],
+    ['loaded', [['templateStyle-9', 108, 109], ['templateStyle-10', 108, 109]]]);
+$spEdit = function (callable $edit) use ($spMap) { $m = $spMap; foreach ($m['operations'] as $n => $op) if ($op['op'] === 'templateStyle.megaColumnRemove') { $m['operations'][$n] = $edit($op); break; } return $m; };
+foreach ([
+    'a column the sub does not hold' => fn ($op) => ['column' => 114, 'path' => 'mm_config.mainmenu.item-108.sub.rows[item=114]'] + $op,
+    'a head that is no child of the item' => fn ($op) => ['column' => 101, 'path' => 'mm_config.mainmenu.item-108.sub.rows[item=101]'] + $op,
+    'no column' => function ($op) { unset($op['column']); return $op; },
+    'a string column' => fn ($op) => ['column' => '109'] + $op,
+    'the sub path' => fn ($op) => ['path' => 'mm_config.mainmenu.item-108.sub'] + $op,
+    'an after the edit does not reach' => fn ($op) => ['after' => str_repeat('a', 64)] + $op,
+    'the sub op name' => fn ($op) => ['op' => 'templateStyle.megaSubRemove'] + $op,
+] as $what => $edit) check("a megaColumnRemove with $what is refused", $spLoads($spEdit($edit)), 'refused');
+// The head stays in the menu (the map no longer hides it): the column is not empty, the profile is refused.
+$spKept = $spMap;
+$spKept['operations'] = array_values(array_filter($spMap['operations'], fn ($op) => $op['key'] !== 'menuItem-109'));
+check('a column whose head the map keeps shown is refused', $spLoads($spKept), 'refused');
+$spOff = $spLock;
+$spOff['entities']['menuItem-109']['published'] = '0';
+check('unless the lock already has it out of the menu', $spLoads($spKept, $spOff), 'loaded');
+// A shown child that heads no column: the lock holds no menu order, so it might sit in the column.
+$spStray = $spLock;
+foreach (['templateStyle-9', 'templateStyle-10'] as $k) {
+    $outer = json_decode($spStray['entities'][$k]['params'], true);
+    $mm = json_decode($outer['mm_config'], true);
+    $mm['mainmenu']['item-108']['sub']['rows'][0] = array_values(array_filter($mm['mainmenu']['item-108']['sub']['rows'][0], fn ($c) => $c['item'] !== 121));
+    $outer['mm_config'] = json_encode($mm);
+    $spStray['entities'][$k]['params'] = json_encode($outer);
+}
+$spStrayMap = $spMap;
+foreach ($spStrayMap['operations'] as &$op) if ($op['op'] === 'templateStyle.megaColumnRemove') {
+    $op['before'] = hash('sha256', $spStray['entities'][$op['key']]['params']);
+    $op['after'] = hash('sha256', T3MegaSub::removeColumn($spStray['entities'][$op['key']]['params'], 'mainmenu', 108, 109)['raw']);
+}
+unset($op);
+check('a shown child that heads no column of the sub refuses the column', $spLoads($spStrayMap, $spStray), 'refused');
+
+$spSub = fn (string $params) => json_decode(json_decode($params, true)['mm_config'], true)['mainmenu']['item-108']['sub'];
+[, $spStore, $spw, $spContract, $spCall] = snavSite($spSource);
+$spStyles = [];
+foreach ($spContent['entities'] as $e) if ($e['kind'] === 'templateStyle' && in_array($e['key'], ['templateStyle-9', 'templateStyle-10'], true)) $spStyles[$e['key']] = (int) $e['sourceId'];
+$spParams = fn (ContractTestWriter $w) => array_map(fn ($id) => (string) $w->store['templateStyle'][$id]['params'], $spStyles);
+$spOriginal = $spParams($spw);
+$spAfter = array_column($spOps, 'after', 'key');
+$spApplied = $spCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sp', 'request_id' => 'sp1']);
+check('the apply removes the column from both styles', [$spApplied['status'], $spApplied['skipped'], array_map(fn ($p) => array_column($spSub($p)['rows'][0], 'item'), $spParams($spw))],
+    ['completed', [], ['templateStyle-9' => [114, 121], 'templateStyle-10' => [114, 121]]]);
+check('each style holds exactly the bytes the map names', array_map(fn ($p) => hash('sha256', $p), $spParams($spw)), $spAfter);
+foreach ($spOriginal as $k => $was) {
+    $wasMm = json_decode(json_decode($was, true)['mm_config'], true);
+    $wasMm['mainmenu']['item-108']['sub']['rows'][0] = array_values(array_filter($wasMm['mainmenu']['item-108']['sub']['rows'][0], fn ($c) => $c['item'] !== 109));
+    check("$k changes nothing else", [array_diff_key(json_decode($spParams($spw)[$k], true), ['mm_config' => 1]), json_decode(json_decode($spParams($spw)[$k], true)['mm_config'], true)],
+        [array_diff_key(json_decode($was, true), ['mm_config' => 1]), $wasMm]);
+}
+check('its receipt names the column path', $spStore->binding['showcaseNav']['receipts']['templateStyle-9']['paths'], ['mm_config.mainmenu.item-108.sub.rows[item=109]']);
+snavClean('the site with the column removed inspects clean', $spContract);
+$spLost = $spCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sp', 'request_id' => 'sp1']);
+check('the same apply after a lost answer writes nothing more', [$spLost['status'], $spLost['alreadyApplied'] ?? null, array_map(fn ($p) => hash('sha256', $p), $spParams($spw))], ['completed', true, $spAfter]);
+$spBack = $spCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-spu', 'request_id' => 'sp2']);
+check('the revert puts every byte of both styles back', [$spBack['status'], $spBack['conflicts'], $spParams($spw)], ['reverted', [], $spOriginal]);
+snavClean('the reverted styles inspect clean', $spContract);
+
+// 🔒 THE LIVE COLUMN, IN MENU ORDER. A child the customer added under Pages sits in a column by its lft:
+// between J! Pages and Other Pages it is in the 109 column, and shown it keeps that column; after Other
+// Pages it is in a column that stays, and the 109 column goes.
+$spAdded = function (int $lft, string $show) use ($spSource) {
+    [, , $w, $c, $call] = snavSite($spSource);
+    foreach ([109 => 10, 114 => 20, 121 => 30] as $id => $at) $w->store['menuItem'][$id]['lft'] = $at;
+    $w->store['menuItem'][9101] = ['id' => 9101, 'title' => 'Our page', 'alias' => 'our-page', 'path' => 'pages/our-page', 'lft' => $lft,
+        'params' => '{"menu_show":"' . $show . '"}'] + $w->store['menuItem'][114];
+    $c->bind($c->inspect()['snapshot']);
+    return [$w, $call];
+};
+[$saw, $saCall] = $spAdded(15, '1');
+$saBefore = $spParams($saw);
+$saApplied = $saCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sa', 'request_id' => 'sa1']);
+check('a shown child in the column keeps it in every style, and says why', [$saApplied['status'], $saApplied['skipped'], $spParams($saw)],
+    ['completed', array_fill_keys(['templateStyle-9', 'templateStyle-10'], 'kept the mega-menu column 109 of menuItem-108: menu item 9101 in that column is still shown on this site'), $saBefore]);
+[$saw, $saCall] = $spAdded(15, '0');
+check('out of the menu, it lets the column go', [$saCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sa', 'request_id' => 'sa1'])['skipped'], array_map(fn ($p) => hash('sha256', $p), $spParams($saw))], [[], $spAfter]);
+[$saw, $saCall] = $spAdded(25, '1');
+check('a shown child in a column that stays lets it go too', [$saCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sa', 'request_id' => 'sa1'])['skipped'], array_map(fn ($p) => hash('sha256', $p), $spParams($saw))], [[], $spAfter]);
+[$saw, $saCall] = $spAdded(5, '1');
+check('before the head of the first column it is in that column', $saCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sa', 'request_id' => 'sa1'])['skipped']['templateStyle-9'] ?? null,
+    'kept the mega-menu column 109 of menuItem-108: menu item 9101 in that column is still shown on this site');
+// The head's own hide a conflict: the column keeps it, and says so.
+[, , $shw, , $shCall] = snavSite($spSource);
+$shw->store['menuItem'][109]['params'] = JsonObjectKey::set((string) $shw->store['menuItem'][109]['params'], 'menu_show', '"maybe"');
+check('a head left in the menu keeps its column', $shCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sh', 'request_id' => 'sh1'])['skipped']['templateStyle-9'] ?? null,
+    'kept the mega-menu column 109 of menuItem-108: its head menuItem-109 stays in the menu (menu_show is "maybe", not shown)');
+
+// ja-smallbiz 1.0.4: one style chains a whole sub (Home, 101, every child gone) and a column (Pages, 103,
+// its 104 column). The sub is a megaSubRemove — no column path — and the column starts from its bytes.
+$sbSource = __DIR__ . '/../lib/contracts/ja-smallbiz/j6/1.0.4';
+$sbMap = json_decode(file_get_contents($sbSource . '/showcase-nav-map.json'), true, 512, JSON_THROW_ON_ERROR);
+$sbChain = [];
+foreach ($sbMap['operations'] as $op) if ($op['key'] === 'templateStyle-10') $sbChain[] = [$op['op'], $op['path']];
+check('smallbiz chains a sub and a column in one style', $sbChain,
+    [['templateStyle.megaSubRemove', 'mm_config.mainmenu.item-101.sub'], ['templateStyle.megaColumnRemove', 'mm_config.mainmenu.item-103.sub.rows[item=104]']]);
+[, $sbStore, $sbw, $sbContract, $sbCall] = snavSite($sbSource);
+$sbIds = [];
+foreach (json_decode(file_get_contents($sbSource . '/content-map.json'), true)['entities'] as $e) if ($e['kind'] === 'templateStyle') $sbIds[$e['key']] = (int) $e['sourceId'];
+$sbFinal = [];
+foreach ($sbMap['operations'] as $op) if (str_starts_with($op['op'], 'templateStyle.')) $sbFinal[$op['key']] = $op['after'];
+$sbOriginal = array_map(fn ($k) => (string) $sbw->store['templateStyle'][$sbIds[$k]]['params'], array_combine(array_keys($sbFinal), array_keys($sbFinal)));
+$sbApplied = $sbCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sb', 'request_id' => 'sb1']);
+$sbNow = fn () => array_map(fn ($k) => (string) $sbw->store['templateStyle'][$sbIds[$k]]['params'], array_combine(array_keys($sbFinal), array_keys($sbFinal)));
+check('smallbiz applies both steps of every style', [$sbApplied['status'], $sbApplied['skipped'], array_map(fn ($p) => hash('sha256', $p), $sbNow())], ['completed', [], $sbFinal]);
+check('Home has no sub left, Pages keeps its sub without the 104 column', array_map(function ($p) {
+    $mm = json_decode(json_decode($p, true)['mm_config'], true)['mainmenu'];
+    return [array_key_exists('sub', $mm['item-101']), in_array(104, array_column(array_merge(...$mm['item-103']['sub']['rows']), 'item'), false), isset($mm['item-103']['sub'])];
+}, array_values($sbNow())), array_fill(0, count($sbFinal), [false, false, true]));
+snavClean('smallbiz inspects clean after the apply', $sbContract);
+check('and reverts every byte', [$sbCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-sbu', 'request_id' => 'sb2'])['conflicts'], $sbNow()], [[], $sbOriginal]);
+
 // ------------------------------------------------------------------ an absent key, beside a demo trim
 
 // Kinetic's showcase items carry no menu_show at all (`from: null`): the apply adds the key, the

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-restaurant/j6/1.0.6",
   "baseHash": "83ce00232939053e6f8a102784f2611e4c2ace6b680f6ae9e54a52e1430fa958",
@@ -221,6 +221,116 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"Themes\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "ja_restaurant - Default",
+        "template": "ja_restaurant",
+        "client_id": "0"
+      },
+      "label": "ja_restaurant - Default · Explore · column 150",
+      "style": {
+        "id": 9,
+        "template": "ja_restaurant"
+      },
+      "menutype": "mainmenu",
+      "item": 110,
+      "column": 150,
+      "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
+      "before": "e15bd38e1c2fc516b33adb08e7ce6d30f6c1e33109c726d3c270ac92cbe4f51b",
+      "after": "0f7cbc99f2baaabbaf042bd1056e01ea1adc84293ca036b8b4c57f77e4b58f95",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_restaurant - Blue",
+        "template": "ja_restaurant",
+        "client_id": "0"
+      },
+      "label": "ja_restaurant - Blue · Explore · column 150",
+      "style": {
+        "id": 10,
+        "template": "ja_restaurant"
+      },
+      "menutype": "mainmenu",
+      "item": 110,
+      "column": 150,
+      "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
+      "before": "4912053e62de08da5ede7b500581ae33ed6021f067cc34215d6ef5392a0c7283",
+      "after": "6c207dd40ba96746e2118b76b3508bf5b69fa329731b32e20c095ca820876f0a",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "ja_restaurant - Green",
+        "template": "ja_restaurant",
+        "client_id": "0"
+      },
+      "label": "ja_restaurant - Green · Explore · column 150",
+      "style": {
+        "id": 11,
+        "template": "ja_restaurant"
+      },
+      "menutype": "mainmenu",
+      "item": 110,
+      "column": 150,
+      "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
+      "before": "ef8bbdbe029201d156393e91b82b3f5d85f368e7eab789e8b93b2774af077c24",
+      "after": "da5f108168c29f27ed1a8ad0d79c69b05bfd5371651f099bf17b7398d866e043",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "ja_restaurant - Pink",
+        "template": "ja_restaurant",
+        "client_id": "0"
+      },
+      "label": "ja_restaurant - Pink · Explore · column 150",
+      "style": {
+        "id": 12,
+        "template": "ja_restaurant"
+      },
+      "menutype": "mainmenu",
+      "item": 110,
+      "column": 150,
+      "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
+      "before": "0e80b03c12aae88c5096c747f3d6567c786ed263805c99bd18618233ce234f55",
+      "after": "37d0b587d1a228d191f9655d42309cb2e99f8bb1b49ca031965fc422fd6a7f75",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-13",
+      "identity": {
+        "title": "ja_restaurant - Purple",
+        "template": "ja_restaurant",
+        "client_id": "0"
+      },
+      "label": "ja_restaurant - Purple · Explore · column 150",
+      "style": {
+        "id": 13,
+        "template": "ja_restaurant"
+      },
+      "menutype": "mainmenu",
+      "item": 110,
+      "column": 150,
+      "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
+      "before": "6a4b2dfa1f08b5e5f49475a69b58ffe67c1452aa537514c0da33c85d850a12ac",
+      "after": "18d96c34e65b20705c521d3b393e97908692720038f374ea969c427b47eab844",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     }
   ],
   "kept": [
@@ -428,12 +538,83 @@
       "where": "mainmenu/explore/j-pages/tagged-items",
       "rule": "unresolved.functional-in-hidden-branch",
       "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+    },
+    {
+      "key": "templateStyle-9",
+      "label": "ja_restaurant - Default",
+      "where": "mm_config.mainmenu.item-109.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-9",
+      "label": "ja_restaurant - Default",
+      "where": "mm_config.mainmenu.item-116.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Bonus Pages\" leave the navigation, but column head(s) menuItem-118 leave while menuItem-147, menuItem-148 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-10",
+      "label": "ja_restaurant - Blue",
+      "where": "mm_config.mainmenu.item-109.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-10",
+      "label": "ja_restaurant - Blue",
+      "where": "mm_config.mainmenu.item-116.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Bonus Pages\" leave the navigation, but column head(s) menuItem-118 leave while menuItem-147, menuItem-148 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-11",
+      "label": "ja_restaurant - Green",
+      "where": "mm_config.mainmenu.item-109.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-11",
+      "label": "ja_restaurant - Green",
+      "where": "mm_config.mainmenu.item-116.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Bonus Pages\" leave the navigation, but column head(s) menuItem-118 leave while menuItem-147, menuItem-148 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-12",
+      "label": "ja_restaurant - Pink",
+      "where": "mm_config.mainmenu.item-109.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-12",
+      "label": "ja_restaurant - Pink",
+      "where": "mm_config.mainmenu.item-116.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Bonus Pages\" leave the navigation, but column head(s) menuItem-118 leave while menuItem-147, menuItem-148 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-13",
+      "label": "ja_restaurant - Purple",
+      "where": "mm_config.mainmenu.item-109.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-13",
+      "label": "ja_restaurant - Purple",
+      "where": "mm_config.mainmenu.item-116.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Bonus Pages\" leave the navigation, but column head(s) menuItem-118 leave while menuItem-147, menuItem-148 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     }
   ],
   "counts": {
     "menuItems": 14,
     "modules": 0,
+    "megaColumns": 5,
     "kept": 26,
-    "unresolved": 3
+    "unresolved": 13
   }
 }

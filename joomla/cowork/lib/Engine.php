@@ -3065,8 +3065,8 @@ final class Engine
     }
 
     /**
-     * Drop the T3 mega-menu subs a style keeps for the items this apply emptied, if its params still
-     * stand, byte for byte, where the map says they start.
+     * Drop the T3 mega-menu subs — or the columns of them — a style keeps for the items this apply
+     * emptied, if its params still stand, byte for byte, where the map says they start.
      *
      * 🔒 THE MAP NAMES THE BYTES, THE ENGINE MAKES THEM. Each step is computed here from the live column
      * (T3MegaSub) and written only when the result hashes to the map's `after`; the whole column is one
@@ -3090,18 +3090,7 @@ final class Engine
         // this batch's hides, with a LOCKING read: this transaction's snapshot would miss a child committed
         // since its first read, and the lock holds a new one back until the style write commits.
         foreach ($steps as $n => $step) {
-            foreach ($step['children'] as $child)
-                if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true)) {
-                    $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
-                    break;
-                }
-            if ($kept === null) {
-                foreach ($this->writer->lockMenuChildren($step['item']) as $child)
-                    if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child)) {
-                        $kept = 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
-                        break;
-                    }
-            }
+            $kept = ($step['column'] ?? null) === null ? $this->showcaseNavSubKept($record, $step) : $this->showcaseNavColumnKept($record, $step);
             if ($kept !== null) { $take = $n; break; }
         }
         $params = (string) ($current['params'] ?? '');
@@ -3115,16 +3104,58 @@ final class Engine
             return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'its params differ from the release'], 'moved' => null];
         $written = $params;
         foreach (array_slice($steps, 0, $take) as $step) {
-            $edit = T3MegaSub::remove($written, $step['menutype'], $step['item']);
+            $column = $step['column'] ?? null;
+            $edit = $column === null ? T3MegaSub::remove($written, $step['menutype'], $step['item']) : T3MegaSub::removeColumn($written, $step['menutype'], $step['item'], $column);
             if (!isset($edit['raw']) || !hash_equals($step['after'], hash('sha256', $edit['raw'])))
-                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'removing the mega-menu sub of ' . $step['itemKey'] . ' does not give the bytes the map names'], 'moved' => null];
+                return ['receipt' => $base + ['outcome' => 'conflict', 'why' => 'removing the mega-menu ' . ($column === null ? 'sub' : 'column ' . $column) . ' of ' . $step['itemKey'] . ' does not give the bytes the map names'], 'moved' => null];
             $written = $edit['raw'];
         }
         if (!$this->writer->replaceTemplateStyleParams($id, $params, $written))
             return ['receipt' => $base + ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED], 'moved' => null];
-        $receipt = ['outcome' => 'written', 'before' => $params, 'after' => hash('sha256', $written), 'items' => array_column(array_slice($steps, 0, $take), 'itemKey')];
+        $taken = array_slice($steps, 0, $take);
+        $receipt = ['outcome' => 'written', 'before' => $params, 'after' => hash('sha256', $written), 'items' => array_column($taken, 'itemKey'), 'paths' => array_column($taken, 'path')];
         if ($kept !== null) $receipt['kept'] = $kept;
         return ['receipt' => $base + $receipt, 'moved' => ['key' => $key, 'kind' => 'templateStyle', 'raw' => $written]];
+    }
+
+    /** Why a megaSubRemove step is not taken — a child of its item still in the menu — or null. */
+    private function showcaseNavSubKept(array $record, array $step): ?string
+    {
+        foreach ($step['children'] as $child)
+            if (!in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
+                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+        foreach ($this->writer->lockMenuChildren($step['item']) as $child)
+            if ((int) ($child['parent_id'] ?? 0) === $step['item'] && ShowcaseNavProfile::shown($child))
+                return 'kept the mega-menu sub of ' . $step['itemKey'] . ': its child menu item ' . (int) ($child['id'] ?? 0) . ' is still shown on this site';
+        return null;
+    }
+
+    /**
+     * Why a megaColumnRemove step is not taken, or null. The column is read on the live menu as T3's
+     * `mega()` reads it: the item's children in menu order (`lft`), from the column's head — from the
+     * first child, for the first column of items — up to the head of the column after it in the sub. Every
+     * child in that range must be out of the menu, or the column still lists something and stays.
+     */
+    private function showcaseNavColumnKept(array $record, array $step): ?string
+    {
+        $what = 'kept the mega-menu column ' . $step['column'] . ' of ' . $step['itemKey'];
+        foreach ($step['children'] as $child)
+            if ((int) substr($child, strlen('menuItem-')) === $step['column'] && !in_array($record['receipts'][$child]['outcome'] ?? null, ['written', 'already'], true))
+                return $what . ': its head ' . $child . ' stays in the menu (' . ($record['receipts'][$child]['why'] ?? 'not hidden') . ')';
+        $live = array_values(array_filter($this->writer->lockMenuChildren($step['item']), fn ($child) => (int) ($child['parent_id'] ?? 0) === $step['item']));
+        usort($live, fn ($a, $b) => [(int) ($a['lft'] ?? 0), (int) ($a['id'] ?? 0)] <=> [(int) ($b['lft'] ?? 0), (int) ($b['id'] ?? 0)]);
+        $ids = array_map(fn ($child) => (string) (int) ($child['id'] ?? 0), $live);
+        $at = array_search((string) $step['column'], $step['heads'], true);
+        $head = array_search((string) $step['column'], $ids, true);
+        if ($at === false || $head === false) return $what . ': its head is no longer a child of the item on this site';
+        $from = $at === 0 ? 0 : $head;
+        $next = $step['heads'][$at + 1] ?? null;
+        $to = count($ids);
+        for ($i = $from + 1; $next !== null && $i < count($ids); $i++) if ($ids[$i] === $next) { $to = $i; break; }
+        for ($i = $from; $i < $to; $i++)
+            if (ShowcaseNavProfile::shown($live[$i]))
+                return $what . ': menu item ' . $ids[$i] . ' in that column is still shown on this site';
+        return null;
     }
 
     /**

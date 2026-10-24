@@ -20,6 +20,13 @@
  * named by the sha256 of the whole column before and after. A style's operations chain — the next one
  * starts from the bytes the last one left — and every link is replayed here from the lock, so a map
  * whose edit this receiver does not reach byte for byte is refused before anything reads it.
+ *
+ * 🔒 AND `templateStyle.megaColumnRemove`, for a sub that keeps other children: the map hides the head of
+ * one of its columns, and T3 would list the remaining columns twice (T3MegaSub). It drops that column's
+ * entries, `mm_config.<menutype>.item-<id>.sub.rows[item=<head>]`, under the same chain and hashes. The
+ * lock holds no menu order, so a column is only accepted as the generator decides it: its head is a child
+ * of the item hidden by this map or out of the menu in the lock, and every child still shown heads a
+ * column of its own; the engine checks the live column, in menu order, before it writes.
  */
 require_once __DIR__ . '/T3MegaSub.php';
 
@@ -28,12 +35,15 @@ final class ShowcaseNavProfile
     public const SCHEMA = 'tracy-quickstart-showcase-nav/joomla/v1';
     public const SCHEMA_V2 = 'tracy-quickstart-showcase-nav/joomla/v2';
     public const MEGA_SUB = 'templateStyle.megaSubRemove';
+    public const MEGA_COLUMN = 'templateStyle.megaColumnRemove';
     /** The one param of a menu item this map may move. */
     public const MENU_PARAM = 'menu_show';
     /** The fields an operation may carry; `label` is the reviewer's, `path`/`field` name what moves. */
     private const FIELDS = ['op', 'key', 'identity', 'label', 'path', 'field', 'from', 'to', 'rule', 'reason'];
     /** The fields of a megaSubRemove operation. */
     private const MEGA_FIELDS = ['op', 'key', 'identity', 'label', 'style', 'menutype', 'item', 'path', 'before', 'after', 'rule', 'reason'];
+    /** A megaColumnRemove operation carries one more: the item heading the column. */
+    private const MEGA_COLUMN_FIELDS = [...self::MEGA_FIELDS, 'column'];
 
     private array $profile;
     /** The column each style's chain has reached so far, while the map is read. */
@@ -41,7 +51,7 @@ final class ShowcaseNavProfile
     private string $hash;
     /**
      * Hides first, then one entry per template style, its steps in map order.
-     * @var array<string,array{key:string,op:string,kind:string,from:?string,to:string,reason:string,steps?:list<array{menutype:string,item:int,itemKey:string,children:list<string>,before:string,after:string}>}>
+     * @var array<string,array{key:string,op:string,kind:string,from:?string,to:string,reason:string,steps?:list<array{op:string,path:string,menutype:string,item:int,column:?int,heads:?list<string>,itemKey:string,children:list<string>,before:string,after:string}>}>
      */
     private array $operations = [];
 
@@ -68,7 +78,7 @@ final class ShowcaseNavProfile
         $entities = array_column($map['entities'], null, 'key');
         $styles = [];
         foreach ($profile['operations'] as $row) {
-            if (is_array($row) && ($row['op'] ?? null) === self::MEGA_SUB && $schema === self::SCHEMA_V2) { $styles[] = $row; continue; }
+            if (is_array($row) && in_array($row['op'] ?? null, [self::MEGA_SUB, self::MEGA_COLUMN], true) && $schema === self::SCHEMA_V2) { $styles[] = $row; continue; }
             if (!is_array($row) || array_diff(array_keys($row), self::FIELDS)) throw new RuntimeException('Showcase-navigation operation carries a field it may not');
             $key = (string) ($row['key'] ?? '');
             $op = (string) ($row['op'] ?? '');
@@ -111,10 +121,11 @@ final class ShowcaseNavProfile
         foreach ($styles as $row) $this->megaSub($row, $entities, $lock);
     }
 
-    /** One `templateStyle.megaSubRemove`, checked against the contract and replayed from the lock. */
+    /** One `templateStyle.megaSubRemove` or `megaColumnRemove`, checked against the contract and replayed from the lock. */
     private function megaSub(array $row, array $entities, array $lock): void
     {
-        if (array_diff(array_keys($row), self::MEGA_FIELDS)) throw new RuntimeException('Showcase-navigation operation carries a field it may not');
+        $columnOp = $row['op'] === self::MEGA_COLUMN;
+        if (array_diff(array_keys($row), $columnOp ? self::MEGA_COLUMN_FIELDS : self::MEGA_FIELDS)) throw new RuntimeException('Showcase-navigation operation carries a field it may not');
         $key = (string) ($row['key'] ?? '');
         $entity = $entities[$key] ?? null;
         $locked = $lock['entities'][$key] ?? null;
@@ -132,8 +143,11 @@ final class ShowcaseNavProfile
         $menutype = $row['menutype'] ?? null;
         $item = $row['item'] ?? null;
         if (!is_string($menutype) || $menutype === '' || !is_int($item) || $item <= 0) throw new RuntimeException('Showcase-navigation operation names no menu item for ' . $key);
-        if (($row['path'] ?? null) !== 'mm_config.' . $menutype . '.item-' . $item . '.sub')
-            throw new RuntimeException('Showcase-navigation operation may only remove the mega-menu sub of its item: ' . $key);
+        $column = $columnOp ? $row['column'] ?? null : null;
+        if ($columnOp && (!is_int($column) || $column <= 0)) throw new RuntimeException('Showcase-navigation operation names no mega-menu column for ' . $key);
+        $path = 'mm_config.' . $menutype . '.item-' . $item . '.sub' . ($columnOp ? '.rows[item=' . $column . ']' : '');
+        if (($row['path'] ?? null) !== $path)
+            throw new RuntimeException('Showcase-navigation operation may only remove the mega-menu ' . ($columnOp ? 'column' : 'sub') . ' of its item: ' . $key);
         // The item is a menu item of the contract, in that menu, and every child this map hides is what empties it.
         $itemKey = null;
         foreach ($entities as $k => $e) if ($e['kind'] === 'menuItem' && (int) $e['sourceId'] === $item) $itemKey = $k;
@@ -143,31 +157,47 @@ final class ShowcaseNavProfile
             throw new RuntimeException('Showcase-navigation operation removes the sub of an item the map hides: ' . $key);
         // 🔒 EVERY CHILD GOES, NOT ONE. A child of the item (by parent, whatever menu its row names) is either hidden by this map or
         // already out of the menu in the lock (unpublished, or menu_show "0"); one still shown keeps the sub.
+        // A column: the children still shown are the ones that stay, and each must head a column that stays.
         $children = [];
+        $stays = [];
         foreach ($lock['entities'] as $k => $child) {
             if (($entities[$k]['kind'] ?? null) !== 'menuItem' || !is_array($child)) continue;
             if ((string) ($child['parent_id'] ?? '') !== (string) $item) continue;
             if (isset($this->operations[$k]) && $this->operations[$k]['kind'] === 'menuItem') $children[] = $k;
-            elseif (self::shown($child))
-                throw new RuntimeException('Showcase-navigation operation removes the sub of an item whose child ' . $k . ' stays in the menu: ' . $key);
+            elseif (!self::shown($child)) continue;
+            elseif ($columnOp) $stays[$k] = (int) $entities[$k]['sourceId'];
+            else throw new RuntimeException('Showcase-navigation operation removes the sub of an item whose child ' . $k . ' stays in the menu: ' . $key);
         }
-        if (!$children) throw new RuntimeException('Showcase-navigation operation removes the sub of an item the map empties of nothing: ' . $key);
+        if ($columnOp) {
+            $headKey = null;
+            foreach ($entities as $k => $e) if ($e['kind'] === 'menuItem' && (int) $e['sourceId'] === $column) $headKey = $k;
+            if ($headKey === null || (string) ($lock['entities'][$headKey]['parent_id'] ?? '') !== (string) $item)
+                throw new RuntimeException('Showcase-navigation operation removes a mega-menu column whose head is no child of the item: ' . $key . ' ' . $path);
+            if (isset($stays[$headKey]))
+                throw new RuntimeException('Showcase-navigation operation removes a mega-menu column whose head ' . $headKey . ' stays in the menu: ' . $key);
+        } elseif (!$children) throw new RuntimeException('Showcase-navigation operation removes the sub of an item the map empties of nothing: ' . $key);
         // 🔒 THE CHAIN, REPLAYED. The first link starts from the locked column; each next one from the last one's bytes.
         $previous = $this->operations[$key] ?? null;
         $raw = $previous === null ? $locked['params'] ?? null : $this->replayed[$key];
         if (!is_string($raw)) throw new RuntimeException('The template style holds no params column: ' . $key);
         foreach ($previous['steps'] ?? [] as $step)
-            if ($step['menutype'] === $menutype && $step['item'] === $item) throw new RuntimeException('Showcase-navigation operation listed twice: ' . $key . ' ' . $row['path']);
+            if ($step['path'] === $path) throw new RuntimeException('Showcase-navigation operation listed twice: ' . $key . ' ' . $path);
         foreach (['before', 'after'] as $name)
             if (!is_string($row[$name] ?? null) || !preg_match('/^[0-9a-f]{64}$/D', $row[$name])) throw new RuntimeException('Showcase-navigation operation names no ' . $name . ' hash: ' . $key);
         if (!hash_equals(hash('sha256', $raw), $row['before'])) throw new RuntimeException('Showcase-navigation operation does not start from the locked value of ' . $key);
-        $edit = T3MegaSub::remove($raw, $menutype, $item);
+        $heads = $columnOp ? array_map('strval', T3MegaSub::columns($raw, $menutype, $item) ?? []) : null;
+        if ($columnOp) {
+            foreach ($stays as $k => $id)
+                if (!in_array((string) $id, $heads, true))
+                    throw new RuntimeException('Showcase-navigation operation removes a mega-menu column while ' . $k . ' stays shown without heading a column: ' . $key);
+        }
+        $edit = $columnOp ? T3MegaSub::removeColumn($raw, $menutype, $item, $column) : T3MegaSub::remove($raw, $menutype, $item);
         if (!isset($edit['raw']) || !hash_equals(hash('sha256', $edit['raw']), $row['after']))
-            throw new RuntimeException('Showcase-navigation operation does not reach its after bytes from the lock: ' . $key . ' ' . $row['path']);
+            throw new RuntimeException('Showcase-navigation operation does not reach its after bytes from the lock: ' . $key . ' ' . $path);
         $this->replayed[$key] = $edit['raw'];
-        $step = ['menutype' => $menutype, 'item' => $item, 'itemKey' => $itemKey, 'children' => $children, 'before' => $row['before'], 'after' => $row['after']];
+        $step = ['op' => $row['op'], 'path' => $path, 'menutype' => $menutype, 'item' => $item, 'column' => $column, 'heads' => $heads, 'itemKey' => $itemKey, 'children' => $children, 'before' => $row['before'], 'after' => $row['after']];
         $this->operations[$key] = $previous === null
-            ? ['key' => $key, 'op' => self::MEGA_SUB, 'kind' => 'templateStyle', 'from' => $row['before'], 'to' => $row['after'], 'reason' => $row['reason'], 'steps' => [$step]]
+            ? ['key' => $key, 'op' => $row['op'], 'kind' => 'templateStyle', 'from' => $row['before'], 'to' => $row['after'], 'reason' => $row['reason'], 'steps' => [$step]]
             : ['to' => $row['after'], 'steps' => array_merge($previous['steps'], [$step])] + $previous;
     }
 

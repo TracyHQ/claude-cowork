@@ -1,10 +1,16 @@
 <?php
 /**
- * Remove ONE T3 mega-menu `sub` from a template style's params, leaving every other byte as it was.
+ * Remove ONE T3 mega-menu `sub`, or one column of it, from a template style's params, leaving every
+ * other byte as it was.
  *
  * T3's renderer (`plugins/system/t3/includes/menu/megamenu.php`) opens a dropdown for an item whenever
  * `mm_config.<menutype>.item-<id>.sub` exists, children or not: once a showcase map has hidden every
  * child of the item, that dropdown opens empty. Dropping the key closes it.
+ *
+ * A COLUMN whose items all leave breaks the panel even when other children stay: `mega()` starts the
+ * first column at the first SHOWN child but ends it at the next column's head, which `nav()` has already
+ * passed, so the first column lists every remaining column again. Dropping that column's entries closes
+ * the gap and the duplicate both.
  *
  * 🔒 BYTE-EXACT OR NOTHING. `mm_config` is a JSON string inside the params JSON. The new column is the
  * old one with only the bytes of the `mm_config` value replaced (JsonObjectKey), and that value is
@@ -35,6 +41,69 @@ final class T3MegaSub
      */
     public static function remove(string $raw, string $menutype, int $item): array
     {
+        return self::edit($raw, $menutype, $item, function (stdClass $setting): bool { unset($setting->sub); return true; });
+    }
+
+    /**
+     * `$raw` with every `{"item": <column>}` column of that sub removed, in every row; a row this empties
+     * goes too, a row that was already empty stays. A column that names a module (`position`) is never one.
+     *
+     * @return array{raw:string}|array{absent:true}|array{problem:string}
+     */
+    public static function removeColumn(string $raw, string $menutype, int $item, int $column): array
+    {
+        return self::edit($raw, $menutype, $item, function (stdClass $setting) use ($column): bool {
+            $rows = $setting->sub->rows ?? null;
+            if (!is_array($rows)) return false;
+            $found = false;
+            foreach ($rows as $row) if (is_array($row)) foreach ($row as $col) if (self::heads($col, $column)) $found = true;
+            if (!$found) return false;
+            $next = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) { $next[] = $row; continue; }
+                $kept = array_values(array_filter($row, fn ($col) => !self::heads($col, $column)));
+                if ($kept || !$row) $next[] = $kept;
+            }
+            $setting->sub->rows = $next;
+            return true;
+        });
+    }
+
+    /**
+     * Whether a sub column is the column of items headed by `$item`. Only an integer or a string names an
+     * item here; anything else (a float, a boolean) matches nothing, so such a sub is never edited.
+     */
+    public static function heads($col, int $item): bool
+    {
+        if (!$col instanceof stdClass || property_exists($col, 'position') || !property_exists($col, 'item')) return false;
+        return (is_int($col->item) || is_string($col->item)) && (string) $col->item === (string) $item;
+    }
+
+    /**
+     * The item columns of the sub a style keeps for `<menutype>.item-<item>`, in the order T3 reads them
+     * (row by row, left to right), as the `item` each names; null when the style keeps no such sub.
+     *
+     * @return ?list<scalar>
+     */
+    public static function columns(string $raw, string $menutype, int $item): ?array
+    {
+        $outer = json_decode($raw);
+        $config = $outer instanceof stdClass && is_string($outer->mm_config ?? null) ? json_decode($outer->mm_config) : null;
+        $setting = $config instanceof stdClass && ($config->{$menutype} ?? null) instanceof stdClass ? ($config->{$menutype}->{'item-' . $item} ?? null) : null;
+        if (!$setting instanceof stdClass || !($setting->sub ?? null) instanceof stdClass) return null;
+        $out = [];
+        foreach (is_array($setting->sub->rows ?? null) ? $setting->sub->rows : [] as $row)
+            if (is_array($row)) foreach ($row as $col)
+                if ($col instanceof stdClass && !property_exists($col, 'position') && property_exists($col, 'item') && is_scalar($col->item)) $out[] = $col->item;
+        return $out;
+    }
+
+    /**
+     * `$raw` with one edit made to the parsed `mm_config.<menutype>.item-<item>` setting, which holds a
+     * `sub`; `$change` returns false when it has nothing to change.
+     */
+    private static function edit(string $raw, string $menutype, int $item, callable $change): array
+    {
         $outer = json_decode($raw);
         if (!$outer instanceof stdClass) return ['problem' => 'the params column is not a JSON object'];
         if (!property_exists($outer, 'mm_config')) return ['absent' => true];
@@ -54,11 +123,11 @@ final class T3MegaSub
         foreach (self::ENCODINGS as $enc) if (self::encodeString($inner, $enc) === $literal) { $outerEnc = $enc; break; }
         if ($innerEnc === null || $outerEnc === null)
             return ['problem' => 'mm_config does not re-encode to the bytes the column holds (' . ($innerEnc === null ? 'inner JSON' : 'string literal') . ')'];
-        unset($setting->sub);
+        if (!$change($setting)) return ['absent' => true];
         $nextInner = self::encode($config, $innerEnc);
         try { $next = JsonObjectKey::set($raw, 'mm_config', self::encodeString($nextInner, $outerEnc)); }
         catch (Throwable $error) { return ['problem' => 'the edited params column does not read back as expected']; }
-        // Proof of the edit: the new column reads as the old one with only that key gone.
+        // Proof of the edit: the new column reads as the old one with only mm_config changed, as encoded.
         $want = clone $outer;
         $want->mm_config = $nextInner;
         $reread = json_decode($next);

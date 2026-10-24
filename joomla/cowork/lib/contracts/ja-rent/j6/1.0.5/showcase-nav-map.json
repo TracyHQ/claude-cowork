@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-rent/j6/1.0.5",
   "baseHash": "b6a01c4c7f604836727a7eb51ace00b868e2d29226684babd36e176c268f89c1",
@@ -176,6 +176,116 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"Colors\" lists the template's colour variants of the home page"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "Ja_Rent - Default",
+        "template": "ja_rent",
+        "client_id": "0"
+      },
+      "label": "Ja_Rent - Default · Explore · column 171",
+      "style": {
+        "id": 9,
+        "template": "ja_rent"
+      },
+      "menutype": "mainmenu",
+      "item": 178,
+      "column": 171,
+      "path": "mm_config.mainmenu.item-178.sub.rows[item=171]",
+      "before": "01b8e143e7562ac58b0ea5c340e3fd67ce775705c03ad3df3b86ac96a13a2671",
+      "after": "7b5d377c8216e63fbebe73084f96fb570b6aa6179c3b8b6fed6794cacf495519",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-171 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "Ja_Rent - Features Intro",
+        "template": "ja_rent",
+        "client_id": "0"
+      },
+      "label": "Ja_Rent - Features Intro · Explore · column 171",
+      "style": {
+        "id": 10,
+        "template": "ja_rent"
+      },
+      "menutype": "mainmenu",
+      "item": 178,
+      "column": 171,
+      "path": "mm_config.mainmenu.item-178.sub.rows[item=171]",
+      "before": "283d1a9c84c7395f8f53cac5faecb87e10975d0466918154f38198073e699347",
+      "after": "c1a1f76bab353b99e57839389661db1a4c6f7d357cc6973efdde243d88287670",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-171 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "Ja_Rent - Orange",
+        "template": "ja_rent",
+        "client_id": "0"
+      },
+      "label": "Ja_Rent - Orange · Explore · column 171",
+      "style": {
+        "id": 11,
+        "template": "ja_rent"
+      },
+      "menutype": "mainmenu",
+      "item": 178,
+      "column": 171,
+      "path": "mm_config.mainmenu.item-178.sub.rows[item=171]",
+      "before": "985b72a8f7b7f02ad67845b602b08c8a6cff712130f43682589530c934a56fe0",
+      "after": "097b2c970c6259a7f10539c06f36db5133479b77f8b667bb73c571741fe3b2a2",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-171 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "Ja_Rent - Green",
+        "template": "ja_rent",
+        "client_id": "0"
+      },
+      "label": "Ja_Rent - Green · Explore · column 171",
+      "style": {
+        "id": 12,
+        "template": "ja_rent"
+      },
+      "menutype": "mainmenu",
+      "item": 178,
+      "column": 171,
+      "path": "mm_config.mainmenu.item-178.sub.rows[item=171]",
+      "before": "d53fc5ef8e3fbd51efc73ad2d5f14e3f3bd6cb8e2c621230974dc677619ebd6a",
+      "after": "1b04a8d4d5f376242784a876a732f61a0c6d2d75b766dfec0ed763fd1b30c632",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-171 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-13",
+      "identity": {
+        "title": "Ja_Rent - Yellow",
+        "template": "ja_rent",
+        "client_id": "0"
+      },
+      "label": "Ja_Rent - Yellow · Explore · column 171",
+      "style": {
+        "id": 13,
+        "template": "ja_rent"
+      },
+      "menutype": "mainmenu",
+      "item": 178,
+      "column": 171,
+      "path": "mm_config.mainmenu.item-178.sub.rows[item=171]",
+      "before": "4bfd2d7feeaa48a7c60622893ef6cba43437c19900c3b392bf798bd2ffc6ec74",
+      "after": "b3fa3734a7dd415736e5567aa95ae48cec324f60bbe3f883b80f42c54fae945e",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-171 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     }
   ],
   "kept": [
@@ -355,12 +465,48 @@
       "where": "mainmenu/explore/features/joomla-blog-style-2",
       "rule": "unresolved.showcase-word",
       "reason": "\"J! Blog Style 2\" names a showcase branch"
+    },
+    {
+      "key": "templateStyle-9",
+      "label": "Ja_Rent - Default",
+      "where": "mm_config.mainmenu.item-128.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla! Pages\" leave the navigation, but column head(s) menuItem-126 leave while menuItem-133 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-10",
+      "label": "Ja_Rent - Features Intro",
+      "where": "mm_config.mainmenu.item-128.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla! Pages\" leave the navigation, but column head(s) menuItem-126 leave while menuItem-133 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-11",
+      "label": "Ja_Rent - Orange",
+      "where": "mm_config.mainmenu.item-128.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla! Pages\" leave the navigation, but column head(s) menuItem-126 leave while menuItem-133 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-12",
+      "label": "Ja_Rent - Green",
+      "where": "mm_config.mainmenu.item-128.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla! Pages\" leave the navigation, but column head(s) menuItem-126 leave while menuItem-133 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-13",
+      "label": "Ja_Rent - Yellow",
+      "where": "mm_config.mainmenu.item-128.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla! Pages\" leave the navigation, but column head(s) menuItem-126 leave while menuItem-133 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     }
   ],
   "counts": {
     "menuItems": 11,
     "modules": 0,
+    "megaColumns": 5,
     "kept": 22,
-    "unresolved": 3
+    "unresolved": 8
   }
 }

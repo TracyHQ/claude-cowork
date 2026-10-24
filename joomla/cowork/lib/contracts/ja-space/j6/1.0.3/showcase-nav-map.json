@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-space/j6/1.0.3",
   "baseHash": "8ba7c49cb524f673ff124747d47db6cbb34932191cf23c7553c57e3f51adb0ad",
@@ -176,6 +176,50 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/homepage"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "ja_space - Default",
+        "template": "ja_space",
+        "client_id": "0"
+      },
+      "label": "ja_space - Default · Pages · column 109",
+      "style": {
+        "id": 9,
+        "template": "ja_space"
+      },
+      "menutype": "mainmenu",
+      "item": 108,
+      "column": 109,
+      "path": "mm_config.mainmenu.item-108.sub.rows[item=109]",
+      "before": "b90cf9719196b2e1a7ac50fbcfe164d2dc783e0ae0d30bbb8b9efa6deb459fbb",
+      "after": "32e35c5fa39f356d46f9bcae3de097ef0d6421840c711d6c7bc433bd9d7e93c8",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_space - Light",
+        "template": "ja_space",
+        "client_id": "0"
+      },
+      "label": "ja_space - Light · Pages · column 109",
+      "style": {
+        "id": 10,
+        "template": "ja_space"
+      },
+      "menutype": "mainmenu",
+      "item": 108,
+      "column": 109,
+      "path": "mm_config.mainmenu.item-108.sub.rows[item=109]",
+      "before": "2e58f2afb3f9dc778fa38070450275113550ecb5552f89ac0c6148805598d3c3",
+      "after": "9854e41a9e412b10936e4b4b0a5a6cabc2a82f35bd84ebd0e7c4c81b76f61a34",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     }
   ],
   "kept": [
@@ -327,12 +371,27 @@
       "where": "mainmenu/our-projects/projects-style-2",
       "rule": "unresolved.showcase-word",
       "reason": "\"Projects Style 2\" names a showcase branch"
+    },
+    {
+      "key": "templateStyle-9",
+      "label": "ja_space - Default",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-123, menuItem-125 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+    },
+    {
+      "key": "templateStyle-10",
+      "label": "ja_space - Light",
+      "where": "mm_config.mainmenu.item-121.sub",
+      "rule": "unresolved.mega-column-member-shown",
+      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-123, menuItem-125 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     }
   ],
   "counts": {
     "menuItems": 11,
     "modules": 0,
+    "megaColumns": 2,
     "kept": 17,
-    "unresolved": 4
+    "unresolved": 6
   }
 }

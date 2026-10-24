@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-social-ii/j6/1.0.5",
   "baseHash": "4e38f45304d7b543748e38ea1102cf600a982b27527750a833931a5d6b53e26c",
@@ -176,6 +176,182 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"Layouts\" lists the template's sidebar layout samples"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "Ja_Social_II - Default",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Default · Pages · column 178",
+      "style": {
+        "id": 9,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 178,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=178]",
+      "before": "97fc6f43d85e5fd291bdbadbaf62503fad04f28efc951e3b161af26064fc4412",
+      "after": "5868a13b26441461daa2d6f4e40550ee52ea0ba792ce7e590029c7b30e9eb559",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-178 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "Ja_Social_II - Default",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Default · Pages · column 174",
+      "style": {
+        "id": 9,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 174,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=174]",
+      "before": "5868a13b26441461daa2d6f4e40550ee52ea0ba792ce7e590029c7b30e9eb559",
+      "after": "9942256e9424b6a0e5e40a06b39d4ea9cebfa010b49180b85e8ff00bee33fb6f",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-174 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "Ja_Social_II - Features Intro",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Features Intro · Pages · column 178",
+      "style": {
+        "id": 10,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 178,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=178]",
+      "before": "7e13be3c5d76b77229afb5f23c3ef8440d3ad2d7f561e77ff405df2b119c8806",
+      "after": "5ddf184e31f8d0e48644955f838734fa66bd47614650d0b9b7e02c6e8d283713",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-178 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "Ja_Social_II - Features Intro",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Features Intro · Pages · column 174",
+      "style": {
+        "id": 10,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 174,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=174]",
+      "before": "5ddf184e31f8d0e48644955f838734fa66bd47614650d0b9b7e02c6e8d283713",
+      "after": "5ea1f4eb2569780573e68a7b0c5c6d6e56396e8af67cbb8394156a3bcfe2ffa4",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-174 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "Ja_Social_II - Purple",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Purple · Pages · column 178",
+      "style": {
+        "id": 11,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 178,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=178]",
+      "before": "e82c6fe2e6b1b974e39892939779617d6564f715a35ac52985413dc68eb871ac",
+      "after": "296a5c34d9cc04c9da0d515da34b3a5d3db58f30276c5d36410e07d9b73712ed",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-178 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "Ja_Social_II - Purple",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Purple · Pages · column 174",
+      "style": {
+        "id": 11,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 174,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=174]",
+      "before": "296a5c34d9cc04c9da0d515da34b3a5d3db58f30276c5d36410e07d9b73712ed",
+      "after": "e2bb7ed1f3c0b2a3efe82fefe4ffddf15063f6ee7325d4b02ae91a493b81ed3a",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-174 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "Ja_Social_II - Violet",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Violet · Pages · column 178",
+      "style": {
+        "id": 12,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 178,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=178]",
+      "before": "3315d0fd312be79322791fe7358860e9ac101be2914a1592222050c29b17826f",
+      "after": "dc8592cc9188aa9733c94b43aa0e17110f4f138757a13497a5c06ec1707070a7",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-178 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "Ja_Social_II - Violet",
+        "template": "ja_social_ii",
+        "client_id": "0"
+      },
+      "label": "Ja_Social_II - Violet · Pages · column 174",
+      "style": {
+        "id": 12,
+        "template": "ja_social_ii"
+      },
+      "menutype": "mainmenu",
+      "item": 164,
+      "column": 174,
+      "path": "mm_config.mainmenu.item-164.sub.rows[item=174]",
+      "before": "dc8592cc9188aa9733c94b43aa0e17110f4f138757a13497a5c06ec1707070a7",
+      "after": "818d8da474345bd1d9400023dd17d833c089d6391322ecad6def21fd8f59c41f",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-174 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
     }
   ],
   "kept": [
@@ -388,6 +564,7 @@
   "counts": {
     "menuItems": 11,
     "modules": 0,
+    "megaColumns": 8,
     "kept": 27,
     "unresolved": 2
   }
