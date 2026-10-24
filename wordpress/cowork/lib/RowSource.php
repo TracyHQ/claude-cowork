@@ -42,6 +42,35 @@ interface RowSource
     public function tableStats(): array;
 
     /**
+     * `CHECKSUM TABLE` over the tables named, in ONE statement: a cheap "has this table changed?"
+     * that reads no row across the wire.
+     *
+     * Keyed by the names asked for, in their order. A value is the checksum as a string (it is an
+     * unsigned 64-bit number, past what a PHP int holds) or null where the server answers NULL — a
+     * table that does not exist, or one it cannot checksum. The caller keeps the list short; the
+     * batching lives in {@see DbDumper::checksums}.
+     *
+     * @param string[] $tables
+     * @return array<string,?string>
+     */
+    public function checksums(array $tables): array;
+
+    /**
+     * A checksum of one table's SUBSTANCE: its rows with the columns in `$skip` left out, so a
+     * column the site rewrites on every visit (a hit counter, a last-visit date, a scheduler's
+     * last run) does not make the table read as changed. CHECKSUM TABLE moves with those, and on
+     * a live site that meant "nothing changed" was never seen.
+     *
+     * `"<rows>:<xor>"`: the row count, then the XOR over the rows of the first 64 bits of an MD5 of
+     * the kept columns, as unsigned decimal. A table with no rows is "0:0"; one with no column left
+     * is "<rows>:0". Null when the table cannot be read (it does not exist). `$skip` is matched
+     * against the column names ignoring case, as MySQL names columns.
+     *
+     * @param string[] $skip
+     */
+    public function substanceChecksum(string $table, array $skip): ?string;
+
+    /**
      * One batch of rows: LIMIT $limit OFFSET $offset. Each row is an array of column values in
      * column order, where null means SQL NULL.
      *
