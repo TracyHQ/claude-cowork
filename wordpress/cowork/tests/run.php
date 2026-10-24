@@ -1900,6 +1900,10 @@ require __DIR__ . '/share-preview.php';
 require __DIR__ . '/glyph-fallback.php';
 // usermeta: an author's bio and job title, the fields a visitor reads, listed, written and taken back (lib/AuthorMeta.php).
 require __DIR__ . '/author-meta.php';
+// Rendered words: theme words replaced in one page's finished HTML (the matcher, the door and receipts, the output buffer).
+require __DIR__ . '/rendered-words.php';
+require __DIR__ . '/rendered-words-receipts.php';
+require __DIR__ . '/rendered-words-hooks.php';
 // content.list search: the words of a title or slug, the real engine and writer over a $wpdb that reads its SQL.
 // Last, because it defines file-scope stand-ins that the tests above rely on being absent: the class Normalizer
 // (only where intl is not loaded), get_post_types, get_permalink (when no test above defined it), and part-way

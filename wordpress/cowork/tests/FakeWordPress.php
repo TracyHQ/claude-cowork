@@ -26,6 +26,8 @@ final class WP_Fake
     public static array $meta = [];
     /** @var array<string,mixed> */
     public static array $options = [];
+    /** @var array<string,mixed> key => the autoload update_option was last given */
+    public static array $autoload = [];
     /** @var array<int,int> */
     public static array $cleaned = [];
     public static int $nextId = 500;
@@ -322,6 +324,7 @@ function update_option(string $key, $value, $autoload = null): bool
         return false;
     }
     WP_Fake::$options[$key] = $value;
+    WP_Fake::$autoload[$key] = $autoload;
     return true;
 }
 

@@ -992,6 +992,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 					sg_cachepress_purge_cache();
 				}
 			},
+			static function () {
+				if ( function_exists( 'wp_cache_clear_cache' ) ) {
+					// WP Super Cache; also what its own "Delete Cache" button calls.
+					wp_cache_clear_cache();
+				}
+			},
 			static function () use ( $written ) {
 				foreach ( $written as $one ) {
 					$kind = (string) ( $one['kind'] ?? '' );
@@ -1831,7 +1837,8 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			throw new RuntimeException( 'option takes one field: value' );
 		}
 
-		update_option( $key, $fields['value'] );
+		// A page's rendered-words rules are read by that page alone: never autoloaded (lib/RenderedWords.php).
+		update_option( $key, $fields['value'], 0 === strpos( $key, 'claude_cowork_rendered_words_' ) ? false : null );
 		return 0;
 	}
 

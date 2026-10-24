@@ -56,6 +56,10 @@ StringOverrides::register();
 // translation (lib/BlockWords.php).
 require_once __DIR__ . '/lib/BlockWords.php';
 BlockWords::register();
+// Words a theme prints at render time that no stored record holds, replaced in one page's finished HTML
+// (`content.renderedWords`). Buffers nothing unless the page's own scope holds rules (lib/RenderedWordsHooks.php).
+require_once __DIR__ . '/lib/RenderedWordsHooks.php';
+RenderedWordsHooks::register();
 // A page's own search title and meta description on a site with no SEO plugin (`_claude_cowork_seo_*`
 // post meta, lib/SeoFields.php). Prints nothing while an SEO plugin runs, or on a page holding neither.
 require_once __DIR__ . '/lib/SeoFields.php';
@@ -107,7 +111,7 @@ function claude_cowork_load_engine(): void
 {
     $lib = __DIR__ . '/lib';
 
-    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'LeafCodec', 'VisibleText', 'DerivedMap', 'DerivedCache', 'LoopbackRoute', 'WordPressDerivedRows', 'StringOverrides', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
+    foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Token', 'SiteWriter', 'IdentityTokens', 'DemoTrimProfile', 'ContractProblem', 'LeafCodec', 'VisibleText', 'DerivedMap', 'DerivedCache', 'LoopbackRoute', 'WordPressDerivedRows', 'StringOverrides', 'RenderedWords', 'QuickstartContract', 'ChangeStamp', 'Engine', 'MysqliRowSource', 'ContentReader', 'ContentDoor', 'BlockProjection'] as $class) {
         require_once $lib . '/' . $class . '.php';
     }
 
@@ -387,6 +391,9 @@ function claude_cowork_exec(): void
         [Claude_Cowork_Site_Writer::class, 'purgePageCaches'],
         [$derived, 'ownerUrl']
     );
+    if ($token !== '') {
+        $engine->renderedWordsSite(new WordPressRenderedWordsSite($token));
+    }
 
     $answer = $engine->handle($request);
 
