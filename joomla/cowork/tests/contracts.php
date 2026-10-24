@@ -292,6 +292,28 @@ $styleContract=new QuickstartContract($styleWriter,$styleStore,$styleDir,$styleD
 file_put_contents($styleDir.'/media/t4/css/9.css','changed pinned style');
 $styleContract->inspect();
 checkTrue('an explicitly pinned numeric style keeps its hash check',str_contains(implode(' ', $styleContract->driftWarnings()),'Presentation asset changed: media/t4/css/9.css'));
+// This plugin's own media (the T3 off-canvas keyboard script) is installed under `media/`, which
+// T3 locks list as a file root: measured on every T3 stand, inspect warned about it right after install.
+$ownMedia='media/plg_system_claudecoworkapi/js/t3-offcanvas-a11y.js';
+$ownWarned=function(string $path)use($styleWriter,$styleStore,$styleDir):bool{$c=new QuickstartContract($styleWriter,$styleStore,$styleDir,$styleDir);$c->inspect();return in_array('Unexpected presentation file: '.$path,$c->driftWarnings(),true);};
+mkdir($styleDir.'/media/plg_system_claudecoworkapi/js',0777,true);
+copy(__DIR__.'/../plg_system_claudecoworkapi/media/js/t3-offcanvas-a11y.js',$styleDir.'/'.$ownMedia);
+checkTrue('without the plugin installed, its media folder is anyone\'s file',$ownWarned($ownMedia));
+mkdir($styleDir.'/plugins/system/claudecoworkapi',0777,true);
+copy(__DIR__.'/../plg_system_claudecoworkapi/claudecoworkapi.xml',$styleDir.'/plugins/system/claudecoworkapi/claudecoworkapi.xml');
+checkTrue('the plugin\'s own shipped media is not presentation drift',!$ownWarned($ownMedia));
+foreach(['media/plg_system_claudecoworkapi/js/evil.php','media/plg_system_claudecoworkapi/other/x.js','media/plg_system_claudecoworkapi/x.js','media/plg_system_claudecoworkapix/js/x.js','media/templates/site/x/js/x.js'] as $path) {
+    @mkdir(dirname($styleDir.'/'.$path),0777,true);file_put_contents($styleDir.'/'.$path,'not shipped by the plugin');
+    checkTrue('a file the plugin does not ship is still reported: '.$path,$ownWarned($path));
+    unlink($styleDir.'/'.$path);
+}
+unlink($styleDir.'/'.$ownMedia);symlink($contractDir.'/assets/demo.css',$styleDir.'/'.$ownMedia);
+checkTrue('a link in the plugin\'s media folder is still reported',$ownWarned($ownMedia));
+unlink($styleDir.'/'.$ownMedia);
+rmdir($styleDir.'/media/plg_system_claudecoworkapi/other');rmdir($styleDir.'/media/plg_system_claudecoworkapi/js');rmdir($styleDir.'/media/plg_system_claudecoworkapi');
+rmdir($styleDir.'/media/plg_system_claudecoworkapix/js');rmdir($styleDir.'/media/plg_system_claudecoworkapix');
+rmdir($styleDir.'/media/templates/site/x/js');rmdir($styleDir.'/media/templates/site/x');rmdir($styleDir.'/media/templates/site');rmdir($styleDir.'/media/templates');
+unlink($styleDir.'/plugins/system/claudecoworkapi/claudecoworkapi.xml');rmdir($styleDir.'/plugins/system/claudecoworkapi');rmdir($styleDir.'/plugins/system');rmdir($styleDir.'/plugins');
 unlink($styleDir.'/media/t4/css/9.css');rmdir($styleDir.'/media/t4/css');rmdir($styleDir.'/media/t4');rmdir($styleDir.'/media');
 foreach(array_keys($styleData) as $name)unlink($styleDir.'/'.$name.'.json');rmdir($styleDir);
 unlink($contractDir.'/media/t4/css/36-sub.css');rmdir($contractDir.'/media/t4/css');

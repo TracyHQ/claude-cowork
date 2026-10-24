@@ -490,6 +490,30 @@ final class QuickstartContract
         // other such page locked the site (measured 23/09/2026 on j-cr4l1l, ja-kinetic: 36-sub.css).
         return (bool)preg_match('~^media/t4/(optimize/(css/[a-f0-9]{32}\.css|js/[a-f0-9]{32}\.js)|css/[0-9]+-sub\.css)$~D',$path);
     }
+    /** Where Joomla keeps this plugin's manifest once installed (element `claudecoworkapi`, group `system`). */
+    private const OWN_PLUGIN_MANIFEST = 'plugins/system/claudecoworkapi/claudecoworkapi.xml';
+    /** @var list<string>|null path prefixes under `media/` the installed plugin manifest ships */
+    private ?array $ownMediaPrefixes = null;
+    private function ownMedia(string $path): bool {
+        // This plugin's own assets (the T3 off-canvas keyboard script) land under `media/`, which T3
+        // locks list as a file root, so every T3 site warned about them right after install. Only the
+        // folders and files the installed manifest's <media> declares are exempt; never a PHP file.
+        if($this->ownMediaPrefixes===null) {
+            $this->ownMediaPrefixes=[];
+            $file=$this->root.'/'.self::OWN_PLUGIN_MANIFEST;
+            $xml=is_file($file) && !is_link($file) && filesize($file)<=1048576 ? (string)@file_get_contents($file) : '';
+            $name='[A-Za-z0-9_][A-Za-z0-9_.-]*';
+            if(preg_match('~<media\b[^>]*\bdestination="('.$name.')"[^>]*>(.*?)</media>~s',$xml,$media)) {
+                preg_match_all('~<(folder|filename)>\s*('.$name.')\s*</\1>~',$media[2],$entries,PREG_SET_ORDER);
+                foreach($entries as [,$kind,$entry])
+                    if(!str_contains($entry,'..'))$this->ownMediaPrefixes[]='media/'.$media[1].'/'.$entry.($kind==='folder'?'/':'');
+            }
+        }
+        if(str_contains($path,'/../') || preg_match('~\.(php[0-9]*|phtml|phar)$~i',$path))return false;
+        foreach($this->ownMediaPrefixes as $prefix)
+            if(str_ends_with($prefix,'/') ? str_starts_with($path,$prefix) : $path===$prefix)return true;
+        return false;
+    }
     private function unlistedStyleCache(string $path): bool {
         // A fresh T4 site compiles its main style CSS on first view too (JA Resort: 9.css, 10.css).
         // Keep every explicitly pinned file checked; only an unlisted, known style's derivative
@@ -562,6 +586,7 @@ final class QuickstartContract
                 $relative=substr($file->getPathname(),strlen($this->root)+1);
                 if(($this->generatedCache($relative) || $this->unlistedStyleCache($relative)) && !$file->isLink())continue;
                 if(TemplateSiteSettings::isDoorFile($relative) && !$file->isLink())continue;
+                if($this->ownMedia($relative) && !$file->isLink())continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
         }
