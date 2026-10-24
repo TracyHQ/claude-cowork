@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>inspect reports a foreign or changed file in the plugin own media folder (only the exact shipped files, by sha256, are exempt) and any unlisted symlink under a locked folder, never following it</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.58</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.58</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.58/pkg_claudecowork-0.24.58.zip</downloadurl>
+        </downloads>
+        <sha256>be391bc877741391d010e37155802875c946b211c951e7cf505663f61e0c14c9</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>a quickstart site can put its template showcase navigation away: showcaseNav.status, apply and revert hide menu items, modules and empty T3 mega-menu dropdowns and columns without unpublishing any page, and revert restores the bytes; inspect no longer reports the plugin own media as presentation drift</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
