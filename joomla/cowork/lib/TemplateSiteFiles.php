@@ -62,6 +62,31 @@ final class TemplateSiteFiles
     }
 
     /**
+     * One site profile's whitelisted settings where T4 reads it (the local copy, the template's, the base theme's), in the file's
+     * order; null when no file holds the profile or it is not a JSON object.
+     *
+     * @return array<string,string>|null
+     */
+    public function profileSettings(string $template, string $profile): ?array
+    {
+        $source = preg_match(TemplateSiteSettings::PROFILE, $profile) ? $this->source($template, $profile) : null;
+        return $source === null ? null : TemplateSiteSettings::settingsOf((string) $this->bytes($source), TemplateSiteSettings::T4_KEYS);
+    }
+
+    /**
+     * The change that makes one profile key read `$value`: written to the profile's `local/` copy, every other byte kept, the
+     * same file `template.siteSettings` writes. Null when the profile already says so. `$value` is cleaned by the caller.
+     *
+     * @return array{path:string,before:?string,after:string}|null
+     */
+    public function profileChange(string $template, string $profile, string $key, string $value): ?array
+    {
+        $plan = $this->plan($template, 't4', [], [$profile => [$key => $value]]);
+        if (isset($plan['error'])) throw new RuntimeException($plan['message']);
+        return $plan['changes'][0] ?? null;
+    }
+
+    /**
      * The files a set would write: for a T4 template, every profile a style uses when `$fields` is
      * given, plus each profile `$byProfile` names (its values over `$fields`), and the share image
      * in the template's settings file, never in a profile; for any other template, its settings file

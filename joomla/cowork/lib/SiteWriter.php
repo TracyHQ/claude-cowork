@@ -99,7 +99,7 @@ final class UserProfileKey
 {
     public const SPAN = 100;
     /** The profile keys a visitor reads, in the order their place in a key names them. Append only. */
-    public const FIELDS = ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline'];
+    public const FIELDS = ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline', 'profile.user_avatar'];
 
     public static function encode(int $userId, string $profileKey): int
     {
