@@ -202,3 +202,46 @@ $uBack = $uCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-uu', 're
 check('the revert writes only the rows still hidden', [$uBack['status'] ?? $uBack, $uBack['moved'] ?? null, $uw->store['article'][203]['state'], $uw->store['menuItem'][330]['published']], ['reverted', 2, '1', '1']);
 check('and leaves the row the customer showed where its baseline was', [$uStore->binding['presentation']['article-post']['state'], $uStore->binding['presentation']['article-old']['state']], ['0', '1']);
 check('so the customer change is still reported after the revert', $trimDrifted($uContract), ['article-post']);
+
+// 🔒 A REVERT REBASES EXACTLY WHAT EACH CALL WROTE. 301 hidden rows take two calls; a row the customer
+// shows between them is written by neither, so its baseline stays hidden and it is still reported.
+$bigDir = sys_get_temp_dir() . '/cowork-demo-trim-big-' . bin2hex(random_bytes(6));
+mkdir($bigDir);
+try {
+    $bigEntities = []; $bigLock = []; $bigHide = [];
+    for ($i = 1; $i <= 301; $i++) {
+        $bigEntities[] = ['key' => "post-$i", 'kind' => 'article', 'sourceId' => $i, 'identity' => ['alias' => "post-$i"]];
+        $bigLock["post-$i"] = ['title' => "Post $i", 'alias' => "post-$i", 'state' => '1', 'access' => '1', 'language' => '*'];
+        $bigHide[] = ['key' => "post-$i", 'kind' => 'article', 'field' => 'state', 'from' => '1', 'to' => '0', 'reason' => 'demo blog post'];
+    }
+    $bigStore = new TestContractStore();
+    $bigLog = new FakeApplyLog();
+    $bigWriter = new ContractTestWriter($bigLog, $bigStore);
+    foreach ($bigLock as $key => $row) $bigWriter->store['article'][1000 + (int) substr($key, 5)] = ['id' => (string) (1000 + (int) substr($key, 5))] + $row;
+    foreach (['manifest' => ['id' => 'trim-big/v1'], 'content-map' => ['entities' => $bigEntities, 'slots' => [], 'pages' => []],
+        'presentation-lock' => ['entities' => $bigLock, 'assignments' => [], 'fileRoots' => [], 'files' => [], 'inventoryCounts' => ['article' => 301], 'access' => $bigStore->acl]] as $name => $body)
+        file_put_contents("$bigDir/$name.json", json_encode($body));
+    $bigBase = '';
+    foreach (['manifest.json', 'content-map.json', 'presentation-lock.json'] as $name) $bigBase .= $name . ':' . hash_file('sha256', "$bigDir/$name") . "\n";
+    file_put_contents("$bigDir/demo-trim-map.json", json_encode(['schemaVersion' => 'tracy-quickstart-demo-trim/v1', 'extensionVersion' => '1.0.0', 'contract' => 'trim-big/v1',
+        'baseHash' => hash('sha256', $bigBase), 'hide' => $bigHide]));
+    $bigContract = new QuickstartContract($bigWriter, $bigStore, $bigDir, $bigDir);
+    $bigEngine = new Engine($WTOKEN, [], null, null, null, null, $bigWriter, null, $bigLog, null, null, null, $bigContract);
+    $bigCall = fn(array $params) => $bigEngine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
+    $bigApply = [$bigCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-b', 'request_id' => 'b1'])['status'] ?? null,
+        $bigCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-b', 'request_id' => 'b1'])['status'] ?? null];
+    check('301 rows are trimmed in two calls', $bigApply, ['running', 'completed']);
+    $bigFirst = $bigCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-bu', 'request_id' => 'b2']);
+    check('the first revert call leaves one row hidden', [$bigFirst['status'] ?? $bigFirst, $bigFirst['moved'] ?? null, $bigFirst['remaining'] ?? null], ['running', 300, 1]);
+    $bigLeft = array_keys(array_filter($bigWriter->store['article'], fn($row) => $row['state'] === '0'));
+    check('one row is still hidden', count($bigLeft), 1);
+    $bigKey = 'post-' . ($bigLeft[0] - 1000);
+    $bigWriter->store['article'][$bigLeft[0]]['state'] = '1';
+    $bigSecond = $bigCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-bu', 'request_id' => 'b2']);
+    check('the second call has nothing left to write, and finishes', [$bigSecond['status'] ?? $bigSecond, $bigSecond['moved'] ?? null], ['reverted', 0]);
+    check('the row the customer showed between the calls keeps its hidden baseline', $bigStore->binding['presentation'][$bigKey]['state'] ?? null, '0');
+    check('so it is still reported after the revert', $trimDrifted($bigContract), [$bigKey]);
+} finally {
+    foreach (glob("$bigDir/*") as $f) unlink($f);
+    rmdir($bigDir);
+}

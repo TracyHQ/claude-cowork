@@ -2283,9 +2283,13 @@ final class Engine
                 }
                 $remaining = count($pending) - count($batch);
                 if ($remaining === 0) {
-                    // Every row the trim owns is expected at this direction's end, derived from the
-                    // profile and the record, never read back from the site.
-                    foreach ($this->demoTrimOwned($record, $hide) as $key => $row) $moved[$key] = [$row['field'], $hide ? $row['to'] : $row['from']];
+                    // A finished apply expects every row it owns hidden, derived from the profile and the
+                    // record, never read back from the site: a batch Joomla committed behind its own
+                    // rollback left rows hidden that no surviving call wrote.
+                    // 🔒 A REVERT REBASES ONLY THE ROWS THIS CALL WROTE, in $moved already. A row of the trim
+                    // the customer showed between two calls was written by neither: its baseline stays
+                    // hidden, and it is still reported.
+                    if ($hide) foreach ($this->demoTrimOwned($record) as $key => $row) $moved[$key] = [$row['field'], $row['to']];
                     if ($hide) $record = ['status' => 'complete', 'completedAt' => gmdate('c')] + $record;
                     else $record = ['status' => 'reverted', 'revert' => ['completedAt' => gmdate('c')] + ($record['revert'] ?? [])] + $record;
                 }

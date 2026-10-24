@@ -726,13 +726,17 @@ final class QuickstartContract
             if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the receiver carries no demo-trim profile');
             if (!hash_equals((string) $trim['profileHash'], $this->demoTrim->hash())) throw new RuntimeException('The installed demo-trim profile changed');
         }
-        // While a trim or its revert is in flight, a listed row may stand at either end of its move:
+        // While a trim is in flight, a listed row may stand at either end of its move:
         // a batch is bounded, not atomic (Joomla's nested tables commit implicitly), so the site can
         // genuinely be half-moved. Only the listed rows, only on their visibility column, and only
         // between the two values the profile names — everything else is held exactly as before.
         // A record that names its rows owns only those: a row the customer had already moved is not
         // the trim's, and stays drift. A record from before rows were named owns every listed row.
-        $trimMoving = $trim !== null && in_array($trim['status'] ?? null, ['applying', 'reverting'], true);
+        // 🔒 NOT WHILE A REVERT IS: an apply's finish expects every row it owns hidden, so a half-moved
+        // row is the apply's either way, but a revert rebases only the rows each of its calls wrote. A
+        // row shown that no call of it wrote is drift from the moment it differs — held back until the
+        // revert finished, it would read as a difference that last call made, and refuse it.
+        $trimMoving = $trim !== null && ($trim['status'] ?? null) === 'applying';
         $trimOwned = isset($trim['rows']) ? array_flip($trim['rows']) : null;
         // The one phase in which a translated source row may legitimately still be at `*`: the
         // retag is chunked, so mid-phase the site is genuinely half-moved. Every other phase, and

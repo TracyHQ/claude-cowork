@@ -13,7 +13,7 @@
 #    and reach the ×, which is a button named "Close" and not hidden from screen readers; ESC closes
 #    it — right after opening too — and focus is back on ☰, from where Tab goes where it went before
 #    the drawer was ever opened. The × and a click on the page behind close it as before, focus back on ☰.
-#    A drawer the adapter cannot close — its × taken out, or a × that never reaches T3 — is not trapped
+#    A drawer the adapter cannot close — its × taken out, taken away while open, or a × that never reaches T3 — is not trapped
 #    and keeps ESC for the page: Tab leaves it, and ESC is taken at most while the × is being tried.
 # 2. the switch off: the page carries no adapter, and the drawer does what T3 alone does (ESC does nothing).
 # 3. a site on Cassiopeia (not T3): the page is the same bytes with the switch on and off, and has no adapter.
@@ -93,11 +93,15 @@ NOCLOSE=$(browse noclose)
 echo "$NOCLOSE"
 DEADCLOSE=$(browse deadclose)
 echo "$DEADCLOSE"
+GONE=$(browse gone)
+echo "$GONE"
 for w in 390 768 1440; do
   expect "$w: no ×: the drawer opens, ESC stays the page's, Tab leaves it" \
     "$(at $w closeCount "$NOCLOSE") $(at $w opened "$NOCLOSE") $(at $w escTaken "$NOCLOSE") $([ "$(at $w tabLeaves "$NOCLOSE")" -gt 0 ] && echo leaves) $(at $w errors "$NOCLOSE")" "0 true [false,false] leaves []"
   expect "$w: a × that does not close: tried once, then ESC is the page's and Tab leaves it" \
     "$(at $w closeCount "$DEADCLOSE") $(at $w stillOpen "$DEADCLOSE") $(at $w escTaken "$DEADCLOSE") $([ "$(at $w tabLeaves "$DEADCLOSE")" -gt 0 ] && echo leaves) $(at $w errors "$DEADCLOSE")" "1 true [true,false] leaves []"
+  expect "$w: × taken away while open: ESC stays the page's, Tab leaves it, no error" \
+    "$(at $w closeCount "$GONE") $(at $w stillOpen "$GONE") $(at $w escTaken "$GONE") $([ "$(at $w tabLeaves "$GONE")" -gt 0 ] && echo leaves) $(at $w errors "$GONE")" "0 true [false,false] leaves []"
 done
 
 say "2. the switch off"

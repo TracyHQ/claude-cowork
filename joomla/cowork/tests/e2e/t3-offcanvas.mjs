@@ -6,6 +6,7 @@
 // A variant is a drawer the adapter cannot close, where it has to leave the keyboard to T3 and the page:
 //   noclose    the drawer's × is taken out of the page T3 draws
 //   deadclose  the × is there, but a click on it never reaches T3
+//   gone       the × is there when the drawer opens, and another script takes it away while it is open
 import { createRequire } from 'node:module';
 
 const [url, core, variant] = process.argv.slice(2);
@@ -32,6 +33,7 @@ async function stranded(page, toggle, out) {
   await pause(400);
   out.opened = await isOpen(page);
   out.focusOnOpen = await focused(page);
+  if (variant === 'gone') out.closeCount = await page.evaluate(() => { document.querySelector('.t3-off-canvas .close').remove(); return document.querySelectorAll('.t3-off-canvas .close').length; });
   await page.keyboard.press('Escape');
   // Every retry the adapter may make, and then some.
   await pause(2500);

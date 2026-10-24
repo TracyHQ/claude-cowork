@@ -41,20 +41,30 @@
 
     // The ☰ that opened it. T3 stops the click from bubbling, so it is noted on the way down.
     var opener = null;
+    var opening = null;
     var openedAt = 0;
     document.addEventListener('click', function (e) {
       var toggle = e.target && e.target.closest && e.target.closest('.off-canvas-toggle[data-nav]');
-      if (toggle && toggles.indexOf(toggle) !== -1 && !isOpen()) { opener = toggle; openedAt = Date.now(); }
+      if (toggle && toggles.indexOf(toggle) !== -1 && !isOpen()) { opener = toggle; opening = document.querySelector(toggle.getAttribute('data-nav')); openedAt = Date.now(); }
     }, true);
 
-    // A drawer its × did not close: from then on it is left to T3 alone, untrapped, ESC the page's.
-    var stuck = [];
+    // 🔒 NO WAY OUT, NO TRAP. ESC can only close a drawer through its ×, so every key asks again whether
+    // the drawer is open and its × is still there, in the page: another script may take it away at any
+    // time. Without one — or once a click on it threw or did not close the drawer — the drawer is
+    // released to T3 alone: Tab is not held in it and ESC is not taken from the page.
+    var released = [];
     function current() {
       for (var i = 0; i < drawers.length; i++) if (drawers[i].classList.contains('off-canvas-current')) return drawers[i];
       return null;
     }
     function isOpen() { return document.body.classList.contains('off-canvas-open') && current() !== null; }
-    function held() { return isOpen() && stuck.indexOf(current()) === -1; }
+    function closer(drawer) {
+      if (!drawer || !drawer.isConnected || released.indexOf(drawer) !== -1) return null;
+      var close = drawer.querySelector('.close');
+      return close && close.isConnected ? close : null;
+    }
+    function release(drawer) { if (drawer && released.indexOf(drawer) === -1) released.push(drawer); }
+    function held() { return isOpen() && closer(current()) !== null; }
     function visible(el) {
       if (el.disabled || el.getAttribute('tabindex') === '-1' || el.closest('[inert]')) return false;
       var style = window.getComputedStyle(el);
@@ -75,7 +85,7 @@
       wasOpen = open;
       toggles.forEach(function (toggle) { toggle.setAttribute('aria-expanded', open ? 'true' : 'false'); });
       if (open) {
-        into(current());
+        if (held()) into(current());
         return;
       }
       if (closing) { clearTimeout(closing); closing = null; }
@@ -95,19 +105,23 @@
         if (tries > 0 && Date.now() - openedAt < 400) closing = setTimeout(function () { shut(tries - 1); }, 60);
         return;
       }
-      drawer.querySelector('.close').click();
+      var close = closer(drawer);
+      if (!close) { release(drawer); return; }
+      try { close.click(); } catch (error) { release(drawer); return; }
       closing = setTimeout(function () {
         closing = null;
         if (!isOpen()) return;
         if (tries > 0) shut(tries - 1);
-        else if (stuck.indexOf(drawer) === -1) stuck.push(drawer);
+        else release(drawer);
       }, 150);
     }
 
     document.addEventListener('keydown', function (e) {
       var drawer = current();
       var open = held();
-      if ((e.key === 'Escape' || e.key === 'Esc') && !e.defaultPrevented && (open || (!isOpen() && Date.now() - openedAt < 400))) {
+      // Pressed before T3 added the open class (it waits 50 ms): the drawer being opened, if it has its ×.
+      var early = !isOpen() && Date.now() - openedAt < 400 && closer(opening) !== null;
+      if ((e.key === 'Escape' || e.key === 'Esc') && !e.defaultPrevented && (open || early)) {
         // A dialog of its own inside the drawer keeps its ESC.
         var dialog = e.target && e.target.closest ? e.target.closest('[role="dialog"], dialog, .modal') : null;
         if (dialog && drawer && drawer.contains(dialog)) return;
