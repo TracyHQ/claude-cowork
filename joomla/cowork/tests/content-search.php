@@ -948,7 +948,14 @@ PHP;
     $csWantEcho = ['ok' => true, 'kind' => 'article', 'offset' => 0, 'search' => $csNfc, 'matched' => 1];
     $csLoaded = $csProbe($csFactoryList, true, 'as-is');
     check('loading: the factory list is enough to search', array_diff_key($csLoaded['answer'] ?? ['probe' => $csLoaded], ['items' => 1]), $csWantEcho);
-    foreach (['disabled' => 'with disable_classes=Normalizer', 'emptied' => 'with a Normalizer class that has no normalize()'] as $csMode => $csWhat) {
+    // PHP 8.5 dropped `disable_classes` (ini_get answers false): the directive is ignored, Normalizer
+    // stays usable, and the two modes built on it cannot be set up. They are skipped there, said so.
+    $csDisableWorks = ini_get('disable_classes') !== false
+        && trim((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -d disable_classes=Normalizer -r ' . escapeshellarg('echo class_exists("Normalizer") && method_exists("Normalizer", "normalize") ? "usable" : "gone";') . ' 2>&1')) === 'gone';
+    if (!$csDisableWorks) {
+        echo "  skip loading: disable_classes=Normalizer has no effect on PHP " . PHP_VERSION . ", the disabled and emptied Normalizer modes are not run\n";
+    }
+    foreach ($csDisableWorks ? ['disabled' => 'with disable_classes=Normalizer', 'emptied' => 'with a Normalizer class that has no normalize()'] : [] as $csMode => $csWhat) {
         $csBare = $csProbe($csFactoryList, true, $csMode);
         check("loading: {$csWhat} there is no usable Normalizer", $csBare['usable'] ?? $csBare, false);
         check("loading: {$csWhat} search still answers, the needle as it came and matched as it came", $csBare['answer'] ?? ['probe' => $csBare], $csWantEcho + ['items' => [['id' => 1, 'title' => $csNfc]]]);

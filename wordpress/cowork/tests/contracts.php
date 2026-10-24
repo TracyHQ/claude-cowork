@@ -367,6 +367,32 @@ file_put_contents($linkedSite['root'] . '/outside/foreign.php', '<?php');
 symlink($linkedSite['root'] . '/outside', $linkedSite['root'] . '/wp-content/themes/test-theme/linked');
 $linkedAnswer = $door($linkedSite['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0']);
 checkTrue('a linked folder is not walked into', strpos(json_encode($linkedAnswer['warnings'] ?? [], JSON_UNESCAPED_SLASHES), 'linked/') === false);
+// A locked root that is itself a link, or sits under one, is walked as its target: every file there
+// reads as no link, and the walk names files outside the webroot. The link is reported instead.
+foreach (['wp-content/themes/test-theme' => 'Theme folder is a link: wp-content/themes/test-theme', 'wp-content/themes' => 'Theme folder is a link: wp-content/themes (holds wp-content/themes/test-theme)'] as $linkedPath => $expect) {
+    $outside = sys_get_temp_dir() . '/cc-contract-outside-' . bin2hex(random_bytes(4));
+    try {
+        $rootLinkSite = contractSite($SITE, $FIXTURES);
+        $theme = $rootLinkSite['root'] . '/wp-content/themes/test-theme';
+        $target = $outside . ($linkedPath === 'wp-content/themes' ? '/test-theme' : '');
+        mkdir($target, 0777, true);
+        foreach (['style.css', 'theme.json'] as $name) {
+            rename($theme . '/' . $name, $target . '/' . $name);
+        }
+        file_put_contents($target . '/foreign.php', '<?php');
+        rmdir($theme);
+        if ($linkedPath === 'wp-content/themes') {
+            rmdir($rootLinkSite['root'] . '/wp-content/themes');
+        }
+        symlink($outside, $rootLinkSite['root'] . '/' . $linkedPath);
+        $rootLinkAnswer = $door($rootLinkSite['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0']);
+        $rootLinkWarnings = json_encode($rootLinkAnswer['warnings'] ?? [], JSON_UNESCAPED_SLASHES);
+        checkTrue("a locked root linked at {$linkedPath} is reported", strpos($rootLinkWarnings, $expect) !== false);
+        checkTrue("a locked root linked at {$linkedPath} is not walked", strpos($rootLinkWarnings, 'foreign') === false);
+    } finally {
+        contractRootRemove($outside);
+    }
+}
 $drifted('an edited template part', static function (array $t): void {
     WP_Fake::$posts[71]['post_content'] = '<!-- wp:paragraph --><p>Edited footer</p><!-- /wp:paragraph -->';
 }, 'Template part footer was edited');
