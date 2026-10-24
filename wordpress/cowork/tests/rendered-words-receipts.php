@@ -278,6 +278,22 @@ check('revert: an edit that kept the revision is a conflict, and the edit stays'
     [true, 'conflict', true]);
 WP_Fake::$options[$rdKey] = $rdWritten;
 check('revert: with the option back as the apply wrote it, the revert goes through', [$rdCall('apply.revert', ['apply_id' => 'rw-6'])['ok'] ?? null, WP_Fake::$options[$rdKey] === $rdKept], [true, true]);
+check('revert: a clean revert answers reverted and nothing else', [array_keys($rdRevB), $rdRevB['reverted'] ?? null], [['ok', 'reverted'], 1]);
+
+// The rules are back but the receipt cannot say so: the answer warns, and status and a retry read the revert, not the receipt.
+$rdBeforeR = WP_Fake::$options[$rdKey];
+$rdR = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-7', 'req-7', [['new' => '+84 7'] + $rdGood[0]]);
+$rdWriter->fail = true;
+$rdRevR = $rdCall('apply.revert', ['apply_id' => 'rw-7']);
+$rdWriter->fail = false;
+check('revert, no receipt: the rules are back, and the answer warns that status may be stale',
+    [$rdR['ok'] ?? $rdR, $rdRevR['ok'] ?? $rdRevR, $rdRevR['reverted'] ?? null, WP_Fake::$options[$rdKey] === $rdBeforeR, is_string($rdRevR['warning'] ?? null) && strpos($rdRevR['warning'], 'database refused the write') !== false],
+    [true, true, 1, true, true]);
+check('revert, no receipt: the stored receipt still says applied', json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true)['req-7']['state'] ?? null, 'applied');
+$rdStatusR = $rdDoor('status', ['request_id' => 'req-7']);
+check('revert, no receipt: status reads the request as reverted', [$rdStatusR['request']['state'] ?? $rdStatusR, array_column($rdStatusR['receipts'] ?? [], 'state', 'request_id')['req-7'] ?? null], ['reverted', 'reverted']);
+$rdLateR = $rdApply($rdDoor('inspect', ['path' => '/contact-us/', 'targets' => $rdTargets]), 'rw-7', 'req-7', [['new' => '+84 7'] + $rdGood[0]]);
+check('revert, no receipt: a retry replays reverted and writes nothing', [$rdLateR['replayed'] ?? $rdLateR, $rdLateR['state'] ?? null, WP_Fake::$options[$rdKey] === $rdBeforeR], [true, 'reverted', true]);
 
 // Receipts are never dropped: a request_id answered long ago still replays, and a full store refuses new requests.
 $rdAll = json_decode((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true);
