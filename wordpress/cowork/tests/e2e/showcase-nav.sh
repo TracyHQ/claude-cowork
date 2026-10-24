@@ -11,13 +11,14 @@
 # Without DINER_RELEASE the two parts are downloaded with `gh release download` (the release is
 # private: gh must be signed in with read access to it). Either way both sha256 are checked first.
 #
-# 1. bind, then status: 3 owners to edit (the header part 96, navigations 93 and 278), none edited.
-# 2. apply (in batches): 93, 278 and 96 end at the map's finals; the home page's header drawer now
-#    renders the mainmenu (About Us, Reservation, Offers, Our Blog, Contact Us) without the Home colour
-#    variants, and links no Typography, Error or Offline page; every showcase page still answers 200.
+# 1. bind, then status: 2 owners to edit (navigations 93 and 278), none edited.
+# 2. apply: 93 and 278 end at the map's finals and the header part 96 keeps the release's bytes; the
+#    mainmenu loses the Home colour variants, the home page's header drawer (navigation 278) still
+#    renders Login, Registration, User Profile, Edit User Profile and Smart Search, and the header
+#    links no Typography, Error or Offline page; every showcase page still answers 200.
 #    Inspect is clean; a second apply changes nothing.
-# 3. the customer edits navigation 93; revert restores 278 and 96 byte for byte, names 93 as a
-#    conflict and leaves the customer's bytes. The same revert retried gets the committed answer.
+# 3. the customer edits navigation 93; revert restores 278 byte for byte, names 93 as a conflict and
+#    leaves the customer's bytes. The same revert retried gets the committed answer.
 # 4. the customer puts 93 back as the apply left it; a new revert request restores it, and every
 #    owner holds the release's bytes again. The site inspects clean; status says reverted, nothing remaining.
 set -euo pipefail
@@ -131,17 +132,18 @@ run_job() {
   echo "$1 still running after five calls" >&2; exit 1
 }
 
+# 96 is the header part: the map does not edit it, and it is watched to stay as the release shipped it.
 OWNERS="93,96,278"
 MAP="$COWORK/lib/contracts/$CONTRACT/showcase-nav-map.json"
-final() { node -e 'const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.stdout.write(["navigation-93", "templatePart-96", "navigation-278"].map((k) => m.finals.find((f) => f.key === k)[process.argv[2]]).join(","))' "$MAP" "$1"; }
-shas() { sql "SELECT GROUP_CONCAT(SHA2(post_content,256) ORDER BY ID) FROM ${QS}posts WHERE ID IN ($OWNERS)"; }
+final() { node -e 'const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.stdout.write(["navigation-93", "navigation-278"].map((k) => m.finals.find((f) => f.key === k)[process.argv[2]]).join(","))' "$MAP" "$1"; }
+shas() { sql "SELECT GROUP_CONCAT(SHA2(post_content,256) ORDER BY ID) FROM ${QS}posts WHERE ID IN (93,278)"; }
 changed() { sql "SELECT COALESCE(GROUP_CONCAT(p.ID ORDER BY p.ID),'none') FROM ${QS}posts p JOIN snav_original o ON o.ID=p.ID WHERE BINARY p.post_content<>BINARY o.post_content"; }
 sql "CREATE TABLE snav_original AS SELECT ID, post_content FROM ${QS}posts WHERE ID IN ($OWNERS)"
-expect "the release ships 93, 96 and 278 as the map starts from" "$(shas)" "$(final before)"
+expect "the release ships 93 and 278 as the map starts from" "$(shas)" "$(final before)"
 
 UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 # The navigation labels the home page renders at desktop, in order: `drawer` for the header's
-# off-canvas navigation (the one whose ref the map moves), `header` for every navigation above the footer.
+# off-canvas navigation (278, site-pages), `header` for every navigation above the footer.
 labels() {
   docker exec "$P-wp" curl -fsS -A "$UA" http://localhost/ | node -e '
     const html = require("fs").readFileSync(0, "utf8");
@@ -167,26 +169,29 @@ pages() {
 showcase_in() {
   node -e 'const shown = process.argv[1].split("|"); process.stdout.write(process.argv[2].split("|").filter((l) => shown.includes(l)).join("|") || "none")' "$(labels "$1")" "$SHOWCASE_LABELS"
 }
-mainmenu_in() {
-  node -e 'const shown = process.argv[1].split("|"); process.stdout.write(["About Us", "Reservation", "Offers", "Our Blog", "Contact Us"].filter((l) => shown.includes(l)).join("|") || "none")' "$(labels "$1")"
+# Which of the drawer's account and search entries, which the map keeps, a region renders.
+KEPT_LABELS="Login|Registration|User Profile|Edit User Profile|Smart Search"
+kept_in() {
+  node -e 'const shown = process.argv[1].split("|"); process.stdout.write(process.argv[2].split("|").filter((l) => shown.includes(l)).join("|") || "none")' "$(labels "$1")" "$KEPT_LABELS"
 }
 
 say "1. bind and status"
 contract "{\"operation\":\"bind\",\"contract\":\"$CONTRACT\"}"
 expect "bound" "$(field bound) $(field contract)" "true $CONTRACT"
 contract '{"operation":"showcaseNav.status"}'
-expect "status: three owners to edit, none edited" "$(field status) $(field remaining) $(field hides)" \
-  'none 3 {"navigation.removeLink":7,"templatePart.setNavigationRef":1}'
-expect "before an apply the header drawer is the site-pages navigation" "$(showcase_in drawer) / $(mainmenu_in drawer)" "Error Page|Offline Page|Typography / none"
+expect "status: two owners to edit, none edited" "$(field status) $(field remaining) $(field hides)" \
+  'none 2 {"navigation.removeLink":7}'
+expect "before an apply the header drawer is the site-pages navigation" "$(showcase_in drawer) / $(kept_in drawer)" "Error Page|Offline Page|Typography / $KEPT_LABELS"
 expect "and the header links every showcase page" "$(showcase_in header)" "$SHOWCASE_LABELS"
 
 say "2. apply"
 run_job '{"operation":"showcaseNav.apply","apply_id":"snav-e2e","request_id":"e2e-1"}'
-expect "apply completes, in batches" "$(field status) $MOVED $(field remaining) $(field skipped)" "completed 3 0 []"
-expect "93, 96 and 278 hold the map's finals" "$(shas)" "$(final after)"
-expect "the header part's drawer navigation now points at the mainmenu" \
-  "$(sql "SELECT LOCATE('\"ref\":93', post_content) > 0, LOCATE('\"ref\":278', post_content) FROM ${QS}posts WHERE ID=96" | tr '\t' ' ')" "1 0"
-expect "the header drawer renders the mainmenu's own links" "$(mainmenu_in drawer)" "About Us|Reservation|Offers|Our Blog|Contact Us"
+expect "apply completes" "$(field status) $MOVED $(field remaining) $(field skipped)" "completed 2 0 []"
+expect "93 and 278 hold the map's finals" "$(shas)" "$(final after)"
+expect "the header part keeps the release's bytes" "$(changed)" "93,278"
+expect "the header drawer still opens site-pages" \
+  "$(sql "SELECT LOCATE('\"ref\":278', post_content) > 0 FROM ${QS}posts WHERE ID=96")" 1
+expect "the header drawer keeps the account and search entries" "$(kept_in drawer)" "$KEPT_LABELS"
 expect "and the header links none of the showcase" "$(showcase_in drawer) / $(showcase_in header)" "none / none"
 expect "every showcase page still answers" "$(pages)" "85:200 86:200 87:200 88:200 82:200 83:200 275:200"
 contract '{"operation":"inspect"}'
@@ -199,9 +204,9 @@ say "3. the customer edits navigation 93; revert"
 sql "UPDATE ${QS}posts SET post_content=CONCAT(post_content, '\n<!-- wp:navigation-link {\"label\":\"Customer\",\"url\":\"/customer/\",\"kind\":\"custom\"} /-->') WHERE ID=93"
 CUSTOMER=$(sql "SELECT SHA2(post_content,256) FROM ${QS}posts WHERE ID=93")
 run_job '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
-expect "revert brings the others back" "$(field status) $MOVED $(field remaining)" "reverted 2 0"
+expect "revert brings 278 back" "$(field status) $MOVED $(field remaining)" "reverted 1 0"
 expect "and names navigation 93 as a conflict" "$(keys conflicts)" navigation-93
-expect "96 and 278 have exactly the release's bytes back" "$(changed)" 93
+expect "96 and 278 hold exactly the release's bytes" "$(changed)" 93
 expect "93 stays as the customer left it" "$(sql "SELECT SHA2(post_content,256) FROM ${QS}posts WHERE ID=93")" "$CUSTOMER"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the same revert retried gets the committed answer" "$(field status) $(field alreadyReverted) $(keys conflicts)" "reverted true navigation-93"
@@ -216,7 +221,7 @@ expect "every owner holds the release's bytes" "$(changed) $(shas)" "none $(fina
 contract '{"operation":"inspect"}'
 expect "the reverted site inspects clean" "$(field warnings)" undefined
 contract '{"operation":"showcaseNav.status"}'
-expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 3"
+expect "and status says the job is reverted, nothing remaining" "$(field status) $(field remaining) $(field conflicts) $(field owners)" "reverted 0 [] 2"
 expect "the header drawer links the showcase again" "$(showcase_in drawer) / $(showcase_in header)" "Error Page|Offline Page|Typography / $SHOWCASE_LABELS"
 contract '{"operation":"showcaseNav.revert","apply_id":"snav-e2e-undo","request_id":"e2e-3"}'
 expect "the first revert still answers its retry" "$(field alreadyReverted) $(keys conflicts)" "true navigation-93"

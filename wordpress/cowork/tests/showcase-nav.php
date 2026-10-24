@@ -61,9 +61,9 @@ $sha = static fn(int $id): string => hash('sha256', (string) WP_Fake::$posts[$id
 $labels = static function (int $id): array {
     return array_map(static fn(array $item): string => $item['label'], ShowcaseNavMarkup::items(ShowcaseNavMarkup::parse((string) WP_Fake::$posts[$id]['post_content'])));
 };
-$finals = static function (string $contractId) use ($snavContracts): array {
+$finals = static function (string $contractId, ?string $contractsDir = null) use ($snavContracts): array {
     $out = [];
-    foreach (json_decode((string) file_get_contents($snavContracts . '/' . $contractId . '/showcase-nav-map.json'), true)['finals'] as $final) {
+    foreach (json_decode((string) file_get_contents(($contractsDir ?? $snavContracts) . '/' . $contractId . '/showcase-nav-map.json'), true)['finals'] as $final) {
         $out[$final['key']] = $final;
     }
     return $out;
@@ -88,6 +88,36 @@ foreach (glob($snavContracts . '/*/wp7/*/showcase-nav-map.json') as $file) {
 
 $DINER = 'ja-diner/wp7/1.0.1';
 $F = $finals($DINER);
+$MORGAN = 'ja-morgan/wp7/1.1.16';
+$MF = $finals($MORGAN);
+
+// The released Diner and Morgan maps only take entries out of navigations. The receiver still
+// applies the two template-part edits the builder shipped for them before (Diner's drawer repointed
+// at the main menu, Morgan's drawer and its toggle removed): those maps, built against the same
+// release bytes, are fixtures (`fixtures/showcase-nav/*-map.json`), each served from a copy of its
+// contract in place of the released map.
+$snavRemove = static function (string $dir): void {
+    if (!is_dir($dir)) {
+        return;
+    }
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+    foreach ($it as $node) {
+        $node->isDir() ? rmdir($node->getPathname()) : unlink($node->getPathname());
+    }
+    rmdir($dir);
+};
+$snavFixtures = sys_get_temp_dir() . '/snav-fixtures-' . bin2hex(random_bytes(4));
+register_shutdown_function($snavRemove, $snavFixtures);
+foreach ([$DINER => 'ja-diner-repoint-map.json', $MORGAN => 'ja-morgan-drawer-map.json'] as $id => $fixtureMap) {
+    mkdir($snavFixtures . '/' . $id, 0777, true);
+    foreach (['manifest.json', 'content-map.json', 'presentation-lock.json'] as $name) {
+        copy($snavContracts . '/' . $id . '/' . $name, $snavFixtures . '/' . $id . '/' . $name);
+    }
+    copy(__DIR__ . '/fixtures/showcase-nav/' . $fixtureMap, $snavFixtures . '/' . $id . '/showcase-nav-map.json');
+}
+$P = $finals($DINER, $snavFixtures);
+$dinerSource = json_decode((string) file_get_contents(__DIR__ . '/fixtures/showcase-nav/ja-diner.json'), true);
+$dinerHeader = hash('sha256', $dinerSource['templateParts'][0]['content']);
 
 // ── refusals ────────────────────────────────────────────────────────────────────────────────
 
@@ -99,7 +129,7 @@ check('an unknown operation is refused', $sdoor($E, 'showcaseNav.hide', ['apply_
 check('revert with nothing applied is refused', $sdoor($E, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1'])['error'], 'contract_failed');
 $status = $sdoor($E, 'showcaseNav.status');
 check('status before an apply', [$status['ok'], $status['status'], $status['remaining'], $status['hides']],
-    [true, 'none', 3, ['navigation.removeLink' => 7, 'templatePart.setNavigationRef' => 1]]);
+    [true, 'none', 2, ['navigation.removeLink' => 7]]);
 
 WP_Fake::$polylang = true;
 WP_Fake::$languages = [
@@ -109,39 +139,62 @@ WP_Fake::$languages = [
 $ml = $sdoor($E, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 check('a site with a second language is refused, both ways', [$ml['error'], $sdoor($E, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1'])['error']], ['contract_failed', 'contract_failed']);
 check('and says nothing was written', $ml['message'], 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
-check('nothing moved, nothing on record', [$sha(93), $sha(278), $sha(96), $sdoor($E, 'inspect')['showcaseNav']], [$F['navigation-93']['before'], $F['navigation-278']['before'], $F['templatePart-96']['before'], null]);
+check('nothing moved, nothing on record', [$sha(93), $sha(278), $sha(96), $sdoor($E, 'inspect')['showcaseNav']], [$F['navigation-93']['before'], $F['navigation-278']['before'], $dinerHeader, null]);
 WP_Fake::$polylang = false;
 WP_Fake::$languages = [];
 
-// ── Diner 1.0.1: the drawer opens the main menu, without the home variants ───────────────────
+// ── Diner 1.0.1: the drawer keeps the account and search pages, without the template's screens ─
 
 $d = snavSite($DINER, $snavContracts);
 $D = $d['engine'];
 $first = $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-check('the first call edits a batch and says it is not done', [$first['ok'], $first['status'], $first['moved'], $first['remaining']], [true, 'running', 2, 1]);
-$replay = $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-check('the same request resumes it', [$replay['status'], $replay['moved'], $replay['remaining'], $replay['skipped']], ['completed', 1, 0, []]);
-check('the header drawer opens navigation 93, not 278', [strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":93') !== false, strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":278')], [true, false]);
-check('every owner holds exactly the bytes the map ends with', [$sha(93), $sha(278), $sha(96)],
-    [$F['navigation-93']['after'], $F['navigation-278']['after'], $F['templatePart-96']['after']]);
+check('both navigations are one batch', [$first['ok'], $first['status'], $first['moved'], $first['remaining'], $first['skipped']], [true, 'completed', 2, 0, []]);
+check('every owner holds exactly the bytes the map ends with', [$sha(93), $sha(278)], [$F['navigation-93']['after'], $F['navigation-278']['after']]);
 check('the home variants are gone from 93; the real entries are kept', $labels(93), ['Home', 'About Us', 'Reservation', 'Offers', 'Our Blog', 'Contact Us']);
+check('the drawer keeps login, registration, profile and search', $labels(278), ['J! Pages', 'Login', 'Registration', 'User Profile', 'Edit User Profile', 'Other Pages', 'Smart Search']);
+check('and loses the error, offline and sample content screens', array_values(array_intersect(['Error Page', 'Offline Page', 'Content', 'Typography', 'Tagged Items'], $labels(278))), []);
+check('the header is not touched: its drawer still opens 278', [$sha(96), strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":278') !== false], [$dinerHeader, true]);
 check('the header is clean to inspect', $drift($D), []);
 check('status says complete', [$sdoor($D, 'showcaseNav.status')['status'], $sdoor($D, 'showcaseNav.status')['remaining']], ['complete', 0]);
+$replay = $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('the same request answers the same again', [$replay['status'], $replay['skipped'], $sha(278)], ['completed', [], $F['navigation-278']['after']]);
 $again = $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-2', 'request_id' => 'n2']);
 check('applying twice writes nothing and says so', [$again['ok'], $again['alreadyApplied'], $again['applyId']], [true, true, 'snav-1']);
-check('each write is logged under the apply id, without the bytes', [count($d['log']->entries('snav-1')), array_key_exists('content', $d['log']->entries('snav-1')[0])], [3, false]);
+check('each write is logged under the apply id, without the bytes', [count($d['log']->entries('snav-1')), array_key_exists('content', $d['log']->entries('snav-1')[0])], [2, false]);
 $viaRevert = $D->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'snav-1']]);
 check('apply.revert of a showcase receipt points at showcaseNav.revert', [$viaRevert['error'], strpos($viaRevert['message'], 'showcaseNav.revert') !== false], ['bad_params', true]);
 
 $rev = $sdoor($D, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
-$rev2 = $sdoor($D, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
-check('revert runs in batches too', [[$rev['status'], $rev['moved'], $rev['remaining']], [$rev2['status'], $rev2['moved'], $rev2['remaining'], $rev2['conflicts']]],
-    [['running', 2, 1], ['reverted', 1, 0, []]]);
-check('every owner is back to the bytes it shipped with', [$contents([93, 278, 96])], [array_map(static fn($n) => $n['content'], array_merge($d['source']['navigations'], $d['source']['templateParts']))]);
+check('revert puts both back in one batch', [$rev['status'], $rev['moved'], $rev['remaining'], $rev['conflicts']], ['reverted', 2, 0, []]);
+check('every owner is back to the bytes it shipped with', $contents([93, 278, 96]), array_map(static fn($n) => $n['content'], array_merge($d['source']['navigations'], $d['source']['templateParts'])));
 $lost = $sdoor($D, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
 check('a revert retried after a lost answer gets it again', [$lost['ok'], $lost['alreadyReverted'], $lost['conflicts']], [true, true, []]);
 check('the request that applied cannot apply again', $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1'])['error'], 'conflict');
-check('a new request applies again', $sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-3', 'request_id' => 'n3'])['status'], 'running');
+check('a new request applies again', [$sdoor($D, 'showcaseNav.apply', ['apply_id' => 'snav-3', 'request_id' => 'n3'])['status'], $sha(278)], ['completed', $F['navigation-278']['after']]);
+
+// ── a map with a template part: the drawer opens the main menu, in batches ──────────────────
+
+$p = snavSite($DINER, $snavFixtures);
+$PE = $p['engine'];
+check('status counts the repoint', $sdoor($PE, 'showcaseNav.status')['hides'], ['navigation.removeLink' => 7, 'templatePart.setNavigationRef' => 1]);
+$first = $sdoor($PE, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('the first call edits a batch and says it is not done', [$first['ok'], $first['status'], $first['moved'], $first['remaining']], [true, 'running', 2, 1]);
+$replay = $sdoor($PE, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('the same request resumes it', [$replay['status'], $replay['moved'], $replay['remaining'], $replay['skipped']], ['completed', 1, 0, []]);
+check('the header drawer opens navigation 93, not 278', [strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":93') !== false, strpos((string) WP_Fake::$posts[96]['post_content'], '"ref":278')], [true, false]);
+check('every owner holds exactly the bytes the fixture map ends with', [$sha(93), $sha(278), $sha(96)],
+    [$P['navigation-93']['after'], $P['navigation-278']['after'], $P['templatePart-96']['after']]);
+check('the repointed header is clean to inspect', $drift($PE), []);
+$rev = $sdoor($PE, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
+$rev2 = $sdoor($PE, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
+check('revert runs in batches too', [[$rev['status'], $rev['moved'], $rev['remaining']], [$rev2['status'], $rev2['moved'], $rev2['remaining'], $rev2['conflicts']]],
+    [['running', 2, 1], ['reverted', 1, 0, []]]);
+check('every owner, the header too, is back to the bytes it shipped with', $contents([93, 278, 96]), array_map(static fn($n) => $n['content'], array_merge($p['source']['navigations'], $p['source']['templateParts'])));
+check('another request is refused while one is in flight', (static function () use ($sdoor, $DINER, $snavFixtures): string {
+    $x = snavSite($DINER, $snavFixtures);
+    $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+    return $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'other'])['error'];
+})(), 'conflict');
 
 // ── an apply that dies mid-write, and its retry ─────────────────────────────────────────────
 
@@ -153,17 +206,11 @@ $GLOBALS['wpdb']->beforeSwap = static function (int $id): void {
 };
 $died = $sdoor($c['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $GLOBALS['wpdb']->beforeSwap = null;
-check('a write that dies is a failure, not a success', [$died['ok'], $sha(96), $sha(93)], [false, $F['templatePart-96']['after'], $F['navigation-93']['before']]);
+check('a write that dies is a failure, not a success', [$died['ok'], $sha(93)], [false, $F['navigation-93']['before']]);
 check('its receipt landed before the write', $sdoor($c['engine'], 'inspect')['showcaseNav']['receipts']['navigation-93']['outcome'], 'writing');
 $resumed = $sdoor($c['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-$resumed = $resumed['status'] === 'running' ? $sdoor($c['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $resumed;
-check('the same request finishes it, exactly', [$resumed['status'], $resumed['skipped'], $sha(93), $sha(278), $sha(96)],
-    ['completed', [], $F['navigation-93']['after'], $F['navigation-278']['after'], $F['templatePart-96']['after']]);
-check('another request is refused while one is in flight', (static function () use ($sdoor): string {
-    $x = snavSite('ja-diner/wp7/1.0.1', __DIR__ . '/../lib/contracts');
-    $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-    return $sdoor($x['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'other'])['error'];
-})(), 'conflict');
+check('the same request finishes it, exactly', [$resumed['status'], $resumed['skipped'], $sha(93), $sha(278)],
+    ['completed', [], $F['navigation-93']['after'], $F['navigation-278']['after']]);
 
 // ── the customer is never overwritten ───────────────────────────────────────────────────────
 
@@ -174,13 +221,19 @@ $GLOBALS['wpdb']->beforeSwap = static function (int $id) use ($customer): void {
         WP_Fake::$posts[93]['post_content'] = $customer; // saved in the editor between the read and the write
     }
 };
-$sdoor($r['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $raced = $sdoor($r['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $GLOBALS['wpdb']->beforeSwap = null;
-check('a customer save between the read and the write wins', [WP_Fake::$posts[93]['post_content'] === $customer, $raced['status']], [true, 'completed']);
+check('a customer save between the read and the write wins', [WP_Fake::$posts[93]['post_content'] === $customer, $raced['status'], $sha(278)], [true, 'completed', $F['navigation-278']['after']]);
 check('and is reported', $raced['skipped'], ['navigation-93' => 'it changed while it was being written']);
 
 $e = snavSite($DINER, $snavContracts);
+WP_Fake::$posts[278]['post_content'] = str_replace('Smart Search', 'Search', (string) WP_Fake::$posts[278]['post_content']);
+$edited = WP_Fake::$posts[278]['post_content'];
+$done = $sdoor($e['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a navigation the customer edited before the apply is left as it is and reported', [WP_Fake::$posts[278]['post_content'] === $edited, $done['status'], $done['skipped'], $sha(93)],
+    [true, 'completed', ['navigation-278' => 'edited on this site since the quickstart shipped it; left as it is'], $F['navigation-93']['after']]);
+
+$e = snavSite($DINER, $snavFixtures);
 WP_Fake::$posts[96]['post_content'] .= "\n<!-- wp:paragraph --><p>mine</p><!-- /wp:paragraph -->";
 $edited = WP_Fake::$posts[96]['post_content'];
 check('a header the customer edited before the apply is drift', count($drift($e['engine'])), 1);
@@ -194,6 +247,23 @@ check('and is still drift after the apply', $drift($e['engine']), ['Template par
 $v = snavSite($DINER, $snavContracts);
 $V = $v['engine'];
 $sdoor($V, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$applied = WP_Fake::$posts[278]['post_content'];
+WP_Fake::$posts[278]['post_content'] = str_replace('Smart Search', 'Search', $applied);
+$left = $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
+check('revert leaves the customer\'s navigation and says so', [$left['status'], array_keys($left['conflicts']), WP_Fake::$posts[278]['post_content'] === str_replace('Smart Search', 'Search', $applied)],
+    ['reverted', ['navigation-278'], true]);
+check('the other navigation went back', $sha(93), $F['navigation-93']['before']);
+check('status lists the conflict', array_keys($sdoor($V, 'showcaseNav.status')['conflicts']), ['navigation-278']);
+WP_Fake::$posts[278]['post_content'] = $applied; // the customer takes their edit back out
+$recover = $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r2', 'request_id' => 'v2']);
+check('a later revert puts it back', [$recover['status'], $recover['moved'], $recover['conflicts'], $sha(278)], ['reverted', 1, [], $F['navigation-278']['before']]);
+$after = $sdoor($V, 'showcaseNav.status');
+check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
+    ['reverted', 0, [], 2, 'snav-1']);
+
+$v = snavSite($DINER, $snavFixtures);
+$V = $v['engine'];
+$sdoor($V, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $sdoor($V, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $applied = WP_Fake::$posts[96]['post_content'];
 WP_Fake::$posts[96]['post_content'] = $applied . "\n<!-- wp:separator /-->";
@@ -202,36 +272,57 @@ $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']
 $left = $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r1', 'request_id' => 'v1']);
 check('revert leaves the customer\'s header and says so', [$left['status'], array_keys($left['conflicts']), WP_Fake::$posts[96]['post_content'] === $applied . "\n<!-- wp:separator /-->"],
     ['reverted', ['templatePart-96'], true]);
-check('the navigations went back', [$sha(93), $sha(278)], [$F['navigation-93']['before'], $F['navigation-278']['before']]);
-check('status lists the conflict', array_keys($sdoor($V, 'showcaseNav.status')['conflicts']), ['templatePart-96']);
+check('the navigations went back', [$sha(93), $sha(278)], [$P['navigation-93']['before'], $P['navigation-278']['before']]);
+check('status lists the header conflict', array_keys($sdoor($V, 'showcaseNav.status')['conflicts']), ['templatePart-96']);
 WP_Fake::$posts[96]['post_content'] = $applied; // the customer takes their edit back out
 check('the header as the apply left it is clean while the conflict is on record', $drift($V), []);
 $recover = $sdoor($V, 'showcaseNav.revert', ['apply_id' => 'snav-r2', 'request_id' => 'v2']);
-check('a later revert puts it back', [$recover['status'], $recover['moved'], $recover['conflicts'], $sha(96)], ['reverted', 1, [], $F['templatePart-96']['before']]);
-$after = $sdoor($V, 'showcaseNav.status');
-check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
-    ['reverted', 0, [], 3, 'snav-1']);
+check('a later revert puts the header back', [$recover['status'], $recover['moved'], $recover['conflicts'], $sha(96)], ['reverted', 1, [], $P['templatePart-96']['before']]);
+check('with every owner back', [$sdoor($V, 'showcaseNav.status')['owners'], $sdoor($V, 'showcaseNav.status')['conflicts']], [3, []]);
 
 // ── an editor open on an owner refuses the call before anything moves ───────────────────────
 
 $l = snavSite($DINER, $snavContracts);
 WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
+WP_Fake::$meta['278:' . EditLock::META] = (time() - 10) . ':3';
+$locked = $sdoor($l['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a navigation open in the editor refuses the apply', [$locked['ok'], array_column($locked['errors'] ?? [], 'code')], [false, ['SLOT_LOCKED_BY_USER']]);
+check('nothing moved, nothing on record', [$sha(93), $sha(278), $sdoor($l['engine'], 'inspect')['showcaseNav']], [$F['navigation-93']['before'], $F['navigation-278']['before'], null]);
+
+$l = snavSite($DINER, $snavFixtures);
+WP_Fake::$users[3] = ['display_name' => 'Ada Editor'];
 WP_Fake::$meta['96:' . EditLock::META] = (time() - 10) . ':3';
 $locked = $sdoor($l['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 check('a header open in the editor refuses the apply', [$locked['ok'], array_column($locked['errors'] ?? [], 'code')], [false, ['SLOT_LOCKED_BY_USER']]);
-check('nothing moved, nothing on record', [$sha(96), $sha(278), $sdoor($l['engine'], 'inspect')['showcaseNav']], [$F['templatePart-96']['before'], $F['navigation-278']['before'], null]);
+check('nothing moved, nothing on record', [$sha(96), $sha(278), $sdoor($l['engine'], 'inspect')['showcaseNav']], [$P['templatePart-96']['before'], $P['navigation-278']['before'], null]);
 
-// ── Morgan 1.1.16: the drawer and its button go; Restaurant 1.0.1: a branch inside the drawer ─
+// ── Morgan 1.1.16: entries leave the drawer, which stays; Restaurant 1.0.1: a branch inside it ─
 
-$MORGAN = 'ja-morgan/wp7/1.1.16';
-$MF = $finals($MORGAN);
 $m = snavSite($MORGAN, $snavContracts);
-$sdoor($m['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$mHeader = (string) WP_Fake::$posts[166]['post_content'];
 $mDone = $sdoor($m['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('Morgan: complete, every owner at the map\'s end', [$mDone['status'], $mDone['skipped'], $sha(158), $sha(160)],
+    ['completed', [], $MF['navigation-158']['after'], $MF['navigation-160']['after']]);
+check('Morgan: the header keeps its drawer and the button that opens it, byte for byte', [(string) WP_Fake::$posts[166]['post_content'] === $mHeader, strpos($mHeader, 'id="jm-off-canvas"') !== false, strpos($mHeader, 'aria-controls="jm-off-canvas"') !== false],
+    [true, true, true]);
+check('Morgan: the drawer keeps login, registration, profile and search', $labels(160), ['Site Pages', 'Login', 'Registration', 'Profile', 'Edit Profile', 'Other Pages', 'Smart Search', 'Content', 'Tagged Items']);
+check('Morgan: and loses the template\'s own screens', array_values(array_intersect(['Offline Page', 'Error Page', 'Typography', 'Featured Articles', 'Single Article'], $labels(160))), []);
+$mBack = $sdoor($m['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('Morgan: and the revert puts both navigations back, byte for byte', [$mBack['status'], $mBack['conflicts'], $contents([158, 160])],
+    ['reverted', [], array_column($m['source']['navigations'], 'content')]);
+
+$MP = $finals($MORGAN, $snavFixtures);
+$mp = snavSite($MORGAN, $snavFixtures);
+$mpBefore = (string) WP_Fake::$posts[166]['post_content'];
+$sdoor($mp['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$mpDone = $sdoor($mp['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $header = (string) WP_Fake::$posts[166]['post_content'];
-check('Morgan: complete, every owner at the map\'s end', [$mDone['status'], $sha(158), $sha(160), $sha(166)],
-    ['completed', $MF['navigation-158']['after'], $MF['navigation-160']['after'], $MF['templatePart-166']['after']]);
-check('Morgan: the drawer and the button that opened it are gone', [strpos($header, 'jm-off-canvas'), strpos($header, '"ref":158') !== false], [false, true]);
+check('a map removing blocks: complete, every owner at the map\'s end', [$mpDone['status'], $sha(158), $sha(160), $sha(166)],
+    ['completed', $MP['navigation-158']['after'], $MP['navigation-160']['after'], $MP['templatePart-166']['after']]);
+check('the drawer and the button that opened it are gone, the main menu stays', [strpos($header, 'jm-off-canvas'), strpos($header, '"ref":158') !== false], [false, true]);
+$sdoor($mp['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+$mpBack = $sdoor($mp['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('and the revert puts the drawer back, byte for byte', [$mpBack['status'], $mpBack['conflicts'], (string) WP_Fake::$posts[166]['post_content'] === $mpBefore], ['reverted', [], true]);
 
 $RESTAURANT = 'ja-restaurant/wp7/1.0.1';
 $RF = $finals($RESTAURANT);
@@ -262,19 +353,18 @@ check('Kinetic: and the revert puts the header back, byte for byte', [$kBack['st
 $themeDir = sys_get_temp_dir() . '/snav-theme-' . bin2hex(random_bytes(4));
 try {
     mkdir($themeDir . '/parts', 0777, true);
-    $dinerSource = json_decode((string) file_get_contents(__DIR__ . '/fixtures/showcase-nav/ja-diner.json'), true);
     file_put_contents($themeDir . '/parts/header.html', $dinerSource['templateParts'][0]['content']);
-    $f = snavSite($DINER, $snavContracts, ['themeFileOnly' => true, 'themeDir' => $themeDir]);
+    $f = snavSite($DINER, $snavFixtures, ['themeFileOnly' => true, 'themeDir' => $themeDir]);
     $sdoor($f['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
     $fDone = $sdoor($f['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
     check('a header only the theme file holds is a conflict for that owner, and nothing is created', [$fDone['status'], $fDone['skipped'], $f['writer']->read('templatePart', 0, 'header')],
         ['completed', ['templatePart-96' => 'the header comes from the theme file; this receiver only edits a saved template part'], null]);
     check('the theme file is untouched, the navigations are edited', [hash('sha256', (string) file_get_contents($themeDir . '/parts/header.html')), $sha(93), $sha(278)],
-        [$F['templatePart-96']['before'], $F['navigation-93']['after'], $F['navigation-278']['after']]);
+        [$P['templatePart-96']['before'], $P['navigation-93']['after'], $P['navigation-278']['after']]);
     $sdoor($f['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
     $fRev = $sdoor($f['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
     check('revert puts back the navigations and creates nothing either', [$fRev['status'], $fRev['conflicts'], $sha(93), $sha(278), $f['writer']->read('templatePart', 0, 'header')],
-        ['reverted', [], $F['navigation-93']['before'], $F['navigation-278']['before'], null]);
+        ['reverted', [], $P['navigation-93']['before'], $P['navigation-278']['before'], null]);
 } finally {
     @unlink($themeDir . '/parts/header.html');
     @rmdir($themeDir . '/parts');
@@ -283,13 +373,13 @@ try {
 
 // ── only this job's writes move the baseline ────────────────────────────────────────────────
 
-$a = snavSite($DINER, $snavContracts);
+$a = snavSite($DINER, $snavFixtures);
 $sdoor($a['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $sdoor($a['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
 $afterBytes = [93 => WP_Fake::$posts[93]['post_content'], 96 => WP_Fake::$posts[96]['post_content']];
 
 // The customer set the header and navigation 93 to the map's end bytes themselves, before any apply.
-$s = snavSite($DINER, $snavContracts);
+$s = snavSite($DINER, $snavFixtures);
 WP_Fake::$posts[93]['post_content'] = $afterBytes[93];
 WP_Fake::$posts[96]['post_content'] = $afterBytes[96];
 check('a header the customer set to the map\'s end bytes is drift', $drift($s['engine']), ['Template part header was edited']);
@@ -301,10 +391,10 @@ check('the customer\'s header is still drift after the apply', $drift($s['engine
 $sdoor($s['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 $sRev = $sdoor($s['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 check('revert puts back only what the apply wrote', [$sRev['status'], $sRev['conflicts'], $sha(278), WP_Fake::$posts[93]['post_content'] === $afterBytes[93], WP_Fake::$posts[96]['post_content'] === $afterBytes[96]],
-    ['reverted', [], $F['navigation-278']['before'], true, true]);
+    ['reverted', [], $P['navigation-278']['before'], true, true]);
 
 // A write that landed but whose answer was lost: its `writing` receipt and the end bytes make it this job's.
-$w = snavSite($DINER, $snavContracts);
+$w = snavSite($DINER, $snavFixtures);
 $GLOBALS['wpdb']->beforeSwap = static function (int $id) use ($afterBytes): void {
     if (isset($afterBytes[$id])) {
         WP_Fake::$posts[$id]['post_content'] = $afterBytes[$id]; // the UPDATE ran ...
@@ -333,7 +423,7 @@ check('the site inspects clean', $drift($w['engine']), []);
 $sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 $wRev = $sdoor($w['engine'], 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
 check('and revert puts them back', [$wRev['status'], $sha(93), $sha(96), $sha(278)],
-    ['reverted', $F['navigation-93']['before'], $F['templatePart-96']['before'], $F['navigation-278']['before']]);
+    ['reverted', $P['navigation-93']['before'], $P['templatePart-96']['before'], $P['navigation-278']['before']]);
 
 // ── maps that cannot be used ────────────────────────────────────────────────────────────────
 
@@ -376,9 +466,6 @@ try {
     $none = snavSite($DINER, $snavCopy);
     check('no map at all is unsupported', $sdoor($none['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1'])['error'], 'unsupported');
 } finally {
-    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($snavCopy, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
-    foreach ($it as $node) {
-        $node->isDir() ? rmdir($node->getPathname()) : unlink($node->getPathname());
-    }
-    rmdir($snavCopy);
+    $snavRemove($snavCopy);
+    $snavRemove($snavFixtures);
 }
