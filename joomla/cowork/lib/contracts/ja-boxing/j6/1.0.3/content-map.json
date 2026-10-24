@@ -1632,6 +1632,16 @@
       "sourceId": 76896395
     },
     {
+      "key": "languageString-166748343",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_CLOSE",
+        "language": "en-GB"
+      },
+      "sourceId": 166748343
+    },
+    {
       "key": "languageString-169039348",
       "kind": "languageString",
       "identity": {
@@ -1702,6 +1712,16 @@
       "sourceId": 34322868
     },
     {
+      "key": "languageString-10831042",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_DETAILS",
+        "language": "en-GB"
+      },
+      "sourceId": 10831042
+    },
+    {
       "key": "languageString-112732346",
       "kind": "languageString",
       "identity": {
@@ -1752,6 +1772,16 @@
       "sourceId": 30910664
     },
     {
+      "key": "languageString-135820122",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_PASSWORD",
+        "language": "en-GB"
+      },
+      "sourceId": 135820122
+    },
+    {
       "key": "languageString-27872773",
       "kind": "languageString",
       "identity": {
@@ -1780,6 +1810,16 @@
         "language": "en-GB"
       },
       "sourceId": 256948293
+    },
+    {
+      "key": "languageString-44242957",
+      "kind": "languageString",
+      "identity": {
+        "extension": "tpl_ja_boxing",
+        "key": "TPL_USERNAME",
+        "language": "en-GB"
+      },
+      "sourceId": 44242957
     },
     {
       "key": "siteSetting-257986166",
@@ -1841,10 +1881,10 @@
       "entity": "category-10",
       "column": "title",
       "type": "text",
-      "sample": "Learning",
-      "maxCharacters": 40,
+      "sample": "Learning Center",
+      "maxCharacters": 50,
       "requiresEvidence": false,
-      "label": "Learning / title",
+      "label": "Learning Center / title",
       "customize": "keep"
     },
     {
@@ -1957,7 +1997,7 @@
       "entity": "module-156",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=168",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["hero", "hero[btn-link]", 0],
@@ -2496,7 +2536,7 @@
       "entity": "module-160",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=167",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -2556,7 +2596,7 @@
       "entity": "module-161",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=168",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["cta", "parallax[data]", "parallax[data][btn-link]", 0],
@@ -3639,7 +3679,7 @@
       "entity": "module-163",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=195",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -4025,7 +4065,7 @@
       "entity": "module-166",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=168",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -5299,7 +5339,7 @@
       "entity": "module-178",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=195",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -5920,7 +5960,7 @@
       "entity": "module-181",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=168",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -6174,7 +6214,7 @@
       "entity": "module-182",
       "column": "params",
       "type": "url",
-      "sample": "#",
+      "sample": "index.php?Itemid=195",
       "maxCharacters": 2048,
       "requiresEvidence": false,
       "jsonPath": ["link-btn"],
@@ -20894,7 +20934,7 @@
       "maxCharacters": 654,
       "requiresEvidence": false,
       "xpath": "/html/body/div/p[1]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20906,7 +20946,7 @@
       "maxCharacters": 460,
       "requiresEvidence": false,
       "xpath": "/html/body/div/p[2]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20918,7 +20958,7 @@
       "maxCharacters": 48,
       "requiresEvidence": false,
       "xpath": "/html/body/div/ul/li[1]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20930,7 +20970,7 @@
       "maxCharacters": 60,
       "requiresEvidence": false,
       "xpath": "/html/body/div/ul/li[2]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20942,7 +20982,7 @@
       "maxCharacters": 46,
       "requiresEvidence": false,
       "xpath": "/html/body/div/ul/li[3]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20954,7 +20994,7 @@
       "maxCharacters": 48,
       "requiresEvidence": false,
       "xpath": "/html/body/div/ul/li[4]/text()",
-      "label": "Admin / aboutme",
+      "label": "Tracy Agent / aboutme",
       "customize": "keep"
     },
     {
@@ -20965,7 +21005,7 @@
       "sample": "Boxer",
       "maxCharacters": 40,
       "requiresEvidence": false,
-      "label": "Admin / user_jobtitle",
+      "label": "Tracy Agent / user_jobtitle",
       "customize": "keep"
     },
     {
@@ -20976,7 +21016,7 @@
       "sample": "images/joomlart/author/pic-1.jpg#joomlaImage://local-images/joomlart/author/pic-1.jpg?width=800&height=800",
       "maxCharacters": 255,
       "requiresEvidence": false,
-      "label": "Admin / user_avatar",
+      "label": "Tracy Agent / user_avatar",
       "customize": "keep"
     },
     {
@@ -20999,6 +21039,17 @@
       "maxCharacters": 70,
       "requiresEvidence": false,
       "label": "TPL_CLASSES_TRIAL (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-166748343.0",
+      "entity": "languageString-166748343",
+      "column": "value",
+      "type": "text",
+      "sample": "Close",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_CLOSE (template string, en-GB)",
       "customize": "keep"
     },
     {
@@ -21079,6 +21130,17 @@
       "customize": "keep"
     },
     {
+      "key": "languageString-10831042.0",
+      "entity": "languageString-10831042",
+      "column": "value",
+      "type": "text",
+      "sample": "Details",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_DETAILS (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
       "key": "languageString-112732346.0",
       "entity": "languageString-112732346",
       "column": "value",
@@ -21147,6 +21209,17 @@
       "customize": "keep"
     },
     {
+      "key": "languageString-135820122.0",
+      "entity": "languageString-135820122",
+      "column": "value",
+      "type": "text",
+      "sample": "Password",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_PASSWORD (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
       "key": "languageString-27872773.0",
       "entity": "languageString-27872773",
       "column": "value",
@@ -21177,6 +21250,17 @@
       "maxCharacters": 42,
       "requiresEvidence": false,
       "label": "TPL_TRY_CLASS (template string, en-GB)",
+      "customize": "keep"
+    },
+    {
+      "key": "languageString-44242957.0",
+      "entity": "languageString-44242957",
+      "column": "value",
+      "type": "text",
+      "sample": "Username",
+      "maxCharacters": 40,
+      "requiresEvidence": false,
+      "label": "TPL_USERNAME (template string, en-GB)",
       "customize": "keep"
     },
     {
