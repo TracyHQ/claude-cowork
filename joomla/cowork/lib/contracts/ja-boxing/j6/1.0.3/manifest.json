@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "tracy-quickstart-contract/v1",
+  "id": "ja-boxing/j6/1.0.3",
+  "platform": "joomla",
+  "template": "ja_boxing",
+  "quickstart": {
+    "product": "ja-boxing",
+    "platform": "joomla",
+    "version": "1.0.3",
+    "cms": {
+      "version": "6.1.1"
+    },
+    "template": "ja_boxing",
+    "parts": {
+      "installer": {
+        "file": "ja-boxing-j6-quickstart-1.0.3.zip",
+        "bytes": 67414709,
+        "sha256": "7ff269a38da4a9be844c232aa04f223235bb5bc762604a21c8c193cba48176ca"
+      }
+    },
+    "createdAt": "2026-10-24T10:38:36.824Z",
+    "builtFrom": {
+      "from": "quickstart/ja-boxing/j6@1.0.2",
+      "by": "tracy-ds-slot release-joomla.mjs",
+      "change": "repaired: 80 files replaced (language/en-GB/en-GB.tpl_ja_boxing.ini, modules/mod_ja_acm/AGENTS.md, modules/mod_ja_acm/CLAUDE.md, templates/ja_boxing/AGENTS.md, templates/ja_boxing/CLAUDE.md, templates/ja_boxing/error.php, modules/mod_ja_acm/docs, plugins/system/t4, templates/ja_boxing/css, templates/ja_boxing/docs, templates/ja_boxing/html, templates/ja_boxing/scss, components/com_content/tmpl, templates/ja_boxing/images, templates/ja_boxing/language, templates/ja_boxing/acm); demo data: 7 statements appended; stylesheets read the worn design system (--ds-c-*)"
+    },
+    "release": "quickstart/ja-boxing/j6"
+  },
+  "coworkContractVersion": "0.24.58",
+  "mode": "content-recommendation"
+}
