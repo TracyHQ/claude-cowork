@@ -914,6 +914,12 @@ final class QuickstartContract
         }
         foreach ((array) ($this->lock['fileRoots'] ?? []) as $prefix) {
             $dir = $this->root . '/' . $prefix;
+            // A linked root would be walked as its target: files outside the webroot, each one no link.
+            $linked = $this->linkedFolder((string) $prefix);
+            if ($linked !== null) {
+                $problems[] = 'Theme folder is a link: ' . $linked . ($linked === $prefix ? '' : ' (holds ' . $prefix . ')');
+                continue;
+            }
             if (!is_dir($dir)) {
                 $problems[] = 'Theme folder missing: ' . $prefix;
                 continue;
@@ -933,6 +939,19 @@ final class QuickstartContract
             }
         }
         return $problems;
+    }
+
+    /** The first folder of a locked root, from the webroot down to the root itself, that is a link. */
+    private function linkedFolder(string $prefix): ?string
+    {
+        $path = '';
+        foreach (explode('/', trim($prefix, '/')) as $part) {
+            $path .= ($path === '' ? '' : '/') . $part;
+            if (is_link($this->root . '/' . $path)) {
+                return $path;
+            }
+        }
+        return null;
     }
 
     /**

@@ -16,6 +16,24 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>inspect reports a locked presentation folder that is itself a symlink as drift instead of walking its target; a mega-menu style kept because its child was not hidden says so</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <version>0.24.59</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.59</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.59/pkg_claudecowork-0.24.59.zip</downloadurl>
+        </downloads>
+        <sha256>4082b935a2d29c7edd2781fe47c02573222ed5e785d92019ef759763d69802a2</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>inspect reports a foreign or changed file in the plugin own media folder (only the exact shipped files, by sha256, are exempt) and any unlisted symlink under a locked folder, never following it</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

@@ -1182,8 +1182,17 @@ final class Engine
         return null;
     }
 
-    /** After a revert: the receipts of its requests say reverted (so a late retry does not write again), and the page caches drop. */
-    private function renderedWordsReverted(array $entries): void
+    /**
+     * After a revert: the receipts of its requests say reverted (so a late retry does not write again), and
+     * the page caches drop. Answers why the receipts could not be written, or null.
+     *
+     * 🔒 A RECEIPT THAT DID NOT MOVE STAYS STALE. Status and a retry of the request then still say
+     * `applied` over rules that are gone, and nothing the site holds can correct them: an empty apply
+     * log is also what a trimmed or lost log row leaves, and the live rules cannot say it either (a
+     * later apply takes over a rule by its place, and an apply that drops rules leaves none of its own).
+     * So the revert answer carries the warning, the one place the caller learns it.
+     */
+    private function renderedWordsReverted(array $entries): ?string
     {
         $keys = [];
         $requests = [];
@@ -1194,19 +1203,26 @@ final class Engine
             }
         }
         if ($keys === []) {
-            return;
+            return null;
         }
-        try {
-            $receipts = $this->renderedWordsReceipts();
-            foreach ($requests as $request) {
-                if (isset($receipts[$request])) {
-                    $receipts[$request]['state'] = 'reverted';
-                    $receipts[$request]['reverted_at'] = time();
+        $failed = null;
+        // Tried twice: a write that failed once (a lock wait, a dropped connection) often goes through again.
+        for ($try = 0; $try < 2; $try++) {
+            try {
+                $receipts = $this->renderedWordsReceipts();
+                foreach ($requests as $request) {
+                    if (isset($receipts[$request])) {
+                        $receipts[$request]['state'] = 'reverted';
+                        $receipts[$request]['reverted_at'] = time();
+                    }
                 }
+                $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
+                $failed = null;
+                break;
+            } catch (Throwable $e) {
+                // The rules are back; a receipt that did not move still names the request, so a retry is answered, not written.
+                $failed = $e->getMessage();
             }
-            $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
-        } catch (Throwable $ignored) {
-            // The rules are back; a receipt that did not move still names the request, so a retry is answered, not written.
         }
         if ($this->renderedSite !== null) {
             foreach (array_unique($keys) as $key) {
@@ -1216,6 +1232,8 @@ final class Engine
                 }
             }
         }
+        return $failed === null ? null : 'The rules were reverted, but the receipt of rendered-words request ' . implode(', ', array_unique($requests))
+            . ' could not be marked reverted (' . $failed . '): rendered-words status and a retry of the request may still say applied';
     }
 
     /**
@@ -4900,13 +4918,13 @@ final class Engine
         }
 
         if ($failed === []) {
-            $this->renderedWordsReverted($entries);
+            $warning = $this->renderedWordsReverted($entries);
             try {
                 $this->log->clear($applyId);
             } catch (Throwable $e) {
                 // The site is back; a log row that would not clear is the caller's to reconcile.
             }
-            return $this->ok(['reverted' => $reverted]);
+            return $this->ok(['reverted' => $reverted] + ($warning === null ? [] : ['warning' => $warning]));
         }
         return $this->ok(['reverted' => $reverted, 'failed' => $failed]);
     }

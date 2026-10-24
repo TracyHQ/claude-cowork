@@ -339,6 +339,26 @@ rmdir($styleDir.'/media/templates/site/x/js');rmdir($styleDir.'/media/templates/
 unlink($styleDir.'/plugins/system/claudecoworkapi/claudecoworkapi.xml');rmdir($styleDir.'/plugins/system/claudecoworkapi');rmdir($styleDir.'/plugins/system');rmdir($styleDir.'/plugins');
 unlink($styleDir.'/media/t4/css/9.css');rmdir($styleDir.'/media/t4/css');rmdir($styleDir.'/media/t4');rmdir($styleDir.'/media');
 foreach(array_keys($styleData) as $name)unlink($styleDir.'/'.$name.'.json');rmdir($styleDir);
+// A locked root that is itself a link, or sits under one, is walked as its target: every file there
+// reads as no link, and the walk names files outside the webroot. The link is reported instead.
+$rootLinkDir=sys_get_temp_dir().'/cowork-root-link-'.bin2hex(random_bytes(6));
+try {
+    mkdir($rootLinkDir.'/web',0777,true);mkdir($rootLinkDir.'/outside/assets',0777,true);mkdir($rootLinkDir.'/outside/media/t4',0777,true);
+    copy($contractDir.'/assets/demo.css',$rootLinkDir.'/outside/assets/demo.css');
+    file_put_contents($rootLinkDir.'/outside/assets/foreign.php','<?php');file_put_contents($rootLinkDir.'/outside/media/t4/foreign.css','x');
+    $rootLinkData=$data;$rootLinkData['presentation-lock']['fileRoots']=['assets','media/t4'];
+    foreach($rootLinkData as $name=>$body)file_put_contents($rootLinkDir.'/'.$name.'.json',json_encode($body));
+    symlink($rootLinkDir.'/outside/assets',$rootLinkDir.'/web/assets');symlink($rootLinkDir.'/outside/media',$rootLinkDir.'/web/media');
+    $c=new QuickstartContract(clone $cw,new TestContractStore(),$rootLinkDir.'/web',$rootLinkDir);$c->inspect();
+    $rootLinkWarnings=$c->driftWarnings();
+    checkTrue('a locked root that is a link is reported',in_array('Presentation folder is a link: assets',$rootLinkWarnings,true));
+    checkTrue('a locked root under a linked folder is reported',in_array('Presentation folder is a link: media (holds media/t4)',$rootLinkWarnings,true));
+    checkTrue('a linked locked root is not walked',!str_contains(implode(' ',$rootLinkWarnings),'foreign'));
+} finally {
+    foreach(['web/assets','web/media','outside/assets/demo.css','outside/assets/foreign.php','outside/media/t4/foreign.css'] as $path)if(is_link($rootLinkDir.'/'.$path)||is_file($rootLinkDir.'/'.$path))unlink($rootLinkDir.'/'.$path);
+    foreach(array_keys($data) as $name)if(is_file($rootLinkDir.'/'.$name.'.json'))unlink($rootLinkDir.'/'.$name.'.json');
+    foreach(['outside/media/t4','outside/media','outside/assets','outside','web',''] as $path)if(is_dir($rootLinkDir.'/'.$path))rmdir($rootLinkDir.'/'.$path);
+}
 unlink($contractDir.'/media/t4/css/36-sub.css');rmdir($contractDir.'/media/t4/css');
 foreach(['module'=>'mod_ja_acm','position'=>'section-1','published'=>'0','publish_up'=>'2099-01-01 00:00:00','publish_down'=>'2000-01-01 00:00:00','ordering'=>'2','access'=>'2','showtitle'=>'1','language'=>'vi-VN','client_id'=>'1','params'=>'{"moduleclass_sfx":"replacement"}'] as $field=>$value) {
     $before=$cw->store['module'][110][$field];$cw->store['module'][110][$field]=$value;

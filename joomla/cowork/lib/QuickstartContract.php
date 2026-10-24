@@ -581,6 +581,9 @@ final class QuickstartContract
         if($this->proofs && $remember!=$known)try{$this->proofs->save($remember);}catch(Throwable $ignored){}
         Timing::count('filesHashed',$hashed);
         foreach($this->lock['fileRoots'] as $prefix) {
+            // A linked root would be walked as its target: files outside the webroot, each one no link.
+            $linked=$this->linkedFolder($prefix);
+            if($linked!==null){$this->drift('Presentation folder is a link: '.$linked.($linked===$prefix?'':' (holds '.$prefix.')'));continue;}
             // A folder removed through Joomla is a difference like any other (Tracy ADR 0022).
             if(!is_dir($this->root.'/'.$prefix)){$this->drift('Presentation folder missing: '.$prefix);continue;}
             $iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root.'/'.$prefix,FilesystemIterator::SKIP_DOTS));
@@ -597,6 +600,16 @@ final class QuickstartContract
         }
         Timing::end('files',$t);
         if($this->filesProved===false)$this->filesProved=true;
+    }
+
+    /** The first folder of a locked root, from the webroot down to the root itself, that is a link. */
+    private function linkedFolder(string $prefix): ?string {
+        $path='';
+        foreach(explode('/',trim($prefix,'/')) as $part) {
+            $path.=($path===''?'':'/').$part;
+            if(is_link($this->root.'/'.$path))return $path;
+        }
+        return null;
     }
 
     /**
