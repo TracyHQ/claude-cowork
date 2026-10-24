@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
+  "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-donate/j6/1.0.7",
   "baseHash": "44ff2b847b154278ac1ac325ea7056f6d0a17927923839c09dac7e830e55a1ba",
@@ -29,6 +29,36 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-128",
+      "identity": {
+        "path": "pages/joomla-content",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Joomla Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-129",
+      "identity": {
+        "path": "pages/joomla-content/all-categories",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "All Categories",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-130",
       "identity": {
         "path": "pages/joomla-content/featured-articles",
@@ -39,8 +69,23 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-131",
+      "identity": {
+        "path": "pages/joomla-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -116,6 +161,94 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "ja_donate - Orange",
+        "template": "ja_donate",
+        "client_id": "0"
+      },
+      "label": "ja_donate - Orange · Pages · column 128",
+      "style": {
+        "id": 9,
+        "template": "ja_donate"
+      },
+      "menutype": "mainmenu",
+      "item": 117,
+      "column": 128,
+      "path": "mm_config.mainmenu.item-117.sub.rows[item=128]",
+      "before": "09f6a2b54d1b5e24949d31d914ac497b2b7f77bd82d45f5227d6b9e0934e1ff3",
+      "after": "664ffcb3be1f6593316178c5a5a4e1a9bad11f943b1d08a9019dea7a3de20765",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-128 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_donate - Green",
+        "template": "ja_donate",
+        "client_id": "0"
+      },
+      "label": "ja_donate - Green · Pages · column 128",
+      "style": {
+        "id": 10,
+        "template": "ja_donate"
+      },
+      "menutype": "mainmenu",
+      "item": 117,
+      "column": 128,
+      "path": "mm_config.mainmenu.item-117.sub.rows[item=128]",
+      "before": "62c95b1ff46f1777def72e785ed93f3c3598b0470146062bfeafa1a56cdebd5d",
+      "after": "55a337e0aad2b5694529ed710441684329bdbe9f186b15c636403b6f76059fb7",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-128 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-11",
+      "identity": {
+        "title": "ja_donate - Blue",
+        "template": "ja_donate",
+        "client_id": "0"
+      },
+      "label": "ja_donate - Blue · Pages · column 128",
+      "style": {
+        "id": 11,
+        "template": "ja_donate"
+      },
+      "menutype": "mainmenu",
+      "item": 117,
+      "column": 128,
+      "path": "mm_config.mainmenu.item-117.sub.rows[item=128]",
+      "before": "fea6930e8bd81e0b1e3a8dc2cd3fff4e0803b48784db432dc44b0f71a5afff15",
+      "after": "a72de4f5016ddd938f0b1e07624117de469b55cdeec850c568fbb6a8f70089a1",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-128 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-12",
+      "identity": {
+        "title": "ja_donate - Red",
+        "template": "ja_donate",
+        "client_id": "0"
+      },
+      "label": "ja_donate - Red · Pages · column 128",
+      "style": {
+        "id": 12,
+        "template": "ja_donate"
+      },
+      "menutype": "mainmenu",
+      "item": 117,
+      "column": 128,
+      "path": "mm_config.mainmenu.item-117.sub.rows[item=128]",
+      "before": "44dd4fd51967e4879bae6deb7f558656c8a82e8621c6755b3801905e6afc00b6",
+      "after": "b93e73849c3d96fc07887f504e557226cd99825de1d1522ef520b282bc449b19",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-128 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     }
   ],
   "kept": [
@@ -218,20 +351,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-129",
-      "label": "All Categories",
-      "where": "mainmenu/pages/joomla-content/all-categories",
-      "rule": "keep.only-route-to-content",
-      "reason": "the only menu route to category:9, category:10, category:11: a branch hide may not take real content along"
-    },
-    {
-      "key": "menuItem-131",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-152",
       "label": "Home",
       "where": "mainmenu/home",
@@ -264,7 +383,7 @@
       "label": "Main menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 15 entries stay"
+      "reason": "renders mainmenu: 12 entries stay"
     },
     {
       "key": "module-126",
@@ -309,26 +428,13 @@
       "where": "mainmenu/pages/j-pages",
       "rule": "unresolved.decision-conflict",
       "reason": "decided hidden, but it holds menuItem-118, which stays"
-    },
-    {
-      "key": "menuItem-128",
-      "label": "Joomla Content",
-      "where": "mainmenu/pages/joomla-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-131, which stays"
-    },
-    {
-      "key": "menuItem-131",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
     }
   ],
   "counts": {
-    "menuItems": 7,
+    "menuItems": 10,
     "modules": 0,
-    "kept": 22,
-    "unresolved": 7
+    "megaColumns": 4,
+    "kept": 20,
+    "unresolved": 5
   }
 }

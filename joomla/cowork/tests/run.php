@@ -2177,6 +2177,7 @@ require __DIR__ . "/written-source-language.php";
 require __DIR__ . "/site-identity.php";
 // The home tab reads the site name alone (lib/HomeTitle.php).
 require __DIR__ . "/home-title.php";
+require __DIR__ . "/t3-offcanvas.php";
 // template.siteSettings: a template's logo, name and favicon, through real profile files on disk.
 require __DIR__ . "/template-site-settings.php";
 // template.languageOverrides: the strings a site still shows in en-GB, through a real override file on disk.

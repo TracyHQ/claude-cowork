@@ -720,6 +720,8 @@ final class QuickstartContract
                     throw new RuntimeException('The installed multilingual profile changed');
         }
         $trim = $binding['demoTrim'] ?? null;
+        // A finished revert's record only answers that revert again: no demo row is hidden by it.
+        if (($trim['status'] ?? null) === 'reverted') $trim = null;
         if ($trim !== null) {
             if (!$this->demoTrim) throw new RuntimeException('This site has hidden demo rows but the receiver carries no demo-trim profile');
             if (!hash_equals((string) $trim['profileHash'], $this->demoTrim->hash())) throw new RuntimeException('The installed demo-trim profile changed');
@@ -728,7 +730,10 @@ final class QuickstartContract
         // a batch is bounded, not atomic (Joomla's nested tables commit implicitly), so the site can
         // genuinely be half-moved. Only the listed rows, only on their visibility column, and only
         // between the two values the profile names — everything else is held exactly as before.
+        // A record that names its rows owns only those: a row the customer had already moved is not
+        // the trim's, and stays drift. A record from before rows were named owns every listed row.
         $trimMoving = $trim !== null && in_array($trim['status'] ?? null, ['applying', 'reverting'], true);
+        $trimOwned = isset($trim['rows']) ? array_flip($trim['rows']) : null;
         // The one phase in which a translated source row may legitimately still be at `*`: the
         // retag is chunked, so mid-phase the site is genuinely half-moved. Every other phase, and
         // every state with no job at all, demands the finished answer.
@@ -781,7 +786,7 @@ final class QuickstartContract
                     $allowed=$transitional?['*',$this->multilingual->sourceLanguage()]:($retagged?[$this->multilingual->sourceLanguage()]:['*']);
                     if(in_array((string)$actual['language'],$allowed,true))$expected['language']=(string)$actual['language'];
                 }
-                $trimRow = $trimMoving ? $this->demoTrim->row($key) : null;
+                $trimRow = $trimMoving && ($trimOwned === null || isset($trimOwned[$key])) ? $this->demoTrim->row($key) : null;
                 if ($trimRow !== null && in_array((string) ($actual[$trimRow['field']] ?? ''), [$trimRow['from'], $trimRow['to']], true))
                     $expected[$trimRow['field']] = (string) $actual[$trimRow['field']];
                 if(!$binding)foreach(['template_style_id'=>'templateStyle','catid'=>'category','parent_id'=>$meta['kind']==='category'?'category':'menuItem'] as $field=>$kind) {
@@ -1293,28 +1298,18 @@ final class QuickstartContract
 
     /* ------------------------------------------------------------ demo trim */
 
-    /** The baseline with a trim on record, before or while rows move. */
-    public function bindingWithTrim(array $record): array {
+    /**
+     * The baseline with the trim's record and the values its writes moved: only the rows the trim
+     * wrote, with the values it wrote, become what is protected from then on. Every other row keeps
+     * the baseline it had, so a change the customer made is still reported.
+     *
+     * @param array<string, array{0: string, 1: string}> $moved key => [field, value]
+     */
+    public function bindingWithTrim(array $record, array $moved = []): array {
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('A demo trim needs a bound site');
         $binding['demoTrim']=$record;
-        return $binding;
-    }
-    /** Every listed row expected hidden from now on. Derived from the profile, never read back from the site. */
-    public function bindingAfterTrim(): array {
-        $binding=$this->store->load();
-        if(!$binding || !isset($binding['demoTrim']))throw new RuntimeException('No demo trim is on record');
-        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['to'];
-        $binding['demoTrim']['status']='complete';
-        $binding['demoTrim']['completedAt']=gmdate('c');
-        return $binding;
-    }
-    /** Every listed row expected at its locked value again, and no trim on record — as if it never happened. */
-    public function bindingAfterTrimRevert(): array {
-        $binding=$this->store->load();
-        if(!$binding)throw new RuntimeException('A revert needs a bound site');
-        foreach($this->demoTrim()->rows() as $key=>$row)$binding['presentation'][$key][$row['field']]=$row['from'];
-        unset($binding['demoTrim']);
+        foreach($moved as $key=>[$field,$value])$binding['presentation'][$key][$field]=$value;
         return $binding;
     }
 

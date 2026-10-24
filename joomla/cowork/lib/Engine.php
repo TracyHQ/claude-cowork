@@ -2197,8 +2197,9 @@ final class Engine
             try {
                 $state = $this->contract->inspect();
                 return $this->ok([
-                    'hides' => $this->contract->demoTrim()->counts(), 'status' => $state['demoTrim'] ?? 'none',
-                    'remaining' => count($this->demoTrimPending($state, true)),
+                    'hides' => $this->contract->demoTrim()->counts(),
+                    'status' => ($state['binding']['demoTrim']['status'] ?? null) === 'reverted' ? 'reverted' : ($state['demoTrim'] ?? 'none'),
+                    'remaining' => count($this->demoTrimPending($state, true, $state['demoTrim'] === null ? null : $state['binding']['demoTrim'])),
                     'profileVersion' => $this->contract->demoTrim()->version(), 'profileHash' => $this->contract->demoTrim()->hash(),
                 ]);
             } catch (Throwable $error) { return $this->contractFailed($error); }
@@ -2217,17 +2218,26 @@ final class Engine
             if (!empty($binding['multilingual']['languages']))
                 return $this->err('contract_failed', 'This site already has a second language; hiding its demo rows would leave the translated copies showing. Nothing has been written.');
             $trim = $binding['demoTrim'] ?? null;
-            $record = ['status' => $operation === 'apply' ? 'applying' : 'reverting', 'applyId' => $apply, 'requestId' => $request,
-                'profileHash' => $this->contract->demoTrim()->hash(), 'profileVersion' => $this->contract->demoTrim()->version(), 'at' => gmdate('c')];
+            // A record written before a revert kept the apply it undid names the revert's own request.
+            $revertRequest = $trim['revert']['requestId'] ?? $trim['requestId'] ?? null;
             if ($operation === 'apply') {
                 if (($trim['status'] ?? null) === 'complete')
                     return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyTrimmed' => true, 'applyId' => $trim['applyId']]);
-                if ($trim !== null && ($trim['status'] !== 'applying' || $trim['requestId'] !== $request))
+                // A reverted trim's request is spent: hiding again is a different change, under a new one.
+                if ($trim !== null && ($trim['status'] === 'reverted' ? $trim['requestId'] === $request : ($trim['status'] !== 'applying' || $trim['requestId'] !== $request)))
                     return $this->err('conflict', 'A demo trim is already ' . $trim['status'] . ' under request ' . $trim['requestId']);
+                $record = ['status' => 'applying', 'applyId' => $apply, 'requestId' => $request,
+                    'profileHash' => $this->contract->demoTrim()->hash(), 'profileVersion' => $this->contract->demoTrim()->version(), 'at' => gmdate('c')];
             } else {
-                if ($trim === null) return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
-                if ($trim['status'] === 'reverting' && $trim['requestId'] !== $request)
-                    return $this->err('conflict', 'A demo trim revert is already running under request ' . $trim['requestId']);
+                // 🔒 A REVERTED TRIM ANSWERS ITS OWN REVERT AGAIN, AND WRITES NOTHING: a retry after a
+                // lost answer is told it is done, not that there is nothing to bring back.
+                if (($trim['status'] ?? null) === 'reverted' && $revertRequest === $request)
+                    return $this->ok(['status' => 'reverted', 'moved' => 0, 'remaining' => 0, 'alreadyReverted' => true, 'applyId' => $trim['revert']['applyId'] ?? $trim['applyId']]);
+                if ($trim === null || $trim['status'] === 'reverted') return $this->err('contract_failed', 'This site has no hidden demo rows to bring back');
+                if ($trim['status'] === 'reverting' && $revertRequest !== $request)
+                    return $this->err('conflict', 'A demo trim revert is already running under request ' . $revertRequest);
+                // The record keeps the apply it undoes: which rows were the trim's, and under which request.
+                $record = ['status' => 'reverting', 'revert' => $trim['revert'] ?? ['applyId' => $apply, 'requestId' => $request, 'at' => gmdate('c')]] + $trim;
             }
             // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES, in its own commit. A batch that dies after
             // Joomla committed some rows must leave a site that says a trim is in flight — otherwise
@@ -2237,10 +2247,13 @@ final class Engine
             // the site, and a trim in flight, exactly where they were, so the same request resumes.
             $hide = $operation === 'apply';
             $checked = false;
-            if ($trim === null || $trim['status'] !== $record['status'] || $trim['requestId'] !== $request) {
+            if ($trim === null || $trim['status'] !== $record['status']) {
                 $this->writer->transaction(function () use ($record, $hide) {
                     $state = $this->contract->inspect();
-                    $this->refuseLocked($this->demoTrimRows($state, $hide));
+                    // 🔒 THE TRIM OWNS ONLY THE ROWS IT FINDS WHERE THE LOCK HAS THEM. A listed row the
+                    // customer already hid is theirs: it is not written, not rebased, and not shown on revert.
+                    if ($hide) $record['rows'] = array_keys($this->demoTrimPending($state, true, null));
+                    $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
                     if (!$state['binding']) $this->contract->bind($state['snapshot']);
                     $this->contract->rebind($this->contract->bindingWithTrim($record));
                     return [];
@@ -2250,9 +2263,11 @@ final class Engine
             $this->batching = true;
             $step = $this->writer->transaction(function () use ($hide, $apply, $checked) {
                 $state = $this->contract->inspect();
-                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide));
-                $pending = $this->demoTrimPending($state, $hide);
+                $record = $state['binding']['demoTrim'];
+                if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
+                $pending = $this->demoTrimPending($state, $hide, $record);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
+                $moved = [];
                 foreach ($batch as $key => [$kind, $field, $value]) {
                     // One column, raw — never write(): Joomla's Table would mint `#__assets` rows
                     // for demo posts that ship without them, and move the ACL the contract holds.
@@ -2260,13 +2275,21 @@ final class Engine
                     $before = (string) ($state['rows'][$key][$field] ?? '');
                     $this->writer->setVisibility($kind, $id, $field, $value);
                     $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => $field, 'before' => $before]);
+                    $moved[$key] = [$field, $value];
                 }
                 $remaining = count($pending) - count($batch);
-                if ($remaining === 0)
-                    $this->contract->rebind($hide ? $this->contract->bindingAfterTrim() : $this->contract->bindingAfterTrimRevert());
-                // Proven, then stored: the full read checks every row against the baseline just
-                // derived, and only a site that passes it becomes the next baseline.
-                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                if ($remaining === 0) {
+                    // Every row the trim owns is expected at this direction's end, derived from the
+                    // profile and the record, never read back from the site.
+                    foreach ($this->demoTrimOwned($record) as $key => $row) $moved[$key] = [$row['field'], $hide ? $row['to'] : $row['from']];
+                    if ($hide) $record = ['status' => 'complete', 'completedAt' => gmdate('c')] + $record;
+                    else $record = ['status' => 'reverted', 'revert' => ['completedAt' => gmdate('c')] + ($record['revert'] ?? [])] + $record;
+                }
+                // 🔒 THE BASELINE MOVES ONLY WHERE THE TRIM WROTE, to the value it wrote — never a fresh
+                // snapshot, which would take a change the customer made into the baseline unseen.
+                $this->contract->rebind($this->contract->bindingWithTrim($record, $moved));
+                // Proven: the full read checks every row against the baseline just derived.
+                $this->contract->inspect();
                 return ['remaining' => $remaining, 'moved' => count($batch)];
             });
             $this->batching = false;
@@ -2766,27 +2789,38 @@ final class Engine
     }
 
     /** The rows the next demo-trim batch would move, as (kind, id). */
-    private function demoTrimRows(array $state, bool $hide): array
+    private function demoTrimRows(array $state, bool $hide, ?array $record): array
     {
         $rows = [];
-        foreach (array_slice($this->demoTrimPending($state, $hide), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
+        foreach (array_slice($this->demoTrimPending($state, $hide, $record), 0, self::DEMO_TRIM_BATCH, true) as $key => [$kind])
             $rows[] = [$kind, (int) $state['ids'][$key]];
         return $rows;
     }
 
     /**
-     * Listed rows not yet where this direction wants them, with the value each should get.
+     * The trim's rows still at the end this direction moves them from, with the value each should get.
+     * With no trim on record, the listed rows a new trim would own: those still where the lock has them.
+     * A record from before rows were named owns every listed row, and moves each not yet at its target.
      *
      * @return array<string,array{0:string,1:string,2:string}> key => [kind, field, value]
      */
-    private function demoTrimPending(array $state, bool $hide): array
+    private function demoTrimPending(array $state, bool $hide, ?array $record): array
     {
         $out = [];
-        foreach ($this->contract->demoTrim()->rows() as $key => $row) {
+        $named = $record === null || isset($record['rows']);
+        foreach ($this->demoTrimOwned($record) as $key => $row) {
             $want = $hide ? $row['to'] : $row['from'];
-            if ((string) ($state['rows'][$key][$row['field']] ?? '') !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
+            $actual = (string) ($state['rows'][$key][$row['field']] ?? '');
+            if ($named ? $actual === ($hide ? $row['from'] : $row['to']) : $actual !== $want) $out[$key] = [$row['kind'], $row['field'], $want];
         }
         return $out;
+    }
+
+    /** The listed rows a trim record owns: those it names, or every listed row for a record that names none. */
+    private function demoTrimOwned(?array $record): array
+    {
+        $rows = $this->contract->demoTrim()->rows();
+        return isset($record['rows']) ? array_intersect_key($rows, array_flip($record['rows'])) : $rows;
     }
 
     /** Rows moved per committed call of showcaseNav.apply and .revert. */

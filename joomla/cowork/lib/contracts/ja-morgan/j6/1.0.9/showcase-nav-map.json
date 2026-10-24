@@ -159,8 +159,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens))"
     },
     {
       "op": "menuItem.param",
@@ -176,6 +176,21 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-122",
+      "identity": {
+        "path": "joomlart-content/tagged-items",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens))"
     },
     {
       "op": "menuItem.param",
@@ -303,13 +318,6 @@
       "where": "usermenu/site-settings",
       "rule": "keep.default",
       "reason": "no rule hides it"
-    },
-    {
-      "key": "menuItem-122",
-      "label": "Tagged Items",
-      "where": "joomla-pages/joomlart-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
     },
     {
       "key": "menuItem-125",
@@ -519,7 +527,7 @@
       "label": "Joomla Pages",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders joomla-pages: 3 entries stay"
+      "reason": "renders joomla-pages: 2 entries stay"
     },
     {
       "key": "module-122",
@@ -563,20 +571,13 @@
       "label": "Joomla Content",
       "where": "joomla-pages/joomlart-content",
       "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-122, which stays"
-    },
-    {
-      "key": "menuItem-122",
-      "label": "Tagged Items",
-      "where": "joomla-pages/joomlart-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+      "reason": "decided hidden, but it holds menuItem-127, which stays"
     }
   ],
   "counts": {
-    "menuItems": 17,
+    "menuItems": 18,
     "modules": 0,
-    "kept": 41,
-    "unresolved": 2
+    "kept": 40,
+    "unresolved": 1
   }
 }

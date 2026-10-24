@@ -69,8 +69,23 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Joomla!\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla!\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-179",
+      "identity": {
+        "path": "pages/joomla-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla!\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -232,13 +247,6 @@
       "reason": "opens com_users (view=login): a working feature stays unless decided"
     },
     {
-      "key": "menuItem-179",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "module-92",
       "label": "User Menu",
       "where": "mod_menu@head-right",
@@ -294,14 +302,7 @@
       "label": "Joomla!",
       "where": "mainmenu/pages/joomla-content",
       "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-179, which stays"
-    },
-    {
-      "key": "menuItem-179",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+      "reason": "decided hidden, but it holds menuItem-105, which stays"
     },
     {
       "key": "module-170",
@@ -319,9 +320,9 @@
     }
   ],
   "counts": {
-    "menuItems": 7,
+    "menuItems": 8,
     "modules": 0,
-    "kept": 19,
-    "unresolved": 9
+    "kept": 18,
+    "unresolved": 8
   }
 }

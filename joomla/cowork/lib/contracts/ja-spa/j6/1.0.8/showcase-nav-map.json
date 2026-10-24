@@ -29,6 +29,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-121",
+      "identity": {
+        "path": "page/joomla-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-122",
       "identity": {
         "path": "page/joomla-content/typography",
@@ -239,13 +254,6 @@
       "reason": "the only menu route to article:10, article:12: a branch hide may not take real content along"
     },
     {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/page/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-123",
       "label": "Other Pages",
       "where": "mainmenu/page/other-pages",
@@ -369,7 +377,7 @@
       "label": "Main Menu",
       "where": "mod_menu@mainnav",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 16 entries stay"
+      "reason": "renders mainmenu: 15 entries stay"
     },
     {
       "key": "module-111",
@@ -397,7 +405,7 @@
       "label": "Main Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 16 entries stay"
+      "reason": "renders mainmenu: 15 entries stay"
     }
   ],
   "unresolved": [
@@ -406,20 +414,13 @@
       "label": "Joomla Content",
       "where": "mainmenu/page/joomla-content",
       "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-121, which stays"
-    },
-    {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/page/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+      "reason": "decided hidden, but it holds menuItem-120, which stays"
     }
   ],
   "counts": {
-    "menuItems": 7,
+    "menuItems": 8,
     "modules": 0,
-    "kept": 40,
-    "unresolved": 2
+    "kept": 39,
+    "unresolved": 1
   }
 }

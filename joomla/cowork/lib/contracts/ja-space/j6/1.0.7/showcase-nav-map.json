@@ -119,6 +119,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-121",
+      "identity": {
+        "path": "pages/joomla-content",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Joomla Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-122",
       "identity": {
         "path": "pages/joomla-content/featured-articles",
@@ -129,8 +144,23 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-123",
+      "identity": {
+        "path": "pages/joomla-content/all-categories",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "All Categories",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -146,6 +176,21 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-125",
+      "identity": {
+        "path": "pages/joomla-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -195,9 +240,31 @@
       "column": 109,
       "path": "mm_config.mainmenu.item-108.sub.rows[item=109]",
       "before": "b90cf9719196b2e1a7ac50fbcfe164d2dc783e0ae0d30bbb8b9efa6deb459fbb",
-      "after": "32e35c5fa39f356d46f9bcae3de097ef0d6421840c711d6c7bc433bd9d7e93c8",
+      "after": "795f6f02cd8772f0c258b82be25ec497c3374d271f77ddee197c79890c7c690a",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-9",
+      "identity": {
+        "title": "ja_space - Default",
+        "template": "ja_space",
+        "client_id": "0"
+      },
+      "label": "ja_space - Default · Pages · column 121",
+      "style": {
+        "id": 9,
+        "template": "ja_space"
+      },
+      "menutype": "mainmenu",
+      "item": 108,
+      "column": 121,
+      "path": "mm_config.mainmenu.item-108.sub.rows[item=121]",
+      "before": "795f6f02cd8772f0c258b82be25ec497c3374d271f77ddee197c79890c7c690a",
+      "after": "f06d66ca454e2415ec18a67459405f2c47d89e23b0991316ffa2029268e9aa84",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-121 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     },
     {
       "op": "templateStyle.megaColumnRemove",
@@ -217,9 +284,31 @@
       "column": 109,
       "path": "mm_config.mainmenu.item-108.sub.rows[item=109]",
       "before": "2e58f2afb3f9dc778fa38070450275113550ecb5552f89ac0c6148805598d3c3",
-      "after": "9854e41a9e412b10936e4b4b0a5a6cabc2a82f35bd84ebd0e7c4c81b76f61a34",
+      "after": "f426f24a52fd1647c068f34a532a6fef954071399788d7dc6a5a294ab4a9e98b",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-109 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
+    },
+    {
+      "op": "templateStyle.megaColumnRemove",
+      "key": "templateStyle-10",
+      "identity": {
+        "title": "ja_space - Light",
+        "template": "ja_space",
+        "client_id": "0"
+      },
+      "label": "ja_space - Light · Pages · column 121",
+      "style": {
+        "id": 10,
+        "template": "ja_space"
+      },
+      "menutype": "mainmenu",
+      "item": 108,
+      "column": 121,
+      "path": "mm_config.mainmenu.item-108.sub.rows[item=121]",
+      "before": "f426f24a52fd1647c068f34a532a6fef954071399788d7dc6a5a294ab4a9e98b",
+      "after": "6062afbca537d9745ba2c2fd91b2cdb90f5dff071144b4d2b758081210f88c7d",
+      "rule": "hide.mega-column-of-hidden-items",
+      "reason": "the column headed by menuItem-121 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     }
   ],
   "kept": [
@@ -301,20 +390,6 @@
       "reason": "opens com_contact (view=contact): a working feature stays unless decided"
     },
     {
-      "key": "menuItem-123",
-      "label": "All Categories",
-      "where": "mainmenu/pages/joomla-content/all-categories",
-      "rule": "keep.only-route-to-content",
-      "reason": "the only menu route to category:9, category:10, category:11: a branch hide may not take real content along"
-    },
-    {
-      "key": "menuItem-125",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-126",
       "label": "Projects",
       "where": "mainmenu/our-projects",
@@ -340,24 +415,10 @@
       "label": "Off Canvas",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 12 entries stay"
+      "reason": "renders mainmenu: 9 entries stay"
     }
   ],
   "unresolved": [
-    {
-      "key": "menuItem-121",
-      "label": "Joomla Content",
-      "where": "mainmenu/pages/joomla-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-125, which stays"
-    },
-    {
-      "key": "menuItem-125",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    },
     {
       "key": "menuItem-132",
       "label": "Style 1",
@@ -371,27 +432,13 @@
       "where": "mainmenu/our-projects/projects-style-2",
       "rule": "unresolved.showcase-word",
       "reason": "\"Style 2\" names a showcase branch"
-    },
-    {
-      "key": "templateStyle-9",
-      "label": "ja_space - Default",
-      "where": "mm_config.mainmenu.item-121.sub",
-      "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-123, menuItem-125 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
-    },
-    {
-      "key": "templateStyle-10",
-      "label": "ja_space - Light",
-      "where": "mm_config.mainmenu.item-121.sub",
-      "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"Joomla Content\" leave the navigation, but column head(s) menuItem-122 leave while menuItem-123, menuItem-125 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     }
   ],
   "counts": {
-    "menuItems": 11,
+    "menuItems": 14,
     "modules": 0,
-    "megaColumns": 2,
-    "kept": 17,
-    "unresolved": 6
+    "megaColumns": 4,
+    "kept": 15,
+    "unresolved": 2
   }
 }

@@ -69,8 +69,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",

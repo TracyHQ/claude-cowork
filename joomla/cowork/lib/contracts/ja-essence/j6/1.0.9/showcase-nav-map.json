@@ -14,6 +14,21 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-105",
+      "identity": {
+        "path": "pages/j-content",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "J! Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-109",
       "identity": {
         "path": "pages/j-pages/error-page",
@@ -84,8 +99,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -131,6 +146,21 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-146",
+      "identity": {
+        "path": "pages/j-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -256,13 +286,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-146",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/j-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-151",
       "label": "Edit User Profile",
       "where": "mainmenu/pages/user/edit-user-profile",
@@ -316,7 +339,7 @@
       "label": "Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 24 entries stay"
+      "reason": "renders mainmenu: 22 entries stay"
     }
   ],
   "unresolved": [
@@ -326,13 +349,6 @@
       "where": "mainmenu/pages/j-pages",
       "rule": "unresolved.decision-conflict",
       "reason": "decided hidden, but it holds menuItem-112, which stays"
-    },
-    {
-      "key": "menuItem-105",
-      "label": "J! Content",
-      "where": "mainmenu/pages/j-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-146, which stays"
     },
     {
       "key": "menuItem-112",
@@ -384,13 +400,6 @@
       "reason": "\"Category Style 3\" names a showcase branch"
     },
     {
-      "key": "menuItem-146",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/j-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    },
-    {
       "key": "menuItem-147",
       "label": "Category Style 4",
       "where": "mainmenu/category/category-style-4",
@@ -399,9 +408,9 @@
     }
   ],
   "counts": {
-    "menuItems": 10,
+    "menuItems": 12,
     "modules": 0,
-    "kept": 22,
-    "unresolved": 11
+    "kept": 21,
+    "unresolved": 9
   }
 }

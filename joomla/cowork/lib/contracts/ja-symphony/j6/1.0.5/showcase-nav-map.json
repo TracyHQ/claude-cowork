@@ -14,6 +14,21 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-118",
+      "identity": {
+        "path": "pages/joomla-content",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Joomla Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-119",
       "identity": {
         "path": "pages/joomla-content/featured-articles",
@@ -24,8 +39,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -41,6 +56,21 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-121",
+      "identity": {
+        "path": "pages/joomla-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Joomla Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -240,13 +270,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-123",
       "label": "Contact us",
       "where": "mainmenu/contact-us",
@@ -272,7 +295,7 @@
       "label": "Main Menu",
       "where": "mod_menu@position-1",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 15 entries stay (class \"_menu\")"
+      "reason": "renders mainmenu: 13 entries stay (class \"_menu\")"
     },
     {
       "key": "module-91",
@@ -286,29 +309,14 @@
       "label": "Main Menu",
       "where": "mod_menu@offcanvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 15 entries stay"
+      "reason": "renders mainmenu: 13 entries stay"
     }
   ],
-  "unresolved": [
-    {
-      "key": "menuItem-118",
-      "label": "Joomla Content",
-      "where": "mainmenu/pages/joomla-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-121, which stays"
-    },
-    {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    }
-  ],
+  "unresolved": [],
   "counts": {
-    "menuItems": 8,
+    "menuItems": 10,
     "modules": 0,
-    "kept": 22,
-    "unresolved": 2
+    "kept": 21,
+    "unresolved": 0
   }
 }

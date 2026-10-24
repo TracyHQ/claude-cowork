@@ -119,16 +119,16 @@ $hidden = [];
 $styles = [];
 foreach ($snavMap['operations'] as $op) foreach ($snavContent['entities'] as $entity) if ($entity['key'] === $op['key']) {
     if ($op['op'] === 'menuItem.param') $hidden[$op['label']] = (int) $entity['sourceId'];
-    else $styles[$op['key']] = (int) $entity['sourceId'];
+    elseif ($op['op'] !== 'module.published') $styles[$op['key']] = (int) $entity['sourceId'];
 }
 $kept = ['Home' => 101, 'Our Blog' => 108, 'Contact Us' => 117, 'Offers' => 141, 'About Us' => 142, 'Reservation' => 144];
 check('the diner map hides the J! Pages drawer and the Home colour variants', array_keys($hidden),
-    ['J! Pages', 'Login', 'Registration', 'User Profile', 'Edit User Profile', 'Other Pages', 'Smart Search', 'Fetured Articles', 'Error Page', 'Offline Page', 'Typography', 'Home - Red', 'Home - Pink', 'Home - Green', 'Home - Blue']);
+    ['J! Pages', 'Login', 'Registration', 'User Profile', 'Edit User Profile', 'Other Pages', 'Smart Search', 'Joomla Content', 'All categories', 'Fetured Articles', 'Tagged Items', 'Error Page', 'Offline Page', 'Typography', 'Home - Red', 'Home - Pink', 'Home - Green', 'Home - Blue']);
 foreach ($kept as $title => $id) check("the diner's $title is the entry the test means", $w->store['menuItem'][$id]['title'], $title);
 $original = array_map(fn ($row) => $row['params'] ?? null, $w->store['menuItem']);
 
 $status = $call(['operation' => 'showcaseNav.status']);
-check('status says what an apply would hide, before anything is written', [$status['ok'], $status['status'], $status['hides'], $status['remaining']], [true, 'none', ['menuItem' => 15, 'templateStyle' => 5], 20]);
+check('status says what an apply would hide, before anything is written', [$status['ok'], $status['status'], $status['hides'], $status['remaining']], [true, 'none', ['menuItem' => 18, 'module' => 1, 'templateStyle' => 5], 24]);
 check('an apply without the snav- prefix is refused by name', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1'])['message'], 'apply_id must start with "snav-"');
 check('an apply without a request_id is refused', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a'])['error'], 'bad_params');
 check('an unknown operation is refused', $call(['operation' => 'showcaseNav.hideAll'])['error'], 'bad_params');
@@ -152,7 +152,7 @@ snavClean('mid-apply, the site still inspects clean', $contract);
 check('a different request cannot take over an apply in flight', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'r2'])['error'], 'conflict');
 
 $done = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1']);
-check('the retried apply completes', [$done['ok'], $done['status'], $done['moved'], $done['remaining'], $done['skipped']], [true, 'completed', 20, 0, []]);
+check('the retried apply completes', [$done['ok'], $done['status'], $done['moved'], $done['remaining'], $done['skipped']], [true, 'completed', 24, 0, []]);
 foreach ($hidden as $title => $id) {
     $before = json_decode($original[$id], true);
     $after = json_decode((string) $w->store['menuItem'][$id]['params'], true);
@@ -162,7 +162,7 @@ foreach ($hidden as $title => $id) {
     check("$title keeps its published state and its link", [$w->store['menuItem'][$id]['published'], $w->store['menuItem'][$id]['link']], ['1', $snavLock['entities']['menuItem-' . $id]['link']]);
 }
 foreach ($kept as $title => $id) check("$title is untouched", $w->store['menuItem'][$id]['params'], $original[$id]);
-check('only the listed rows changed', count(array_diff_assoc(array_map(fn ($row) => $row['params'] ?? null, $w->store['menuItem']), $original)), 15);
+check('only the listed rows changed', count(array_diff_assoc(array_map(fn ($row) => $row['params'] ?? null, $w->store['menuItem']), $original)), 18);
 $receipt = $store->binding['showcaseNav']['receipts']['menuItem-' . $hidden['Typography']];
 check('the receipt holds what was found and what was written', [$receipt['outcome'], $receipt['existed'], $receipt['before'], $receipt['after']], ['written', true, '1', '0']);
 snavClean('the applied site inspects clean', $contract);
@@ -192,7 +192,7 @@ $pink = $hidden['Home - Pink'];
 $w->store['menuItem'][$pink]['params'] = JsonObjectKey::set($w->store['menuItem'][$pink]['params'], 'menu_show', '"1"');
 $customer = $w->store['menuItem'][$pink]['params'];
 $back = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1']);
-check('revert brings the showcase back', [$back['ok'], $back['status'], $back['moved'], $back['remaining']], [true, 'reverted', 19, 0]);
+check('revert brings the showcase back', [$back['ok'], $back['status'], $back['moved'], $back['remaining']], [true, 'reverted', 23, 0]);
 check('and names the entry the customer changed', array_keys($back['conflicts']), ['menuItem-' . $pink]);
 check("the customer's own value is left as they wrote it", $w->store['menuItem'][$pink]['params'], $customer);
 foreach ($hidden as $title => $id) if ($id !== $pink) check("$title has exactly its params back", $w->store['menuItem'][$id]['params'], $original[$id]);
@@ -214,7 +214,7 @@ check('a later revert takes the row put back by hand', [$again['ok'], $again['st
 snavClean('the reverted site inspects clean', $contract);
 $after = $call(['operation' => 'showcaseNav.status']);
 check('status after a finished revert: reverted, nothing remaining, nothing in conflict', [$after['status'], $after['remaining'], $after['conflicts'], $after['owners'], $after['applyId']],
-    ['reverted', 0, [], 20, 'snav-a']);
+    ['reverted', 0, [], 24, 'snav-a']);
 check('with nothing left to bring back, a revert says so', $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo3', 'request_id' => 'u3'])['error'], 'contract_failed');
 check('both reverts still answer their retries', [
     array_keys($call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo', 'request_id' => 'u1'])['conflicts']),
@@ -226,14 +226,14 @@ $w->store['menuItem'][$hidden['Login']]['params'] = JsonObjectKey::set($original
 $w->store['menuItem'][$hidden['Registration']]['params'] = JsonObjectKey::set($original[$hidden['Registration']], 'menu_show', '"maybe"');
 $skip = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-d', 'request_id' => 'r4']);
 check('rows not where the map starts are skipped, by name', [$skip['status'], $skip['moved'], $skip['skipped']],
-    ['completed', 18, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
+    ['completed', 22, ['menuItem-' . $hidden['Login'] => 'already out of the menu', 'menuItem-' . $hidden['Registration'] => 'menu_show is "maybe", not shown']]);
 $skipDrift = ['menuItem-' . $hidden['Login'], 'menuItem-' . $hidden['Registration']];
 sort($skipDrift);
 // 🔒 A row found already where the map leaves it was not this job's write: the baseline does not move for it.
 check('a row the customer already hid is still drift after the apply', snavDrifted($contract), $skipDrift);
 check('the skipped rows were not written', [JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal'], JsonObjectKey::get($w->store['menuItem'][$hidden['Registration']]['params'], 'menu_show')['literal']], ['0', '"maybe"']);
 $skipBack = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-undo4', 'request_id' => 'u4']);
-check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 18, '0']);
+check('their revert leaves them as they were', [$skipBack['status'], $skipBack['moved'], JsonObjectKey::get($w->store['menuItem'][$hidden['Login']]['params'], 'menu_show')['literal']], ['reverted', 22, '0']);
 check('and still drift after it', snavDrifted($contract), $skipDrift);
 
 // ------------------------------------------------------------------ a module, through the visibility column
@@ -242,12 +242,13 @@ $snavModule = null;
 foreach ($snavContent['entities'] as $entity)
     if ($entity['kind'] === 'module' && (string) ($snavLock['entities'][$entity['key']]['published'] ?? '') === '1') { $snavModule = $entity; break; }
 [, $mStore, $mw, $mContract, $mCall] = snavSite($snavSource, fn ($dir) => snavRewrite($dir, function ($m) use ($snavModule) {
-    $m['operations'][] = ['op' => 'module.published', 'key' => $snavModule['key'], 'identity' => $snavModule['identity'], 'field' => 'published', 'from' => '1', 'to' => '0', 'rule' => 'test', 'reason' => 'a showcase module'];
+    if (!in_array($snavModule['key'], array_column($m['operations'], 'key'), true))
+        $m['operations'][] = ['op' => 'module.published', 'key' => $snavModule['key'], 'identity' => $snavModule['identity'], 'field' => 'published', 'from' => '1', 'to' => '0', 'rule' => 'test', 'reason' => 'a showcase module'];
     return $m;
 }));
 $mid = (int) $snavModule['sourceId'];
 $mApplied = $mCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-m', 'request_id' => 'm1']);
-check('a listed module is unpublished with the menu entries', [$mApplied['status'], $mApplied['moved'], $mw->store['module'][$mid]['published']], ['completed', 21, '0']);
+check('a listed module is unpublished with the menu entries', [$mApplied['status'], $mApplied['moved'], $mw->store['module'][$mid]['published']], ['completed', 25, '0']);
 snavClean('the site with the module hidden inspects clean', $mContract);
 $mBack = $mCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-mu', 'request_id' => 'm2']);
 check('and is published again by the revert', [$mBack['status'], $mw->store['module'][$mid]['published']], ['reverted', '1']);
@@ -303,7 +304,8 @@ check('and a revert has nothing more to bring back', $cCall(['operation' => 'sho
 // (here: the same value in other bytes, so the site itself is not drift) is left as it was saved and
 // named a conflict; the rest of the batch goes on.
 [, $rStore, $rw, $rContract, $rCall] = snavSite($snavSource, fn ($dir) => snavRewrite($dir, function ($m) use ($snavModule) {
-    $m['operations'][] = ['op' => 'module.published', 'key' => $snavModule['key'], 'identity' => $snavModule['identity'], 'field' => 'published', 'from' => '1', 'to' => '0', 'rule' => 'test', 'reason' => 'a showcase module'];
+    if (!in_array($snavModule['key'], array_column($m['operations'], 'key'), true))
+        $m['operations'][] = ['op' => 'module.published', 'key' => $snavModule['key'], 'identity' => $snavModule['identity'], 'field' => 'published', 'from' => '1', 'to' => '0', 'rule' => 'test', 'reason' => 'a showcase module'];
     return $m;
 }));
 $rTypo = $hidden['Typography'];
@@ -314,7 +316,7 @@ $rw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) us
 };
 $rApplied = $rCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-r', 'request_id' => 'race1']);
 $rReceipts = $rStore->binding['showcaseNav']['receipts'] ?? [];
-check('a raced apply goes on with the other rows', [$rApplied['ok'], $rApplied['status'] ?? null, $rApplied['moved'] ?? null], [true, 'completed', 19]);
+check('a raced apply goes on with the other rows', [$rApplied['ok'], $rApplied['status'] ?? null, $rApplied['moved'] ?? null], [true, 'completed', 23]);
 check('and names both raced rows a conflict', [$rReceipts['menuItem-' . $rTypo]['outcome'] ?? null, $rReceipts[$snavModule['key']]['outcome'] ?? null], ['conflict', 'conflict']);
 check('neither raced row is overwritten', [$rw->store['menuItem'][$rTypo]['params'], $rw->store['module'][$mid]['published']], [$rRaced, '01']);
 $rw->beforeCas = null;
@@ -344,10 +346,10 @@ $dWant = ['menuItem-141', 'menuItem-' . $dGreen];
 sort($dWant);
 check('the drift is reported before the apply', snavDrifted($dContract), $dWant);
 $dApplied = $dCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-dr', 'request_id' => 'd1']);
-check('the apply still runs', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied], [true, 20]);
+check('the apply still runs', [$dApplied['ok'], $dApplied['moved'] ?? $dApplied], [true, 24]);
 check('and the drift it did not make is still reported after it', snavDrifted($dContract), $dWant);
 $dBack = $dCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-dru', 'request_id' => 'd2']);
-check('the revert still runs', [$dBack['ok'], $dBack['moved'] ?? $dBack], [true, 20]);
+check('the revert still runs', [$dBack['ok'], $dBack['moved'] ?? $dBack], [true, 24]);
 check('and the drift is still reported after it', snavDrifted($dContract), $dWant);
 $dw->store['menuItem'][141]['params'] = $dOffers;
 check('and a row put back is no longer reported', snavDrifted($dContract), ['menuItem-' . $dGreen]);
@@ -369,10 +371,10 @@ foreach (['empty' => '', 'whitespace-only' => " \n", '[]' => '[]'] as $bName => 
     check("the $bName column is what the site holds", $bw->store['menuItem'][$bId]['params'], $bText);
     snavClean("and the site inspects clean with the $bName column", $bContract);
     $bApplied = $bCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-b', 'request_id' => 'b1']);
-    check("the $bName params column is hidden from null", [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 20, '{"menu_show":"0"}']);
+    check("the $bName params column is hidden from null", [$bApplied['ok'], $bApplied['moved'] ?? $bApplied, $bw->store['menuItem'][$bId]['params']], [true, 24, '{"menu_show":"0"}']);
     snavClean("the site with the $bName row hidden inspects clean", $bContract);
     $bBack = $bCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-bu', 'request_id' => 'b2']);
-    check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 20, $bText]);
+    check("the revert hands the $bName column back as it was", [$bBack['ok'], $bBack['moved'] ?? $bBack, $bw->store['menuItem'][$bId]['params']], [true, 24, $bText]);
     snavClean("the site with the $bName row back inspects clean", $bContract);
 }
 
@@ -461,7 +463,7 @@ $tWrites = [];
 $tw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$tWrites) { $tWrites[] = $kind; };
 $tApplied = $tCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-t', 'request_id' => 't1']);
 $tw->beforeCas = null;
-check('the apply removes the sub from every style', [$tApplied['status'], $tApplied['moved'], $tApplied['skipped'], array_values($tHome($tw))], ['completed', 20, [], [false, false, false, false, false]]);
+check('the apply removes the sub from every style', [$tApplied['status'], $tApplied['moved'], $tApplied['skipped'], array_values($tHome($tw))], ['completed', 24, [], [false, false, false, false, false]]);
 check('each style holds exactly the bytes the map names', $tHash($tw), $tFinal);
 check('the styles are written after every hide of their item', array_slice($tWrites, -5), array_fill(0, 5, 'templateStyle'));
 foreach ($styles as $key => $id) {
@@ -495,7 +497,7 @@ $tw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) us
 $tBack = $tCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-tu', 'request_id' => 't2']);
 $tw->beforeCas = null;
 check('the revert puts the subs back and leaves the edited style', [$tBack['status'], $tBack['moved'], $tBack['conflicts']],
-    ['reverted', 19, ['templateStyle-10' => 'its params were changed since the mega-menu sub was removed']]);
+    ['reverted', 23, ['templateStyle-10' => 'its params were changed since the mega-menu sub was removed']]);
 check('it writes only the styles that held what the apply wrote', $tWrites, [9, 12, 13]);
 check('every other style has exactly its bytes back', array_diff_key($tParams($tw), ['templateStyle-10' => 1]), array_diff_key($tOriginal, ['templateStyle-10' => 1]));
 check("the customer's style is left as they saved it", $tw->store['templateStyle'][$tRed]['params'], $tRedSaved);
@@ -512,10 +514,10 @@ check('a bound site for the edited style', $eCall(['operation' => 'bind'])['ok']
 $ew->store['templateStyle'][$tRed]['params'] = JsonObjectKey::set((string) $ew->store['templateStyle'][$tRed]['params'], 'devmode', '"1"');
 $eSaved = $ew->store['templateStyle'][$tRed]['params'];
 $eApplied = $eCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-e', 'request_id' => 'e1']);
-check('an edited style is skipped as a conflict', [$eApplied['status'], $eApplied['moved'], $eApplied['skipped']], ['completed', 19, ['templateStyle-10' => 'its params differ from the release']]);
+check('an edited style is skipped as a conflict', [$eApplied['status'], $eApplied['moved'], $eApplied['skipped']], ['completed', 23, ['templateStyle-10' => 'its params differ from the release']]);
 check('and not written', [$ew->store['templateStyle'][$tRed]['params'], array_values(array_diff_key($tHome($ew), ['templateStyle-10' => 1]))], [$eSaved, [false, false, false, false]]);
 check('it is still drift after the apply', snavDrifted($eContract), ['templateStyle-10']);
-check('and after the revert', [$eCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-eu', 'request_id' => 'e2'])['moved'], snavDrifted($eContract)], [19, ['templateStyle-10']]);
+check('and after the revert', [$eCall(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-eu', 'request_id' => 'e2'])['moved'], snavDrifted($eContract)], [23, ['templateStyle-10']]);
 
 // A style already as the map leaves it: nothing written, and — not this job's write — the baseline does not move.
 [, , $aw, $aContract, $aCall] = snavSite($snavSource);
@@ -523,7 +525,7 @@ check('a bound site for the style already edited', $aCall(['operation' => 'bind'
 $aAfter = T3MegaSub::remove((string) $aw->store['templateStyle'][$tRed]['params'], 'mainmenu', 101)['raw'];
 $aw->store['templateStyle'][$tRed]['params'] = $aAfter;
 $aApplied = $aCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-al', 'request_id' => 'al1']);
-check('a style already without the sub is left', [$aApplied['moved'], $aApplied['skipped'], $aw->store['templateStyle'][$tRed]['params']], [19, ['templateStyle-10' => 'the mega-menu sub is already gone'], $aAfter]);
+check('a style already without the sub is left', [$aApplied['moved'], $aApplied['skipped'], $aw->store['templateStyle'][$tRed]['params']], [23, ['templateStyle-10' => 'the mega-menu sub is already gone'], $aAfter]);
 check('and stays drift', snavDrifted($aContract), ['templateStyle-10']);
 
 // A child of Home still in the menu: its item keeps the dropdown, in every style.
@@ -534,9 +536,9 @@ $cBefore = $tParams($cw2);
 $cApplied = $cCall2(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-ch', 'request_id' => 'ch1']);
 $cWhy = 'kept the mega-menu sub of menuItem-101: its child menuItem-' . $cRed . ' stays in the menu (menu_show is "maybe", not shown)';
 check('a child left in the menu keeps its item\'s sub, and says why', [$cApplied['status'], $cApplied['moved'], $cApplied['skipped']],
-    ['completed', 14, ['menuItem-' . $cRed => 'menu_show is "maybe", not shown'] + array_fill_keys(array_keys($styles), $cWhy)]);
+    ['completed', 18, ['menuItem-' . $cRed => 'menu_show is "maybe", not shown'] + array_fill_keys(array_keys($styles), $cWhy)]);
 check('no style is written', $tParams($cw2), $cBefore);
-check('the skipped styles have nothing to revert', [$cCall2(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-chu', 'request_id' => 'ch2'])['moved'], $tParams($cw2)], [14, $cBefore]);
+check('the skipped styles have nothing to revert', [$cCall2(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-chu', 'request_id' => 'ch2'])['moved'], $tParams($cw2)], [18, $cBefore]);
 
 // 🔒 THE LIVE MENU HAS THE LAST WORD: a page the customer added under Home after the install is a child
 // the map never saw. Shown, it keeps the dropdown in every style; out of the menu, the sub goes.
@@ -551,7 +553,7 @@ $tAdded = function (string $params, string $published = '1', array $more = []) u
 $lBefore = $tParams($lw);
 $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lv', 'request_id' => 'lv1']);
 check('a shown child the customer added under Home keeps its sub in every style, and says why', [$lApplied['status'], $lApplied['moved'], $lApplied['skipped']],
-    ['completed', 15, array_fill_keys(array_keys($styles), 'kept the mega-menu sub of menuItem-101: its child menu item 9001 is still shown on this site')]);
+    ['completed', 19, array_fill_keys(array_keys($styles), 'kept the mega-menu sub of menuItem-101: its child menu item 9001 is still shown on this site')]);
 check('and no style is written', $tParams($lw), $lBefore);
 // A child another connection committed after this batch's snapshot: only the locking read, in the batch's
 // own transaction, sees it — and seeing it keeps the sub.
@@ -560,7 +562,7 @@ $lBefore = $tParams($lw);
 $lw->lateChildren = fn (int $parent) => $parent === 101 ? [['id' => 9002, 'parent_id' => 101, 'menutype' => 'mainmenu', 'language' => '*', 'published' => '1', 'params' => '{}']] : [];
 $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lt', 'request_id' => 'lt1']);
 check('a shown child committed after the snapshot is seen by the locking read, and keeps the sub', [$lApplied['moved'], $tParams($lw), array_unique($lw->lockedParents), array_unique($lw->lockedOpen)],
-    [15, $lBefore, [101], [true]]);
+    [19, $lBefore, [101], [true]]);
 // With innodb_snapshot_isolation ON, MariaDB refuses that locking read (error 1020): the batch rolls back
 // whole, and the same request run again completes.
 [, , $lw, , $lCall] = snavSite($snavSource);
@@ -570,18 +572,18 @@ $lw->lateChildren = function () use ($lw) { $lw->lateChildren = null; throw new 
 $lFailed = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lr', 'request_id' => 'lr1']);
 check('a refused locking read rolls the batch back: no menu item, no style written', [$lFailed['ok'], $tParams($lw), array_map(fn ($row) => $row['params'] ?? null, $lw->store['menuItem'])], [false, $lBefore, $lMenu]);
 $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lr', 'request_id' => 'lr1']);
-check('and the same request run again completes', [$lApplied['status'], $lApplied['moved'], array_values($tHash($lw))], ['completed', 20, array_values($tFinal)]);
+check('and the same request run again completes', [$lApplied['status'], $lApplied['moved'], array_values($tHash($lw))], ['completed', 24, array_values($tFinal)]);
 foreach (['another language' => ['language' => 'fr-FR'], 'a row naming another menu' => ['menutype' => 'joomla-pages']] as $what => $more) {
     [$lw, $lCall] = $tAdded('{}', '1', $more);
     $lBefore = $tParams($lw);
     $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lo', 'request_id' => 'lo1']);
-    check("a shown child in $what keeps the sub too", [$lApplied['moved'], $tParams($lw)], [15, $lBefore]);
+    check("a shown child in $what keeps the sub too", [$lApplied['moved'], $tParams($lw)], [19, $lBefore]);
 }
 foreach (['{"menu_show":"0"}' => ['1', 'out of the menu'], '{}' => ['0', 'unpublished']] as $params => [$published, $what]) {
     [$lw, $lCall] = $tAdded($params, $published);
     $lApplied = $lCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-lh', 'request_id' => 'lh1']);
     check("a child the customer added $what lets every sub go", [$lApplied['status'], $lApplied['moved'], $lApplied['skipped'], array_values($tHash($lw))],
-        ['completed', 20, [], array_values($tFinal)]);
+        ['completed', 24, [], array_values($tFinal)]);
 }
 
 // Listed first in the map, the styles still wait for the hides of their item's children.
@@ -591,7 +593,7 @@ foreach (['{"menu_show":"0"}' => ['1', 'out of the menu'], '{}' => ['0', 'unpubl
 }));
 $oWrites = [];
 $ow->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use (&$oWrites) { $oWrites[] = $kind; };
-check('styles listed first are still applied', $oCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-o', 'request_id' => 'o1'])['moved'], 20);
+check('styles listed first are still applied', $oCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-o', 'request_id' => 'o1'])['moved'], 24);
 check('after every hide', array_slice($oWrites, -5), array_fill(0, 5, 'templateStyle'));
 
 // A crash on a style rolls the batch back; the same request resumes it. A save between the read and the write is a conflict.
@@ -605,7 +607,7 @@ $xw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) us
 $xDone = $xCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-x', 'request_id' => 'x1']);
 $xw->beforeCas = null;
 check('the retried apply completes, the raced style a conflict', [$xDone['status'], $xDone['moved'], $xDone['skipped'], $xw->store['templateStyle'][$tPink]['params']],
-    ['completed', 19, ['templateStyle-11' => 'it changed while it was being written'], $xRaced . ' ']);
+    ['completed', 23, ['templateStyle-11' => 'it changed while it was being written'], $xRaced . ' ']);
 // ------------------------------------------------------------------ a T3 mega-menu column whose items all leave
 
 // T3MegaSub::removeColumn on its own: every entry of the column goes, a row it empties goes with it, a
@@ -613,17 +615,48 @@ check('the retried apply completes, the raced style a conflict', [$xDone['status
 $cCol = fn (array $rows) => json_encode(['mm_config' => json_encode(['mainmenu' => ['item-7' => ['sub' => ['rows' => $rows]]]])]);
 $cRows = fn (array $edit) => isset($edit['raw']) ? json_decode(json_decode($edit['raw'], true)['mm_config'], true)['mainmenu']['item-7']['sub']['rows'] : $edit;
 check('removeColumn drops the column in every row, and a row it empties',
-    $cRows(T3MegaSub::removeColumn($cCol([[['item' => 8, 'width' => 6], ['item' => '9']], [['item' => 8]], [], [['position' => 8, 'item' => 8]]]), 'mainmenu', 7, 8)),
-    [[['item' => '9']], [], [['position' => 8, 'item' => 8]]]);
+    $cRows(T3MegaSub::removeColumn($cCol([[['item' => 8, 'width' => 6], ['item' => '9', 'width' => 6]], [['item' => 8]], [], [['position' => 8, 'item' => 8]]]), 'mainmenu', 7, 8)),
+    [[['item' => '9', 'width' => 12]], [], [['position' => 8, 'item' => 8]]]);
 check('a column the sub does not hold is absent', T3MegaSub::removeColumn($cCol([[['item' => 9]]]), 'mainmenu', 7, 8), ['absent' => true]);
 check('nor is a boolean or a float an item: nothing is edited', [isset(T3MegaSub::removeColumn($cCol([[['item' => true]]]), 'mainmenu', 7, 1)['raw']), isset(T3MegaSub::removeColumn(str_replace(':8}', ':8.0}', $cCol([[['item' => 8]]])), 'mainmenu', 7, 8)['raw'])], [false, false]);
-$cSlashes = '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"sub\":{\"rows\":[[{\"item\":8,\"class\":\"a\\\\\/b\"},{\"item\":9}]]}}}}","z":1}';
+$cSlashes = '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"class\":\"a\\\\\/b\",\"sub\":{\"rows\":[[{\"item\":8,\"width\":\"6\"},{\"item\":9,\"width\":\"6\"}]]}}}}","z":1}';
 check('the column is re-encoded the way it was stored, every other byte kept', T3MegaSub::removeColumn($cSlashes, 'mainmenu', 7, 8)['raw'] ?? null,
-    '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"sub\":{\"rows\":[[{\"item\":9}]]}}}}","z":1}');
+    '{"a":"x\/y","mm_config":"{\"mainmenu\":{\"item-7\":{\"class\":\"a\\\\\/b\",\"sub\":{\"rows\":[[{\"item\":9,\"width\":\"12\"}]]}}}}","z":1}');
 
-// 🔒 ja-space 1.0.7: the map hides "J! Pages" (109), the head of the first column of "Pages" (108),
-// while "Other Pages" and "Joomla Content" stay. T3 would start the first column at Other Pages and run
-// it to the end, listing both columns twice: each style drops the 109 column and nothing else.
+// 🔒 THE ROW KEEPS ITS WIDTH, AS TRACY'S GENERATOR SPREADS IT (`spreadWidths`): the columns left in a row
+// that lost one are scaled back to the row's old total, floor first, the units left one each to the
+// largest remainders, the leftmost first on a tie; integers stay integers, digit strings stay strings.
+$cWidths = fn (array $row, int $head) => array_column($cRows(T3MegaSub::removeColumn($cCol([$row]), 'mainmenu', 7, $head))[0] ?? [], 'width');
+$cRow = fn (array $widths) => array_map(fn ($w, $n) => ['item' => 20 + $n, 'width' => $w], $widths, array_keys($widths));
+foreach ([
+    'restaurant: "6","3","3" without a "3"' => [['6', '3', '3'], 22, ['8', '4']],
+    'donate: 4,4,4 without one' => [[4, 4, 4], 20, [6, 6]],
+    'a single column left takes the whole row' => [['3', '9'], 21, ['12']],
+    'ties go to the leftmost' => [[3, 3, 3, 2], 23, [4, 4, 3]],
+    'the largest remainder first' => [[5, 4, 1, 2], 23, [6, 5, 1]],
+    'a total other than 12 is kept' => [[2, 2, 2], 20, [3, 3]],
+] as $what => [$widths, $head, $want]) check("re-spread widths, $what", $cWidths($cRow($widths), $head), $want);
+check('a row that lost nothing keeps its widths, however it stores them', $cRows(T3MegaSub::removeColumn($cCol([[['item' => 8, 'width' => 6], ['item' => 9, 'width' => 6]], [['item' => 10, 'width' => '06', 'class' => 'x'], ['item' => 11]]]), 'mainmenu', 7, 8)),
+    [[['item' => 9, 'width' => 12]], [['item' => 10, 'width' => '06', 'class' => 'x'], ['item' => 11]]]);
+foreach ([
+    'a column with a class' => [['item' => 8, 'width' => 6], ['item' => 9, 'width' => 6, 'class' => 'x']],
+    'a column with no width' => [['item' => 8, 'width' => 6], ['item' => 9]],
+    'mixed integers and strings' => [['item' => 8, 'width' => 6], ['item' => 9, 'width' => '6']],
+    'a leading zero' => [['item' => 8, 'width' => '06'], ['item' => 9, 'width' => '6']],
+    'a zero width' => [['item' => 8, 'width' => 0], ['item' => 9, 'width' => 6]],
+    'a negative width' => [['item' => 8, 'width' => -6], ['item' => 9, 'width' => 6]],
+    'a boolean width' => [['item' => 8, 'width' => true], ['item' => 9, 'width' => 6]],
+    'a null width' => [['item' => 8, 'width' => null], ['item' => 9, 'width' => 6]],
+    'a decimal string' => [['item' => 8, 'width' => '6.5'], ['item' => 9, 'width' => '6']],
+] as $what => $row) {
+    $edit = T3MegaSub::removeColumn($cCol([$row]), 'mainmenu', 7, 8);
+    check("a row with $what is not re-spread: nothing is edited", [isset($edit['raw']), str_contains($edit['problem'] ?? '', 'cannot be re-spread exactly')], [false, true]);
+}
+
+// 🔒 ja-space 1.0.7: the map hides "J! Pages" (109), the head of the first column of "Pages" (108), and
+// "Joomla Content" (121) with its sample listings, while "Other Pages" (114) stays. T3 would start the
+// first column at Other Pages and run it to the end: each style drops the 109 and the 121 columns, and
+// Other Pages, left alone in the row, is spread back over its whole width.
 $spSource = __DIR__ . '/../lib/contracts/ja-space/j6/1.0.7';
 $spMap = json_decode(file_get_contents($spSource . '/showcase-nav-map.json'), true, 512, JSON_THROW_ON_ERROR);
 $spContent = json_decode(file_get_contents($spSource . '/content-map.json'), true, 512, JSON_THROW_ON_ERROR);
@@ -634,7 +667,7 @@ $spLoads = function (array $profile, ?array $lock = null) use ($spSource, $spCon
 };
 $spOps = array_values(array_filter($spMap['operations'], fn ($op) => $op['op'] === 'templateStyle.megaColumnRemove'));
 check('the space map removes column 109 of Pages from both T3 styles', [$spLoads($spMap), array_map(fn ($op) => [$op['key'], $op['item'], $op['column']], $spOps)],
-    ['loaded', [['templateStyle-9', 108, 109], ['templateStyle-10', 108, 109]]]);
+    ['loaded', [['templateStyle-9', 108, 109], ['templateStyle-9', 108, 121], ['templateStyle-10', 108, 109], ['templateStyle-10', 108, 121]]]);
 $spEdit = function (callable $edit) use ($spMap) { $m = $spMap; foreach ($m['operations'] as $n => $op) if ($op['op'] === 'templateStyle.megaColumnRemove') { $m['operations'][$n] = $edit($op); break; } return $m; };
 foreach ([
     'a column the sub does not hold' => fn ($op) => ['column' => 114, 'path' => 'mm_config.mainmenu.item-108.sub.rows[item=114]'] + $op,
@@ -657,14 +690,17 @@ $spStray = $spLock;
 foreach (['templateStyle-9', 'templateStyle-10'] as $k) {
     $outer = json_decode($spStray['entities'][$k]['params'], true);
     $mm = json_decode($outer['mm_config'], true);
-    $mm['mainmenu']['item-108']['sub']['rows'][0] = array_values(array_filter($mm['mainmenu']['item-108']['sub']['rows'][0], fn ($c) => $c['item'] !== 121));
+    $mm['mainmenu']['item-108']['sub']['rows'][0] = array_values(array_filter($mm['mainmenu']['item-108']['sub']['rows'][0], fn ($c) => $c['item'] !== 114));
     $outer['mm_config'] = json_encode($mm);
     $spStray['entities'][$k]['params'] = json_encode($outer);
 }
+// Each step of a style's chain re-hashed from the step before it, so only the stray child can refuse it.
 $spStrayMap = $spMap;
+$spChain = array_map(fn ($e) => $e['params'], $spStray['entities']);
 foreach ($spStrayMap['operations'] as &$op) if ($op['op'] === 'templateStyle.megaColumnRemove') {
-    $op['before'] = hash('sha256', $spStray['entities'][$op['key']]['params']);
-    $op['after'] = hash('sha256', T3MegaSub::removeColumn($spStray['entities'][$op['key']]['params'], 'mainmenu', 108, 109)['raw']);
+    $op['before'] = hash('sha256', $spChain[$op['key']]);
+    $spChain[$op['key']] = T3MegaSub::removeColumn($spChain[$op['key']], 'mainmenu', 108, $op['column'])['raw'];
+    $op['after'] = hash('sha256', $spChain[$op['key']]);
 }
 unset($op);
 check('a shown child that heads no column of the sub refuses the column', $spLoads($spStrayMap, $spStray), 'refused');
@@ -684,7 +720,7 @@ foreach ([
     'position 112' => [['position' => 112], [8], 1, false],
     'position "112abc"' => [['position' => '112abc'], [8], 1, false],
 ] as $what => [$pos, $heads, $modules, $edited]) {
-    $raw = $cCol([[['item' => 8], $pos + ['item' => 9]]]);
+    $raw = $cCol([[['item' => 8, 'width' => 6], $pos + ['item' => 9, 'width' => 6]]]);
     check("a column with $what next to an item column", [T3MegaSub::sub($raw, 'mainmenu', 7), isset(T3MegaSub::removeColumn($raw, 'mainmenu', 7, 9)['raw'])],
         [['problem' => null, 'heads' => $heads, 'modules' => $modules], $edited]);
 }
@@ -756,15 +792,16 @@ $spOriginal = $spParams($spw);
 $spAfter = array_column($spOps, 'after', 'key');
 $spApplied = $spCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sp', 'request_id' => 'sp1']);
 check('the apply removes the column from both styles', [$spApplied['status'], $spApplied['skipped'], array_map(fn ($p) => array_column($spSub($p)['rows'][0], 'item'), $spParams($spw))],
-    ['completed', [], ['templateStyle-9' => [114, 121], 'templateStyle-10' => [114, 121]]]);
+    ['completed', [], ['templateStyle-9' => [114], 'templateStyle-10' => [114]]]);
 check('each style holds exactly the bytes the map names', array_map(fn ($p) => hash('sha256', $p), $spParams($spw)), $spAfter);
 foreach ($spOriginal as $k => $was) {
     $wasMm = json_decode(json_decode($was, true)['mm_config'], true);
-    $wasMm['mainmenu']['item-108']['sub']['rows'][0] = array_values(array_filter($wasMm['mainmenu']['item-108']['sub']['rows'][0], fn ($c) => $c['item'] !== 109));
+    // 4/4/4 loses 109, then 121: Other Pages, left alone, takes the whole row.
+    $wasMm['mainmenu']['item-108']['sub']['rows'][0] = [['item' => 114, 'width' => 12]];
     check("$k changes nothing else", [array_diff_key(json_decode($spParams($spw)[$k], true), ['mm_config' => 1]), json_decode(json_decode($spParams($spw)[$k], true)['mm_config'], true)],
         [array_diff_key(json_decode($was, true), ['mm_config' => 1]), $wasMm]);
 }
-check('its receipt names the column path', $spStore->binding['showcaseNav']['receipts']['templateStyle-9']['paths'], ['mm_config.mainmenu.item-108.sub.rows[item=109]']);
+check('its receipt names both column paths', $spStore->binding['showcaseNav']['receipts']['templateStyle-9']['paths'], ['mm_config.mainmenu.item-108.sub.rows[item=109]', 'mm_config.mainmenu.item-108.sub.rows[item=121]']);
 snavClean('the site with the column removed inspects clean', $spContract);
 $spLost = $spCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sp', 'request_id' => 'sp1']);
 check('the same apply after a lost answer writes nothing more', [$spLost['status'], $spLost['alreadyApplied'] ?? null, array_map(fn ($p) => hash('sha256', $p), $spParams($spw))], ['completed', true, $spAfter]);
@@ -801,14 +838,15 @@ $shw->store['menuItem'][109]['params'] = JsonObjectKey::set((string) $shw->store
 check('a head left in the menu keeps its column', $shCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-sh', 'request_id' => 'sh1'])['skipped']['templateStyle-9'] ?? null,
     'kept the mega-menu column 109 of menuItem-108: its head menuItem-109 stays in the menu (menu_show is "maybe", not shown)');
 
-// ja-smallbiz 1.0.4: one style chains a whole sub (Home, 101, every child gone) and a column (Pages, 103,
-// its 104 column). The sub is a megaSubRemove — no column path — and the column starts from its bytes.
+// ja-smallbiz 1.0.4: one style chains a whole sub (Home, 101, every child gone) and two columns (Pages,
+// 103, its 104 and 121 columns). The sub is a megaSubRemove — no column path — and each column starts
+// from the bytes of the step before it.
 $sbSource = __DIR__ . '/../lib/contracts/ja-smallbiz/j6/1.0.4';
 $sbMap = json_decode(file_get_contents($sbSource . '/showcase-nav-map.json'), true, 512, JSON_THROW_ON_ERROR);
 $sbChain = [];
 foreach ($sbMap['operations'] as $op) if ($op['key'] === 'templateStyle-10') $sbChain[] = [$op['op'], $op['path']];
 check('smallbiz chains a sub and a column in one style', $sbChain,
-    [['templateStyle.megaSubRemove', 'mm_config.mainmenu.item-101.sub'], ['templateStyle.megaColumnRemove', 'mm_config.mainmenu.item-103.sub.rows[item=104]']]);
+    [['templateStyle.megaSubRemove', 'mm_config.mainmenu.item-101.sub'], ['templateStyle.megaColumnRemove', 'mm_config.mainmenu.item-103.sub.rows[item=104]'], ['templateStyle.megaColumnRemove', 'mm_config.mainmenu.item-103.sub.rows[item=121]']]);
 [, $sbStore, $sbw, $sbContract, $sbCall] = snavSite($sbSource);
 $sbIds = [];
 foreach (json_decode(file_get_contents($sbSource . '/content-map.json'), true)['entities'] as $e) if ($e['kind'] === 'templateStyle') $sbIds[$e['key']] = (int) $e['sourceId'];

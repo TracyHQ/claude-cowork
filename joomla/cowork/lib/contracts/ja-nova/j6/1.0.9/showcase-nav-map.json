@@ -69,8 +69,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "the \"jcontent\" footer menu (module \"J! Content\") lists only Joomla sample content views of the demo"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"jcontent\" footer menu (module \"J! Content\") lists only Joomla sample content views of the demo)"
     },
     {
       "op": "menuItem.param",

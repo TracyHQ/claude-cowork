@@ -14,6 +14,66 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-118",
+      "identity": {
+        "path": "joomla-content",
+        "menutype": "offcanvas",
+        "language": "*"
+      },
+      "label": "Joomla Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.empty-heading",
+      "reason": "a heading whose every entry leaves the navigation"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-119",
+      "identity": {
+        "path": "joomla-content/featured-articles",
+        "menutype": "offcanvas",
+        "language": "*"
+      },
+      "label": "Featured Articles",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_content view=featured) in offcanvas, the drawer menu of module-117"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-120",
+      "identity": {
+        "path": "joomla-content/all-categories",
+        "menutype": "offcanvas",
+        "language": "*"
+      },
+      "label": "All Categories",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_content view=categories) in offcanvas, the drawer menu of module-117"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-121",
+      "identity": {
+        "path": "joomla-content/tagged-items",
+        "menutype": "offcanvas",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing (com_tags view=tag) in offcanvas, the drawer menu of module-117"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-180",
       "identity": {
         "path": "joomla-content/typography",
@@ -142,13 +202,6 @@
       "where": "offcanvas/other-pages/smart-search",
       "rule": "keep.functional-default",
       "reason": "opens com_finder (view=search): a working feature stays unless decided"
-    },
-    {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "offcanvas/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
     },
     {
       "key": "menuItem-122",
@@ -344,7 +397,7 @@
       "label": "Bonus Pages",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders offcanvas: 10 entries stay"
+      "reason": "renders offcanvas: 6 entries stay"
     },
     {
       "key": "module-123",
@@ -363,27 +416,6 @@
       "reason": "\"J! Pages\" names a showcase branch"
     },
     {
-      "key": "menuItem-118",
-      "label": "Joomla Content",
-      "where": "offcanvas/joomla-content",
-      "rule": "unresolved.showcase-word",
-      "reason": "\"Joomla Content\" names a showcase branch"
-    },
-    {
-      "key": "menuItem-119",
-      "label": "Featured Articles",
-      "where": "offcanvas/joomla-content/featured-articles",
-      "rule": "unresolved.showcase-word",
-      "reason": "\"Joomla Content\" names a showcase branch"
-    },
-    {
-      "key": "menuItem-120",
-      "label": "All Categories",
-      "where": "offcanvas/joomla-content/all-categories",
-      "rule": "unresolved.showcase-word",
-      "reason": "\"Joomla Content\" names a showcase branch"
-    },
-    {
       "key": "menuItem-196",
       "label": "Other pages",
       "where": "offcanvas/other-pages",
@@ -392,9 +424,9 @@
     }
   ],
   "counts": {
-    "menuItems": 3,
+    "menuItems": 7,
     "modules": 0,
-    "kept": 42,
-    "unresolved": 5
+    "kept": 41,
+    "unresolved": 2
   }
 }

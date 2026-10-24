@@ -82,6 +82,13 @@ final class EngineFactory
         require_once self::libDir() . '/TemplateSiteSettings.php';
     }
 
+    /** Only the T3 off-canvas gate (with the site-settings rules it reads), for the system plugin's drawer keyboard. */
+    public static function loadT3OffCanvas(): void
+    {
+        self::loadTemplateSiteSettings();
+        require_once self::libDir() . '/T3OffCanvas.php';
+    }
+
     /**
      * The published contract profile this site is held to.
      *

@@ -119,6 +119,36 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-126",
+      "identity": {
+        "path": "joomla-content",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Joomla Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-127",
+      "identity": {
+        "path": "joomla-content/all-categories",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "All categories",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens))"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-128",
       "identity": {
         "path": "joomla-content/fetured-articles",
@@ -129,8 +159,23 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-129",
+      "identity": {
+        "path": "joomla-content/tagged-items",
+        "menutype": "joomla-pages",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (the \"joomla-pages\" menu is the off-canvas drawer of the JA demo: every entry is a Joomla sample page (typography, error/offline, sample content views, sample user screens))"
     },
     {
       "op": "menuItem.param",
@@ -236,6 +281,21 @@
       "to": "0",
       "rule": "hide.home-branch-variant",
       "reason": "another demo of the home page: under mainmenu/home"
+    },
+    {
+      "op": "module.published",
+      "key": "module-113",
+      "identity": {
+        "title": "Offcanvas",
+        "module": "mod_menu",
+        "position": "off-canvas"
+      },
+      "label": "Offcanvas",
+      "field": "published",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.module-renders-nothing",
+      "reason": "renders joomla-pages, whose 14 entries all leave the navigation"
     },
     {
       "op": "templateStyle.megaSubRemove",
@@ -401,20 +461,6 @@
       "reason": "opens com_contact (view=contact): a working feature stays unless decided"
     },
     {
-      "key": "menuItem-127",
-      "label": "All categories",
-      "where": "joomla-pages/joomla-content/all-categories",
-      "rule": "keep.only-route-to-content",
-      "reason": "the only menu route to category:2, category:9, category:10 (+1): a branch hide may not take real content along"
-    },
-    {
-      "key": "menuItem-129",
-      "label": "Tagged Items",
-      "where": "joomla-pages/joomla-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-141",
       "label": "Offers",
       "where": "mainmenu/offers",
@@ -434,36 +480,50 @@
       "where": "mainmenu/reservation",
       "rule": "keep.default",
       "reason": "no rule hides it"
-    },
-    {
-      "key": "module-113",
-      "label": "Offcanvas",
-      "where": "mod_menu@off-canvas",
-      "rule": "keep.default",
-      "reason": "renders joomla-pages: 3 entries stay"
     }
   ],
   "unresolved": [
     {
-      "key": "menuItem-126",
-      "label": "Joomla Content",
-      "where": "joomla-pages/joomla-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-129, which stays"
+      "key": "templateStyle-9",
+      "label": "ja_diner - Default",
+      "where": "ja_diner",
+      "rule": "unresolved.offcanvas-toggle",
+      "reason": "addon_offcanvas_enable is \"1\" but every module at off-canvas leaves: the toggle would open an empty drawer"
     },
     {
-      "key": "menuItem-129",
-      "label": "Tagged Items",
-      "where": "joomla-pages/joomla-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
+      "key": "templateStyle-10",
+      "label": "ja_diner - Red",
+      "where": "ja_diner",
+      "rule": "unresolved.offcanvas-toggle",
+      "reason": "addon_offcanvas_enable is \"1\" but every module at off-canvas leaves: the toggle would open an empty drawer"
+    },
+    {
+      "key": "templateStyle-11",
+      "label": "ja_diner - Pink",
+      "where": "ja_diner",
+      "rule": "unresolved.offcanvas-toggle",
+      "reason": "addon_offcanvas_enable is \"1\" but every module at off-canvas leaves: the toggle would open an empty drawer"
+    },
+    {
+      "key": "templateStyle-12",
+      "label": "ja_diner - Blue",
+      "where": "ja_diner",
+      "rule": "unresolved.offcanvas-toggle",
+      "reason": "addon_offcanvas_enable is \"1\" but every module at off-canvas leaves: the toggle would open an empty drawer"
+    },
+    {
+      "key": "templateStyle-13",
+      "label": "ja_diner - Green",
+      "where": "ja_diner",
+      "rule": "unresolved.offcanvas-toggle",
+      "reason": "addon_offcanvas_enable is \"1\" but every module at off-canvas leaves: the toggle would open an empty drawer"
     }
   ],
   "counts": {
-    "menuItems": 15,
-    "modules": 0,
+    "menuItems": 18,
+    "modules": 1,
     "megaSubs": 5,
-    "kept": 14,
-    "unresolved": 2
+    "kept": 11,
+    "unresolved": 5
   }
 }

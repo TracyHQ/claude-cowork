@@ -14,6 +14,21 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-163",
+      "identity": {
+        "path": "2015-05-27-03-13-06/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": null,
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-164",
       "identity": {
         "path": "2015-05-27-03-13-06/offline-page",
@@ -123,13 +138,6 @@
       "reason": "opens com_finder (view=search): a working feature stays unless decided"
     },
     {
-      "key": "menuItem-163",
-      "label": "Tagged Items",
-      "where": "mainmenu/2015-05-27-03-13-06/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
       "key": "menuItem-171",
       "label": "Logout",
       "where": "mainmenu/user/logout",
@@ -155,7 +163,7 @@
       "label": "Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 14 entries stay"
+      "reason": "renders mainmenu: 13 entries stay"
     }
   ],
   "unresolved": [
@@ -172,19 +180,12 @@
       "where": "mainmenu/2015-05-27-03-13-06/advanced-search",
       "rule": "unresolved.functional-in-hidden-branch",
       "reason": "opens com_finder (view=search) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    },
-    {
-      "key": "menuItem-163",
-      "label": "Tagged Items",
-      "where": "mainmenu/2015-05-27-03-13-06/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
     }
   ],
   "counts": {
-    "menuItems": 3,
+    "menuItems": 4,
     "modules": 0,
-    "kept": 14,
-    "unresolved": 3
+    "kept": 13,
+    "unresolved": 2
   }
 }

@@ -44,15 +44,20 @@ final class T3MegaSub
         return self::edit($raw, $menutype, $item, function (stdClass $setting): bool { unset($setting->sub); return true; });
     }
 
+    /** The only keys a column may carry for its row to be re-spread: T3 reads `width` and nothing else for size. */
+    private const COLUMN_KEYS = ['item', 'position', 'width'];
+
     /**
      * `$raw` with every `{"item": <column>}` column of that sub removed, in every row; a row this empties
-     * goes too, a row that was already empty stays. A module column (placesModule) is never one.
+     * goes too, a row that was already empty stays. A module column (placesModule) is never one. The other
+     * columns of each row that lost one are re-spread over the row's old total (spreadWidths); a row whose
+     * widths cannot be re-spread exactly leaves the whole edit undone, as a problem.
      *
      * @return array{raw:string}|array{absent:true}|array{problem:string}
      */
     public static function removeColumn(string $raw, string $menutype, int $item, int $column): array
     {
-        return self::edit($raw, $menutype, $item, function (stdClass $setting) use ($column): bool {
+        return self::edit($raw, $menutype, $item, function (stdClass $setting) use ($column) {
             $rows = $setting->sub->rows ?? null;
             if (!is_array($rows)) return false;
             $found = false;
@@ -60,13 +65,59 @@ final class T3MegaSub
             if (!$found) return false;
             $next = [];
             foreach ($rows as $row) {
-                if (!is_array($row)) { $next[] = $row; continue; }
+                if (!is_array($row) || !array_filter($row, fn ($col) => self::heads($col, $column))) { $next[] = $row; continue; }
                 $kept = array_values(array_filter($row, fn ($col) => !self::heads($col, $column)));
-                if ($kept || !$row) $next[] = $kept;
+                if (!$kept) continue;
+                $widths = self::spreadWidths($row, $kept);
+                if (isset($widths['problem'])) return ['problem' => $widths['problem'] . ': its columns cannot be re-spread exactly'];
+                foreach ($kept as $n => $col) $col->width = $widths['widths'][$n];
+                $next[] = $kept;
             }
             $setting->sub->rows = $next;
             return true;
         });
+    }
+
+    /**
+     * The widths of a row that keeps `$kept` of its columns, spread back over the row's old total, as Tracy's
+     * generator (`spreadWidths`) spreads them, or a problem when the row stores its widths in a way this
+     * cannot reproduce. T3 sizes a column by its `width` alone (12 when absent), so a row qualifies only when
+     * every column carries `width`, all as JSON integers >= 1 or all as strings of digits without a leading
+     * 0, and no column carries a key besides `item`, `position` and `width` (a `class` may size it too).
+     * Spread: T = the row's old sum, S = the sum of what stays; each column gets floor(w*T/S), and the
+     * T - sum units left go one each to the columns with the largest (w*T mod S), the leftmost first on a tie.
+     *
+     * @param list<mixed> $row
+     * @param list<stdClass> $kept
+     * @return array{widths:list<int|string>}|array{problem:string}
+     */
+    public static function spreadWidths(array $row, array $kept): array
+    {
+        foreach ($row as $col)
+            if (!$col instanceof stdClass || array_diff(array_keys(get_object_vars($col)), self::COLUMN_KEYS))
+                return ['problem' => 'a column of the row carries a key besides item, position and width'];
+        foreach ($row as $col)
+            if (!property_exists($col, 'width')) return ['problem' => 'a column of the row has no width (T3 would size it 12)'];
+        $ints = !array_filter($row, fn ($col) => !is_int($col->width) || $col->width < 1);
+        $texts = !array_filter($row, fn ($col) => !is_string($col->width) || !preg_match('/^[1-9][0-9]*$/D', $col->width));
+        if (!$ints && !$texts) return ['problem' => 'the row mixes or bends its width encodings'];
+        $total = array_sum(array_map(fn ($col) => (int) $col->width, $row));
+        $left = array_sum(array_map(fn ($col) => (int) $col->width, $kept));
+        $base = [];
+        $rest = [];
+        foreach ($kept as $n => $col) {
+            $base[$n] = intdiv((int) $col->width * $total, $left);
+            $rest[$n] = ((int) $col->width * $total) % $left;
+        }
+        $units = $total - array_sum($base);
+        $order = array_keys($kept);
+        usort($order, fn ($a, $b) => [$rest[$b], $a] <=> [$rest[$a], $b]);
+        foreach ($order as $n) {
+            if ($units === 0) break;
+            $base[$n]++;
+            $units--;
+        }
+        return ['widths' => array_map(fn ($w) => $ints ? $w : (string) $w, $base)];
     }
 
     /**
@@ -143,7 +194,8 @@ final class T3MegaSub
 
     /**
      * `$raw` with one edit made to the parsed `mm_config.<menutype>.item-<item>` setting, which holds a
-     * `sub`; `$change` returns false when it has nothing to change.
+     * `sub`; `$change` returns false when it has nothing to change, or a problem when the change cannot be
+     * made exactly.
      */
     private static function edit(string $raw, string $menutype, int $item, callable $change): array
     {
@@ -166,7 +218,9 @@ final class T3MegaSub
         foreach (self::ENCODINGS as $enc) if (self::encodeString($inner, $enc) === $literal) { $outerEnc = $enc; break; }
         if ($innerEnc === null || $outerEnc === null)
             return ['problem' => 'mm_config does not re-encode to the bytes the column holds (' . ($innerEnc === null ? 'inner JSON' : 'string literal') . ')'];
-        if (!$change($setting)) return ['absent' => true];
+        $changed = $change($setting);
+        if ($changed === false) return ['absent' => true];
+        if (is_array($changed)) return $changed;
         $nextInner = self::encode($config, $innerEnc);
         try { $next = JsonObjectKey::set($raw, 'mm_config', self::encodeString($nextInner, $outerEnc)); }
         catch (Throwable $error) { return ['problem' => 'the edited params column does not read back as expected']; }

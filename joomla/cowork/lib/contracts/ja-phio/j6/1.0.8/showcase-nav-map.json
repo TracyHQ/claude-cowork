@@ -14,6 +14,21 @@
   "operations": [
     {
       "op": "menuItem.param",
+      "key": "menuItem-110",
+      "identity": {
+        "path": "pages/j-content",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "J! Content",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.decision",
+      "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-115",
       "identity": {
         "path": "pages/j-pages/error-page",
@@ -69,8 +84,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -86,6 +101,21 @@
       "to": "0",
       "rule": "hide.decision",
       "reason": "\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-121",
+      "identity": {
+        "path": "pages/j-content/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Content\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -232,13 +262,6 @@
       "where": "mainmenu/pages/j-pages/smart-search",
       "rule": "keep.functional-default",
       "reason": "opens com_finder (view=search): a working feature stays unless decided"
-    },
-    {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/j-content/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
     },
     {
       "key": "menuItem-123",
@@ -420,7 +443,7 @@
       "label": "Offcanvas",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 27 entries stay"
+      "reason": "renders mainmenu: 25 entries stay"
     },
     {
       "key": "module-149",
@@ -439,31 +462,17 @@
       "reason": "decided hidden, but it holds menuItem-118, which stays"
     },
     {
-      "key": "menuItem-110",
-      "label": "J! Content",
-      "where": "mainmenu/pages/j-content",
-      "rule": "unresolved.decision-conflict",
-      "reason": "decided hidden, but it holds menuItem-121, which stays"
-    },
-    {
       "key": "menuItem-118",
       "label": "Smart Search",
       "where": "mainmenu/pages/j-pages/smart-search",
       "rule": "unresolved.functional-in-hidden-branch",
       "reason": "opens com_finder (view=search) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    },
-    {
-      "key": "menuItem-121",
-      "label": "Tagged Items",
-      "where": "mainmenu/pages/j-content/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
     }
   ],
   "counts": {
-    "menuItems": 9,
+    "menuItems": 11,
     "modules": 0,
-    "kept": 40,
-    "unresolved": 4
+    "kept": 39,
+    "unresolved": 2
   }
 }

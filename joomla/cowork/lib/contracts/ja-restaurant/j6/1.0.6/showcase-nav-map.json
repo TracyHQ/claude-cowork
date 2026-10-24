@@ -119,6 +119,21 @@
     },
     {
       "op": "menuItem.param",
+      "key": "menuItem-134",
+      "identity": {
+        "path": "explore/j-pages/tagged-items",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "Tagged Items",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
       "key": "menuItem-135",
       "identity": {
         "path": "explore/j-pages/featured-articles",
@@ -129,8 +144,23 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"J! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views)"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
+    },
+    {
+      "op": "menuItem.param",
+      "key": "menuItem-136",
+      "identity": {
+        "path": "explore/j-pages/all-categories",
+        "menutype": "mainmenu",
+        "language": "*"
+      },
+      "label": "All Categories",
+      "path": "menu_show",
+      "from": "1",
+      "to": "0",
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"J! Pages\": the Joomla sample-pages branch of the JA demo (error/offline/typography, sample content views))"
     },
     {
       "op": "menuItem.param",
@@ -159,8 +189,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Themes\" lists the template's colour variants of the home page"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Themes\" lists the template's colour variants of the home page)"
     },
     {
       "op": "menuItem.param",
@@ -174,8 +204,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Themes\" lists the template's colour variants of the home page"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Themes\" lists the template's colour variants of the home page)"
     },
     {
       "op": "menuItem.param",
@@ -189,8 +219,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Themes\" lists the template's colour variants of the home page"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Themes\" lists the template's colour variants of the home page)"
     },
     {
       "op": "menuItem.param",
@@ -204,8 +234,8 @@
       "path": "menu_show",
       "from": "1",
       "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Themes\" lists the template's colour variants of the home page"
+      "rule": "hide.sample-listing",
+      "reason": "a sample listing inside a branch or menu decided hidden (\"Themes\" lists the template's colour variants of the home page)"
     },
     {
       "op": "menuItem.param",
@@ -240,9 +270,9 @@
       "column": 150,
       "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
       "before": "e15bd38e1c2fc516b33adb08e7ce6d30f6c1e33109c726d3c270ac92cbe4f51b",
-      "after": "0f7cbc99f2baaabbaf042bd1056e01ea1adc84293ca036b8b4c57f77e4b58f95",
+      "after": "fc0472ae63ab87b8c531c52e91b4f4a5cd48d513d04f099dbbf4414aacf4ddae",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     },
     {
       "op": "templateStyle.megaColumnRemove",
@@ -262,9 +292,9 @@
       "column": 150,
       "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
       "before": "4912053e62de08da5ede7b500581ae33ed6021f067cc34215d6ef5392a0c7283",
-      "after": "6c207dd40ba96746e2118b76b3508bf5b69fa329731b32e20c095ca820876f0a",
+      "after": "8078300f275548aed2fa70a2fc2b8b9710699324c38734ab59a57cd105929480",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     },
     {
       "op": "templateStyle.megaColumnRemove",
@@ -284,9 +314,9 @@
       "column": 150,
       "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
       "before": "ef8bbdbe029201d156393e91b82b3f5d85f368e7eab789e8b93b2774af077c24",
-      "after": "da5f108168c29f27ed1a8ad0d79c69b05bfd5371651f099bf17b7398d866e043",
+      "after": "909f3943cdd3b690c6b2ded90af42b57700938babcea1b753e43aaa7df594625",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     },
     {
       "op": "templateStyle.megaColumnRemove",
@@ -306,9 +336,9 @@
       "column": 150,
       "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
       "before": "0e80b03c12aae88c5096c747f3d6567c786ed263805c99bd18618233ce234f55",
-      "after": "37d0b587d1a228d191f9655d42309cb2e99f8bb1b49ca031965fc422fd6a7f75",
+      "after": "3c92cfc2c886c802d86643905b9278b7a531fa42045962e3c49865d94862f39f",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     },
     {
       "op": "templateStyle.megaColumnRemove",
@@ -328,9 +358,9 @@
       "column": 150,
       "path": "mm_config.mainmenu.item-110.sub.rows[item=150]",
       "before": "6a4b2dfa1f08b5e5f49475a69b58ffe67c1452aa537514c0da33c85d850a12ac",
-      "after": "18d96c34e65b20705c521d3b393e97908692720038f374ea969c427b47eab844",
+      "after": "0353fe849f36cfeaccc3a814e3dc9615314f687d6df1c9b3461de66d3d8c1729",
       "rule": "hide.mega-column-of-hidden-items",
-      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice"
+      "reason": "the column headed by menuItem-150 holds only entries that leave the navigation; T3 starts the first column at the first shown child but ends it at the next head, so the panel would list the other columns twice; the columns left in its row are re-spread over the row's old width"
     }
   ],
   "kept": [
@@ -433,20 +463,6 @@
       "reason": "no rule hides it"
     },
     {
-      "key": "menuItem-134",
-      "label": "Tagged Items",
-      "where": "mainmenu/explore/j-pages/tagged-items",
-      "rule": "keep.functional-default",
-      "reason": "opens com_tags (view=tag): a working feature stays unless decided"
-    },
-    {
-      "key": "menuItem-136",
-      "label": "All Categories",
-      "where": "mainmenu/explore/j-pages/all-categories",
-      "rule": "keep.only-route-to-content",
-      "reason": "the only menu route to category:8, category:9, category:11 (+1): a branch hide may not take real content along"
-    },
-    {
       "key": "menuItem-138",
       "label": "Our History",
       "where": "mainmenu/about-us/our-history",
@@ -514,7 +530,7 @@
       "label": "Main Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 21 entries stay"
+      "reason": "renders mainmenu: 19 entries stay"
     }
   ],
   "unresolved": [
@@ -533,18 +549,11 @@
       "reason": "opens com_users (view=remind) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
     },
     {
-      "key": "menuItem-134",
-      "label": "Tagged Items",
-      "where": "mainmenu/explore/j-pages/tagged-items",
-      "rule": "unresolved.functional-in-hidden-branch",
-      "reason": "opens com_tags (view=tag) inside a branch or menu decided hidden: a working screen leaves only when a decision names it"
-    },
-    {
       "key": "templateStyle-9",
       "label": "ja_restaurant - Default",
       "where": "mm_config.mainmenu.item-109.sub",
       "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111, menuItem-136 leave while menuItem-121 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     },
     {
       "key": "templateStyle-9",
@@ -558,7 +567,7 @@
       "label": "ja_restaurant - Blue",
       "where": "mm_config.mainmenu.item-109.sub",
       "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111, menuItem-136 leave while menuItem-121 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     },
     {
       "key": "templateStyle-10",
@@ -572,7 +581,7 @@
       "label": "ja_restaurant - Green",
       "where": "mm_config.mainmenu.item-109.sub",
       "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111, menuItem-136 leave while menuItem-121 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     },
     {
       "key": "templateStyle-11",
@@ -586,7 +595,7 @@
       "label": "ja_restaurant - Pink",
       "where": "mm_config.mainmenu.item-109.sub",
       "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111, menuItem-136 leave while menuItem-121 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     },
     {
       "key": "templateStyle-12",
@@ -600,7 +609,7 @@
       "label": "ja_restaurant - Purple",
       "where": "mm_config.mainmenu.item-109.sub",
       "rule": "unresolved.mega-column-member-shown",
-      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111 leave while menuItem-121, menuItem-134 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
+      "reason": "children of \"J! Pages\" leave the navigation, but column head(s) menuItem-111, menuItem-136 leave while menuItem-121 stay shown without heading a column (the lock holds no menu order to tell which column they sit in): the panel stays as the template has it"
     },
     {
       "key": "templateStyle-13",
@@ -611,10 +620,10 @@
     }
   ],
   "counts": {
-    "menuItems": 14,
+    "menuItems": 16,
     "modules": 0,
     "megaColumns": 5,
-    "kept": 26,
-    "unresolved": 13
+    "kept": 24,
+    "unresolved": 12
   }
 }
