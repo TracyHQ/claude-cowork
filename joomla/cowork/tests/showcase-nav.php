@@ -669,6 +669,84 @@ foreach ($spStrayMap['operations'] as &$op) if ($op['op'] === 'templateStyle.meg
 unset($op);
 check('a shown child that heads no column of the sub refuses the column', $spLoads($spStrayMap, $spStray), 'refused');
 
+// 🔒 T3'S OWN MODULE TEST (`mega()`, `isset($col['position'])`): a column with a non-null `position` places a
+// module and is never edited; any other column is a column of items headed by `item`. A module column fills
+// the panel only when PHP `intval()` of its position is above 0; a list or object position is a shape this
+// does not read, as is an item column with no item.
+foreach ([
+    'a null position' => [['position' => null], [8, 9], 0, true],
+    'no position' => [[], [8, 9], 0, true],
+    'an empty position' => [['position' => ''], [8], 0, false],
+    'position "abc"' => [['position' => 'abc'], [8], 0, false],
+    'position 0' => [['position' => 0], [8], 0, false],
+    'position "112"' => [['position' => '112'], [8], 1, false],
+    'position " 112"' => [['position' => ' 112'], [8], 1, false],
+    'position 112' => [['position' => 112], [8], 1, false],
+    'position "112abc"' => [['position' => '112abc'], [8], 1, false],
+] as $what => [$pos, $heads, $modules, $edited]) {
+    $raw = $cCol([[['item' => 8], $pos + ['item' => 9]]]);
+    check("a column with $what next to an item column", [T3MegaSub::sub($raw, 'mainmenu', 7), isset(T3MegaSub::removeColumn($raw, 'mainmenu', 7, 9)['raw'])],
+        [['problem' => null, 'heads' => $heads, 'modules' => $modules], $edited]);
+}
+foreach ([
+    'a list position' => ['position' => [112], 'item' => 9],
+    'an object position' => ['position' => ['id' => 112], 'item' => 9],
+    'a null position and no item' => ['position' => null],
+    'a null item' => ['item' => null],
+    'neither key' => ['width' => 6],
+] as $what => $col) check("a column with $what is a shape the sub cannot be read in", T3MegaSub::sub($cCol([[['item' => 8], $col]]), 'mainmenu', 7)['problem'] !== null, true);
+check('a style without that sub has none', T3MegaSub::sub($cCol([[['item' => 8]]]), 'mainmenu', 6), null);
+
+// The profile: a lock whose sub gains one column, each mega step of that style re-hashed along its chain.
+$megaCol = function (array $lock, string $style, int $item, callable $rows) {
+    $outer = json_decode($lock['entities'][$style]['params'], true);
+    $mm = json_decode($outer['mm_config'], true);
+    $mm['mainmenu']['item-' . $item]['sub']['rows'] = $rows($mm['mainmenu']['item-' . $item]['sub']['rows']);
+    $outer['mm_config'] = json_encode($mm);
+    $lock['entities'][$style]['params'] = json_encode($outer);
+    return $lock;
+};
+$megaHashed = function (array $map, array $lock, string $style) {
+    $raw = $lock['entities'][$style]['params'];
+    foreach ($map['operations'] as &$op) if ($op['key'] === $style) {
+        $op['before'] = hash('sha256', $raw);
+        $edit = isset($op['column']) ? T3MegaSub::removeColumn($raw, $op['menutype'], $op['item'], $op['column']) : T3MegaSub::remove($raw, $op['menutype'], $op['item']);
+        $raw = $edit['raw'] ?? $raw;
+        $op['after'] = isset($edit['raw']) ? hash('sha256', $raw) : str_repeat('0', 64);
+    }
+    unset($op);
+    return $map;
+};
+$dinerLoads = function (array $profile, array $lock) use ($snavSource, $snavContent) {
+    try { new ShowcaseNavProfile($profile, $snavContent, $lock, $snavSource, json_encode($profile), 'ja-diner/j6/1.0.4'); return 'loaded'; }
+    catch (RuntimeException $e) { return 'refused'; }
+};
+foreach ([
+    'position "112"' => [['position' => '112'], 'refused'],
+    'position " 112"' => [['position' => ' 112'], 'refused'],
+    'position 112' => [['position' => 112], 'refused'],
+    'position "112abc"' => [['position' => '112abc'], 'refused'],
+    'position ""' => [['position' => ''], 'loaded'],
+    'position "abc"' => [['position' => 'abc'], 'loaded'],
+    'position 0' => [['position' => 0], 'loaded'],
+    'a list position' => [['position' => [112]], 'refused'],
+    'a null position and no item' => [['position' => null], 'refused'],
+] as $what => [$col, $want]) {
+    $lock = $megaCol($snavLock, 'templateStyle-9', 101, fn ($rows) => [array_merge($rows[0], [$col])]);
+    check("the Home sub beside a module column with $what: $want", $dinerLoads($megaHashed($snavMap, $lock, 'templateStyle-9'), $lock), $want);
+}
+// A column: module columns stay as they are, a module the sub cannot read refuses it.
+foreach ([
+    'position "112"' => [['position' => '112'], 'loaded'],
+    'position 0' => [['position' => 0], 'loaded'],
+    'a list position' => [['position' => [112]], 'refused'],
+] as $what => [$col, $want]) {
+    $lock = $megaCol($spLock, 'templateStyle-9', 108, fn ($rows) => array_merge($rows, [[$col]]));
+    $map = $megaHashed($spMap, $lock, 'templateStyle-9');
+    $kept = T3MegaSub::removeColumn($lock['entities']['templateStyle-9']['params'], 'mainmenu', 108, 109)['raw'] ?? null;
+    check("the 109 column beside a module column with $what: $want", [$spLoads($map, $lock), $kept === null ? null : array_slice(json_decode(json_decode($kept, true)['mm_config'], true)['mainmenu']['item-108']['sub']['rows'], -1)[0]], [$want, [$col]]);
+}
+
 $spSub = fn (string $params) => json_decode(json_decode($params, true)['mm_config'], true)['mainmenu']['item-108']['sub'];
 [, $spStore, $spw, $spContract, $spCall] = snavSite($spSource);
 $spStyles = [];

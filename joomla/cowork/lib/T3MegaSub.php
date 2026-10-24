@@ -46,7 +46,7 @@ final class T3MegaSub
 
     /**
      * `$raw` with every `{"item": <column>}` column of that sub removed, in every row; a row this empties
-     * goes too, a row that was already empty stays. A column that names a module (`position`) is never one.
+     * goes too, a row that was already empty stays. A module column (placesModule) is never one.
      *
      * @return array{raw:string}|array{absent:true}|array{problem:string}
      */
@@ -75,7 +75,7 @@ final class T3MegaSub
      */
     public static function heads($col, int $item): bool
     {
-        if (!$col instanceof stdClass || property_exists($col, 'position') || !property_exists($col, 'item')) return false;
+        if (!$col instanceof stdClass || self::placesModule($col) || !property_exists($col, 'item')) return false;
         return (is_int($col->item) || is_string($col->item)) && (string) $col->item === (string) $item;
     }
 
@@ -87,15 +87,58 @@ final class T3MegaSub
      */
     public static function columns(string $raw, string $menutype, int $item): ?array
     {
+        return self::sub($raw, $menutype, $item)['heads'] ?? null;
+    }
+
+    /**
+     * What the sub a style keeps for `<menutype>.item-<item>` holds, as this class reads it: `problem`, the
+     * shape it cannot read (null when it can); `heads`, as columns() gives them; `modules`, the module
+     * columns that can put something in the panel (moduleId above 0). Null when the style keeps no such sub.
+     *
+     * @return ?array{problem:?string,heads:list<scalar>,modules:int}
+     */
+    public static function sub(string $raw, string $menutype, int $item): ?array
+    {
         $outer = json_decode($raw);
         $config = $outer instanceof stdClass && is_string($outer->mm_config ?? null) ? json_decode($outer->mm_config) : null;
         $setting = $config instanceof stdClass && ($config->{$menutype} ?? null) instanceof stdClass ? ($config->{$menutype}->{'item-' . $item} ?? null) : null;
-        if (!$setting instanceof stdClass || !($setting->sub ?? null) instanceof stdClass) return null;
-        $out = [];
-        foreach (is_array($setting->sub->rows ?? null) ? $setting->sub->rows : [] as $row)
-            if (is_array($row)) foreach ($row as $col)
-                if ($col instanceof stdClass && !property_exists($col, 'position') && property_exists($col, 'item') && is_scalar($col->item)) $out[] = $col->item;
+        if (!$setting instanceof stdClass || !property_exists($setting, 'sub')) return null;
+        $sub = $setting->sub;
+        $out = ['problem' => null, 'heads' => [], 'modules' => 0];
+        if (!$sub instanceof stdClass) return ['problem' => 'the sub is not an object'] + $out;
+        if (!property_exists($sub, 'rows')) return $out;
+        if (!is_array($sub->rows)) return ['problem' => 'its rows are not a list'] + $out;
+        foreach ($sub->rows as $row) {
+            if (!is_array($row)) $out['problem'] ??= 'a row is not a list';
+            else foreach ($row as $col) {
+                if (!$col instanceof stdClass) $out['problem'] ??= 'a column is not an object';
+                elseif (self::placesModule($col)) {
+                    $id = self::moduleId($col->position);
+                    if ($id === null) $out['problem'] ??= 'a column names a module that is not a scalar';
+                    elseif ($id > 0) $out['modules']++;
+                } elseif (($col->item ?? null) === null) $out['problem'] ??= 'a column names neither an item nor a module';
+                elseif (is_scalar($col->item)) $out['heads'][] = $col->item;
+            }
+        }
         return $out;
+    }
+
+    /**
+     * T3's own test for a module column (`mega()`, `isset($col['position'])`): the key is there and not null.
+     * Any other column, `"position": null` included, is a column of items headed by its `item`.
+     */
+    public static function placesModule(stdClass $col): bool
+    {
+        return isset($col->position);
+    }
+
+    /**
+     * The module id `module()` loads for a scalar `position`, by PHP `intval()` as T3 reads it ("" and
+     * "abc" give 0, " 112" and "112abc" 112); null for a list or an object, a shape this does not read.
+     */
+    public static function moduleId($position): ?int
+    {
+        return is_scalar($position) ? intval($position) : null;
     }
 
     /**

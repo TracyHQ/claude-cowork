@@ -185,7 +185,14 @@ final class ShowcaseNavProfile
         foreach (['before', 'after'] as $name)
             if (!is_string($row[$name] ?? null) || !preg_match('/^[0-9a-f]{64}$/D', $row[$name])) throw new RuntimeException('Showcase-navigation operation names no ' . $name . ' hash: ' . $key);
         if (!hash_equals(hash('sha256', $raw), $row['before'])) throw new RuntimeException('Showcase-navigation operation does not start from the locked value of ' . $key);
-        $heads = $columnOp ? array_map('strval', T3MegaSub::columns($raw, $menutype, $item) ?? []) : null;
+        // 🔒 A SUB THIS READS, AND NOTHING ELSE IN IT. Module columns are T3's (`isset($col['position'])`) and never
+        // edited; one with a module id above 0 fills the panel, so the sub stays while it does.
+        $sub = T3MegaSub::sub($raw, $menutype, $item);
+        if (($sub['problem'] ?? null) !== null)
+            throw new RuntimeException('Showcase-navigation operation edits a mega-menu sub this cannot read (' . $sub['problem'] . '): ' . $key . ' ' . $path);
+        if (!$columnOp && ($sub['modules'] ?? 0) > 0)
+            throw new RuntimeException('Showcase-navigation operation removes a mega-menu sub that keeps a module column: ' . $key . ' ' . $path);
+        $heads = $columnOp ? array_map('strval', $sub['heads'] ?? []) : null;
         if ($columnOp) {
             foreach ($stays as $k => $id)
                 if (!in_array((string) $id, $heads, true))
