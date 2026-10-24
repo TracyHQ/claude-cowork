@@ -910,7 +910,10 @@ final class QuickstartContract
             }
             $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
             foreach ($iterator as $file) {
-                if (!$file->isFile()) {
+                // The iterator does not descend into a linked folder, and a link is never followed or
+                // hashed here: a link the lock does not list, to a file or to a folder, is unexpected
+                // as a file is.
+                if (!$file->isLink() && !$file->isFile()) {
                     continue;
                 }
                 $relative = substr($file->getPathname(), strlen($this->root) + 1);
