@@ -26,10 +26,30 @@ final class ContractRows
     /** @var array<string,array<int,?array>> kind => id => row or null, for ids fetched by readMany */
     private array $known = [];
 
-    public function __construct(SiteWriter $writer)
+    /** @var (callable(): array<int,array>)|null the `languageString` rows a contract names (LanguageStrings::rows) */
+    private $languageStrings;
+
+    /** @var (callable(): array<int,array>)|null the `siteSetting` rows a contract names (SiteSettingRows::rows) */
+    private $siteSettings;
+
+    /**
+     * @param (callable(): array<int,array>)|null $languageStrings the rows of kind `languageString`, by id: they are
+     * strings of language files, not rows of the writer's tables (lib/LanguageStrings.php). Without it the kind has none.
+     * @param (callable(): array<int,array>)|null $siteSettings the rows of kind `siteSetting`, by id: logos of a T4 profile
+     * file (lib/SiteSettingRows.php), likewise not rows of the writer's tables.
+     */
+    public function __construct(SiteWriter $writer, ?callable $languageStrings = null, ?callable $siteSettings = null)
     {
         $this->writer = $writer;
         $this->bulk = $writer instanceof BulkSiteReader;
+        $this->languageStrings = $languageStrings;
+        $this->siteSettings = $siteSettings;
+    }
+
+    /** A kind that is lines of files, not rows of the writer's tables: language strings and T4 site settings. */
+    private static function fromFiles(string $kind): bool
+    {
+        return $kind === 'languageString' || $kind === 'siteSetting';
     }
 
     /**
@@ -41,7 +61,20 @@ final class ContractRows
     {
         if (!isset($this->all[$kind])) {
             $rows = [];
-            if ($this->bulk) {
+            if ($kind === 'languageString') {
+                // Read whole from the files at once (a few dozen strings); never from the writer.
+                foreach ($this->languageStrings ? ($this->languageStrings)() : [] as $id => $row) $rows[(int) $id] = $row;
+            } elseif ($kind === 'siteSetting') {
+                foreach ($this->siteSettings ? ($this->siteSettings)() : [] as $id => $row) $rows[(int) $id] = $row;
+            } elseif ($kind === 'userProfile') {
+                // Never read whole (it is one value per author and key): its list rows name the author
+                // (`user_id`) and the field, which is what a contract entity is matched by.
+                for ($offset = 0; $offset < self::LIMIT; $offset += 100) {
+                    $page = $this->writer->list($kind, $offset, 100);
+                    foreach ($page as $item) $rows[(int) $item['id']] = $item;
+                    if (count($page) < 100) break;
+                }
+            } elseif ($this->bulk) {
                 // The same refusal as the paged walk, which threw on a full page at offset 19,900 —
                 // that is, at 20,000 rows or more, so a result filling the limit is refused too.
                 foreach ($this->writer->readAll($kind, self::LIMIT) as $id => $row) $rows[(int) $id] = $row;
@@ -68,7 +101,7 @@ final class ContractRows
      */
     public function summaries(string $kind): array
     {
-        if ($this->bulk) {
+        if ($this->bulk || self::fromFiles($kind)) {
             $this->all($kind);
             $rows = [];
             // A list row always names its id; a full row does too on Joomla, and keeps its own.
@@ -89,6 +122,7 @@ final class ContractRows
     /** Fetch many ids of one kind in one round trip, so the `row()` calls that follow cost nothing. */
     public function prefetch(string $kind, array $ids): void
     {
+        if (self::fromFiles($kind)) { $this->all($kind); return; }
         if (!$this->bulk) return;
         $missing = [];
         foreach ($ids as $id) {
@@ -104,6 +138,7 @@ final class ContractRows
     /** What `read($kind, $id)` answers, from memory when this call already holds it. */
     public function row(string $kind, int $id): ?array
     {
+        if (self::fromFiles($kind)) { $this->all($kind); return $this->all[$kind][$id] ?? null; }
         if ($this->bulk) {
             // A kind read whole is the complete in-scope set: an id outside it is one `read()`
             // would also answer null for, because both apply the same scope.

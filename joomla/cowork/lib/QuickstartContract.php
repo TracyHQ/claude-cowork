@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
 require_once __DIR__ . '/ContractRows.php';
+require_once __DIR__ . '/LanguageStrings.php';
+require_once __DIR__ . '/SiteSettingRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/JoomlaLocks.php';
@@ -425,13 +427,26 @@ final class QuickstartContract
                 try { $row[$col]=LeafCodec::set((string)$row[$col],$slot['leaf'],(string)$value); }
                 catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot cannot be rewritten in place: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
             }
-            elseif (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
+            // A JSON slot is a string at `jsonPath`, inside the nested JSON `nestedJson` names (an ACM's
+            // `jatools-config`) or, without one, in the column's own JSON (an article's `images` and
+            // `attribs`, a module's template fields, a menu item's page title). With `xpath` as well, that
+            // string is HTML and the slot is one text or attribute in it (a textarea field holding markup).
             elseif (isset($slot['jsonPath'])) {
                 $data=$json[$col]??json_decode($row[$col],true,512,JSON_THROW_ON_ERROR);
-                $inner=$slot['nestedJson']; $body=json_decode($data[$inner],true,512,JSON_THROW_ON_ERROR);
-                $data[$inner]=json_encode(ContentSlots::jsonPatch($body,$slot['jsonPath'],$value),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                $patch=static function(array $body) use ($slot,$value): array {
+                    if(!isset($slot['xpath']))return ContentSlots::jsonPatch($body,$slot['jsonPath'],$value);
+                    $leaf=$body; foreach($slot['jsonPath'] as $key){ if(!is_array($leaf)||!array_key_exists($key,$leaf))throw new RuntimeException('JSON slot is missing'); $leaf=$leaf[$key]; }
+                    if(!is_string($leaf))throw new RuntimeException('JSON slot is not text');
+                    return ContentSlots::jsonPatch($body,$slot['jsonPath'],ContentSlots::htmlPatch($leaf,[['xpath'=>$slot['xpath'],'value'=>$value]]));
+                };
+                if(isset($slot['nestedJson'])) {
+                    $inner=$slot['nestedJson']; $body=json_decode($data[$inner],true,512,JSON_THROW_ON_ERROR);
+                    $data[$inner]=json_encode($patch($body),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                } else $data=$patch($data);
                 $json[$col]=$data;
-            } else $row[$col]=$value;
+            }
+            elseif (isset($slot['xpath'])) $html[$col][]=['xpath'=>$slot['xpath'],'value'=>$value];
+            else $row[$col]=$value;
         }
         foreach($html as $col=>$changes)$row[$col]=ContentSlots::htmlPatch($row[$col],$changes);
         foreach($json as $col=>$data)$row[$col]=json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
@@ -448,18 +463,74 @@ final class QuickstartContract
             try { return LeafCodec::get((string)$value,$slot['leaf']); }
             catch (LeafCodecError $e) { throw new ContractProblem('SLOT_UNWRITABLE','Content slot is missing from its column: '.$slot['key'].' ('.$e->getMessage().')',$slot['key']); }
         }
-        if(isset($slot['xpath'])) {
+        if(isset($slot['jsonPath'])) {
+            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
+            $value=isset($slot['nestedJson'])
+                ? ($parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR))
+                : $outer;
+            foreach($slot['jsonPath'] as $key)$value=is_array($value)&&array_key_exists($key,$value)?$value[$key]:null;
+            if(isset($slot['xpath'])) {
+                if(!is_string($value))throw new RuntimeException('Content slot is not text');
+                $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
+                if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+                return $nodes->item(0)->nodeValue;
+            }
+        }
+        elseif(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
             return $nodes->item(0)->nodeValue;
         }
-        if(isset($slot['jsonPath'])) {
-            $outer=$parsed['json'][$column] ??= json_decode($value,true,512,JSON_THROW_ON_ERROR);
-            $value=$parsed['nested'][$column][$slot['nestedJson']] ??= json_decode($outer[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
-            foreach($slot['jsonPath'] as $key)$value=$value[$key];
-        }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
         return $value;
+    }
+    /** This call's rows (see ContractRows), the template language strings the contract names among them. */
+    private function contractRows(): ContractRows {
+        return new ContractRows($this->writer, fn(): array => $this->languageStringRows(), fn(): array => $this->siteSettingRows());
+    }
+    /** The `languageString` rows of every string the contract names, by id (lib/LanguageStrings.php). */
+    private function languageStringRows(): array {
+        $wanted=[];
+        foreach($this->baseEntities() as $entity)if($entity['kind']===LanguageStrings::KIND)$wanted[]=$entity['identity'];
+        return $wanted ? (new LanguageStrings($this->root))->rows($wanted) : [];
+    }
+    /** The T4 profile files, read where T4 reads them; a contract needs no style to name a profile. */
+    private function siteSettingFiles(): TemplateSiteFiles {
+        return new TemplateSiteFiles($this->root, static fn(string $template): array => []);
+    }
+    /** The `siteSetting` rows of every logo the contract names, by id (lib/SiteSettingRows.php). */
+    private function siteSettingRows(): array {
+        $wanted=[];
+        foreach($this->baseEntities() as $entity)if($entity['kind']===SiteSettingRows::KIND)$wanted[]=$entity['identity'];
+        return $wanted ? (new SiteSettingRows($this->siteSettingFiles()))->rows($wanted) : [];
+    }
+    /**
+     * The profile file change a contract apply makes for one `siteSetting` operation, checked against the value the plan
+     * read (`expected`): written to the profile's `local/` copy, never the template's file. Null when nothing changes.
+     *
+     * @return array{change:?array{path:string,before:?string,after:string}}
+     */
+    public function siteSettingChange(int $id, string $value, ?array $expected): array {
+        $this->ready();
+        $row=$this->siteSettingRows()[$id]??null;
+        if($row===null)throw new RuntimeException('Not a site setting of this contract: '.$id);
+        if($expected!==null && array_key_exists('value',$expected) && (string)$expected['value']!==$row['value'])
+            throw new ContractProblem('CONFLICT','conflict: the site setting '.$row['key'].' changed');
+        return ['change'=>(new SiteSettingRows($this->siteSettingFiles()))->change($row,$value)];
+    }
+    /**
+     * The override file change a contract apply makes for one `languageString` operation, checked against the
+     * value the plan read (`expected`): the door writes it, never a language file. Null when nothing changes.
+     *
+     * @return array{locale:string,change:?array{path:string,before:?string,after:string}}
+     */
+    public function languageStringChange(int $id, string $value, ?array $expected): array {
+        $this->ready();
+        $row=$this->languageStringRows()[$id]??null;
+        if($row===null)throw new RuntimeException('Not a language string of this contract: '.$id);
+        if($expected!==null && array_key_exists('value',$expected) && (string)$expected['value']!==$row['value'])
+            throw new ContractProblem('CONFLICT','conflict: the language string '.$row['key'].' changed');
+        return ['locale'=>$row['language'],'change'=>(new LanguageStrings($this->root))->change($row,$value)];
     }
     /** @param array<string,mixed> $meta the record from {@see inventoryKeys} */
     private function presentation(string $key, array $row, array $meta): array {
@@ -729,7 +800,7 @@ final class QuickstartContract
         $switcher = $binding['multilingual']['switcher'] ?? null;
         $keys = $this->inventoryKeys($languages, $switcher === null ? null : (int)$switcher);
         // A derived map is rebuilt from the rows it names, so its entities resolve by their own ids.
-        $resolved = $this->resolveRows(new ContractRows($this->writer), $keys, $this->derivedMode ? ['ids'=>$this->sourceIds()] : $binding, $languages, $switcher);
+        $resolved = $this->resolveRows($this->contractRows(), $keys, $this->derivedMode ? ['ids'=>$this->sourceIds()] : $binding, $languages, $switcher);
         foreach ($resolved['missing'] as $gone) unset($keys[$gone]);
         unset($resolved['missing']);
         $slots = [];
@@ -750,7 +821,7 @@ final class QuickstartContract
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $job = $this->store->job();
         // This call's rows, read in bulk and dropped when it returns (see ContractRows).
-        $source = new ContractRows($this->writer);
+        $source = $this->contractRows();
         $languages = $this->effectiveLanguages($binding, $job);
         $switcher = $binding['multilingual']['switcher'] ?? ($job['switcher'] ?? null);
         // A taken edition creates no rows, so a half-run job of one leaves none unnamed behind it.
@@ -899,6 +970,10 @@ final class QuickstartContract
         Timing::end('access',$t);
         $t=Timing::begin();
         $counts=array_map('count',$lists);
+        // Accounts are not quickstart inventory: every provision adds the owner's own (an author's name and
+        // picture are slots, the people on the site are not counted), unless the lock counts them itself.
+        // A template's language strings and T4 logos are not rows at all (lib/LanguageStrings.php, lib/SiteSettingRows.php): only the keys the contract names are read.
+        foreach(['user','userProfile',LanguageStrings::KIND,SiteSettingRows::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
         // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
         // design-system slot puts a system on a site as one mod_custom it writes through content.update
         // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart
@@ -962,7 +1037,7 @@ final class QuickstartContract
         $binding=$this->store->load();
         if($binding && ($binding['contractHash']??null)!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
         $keys=$this->inventoryKeys([],null);
-        ['ids'=>$ids,'rows'=>$rows,'missing'=>$missing]=$this->resolveRows(new ContractRows($this->writer),$keys,['ids'=>$this->sourceIds()],[],null);
+        ['ids'=>$ids,'rows'=>$rows,'missing'=>$missing]=$this->resolveRows($this->contractRows(),$keys,['ids'=>$this->sourceIds()],[],null);
         foreach($missing as $gone){unset($keys[$gone]);$this->drift('Derived entity disappeared: '.$gone);}
         $this->settleDrift();
         $slots=[];$slotValues=[];$revisionRows=[];

@@ -16,7 +16,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>template.files.status, write and undo: the files of an installed site template, written compare-and-set under the write lock, PHP linted by the site's own PHP and only once the owner allows it (Options: Allow PHP in template files), all or nothing, and taken back only where the site still holds what was written; every write in the User Actions Log</description>
+        <description>a contract slot can be an author, a template language string or a T4 site-profile logo, and a jsonPath slot needs no nestedJson; ships the ja-boxing 1.0.2 and 1.0.3 content contracts</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <version>0.24.60</version>
@@ -24,7 +24,7 @@
         <downloads>
             <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.60/pkg_claudecowork-0.24.60.zip</downloadurl>
         </downloads>
-        <sha256>4dde0d6049848cf1ed74fe2d7df2d9b8b5289010199426ff69d06c33e258101b</sha256>
+        <sha256>fbe746890d3d2ad1588c778bc0e119c2ea06fb8e25875a019074a5f657ae9afc</sha256>
         <tags>
             <tag>stable</tag>
         </tags>
