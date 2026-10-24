@@ -1804,7 +1804,7 @@ final class Engine
      * links absolutely no longer holds the bytes the map hashed). Which spelling of the address that
      * run was given is not on record, so each one it may have been is its own fold, tried in turn:
      * `home` and `siteurl`, with and without a trailing slash (the slash first: it is the longer), under
-     * either scheme. A fold is live spelling => packed spelling, plain and JSON-escaped.
+     * the option's own scheme only. A fold is live spelling => packed spelling, plain and JSON-escaped.
      *
      * 🔒 A FOLD IS OFFERED ONLY WHEN IT IS EXACTLY UNDONE BY ITS INVERSE. Bytes that already hold a
      * packed spelling outside the live ones it would fold (the customer pasted the placeholder, or a
@@ -1824,13 +1824,13 @@ final class Engine
         $spellings = [];
         foreach (['home', 'siteurl'] as $option) {
             $url = rtrim((string) ($this->writer->read('option', 0, $option)['value'] ?? ''), '/');
-            if (!preg_match('~^(https?)(://[^/\s]+.*)$~s', $url, $m)) {
+            if (!preg_match('~^https?://[^/\s]+~', $url)) {
                 continue;
             }
-            foreach ([$url, ($m[1] === 'https' ? 'http' : 'https') . $m[2]] as $address) {
-                $spellings[] = $address . '/';
-                $spellings[] = $address;
-            }
+            // Only the option's own scheme: search-replace wrote exactly that address, so an http link on
+            // an https site (or the reverse) is the owner's edit, never provisioning's.
+            $spellings[] = $url . '/';
+            $spellings[] = $url;
         }
         foreach (array_unique($spellings) as $address) {
             if (rtrim($address, '/') === $placeholder) {

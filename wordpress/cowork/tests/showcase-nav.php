@@ -537,9 +537,16 @@ check('a site at the placeholder address compares its bytes as they are', [$xpDo
 $snavRewritten('an address the placeholder begins', ['home' => 'https://quickstart.invalid.example']);
 // `wp search-replace` given the address with its trailing slash; `home` holds it without.
 $snavRewritten('a target with a trailing slash', ['home' => 'https://site.example.test', 'rewrite' => 'https://site.example.test/']);
-// The address under the other scheme (a proxy terminating TLS), and siteurl rather than home.
-$snavRewritten('the other scheme', ['home' => 'https://site.example.test', 'rewrite' => 'http://site.example.test']);
+// siteurl rather than home.
 $snavRewritten('siteurl, not home', ['home' => 'https://www.example.test', 'siteurl' => 'https://site.example.test/wp', 'rewrite' => 'https://site.example.test/wp']);
+
+// The owner moved one navigation's links to the other scheme: their edit, not provisioning's, so a conflict.
+$xs = snavSite($DINER, $snavContracts, ['home' => 'https://site.example.test']);
+$xsMoved = str_replace('https://site.example.test', 'http://site.example.test', (string) WP_Fake::$posts[278]['post_content']);
+WP_Fake::$posts[278]['post_content'] = $xsMoved;
+$xsDone = $sdoor($xs['engine'], 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('links the owner moved to the other scheme are a conflict, not folded', [$xsDone['skipped'], WP_Fake::$posts[278]['post_content'] === $xsMoved, $xsMoved !== $xs['source']['navigations'][1]['content']],
+    [['navigation-278' => 'edited on this site since the quickstart shipped it; left as it is'], true, true]);
 
 // ── maps that cannot be used ────────────────────────────────────────────────────────────────
 
