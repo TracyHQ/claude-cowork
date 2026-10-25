@@ -433,6 +433,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-169",
+      "label": "Joomla! pages",
+      "where": "mainmenu/pages/joomla-pages",
+      "rule": "keep.holds-kept-entry",
+      "reason": "a sample-pages heading that holds menuItem-170, which stays"
+    },
+    {
       "key": "menuItem-170",
       "label": "Login page",
       "where": "mainmenu/pages/joomla-pages/login-page",
@@ -547,13 +554,6 @@
   ],
   "unresolved": [
     {
-      "key": "menuItem-169",
-      "label": "Joomla! pages",
-      "where": "mainmenu/pages/joomla-pages",
-      "rule": "unresolved.showcase-word",
-      "reason": "\"Joomla! pages\" names a showcase branch"
-    },
-    {
       "key": "menuItem-249",
       "label": "Sample product page",
       "where": "typo-pages/product-detail",
@@ -565,7 +565,7 @@
     "menuItems": 11,
     "modules": 0,
     "megaColumns": 8,
-    "kept": 27,
-    "unresolved": 2
+    "kept": 28,
+    "unresolved": 1
   }
 }

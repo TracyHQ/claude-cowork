@@ -162,6 +162,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-109",
+      "label": "J! Pages",
+      "where": "offcanvas/j-pages",
+      "rule": "keep.holds-kept-entry",
+      "reason": "a sample-pages heading that holds menuItem-110, which stays"
+    },
+    {
       "key": "menuItem-110",
       "label": "Login",
       "where": "offcanvas/j-pages/login",
@@ -409,13 +416,6 @@
   ],
   "unresolved": [
     {
-      "key": "menuItem-109",
-      "label": "J! Pages",
-      "where": "offcanvas/j-pages",
-      "rule": "unresolved.showcase-word",
-      "reason": "\"J! Pages\" names a showcase branch"
-    },
-    {
       "key": "menuItem-196",
       "label": "Other pages",
       "where": "offcanvas/other-pages",
@@ -426,7 +426,7 @@
   "counts": {
     "menuItems": 7,
     "modules": 0,
-    "kept": 41,
-    "unresolved": 2
+    "kept": 42,
+    "unresolved": 1
   }
 }
