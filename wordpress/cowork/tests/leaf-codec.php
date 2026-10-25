@@ -160,3 +160,9 @@ $lcManyPeak = ($lcManyReset ? memory_get_peak_usage() : memory_get_usage()) - $l
 check('leaf: every leaf of a 40,000-object column reads back', $lcManyOk, 40000);
 checkTrue('leaf: and the parses kept for it stay within their budget (' . round($lcManyPeak / 1048576, 1) . ' MB)', $lcManyPeak < 40 * 1048576);
 unset($lcManyRaw, $lcManyLeaves);
+// The codec keeps its parses for as long as the process lives, up to MEMO_BYTES (32 MB): a request ends
+// and drops them, one process running every test file does not. The files below start without them,
+// and without the 3000-block column above.
+unset($lcBig, $lcBigRaw, $lcBigLeaves, $lcBigRead, $lcBigSet);
+(new ReflectionProperty(LeafCodec::class, 'memo'))->setValue(null, []);
+(new ReflectionProperty(LeafCodec::class, 'memoBytes'))->setValue(null, 0);

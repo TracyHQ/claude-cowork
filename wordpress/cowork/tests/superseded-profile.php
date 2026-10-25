@@ -130,6 +130,24 @@ foreach (['tracy-business/wp7/1.1.0', 'tracy-business/wp7/1.2.0', 'tracy-busines
     }
 }
 
+// 6b. Every profile the plugin ships loads: its manifest names its directory, and each extension it carries
+//     (demo-trim, editions, superseded) is pinned to its base bytes. A profile that does not load is a
+//     site whose every write is refused.
+// Releases published on ja-products that a site can be built from, so the plugin must carry their profiles.
+foreach (['tracy-base/wp7/1.1.1', 'tracy-base/wp7/1.1.6', 'tracy-business/wp7/1.0.0', 'tracy-business/wp7/1.3.7', 'tracy-business/wp7/1.3.8'] as $published) {
+    check('the plugin ships the ' . $published . ' profile', is_file(__DIR__ . '/../lib/contracts/' . $published . '/manifest.json'), true);
+}
+foreach (glob(__DIR__ . '/../lib/contracts/*/wp*/*/manifest.json') as $manifest) {
+    $shipped = substr(dirname($manifest), strlen(__DIR__ . '/../lib/contracts/'));
+    $real = new QuickstartContract(new FakeSiteWriter(), new Claude_Cowork_Contract_Store(), sys_get_temp_dir(), __DIR__ . '/../lib/contracts');
+    try {
+        $real->preview($shipped);
+        check('the shipped ' . $shipped . ' loads', true, true);
+    } catch (Throwable $e) {
+        check('the shipped ' . $shipped . ' loads', $e->getMessage(), 'loaded');
+    }
+}
+
 // 7. A later version of a release keeps the editions and demo-trim profiles an earlier version shipped. Tracy Business
 //    wp7 1.3.4 shipped without them (plugin 0.18.1): multilingual.retire answered "no editions profile", all 41
 //    Polylang editions stayed live, and an unticked page was still reached through its translations (TracyHQ/tch#1013).

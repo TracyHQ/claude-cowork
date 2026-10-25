@@ -126,6 +126,19 @@ $insp = $sdoor($B, 'inspect');
 check('inspect stays clean', $insp['problems'], []);
 check('and reports the site language', $insp['siteLanguage'], ['language' => 'de', 'from' => 'en', 'applyId' => 'slang-f']);
 
+// A difference the customer made before the language is set is still reported after it and after
+// its revert: the drift is read against the profile's lock, and neither step moves that.
+WP_Fake::$options['template'] = 'customer-theme';
+$fsDrift = static fn () => array_values(array_filter(array_column($sdoor($B, 'inspect')['warnings'] ?? [], 'message'), static fn ($line) => strpos((string) $line, 'template') !== false));
+check('a customer change to a locked option is drift', $fsDrift(), ['Option template differs from the lock']);
+$fsBack = $sdoor($B, 'siteLanguage.revert', ['apply_id' => 'slang-fu', 'request_id' => 'f2']);
+check('the language is taken back', [$fsBack['status'] ?? $fsBack, WP_Fake::$options['polylang']['default_lang']], ['reverted', 'en']);
+check('and the change is still reported after the revert', $fsDrift(), ['Option template differs from the lock']);
+$fs2 = $sdoor($B, 'siteLanguage.set', ['apply_id' => 'slang-f2', 'request_id' => 'f3', 'language' => 'de-de']);
+check('the language is set again', $fs2['status'] ?? $fs2, 'completed');
+check('and the change is still reported after it', $fsDrift(), ['Option template differs from the lock']);
+WP_Fake::$options['template'] = 'test-theme';
+
 // ── an edition the archive ships but the site lacks ────────────────────────────────────────
 
 $m = $siteLanguageSite();

@@ -482,6 +482,11 @@ check('and reads every row as pending', array_column($tplan['rows'], 'state'), [
 check('no trim on record yet', $tplan['status'], 'none');
 check('apply needs a dtrim- apply_id', $door($D, 'demoTrim.apply', ['apply_id' => 'contract-1', 'request_id' => 't1'])['error'], 'bad_params');
 WP_Fake::$posts[27]['post_status'] = 'private'; // the customer already moved this one
+// A difference the customer made to the presentation is drift before the trim, after it and after its
+// revert: drift is read against the profile's lock, which neither step moves.
+WP_Fake::$options['template'] = 'customer-theme';
+$trimDrift = static fn () => array_values(array_filter(array_column($door($D, 'inspect')['warnings'] ?? [], 'message'), static fn ($line) => strpos((string) $line, 'template') !== false));
+check('a customer change to a locked option is drift before the trim', $trimDrift(), ['Option template differs from the lock']);
 $trimmed = $door($D, 'demoTrim.apply', ['apply_id' => 'dtrim-1', 'request_id' => 't1']);
 check('apply hides the rows that stand where the profile left them', $trimmed['status'], 'completed');
 check('three moved', $trimmed['moved'], 3);
@@ -493,6 +498,7 @@ $trimState = $door($D, 'inspect');
 check('the binding records the trim', $trimState['demoTrim']['status'], 'complete');
 check('and how many it hid', $trimState['demoTrim']['hidden'], 3);
 check('inspect stays clean', $trimState['problems'], []);
+check('and the drift it did not make is still reported after it', $trimDrift(), ['Option template differs from the lock']);
 check('a rerun is idempotent', $door($D, 'demoTrim.apply', ['apply_id' => 'dtrim-2', 'request_id' => 't2'])['alreadyTrimmed'], true);
 check('apply.revert of a trim is not the way back', $call($D, 'apply.revert', ['apply_id' => 'dtrim-1'])['error'], 'bad_params');
 $untrimmed = $door($D, 'demoTrim.revert', ['apply_id' => 'dtrim-3', 'request_id' => 't3']);
@@ -500,6 +506,8 @@ check('revert shows them again', $untrimmed['status'], 'reverted');
 check('restoring from', [WP_Fake::$posts[26]['post_status'], WP_Fake::$posts[28]['post_status']], ['publish', 'publish']);
 check('and leaving the customer-edited one alone', WP_Fake::$posts[27]['post_status'], 'private');
 check('no trim on record any more', $door($D, 'inspect')['demoTrim'], null);
+check('and the drift is still reported after the revert', $trimDrift(), ['Option template differs from the lock']);
+WP_Fake::$options['template'] = 'test-theme';
 check('reverting twice has nothing to do', $door($D, 'demoTrim.revert', ['apply_id' => 'dtrim-4', 'request_id' => 't4'])['error'], 'contract_failed');
 
 $f = contractSite($SITE, $FIXTURES, true);

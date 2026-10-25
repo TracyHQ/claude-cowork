@@ -613,6 +613,14 @@ exec('tar -tf ' . escapeshellarg($evenTar) . ' 2>&1', $evenList, $evenStatus);
 check('and the archive is still whole', $evenStatus, 0);
 check('with every file in it', count(array_filter($evenList, fn($l) => strpos($l, 'tar:') !== 0)), 7);
 
+// The pack cases above keep every part they captured (6 MB files, more than one part each) in
+// file-scope engines and uploaders: about 40 MB nothing below reads. Held for the rest of the run
+// they pushed the suite past PHP's default 128M in the leaf-codec memory case, which budgets the
+// codec, not this.
+unset($capture, $growEngine, $inlineEngine, $shrinkCapture, $shrinkEngine, $edgeCapture, $edgeEngine,
+    $evenCapture, $evenEngine, $archive, $whole, $parts, $part1, $part2, $cut, $r);
+gc_collect_cycles();
+
 // ------------------------------------------- long paths and stray backups ---
 //
 // Both learned from one real site (juneflower.vn, 2026-08-14): a webpack chunk shipped by

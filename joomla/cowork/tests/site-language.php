@@ -75,3 +75,21 @@ check('the generic revert does not take the language apart', $langEngine->handle
 $back = $langCall(['operation' => 'siteLanguage.revert', 'apply_id' => 'slang-undo', 'request_id' => 'u1']);
 check('revert restores the previous defaults and drops the record', [$back['ok'], $langWriter->store['languageDefaults'], isset($langStore->binding['siteLanguage'])], [true, ['site' => 'en-GB', 'administrator' => 'en-GB'], false]);
 check('the reverted site inspects clean', $langContract->inspect()['contract'], 'lang/j6/1.0.0');
+
+// 🔒 SETTING OR TAKING BACK THE LANGUAGE MOVES THE BASELINE ONLY WHERE IT WROTE. A difference the customer
+// made before it is still reported after the set and after the revert, as after a demo trim.
+$langDrifted = function () use ($langContract): array {
+    try { $langContract->inspect(); } catch (Throwable $e) { return ['refused: ' . $e->getMessage()]; }
+    $keys = [];
+    foreach ($langContract->driftWarnings() as $warning) if (preg_match('/drift: (\S+) /', $warning, $m)) $keys[] = $m[1];
+    return array_values(array_unique($keys));
+};
+$langWriter->store['module'][110]['access'] = '2';
+check('a customer change to a module is drift before the language is set', $langDrifted(), ['hero']);
+$set = $langCall(['operation' => 'siteLanguage.set', 'locale' => 'vi-VN', 'apply_id' => 'slang-c', 'request_id' => 'r3']);
+check('the language is set again', [$set['ok'], $langWriter->store['languageDefaults']['site']], [true, 'vi-VN']);
+check('and the change it did not make is still reported after it', [$langDrifted(), $langStore->binding['presentation']['hero']['access'] ?? null], [['hero'], '1']);
+$back = $langCall(['operation' => 'siteLanguage.revert', 'apply_id' => 'slang-cundo', 'request_id' => 'u3']);
+check('the language is taken back', [$back['ok'], $langWriter->store['languageDefaults']['site']], [true, 'en-GB']);
+check('and the change is still reported after the revert', [$langDrifted(), $langStore->binding['presentation']['hero']['access'] ?? null], [['hero'], '1']);
+$langWriter->store['module'][110]['access'] = '1';

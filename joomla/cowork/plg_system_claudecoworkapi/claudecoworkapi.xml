@@ -28,7 +28,7 @@
                 <!-- Off (0): no page gets the T3 off-canvas keyboard; the drawer is what T3 draws. -->
                 <field name="t3_offcanvas_a11y" type="radio" default="1" layout="joomla.form.field.radio.switcher"
                     label="Keyboard for T3 off-canvas drawers"
-                    description="ESC closes a T3 template's off-canvas drawer, focus stays in it while it is open and goes back to its button when it closes, and its close button is announced.">
+                    description="ESC closes a T3 template's off-canvas drawer, focus stays in it while it is open and goes back to its button when it closes, its close button is announced, and a menu or close button the keyboard could not reach is made one it can.">
                     <option value="0">JNO</option>
                     <option value="1">JYES</option>
                 </field>
