@@ -48,7 +48,8 @@ column. Where the site differs from its design, the contract door says so in `wa
 | `content.delete` | write | ok | ok |
 | `media.upload` | write | ok | ok; a picture under `wp-content/uploads/tracy-content/` (an image slot's folder) is named by the sha256 of its bytes and uses an `apply_id` that does not start with `contract-` |
 | `media.delete` | write | ok | ok; refuses a picture that is the current value of a bound image slot |
-| `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
+| `media.usage` (unreleased), see [Deleting a Media Library picture](#deleting-a-media-library-picture-mediadelete) | read | ok | ok |
+| `apply.revert` | write | ok; takes back only what that receipt's writes changed: the span of each field, found again by the bytes around it, so later receipts on the same row stay. Refused (`error: conflict`, one `CONFLICT` in `errors[]`, a `next`) when those words were changed since, or when a whole-row undo (a create, a trash, a receipt recorded before span receipts) has a later receipt on the same row. A post write's `featured_image_id` and `template` (and `seo`) are recorded as their own `postmeta` steps, so the revert puts back the featured image and page template the post had, or takes off one it did not have (unreleased) | ok; the same, and a `content.contract` receipt goes back through the contract (only the latest one, its `afterRevision` must be the current revision), and a trim, relabel, retired edition or site language only through its own operation |
 | `apply.list` | read | ok | ok |
 | `template.files.status` (unreleased), see [A theme's own files](#a-themes-own-files-templatefiles-unreleased) | read | ok | ok |
 | `template.files.write`, `template.files.undo` (unreleased) | write | ok | ok |
@@ -91,6 +92,62 @@ If the picture and sizes exceed the cap, the write refuses with `too_large` and 
 The successful answer reports `storageDeleted`, `filesLeft`, the search scope and a CDN/browser
 cache note; it does not claim that a cached URL is dead. The Apply log holds the original bytes and
 attachment database state; `apply.revert {apply_id}` restores them under the same attachment id.
+
+Both answers also carry `usedInStorage` (and its `usedInStorageScope`): where a theme keeps the
+picture outside post bodies, found from the stored value the same way for every theme, with no
+table of theme keys.
+
+`media.usage {id}` (or `{url}`, resolved as above) asks only that, read-only: it answers `id`,
+`usedIn`, `usedInScope`, `usedInStorage` and `usedInStorageScope` as the dry run does, with no
+`apply_id`, nothing recorded and no file read (the paths come from what WordPress records). An id
+that is not an image attachment is `not_found`; a post-body search that fails is `read_failed`
+(and `media.delete` deletes nothing on it), never an empty `usedIn`. `after: {postmeta, options}`
+resumes each storage walk after the id its last answer stopped at. `info` advertises it as
+`media_usage` (`storage`, `max_ids_scanned`, `max_rows_reported`).
+
+```json
+{"postmeta": [{"post_id": 7, "key": "jd_intro_image", "shape": "id"},
+              {"post_id": 9, "key": "card_bg", "shape": "url", "size": "medium"}],
+ "options":  [{"option": "wp_ja_diner_blog_banner_image", "shape": "id"},
+              {"option": "theme_mods_ja-diner", "shape": "serialized"}],
+ "truncated": false,
+ "scanned": {"postmeta": {"after": 0, "through": 4210, "lastId": 4210, "complete": true},
+             "options":  {"after": 0, "through": 980, "lastId": 980, "complete": true}}}
+```
+
+- `shape` is `id` (the value is the attachment id, as a number or a numeric string), `url` (a string
+  holding the uploads URL of the original or of one registered size, matched on the uploads path, so
+  another host, http/https or a relative URL count), `json` or `serialized` (such a URL inside, or the
+  id as below). `size` names the size a URL points at (`full`, `original` for the pre-scaling file, or
+  a registered size name).
+- A bare number counts only by its key's name (the row's key, or the nearest named key above an `id`
+  or a list entry): `_thumbnail_id`, `site_logo`, `site_icon`, `custom_logo`, or a name with a
+  picture word in it (`image`, `img`, `logo`, `banner`, `photo`, `picture`, `thumbnail`, `thumb`,
+  `background`, `bg`, `icon`, `cover`, `media`, `attachment`, `avatar`, `hero`; `snake_case`,
+  `kebab-case` or `camelCase`), so `jd_intro_image` and `wp_ja_diner_blog_banner_image` count. A name
+  that ends in a measure (`image_width`, `logo_height`, `_count`, `_size`, `_order`, `_position`, …)
+  or in another record's id (`hero_post_id`) does not, nor does a number under any other name: no
+  evidence, no row. A list word (`gallery`, `galleries`, `slides`, `slider`, `carousel`) names the
+  entries of its array, not a number set on it directly: `{"gallery":[ 24 ]}` and `{"slides":[{"id":24}]}`
+  count, `{"gallery":24}` and `gallery_count` do not. `images`, `photos`, `pictures`, `media_ids`,
+  `attachments` count by their picture word, as do `ids` under a picture key.
+- Skipped: WordPress bookkeeping (`_wp_attached_file`, `_wp_attachment_*`, `_edit_lock`, `_edit_last`,
+  `_wp_old_slug`, trash and oEmbed meta), the attachment's own rows, this plugin's `_claude_cowork_*`,
+  `_tracy_*` and `claude_cowork_*` keys, transients, `cron`, `rewrite_rules` and the core numeric
+  settings (image sizes, counts). `_thumbnail_id`, `site_logo` and `theme_mods_*` are included.
+- An option that `content.update {kind:"option"}` would refuse is marked `locked: true`. On a sealed
+  site, an option the presentation lock pins (`optionValues`, `options` in older profiles) is marked
+  `pinned: true`: a write is not refused, but it shows as drift, so a caller should leave it. When the
+  contract cannot be read, `pinnedUnknown: true` says an unmarked option is not known to be unpinned.
+- Read-only and bounded: WordPress indexes neither `meta_value` nor `option_value`, so each table is
+  walked by its primary key in prepared ranges of 10000 ids, at most 100000 ids and 100 reported rows
+  per table per call. The SQL only narrows (a whitespace-tolerant `REGEXP` on the id and `LIKE` on the
+  size file names, as written and as JSON escapes them, `caf\u00e9.jpg`; a superset of what is
+  reported); the plugin decides each row. `scanned[table]` says where the walk stopped (`through`,
+  to pass back as `after`) and whether it reached the last id;
+  `truncated: true` says the walk or the list was cut. A table whose query fails is named in
+  `errors` (and `truncated` is true), so it never reads as "held nowhere"; a search that fails as a
+  whole answers `error`. Neither stops the delete.
 
 ## A theme's own files: `template.files.*` (unreleased)
 

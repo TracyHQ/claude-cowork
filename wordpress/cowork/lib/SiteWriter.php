@@ -156,8 +156,18 @@ interface MediaWriter
     /** Restore a snapshot made by snapshotForDelete(), refusing any occupied target. */
     public function restoreDeletedAttachment(array $snapshot, bool $rollback = false): void;
 
+    /** The upload paths an image attachment owns (`[{path}]`), no bytes read; null when the id is not an image. */
+    public function attachmentPaths(int $attachmentId): ?array;
+
     /** Cheap, bounded references to this attachment, with the searched scope. */
     public function attachmentUsage(int $attachmentId, array $files): array;
+
+    /**
+     * Post meta rows and options whose value holds this attachment (AttachmentReferences), read-only
+     * and bounded: `{postmeta: [{post_id, key, shape, size?}], options: [{option, shape, size?}], truncated,
+     * scanned: {postmeta|options: {after, through, lastId, complete}}, errors?}`; `$after` resumes each table's walk.
+     */
+    public function attachmentStorageUsage(int $attachmentId, array $after = []): array;
 
     /** Whether a snapshot's file path is occupied now. */
     public function deletedAttachmentPathExists(string $path): bool;

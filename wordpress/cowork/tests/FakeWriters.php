@@ -12,6 +12,14 @@ declare(strict_types=1);
 
 final class FakeSiteWriter implements SiteWriter
 {
+    /** @var string[] options the real writer would refuse to write (Claude_Cowork_Site_Writer::optionRefused) */
+    public array $refusedOptions = [];
+
+    public function optionRefused(string $key): bool
+    {
+        return in_array($key, $this->refusedOptions, true);
+    }
+
     /** @var array<int,array<string,mixed>> Rows the mirror should see, in id order. */
     public array $posts = [];
 
@@ -178,7 +186,21 @@ final class FakeMediaWriter implements MediaWriter
         $this->attachmentRows[$id] = ['post' => $snapshot['post'] ?? [], 'meta' => $snapshot['meta'] ?? [], 'terms' => $snapshot['terms'] ?? []];
     }
 
-    public function attachmentUsage(int $attachmentId, array $files): array { return []; }
+    public function attachmentPaths(int $attachmentId): ?array
+    {
+        if (!isset($this->attachments[$attachmentId])) return null;
+        return array_map(static fn(string $path): array => ['path' => $path], $this->attachmentFiles[$attachmentId] ?? [$this->attachments[$attachmentId]]);
+    }
+    /** @var array<int,array> attachment id => what attachmentUsage answers for it */
+    public array $usage = [];
+    /** @var array<int,array> the files each attachmentUsage call was given */
+    public array $usageFiles = [];
+    public function attachmentUsage(int $attachmentId, array $files): array { $this->usageFiles[$attachmentId] = $files; return $this->usage[$attachmentId] ?? []; }
+    /** @var array<int,array> attachment id => what attachmentStorageUsage answers for it */
+    public array $storageUsage = [];
+    /** @var array<int,array> the `after` each attachmentStorageUsage call was given */
+    public array $storageAfter = [];
+    public function attachmentStorageUsage(int $attachmentId, array $after = []): array { $this->storageAfter[$attachmentId] = $after; return $this->storageUsage[$attachmentId] ?? ['postmeta' => [], 'options' => [], 'truncated' => false]; }
     public function deletedAttachmentPathExists(string $path): bool { return array_key_exists($path, $this->store); }
     public function deletedAttachmentPathMatchesSnapshot(string $path, array $file): bool { return isset($this->store[$path]) && hash_equals((string) ($file['sha256'] ?? ''), hash('sha256', $this->store[$path])); }
     public function attachmentIdForUrl(string $url): ?int { return null; }

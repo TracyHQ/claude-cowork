@@ -19,6 +19,8 @@ defined( 'ABSPATH' ) || exit;
 // Where a post's search title and description go, and the refusal when nothing would print them.
 require_once __DIR__ . '/SeoFields.php';
 require_once __DIR__ . '/AuthorMeta.php';
+// Which post meta row or option holds a picture, read from the value for every theme alike.
+require_once __DIR__ . '/AttachmentReferences.php';
 
 /**
  * Posts, post meta and options — the three things an Apply may edit on a WordPress site.
@@ -36,6 +38,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * `post_type` is here because an insert has to say what it is creating; on an update it is
 	 * ignored, since turning a page into a post is not an edit, it is a different object.
 	 */
+	/** The fields of a post write kept in post meta beside the row (write_beyond_the_row), by meta key. */
+	private const POST_META_FIELDS = array(
+		'featured_image_id' => '_thumbnail_id',
+		'template'          => '_wp_page_template',
+	);
+
 	private const POST_FIELDS = array(
 		'post_title',
 		'post_content',
@@ -1755,6 +1763,20 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	/**
+	 * The post meta key behind each field of a post write that is not a column of the row
+	 * (write_beyond_the_row): the featured image and the page template. The engine reads each before
+	 * the write and records it as its own postmeta undo step, as it does for `seo`, so apply.revert
+	 * puts back the value the post had, or takes off one it did not have. Categories and tags are
+	 * not here: the row the engine reads back carries them (`post_category`, `tags_input`).
+	 *
+	 * @param array<string,mixed> $fields
+	 * @return array<string,string> field => meta key, for the fields named
+	 */
+	public function postMetaTargets( array $fields ): array {
+		return array_intersect_key( self::POST_META_FIELDS, $fields );
+	}
+
+	/**
 	 * @param array<string,mixed> $fields
 	 */
 	/**
@@ -1840,6 +1862,11 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		// A page's rendered-words rules are read by that page alone: never autoloaded (lib/RenderedWords.php).
 		update_option( $key, $fields['value'], 0 === strpos( $key, 'claude_cowork_rendered_words_' ) ? false : null );
 		return 0;
+	}
+
+	/** Whether `content.update {kind:"option"}` refuses this option here (the engine adds its own). */
+	public function optionRefused( string $key ): bool {
+		return self::is_protected( $key );
 	}
 
 	private static function is_protected( string $key ): bool {
@@ -1942,15 +1969,7 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		$terms = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->term_relationships} WHERE object_id = %d", $attachmentId
 		), ARRAY_A );
-		$paths = [];
-		$original = get_attached_file( $attachmentId );
-		if ( is_string( $original ) && $original !== '' ) $paths[] = $original;
-		$metadata = wp_get_attachment_metadata( $attachmentId );
-		if ( is_array( $metadata ) ) {
-			if ( ! empty( $metadata['original_image'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . $metadata['original_image'];
-			foreach ( (array) ( $metadata['sizes'] ?? [] ) as $size ) if ( ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
-		}
-		foreach ( (array) get_post_meta( $attachmentId, '_wp_attachment_backup_sizes', true ) as $size ) if ( is_array( $size ) && ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
+		$paths = $this->owned_paths( $attachmentId );
 		$dirs = wp_upload_dir( null, false );
 		$basedir = realpath( (string) ( $dirs['basedir'] ?? '' ) );
 		if ( $basedir === false ) throw new RuntimeException( 'uploads folder is unavailable' );
@@ -1968,6 +1987,36 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 			$files[] = [ 'path' => 'wp-content/uploads/' . $relative, 'bytes' => $bytes, 'size' => strlen( $bytes ), 'sha256' => hash( 'sha256', $bytes ) ];
 		}
 		return [ 'id' => $attachmentId, 'post' => $post, 'meta' => $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->postmeta} WHERE post_id = %d", $attachmentId ), ARRAY_A ), 'terms' => is_array( $terms ) ? $terms : [], 'files' => $files ];
+	}
+
+	/** The absolute paths of the original, scaled, intermediate and backup-size files WordPress records for an attachment. */
+	private function owned_paths( int $attachmentId ): array {
+		$paths = [];
+		$original = get_attached_file( $attachmentId );
+		if ( is_string( $original ) && $original !== '' ) $paths[] = $original;
+		$metadata = wp_get_attachment_metadata( $attachmentId );
+		if ( is_array( $metadata ) ) {
+			if ( ! empty( $metadata['original_image'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . $metadata['original_image'];
+			foreach ( (array) ( $metadata['sizes'] ?? [] ) as $size ) if ( ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
+		}
+		foreach ( (array) get_post_meta( $attachmentId, '_wp_attachment_backup_sizes', true ) as $size ) if ( is_array( $size ) && ! empty( $size['file'] ) ) $paths[] = trailingslashit( dirname( $original ) ) . basename( $size['file'] );
+		return array_values( array_unique( $paths ) );
+	}
+
+	/**
+	 * The upload paths an image attachment owns, as `[{path}]` in the engine's vocabulary, without
+	 * reading a byte or requiring the files to still be there; null when the id is not an image.
+	 */
+	public function attachmentPaths( int $attachmentId ): ?array {
+		$post = get_post( $attachmentId, ARRAY_A );
+		if ( ! is_array( $post ) || ( $post['post_type'] ?? '' ) !== 'attachment' || strpos( (string) ( $post['post_mime_type'] ?? '' ), 'image/' ) !== 0 ) return null;
+		$basedir = rtrim( str_replace( DIRECTORY_SEPARATOR, '/', (string) ( wp_upload_dir( null, false )['basedir'] ?? '' ) ), '/' ) . '/';
+		$files = [];
+		foreach ( $this->owned_paths( $attachmentId ) as $path ) {
+			$path = str_replace( DIRECTORY_SEPARATOR, '/', $path );
+			if ( $basedir !== '/' && strpos( $path, $basedir ) === 0 && strpos( $path, '..' ) === false ) $files[] = [ 'path' => self::PREFIX . substr( $path, strlen( $basedir ) ) ];
+		}
+		return $files;
 	}
 
 	/** Reinsert the exact attachment identity, metadata, relationships and original bytes. */
@@ -2077,14 +2126,127 @@ final class Claude_Cowork_Media_Writer implements MediaWriter {
 		$args = [ 'wp-image-' . $id . '([^0-9]|$)' ];
 		foreach ( $urls as $imageUrl ) { $where[] = "post_content LIKE %s"; $args[] = '%' . $wpdb->esc_like( $imageUrl ) . '%'; }
 		$posts = $wpdb->get_results( $wpdb->prepare( "SELECT ID, post_type, post_title FROM {$wpdb->posts} WHERE post_type IN ('post','page') AND (" . implode( ' OR ', $where ) . ')', $args ), ARRAY_A );
+		// A failed search is not "used nowhere": say so, and media.delete refuses rather than deleting on it.
+		if ( '' !== (string) $wpdb->last_error || ! is_array( $posts ) ) throw new RuntimeException( 'could not search post bodies for this picture: ' . (string) $wpdb->last_error );
 		$out = [];
 		foreach ( (array) $posts as $row ) $out[] = [ 'type' => 'post', 'id' => (int) $row['ID'], 'postType' => $row['post_type'], 'title' => $row['post_title'] ];
 		$thumbs = $wpdb->get_results( $wpdb->prepare( "SELECT p.ID, p.post_type, p.post_title FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} m ON m.post_id=p.ID WHERE p.post_type IN ('post','page') AND m.meta_key='_thumbnail_id' AND m.meta_value=%s", (string) $id ), ARRAY_A );
+		if ( '' !== (string) $wpdb->last_error || ! is_array( $thumbs ) ) throw new RuntimeException( 'could not search featured images for this picture: ' . (string) $wpdb->last_error );
 		foreach ( (array) $thumbs as $row ) $out[] = [ 'type' => 'featuredImage', 'id' => (int) $row['ID'], 'postType' => $row['post_type'], 'title' => $row['post_title'] ];
 		if ( function_exists( 'get_theme_mod' ) && (int) get_theme_mod( 'custom_logo', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_logo' ];
 		if ( (int) get_option( 'site_logo', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_logo' ];
 		if ( (int) get_option( 'site_icon', 0 ) === $id ) $out[] = [ 'type' => 'option', 'key' => 'site_icon' ];
 		return $out;
+	}
+
+	/**
+	 * Every post meta row and option whose value holds this attachment (see AttachmentReferences):
+	 * `{post_id, key, shape, size?}` and `{option, shape, size?}`. Read-only.
+	 *
+	 * WordPress indexes neither `meta_value` nor `option_value`, so the scan is bounded by the
+	 * primary key, not by what matches: each table is walked in AttachmentReferences::SCAN_CHUNK
+	 * ranges of its id, from `$after[table]`, up to AttachmentReferences::MAX_SCAN ids per call. The
+	 * SQL only narrows; AttachmentReferences decides. `scanned[table]` says where the walk stopped
+	 * (`through`, the id to pass back as `after`) and whether it reached the table's last id; a scan
+	 * cut short, a reference cap reached or a failed query answers `truncated: true`, and a failed
+	 * query names its table in `errors` rather than reading as "held nowhere".
+	 *
+	 * @param array{postmeta?:int,options?:int} $after the id each table's walk resumes after
+	 * @return array{postmeta:array<int,array>,options:array<int,array>,truncated:bool,scanned:array,errors?:array<string,string>}
+	 */
+	public function attachmentStorageUsage( int $id, array $after = array() ): array {
+		global $wpdb;
+		$metadata = function_exists( 'wp_get_attachment_metadata' ) ? wp_get_attachment_metadata( $id, true ) : get_post_meta( $id, '_wp_attachment_metadata', true );
+		$refs = AttachmentReferences::forAttachment(
+			$id,
+			(string) ( wp_upload_dir( null, false )['baseurl'] ?? '' ),
+			(string) get_post_meta( $id, '_wp_attached_file', true ),
+			$metadata,
+			get_post_meta( $id, '_wp_attachment_backup_sizes', true )
+		);
+		$meta = $this->scan_for_attachment(
+			$refs, $wpdb->postmeta, 'meta_id', 'meta_key', 'meta_value', AttachmentReferences::SKIP_META_KEYS,
+			AttachmentReferences::SKIP_META_PREFIXES, max( 0, (int) ( $after['postmeta'] ?? 0 ) ), $id,
+			static function ( array $row, array $hit ) use ( $id ): ?array {
+				if ( (int) ( $row['post_id'] ?? 0 ) === $id ) return null; // the attachment's own record
+				return array( 'post_id' => (int) $row['post_id'], 'key' => (string) $row['meta_key'] ) + $hit;
+			}
+		);
+		$options = $this->scan_for_attachment(
+			$refs, $wpdb->options, 'option_id', 'option_name', 'option_value', AttachmentReferences::SKIP_OPTIONS,
+			AttachmentReferences::SKIP_OPTION_PREFIXES, max( 0, (int) ( $after['options'] ?? 0 ) ), null,
+			static function ( array $row, array $hit ): ?array {
+				return array( 'option' => (string) $row['option_name'] ) + $hit;
+			}
+		);
+		$answer = array(
+			'postmeta'  => $meta['hits'],
+			'options'   => $options['hits'],
+			'truncated' => ! $meta['scanned']['complete'] || ! $options['scanned']['complete'],
+			'scanned'   => array( 'postmeta' => $meta['scanned'], 'options' => $options['scanned'] ),
+		);
+		$errors = array_filter( array( 'postmeta' => $meta['error'], 'options' => $options['error'] ) );
+		return array() === $errors ? $answer : $answer + array( 'errors' => $errors );
+	}
+
+	/**
+	 * One table's walk for attachmentStorageUsage(): primary-key ranges, prepared, read-only.
+	 *
+	 * @return array{hits:array,scanned:array{after:int,through:int,lastId:int,complete:bool},error:?string}
+	 */
+	private function scan_for_attachment( AttachmentReferences $refs, string $table, string $idCol, string $keyCol, string $valueCol,
+		array $skipKeys, array $skipPrefixes, int $after, ?int $postId, callable $row_hit ): array {
+		global $wpdb;
+		$scanned = array( 'after' => $after, 'through' => $after, 'lastId' => 0, 'complete' => false );
+		$lastId = $wpdb->get_var( "SELECT MAX({$idCol}) FROM {$table}" );
+		if ( '' !== (string) $wpdb->last_error ) return array( 'hits' => array(), 'scanned' => $scanned, 'error' => (string) $wpdb->last_error );
+		$scanned['lastId'] = (int) $lastId;
+
+		$where = array( "{$idCol} > %d", "{$idCol} <= %d" );
+		$fixed = array();
+		if ( null !== $postId ) { $where[] = 'post_id <> %d'; $fixed[] = $postId; }
+		$where[] = "{$keyCol} NOT IN (" . implode( ',', array_fill( 0, count( $skipKeys ), '%s' ) ) . ')';
+		$fixed = array_merge( $fixed, $skipKeys );
+		foreach ( $skipPrefixes as $prefix ) { $where[] = "{$keyCol} NOT LIKE %s"; $fixed[] = $wpdb->esc_like( $prefix ) . '%'; }
+		$holds = array( "{$valueCol} REGEXP %s" );
+		$fixed[] = $refs->sqlIdPattern();
+		foreach ( $refs->likeNeedles() as $needle ) { $holds[] = "{$valueCol} LIKE %s"; $fixed[] = '%' . $wpdb->esc_like( $needle ) . '%'; }
+		$columns = "{$idCol}, {$keyCol}, {$valueCol}" . ( null === $postId ? '' : ', post_id' );
+		$sql = "SELECT {$columns} FROM {$table} WHERE " . implode( ' AND ', $where ) . ' AND (' . implode( ' OR ', $holds ) . ") ORDER BY {$idCol}";
+
+		$hits = array();
+		$from = $after;
+		$stop = min( $scanned['lastId'], $after + AttachmentReferences::MAX_SCAN );
+		while ( $from < $stop ) {
+			$to = min( $from + AttachmentReferences::SCAN_CHUNK, $stop );
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, array_merge( array( $from, $to ), $fixed ) ), ARRAY_A );
+			if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) ) {
+				$scanned['through'] = $from;
+				return array( 'hits' => $hits, 'scanned' => $scanned, 'error' => '' !== (string) $wpdb->last_error ? (string) $wpdb->last_error : 'the query answered nothing' );
+			}
+			foreach ( $rows as $row ) {
+				$key = (string) ( $row[ $keyCol ] ?? '' );
+				if ( in_array( $key, $skipKeys, true ) || $this->has_prefix( $key, $skipPrefixes ) ) continue;
+				$hit = $refs->match( $row[ $valueCol ] ?? null, $key );
+				$hit = null === $hit ? null : $row_hit( $row, $hit );
+				if ( null === $hit ) continue;
+				if ( count( $hits ) >= AttachmentReferences::MAX_HITS ) {
+					// Resume at this row: everything before it is reported.
+					$scanned['through'] = (int) $row[ $idCol ] - 1;
+					return array( 'hits' => $hits, 'scanned' => $scanned, 'error' => null );
+				}
+				$hits[] = $hit;
+			}
+			$from = $to;
+		}
+		$scanned['through'] = $from;
+		$scanned['complete'] = $from >= $scanned['lastId'];
+		return array( 'hits' => $hits, 'scanned' => $scanned, 'error' => null );
+	}
+
+	private function has_prefix( string $key, array $prefixes ): bool {
+		foreach ( $prefixes as $prefix ) if ( 0 === strpos( $key, $prefix ) ) return true;
+		return false;
 	}
 
 	/** Register a file with the Media Library and build its thumbnails. */
