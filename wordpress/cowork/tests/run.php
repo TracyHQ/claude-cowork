@@ -1846,6 +1846,10 @@ $usageMediaWriter->attachmentUsage(5, []);
 $usageQuery = '';
 foreach ($GLOBALS['wpdb']->queries as $query) if (str_contains($query, 'REGEXP')) $usageQuery = $query;
 checkTrue('real attachment usage query uses the numeric boundary regexp', str_contains($usageQuery, "REGEXP 'wp-image-5([^0-9]|$)'"));
+// Post meta rows and options that hold a picture (usedInStorage), for every theme alike.
+require_once __DIR__ . '/attachment-references.php';
+// apply.revert of a post write puts back the featured image and the page template beside the row.
+require_once __DIR__ . '/revert-post-fields.php';
 require_once __DIR__ . '/global-styles-kses.php';
 require_once __DIR__ . '/string-translations.php';
 require __DIR__ . '/activation-order.php';
@@ -1870,6 +1874,8 @@ require __DIR__ . '/pattern-list.php';
 require __DIR__ . '/content-batch.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
+// media.usage on a sealed site: options the presentation lock pins (uses imageSite() above).
+require __DIR__ . '/media-usage-pinned.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.
 require __DIR__ . '/provenance-stamps.php';
 // content.language: the page being filed joins its own translation group (defines Polylang writers, so last).

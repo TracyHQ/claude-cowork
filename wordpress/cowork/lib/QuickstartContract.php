@@ -591,6 +591,25 @@ final class QuickstartContract
      * @return array{bound:bool,contract:string,revision:string,ids:array<string,int>,entities:array,slots:array<string,string>,
      *               rows:array<string,array>,demoTrim:?array,sourceLanguage:?array,multilingual:?array,siteLanguage:?array,problems:string[]}
      */
+    /**
+     * The options the presentation lock pins (`optionValues`; old profiles spell it `options`): a
+     * write to one is not refused, it only shows as drift. None on an unbound site or a derived contract.
+     *
+     * @return string[]
+     */
+    public function pinnedOptions(): array
+    {
+        if (!$this->bound()) {
+            return [];
+        }
+        $this->resolve(null);
+        if ($this->derived) {
+            return [];
+        }
+        $values = $this->lock['optionValues'] ?? ($this->lock['options'] ?? []);
+        return is_array($values) ? array_map('strval', array_keys($values)) : [];
+    }
+
     public function inspect(?string $requested = null): array
     {
         $this->resolve($requested);

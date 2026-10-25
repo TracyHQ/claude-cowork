@@ -28,6 +28,7 @@ require_once __DIR__ . '/StringOverrides.php';
 require_once __DIR__ . '/DateFormats.php';
 require_once __DIR__ . '/BlockWords.php';
 require_once __DIR__ . '/RenderedWords.php';
+require_once __DIR__ . '/AttachmentReferences.php';
 require_once __DIR__ . '/TemplateFiles.php';
 
 final class Engine
@@ -96,6 +97,10 @@ final class Engine
      */
     private const BODY_FIELDS = ['post' => 'post_content', 'templatePart' => 'content', 'template' => 'content'];
     /** Writes that go through the contract's own rules on a bound site (see handle()). */
+    /** What `usedIn` searched. */
+    private const USAGE_SCOPE = 'post/page post_content URL or wp-image-ID, _thumbnail_id, site_logo and site_icon';
+    /** What `usedInStorage` searched, said beside it so a short list is not read as the whole site. */
+    private const STORAGE_USAGE_SCOPE = 'post meta and options whose value is the attachment id under a picture-like key, holds the uploads URL of the original or a registered size, or is JSON/serialized data with that URL or with the id under a picture-like key; WordPress bookkeeping keys, transients and this plugin\'s own keys skipped; each table walked by primary key, at most 100000 ids and 100 references per table per call: scanned says where each walk stopped, and media.usage after resumes it; truncated says the list is not the whole site, errors names a table that could not be read';
     private const CONTRACT_RULED = ['media.upload', 'media.delete', 'apply.revert', 'content.contract'];
     /** Actions that change the site, and so run one at a time under the writer's lock. */
     private const SERIALIZED = [
@@ -313,6 +318,10 @@ final class Engine
                 ], 'files_pack' => [
                     'inline' => true,
                     'max_paths' => self::MAX_PACK_PATHS,
+                ], 'media_usage' => [
+                    'storage' => true,
+                    'max_ids_scanned' => AttachmentReferences::MAX_SCAN,
+                    'max_rows_reported' => AttachmentReferences::MAX_HITS,
                 ]] + ($this->renderedSite === null ? [] : ['rendered_words' => [
                     'schema' => RenderedWords::SCHEMA,
                     'operations' => ['inspect', 'apply', 'status'],
@@ -382,6 +391,8 @@ final class Engine
                 return $this->mediaUpload($params);
             case 'media.delete':
                 return $this->mediaDelete($params);
+            case 'media.usage':
+                return $this->mediaUsage($params);
             case 'apply.revert':
                 return $this->applyRevert($params);
             case 'apply.list':
@@ -4237,16 +4248,25 @@ final class Engine
                 return $stale;
             }
         }
-        // A post write's `seo` lands in post meta beside the row, which the row's undo cannot reach.
-        // Each meta key it will change is read now and recorded below as its own postmeta step (the
-        // value before, or absent), so apply.revert puts each back exactly. A refusal here is the
-        // write's own refusal, before anything is written.
+        // A post write's `seo`, featured image and page template land in post meta beside the row,
+        // which the row's undo cannot reach. Each meta key the write will change is read now and
+        // recorded below as its own postmeta step (the value before, or absent), so apply.revert puts
+        // each back exactly. A refusal here is the write's own refusal, before anything is written.
         $metaBefore = [];
-        $seoSteps = $kind === 'post' && array_key_exists('seo', $p['fields']) && method_exists($this->writer, 'seoTargets');
-        if ($seoSteps) {
+        $metaFields = [];
+        if ($kind === 'post') {
             try {
-                foreach ($this->writer->seoTargets($id, $p['fields']['seo']) as $metaKey) {
-                    $metaBefore[(string) $metaKey] = $this->writer->read('postmeta', $id, (string) $metaKey);
+                if (array_key_exists('seo', $p['fields']) && method_exists($this->writer, 'seoTargets')) {
+                    foreach ($this->writer->seoTargets($id, $p['fields']['seo']) as $metaKey) {
+                        $metaBefore[(string) $metaKey] = $this->writer->read('postmeta', $id, (string) $metaKey);
+                    }
+                    $metaFields[] = 'seo';
+                }
+                if (method_exists($this->writer, 'postMetaTargets')) {
+                    foreach ($this->writer->postMetaTargets($p['fields']) as $field => $metaKey) {
+                        $metaBefore[(string) $metaKey] = $this->writer->read('postmeta', $id, (string) $metaKey);
+                        $metaFields[] = (string) $field;
+                    }
                 }
             } catch (Throwable $e) {
                 return $this->err('write_failed', $e->getMessage());
@@ -4267,8 +4287,9 @@ final class Engine
         $after = null;
         try {
             $after = $this->writer->read($kind, $newId, $key);
-            // `seo` is not a column of the row: its keys are undone by their own steps below.
-            $rowFields = $seoSteps ? array_values(array_diff(array_keys($p['fields']), ['seo'])) : array_keys($p['fields']);
+            // `seo`, the featured image and the template are not columns of the row: their keys are
+            // undone by their own steps below.
+            $rowFields = array_values(array_diff(array_keys($p['fields']), $metaFields));
             $changes = ContentUndo::record($before, $after, $rowFields);
         } catch (Throwable $e) {
             $changes = null;
@@ -4803,12 +4824,14 @@ final class Engine
             }
             $total = array_sum(array_map(static fn($f) => (int) ($f['size'] ?? strlen((string) ($f['bytes'] ?? ''))), $files));
             $used = $this->media->attachmentUsage($id, $files);
+            // A storage search that fails is said in the answer and does not stop the delete.
+            $storedIn = $this->storageAnswer($id);
         } catch (Throwable $e) {
             return $this->err('write_failed', 'could not make and verify the undo copy; nothing was deleted: ' . $e->getMessage());
         }
         $shown = array_map(static fn($f) => ['path' => $f['path'] ?? '', 'size' => (int) ($f['size'] ?? 0), 'sha256' => $f['sha256'] ?? ''], $files);
         $underCap = $total <= self::MAX_MEDIA_BYTES;
-        if (!empty($p['dry_run'])) return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'totalBytes' => $total, 'undoCopyUnderCap' => $underCap, 'usedIn' => $used, 'usedInScope' => 'post/page post_content URL or wp-image-ID, _thumbnail_id, site_logo and site_icon']);
+        if (!empty($p['dry_run'])) return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'totalBytes' => $total, 'undoCopyUnderCap' => $underCap, 'usedIn' => $used, 'usedInScope' => self::USAGE_SCOPE] + $storedIn);
         if (!$underCap) return $this->err('too_large', 'this picture and its sizes are too large to keep an undo copy; nothing was deleted', ['totalBytes' => $total]);
         try {
             foreach ($files as $file) {
@@ -4834,7 +4857,81 @@ final class Engine
         }
         try { if ($this->writer !== null) $this->writer->purgeCache(); } catch (Throwable $e) {}
         $this->stamped('media');
-        return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'storageDeleted' => $left === [], 'filesLeft' => $left, 'usedIn' => $used, 'usedInScope' => 'post/page post_content URL or wp-image-ID, _thumbnail_id, site_logo and site_icon', 'undo' => 'apply.revert ' . $applyId, 'cdnCache' => 'a CDN or browser may still serve a cached copy of the old URL for a while']);
+        return $this->ok(['deleted' => ['id' => $id, 'files' => $shown], 'storageDeleted' => $left === [], 'filesLeft' => $left, 'usedIn' => $used, 'usedInScope' => self::USAGE_SCOPE] + $storedIn + ['undo' => 'apply.revert ' . $applyId, 'cdnCache' => 'a CDN or browser may still serve a cached copy of the old URL for a while']);
+    }
+
+    /**
+     * The post meta rows and options holding the picture, each option marked `locked` when
+     * `content.update {kind:"option"}` would refuse to write it: the same checks handle() and the
+     * writer make on that door. Post meta has no such refusal, so its rows carry no flag.
+     */
+    private function storageUsage(array $found): array
+    {
+        $pinned = [];
+        $pinnedUnknown = false;
+        if ($this->contract !== null) {
+            try {
+                $pinned = array_flip($this->contract->pinnedOptions());
+            } catch (Throwable $e) {
+                $pinnedUnknown = true;
+            }
+        }
+        $options = [];
+        foreach ((array) ($found['options'] ?? []) as $row) {
+            $name = is_array($row) ? (string) ($row['option'] ?? '') : '';
+            if ($name !== '' && $this->optionWriteRefused($name)) $row['locked'] = true;
+            if ($name !== '' && isset($pinned[$name])) $row['pinned'] = true;
+            $options[] = $row;
+        }
+        $answer = ['postmeta' => array_values((array) ($found['postmeta'] ?? [])), 'options' => $options, 'truncated' => !empty($found['truncated'])]
+            + array_intersect_key($found, ['scanned' => true, 'errors' => true]);
+        // A contract that cannot be read is said: an unmarked option is then not known to be unpinned.
+        return $pinnedUnknown ? $answer + ['pinnedUnknown' => true] : $answer;
+    }
+
+    /**
+     * Where one Media Library picture is used, without changing anything: the `usedIn` and
+     * `usedInStorage` a `media.delete` dry run answers, with no apply_id and no file read.
+     */
+    private function mediaUsage(array $p): array
+    {
+        if ($this->media === null) {
+            return $this->err('unavailable', 'media writer not wired');
+        }
+        $id = isset($p['id']) ? (int) $p['id'] : 0;
+        $url = isset($p['url']) && is_string($p['url']) ? trim($p['url']) : '';
+        if ($id < 1 && $url !== '') $id = (int) ($this->media->attachmentIdForUrl($url) ?? 0);
+        if ($id < 1) return $this->err($url !== '' ? 'not_found' : 'bad_params', $url !== '' ? 'url did not resolve to one attachment' : 'id required');
+        try {
+            $files = $this->media->attachmentPaths($id);
+            if ($files === null) return $this->err('not_found', "no image attachment with id {$id}");
+            $used = $this->media->attachmentUsage($id, $files);
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        $after = isset($p['after']) && is_array($p['after']) ? $p['after'] : [];
+        return $this->ok(['id' => $id, 'usedIn' => $used, 'usedInScope' => self::USAGE_SCOPE] + $this->storageAnswer($id, $after));
+    }
+
+    /** `usedInStorage` and its scope; a search that fails is said, not taken for "held nowhere". */
+    private function storageAnswer(int $id, array $after = []): array
+    {
+        $resume = [];
+        foreach (['postmeta', 'options'] as $table) {
+            if (isset($after[$table]) && is_numeric($after[$table])) $resume[$table] = max(0, (int) $after[$table]);
+        }
+        try {
+            $stored = $this->storageUsage($this->media->attachmentStorageUsage($id, $resume));
+        } catch (Throwable $e) {
+            $stored = ['postmeta' => [], 'options' => [], 'truncated' => true, 'error' => $e->getMessage()];
+        }
+        return ['usedInStorage' => $stored, 'usedInStorageScope' => self::STORAGE_USAGE_SCOPE];
+    }
+
+    private function optionWriteRefused(string $key): bool
+    {
+        return in_array($key, self::CONTRACT_OPTIONS, true) || RenderedWords::isOption($key)
+            || ($this->writer !== null && method_exists($this->writer, 'optionRefused') && $this->writer->optionRefused($key));
     }
 
     /**
