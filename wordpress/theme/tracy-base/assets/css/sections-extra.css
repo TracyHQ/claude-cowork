@@ -289,7 +289,7 @@
 }
 
 .tracy .acm-cta-capsule .tracy-btn--ghost .wp-block-button__link:hover {
-  color: var(--wp--preset--color--accent);
+  color: var(--ds-c-accent-text, var(--wp--preset--color--accent));
 }
 
 @media (max-width: 640px) {
@@ -362,8 +362,11 @@
   transform: translateX(2px) rotate(135deg);
 }
 
+/* An end step (no slide that way): quieter, in the disabled roles when a design system gives them;
+   the fill stays the rest rule's transparent without one. */
 .acm-carousel__step:disabled {
-  color: var(--wp--preset--color--meta);
+  color: var(--ds-c-disabled-fg, var(--wp--preset--color--meta));
+  background: var(--ds-c-disabled-bg, transparent);
   border-color: var(--wp--preset--color--border-soft);
   cursor: default;
 }
@@ -408,4 +411,113 @@
 
 .tracy .acm-tabs__panel[hidden] {
   display: none;
+}
+
+/* ── Contact Form 7 messages: the plugin's own state colours (its styles.css: the neutral note
+   #00a0d2, sent #46b450, failed/aborted #dc3232, spam #f56e28, invalid/unaccepted/payment
+   #ffb900, the field tip #dc3232), read through the status roles so a worn design system tints
+   them; without one each line is the plugin's value, the words keep the form's colour and the
+   note draws no fill, as before. ─────────────────────────────────────────────────────────── */
+
+.tracy .wpcf7 form .wpcf7-response-output {
+  border-color: var(--ds-c-info, #00a0d2);
+  color: var(--ds-c-info-text, currentColor);
+  background: var(--ds-c-info-bg, transparent);
+}
+
+.tracy .wpcf7 form.sent .wpcf7-response-output {
+  border-color: var(--ds-c-success, #46b450);
+  color: var(--ds-c-success-text, currentColor);
+  background: var(--ds-c-success-bg, transparent);
+}
+
+.tracy .wpcf7 form.failed .wpcf7-response-output,
+.tracy .wpcf7 form.aborted .wpcf7-response-output {
+  border-color: var(--ds-c-danger, #dc3232);
+  color: var(--ds-c-danger-text, currentColor);
+  background: var(--ds-c-danger-bg, transparent);
+}
+
+.tracy .wpcf7 form.spam .wpcf7-response-output {
+  border-color: var(--ds-c-warn, #f56e28);
+  color: var(--ds-c-warn-text, currentColor);
+  background: var(--ds-c-warn-bg, transparent);
+}
+
+.tracy .wpcf7 form.invalid .wpcf7-response-output,
+.tracy .wpcf7 form.unaccepted .wpcf7-response-output,
+.tracy .wpcf7 form.payment-required .wpcf7-response-output {
+  border-color: var(--ds-c-warn, #ffb900);
+  color: var(--ds-c-warn-text, currentColor);
+  background: var(--ds-c-warn-bg, transparent);
+}
+
+.tracy .wpcf7-not-valid-tip {
+  color: var(--ds-c-danger-text, #dc3232);
+}
+
+/* ── Contact Form 7 fields and submit: the theme's own field (.tracy-field in sections.css) and
+   button (.wp-block-button__link in tracy.css and tracy-base.css), so the contact form is not the
+   browser's 18px boxes and grey "Send". The label reads like .tracy-field__label, a field like
+   .tracy-field input (its corner reads the input role), the submit like the core button: accent
+   fill, pill, body size. The acceptance checkbox keeps the browser's box. ───────────────────── */
+
+.tracy .wpcf7 form > p > label {
+  font-size: var(--wp--preset--font-size--sm);
+  color: var(--wp--preset--color--fg-2);
+}
+
+.tracy .wpcf7 form .wpcf7-form-control-wrap {
+  display: block;
+  margin-top: var(--wp--preset--spacing--1);
+}
+
+.tracy
+  .wpcf7
+  form
+  .wpcf7-form-control:is(
+    input:not([type='checkbox'], [type='radio'], [type='submit'], [type='file']),
+    textarea,
+    select
+  ) {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  font-size: var(--wp--preset--font-size--base);
+  padding: var(--wp--preset--spacing--3);
+  border: 1px solid var(--wp--preset--color--border);
+  border-radius: var(--ds-input-radius, var(--wp--custom--radius--md));
+  background: var(--wp--preset--color--bg);
+  color: var(--wp--preset--color--fg);
+}
+
+.tracy .wpcf7 form .wpcf7-form-control:focus-visible {
+  outline: none;
+  box-shadow: var(--wp--custom--focus-ring);
+}
+
+.tracy .wpcf7 form input.wpcf7-submit {
+  font: inherit;
+  font-size: var(--wp--preset--font-size--base);
+  font-weight: 400;
+  line-height: 1.2;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+  border: 0;
+  border-radius: var(--wp--custom--radius--pill);
+  background: var(--wp--preset--color--accent);
+  color: var(--wp--preset--color--accent-on);
+  cursor: pointer;
+  transition:
+    background var(--wp--custom--motion--base) var(--wp--custom--ease--standard),
+    box-shadow var(--wp--custom--motion--base) var(--wp--custom--ease--standard);
+}
+
+.tracy .wpcf7 form input.wpcf7-submit:hover {
+  background: var(--wp--preset--color--accent-hover);
+  box-shadow: var(--wp--custom--elev--raised);
+}
+
+.tracy .wpcf7 form input.wpcf7-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }

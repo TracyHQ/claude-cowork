@@ -11,6 +11,7 @@ not the live site's; find current ids by slug with `wp post list`.
 | A menu | one of six `wp_navigation` posts: `tracy` (header, 52 items in the source tree), `tracy-utility` (14), `tracy-onepage` (6), `tracy-footer-product`, `tracy-footer-resources`, `tracy-footer-company` | `wp post list --post_type=wp_navigation --fields=ID,post_name,post_title` | Site Editor > Navigation, or update the post's block markup (`core/navigation-link`, `core/navigation-submenu`) |
 | Header and footer | `wp_template_part` rows `header` and `footer` — the theme's `parts/*.html` with the navigation `ref`s filled; they **shadow the files** | `wp post list --post_type=wp_template_part --fields=ID,post_name` | Site Editor > Patterns > Template parts. Delete the row to fall back to the file (and lose the refs) |
 | Mega-menu columns (Service, Resources, Company) | inside the `header` template-part row, as `tracy-base/mega-menu` inner blocks; the links are plain `core/list` items, not a `wp_navigation` | as above | Site Editor, header part |
+| The one-page home's header (About, Services, Product, Team, Contact) | the `header-onepage` part (`parts/header-onepage.html`), used by the `page-onepage` template, which prints no site footer; its links are anchors into that page | as above | Site Editor, header (one page) part |
 | Footer link columns | three `core/navigation` blocks in the `footer` row, `ref` → `tracy-footer-*`; the social row and the site notice are copies of `tracy-base/section-social-links` and `section-site-notice` | as above | Site Editor, footer part; the menus under Navigation |
 | Site name, tagline, front page | options `blogname` ("Tracy"), `blogdescription`, `show_on_front=page`, `page_on_front` (the `/` page); `page_for_posts` is unset on purpose — `/resources/blog` is a page | `wp option get blogname` | `wp option update …`, or Settings > General / Reading |
 | Logo | `site_logo` option / `custom_logo` theme mod, an attachment id; the header's `core/site-logo` reads it | `wp option get site_logo` | Site Editor, header part, click the logo |
@@ -65,5 +66,7 @@ Edit their HTML, or replace them with a Tracy Base section.
 ## Account and search
 
 There are no account pages: the menu's Sign in / Register / Reset password items link to
-`/wp-login.php` and its actions, Profile to `/wp-admin/profile.php`. Search is the `search`
-template; the mega menu's search field is a `core/search` block.
+`/wp-login.php` and its actions, Profile to `/wp-admin/profile.php`. The Resources menu's Search
+item opens the page `/resources/search`, which holds a `core/search` block; the results are the
+`search` template (its body is the pattern `tracy-base/search-results`: the same form, one result
+per row, or a "No Results Found" panel naming the query).

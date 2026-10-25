@@ -12,7 +12,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-// The identity tokens this theme renders ({site.title} in the footer's copyright line).
+// The identity tokens this theme renders ({site.title}, kept for footer rows of earlier versions).
 require_once __DIR__ . '/identity.php';
 
 /**
@@ -29,11 +29,17 @@ function tracy_base_enqueue_assets(): void {
 	if ( is_readable( get_theme_file_path( 'assets/css/sections-extra.css' ) ) ) {
 		wp_enqueue_style( 'tracy-base-sections-extra', get_theme_file_uri( 'assets/css/sections-extra.css' ), array( 'tracy-sections' ), $version );
 	}
+	// Parity with the Joomla source, measured on it: printed last, so each value stands as measured.
+	$parity_after = wp_style_is( 'tracy-base-sections-extra', 'enqueued' ) ? array( 'tracy-base', 'tracy-base-sections-extra' ) : array( 'tracy-base' );
+	foreach ( array( 'chrome', 'home', 'pages', 'landing' ) as $part ) {
+		wp_enqueue_style( 'tracy-base-parity-' . $part, get_theme_file_uri( 'assets/css/tracy-base-parity-' . $part . '.css' ), $parity_after, $version );
+	}
 	// In the head, blocking, on purpose: it resolves the theme before the first paint, so a
 	// visitor who chose dark never sees a light frame. It is a few hundred bytes.
 	wp_enqueue_script( 'tracy-base-dark', get_theme_file_uri( 'assets/js/tracy-base-dark.js' ), array(), $version, array( 'in_footer' => false ) );
 	wp_enqueue_script( 'tracy-base-mega', get_theme_file_uri( 'assets/js/tracy-base-mega.js' ), array(), $version, array( 'strategy' => 'defer' ) );
 	wp_enqueue_script( 'tracy-base-sections', get_theme_file_uri( 'assets/js/tracy-base-sections.js' ), array(), $version, array( 'strategy' => 'defer' ) );
+	wp_enqueue_script( 'tracy-base-drawer', get_theme_file_uri( 'assets/js/tracy-base-drawer.js' ), array(), $version, array( 'strategy' => 'defer' ) );
 }
 add_action( 'wp_enqueue_scripts', 'tracy_base_enqueue_assets', 11 );
 
