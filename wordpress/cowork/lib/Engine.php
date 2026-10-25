@@ -5142,6 +5142,7 @@ final class Engine
             if ($back['fields'] !== []) {
                 $this->writer->write($kind, $id, $back['fields'], $key);
             }
+            $this->restorePostModified($entry);
             return;
         }
         if ($op === 'content') {
@@ -5154,6 +5155,7 @@ final class Engine
                 (string) ($entry['key'] ?? ''),
                 $entry['before'] ?? null
             );
+            $this->restorePostModified($entry);
             // After the row, so Polylang's own re-keying on that write cannot undo the restore.
             if (isset($entry['translations']) && is_array($entry['translations'])) {
                 QuickstartContract::stringTranslationsRestore($entry['translations']);
@@ -5355,6 +5357,43 @@ final class Engine
     }
 
     /** @param array<string,mixed>|null $before */
+    /**
+     * The modified date of a post a revert just put back. WordPress stamped it when the write landed
+     * and stamps it again when the revert writes the row back, whatever either passes, so the post
+     * read as edited at the revert's time with its words exactly as before. When the row now holds
+     * everything it held before the write, the stamp from before comes back with it. When it does
+     * not (a later edit the span revert kept, a comment counted since), there is a change since
+     * then, and the post stays dated now.
+     *
+     * @param array<string,mixed> $entry
+     */
+    private function restorePostModified(array $entry): void
+    {
+        $before = $entry['before'] ?? null;
+        if (($entry['kind'] ?? '') !== 'post' || !is_array($before) || !isset($before['post_modified'], $before['post_modified_gmt'])
+            || !method_exists($this->writer, 'setPostModified')) {
+            return;
+        }
+        $id = (int) ($entry['id'] ?? 0);
+        $now = $this->writer->read('post', $id, '');
+        if ($now === null) {
+            return;
+        }
+        // The receipt went through the log's JSON; the row comes from WordPress. Compared as text.
+        $row = static function (array $row): array {
+            unset($row['post_modified'], $row['post_modified_gmt']);
+            ksort($row);
+            return array_map(static fn ($value) => is_scalar($value) || $value === null ? (string) $value : $value, $row);
+        };
+        if ($row($before) !== $row($now)) {
+            return;
+        }
+        if (($now['post_modified'] ?? null) === $before['post_modified'] && ($now['post_modified_gmt'] ?? null) === $before['post_modified_gmt']) {
+            return;
+        }
+        $this->writer->setPostModified($id, (string) $before['post_modified'], (string) $before['post_modified_gmt']);
+    }
+
     private function rollbackContent(string $kind, int $id, string $key, ?array $before): void
     {
         if ($before === null) {

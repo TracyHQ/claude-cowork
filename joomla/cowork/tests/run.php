@@ -1692,6 +1692,20 @@ check('and points at that version\'s release asset',
     trim((string) $upd->update->downloads->downloadurl),
     "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
 check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
+// Joomla's ExtensionAdapter starts every <update> at client_id 1 and changes it only when the entry
+// names a <client>. A package is installed with client_id 0, so an entry without one never matches
+// the installed row: the update is stored with extension_id 0 and Extensions › Update lists nothing.
+// Every entry, not only the newest — Joomla picks among all of them.
+$entriesWithoutSite = [];
+
+foreach ($upd->update as $entry) {
+    if (trim((string) $entry->client) !== 'site' || trim((string) $entry->type) !== 'package'
+        || trim((string) $entry->element) !== 'pkg_claudecowork' || trim((string) $entry->folder) !== '') {
+        $entriesWithoutSite[] = trim((string) $entry->version);
+    }
+}
+
+check('every update.xml entry names the installed package row: package, site client, no folder', $entriesWithoutSite, []);
 // The self-updater (0.24.28 on) and Joomla's own updater both refuse a download whose sha256 differs
 // from the one announced. Written after the zip is built, from that zip: `shasum -a 256 dist/…`.
 checkTrue('update.xml carries the sha256 of the newest release asset', (bool) preg_match('/^[0-9a-f]{64}$/', trim((string) $upd->update->sha256)));

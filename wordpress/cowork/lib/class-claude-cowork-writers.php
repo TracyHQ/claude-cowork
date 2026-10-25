@@ -948,6 +948,27 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		return 1 === (int) $done;
 	}
 
+	/**
+	 * Put one post's two modified columns back, raw. `wp_update_post` stamps every update with the
+	 * time it ran, whatever it is given, so a revert that writes the row back through it cannot
+	 * restore these: the engine calls this once the row holds what it held before the write.
+	 */
+	public function setPostModified( int $id, string $modified, string $modified_gmt ): void {
+		global $wpdb;
+		$done = $wpdb->update(
+			$wpdb->posts,
+			array( 'post_modified' => $modified, 'post_modified_gmt' => $modified_gmt ),
+			array( 'ID' => $id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+		if ( false === $done ) {
+			throw new RuntimeException( 'WordPress could not date post ' . $id . ': ' . (string) $wpdb->last_error );
+		}
+		clean_post_cache( $id );
+		$this->touched[ $id ] = $id;
+	}
+
 	public function purgeCache(): void {
 		foreach ( $this->touched as $post_id ) {
 			clean_post_cache( $post_id );

@@ -570,7 +570,7 @@ final class QuickstartContract
      * tests/contracts.php holds this to the files the plugin's manifest `<media>` installs.
      */
     private const OWN_MEDIA = [
-        'media/plg_system_claudecoworkapi/js/t3-offcanvas-a11y.js' => 'b5177a14204e14e4f43e0c2eb361a3d7fa9ed77375b2d9361e4b7477e5cda916',
+        'media/plg_system_claudecoworkapi/js/t3-offcanvas-a11y.js' => '2a7bc795206bac9cdb349e3cebccb989cc7e08625d39416dc680c3f64cc2aced',
     ];
     private ?bool $ownPluginInstalled = null;
     private function ownMedia(string $path): bool {

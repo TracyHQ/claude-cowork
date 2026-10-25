@@ -312,7 +312,8 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
     /**
      * The keyboard for a T3 template's off-canvas drawer (`media/js/t3-offcanvas-a11y.js`): ESC closes
-     * it, focus goes into it and back to ☰, Tab stays inside while it is open, and the × is announced.
+     * it (through its ×, or ☰ when it has none), focus goes into it and back to ☰, Tab stays inside while
+     * it is open, the × is announced, and a ☰ or × Tab could not reach is made a button it can.
      * Only where `T3OffCanvas::applies` (a T3 style with the drawer on, T3's off-canvas.js the bytes
      * the script was checked against), and only while the plugin's `t3_offcanvas_a11y` is on: set to
      * 0, every page is what it was without this. Independent of the favicon and of Tracy's proxy.

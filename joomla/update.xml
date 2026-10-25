@@ -11,14 +11,21 @@
     targetplatform matches the site it runs on, so leaving old entries in place costs nothing and
     lets a site on an older Joomla still find the last version that supported it.
 
+    Every entry carries <client>site</client>: Joomla gives an entry without one client_id 1, a
+    package is installed with client_id 0, and the entry then matches no installed row, so
+    Extensions › Update never lists it (tests/run.php checks every entry).
+
     Bump it in the same commit that bumps the manifest: tests/run.php fails if the two disagree.
 -->
 <updates>
+    <!-- Unreleased, the next version's <description> (an entry is added only with its release, and its zip's sha256):
+         T3 off-canvas keyboard (t3-offcanvas-a11y.js): a ☰ or × drawn as a link with no href (JA Social II) is reached by Tab and works on Enter and Space as a button, while one that already works is left as it is; a drawer drawn with no × (JA Resume) closes on ESC through ☰, which T3 closes an open drawer on too, and focus goes back to ☰; ESC on a menu link in the drawer, which Bootstrap 3's dropdown takes and uses only to close an open dropdown, closes the drawer too; a drawer left with no way out at all is still not trapped -->
     <update>
         <name>Joomla Claude Cowork</name>
         <description>template.files.status, write and undo: the files of an installed site template, written compare-and-set under the write lock, PHP linted by the site's own PHP and only once the owner allows it (Options: Allow PHP in template files), all or nothing, and taken back only where the site still holds what was written; every write in the User Actions Log</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.61</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.61</infourl>
         <downloads>
@@ -37,6 +44,7 @@
         <description>a contract slot can be an author, a template language string or a T4 site-profile logo, and a jsonPath slot needs no nestedJson; ships the ja-boxing 1.0.2 and 1.0.3 content contracts</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.60</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.60</infourl>
         <downloads>
@@ -55,6 +63,7 @@
         <description>inspect reports a locked presentation folder that is itself a symlink as drift instead of walking its target; a mega-menu style kept because its child was not hidden says so</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.59</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.59</infourl>
         <downloads>
@@ -73,6 +82,7 @@
         <description>inspect reports a foreign or changed file in the plugin own media folder (only the exact shipped files, by sha256, are exempt) and any unlisted symlink under a locked folder, never following it</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.58</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.58</infourl>
         <downloads>
@@ -88,9 +98,10 @@
     </update>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>a quickstart site can put its template showcase navigation away: showcaseNav.status, apply and revert hide menu items, modules and empty T3 mega-menu dropdowns and columns without unpublishing any page, and revert restores the bytes; inspect no longer reports the plugin own media as presentation drift</description>
+        <description>a quickstart site can put its template showcase navigation away: showcaseNav.status, apply and revert hide menu items, modules and empty T3 mega-menu dropdowns and columns without unpublishing any page, and revert restores the bytes; inspect no longer reports the plugin own media as presentation drift; T3 templates whose style turns on the off-canvas drawer get the plugin's keyboard script for it (t3-offcanvas-a11y.js: focus moves into the open drawer, Escape closes it, the × is announced), printed only where T3's off-canvas.js is the checked T3 3.3.2 base-bs3 copy</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.57</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.57</infourl>
         <downloads>
@@ -109,6 +120,7 @@
         <description>a site whose component folder belongs to another user (Tracy installs the package as root) fetches its contract profile into a folder under Joomla tmp_path instead of failing with contract_unavailable; profiles already in lib/contracts are read there as before</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.56</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.56</infourl>
         <downloads>
@@ -127,6 +139,7 @@
         <description>the package no longer carries the quickstart contract profiles (70 MB to under 1 MB): each is a release asset listed with its sha256 in lib/contracts.json, the component fetches the one the site is bound to, and an update removes the profiles no longer used</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.55</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.55</infourl>
         <downloads>
@@ -145,6 +158,7 @@
         <description>files.pack can be cut to named paths: Sync from live takes a changed configuration.php or large file without reading the whole site again</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.54</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.54</infourl>
         <downloads>
@@ -163,6 +177,7 @@
         <description>carries the JA Seven 1.0.5, JA Prodex 1.0.5, JA Phio 1.0.8, JA Voyara 1.0.11, JA Vega 1.0.8, JA Essence 1.0.10, JA Nova 1.0.9 and JA Vogue 1.0.8 contracts (text and hover colours read text roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.53</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.53</infourl>
         <downloads>
@@ -181,6 +196,7 @@
         <description>carries the JA Trip 1.0.8, JA Morgan 1.0.9, JA Podcast 1.0.7, JA Resort 1.0.8, JA Tour 1.0.5, JA Vital 1.0.7, JA Spa 1.0.8 and JA Resume 1.0.7 contracts (text and hover colours read text roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.52</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.52</infourl>
         <downloads>
@@ -199,6 +215,7 @@
         <description>answers the cheap questions a sync asks first: site.fingerprint (with skip_columns, a table checksum that ignores hit counters and visit dates), files.list without the sha1, and files.hash</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.51</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.51</infourl>
         <downloads>
@@ -217,6 +234,7 @@
         <description>carries the JA Symphony 1.0.5, JA Kinetic 1.0.10, JA Space 1.0.7, JA Sensei 1.0.6 and JA Impact 1.0.5 contracts (text colours read text roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.50</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.50</infourl>
         <downloads>
@@ -235,6 +253,7 @@
         <description>carries the JA Fresco 1.0.4 and JA Diner 1.0.4 contracts (text colours read text roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.49</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.49</infourl>
         <downloads>
@@ -253,6 +272,7 @@
         <description>carries the JA Fresco 1.0.3 and JA Diner 1.0.3 contracts (Customize fixes and demo link targets)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.48</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.48</infourl>
         <downloads>
@@ -271,6 +291,7 @@
         <description>carries the JA Restaurant 1.0.6, Fresco 1.0.2 and Diner 1.0.2 contracts (Fresco and Diner are new to the package; design-system role-variable releases)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.47</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.47</infourl>
         <downloads>
@@ -289,6 +310,7 @@
         <description>carries the JA Social II 1.0.5 contract (design-system role-variable release; with no design system worn it looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.46</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.46</infourl>
         <downloads>
@@ -307,6 +329,7 @@
         <description>carries the JA Prodex 1.0.4, Smallbiz 1.0.4, Rent 1.0.5, Mood 1.0.4, Symphony 1.0.4, Donate 1.0.7 and Space 1.0.6 contracts (design-system role-variable releases; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.45</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.45</infourl>
         <downloads>
@@ -325,6 +348,7 @@
         <description>answers the administrator door on Joomla 3 and on sites missing the component's site folder</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.44</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.44</infourl>
         <downloads>
@@ -343,6 +367,7 @@
         <description>carries the JA Kinetic 1.0.9 and Tracy Business 1.2.6 contracts (two dot-1 design-system fixes moved into the template source; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.43</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.43</infourl>
         <downloads>
@@ -361,6 +386,7 @@
         <description>info and db.tables name the site's table prefix (db_prefix, prefix), so the importer can keep only this site's tables when one database holds several sites</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.42</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.42</infourl>
         <downloads>
@@ -379,6 +405,7 @@
         <description>carries the JA Resort 1.0.7 contract (the template reads the design-system role variables; with no design system worn it looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.41</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.41</infourl>
         <downloads>
@@ -397,6 +424,7 @@
         <description>adds db.dump_many: several database tables in one request, bounded by size and time, so a host firewall that counts requests is less likely to block the importer on a site with many tables</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.40</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.40</infourl>
         <downloads>
@@ -415,6 +443,7 @@
         <description>runs on PHP 7.4, as it declares: on a PHP 7 site the engine no longer fails to parse (every call answered HTTP 500) and no longer calls PHP 8 functions PHP 7 does not have</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.39</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.39</infourl>
         <downloads>
@@ -433,6 +462,7 @@
         <description>carries the JA Morgan 1.0.8 and JA Resume 1.0.6 contracts (the templates stop linking files Joomla 5/6 do not ship; Morgan's font draws Vietnamese letters; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.38</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.38</infourl>
         <downloads>
@@ -451,6 +481,7 @@
         <description>carries the design-system batch 2 contracts: Tracy Apple 1.3.1 and JA Essence 1.0.9, Impact 1.0.4, Morgan 1.0.7, Nova 1.0.8, Phio 1.0.7, Podcast 1.0.6, Resume 1.0.5, Sensei 1.0.5, Seven 1.0.4, Spa 1.0.7, Tour 1.0.4, Trip 1.0.7, Vega 1.0.7, Vital 1.0.6, Vogue 1.0.7, Voyara 1.0.10 (their templates wear a design system cleanly; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.37</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.37</infourl>
         <downloads>
@@ -469,6 +500,7 @@
         <description>carries the JA Kinetic 1.0.8 demo-trim map (a site built on it keeps the Single Article page and the article it opens; every other demo post is still hidden)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.36</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.36</infourl>
         <downloads>
@@ -487,6 +519,7 @@
         <description>carries the Tracy Base 1.0.5 and Tracy Business 1.2.5 contracts (their templates wear a design system cleanly in the preview; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.35</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.35</infourl>
         <downloads>
@@ -505,6 +538,7 @@
         <description>carries 28 new Joomla quickstart contracts (status colours set as text read the design system's readable shade)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.34</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.34</infourl>
         <downloads>
@@ -523,6 +557,7 @@
         <description>carries the Tracy Business 1.2.4, Tracy Base 1.0.4 and JA Kinetic 1.0.8 contracts (their templates read the standard design-system role variables; with no design system worn each looks as before)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.33</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.33</infourl>
         <downloads>
@@ -541,6 +576,7 @@
         <description>undoing a deleted image finishes when its file is already back with the same bytes; a file with different bytes at that path is still refused and never overwritten</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.31</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.31</infourl>
         <downloads>
@@ -559,6 +595,7 @@
         <description>a picture written into a captured image slot keeps its slot's shape: the demo picture is read under Joomla's media suffix, so a picture of another shape is refused as WordPress already refuses it</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.30</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.30</infourl>
         <downloads>
@@ -577,6 +614,7 @@
         <description>extension.install through the Tracy API downloads the package straight to a file, checked against its sha256, instead of reading it into memory; a large package such as this one no longer runs out of memory at memory_limit 128M</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.29</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.29</infourl>
         <downloads>
@@ -595,6 +633,7 @@
         <description>the self-updater no longer downloads inside a visitor's request: it knocks on the site's own door and the download goes straight to a file, checked against its sha256; a failed version waits before it is tried again</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.28</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.28</infourl>
         <downloads>
@@ -613,6 +652,7 @@
         <description>carries the JA Voyara 1.0.8 and Tracy Business 1.2.3 contracts (JA Voyara's block layouts print their module fields; Tracy Business's topbar contacts wrap on a phone)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.27</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.27</infourl>
         <downloads>
@@ -630,6 +670,7 @@
         <description>carries the JA Donate 1.0.5 contract (the template's html overrides repaired, stylesheets read a worn design system in today's roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.26</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.26</infourl>
         <downloads>
@@ -647,6 +688,7 @@
         <description>carries the JA Donate 1.0.4, JA Kinetic 1.0.6 and JA Podcast 1.0.4 contracts (stylesheets read a worn design system in today's roles)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.25</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.25</infourl>
         <downloads>
@@ -664,6 +706,7 @@
         <description>0.24.23 plus: JA Resort 1.0.6 contract with current template, T4 and ACM agent instructions</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.24</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.24</infourl>
         <downloads>
@@ -681,6 +724,7 @@
         <description>0.24.22 plus: JA Resort 1.0.5 contract and known first-render T4 style-cache warnings</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.23</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.23</infourl>
         <downloads>
@@ -698,6 +742,7 @@
         <description>0.24.21 plus: carries the JA Resort 1.0.4 contract (Vietnamese fonts for every theme.tpl.css font rule)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.22</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.22</infourl>
         <downloads>
@@ -715,6 +760,7 @@
         <description>0.24.20 plus: carries the contracts of the batch-2 Joomla quickstarts re-cut for Template Customization Question Readiness</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.21</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.21</infourl>
         <downloads>
@@ -732,6 +778,7 @@
         <description>0.24.19 plus: carries the contracts of ja-essence 1.0.6, ja-restaurant 1.0.4, ja-resume 1.0.2, ja-sensei 1.0.2, rebuilt so their template stylesheets read a worn design system (TracyHQ/tch#1180)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.20</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.20</infourl>
         <downloads>
@@ -749,6 +796,7 @@
         <description>0.24.18 plus: an article created through Tracy gets a real author and Joomla's default fields (publish_up, modified_by, empty JSON columns), so T4 home pages no longer fail (TracyHQ/tch#1182)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.19</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.19</infourl>
         <downloads>
@@ -766,6 +814,7 @@
         <description>0.24.17 plus: carries the contracts of the next versions of ja-directory, ja-prodex, ja-rent, ja-resume, ja-sensei, ja-seven, ja-tour, ja-conf, ja-vital, ja-symphony and ja-resort, whose stylesheets read a worn design system (TracyHQ/tch#1134)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.18</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.18</infourl>
         <downloads>
@@ -783,6 +832,7 @@
         <description>0.24.16 plus: carries the contract of the JA Restaurant j6 1.0.3 quickstart; every contract of 0.24.16 unchanged; no code change</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.17</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.17</infourl>
         <downloads>
@@ -800,6 +850,7 @@
         <description>0.24.15 plus: carries the contracts of the published JA Voyara j6 1.0.6 and JA Spa j6 1.0.3 and 1.0.4 quickstarts; every contract of 0.24.15 unchanged; no code change</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.16</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.16</infourl>
         <downloads>
@@ -817,6 +868,7 @@
         <description>0.24.14 plus: carries the contract of the next JA Essence quickstart, ja-essence/j6/1.0.5 (ja_essence 1.3.4, Vietnamese headings in Be Vietnam Pro) (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.15</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.15</infourl>
         <downloads>
@@ -834,6 +886,7 @@
         <description>0.24.13 plus: template.languageOverrides offers a language pack's values that are still English reworded (vi-VN 4.2.2 "Show Profile" for en-GB "User Profile") and the column titles and captions of a T4 mega menu (etc/navigation/*.json), printed raw by T4, as page literals the output filter replaces (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.14</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.14</infourl>
         <downloads>
@@ -851,6 +904,7 @@
         <description>0.24.12 plus: template.languageOverrides offers the plugin strings a visitor reads (administrator/language plg_*.ini keys a plugin's tmpl/ or a visitor's form names) and the English-order date formats layouts pass through Text::_ (written as the language's own DATE_FORMAT_LC3); template.siteSettings keeps other_glyphFaces, the faces that draw the letters of the site's language its template's fonts cannot, printed in every page's head (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.13</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.13</infourl>
         <downloads>
@@ -868,6 +922,7 @@
         <description>0.24.11 plus: template.languageOverrides reads in pages (offset, nextOffset) and offers the words a visitor reads first, so a long template no longer stops at 600 strings; the language step gives the T4/T3 module chrome words too, and sets the dates modules print (show_date_format, date_format) to the language's own DATE_FORMAT_LC3, recorded so revert gives each format back (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.12</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.12</infourl>
         <downloads>
@@ -885,6 +940,7 @@
         <description>0.24.10 plus: template.languageOverrides reads the template's and the site's front-end strings that are missing, left in en-GB or implausibly long in the site's language, and writes their translations to the language override file, undone by apply.revert; siteLanguage and a written sourceLanguage name the module headings and the visitor-facing words modules keep in their params (a newsletter's intro and button), take their translations with the language and give them back on revert (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.11</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.11</infourl>
         <downloads>
@@ -902,6 +958,7 @@
         <description>0.24.9 plus: a module written through content.update ends with the ordering the call names, 0 included, on create and update (Tracy's design-system module asked for 0 and was stored at 2, then 3); a row the quickstart never shipped is held to the ACL it inherits, so a module or page added to the site is no longer reported as "Access-level or ACL definition changed"; Tracy's own design-system module (marked &lt;style id="tracy-ds-slot"&gt;) is not counted as a row the site gained, so it no longer reports "Quickstart inventory changed" while any other added row still does, and a baseline saved while it still counted is moved by the next content apply instead of refusing it (TracyHQ/tch design-system slot)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.10</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.10</infourl>
         <downloads>
@@ -919,6 +976,7 @@
         <description>0.24.8 plus: carries the contract of the next JA Essence quickstart, ja-essence/j6/1.0.4 (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.9</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.9</infourl>
         <downloads>
@@ -936,6 +994,7 @@
         <description>0.24.7 plus: carries the contracts of the next versions of ja-trip, ja-mood, ja-nova, ja-space, ja-vega, ja-smallbiz, ja-social-ii, ja-spa, ja-morgan and ja-vogue, whose stylesheets read a worn design system (TracyHQ/tch#1095)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.8</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.8</infourl>
         <downloads>
@@ -953,6 +1012,7 @@
         <description>0.24.6 plus: carries the demo-trim map of ja-kinetic/j6/1.0.4 — a Kinetic site hides the 241 demo posts again (TracyHQ/tch, follow-up of #1087)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.7</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.7</infourl>
         <downloads>
@@ -970,6 +1030,7 @@
         <description>0.24.5 plus: carries the contracts of the next JA quickstart versions whose stylesheets read a worn design system — ja-voyara/j6/1.0.5, ja-kinetic/j6/1.0.4, ja-impact/j6/1.0.1, ja-donate/j6/1.0.2, ja-morgan/j6/1.0.3, ja-phio/j6/1.0.4, ja-podcast/j6/1.0.2 (TracyHQ/tch#1087)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.6</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.6</infourl>
         <downloads>
@@ -987,6 +1048,7 @@
         <description>0.24.4 plus: site.identity can turn on the site name in page titles and the home tab reads the site name alone; a T4 template takes the customer's share image where a page has none, and a template without T4 prints it as og:image; a language job keeps a dropped default-language prefix dropped; a write silent about tags keeps an article's tags; carries the ja-essence/j6/1.0.3 contract (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.5</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.5</infourl>
         <downloads>
@@ -1005,6 +1067,7 @@
         <description>0.24.3 plus: content.contract apply takes empty_links, link slots to empty where the layout the module renders was reviewed to draw no dead link without them (lib/link-layouts.json; Tracy Business j6 1.2.1): a button to a page the customer took off is taken off too, not sent to Contact (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.4</infourl>
         <downloads>
@@ -1023,6 +1086,7 @@
         <description>0.24.2 plus: a source edition written in another language than its en-GB tag (sourceLanguage.set with written:true) is relabelled to the language it is really written in, with its module headings, and reverted; the multilingual setup refuses while such a relabel stands (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.3</infourl>
         <downloads>
@@ -1041,6 +1105,7 @@
         <description>0.24.1 plus: a contract apply that fails partway takes back everything it wrote; carries the content contracts of the re-released quickstarts JA Social II 1.0.1, JA Donate 1.0.1 and JA Rent 1.0.1 (missing pages answer 404 instead of 500), JA Essence 1.0.2 and JA Vogue 1.0.3 (dark-mode footer logo) and Tracy Business 1.2.1 (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.2</infourl>
         <downloads>
@@ -1059,6 +1124,7 @@
         <description>0.24.0 plus: a T3 page shows only the customer's favicon, not also the template's favicon.ico (TracyHQ/claude-cowork#143); a content write keeps a module's ordering, so the contract apply is no longer refused as its own presentation drift; an article update that does not name tags keeps the article's tags (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.1</infourl>
         <downloads>
@@ -1077,6 +1143,7 @@
         <description>0.23.0 plus: carries the content contracts of nine re-released Joomla quickstarts (JA Essence 1.0.1, JA Vital 1.0.2, JA Vogue 1.0.2, JA Phio 1.0.3, JA Trip 1.0.3, JA Kinetic 1.0.3, JA Voyara 1.0.4, JA Morgan 1.0.2, Tracy Base 1.0.2), the re-releases that carry a logo for dark backgrounds (TracyHQ/tch#1013)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.24.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.0</infourl>
         <downloads>
@@ -1095,6 +1162,7 @@
         <description>0.22.0 plus: the template.siteSettings door writes a template's logo, logo for dark backgrounds and small screens, name, slogan and favicon into its T4 site profiles (templates/&lt;t&gt;/local/etc/site), with undo through apply.revert and without a presentation-drift warning; a template without T4 gets the customer's favicon (TracyHQ/claude-cowork#138)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.23.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.23.0</infourl>
         <downloads>
@@ -1113,6 +1181,7 @@
         <description>0.21.2 plus: multilingual.retire and .restore write in bulk, so hiding the languages nobody chose takes about 2.4 s instead of 22 s on a Tracy Business site (TracyHQ/claude-cowork#115); the site.identity door reads and sets the site name and the home page meta description (#117); an HTML slot write keeps identity tokens raw and stores an ampersand whole (#120)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.22.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.22.0</infourl>
         <downloads>
@@ -1131,6 +1200,7 @@
         <description>0.21.1 plus: the ja-vega/j6 1.0.3 content-contract profile, so a JA Vega quickstart site seals to its own design's profile (TracyHQ/claude-cowork#105)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.21.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.21.2</infourl>
         <downloads>
@@ -1149,6 +1219,7 @@
         <description>0.21.0 plus: 29 content-contract profiles added (23 Joomla j6, 6 WordPress wp7) so a quickstart site seals to its own design's profile instead of falling back to the tracy-apple default (TracyHQ/claude-cowork#101)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.21.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.21.1</infourl>
         <downloads>
@@ -1167,6 +1238,7 @@
         <description>0.20.3 plus: every release says which files it is (tracy-release.json, installed at administrator/components/com_claudecowork/tracy-release.json and attached to the release) and every install writes one receipt row to #__claudecowork_update_log (from and to version, tag, manifest hash, trigger: auto-updater, door, admin or unknown); the self-updater's log now reaches administrator/logs/plg_system_claudecoworkupdate.php; an unbound site is read without a contract instead of the tracy-apple default, and the content engine logs the Throwable it catches (TracyHQ/claude-cowork#94, #96, #97)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.21.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.21.0</infourl>
         <downloads>
@@ -1184,6 +1256,7 @@
         <description>0.20.2 plus: carries the JA Spa 1.0.1 (ja-spa/j6/1.0.1), JA Trip 1.0.2 (ja-trip/j6/1.0.2) and JA Space 1.0.2 (ja-space/j6/1.0.2) content contract profiles</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.20.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.3</infourl>
         <downloads>
@@ -1201,6 +1274,7 @@
         <description>0.20.1 plus: a credential is never a slot of a derived content map. A setting whose name says it holds one (smtp, api_key, password, client_secret, webhook...) takes its whole subtree out of the map, and a value whose shape gives it away (a Google or Stripe key, a JWT, a webhook address, a URL that carries a token) is skipped, so a key typed into a module or menu setting no longer reaches inspect, content.read or the files the Tracy host writes for an agent; nothing already written changes (TracyHQ/claude-cowork#87)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.20.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.2</infourl>
         <downloads>
@@ -1218,6 +1292,7 @@
         <description>0.20.0 plus: a write clears every cache group the site holds, as System › Clear Cache does, so a renamed article or a new picture shows in the module listings at once instead of after the cache lifetime; the groups of the article modules and of custom modules join the fallback list for a cache storage that lists none, and a group that will not clean never fails a write that landed (TracyHQ/claude-cowork#85)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.20.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.1</infourl>
         <downloads>
@@ -1235,6 +1310,7 @@
         <description>0.19.2 plus: content.list takes a search. A substring of a title, name or alias (case ignored, so one call reaches the language editions that share an alias stem), answered with the key search as proof the plugin read it and the exact count matched; every kind either filters or refuses it, and a request without search answers exactly as before (TracyHQ/claude-cowork#83)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.20.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.20.0</infourl>
         <downloads>
@@ -1252,6 +1328,7 @@
         <description>0.19.1 plus: derived content contracts for imported sites fit in memory on large sites (rows read in batches, filtered in SQL) and the built map is kept between requests in its own table; reading a slot no longer re-encodes its column, and picture hashes are kept by file signature, so a content.read on an imported site takes about 0.3 s instead of several seconds (TracyHQ/claude-cowork#80)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.19.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.19.2</infourl>
         <downloads>
@@ -1269,6 +1346,7 @@
         <description>0.19.0 plus: carries the Tracy Base 1.0.1 (tracy-base/j6/1.0.1) and JA Voyara 1.0.3 (ja-voyara/j6/1.0.3) content contract profiles, the quickstarts whose templates honour ?theme=dark|light for one page load</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.19.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.19.1</infourl>
         <downloads>
@@ -1286,6 +1364,7 @@
         <description>0.18.5 plus: an imported site can be bound to a content contract derived from its own rows (content.contract operation derive), with leaf slots inside module params, articles, categories and custom fields, calibrated against the rendered pages; custom field values can be written through content.update (kind fieldValue) (TracyHQ/claude-cowork#74)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.19.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.19.0</infourl>
         <downloads>
@@ -1303,6 +1382,7 @@
         <description>0.18.4 plus: a redirect and a custom field can be created through content.update, a redirect says when its System - Redirect plugin is off and extension.enable may switch that one core plugin on (TracyHQ/claude-cowork#68)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.5</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.5</infourl>
         <downloads>
@@ -1320,6 +1400,7 @@
         <description>0.18.3 plus: tracyaccess logs a Tracy editor into the administrator only, so a site whose Privacy Consent plugin is on shows Tracy's Browser tab the site instead of the profile form (TracyHQ/tch#516)</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.4</infourl>
         <downloads>
@@ -1337,6 +1418,7 @@
         <description>0.18.2 plus: content.read carries what a page prints beyond the contract's slots (mega menu captions and columns, menu item parameters, inlined module titles, article pictures, custom fields and author, and the categories and tags the readable articles live in), with render stamps on category and tag links; content.read takes ids to answer up to 100 details from one projection; and a read no longer writes inside its snapshot, so overlapping reads stop deadlocking each other.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.3</infourl>
         <downloads>
@@ -1354,6 +1436,7 @@
         <description>Release candidate 6: a quickstart contract recommends the design instead of locking it (Tracy ADR 0022). A bound site takes every action an unbound one does; where it differs from its quickstart's design the contract door answers with warnings, a bound row removed through Joomla closes only its own slots, and only a difference the contract's own write makes is refused. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.2</infourl>
         <downloads>
@@ -1371,6 +1454,7 @@
         <description>Release candidate 5 of the Content API reader: every content read carries its own revision, a contract apply accepts those revisions in place of an inspect and reports the new ones, and every contract refusal lists its problems with a code, the slot and content they concern, and whether a retry can succeed. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.0-rc.5</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.5</infourl>
         <downloads>
@@ -1388,6 +1472,7 @@
         <description>Release candidate 4 of the Content API v1 reader: a contract inspect or apply reads each kind of row in one query instead of one per row (35 queries instead of 21,931 on Tracy Business), with the same answers; each map field names its semantic key and a picture takes its alt from its paired slot. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.0-rc.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.4</infourl>
         <downloads>
@@ -1405,6 +1490,7 @@
         <description>Release candidate 3 of the Content API v1 reader: a module only one page places is read as that page's section, with its fields, slot keys and pictures; the all-languages home is left out when every language has its own. For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.0-rc.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.3</infourl>
         <downloads>
@@ -1422,6 +1508,7 @@
         <description>Release candidate 2 of the Content API v1 reader: a picture read from a slot names the block it belongs to (usages[].blockId). For Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.0-rc.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.18.0-rc.2</infourl>
         <downloads>
@@ -1439,6 +1526,7 @@
         <description>Release candidate for the Content API v1 reader (/content.json and content.read), for Tracy dev sites only. Not announced to installed sites.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.18.0-rc.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.4</infourl>
         <downloads>
@@ -1456,6 +1544,7 @@
         <description>Carries the site-identity profiles of Tracy Apple 1.3.0 and the Airbnb design 1.2.0 on it: the site name, slogan and monogram live in one "[Tracy] Site identity" module the page reads through plg_system_tracyidentity, so those slots may be emptied or filled like Tracy Business 1.2.0. No code change; built on 0.17.3.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.17.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.4</infourl>
         <downloads>
@@ -1473,6 +1562,7 @@
         <description>Writing an article or module the quickstart shipped without an ACL asset keeps it without one: Joomla minted an asset on save and, with no category asset, hung it under the root, so the contract refused the whole apply as an ACL change (ja-voyara page articles). The minted asset is removed through the Asset table. Built on 0.17.2.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.17.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.3</infourl>
         <downloads>
@@ -1490,6 +1580,7 @@
         <description>A sealed quickstart's source edition can be called by another tag of the same language. New `sourceLanguage.plan / set / revert` on content.contract: en-GB → en-US, en-AU, en-CA or en-NZ RELABELS the archive's English in place — the content language keeps its id and its `sef`, so `/en/`, `tb-main-en` and the megamenu are untouched, while every row, the site and administrator defaults and the Language Filter's x-default take the new tag. A copy would have lost the main menu. The empty content language Joomla's installer adds for the new pack is removed; the binding records the relabel, every later step (retire, a second edition, its revert) names the source by its new tag, and `revert` restores the published tag and label exactly. Measured on a local Tracy Business 1.1.0 site carrying vi-VN and fr-FR editions: relabelled in 12 s, `/en/` answers lang="en-us" with hreflang en-US and x-default, the main menu is whole, the contract inspects clean, and the revert gives back en-GB byte for byte.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.17.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.2</infourl>
         <downloads>
@@ -1507,6 +1598,7 @@
         <description>The ja-kinetic demo trim also hides the demo post its "Single Article" showcase opens (/pages/helixql, with its tag chips) and the two menu items that lead to it: an article a menu opens is a page unless it sits in the blog a hidden listing showed. A site trimmed with the previous map must be trimmed again.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.17.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.1</infourl>
         <downloads>
@@ -1524,6 +1616,7 @@
         <description>A Tracy quickstart can keep its identity — name, contact, social links — in one "[Tracy] Site identity" module: the contract lets exactly the identity tokens ({site.name}, {contact.email}...) through where it refuses every other Joomla directive, lets an identity slot be emptied or filled so a fact the customer lacks is not left at the demo's value, and refuses a translation that drops a token. Carries the tracy-business/j6 1.2.0 profile and 0.16.16.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.17.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.17.0</infourl>
         <downloads>
@@ -1541,6 +1634,7 @@
         <description>A picture changed on the source reaches every language the site carries, in the same apply: words wait for their language job, a picture is the same picture everywhere. Before this, a photo drawn for `/en/careers` stayed the demo on `/vi/` and `/fr/` (measured on a local Tracy Business site). Carries 0.16.15.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.16</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.16</infourl>
         <downloads>
@@ -1558,6 +1652,7 @@
         <description>A hidden article no longer shows on the tag pages. Joomla keeps a second copy of an article's state in #__ucm_content, and com_tags lists items by that copy; the Table keeps the two in step, the raw visibility UPDATE used by the demo trim, retire and taking an edition back did not. Measured on a JA Kinetic site: 240 trimmed demo posts still listed under the tag pages, 205 links to 404. setVisibility now writes both. The JA Kinetic demo-trim map also hides the Tags menu item and its alias, which list only demo posts (a site trimmed with the previous map must be trimmed again). Carries 0.16.14.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.15</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.15</infourl>
         <downloads>
@@ -1575,6 +1670,7 @@
         <description>A language the quickstart ships an edition of now shows the customer's pictures and links there too: a taken edition row held the archive's picture, so `/vi/` kept the demo hero while `/en/` showed the one drawn for the customer. The source's picture goes into every image slot of a taken row, its links are pointed at the edition, and an article's `images` column is written with them. Carries 0.16.13.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.14</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.14</infourl>
         <downloads>
@@ -1592,6 +1688,7 @@
         <description>A customer opening a page of a T4 site no longer locks its content door. T4 compiles media/t4/css/&lt;styleId&gt;-sub.css the first time a style renders a page that is not its menu item's own target; a contract capture only holds the ones its crawl happened to open, so the next visitor to any other such page made inspect refuse the site with "Unexpected presentation file" (measured on a JA Kinetic site: 36-sub.css, and the build's seed stage stopped). That file is now treated as the compiled cache it is, like media/t4/optimize; a script, a .php or a differently named stylesheet there is still refused. Carries 0.16.12.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.13</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.13</infourl>
         <downloads>
@@ -1609,6 +1706,7 @@
         <description>A customer can take any language the quickstart already ships, one or several, and keep it the way the archive built it. Tracy Business ships 41 editions made by its own add-language tool, each with its own menus (`tb-main-vi`), megamenu, modules and categories; a copy made from the source sat in `tb-main-en` while the template reads `tb-main-&lt;sef&gt;`, so `/vi/` lost its main menu. A contract may now carry `editions.json`, generated from the release database and pinned to the base: for such a language the receiver writes the translation into the edition's own rows, shows them, spares them from retire, joins the edition's association group, and a revert returns words and visibility without deleting anything. Inspect holds each taken row to the add-language rules the generator proved against every edition of the release. For a language without an edition the copy road stays, now with: the archive's own rows moved off an alias a copy needs, association groups kept whole, a new switcher placed even when its id matches another kind's, and a second Build able to bind and seed while a language is half made. Carries 0.16.11.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.12</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.12</infourl>
         <downloads>
@@ -1626,6 +1724,7 @@
         <description>A quickstart that ships editions of its own no longer leaves them on a customer's site. `multilingual.retire` hides (never deletes) every content language the customer did not ask for, and every row the archive shipped in a language other than its source that the contract does not govern, so the switcher and hreflang offer only the site's own languages and a derived edition no longer sits beside the archive's. Rows move by their visibility column only (setVisibility, as the demo trim does), so no row's ACL changes; `multilingual.restore` brings a pass back. A switcher the archive already ships (Business reuses its own, so the topbar never carries two) is held to its own lock, assignment and count, not to the shape of a new switcher, so a Business site can gain a language. The door also reserves 300 s of execution beside its memory: a contract inspect of the 43-language Business quickstart outlived PHP's stock 30 s. A language copy keeps its source article's note (Business marks every article), a job taken back never deletes a governed module, and a new switcher whose id matches a governed menu item or article is still placed on every page. Every shipped multilingual contract now runs the whole language road in the test suite before a release. Carries 0.16.10: one language for a quickstart with no second edition.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.11</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.11</infourl>
         <downloads>
@@ -1643,6 +1742,7 @@
         <description>A sealed quickstart with no second edition can be built in the customer's language. New `siteLanguage.plan / set / revert`: the reviewed language pack is installed (verified against the catalog, as for a second edition) and made the default for the site and the administrator, with the previous defaults kept on record for the revert. It needs no multilingual profile — JA Kinetic has none — and refuses a site that already has a second edition. Measured on a local JA Kinetic 1.0.0 site: vi-VN 4.2.2.1 installed and set in 5.8 s, the home page and the administrator answer lang="vi-vn", and the contract inspects clean, demo trim included.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.10</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.10</infourl>
         <downloads>
@@ -1660,6 +1760,7 @@
         <description>Two false refusals that stopped the `language` stage on text Tracy itself shipped. A figure is now compared by its VALUE, not its spelling: Vietnamese writes 4.800 where English writes 4,800 and 6,2 where English writes 6.2, and every locale that groups with a dot or a space hit the same wall — a changed or missing figure is still refused. And an angle bracket counts as markup only where the source has none, so a translation that faithfully keeps an email address in brackets is no longer turned away. Carries the 0.16.5 payload: the tracy-business/j6/1.1.0 multilingual profile.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.6</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.6</infourl>
         <downloads>
@@ -1677,6 +1778,7 @@
         <description>Bundles the tracy-business/j6/1.1.0 multilingual profile, so a Tracy Business site can be given a second language. The profile is written for an archive that is ALREADY two authored editions: its 157 en-GB rows are translated, while the 180 ru-RU rows the customer authored and the rows left at language='*' are declared shared and never copied, and the language switcher the archive already publishes is reused instead of a second one being created.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.5</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.5</infourl>
         <downloads>
@@ -1694,6 +1796,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Replaces the tracy-business/j6/1.1.0 presentation lock with one captured from the 1.1.0 archive itself, carrying ACL rules for all 6,144 entities of its 43 language editions instead of the 322 of 1.0.0, so bind on a Tracy Business site no longer refuses with an entityRules change. The API door now reserves 512M of PHP memory before loading a profile, so that 8 MB lock decodes on a site left at PHP's 128M default; a higher or unlimited limit is never lowered.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.4</infourl>
         <downloads>
@@ -1711,6 +1814,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the Tracy Business profiles, tracy-business/j6/1.0.0 and tracy-business/j6/1.1.0, so a site built on the tracy-business quickstart verifies against its own contract and its build passes the check stage instead of dying at bind. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.3</infourl>
         <downloads>
@@ -1728,6 +1832,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara 1.0.2 profile, the archive that ships the template's agent documentation (AGENTS.md, CLAUDE.md and docs/) inside templates/ja_voyara, so a site built on it verifies against its own contract instead of reading those files as unexpected presentation. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.2</infourl>
         <downloads>
@@ -1745,6 +1850,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Carries the JA Voyara profile, so a site built on the JoomlArt ja_voyara quickstart verifies against its own contract. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.1</infourl>
         <downloads>
@@ -1762,6 +1868,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. One quickstart archive can now serve more than one design: the content contract a site is held to is named by the provisioner rather than fixed in the code, so a site built on the Apple base with the Airbnb template activated verifies against its own profile. A receiver that does not carry the profile a site names refuses every write instead of reading as a site with no contract at all.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.16.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.16.0</infourl>
         <downloads>
@@ -1780,6 +1887,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. A multilingual site can now be built through the same door as its words: a content language is a kind, so the languages a site speaks are declared the way its articles are. A menu can also name itself — menutype was the one column a menu item points at that the door would not write, so a menu made through it was reachable by nothing.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.12.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.12.0</infourl>
         <downloads>
@@ -1798,6 +1906,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Making a template style the site default now clears the previous one, the way the style manager does: two rows flagged home left the site rendering with whichever the query reached first.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.11.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.11.2</infourl>
         <downloads>
@@ -1815,6 +1924,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. A contact can now be created: its alias and metadata are columns the table requires and the door could not name, so every attempt was refused by the database with a message that named no contact.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.11.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.11.1</infourl>
         <downloads>
@@ -1832,6 +1942,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. A menu item can now be made the site home page, so a site built from a design opens on its own landing page rather than on the article list Joomla ships with; and the manifest names its platform, so a caller holding a token for a site it has never seen can tell which CMS answered.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.11.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.11.0</infourl>
         <downloads>
@@ -1849,6 +1960,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Takes the updates Tracy announces by itself now: Joomla shows an extension update and waits, so a site nobody administers by hand sat on the version it was born with.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.10.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.10.0</infourl>
         <downloads>
@@ -1867,6 +1979,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Adds extension.enable, so a plugin can be switched on or off and the step undone; and db.snapshot with db.rollback, which copy the tables aside before an upgrade and rename them back if it fails.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.9.0</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.9.0</infourl>
         <downloads>
@@ -1884,6 +1997,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Archives a path longer than USTAR allows with a PAX header instead of failing the part, matching the WordPress plugin.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.23</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.23</infourl>
         <downloads>
@@ -1901,6 +2015,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. files.pack can now hand each part back inline, for a host that cannot open an outbound connection at all; info reports which upload road the host has.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.22</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.22</infourl>
         <downloads>
@@ -1918,6 +2033,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Uploads through PHP's own HTTP streams when ext/curl is missing, so a host without curl can still hand its files to Tracy.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.21</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.21</infourl>
         <downloads>
@@ -1935,6 +2051,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Adds a system plugin that answers that endpoint before Joomla routes the request, on the site and the administrator alike, so a coming-soon page, offline switch or maintenance screen no longer hides it.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.20</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.20</infourl>
         <downloads>
@@ -1952,6 +2069,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Bundles the auto-login system plugin, now mapping a coworker's Role to their Joomla group: an owner or admin signs in as a Super User, everyone else as Manager.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.19</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.19</infourl>
         <downloads>
@@ -1969,6 +2087,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint. Now also bundles the auto-login system plugin, so one package carries both.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.18</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.18</infourl>
         <downloads>
@@ -1986,6 +2105,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.17</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.17</infourl>
         <downloads>
@@ -2006,6 +2126,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.14</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.14</infourl>
         <downloads>
@@ -2026,6 +2147,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.13</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.13</infourl>
         <downloads>
@@ -2046,6 +2168,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.12</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.12</infourl>
         <downloads>
@@ -2066,6 +2189,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.7</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.7</infourl>
         <downloads>
@@ -2086,6 +2210,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.6</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.6</infourl>
         <downloads>
@@ -2106,6 +2231,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.5</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.5</infourl>
         <downloads>
@@ -2126,6 +2252,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.4</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.4</infourl>
         <downloads>
@@ -2146,6 +2273,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.3</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.3</infourl>
         <downloads>
@@ -2167,6 +2295,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.2</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.2</infourl>
         <downloads>
@@ -2188,6 +2317,7 @@
         <description>Lets an AI assistant read and, when asked, write this site over one token-authenticated endpoint.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
+        <client>site</client>
         <version>0.8.1</version>
         <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.8.1</infourl>
         <downloads>

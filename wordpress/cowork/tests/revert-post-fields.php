@@ -81,6 +81,28 @@ $rp('content.update', ['apply_id' => 'rp-10', 'kind' => 'post', 'id' => 88, 'fie
 $rpRevert = $rp('apply.revert', ['apply_id' => 'rp-9']);
 check('a later featured image is not overwritten by an older revert', [$rpRevert['error'] ?? null, WP_Fake::$meta['88:_thumbnail_id'] ?? null], ['conflict', 33]);
 
+// The modified date is part of what a write changes: WordPress stamps it on every update, so a revert
+// that leaves the post as it was before the write puts the write's stamp back too. Measured on a
+// stand: the text came back byte for byte and post_modified kept the write's time.
+$rpDated = static fn (int $id) => $rpPost($id, 'Card') + ['post_modified' => '2026-01-02 03:04:05', 'post_modified_gmt' => '2026-01-02 01:04:05'];
+WP_Fake::$posts[89] = $rpDated(89);
+$rp('content.update', ['apply_id' => 'rp-12', 'kind' => 'post', 'id' => 89, 'fields' => ['post_content' => '<p>Card, edited</p>']]);
+check('the write stamps the post as modified', WP_Fake::$posts[89]['post_modified'] !== '2026-01-02 03:04:05', true);
+$rpRevert = $rp('apply.revert', ['apply_id' => 'rp-12']);
+check('apply.revert puts the modified date back with the text', [$rpRevert['ok'] ?? null, WP_Fake::$posts[89]], [true, $rpDated(89)]);
+// A whole-row undo (a trash) the same way.
+WP_Fake::$posts[90] = $rpDated(90);
+$rp('content.update', ['apply_id' => 'rp-13', 'kind' => 'post', 'id' => 90, 'fields' => ['post_status' => 'draft']]);
+$rp('apply.revert', ['apply_id' => 'rp-13']);
+check('a status change and its revert leave the modified date as it was', WP_Fake::$posts[90], $rpDated(90));
+// A later change that the revert keeps is a change since then: the post stays dated now.
+WP_Fake::$posts[91] = $rpDated(91);
+$rp('content.update', ['apply_id' => 'rp-14', 'kind' => 'post', 'id' => 91, 'fields' => ['post_title' => 'Card two']]);
+$rp('content.update', ['apply_id' => 'rp-15', 'kind' => 'post', 'id' => 91, 'fields' => ['post_content' => '<p>Later</p>']]);
+$rpRevert = $rp('apply.revert', ['apply_id' => 'rp-14']);
+check('with a later edit kept, the revert does not date the post back', [$rpRevert['ok'] ?? null, WP_Fake::$posts[91]['post_title'], WP_Fake::$posts[91]['post_content'], WP_Fake::$posts[91]['post_modified'] !== '2026-01-02 03:04:05'],
+    [true, 'Card', '<p>Later</p>', true]);
+
 // A create's undo is still the delete, featured image and all.
 $rpNew = $rp('content.update', ['apply_id' => 'rp-11', 'kind' => 'post', 'id' => 0, 'fields' => ['post_title' => 'Fresh', 'featured_image_id' => 22]]);
 $rpNewId = (int) ($rpNew['id'] ?? 0);

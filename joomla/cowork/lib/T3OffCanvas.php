@@ -4,7 +4,7 @@
  * (plg_system_claudecoworkapi/media/js/t3-offcanvas-a11y.js, printed by plg_system_claudecoworkapi).
  *
  * The script is written against one T3 off-canvas.js — the bytes every T3 quickstart contract locks
- * (T3 3.3.2, `base-bs3`). It clicks T3's own × and reads the classes T3 sets, so it is printed only
+ * (T3 3.3.2, `base-bs3`). It clicks T3's own × (or ☰) and reads the classes T3 sets, so it is printed only
  * where those are the bytes on disk: a T3 template whose style turns the drawer on, its T3 base's
  * off-canvas.js hashing to one listed here. A T3 that is different (updated upstream, edited by hand)
  * gets nothing, and the drawer stays exactly as T3 draws it.

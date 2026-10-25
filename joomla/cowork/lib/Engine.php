@@ -2397,8 +2397,10 @@ final class Engine
                     if ($idsBack !== []) $this->writer->writeModuleTitles($idsBack);
                     if ($textIdsBack !== []) $this->writer->writeModuleParams($textIdsBack);
                     $this->log->record($apply, ['op' => 'languageDefaults', 'before' => $before]);
+                    // The baseline moves only where the revert wrote — never a fresh snapshot, which would take a
+                    // change the customer made into the baseline unseen. Proven by the full read.
                     $this->contract->rebind($this->contract->bindingWithSiteLanguage(null, $titlesBack, $textsBack));
-                    $this->contract->rebind($this->contract->inspect()['snapshot']);
+                    $this->contract->inspect();
                     return [];
                 });
                 try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
@@ -2445,8 +2447,9 @@ final class Engine
                     'locale' => $locale, 'previous' => $defaults, 'applyId' => $apply, 'requestId' => $request,
                     'packVersion' => $pack['version'] ?? null, 'at' => gmdate('c'),
                 ] + ($before !== [] ? ['titles' => $before] : []) + ($textsBefore !== [] ? ['texts' => $textsBefore] : []), $after, $textsAfter));
-                // Proven, then stored — the same two steps every other sealed write ends with.
-                $this->contract->rebind($this->contract->inspect()['snapshot']);
+                // 🔒 THE BASELINE MOVES ONLY WHERE THE LANGUAGE WROTE — never a fresh snapshot, which would take a
+                // change the customer made into the baseline unseen. Proven: the full read checks every row.
+                $this->contract->inspect();
                 return [];
             });
             try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}

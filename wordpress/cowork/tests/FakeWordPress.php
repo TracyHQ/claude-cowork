@@ -218,6 +218,11 @@ function wp_update_post(array $data, bool $wpError = false)
         return $wpError ? new WP_Error("no such post: {$id}") : 0;
     }
     $data = wp_fake_apply_content_filter($data);
+    // wp_insert_post stamps an update with the time it ran, whatever the caller passed. Only on a row
+    // that carries the column, so rows a test writes without one compare as before.
+    if (array_key_exists('post_modified', WP_Fake::$posts[$id])) {
+        $data['post_modified'] = $data['post_modified_gmt'] = gmdate('Y-m-d H:i:s');
+    }
     WP_Fake::$posts[$id] = array_merge(WP_Fake::$posts[$id], $data);
     return $id;
 }
