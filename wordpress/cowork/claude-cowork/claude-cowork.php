@@ -5,7 +5,7 @@
  * Plugin URI:  https://github.com/TracyHQ/claude-cowork
  * Update URI:  https://github.com/TracyHQ/claude-cowork
  * Description: Lets an AI assistant work on this site over one token-authenticated endpoint: it can read the database, the files and what is installed, and — only when you ask for it — install a plugin or theme, turn it on, edit a post, add a file to your media, or change a file of your theme. Edits to posts, media and theme files are recorded so they can be put back. Installing is additive and the CMS owns the uninstall, so an install is undone the same way you would undo it yourself. Remove the token to switch it off.
- * Version:     0.18.31
+ * Version:     0.18.32
  * Author:      Tracy
  * License:     GPL-2.0-or-later
  * Text Domain: claude-cowork
