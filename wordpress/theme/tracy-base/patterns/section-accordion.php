@@ -36,7 +36,7 @@
 <!-- /wp:details -->
 <!-- wp:details {"name":"acm-accordion","className":"tracy-faq__item border-t border-border-soft py-4 m-0","metadata":{"role":"content","name":"accordion.item.2"}} -->
 <details class="wp-block-details tracy-faq__item border-t border-border-soft py-4 m-0" name="acm-accordion"><summary><?php esc_html_e( 'Can our team update the content?', 'tracy-base' ); ?></summary><!-- wp:paragraph {"className":"mt-3 mb-0 text-fg-2","metadata":{"role":"content","name":"accordion.entry-answer.2"}} -->
-<p class="mt-3 mb-0 text-fg-2"><?php esc_html_e( 'The demo uses editable Joomla articles and modules. Your team can replace words, images, links and section content through the admin.', 'tracy-base' ); ?></p>
+<p class="mt-3 mb-0 text-fg-2"><?php esc_html_e( 'The demo uses editable WordPress pages and blocks. Your team can replace words, images, links and section content through the admin.', 'tracy-base' ); ?></p>
 <!-- /wp:paragraph --></details>
 <!-- /wp:details -->
 <!-- wp:details {"name":"acm-accordion","className":"tracy-faq__item border-t border-border-soft py-4 m-0","metadata":{"role":"content","name":"accordion.item.3"}} -->

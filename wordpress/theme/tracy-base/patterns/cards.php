@@ -4,7 +4,7 @@
  * Slug: tracy/cards
  * Categories: query
  * Block Types: core/query
- * Description: The listing: a query loop of cards — image, kind (excerpt), name (title). Used by the blog and archive templates.
+ * Description: The listing: a query loop of cards — image, name (title), excerpt. Used by the blog and archive templates.
  * As tracy-base ships it: the empty-state line goes through the theme text domain, so a site in another language shows it in it.
  *
  * @package tracy-base
@@ -18,7 +18,6 @@
 <!-- wp:post-featured-image {"isLink":true,"aspectRatio":"4/3","className":"tracy-card__media"} /-->
 <!-- wp:group {"className":"tracy-card__body","layout":{"type":"default"}} -->
 <div class="wp-block-group tracy-card__body">
-<!-- wp:post-terms {"term":"category","className":"tracy-eyebrow"} /-->
 <!-- wp:post-title {"level":3,"isLink":true,"className":"tracy-card__title"} /-->
 <!-- wp:post-excerpt {"excerptLength":24,"className":"tracy-card__text"} /-->
 </div>

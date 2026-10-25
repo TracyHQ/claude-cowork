@@ -34,7 +34,7 @@
 </div>
 <!-- /wp:group -->
 <!-- wp:image {"className":"acm-story-chapter__media rounded-lg overflow-hidden","sizeSlug":"large","metadata":{"role":"content","name":"story-chapter.media"}} -->
-<figure class="wp-block-image size-large acm-story-chapter__media rounded-lg overflow-hidden"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'A graphite field lit from the lower left', 'tracy-base' ); ?>"/></figure>
+<?php /* ds-keep: rounded-lg reads --wp--custom--radius--lg, which reads --ds-card-radius in theme.json */ ?><figure class="wp-block-image size-large acm-story-chapter__media rounded-lg overflow-hidden"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/hero-placeholder.svg' ) ); ?>" alt="<?php esc_attr_e( 'A graphite field lit from the lower left', 'tracy-base' ); ?>"/></figure>
 <!-- /wp:image -->
 </div>
 <!-- /wp:group -->

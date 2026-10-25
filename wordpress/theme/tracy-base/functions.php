@@ -23,6 +23,9 @@ require_once __DIR__ . '/inc/asset-version.php';
 // The customer's logo for dark backgrounds (option tracy_logo_dark), the site name as text where no logo
 // fits, and {site.title}/{year} in a copyright line: inc/brand-logo.php.
 require_once __DIR__ . '/inc/brand-logo.php';
+// The block and site editors get plain colours where a palette entry reads a design-system role
+// (`var(--ds-c-bg, #f5f3ee)`): their colour pickers parse the raw value. inc/role-reads.php.
+require_once __DIR__ . '/inc/role-reads.php';
 
 const TRACY_NAVS  = array( 'top-left', 'top-centered', 'brand-centered', 'sidebar', 'overlay' );
 const TRACY_HEROS = array( 'split', 'centered', 'cover', 'stack' );
@@ -406,18 +409,26 @@ add_action(
 	}
 );
 
-add_action(
-	'wp_enqueue_scripts',
-	function (): void {
-		if ( ! in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
-			return;
-		}
-		foreach ( array( 'wp-block-library', 'wp-block-library-theme', 'global-styles', 'classic-theme-styles', 'core-block-supports', 'wp-emoji-styles' ) as $handle ) {
-			wp_dequeue_style( $handle );
-		}
-	},
-	100
-);
+/**
+ * A design page (fixture, artifact) loads only its own sheets: the core and global styles go.
+ *
+ * On a block theme WordPress prints Customizer › Additional CSS (the `custom_css` post) inside the
+ * `global-styles` inline sheet and takes `wp_custom_css_cb` off `wp_head` (WordPress 7.1.3,
+ * `wp_enqueue_global_styles`), so dequeuing `global-styles` silently dropped the site's Additional
+ * CSS from every design page — the seeded home page among them (TracyHQ/tch#1710). It is the site
+ * owner's CSS, not WordPress's element rules, so it is handed back to WordPress's own printer: a
+ * `<style id="wp-custom-css">` at `wp_head` 101, after every sheet of the page.
+ */
+function tracy_design_page_styles(): void {
+	if ( ! in_array( tracy_page_kind(), array( 'fixture', 'artifact' ), true ) ) {
+		return;
+	}
+	foreach ( array( 'wp-block-library', 'wp-block-library-theme', 'global-styles', 'classic-theme-styles', 'core-block-supports', 'wp-emoji-styles' ) as $handle ) {
+		wp_dequeue_style( $handle );
+	}
+	add_action( 'wp_head', 'wp_custom_css_cb', 101 );
+}
+add_action( 'wp_enqueue_scripts', 'tracy_design_page_styles', 100 );
 
 add_action(
 	'after_setup_theme',

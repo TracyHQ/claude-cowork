@@ -2,7 +2,7 @@
 /**
  * Title: Features intro
  * Slug: tracy-base/section-features-intro
- * Description: Eyebrow, title, lead and four cards, the first a spotlight on the warm surface with its own label and the wide track — the Joomla ACM block `features-intro`. Each card links out with its own label. The icon branch is not carried: `card-icon` is empty on both source instances.
+ * Description: Eyebrow, title, lead and four cards, the first a spotlight on the warm surface and the wide track (no label: the approved Joomla page shows none) — the Joomla ACM block `features-intro`. Each card links out with its own label. The icon branch is not carried: `card-icon` is empty on both source instances.
  * Categories: tracy-base, tracy
  * Post Types: page
  * Viewport Width: 1200
@@ -33,9 +33,6 @@
 <div class="wp-block-group tracy-grid tracy-cards acm-features-intro__grid grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 <!-- wp:group {"className":"tracy-card acm-features-intro__card acm-features-intro__card--feature bg-surface-warm p-8 flex flex-col","metadata":{"name":"features-intro.item.1"}} -->
 <div class="wp-block-group tracy-card acm-features-intro__card acm-features-intro__card--feature bg-surface-warm p-8 flex flex-col">
-<!-- wp:paragraph {"className":"tracy-eyebrow","metadata":{"role":"content","name":"features-intro.spotlight-label"}} -->
-<p class="tracy-eyebrow"><?php esc_html_e( 'The contract', 'tracy-base' ); ?></p>
-<!-- /wp:paragraph -->
 <!-- wp:heading {"level":3,"className":"text-xl mb-2","metadata":{"role":"content","name":"features-intro.card-title.1"}} -->
 <h3 class="wp-block-heading text-xl mb-2"><?php esc_html_e( 'Plan with purpose', 'tracy-base' ); ?></h3>
 <!-- /wp:heading -->

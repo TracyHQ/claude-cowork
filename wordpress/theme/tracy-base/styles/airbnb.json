@@ -8,82 +8,82 @@
         {
           "slug": "bg",
           "name": "Background",
-          "color": "#ffffff"
+          "color": "var(--ds-c-bg, #ffffff)"
         },
         {
           "slug": "surface",
           "name": "Surface",
-          "color": "#ffffff"
+          "color": "var(--ds-c-surface, #ffffff)"
         },
         {
           "slug": "surface-warm",
           "name": "Surface warm",
-          "color": "#f7f7f7"
+          "color": "var(--ds-c-surface-warm, #f7f7f7)"
         },
         {
           "slug": "fg",
           "name": "Foreground",
-          "color": "#222222"
+          "color": "var(--ds-c-fg, #222222)"
         },
         {
           "slug": "fg-2",
           "name": "Foreground 2",
-          "color": "#3f3f3f"
+          "color": "var(--ds-c-fg-2, #3f3f3f)"
         },
         {
           "slug": "muted",
           "name": "Muted",
-          "color": "#6a6a6a"
+          "color": "var(--ds-c-muted, #6a6a6a)"
         },
         {
           "slug": "meta",
           "name": "Meta",
-          "color": "#929292"
+          "color": "var(--ds-c-meta, #929292)"
         },
         {
           "slug": "border",
           "name": "Border",
-          "color": "#dddddd"
+          "color": "var(--ds-c-border, #dddddd)"
         },
         {
           "slug": "border-soft",
           "name": "Border soft",
-          "color": "#ebebeb"
+          "color": "var(--ds-c-border-soft, #ebebeb)"
         },
         {
           "slug": "accent",
           "name": "Accent",
-          "color": "#ff385c"
+          "color": "var(--ds-c-accent, #ff385c)"
         },
         {
           "slug": "accent-on",
           "name": "On accent",
-          "color": "#ffffff"
+          "color": "var(--ds-c-accent-on, #ffffff)"
         },
         {
           "slug": "accent-hover",
           "name": "Accent hover",
-          "color": "#e31c5f"
+          "color": "var(--ds-c-accent-hover, #e31c5f)"
         },
         {
           "slug": "accent-active",
           "name": "Accent active",
-          "color": "#e00b41"
+          "color": "var(--ds-c-accent-active, #e00b41)"
         },
         {
           "slug": "success",
           "name": "Success",
-          "color": "#008a05"
+          "color": "var(--ds-c-success, #008a05)"
         },
         {
           "slug": "warn",
           "name": "Warn",
-          "color": "#c47700"
+          "color": "var(--ds-c-warn, #c47700)"
         },
         {
           "slug": "danger",
           "name": "Danger",
-          "color": "#c13515"
+          "color": "var(--ds-c-danger, #c13515)"
         }
       ]
     },
@@ -92,12 +92,12 @@
         {
           "slug": "display",
           "name": "Display",
-          "fontFamily": "\"Airbnb Cereal VF\", \"Airbnb Cereal App\", Circular,\n    -apple-system, system-ui, \"Helvetica Neue\", Roboto, sans-serif"
+          "fontFamily": "var(--ds-font-display, \"Airbnb Cereal VF\", \"Airbnb Cereal App\", Circular,\n    -apple-system, system-ui, \"Helvetica Neue\", Roboto, sans-serif)"
         },
         {
           "slug": "body",
           "name": "Body",
-          "fontFamily": "\"Airbnb Cereal VF\", \"Airbnb Cereal App\", Circular,\n    -apple-system, system-ui, \"Helvetica Neue\", Roboto, sans-serif"
+          "fontFamily": "var(--ds-font-body, \"Airbnb Cereal VF\", \"Airbnb Cereal App\", Circular,\n    -apple-system, system-ui, \"Helvetica Neue\", Roboto, sans-serif)"
         },
         {
           "slug": "mono",
@@ -210,17 +210,17 @@
         "phone": "32px"
       },
       "radius": {
-        "sm": "8px",
-        "md": "14px",
-        "lg": "20px",
-        "pill": "9999px"
+        "sm": "var(--ds-input-radius, 8px)",
+        "md": "var(--ds-btn-radius, 14px)",
+        "lg": "var(--ds-card-radius, 20px)",
+        "pill": "var(--ds-pill-radius, 9999px)"
       },
       "elev": {
         "flat": "none",
         "ring": "0 0 0 1px var(--wp--preset--color--border)",
-        "raised": "rgba(0, 0, 0, 0.02) 0 0 0 1px,\n    rgba(0, 0, 0, 0.04) 0 2px 6px 0,\n    rgba(0, 0, 0, 0.1) 0 4px 8px 0"
+        "raised": "rgba(0, 0, 0, 0.02) 0 0 0 1px,\n    rgba(0, 0, 0, 0.04) 0 2px 6px 0,\n    rgba(0, 0, 0, 0.1) 0 4px 8px 0 /* ds-keep: shadow depth, not a colour role */"
       },
-      "focusRing": "0 0 0 2px var(--wp--preset--color--fg)",
+      "focusRing": "0 0 0 2px var(--ds-c-focus-ring, var(--wp--preset--color--fg))",
       "motion": {
         "fast": "150ms",
         "base": "200ms"

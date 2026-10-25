@@ -15,7 +15,7 @@
 <!-- wp:group {"tagName":"section","className":"tracy-section acm-cta-capsule pb-section-phone sm:pb-section-tablet lg:pb-section-desktop px-container-phone sm:px-container-tablet lg:px-container-desktop"} -->
 <section class="wp-block-group tracy-section acm-cta-capsule pb-section-phone sm:pb-section-tablet lg:pb-section-desktop px-container-phone sm:px-container-tablet lg:px-container-desktop">
 <!-- wp:group {"className":"acm-cta-capsule__box max-w-page mx-auto flex flex-wrap items-center justify-between gap-6 p-8 rounded-lg border border-accent/40 bg-accent/10"} -->
-<div class="wp-block-group acm-cta-capsule__box max-w-page mx-auto flex flex-wrap items-center justify-between gap-6 p-8 rounded-lg border border-accent/40 bg-accent/10">
+<?php /* ds-keep: rounded-lg reads --wp--custom--radius--lg, which reads --ds-card-radius in theme.json */ ?><div class="wp-block-group acm-cta-capsule__box max-w-page mx-auto flex flex-wrap items-center justify-between gap-6 p-8 rounded-lg border border-accent/40 bg-accent/10">
 <!-- wp:group {"className":"acm-cta-capsule__copy max-w-[62ch]"} -->
 <div class="wp-block-group acm-cta-capsule__copy max-w-[62ch]">
 <!-- wp:paragraph {"className":"acm-cta-capsule__statement font-display text-xl leading-tight mb-1","metadata":{"role":"content","name":"cta-capsule.statement"}} -->
