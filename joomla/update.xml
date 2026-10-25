@@ -20,6 +20,25 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>JA Boxing quickstart 1.0.4 content contract (ja-boxing/j6/1.0.4): image alt text from the article in four template overrides, and the template preview's ?theme=dark|light</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.63</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.63</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.63/pkg_claudecowork-0.24.63.zip</downloadurl>
+        </downloads>
+        <sha256>b3c884e14a16fb31e9fb1f3a2b5913f2e511180a0c30e5d586e3afc09e46ebbc</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>siteLanguage rebind moves the baseline only where it wrote, so a customer's own drift stays reported; every update entry names its client, so Extensions › Update lists the package; T3 off-canvas keyboard: a ☰ or × drawn as a link with no href (JA Social II) is reached by Tab and works on Enter and Space, a drawer drawn with no × (JA Resume) closes on ESC through ☰ with focus back on ☰, ESC on a menu link in the drawer closes the drawer when the dropdown is closed, and a drawer with no way out is still not trapped</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
