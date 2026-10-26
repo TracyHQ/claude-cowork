@@ -4634,6 +4634,16 @@ final class Engine
         } catch (Throwable $e) {
             return $this->err('write_failed', $e->getMessage());
         }
+        // This token is site-scoped. The writer refuses multisite and every account field except
+        // the public name; an exact old value prevents overwriting a name changed since the read.
+        if ($kind === 'author') {
+            if (!is_string($p['expected_display_name'] ?? null)) {
+                return $this->err('bad_params', 'author requires expected_display_name from content.get');
+            }
+            if ($before === null || ($before['display_name'] ?? null) !== $p['expected_display_name']) {
+                return $this->err('conflict', 'author is missing or its display name changed; read it again');
+            }
+        }
         $locked = $this->editLocked($kind, $id, $before);
         if ($locked !== null) {
             return $locked;
@@ -4690,6 +4700,11 @@ final class Engine
             // undone by their own steps below.
             $rowFields = array_values(array_diff(array_keys($p['fields']), $metaFields));
             $changes = ContentUndo::record($before, $after, $rowFields);
+            // A person's name is one value. Reverting a changed substring could produce a new,
+            // unapproved name after a manual edit; require the exact name left by this Apply.
+            if ($kind === 'author' && $before !== null && $after !== null) {
+                $changes = ['display_name' => ['was' => $before['display_name'], 'now' => $after['display_name']]];
+            }
         } catch (Throwable $e) {
             $changes = null;
         }
@@ -4742,7 +4757,7 @@ final class Engine
             'id' => $newId,
             'key' => $key === '' ? null : $key,
             'created' => $before === null,
-        ] + self::bodyRevision($kind, $after) + ($follow === null ? [] : ['follow' => $follow]));
+        ] + self::bodyRevision($kind, $after) + ($kind === 'author' ? ['item' => $after, 'name_matches' => ($after['display_name'] ?? null) === $p['fields']['display_name']] : []) + ($follow === null ? [] : ['follow' => $follow]));
     }
 
     /** What decides the date and time formats of a locale: DateFormats::ofLocale, or a stand-in under test. */

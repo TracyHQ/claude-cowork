@@ -957,3 +957,19 @@ sed 's/ data-tracy-src="[^"]*"//g; s#<template data-tracy-owner="[^"]*"></templa
 ```
 
 Measured 27/09/2026 on WordPress 7.1.2 with the Tracy theme (single post with a related-posts loop inside a synced pattern, the posts page, a category archive, the front page): plain pages identical, stamped pages identical to them once the stamps are removed, and the related-post teasers stamped with their own posts.
+
+## Public author names (unreleased)
+
+On a single-site WordPress install, `content.get {kind:"author", id:<existing user id>}` reads only
+`item.display_name`. A post's existing author ID comes from its native read. An approved
+`content.update {kind:"author", id, expected_display_name:<the exact name read>, fields:{display_name:<new name>}}`
+changes that public name everywhere this author is displayed on the site, under the usual
+`apply_id`. Its receipt reads back `item.display_name` and `name_matches`: a WordPress filter may change the requested name, and the actual stored name is what the undo records. The site token's write scope includes this one public field; it does not authenticate
+as a WordPress user. A missing or changed expected name is refused. This uses the existing write
+serialization; the check is not an atomic compare-and-swap with edits made outside this plugin.
+
+No account can be created or deleted through this kind. Login, email, password, role, slug and
+post ownership are refused. The name must be non-empty plain UTF-8 text, without control
+characters, at most 250 bytes. Multisite reads and writes are refused: the user name is shared by
+the network, beyond the authority of one site's token. The Apply snapshot contains only the name;
+`apply.revert` restores it only if the whole current name is still the one that Apply wrote.

@@ -142,6 +142,12 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 			return array( 'value' => get_post_meta( $id, $key, true ) );
 		}
 
+		if ( 'author' === $kind ) {
+			if ( is_multisite() || $id <= 0 || '' !== $key ) return null;
+			$user = get_userdata( $id );
+			return $user ? array( 'display_name' => (string) $user->display_name ) : null;
+		}
+
 		if ( 'usermeta' === $kind ) {
 			// Only the fields a visitor reads (AuthorMeta): any other key of a person's account is not this door's.
 			if ( $id <= 0 || ! AuthorMeta::visitorKey( $key ) || ! metadata_exists( 'user', $id, $key ) ) {
@@ -749,6 +755,9 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		if ( 'postmeta' === $kind ) {
 			return $this->write_postmeta( $id, $fields, $key );
 		}
+		if ( 'author' === $kind ) {
+			return $this->write_author( $id, $fields, $key );
+		}
 		if ( 'usermeta' === $kind ) {
 			return $this->write_usermeta( $id, $fields, $key );
 		}
@@ -768,6 +777,7 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	}
 
 	public function delete( string $kind, int $id, string $key = '' ): void {
+		if ( 'author' === $kind ) throw new RuntimeException( 'authors cannot be created or deleted through this door' );
 		if ( 'post' === $kind ) {
 			if ( $id > 0 ) {
 				// Forced: this only ever reverses an insert this run made, and leaving it in the
@@ -1801,13 +1811,23 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 		return array_intersect_key( self::POST_META_FIELDS, $fields );
 	}
 
-	/**
-	 * @param array<string,mixed> $fields
-	 */
-	/**
-	 * One field of an author a visitor reads (AuthorMeta), as plain text: the bio or a theme's job title. Any other key of a
-	 * person's account is refused, and so is a user that does not exist.
-	 */
+	/** The site token may rename a public author, never a network-wide or private account field. */
+	private function write_author( int $id, array $fields, string $key ): int {
+		if ( is_multisite() ) throw new RuntimeException( 'author names are network-wide on multisite; this site token cannot change them' );
+		if ( $id <= 0 || '' !== $key || ! get_userdata( $id ) ) throw new RuntimeException( 'author needs an existing user id and no key' );
+		if ( array_keys( $fields ) !== array( 'display_name' ) || ! is_string( $fields['display_name'] ) ) {
+			throw new RuntimeException( 'author takes only display_name, a non-empty plain-text string' );
+		}
+		$name = $fields['display_name'];
+		if ( '' === trim( $name ) || strlen( $name ) > 250 || strip_tags( $name ) !== $name || preg_match( '/[\x00-\x1f\x7f]/', $name ) || 1 !== preg_match( '//u', $name ) ) {
+			throw new RuntimeException( 'display_name must be non-empty UTF-8 plain text, at most 250 bytes, without control characters' );
+		}
+		$result = wp_update_user( array( 'ID' => $id, 'display_name' => $name ) );
+		if ( is_wp_error( $result ) ) throw new RuntimeException( $result->get_error_message() );
+		return $id;
+	}
+
+	/** One visitor-facing author meta field; account fields are refused. */
 	private function write_usermeta( int $id, array $fields, string $key ): int {
 		if ( $id <= 0 || false === get_userdata( $id ) ) {
 			throw new RuntimeException( "no such user: {$id}" );
