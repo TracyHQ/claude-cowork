@@ -896,6 +896,10 @@ final class QuickstartContract
                     $this->presentation($meta['base'],$rows[$meta['base']],$keys[$meta['base']]),
                     $meta['locale'], $localeMaps[$meta['locale']] ?? [], $this->lock['entities'][$meta['base']], $actual
                 );
+                // A trim in flight moves a copy with its source, and may leave it half-moved the same way.
+                $trimRow = $trimMoving && ($trimOwned === null || isset($trimOwned[$meta['base']])) ? $this->demoTrim->row($meta['base']) : null;
+                if ($trimRow !== null && in_array((string) ($actual[$trimRow['field']] ?? ''), [$trimRow['from'], $trimRow['to']], true))
+                    $expected[$trimRow['field']] = (string) $actual[$trimRow['field']];
             } else {
                 $expected=$binding['presentation'][$key]??$this->presentation($key,$this->lock['entities'][$key],$meta);
                 // A translated source leaves `*` for its own language, because `*` means "shows in

@@ -5,6 +5,7 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/Php8Functions.php';
 require_once __DIR__ . '/../lib/SqlValue.php';
 require_once __DIR__ . '/../lib/RowSource.php';
 require_once __DIR__ . '/../lib/DbDumper.php';
@@ -899,6 +900,7 @@ check('reverting an option restores the old value', $writer->read('option', 0, '
 $normalizerReflection = new ReflectionClass(QuickstartContract::class);
 $imageNormalizer = $normalizerReflection->newInstanceWithoutConstructor();
 $homeHostProperty = $normalizerReflection->getProperty('homeHost');
+if (PHP_VERSION_ID < 80100) $homeHostProperty->setAccessible(true);
 $homeHostProperty->setValue($imageNormalizer, 'example.test');
 foreach ([
     'full URL' => 'https://example.test/wp-content/uploads/photo.jpg',

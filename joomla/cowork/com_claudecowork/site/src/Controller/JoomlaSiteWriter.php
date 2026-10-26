@@ -602,7 +602,6 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
     public function setVisibilityIf(string $kind, int $id, string $column, string $expected, string $value): bool
     {
         if ((self::VISIBILITY[$kind] ?? null) !== $column) throw new \RuntimeException("{$column} is not the visibility column of {$kind}");
-        if ($kind === 'article') throw new \RuntimeException('An article\'s state is not written by compare-and-set');
         if ($id <= 0) return false;
         $col = $this->db->quoteName($column);
         // One raw UPDATE of one column, as setVisibilityMany(): the check is in its WHERE.
@@ -613,7 +612,18 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             ->where($col . ' = ' . (int) $expected);
         $this->applyScope($kind, $query);
         $this->db->setQuery($query)->execute();
-        return $this->db->getAffectedRows() === 1;
+        if ($this->db->getAffectedRows() !== 1) return false;
+        // 🔒 AN ARTICLE'S STATE LIVES TWICE (see setVisibilityMany()): the tag index's copy moves only
+        // with a write that landed, in the caller's transaction, so the two never stand apart.
+        if ($kind === 'article') {
+            $ucm = $this->db->getQuery(true)
+                ->update($this->db->quoteName('#__ucm_content'))
+                ->set($this->db->quoteName('core_state') . ' = ' . (int) $value)
+                ->where($this->db->quoteName('core_type_alias') . ' = ' . $this->db->quote('com_content.article'))
+                ->where($this->db->quoteName('core_content_item_id') . ' = ' . $id);
+            $this->db->setQuery($ucm)->execute();
+        }
+        return true;
     }
 
     public function setVisibilityMany(string $kind, array $ids, string $column, string $value): void

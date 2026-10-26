@@ -924,11 +924,15 @@ final class Claude_Cowork_Site_Writer implements SiteWriter {
 	 * whose WHERE is the compare, so a customer save landing between the read and the write leaves
 	 * the row as the customer saved it and this answers false. The content goes in raw, not through
 	 * `wp_update_post`: no filter, kses or slashing may change a byte of what the caller fingerprinted.
+	 *
+	 * The row is stamped modified now, or — given `$modified` and `$modified_gmt`, as a revert putting
+	 * back the bytes it found is — with those, in the same UPDATE: never a second write that could land
+	 * on a save made after this one.
 	 */
-	public function replacePostContentIf( int $id, string $postType, string $expected, string $content ): bool {
+	public function replacePostContentIf( int $id, string $postType, string $expected, string $content, ?string $modified = null, ?string $modified_gmt = null ): bool {
 		global $wpdb;
-		$now = function_exists( 'current_time' ) ? (string) current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' );
-		$gmt = function_exists( 'current_time' ) ? (string) current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
+		$now = null !== $modified ? $modified : ( function_exists( 'current_time' ) ? (string) current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' ) );
+		$gmt = null !== $modified_gmt ? $modified_gmt : ( function_exists( 'current_time' ) ? (string) current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' ) );
 		$done = $wpdb->query(
 			$wpdb->prepare(
 				"UPDATE {$wpdb->posts} SET post_content = %s, post_modified = %s, post_modified_gmt = %s WHERE ID = %d AND post_type = %s AND CAST(post_content AS BINARY) = CAST(%s AS BINARY)",

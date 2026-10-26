@@ -17,7 +17,9 @@ try {
     $muSite = imageSite($IMAGE_HOME, $muFixtures);
     WP_Fake::$options['wp_ja_diner_blog_banner_image'] = '24';
     $muEngine = $muSite['engine'];
-    $muMedia = (new ReflectionProperty(Engine::class, 'media'))->getValue($muEngine);
+    $muMediaProperty = new ReflectionProperty(Engine::class, 'media');
+    if (PHP_VERSION_ID < 80100) $muMediaProperty->setAccessible(true);
+    $muMedia = $muMediaProperty->getValue($muEngine);
     $muMedia->store['wp-content/uploads/2026/10/blog.jpg'] = 'JPEG';
     $muMedia->attachments[24] = 'wp-content/uploads/2026/10/blog.jpg';
     $muMedia->storageUsage[24] = ['postmeta' => [], 'options' => [

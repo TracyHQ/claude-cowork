@@ -14,8 +14,49 @@
   },
   "decisionsHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
   "status": "checked",
-  "operations": [],
-  "finals": [],
+  "operations": [
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 80,
+        "slug": "header"
+      },
+      "label": "Style guide",
+      "block": {
+        "name": "core/list-item",
+        "contains": "<a href=\"/style-guide/\">"
+      },
+      "rule": "hide.kit-screen",
+      "reason": "\"Style guide\" is one of the template's own screens",
+      "key": "templatePart-80",
+      "before": "3d47962125c8e94f9e9605d5cd3dfdecce969d9a832f325d638973413c962e8a",
+      "after": "038849e70591465c8bd1bd9624cf0c18a3fefa7b6543257e2400194eb11d6bd2"
+    },
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 80,
+        "slug": "header"
+      },
+      "label": "404",
+      "block": {
+        "name": "core/list-item",
+        "contains": "<a href=\"/404/\">"
+      },
+      "rule": "hide.kit-screen",
+      "reason": "\"404\" is one of the template's own screens",
+      "key": "templatePart-80",
+      "before": "038849e70591465c8bd1bd9624cf0c18a3fefa7b6543257e2400194eb11d6bd2",
+      "after": "0450dea7544a8b3c1c84e55374423e1e9f27f4103a248cfd604edf6bf700e4e7"
+    }
+  ],
+  "finals": [
+    {
+      "key": "templatePart-80",
+      "before": "3d47962125c8e94f9e9605d5cd3dfdecce969d9a832f325d638973413c962e8a",
+      "after": "0450dea7544a8b3c1c84e55374423e1e9f27f4103a248cfd604edf6bf700e4e7"
+    }
+  ],
   "kept": [
     {
       "key": "navigation-68",
@@ -6335,7 +6376,7 @@
   "unresolved": [],
   "counts": {
     "links": 0,
-    "templateParts": 0,
+    "templateParts": 2,
     "kept": 574,
     "unresolved": 0
   }

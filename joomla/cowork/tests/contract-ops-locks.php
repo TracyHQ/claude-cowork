@@ -26,6 +26,10 @@ $opTrimSite = fn () => [$trimWriter->store, $trimLog->log, $trimStore->binding];
 
 $opHeld = ['article:203' => $opJane];
 $opBefore = $opTrimSite();
+// 🔒 THE PLAN'S `refusal` IS WHAT THE APPLY WILL MEET: an open editor on a row the trim would move included.
+$opPlan = $opTrimCall(['operation' => 'demoTrim.plan']);
+check('demoTrim.plan: a demo row open in the editor is the refusal the apply will meet', $opPlan['refusal'] ?? null,
+    '"An older post" is open in the Joomla editor by Jane Admin since 2026-09-26T10:00:00Z: ask them to save and close it, then try again.');
 $opR = $opTrimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-lock', 'request_id' => 'lock-1']);
 check('demoTrim.apply: a demo row open in the editor refuses the trim', $opWhy($opR),
     [false, 'SLOT_LOCKED_BY_USER', $opJane, ['kind' => 'article', 'id' => 203], 'content-old', null]);
