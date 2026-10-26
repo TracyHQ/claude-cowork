@@ -910,9 +910,10 @@ snavClean('kinetic inspects clean after both reverts', $kContract);
 // ------------------------------------------------------------------ every language of the association group
 
 // 🔒 EVERY LANGUAGE THAT SHOWS A SHOWCASE ENTRY LOSES IT, NOT ONLY THE ONES COWORK MADE. Business 1.2.6
-// ships its editions in the source's association groups (41 of them; the gate lays vi-VN and fr-FR,
-// de-DE and an unpublished ja-JP are laid here). Each published member is hidden in the same write as
-// its source and comes back with it, byte for byte; an unpublished one shows nothing and is left alone.
+// ships each entry in TWO association groups: {en-GB, ru-RU}, and its 41 editions in one of their own —
+// the rows `editions.json` names for the entry's key (measured on a fresh 1.2.6 stand, 25/10/2026; laid
+// here for vi-VN, fr-FR, de-DE and an unpublished ja-JP). Each published edition is hidden in the same
+// write as its source and comes back with it, byte for byte; an unpublished one shows nothing and is left alone.
 $tbSource = __DIR__ . '/../lib/contracts/tracy-business/j6/1.2.6';
 $tbEditions = json_decode(file_get_contents($tbSource . '/editions.json'), true, 512, JSON_THROW_ON_ERROR);
 $tbKeys = ['menuItem-615', 'menuItem-616', 'menuItem-617'];
@@ -924,7 +925,8 @@ $tbSite = function (array $published) use ($tbSource, $tbEditions, $tbKeys, $tbR
     foreach ($tbKeys as $key) {
         $source = (int) substr($key, strlen('menuItem-'));
         // The ru-RU entry is a governed row of its own, with its own operation: in the group, never followed.
-        $group = [$source, $tbRu[$key]];
+        $w->groups['menuAssociation'][$source] = $w->groups['menuAssociation'][$tbRu[$key]] = 'tb-' . $key;
+        $group = [];
         foreach ($published as $locale => $state) {
             $eid = (int) $tbEditions['locales'][$locale]['ids'][$key];
             if (!isset($w->store['menuItem'][$eid])) snavDropPad($w);
@@ -933,7 +935,7 @@ $tbSite = function (array $published) use ($tbSource, $tbEditions, $tbKeys, $tbR
             $group[] = $eid;
             $members[$key][$locale] = $eid;
         }
-        foreach ($group as $mid) $w->groups['menuAssociation'][$mid] = 'tb-' . $key;
+        foreach ($group as $mid) $w->groups['menuAssociation'][$mid] = 'tb-editions-' . $key;
     }
     return [$site, $members];
 };
@@ -989,7 +991,8 @@ $tbTrimMembers = [];
 foreach ($tbTrim['hide'] as $row) {
     if (!isset($tbField[$row['kind']]) || $row['from'] !== '1') continue;
     $source = (int) substr($row['key'], strlen($row['kind']) + 1);
-    $group = [$source];
+    // As 1.2.6 ships it: the editions in a group of their own, not the source's.
+    $group = [];
     foreach (['vi-VN' => '1', 'fr-FR' => '1', 'de-DE' => '1', 'ja-JP' => '0'] as $locale => $state) {
         $eid = $tbEditions['locales'][$locale]['ids'][$row['key']] ?? null;
         if ($eid === null) continue;
@@ -1001,7 +1004,7 @@ foreach ($tbTrim['hide'] as $row) {
         $group[] = (int) $eid;
         $tbTrimMembers[$row['key']][$locale] = (int) $eid;
     }
-    foreach ($group as $mid) $tbw->groups[['article' => 'articleAssociation', 'menuItem' => 'menuAssociation'][$row['kind']]][$mid] = 'tbt-' . $row['key'];
+    foreach ($group as $mid) $tbw->groups[['article' => 'articleAssociation', 'menuItem' => 'menuAssociation'][$row['kind']]][$mid] = 'tbt-editions-' . $row['key'];
 }
 $tbVisible = function () use ($tbw, $tbField): array {
     $out = [];

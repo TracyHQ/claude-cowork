@@ -3235,13 +3235,46 @@ final class Engine
     private const ASSOCIATIONS = ['menuItem' => 'menuAssociation', 'article' => 'articleAssociation'];
 
     /**
+     * Every row id that is the listed row `$key` in some language, by its groups: the source's association
+     * group, and the group of each row the archive's reviewed `editions.json` names for `$key` — that row
+     * itself included, in a group of its own or in none (see languageMembers()). The strict check on a
+     * bound copy stays on the source's group alone: a language job links each copy it makes there.
+     *
+     * @return array<int,true>
+     */
+    private function entryGroup(string $key, string $kind, string $relation, int $id): array
+    {
+        $out = [];
+        $read = function (int $at) use ($relation, &$out): void {
+            foreach (json_decode((string) (($this->writer->read($relation, $at) ?? [])['members'] ?? '[]'), true) ?: [] as $member)
+                if ((int) ($member['id'] ?? 0) > 0) $out[(int) $member['id']] = true;
+        };
+        $read($id);
+        $out[$id] = true;
+        $profile = $this->contract->multilingualAvailable() ? $this->contract->profile() : null;
+        foreach ($profile ? $profile->editionLocales() : [] as $locale) {
+            $eid = (int) ($profile->edition($locale)['ids'][$key] ?? 0);
+            if ($eid < 1 || isset($out[$eid])) continue;
+            // An id is only the archive's row while it still holds that edition's language; a site whose
+            // ids moved is not followed by id.
+            if ((string) (($this->writer->read($kind, $eid) ?? [])['language'] ?? '') !== $locale) continue;
+            $out[$eid] = true;
+            $read($eid);
+        }
+        return $out;
+    }
+
+    /**
      * The translations of one listed row that no language job of this receiver made: the other members
      * of its Joomla association group, each in a language of its own — a shipped edition, or a language
      * the customer added in Joomla and associated — that are no row the contract governs (a bound copy,
      * or another language's source row, which has its own entry in the profile).
      *
-     * 🔒 THE ASSOCIATION GROUP IS THE LINK. A row in another language that its source's group does not
-     * hold is not followed: nothing ties it to the source, and hiding it would be a guess.
+     * 🔒 THE ASSOCIATION GROUP IS THE LINK, AND THE ARCHIVE'S EDITIONS NAME THEIR OWN. A row in another
+     * language that no group of the entry holds is not followed: nothing ties it to the source, and hiding
+     * it would be a guess. The entry's groups are its source's, and the group of each row the reviewed
+     * `editions.json` names for its key: Business 1.2.6 ships {en-GB, ru-RU} and its 41 editions as two
+     * groups (measured on a fresh stand, 25/10/2026), which a language job only merges once it runs.
      *
      * @return array<int,array{language:string,row:array}> member id => its language and its live row
      */
@@ -3251,7 +3284,7 @@ final class Engine
         $relation = self::ASSOCIATIONS[$kind] ?? null;
         $id = (int) ($state['ids'][$key] ?? 0);
         if ($relation === null || $id < 1) return [];
-        $group = json_decode((string) (($this->writer->read($relation, $id) ?? [])['members'] ?? '[]'), true) ?: [];
+        $group = array_map(static fn (int $mid): array => ['id' => $mid], array_keys($this->entryGroup($key, $kind, $relation, $id)));
         if (count($group) < 2) return [];
         $governed = [];
         foreach ($state['ids'] as $other => $oid)
