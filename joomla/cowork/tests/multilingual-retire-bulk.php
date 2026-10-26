@@ -282,7 +282,10 @@ namespace {
             $row = $this->run()->fetch(PDO::FETCH_NUM);
             return $row === false ? null : $row[0];
         }
-        public function execute(): bool { $this->run(); return true; }
+        public function execute(): bool { $this->affected = $this->run()->rowCount(); return true; }
+        /** Rows the last execute() changed, as Joomla's driver reports them. */
+        public function getAffectedRows(): int { return $this->affected; }
+        private int $affected = 0;
         public function insertObject(string $table, object $object, $key = null): bool
         {
             $columns = array_keys(get_object_vars($object));
@@ -363,6 +366,17 @@ namespace {
         check('sql: setVisibility() is the same write for one row', [$rbHiddenIds('j_content', 'state'), $rbUcm()], [array_merge(range(1, 600), [700]), [0, 0, 1]]);
         $rbW->setVisibilityMany('article', array_merge(range(1, 600), [700]), 'state', '1');
         check('sql: and an article shown again shows in the tag index too', [$rbHiddenIds('j_content', 'state'), $rbUcm()], [[], [1, 1, 1]]);
+        // 🔒 A DEMO TRIM HIDES AN ARTICLE'S TRANSLATION BY COMPARE-AND-SET: its state and the tag index's copy
+        // move together, and an article no longer holding the value it was read with is not written at all.
+        $rbThrown = null;
+        $rbCas = null;
+        try {
+            $rbCas = [$rbW->setVisibilityIf('article', 5, 'state', '0', '0'), $rbW->setVisibilityIf('article', 5, 'state', '1', '0'), $rbW->setVisibilityIf('article', 4999, 'state', '1', '0')];
+        } catch (RuntimeException $e) { $rbThrown = $e->getMessage(); }
+        check('sql: an article is hidden by compare-and-set, its tag-index copy with it; one not holding the value is left',
+            [$rbThrown, $rbCas, $rbHiddenIds('j_content', 'state'), $rbUcm()], [null, [false, true, false], [5], [0, 1, 1]]);
+        $rbW->setVisibilityIf('article', 5, 'state', '0', '1');
+        check('sql: and shown again the same way', [$rbHiddenIds('j_content', 'state'), $rbUcm()], [[], [1, 1, 1]]);
         $rbDb->verbs();
         $rbW->setVisibilityMany('module', [], 'published', '0');
         check('sql: no ids, no statement', $rbDb->verbs(), []);

@@ -2231,6 +2231,8 @@ final class Engine
                     try {
                         $this->refuseLanguageJob($state, 'a demo trim', true);
                         foreach ($this->demoTrimPending($state, true, $trim) as $key => $row) $this->languageCopies($state, $key, true, true);
+                        // The same check the apply makes before its record lands: no row it would move is open in an editor.
+                        $this->refuseLocked($this->demoTrimRows($state, true, $trim));
                     } catch (Throwable $error) { $refusal = $error->getMessage(); }
                 return $this->ok([
                     'hides' => $this->contract->demoTrim()->counts(),
@@ -2248,6 +2250,8 @@ final class Engine
         if (!$apply || strpos($apply, 'dtrim-') !== 0) return $this->err('bad_params', 'apply_id must start with "dtrim-"');
         if (!is_string($request) || !preg_match('/^[a-zA-Z0-9._:-]{1,100}$/D', $request))
             return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
+        $checked = $refused = false;
+        $trim = null;
         try {
             $binding = $this->contract->binding();
             $trim = $binding['demoTrim'] ?? null;
@@ -2256,9 +2260,10 @@ final class Engine
             $reopen = false;
             if ($operation === 'apply') {
                 // 🔒 A COMPLETE TRIM IS TAKEN UP AGAIN WHEN A LANGUAGE SHOWS ITS DEMO ROWS SINCE: the next
-                // apply hides that translation, under its own request, and the record names it for the revert.
+                // apply hides what the plan names as showing (demoTrimShowing) — a translation, a copy, or
+                // the row itself — under its own request, and the record names each translation for the revert.
                 if (($trim['status'] ?? null) === 'complete') {
-                    if ($this->demoTrimMembersPending($this->contract->inspect(), $trim) === [])
+                    if ($this->demoTrimPending($this->contract->inspect(), true, $trim) === [])
                         return $this->ok(['status' => 'completed', 'remaining' => 0, 'alreadyTrimmed' => true, 'applyId' => $trim['applyId']]);
                     $reopen = true;
                 }
@@ -2286,7 +2291,6 @@ final class Engine
             // checked before the first write of the call, the record included: a refused call leaves
             // the site, and a trim in flight, exactly where they were, so the same request resumes.
             $hide = $operation === 'apply';
-            $checked = false;
             if ($trim === null || $reopen || $trim['status'] !== $record['status']) {
                 $this->writer->transaction(function () use ($record, $hide, $reopen) {
                     $state = $this->contract->inspect();
@@ -2309,16 +2313,16 @@ final class Engine
                 $checked = true;
             }
             $this->batching = true;
-            $step = $this->writer->transaction(function () use ($hide, $apply, $checked) {
+            $step = $this->writer->transaction(function () use ($hide, $apply, $checked, &$refused) {
                 $state = $this->contract->inspect();
                 $record = $state['binding']['demoTrim'];
                 $this->refuseLanguageJob($state, 'a demo trim', false);
                 if (!$checked) $this->refuseLocked($this->demoTrimRows($state, $hide, $record));
                 $reopened = $hide && isset($record['reopenedAt']) && ($record['completedAt'] ?? '') !== '';
-                $pending = $reopened ? $this->demoTrimMembersPending($state, $record) : $this->demoTrimPending($state, $hide, $record);
+                $pending = $this->demoTrimPending($state, $hide, $record);
                 $batch = array_slice($pending, 0, self::DEMO_TRIM_BATCH, true);
                 $copies = [];
-                foreach ($batch as $key => $row) $copies[$key] = $reopened ? [] : $this->languageCopies($state, $key, $hide, false);
+                foreach ($batch as $key => $row) $copies[$key] = $this->languageCopies($state, $key, $hide, false);
                 $owned = $this->demoTrimOwned($record, $hide);
                 $moved = [];
                 foreach ($batch as $key => [$kind, $field, $value]) {
@@ -2327,12 +2331,13 @@ final class Engine
                     // where they still stand hidden.
                     foreach ($this->demoTrimMembers($state, $key, $owned[$key], $hide, $record) as $mid) {
                         $from = $hide ? $owned[$key]['from'] : $owned[$key]['to'];
-                        if (!$this->writer->setVisibilityIf($kind, $mid, $field, $from, $value))
-                            throw new RuntimeException('The translation ' . $mid . ' of ' . $key . ' changed while it was being written. Nothing more has been written.');
+                        if (!$this->writer->setVisibilityIf($kind, $mid, $field, $from, $value)) {
+                            $refused = true;
+                            throw new RuntimeException('The translation ' . $mid . ' of ' . $key . ' changed while it was being written. Nothing has been written.');
+                        }
                         $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $mid, 'column' => $field, 'before' => $from]);
                         if ($hide && !in_array($mid, $record['members'][$key] ?? [], true)) $record['members'][$key][] = $mid;
                     }
-                    if ($reopened) continue;
                     // 🔒 A COPY GOES WITH ITS SOURCE, IN THE SAME BATCH: its visibility is derived from the
                     // source's, so the two never stand apart past this transaction.
                     // A revert that finds the source already shown (the customer's) takes back only what
@@ -2341,6 +2346,10 @@ final class Engine
                     foreach (['' => $key] + $copies[$key] as $rowKey) {
                         $before = (string) ($state['rows'][$rowKey][$field] ?? '');
                         if (($rowKey !== $key || $sourceShown) && $before === $value) continue;
+                        // Taken up again, a trim moves only what shows the row again — what the plan named: a
+                        // copy a language bound or restored since brought back where the trim moves it from,
+                        // or the row itself. The undo entry under this apply is its receipt.
+                        if ($reopened && $before !== $owned[$key]['from']) continue;
                         // One column, raw — never write(): Joomla's Table would mint `#__assets` rows
                         // for demo posts that ship without them, and move the ACL the contract holds.
                         $id = (int) $state['ids'][$rowKey];
@@ -2378,6 +2387,19 @@ final class Engine
             ]);
         } catch (Throwable $error) {
             $this->batching = false;
+            // 🔒 A REFUSAL MET MID-APPLY TAKES BACK THE RECORD THIS CALL LANDED. The step rolled back whole
+            // (raw column writes, no Table::store() to commit behind it), so no row of this call is on the
+            // site: the trim is again what it was, and is not left `applying` under a request that would
+            // only meet the same refusal. A crash keeps the record — Joomla may have committed rows of it.
+            if ($checked && $refused)
+                try {
+                    $this->writer->transaction(function () use ($trim) {
+                        $binding = $this->contract->binding();
+                        if ($trim === null) unset($binding['demoTrim']); else $binding['demoTrim'] = $trim;
+                        $this->contract->rebind($binding);
+                        return [];
+                    });
+                } catch (Throwable $ignored) {}
             return $this->contractFailed($error);
         }
     }
@@ -2922,15 +2944,6 @@ final class Engine
         return $out;
     }
 
-    /** The rows of a complete trim whose translations show them again: what an apply taking it up again writes. */
-    private function demoTrimMembersPending(array $state, array $record): array
-    {
-        $out = [];
-        foreach ($this->demoTrimOwned($record) as $key => $row)
-            if ($this->demoTrimMembers($state, $key, $row, true, $record) !== []) $out[$key] = [$row['kind'], $row['field'], $row['to']];
-        return $out;
-    }
-
     /**
      * The translations of a listed row a demo-trim step writes, by id: on a hide, the members of its
      * association group still standing where the row moves from (an unpublished edition shows nothing,
@@ -3271,22 +3284,28 @@ final class Engine
     private function showcaseNavShowing(array $state, string $key, array $receipt): array
     {
         $out = [];
-        foreach ($this->showcaseNavCopiesShowing($state, $receipt) as $copy) $out[$copy['language']] = $copy['id'];
+        foreach ($this->showcaseNavCopiesShowing($state, $key, $receipt) as $copy) $out[$copy['language']] = $copy['id'];
         foreach ($this->showcaseNavMembers($state, $key) as $mid => $member) $out[$member['language']] = $mid;
         return $out;
     }
 
     /**
-     * The bound copies of a listed menu item this job hid, or found hidden, that show it again.
+     * The bound copies of a listed menu item this job hid that show it, as the site stands now.
+     *
+     * 🔒 EVERY COPY BOUND NOW, NOT ONLY THE ONES THE RECEIPT NAMES: a language a language job bound, or
+     * bound again, after the apply builds its copy in the menu, and no receipt of this job knows it.
      *
      * @return array<string,array{language:string,id:int}> copy key => its language and id
      */
-    private function showcaseNavCopiesShowing(array $state, ?array $receipt): array
+    private function showcaseNavCopiesShowing(array $state, string $key, ?array $receipt): array
     {
         $out = [];
-        foreach ($receipt['copies'] ?? [] as $copy => $copyReceipt)
-            if (in_array($copyReceipt['outcome'], ['written', 'already'], true) && isset($state['rows'][$copy]) && ShowcaseNavProfile::shown($state['rows'][$copy]))
-                $out[$copy] = ['language' => (string) ($state['rows'][$copy]['language'] ?? ''), 'id' => (int) ($state['ids'][$copy] ?? $copyReceipt['id'])];
+        foreach (array_keys($this->languageCopies($state, $key, false, false) + ($receipt['copies'] ?? [])) as $copy) {
+            $copyReceipt = $receipt['copies'][$copy] ?? null;
+            if ($copyReceipt !== null && !in_array($copyReceipt['outcome'], ['written', 'already'], true)) continue;
+            if (isset($state['rows'][$copy]) && ShowcaseNavProfile::shown($state['rows'][$copy]))
+                $out[$copy] = ['language' => (string) ($state['rows'][$copy]['language'] ?? ''), 'id' => (int) ($state['ids'][$copy] ?? $copyReceipt['id'] ?? 0)];
+        }
         return $out;
     }
 
@@ -3312,7 +3331,9 @@ final class Engine
     private function showcaseNavCheck(array $state, array $pending, bool $first): void
     {
         foreach ($pending as $key => $row) {
-            if (empty($row['refollow'])) $this->showcaseNavCopies($state, $key, $row, $first);
+            // A copy no receipt names — a language bound since — is proven its source's translation too.
+            if (empty($row['refollow']) || array_diff_key($this->showcaseNavCopiesShowing($state, $key, $row['receipt']), $row['receipt']['copies'] ?? []) !== [])
+                $this->showcaseNavCopies($state, $key, $row, $first);
             if ($row['kind'] !== 'menuItem') continue;
             foreach ($this->showcaseNavMembers($state, $key) as $mid => $member) {
                 $probe = $this->showcaseNavHide($state, $key, ['kind' => 'menuItem', 'id' => $mid], $member['row'], true);
@@ -3402,7 +3423,7 @@ final class Engine
             if ($row['id'] > 0) $rows[] = [$row['kind'], $row['id']];
             if ($row['kind'] !== 'menuItem') continue;
             foreach (array_keys($hide ? $this->showcaseNavMembers($state, $key) : ($row['receipt']['members'] ?? [])) as $mid) $rows[] = ['menuItem', (int) $mid];
-            if ($hide && !empty($row['refollow'])) foreach ($this->showcaseNavCopiesShowing($state, $row['receipt']) as $copy) $rows[] = ['menuItem', $copy['id']];
+            if ($hide && !empty($row['refollow'])) foreach ($this->showcaseNavCopiesShowing($state, $key, $row['receipt']) as $copy) $rows[] = ['menuItem', $copy['id']];
         }
         return $rows;
     }
@@ -3489,13 +3510,14 @@ final class Engine
                 $result['receipt']['copies'][$copy] = $followed['receipt'];
             }
             // A copy this job hid that the customer put back in its menu goes again, by the same
-            // compare-and-set. One it wrote keeps that first receipt: it holds what the row was before this job.
-            if (!empty($row['refollow'])) foreach ($this->showcaseNavCopiesShowing($state, $row['receipt']) as $copy => $found) {
+            // compare-and-set, and so does one a language bound since builds showing it. One it wrote
+            // keeps that first receipt: it holds what the row was before this job.
+            if (!empty($row['refollow'])) foreach ($this->showcaseNavCopiesShowing($state, $key, $row['receipt']) as $copy => $found) {
                 $followed = $this->showcaseNavHide($state, $copy, ['kind' => $row['kind'], 'id' => $found['id']]);
                 if ($followed['receipt']['outcome'] !== 'written')
                     throw new RuntimeException('The copy ' . $copy . ' of ' . $key . ' cannot follow it out of the menu again (' . $followed['receipt']['why'] . '). Nothing more has been written.');
                 $result['followed']++;
-                if ($result['receipt']['copies'][$copy]['outcome'] !== 'written') $result['receipt']['copies'][$copy] = $followed['receipt'];
+                if (($result['receipt']['copies'][$copy]['outcome'] ?? null) !== 'written') $result['receipt']['copies'][$copy] = $followed['receipt'];
             }
             // 🔒 EVERY TRANSLATION IN THE GROUP STILL SHOWING THE ENTRY GOES WITH IT, in the same write and
             // by the same compare-and-set, its receipt kept in the source's. A translation hidden by an

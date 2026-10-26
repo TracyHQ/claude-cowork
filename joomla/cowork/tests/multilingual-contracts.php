@@ -453,6 +453,19 @@ foreach ($gateContracts as $profileFile) {
         $navAgain = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gate-2', 'request_id' => 'gate-nav-2']);
         check("$id: a new apply request takes them out again", [$navAgain['status'] ?? $navAgain['message'] ?? null, array_map($menuShow, $navReshow),
             $call(['operation' => 'showcaseNav.status'])['status'] ?? null], ['completed', array_fill(0, count($navReshow), '0'), 'complete']);
+        // 🔒 A LANGUAGE BOUND AFTER THE APPLY IS READ FROM THE SITE, NOT FROM THE RECEIPTS: its copy — showing
+        // the entry, as a language job builds it, and named by no receipt — keeps the job incomplete, and the
+        // next apply takes it out of the menu; the revert gives it back as that language job left it.
+        $navLate = array_filter($gs->binding['showcaseNav']['receipts'][$navCopyKey]['copies'] ?? [], fn ($c) => (int) $c['id'] === $navCopy);
+        checkTrue("$id: (the copy has a receipt to take away)", $navLate !== []);
+        foreach (array_keys($navLate) as $navLateKey) unset($gs->binding['showcaseNav']['receipts'][$navCopyKey]['copies'][$navLateKey]);
+        $gw->store['menuItem'][$navCopy]['params'] = $paramsBefore[$navCopy];
+        $navStatus = $call(['operation' => 'showcaseNav.status']);
+        check("$id: a copy bound after the apply, showing the entry, leaves the job incomplete, named", [$navStatus['status'] ?? null, $navStatus['showing'] ?? null],
+            ['incomplete', [$navCopyKey => [(string) $gw->store['menuItem'][$navCopy]['language'] => $navCopy]]]);
+        $navAgain = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gate-3', 'request_id' => 'gate-nav-3']);
+        check("$id: and a new apply request takes it out of the menu", [$navAgain['status'] ?? $navAgain['message'] ?? null, $navAgain['alreadyApplied'] ?? false, $menuShow($navCopy),
+            $call(['operation' => 'showcaseNav.status'])['status'] ?? null], ['completed', false, '0', 'complete']);
         for ($i = 0, $navStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($navStep['status'] ?? '') === 'running'; $i++)
             $navStep = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-gate-undo', 'request_id' => 'gate-nav-undo']);
         if (!$step('bring the showcase entries back in every language', $navStep)) continue;
@@ -493,6 +506,26 @@ foreach ($gateContracts as $profileFile) {
         foreach ($trimForeign as $extra)
             check("$id: a {$extra['kind']} translation outside this receiver's copies is trimmed with its source",
                 $trimNow[$extra['kind']][$extra['id']], array_column($gateTrim['hide'], 'to', 'key')[$extra['key']]);
+        // 🔒 WHAT THE PLAN NAMES AS SHOWING, THE NEXT APPLY HIDES. A bound copy back where the trim moves it
+        // from — a language bound, or restored, after the trim, with the copy as its retire found it — keeps
+        // the trim incomplete, and a new apply request takes it, not `alreadyTrimmed`; the revert below
+        // still gives every language back its rows as they were.
+        $trimLate = null;
+        foreach ($gateTrim['hide'] as $row)
+            if ($row['from'] === '1' && in_array($row['kind'], ['article', 'menuItem'], true) && $copiesOf($row['key']) !== []) { $trimLate = $row; break; }
+        if ($trimLate !== null) {
+            $trimLateLanguage = (string) array_key_last($copiesOf($trimLate['key']));
+            $trimLateId = (int) $copiesOf($trimLate['key'])[$trimLateLanguage];
+            $trimField = ['article' => 'state', 'menuItem' => 'published'][$trimLate['kind']];
+            $gw->store[$trimLate['kind']][$trimLateId][$trimField] = $trimLate['from'];
+            $trimPlan = $call(['operation' => 'demoTrim.plan']);
+            check("$id: a copy back where the trim moved it from leaves the trim incomplete, named", [$trimPlan['status'] ?? null, $trimPlan['showing'][$trimLate['key']][$trimLateLanguage] ?? null],
+                ['incomplete', $trimLateId]);
+            $trimAgain = $call(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-gate-2', 'request_id' => 'gate-trim-2']);
+            $trimPlan = $call(['operation' => 'demoTrim.plan']);
+            check("$id: and a new apply request hides it, so the plan says the trim is complete", [$trimAgain['status'] ?? $trimAgain['message'] ?? null, $trimAgain['alreadyTrimmed'] ?? false,
+                (string) $gw->store[$trimLate['kind']][$trimLateId][$trimField], $trimPlan['status'] ?? null, $trimPlan['showing'] ?? null], ['completed', false, $trimLate['to'], 'complete', []]);
+        }
         for ($i = 0, $trimStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($trimStep['status'] ?? '') === 'running'; $i++)
             $trimStep = $call(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-gate-undo', 'request_id' => 'gate-trim-undo']);
         if (!$step('bring the demo rows back in every language', $trimStep)) continue;

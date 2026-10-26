@@ -1038,6 +1038,21 @@ ksort($tbJaShowing);
 $tbPlanShowing = $tbPlan['showing'] ?? null;
 if (is_array($tbPlanShowing)) ksort($tbPlanShowing);
 check('business: and names each row that shows again, by language and id', $tbPlanShowing, $tbJaShowing);
+// 🔒 A REFUSAL MET MID-APPLY TAKES BACK THE RECORD IT LANDED: an edition saved between the read and its
+// compare-and-set refuses the call, nothing is written, and the trim is the complete one it was — never
+// a job left `applying` that no retry of the plan's request would finish.
+$tbBeforeRace = [$tbStore->binding['demoTrim'], $tbVisible()];
+$tbRaced = array_key_first($tbJaShowing);
+$tbRacedId = reset($tbJaShowing[$tbRaced]);
+$tbw->beforeCas = function (ContractTestWriter $writer, string $kind, int $id) use ($tbRacedId, $tbField) {
+    if ($id === $tbRacedId) $writer->store[$kind][$id][$tbField[$kind]] = '2';
+};
+$tbRefused = $tbCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-tb', 'request_id' => 'tbt-race']);
+$tbw->beforeCas = null;
+$tbw->store[explode('-', $tbRaced)[0]][$tbRacedId][$tbField[explode('-', $tbRaced)[0]]] = '1';
+check('business: an edition saved mid-apply refuses the call, and the trim is the complete one it was',
+    [$tbRefused['ok'], str_contains($tbRefused['message'] ?? '', 'changed while it was being written'), $tbStore->binding['demoTrim'] === $tbBeforeRace[0], $tbVisible() === $tbBeforeRace[1]],
+    [false, true, true, true]);
 for ($i = 0, $tbTrimmed = ['ok' => true, 'status' => 'running']; $i < 40 && ($tbTrimmed['status'] ?? '') === 'running'; $i++)
     $tbTrimmed = $tbCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-tbu', 'request_id' => 'tbt2']);
 check('business: the trim revert brings back exactly what the trim hid', [$tbTrimmed['status'] ?? $tbTrimmed['message'] ?? null, $tbVisible() === $tbShown], ['reverted', true]);

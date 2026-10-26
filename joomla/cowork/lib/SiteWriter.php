@@ -191,7 +191,8 @@ interface SiteWriter
     /**
      * setVisibility() as a compare-and-set: write `$value` only while the row still holds `$expected`,
      * the check in the UPDATE itself, so a save that lands between the caller's read and this write
-     * is never overwritten.
+     * is never overwritten. Every kind setVisibility() takes: an article's tag-index copy of its state
+     * moves with a write that landed, as setVisibility() moves it.
      *
      * @return bool false, and nothing written, when the row in scope no longer holds `$expected`
      *              (changed, or gone since it was read)
