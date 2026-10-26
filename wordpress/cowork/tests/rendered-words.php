@@ -130,3 +130,66 @@ check('merge: new equal to old drops the rule', RenderedWords::merge($rwMerged, 
 check('option: one per page and locale, recognised by its prefix', [RenderedWords::optionKey(12, 'vi'), RenderedWords::isOption('claude_cowork_rendered_words_12_vi'), RenderedWords::isOption('blogname')],
     ['claude_cowork_rendered_words_12_vi', true, false]);
 check('option: a set that is not the shape reads as none', [RenderedWords::decodeSet('{"schema":1}'), RenderedWords::decodeSet('nonsense'), RenderedWords::decodeSet('')], [[], [], []]);
+
+// Composition provenance and ambiguity are checked on the raw and effective page together.
+$rvPage = '<main><section class="one"><p>Original</p></section><aside class="two"><p>Original</p></aside></main>';
+$rvSources = RenderedWords::candidates($rvPage, [['kind' => 'text', 'old' => 'Original']])[0]['candidates'];
+$rvRules = [];
+foreach ($rvSources as $candidate) {
+    $rvRules[] = ['kind' => 'text', 'anchor' => $candidate['anchor'], 'old' => 'Original', 'new' => 'Replacement', 'expected_matches' => $candidate['count']];
+}
+$rvStored = RenderedWords::merge([], $rvRules, 'first');
+$rvVisible = RenderedWords::visibleCandidates($rvPage, $rvStored, [['kind' => 'text', 'old' => 'Replacement']]);
+check('composition provenance: equal outputs at separate anchors name their own raw rule',
+    array_column($rvVisible[0]['candidates'] ?? [], 'replaces_rule'), array_column($rvStored, 'id'));
+$rvEdits = [];
+foreach ($rvStored as $rule) {
+    $rvEdits[] = ['kind' => 'text', 'anchor' => $rule['anchor'], 'old' => 'Replacement', 'new' => 'Final',
+        'expected_matches' => $rule['expected_matches'], 'replaces_rule' => $rule['id']];
+}
+$rvComposed = RenderedWords::compose($rvPage, $rvStored, $rvEdits);
+check('composition provenance: both mapped outputs change exactly once', substr_count(RenderedWords::render($rvPage,
+    RenderedWords::merge($rvStored, $rvComposed ?? [], 'second'))['html'], '>Final<'), 2);
+$rvMixed = '<main><p>Original and Replacement</p></main>';
+$rvAnchor = RenderedWords::candidates($rvMixed, [['kind' => 'text', 'old' => 'Original']])[0]['candidates'][0]['anchor'];
+$rvMixedRules = RenderedWords::merge([], [['kind' => 'text', 'anchor' => $rvAnchor, 'old' => 'Original', 'new' => 'Replacement', 'expected_matches' => 1]], 'mixed');
+check('composition provenance: raw and generated equal words at one anchor are refused',
+    RenderedWords::visibleCandidates($rvMixed, $rvMixedRules, [['kind' => 'text', 'old' => 'Replacement']]), null);
+$rvLink = '<main><a href="/old">Contact</a></main>';
+$rvLinkAnchor = RenderedWords::candidates($rvLink, [['kind' => 'attribute', 'name' => 'href', 'old' => '/old']])[0]['candidates'][0]['anchor'];
+$rvLinkRules = RenderedWords::merge([], [['kind' => 'attribute', 'name' => 'href', 'anchor' => $rvLinkAnchor, 'old' => '/old', 'new' => '/new', 'expected_matches' => 1]], 'link-first');
+$rvLinkEdit = ['kind' => 'attribute', 'name' => 'href', 'anchor' => $rvLinkAnchor, 'old' => '/new', 'new' => '/final', 'expected_matches' => 1, 'replaces_rule' => $rvLinkRules[0]['id']];
+$rvLinkNext = RenderedWords::compose($rvLink, $rvLinkRules, [$rvLinkEdit]);
+check('composition provenance: a href keeps its original source and validates its destination',
+    [$rvLinkNext[0]['old'] ?? null, $rvLinkNext[0]['new'] ?? null,
+        RenderedWords::compose($rvLink, $rvLinkRules, [['new' => 'javascript:alert(1)'] + $rvLinkEdit])], ['/old', '/final', null]);
+check('composition provenance: canonical duplicates cannot overwrite one another within a request',
+    RenderedWords::compose($rvLink, $rvLinkRules, [$rvLinkEdit, ['kind' => 'attribute', 'name' => 'href', 'anchor' => $rvLinkAnchor,
+        'old' => '/old', 'new' => '/other', 'expected_matches' => 1]]), null);
+
+$rvCard = '<main><p>Orders note. <br>Telephone note. <br>Opening note.</p></main>';
+$rvCardRules = [];
+foreach (['Orders note.' => 'First order wording.', 'Telephone note.' => 'First telephone wording.', 'Opening note.' => 'First opening wording.'] as $from => $to) {
+    $candidate = RenderedWords::candidates($rvCard, [['kind' => 'text', 'old' => $from]])[0]['candidates'][0];
+    $rvCardRules[] = ['kind' => 'text', 'anchor' => $candidate['anchor'], 'old' => $from, 'new' => $to, 'expected_matches' => 1];
+}
+$rvCardStored = RenderedWords::merge([], $rvCardRules, 'card-first');
+check('composition contact fixture: three independent phrases share the same anchor', count(array_unique(array_column($rvCardStored, 'anchor'))), 1);
+$rvCardEdit = ['old' => 'First order wording.', 'new' => 'For bakery enquiries, contact us.', 'replaces_rule' => $rvCardStored[0]['id']] + $rvCardRules[0];
+$rvCardNext = RenderedWords::compose($rvCard, $rvCardStored, [$rvCardEdit]);
+$rvCardFinal = RenderedWords::merge($rvCardStored, $rvCardNext ?? [], 'card-second');
+check('composition contact fixture: editing one phrase retains its two neighbours byte-for-byte',
+    [$rvCardFinal[1] === $rvCardStored[1], $rvCardFinal[2] === $rvCardStored[2], RenderedWords::render($rvCard, $rvCardFinal)['html']],
+    [true, true, '<main><p>For bakery enquiries, contact us. <br>First telephone wording. <br>First opening wording.</p></main>']);
+$rvBothSame = $rvCardStored;
+$rvBothSame[1]['new'] = $rvBothSame[0]['new'];
+check('composition contact fixture: two rules producing the same phrase at one anchor refuse',
+    RenderedWords::visibleCandidates($rvCard, $rvBothSame, [['kind' => 'text', 'old' => 'First order wording.']]), null);
+$rvEntityLink = '<main><a href="/old?a=1&amp;b=2">Contact</a></main>';
+$rvEntityAnchor = RenderedWords::candidates($rvEntityLink, [['kind' => 'attribute', 'name' => 'href', 'old' => '/old?a=1&b=2']])[0]['candidates'][0]['anchor'];
+$rvEntityRules = RenderedWords::merge([], [['kind' => 'attribute', 'name' => 'href', 'anchor' => $rvEntityAnchor, 'old' => '/old?a=1&b=2', 'new' => '/new?a=3&b=4', 'expected_matches' => 1]], 'entity-first');
+$rvEntityNext = RenderedWords::compose($rvEntityLink, $rvEntityRules, [['kind' => 'attribute', 'name' => 'href', 'anchor' => $rvEntityAnchor,
+    'old' => '/new?a=3&b=4', 'new' => '/final?a=5&b=6', 'expected_matches' => 1, 'replaces_rule' => $rvEntityRules[0]['id']]]);
+check('composition href: decoded values compose while the output retains escaped entities',
+    RenderedWords::render($rvEntityLink, RenderedWords::merge($rvEntityRules, $rvEntityNext ?? [], 'entity-second'))['html'],
+    '<main><a href="/final?a=5&amp;b=6">Contact</a></main>');

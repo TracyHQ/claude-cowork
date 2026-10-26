@@ -769,11 +769,21 @@ A page with no rules for its scope gets no output buffer and goes out byte for b
   `new` equals `old` drops it. The merged set must apply whole to the page as it renders now, or nothing
   is written (`drift`). After the write, the page caches are purged and the page is read as a visitor:
   `render` is `verified`, `cache_verification_failed` or `not_verified`. Sending the same `request_id`
-  again returns the first answer, without its `rules`, with `replayed: true`. The same `request_id` with a
+  again returns the first answer, without its `rules` or `visible_changes`, with `replayed: true`. The same `request_id` with a
   different request is a `conflict`. If the stored rules changed since the inspection, even at the same
   revision, the apply is a `conflict`. A site keeps the receipt of every request it answered and never
   drops one, so a `request_id` cannot apply twice. After 1000 receipts, new requests are refused
   (`too_large`, code `RECEIPTS_FULL`); retries of known requests are still answered.
+- Sites advertising `info.rendered_words.composition: ["whole-output"]` also accept
+  `inspect {path, targets, composition: "whole-output"}`. This inspects the words visitors currently
+  see. When one complete output belongs to exactly one existing rule at the same anchor and count,
+  its candidate includes `replaces_rule`. Send that marker with the visible `old` and desired `new`
+  in `apply`, using this inspection's proof and revision. The engine verifies the current raw page,
+  scope, rule digest and provenance again, and stores the original raw input → new output as one
+  rule. Rendering remains one pass; rules never chain. Substrings of an output, ambiguous outputs,
+  mixed raw/output matches and drift are refused. The first apply response includes `visible_changes`
+  for composed edits; durable receipts omit that payload as well as `rules`, keeping receipt growth
+  bounded. Existing snapshot and undo checks apply to the complete scope.
 - `status {request_id}` or `status {post, locale}`: the scope's rules, revision, receipts and the last
   `drift` the front end saw.
 - `apply.revert {apply_id}`: puts the scope's option back as it was before. The option must still hold

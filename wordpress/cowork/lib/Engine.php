@@ -323,6 +323,7 @@ final class Engine
                     'max_ids_scanned' => AttachmentReferences::MAX_SCAN,
                     'max_rows_reported' => AttachmentReferences::MAX_HITS,
                 ]] + ($this->renderedSite === null ? [] : ['rendered_words' => [
+                    'composition' => ['whole-output'],
                     'schema' => RenderedWords::SCHEMA,
                     'operations' => ['inspect', 'apply', 'status'],
                     'targets' => ['text', 'attribute:href'],
@@ -892,6 +893,9 @@ final class Engine
 
     private function renderedWordsInspect(array $p): array
     {
+        if (isset($p['composition']) && $p['composition'] !== 'whole-output') {
+            return $this->err('bad_params', 'composition is whole-output when requested');
+        }
         $path = self::renderedWordsPath($p['path'] ?? null);
         if ($path === null) {
             return $this->err('bad_params', 'path is the page address from the site root, e.g. /contact-us/');
@@ -915,10 +919,6 @@ final class Engine
         if ($page['post'] <= 0 || !RenderedWords::validLocale($page['locale'])) {
             return $this->err('unsupported', 'The page is not a single published post or page this site scopes rendered words to');
         }
-        $found = RenderedWords::candidates($page['body'], $targets);
-        if ($found === null) {
-            return $this->err('unsupported', 'The page is larger than ' . RenderedWords::MAX_HTML . ' bytes or its markup could not be followed');
-        }
         try {
             $set = $this->renderedWordsSet(RenderedWords::optionKey($page['post'], $page['locale']), $row);
         } catch (Throwable $e) {
@@ -927,11 +927,20 @@ final class Engine
         if ($set === null) {
             return $this->err('conflict', 'The stored rendered-words rules of this page cannot be read');
         }
+        $composition = ($p['composition'] ?? null) === 'whole-output';
+        if ($composition && $set !== [] && $set['theme'] !== $page['theme']) {
+            return $this->err('conflict', 'The active theme changed since the rules were written');
+        }
+        $found = $composition ? RenderedWords::visibleCandidates($page['body'], $set['rules'] ?? [], $targets)
+            : RenderedWords::candidates($page['body'], $targets);
+        if ($found === null) {
+            return $this->err('unsupported', 'The page cannot be inspected safely: raw rules drifted, markup is unreadable, or this edit is not one whole replacement output');
+        }
         $revision = (int) ($set['revision'] ?? 0);
         // The proof holds the rules it was answered with: an apply merges onto exactly those, or conflicts.
         $proof = RenderedWords::sign(RenderedWords::key($this->token), ['v' => 1, 'path' => $path, 'post' => $page['post'],
             'locale' => $page['locale'], 'revision' => $revision, 'digest' => self::renderedWordsDigest($row), 'theme' => $page['theme'],
-            'exp' => time() + RenderedWords::PROOF_SECONDS]);
+            'exp' => time() + RenderedWords::PROOF_SECONDS, 'composition' => $composition]);
         return $this->ok(['scope' => ['entity' => ['kind' => 'post', 'id' => $page['post']], 'locale' => $page['locale']], 'path' => $path,
             'revision' => $revision, 'targets' => $found, 'rules' => self::renderedWordsRuleList($set['rules'] ?? []),
             'proof' => $proof, 'expires_in' => RenderedWords::PROOF_SECONDS]);
@@ -1024,6 +1033,28 @@ final class Engine
         if (($proof['digest'] ?? null) !== self::renderedWordsDigest($before)) {
             return $this->err('conflict', 'The rules of this page were changed since the inspection: inspect the page again', ['code' => 'CONFLICT', 'revision' => $revision]);
         }
+        $visibleChanges = [];
+        foreach ($rules as $rule) {
+            if (isset($rule['replaces_rule'])) {
+                if (($proof['composition'] ?? false) !== true) {
+                    return $this->err('stale_proof', 'A replacement edit needs a whole-output inspection');
+                }
+                $visibleChanges[] = ['anchor' => $rule['anchor'], 'before' => $rule['old'], 'after' => $rule['new']];
+            }
+        }
+        // Composition is checked against a fresh raw render and the revision/digest pinned above.
+        // Store a single a -> c rule, never a second b -> c pass over generated output.
+        $compositionPage = $visibleChanges === [] ? null : $this->renderedSite->probe($proof['path']);
+        if ($compositionPage !== null) {
+            if ($compositionPage['code'] !== 200 || $compositionPage['post'] !== $proof['post'] || $compositionPage['locale'] !== $proof['locale']) {
+                return $this->err('drift', 'The page no longer answers as the inspection saw it');
+            }
+            $composed = RenderedWords::compose($compositionPage['body'], $set['rules'] ?? [], $rules);
+            if ($composed === null) {
+                return $this->err('drift', 'The visible replacement no longer belongs to the inspected rule; nothing was written');
+            }
+            $rules = $composed;
+        }
         $merged = RenderedWords::merge($set['rules'] ?? [], $rules, $apply);
         $next = ['schema' => RenderedWords::SCHEMA, 'post' => $proof['post'], 'locale' => $proof['locale'], 'revision' => $revision + 1,
             'theme' => (string) $proof['theme'], 'rules' => $merged];
@@ -1040,7 +1071,7 @@ final class Engine
             return $this->err('too_large', 'This site holds at most ' . RenderedWords::MAX_SITE_BYTES . ' bytes of rendered-words rules');
         }
         // The page as it renders now, without rules: every rule of the new set must apply to it whole.
-        $page = $this->renderedSite->probe($proof['path']);
+        $page = $compositionPage ?? $this->renderedSite->probe($proof['path']);
         if ($page['code'] !== 200 || $page['post'] !== $proof['post'] || $page['locale'] !== $proof['locale']) {
             return $this->err('drift', 'The page no longer answers as the inspection saw it: inspect it again');
         }
@@ -1064,10 +1095,12 @@ final class Engine
         $render = $this->renderedWordsPurgeAndVerify($key, $proof['path'], $merged);
         $answer = ['apply_id' => $apply, 'request_id' => $request, 'stored' => true, 'revision' => $revision + 1,
             'scope' => ['entity' => ['kind' => 'post', 'id' => $proof['post']], 'locale' => $proof['locale']], 'path' => $proof['path'],
-            'rules' => self::renderedWordsRuleList($merged), 'render' => $render, 'written' => $written];
-        // The receipt keeps the answer without its rules (status reads those): small enough that none is ever dropped.
+            'rules' => self::renderedWordsRuleList($merged), 'render' => $render, 'written' => $written,
+            'visible_changes' => $visibleChanges];
+        // Keep metadata only: rules and visible before/after strings are bounded per request but
+        // could otherwise multiply by all 1000 durable receipts. Status reads the current rules.
         $receipts[$request] = ['hash' => $hash, 'apply_id' => $apply, 'key' => $key, 'state' => 'applied', 'at' => time(),
-            'answer' => array_diff_key($answer, ['rules' => true])];
+            'answer' => array_diff_key($answer, ['rules' => true, 'visible_changes' => true])];
         try {
             $this->writer->write('option', 0, ['value' => (string) json_encode($receipts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)], RenderedWords::RECEIPTS_OPTION);
         } catch (Throwable $e) {
