@@ -69,6 +69,9 @@ function snavSite(string $source, ?callable $edit = null): array {
     $store = new GateContractStore();
     $log = new FakeApplyLog();
     $writer = gateSite($dir, $store, $log);
+    // A one-language site: the shared fake also publishes de-DE, and a T3 style is refused on a site
+    // publishing a second content language. A test that wants one adds it.
+    $writer->store['language'] = array_filter($writer->store['language'] ?? [], fn (array $row): bool => ($row['lang_code'] ?? '') === 'en-GB');
     $contract = new QuickstartContract($writer, $store, $dir, $dir);
     $engine = new Engine($WTOKEN, ['joomla' => '6.1.1'], null, null, null, new FakeExtensions(), $writer, null, $log, null, null, null, $contract);
     $call = fn (array $params) => $engine->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => $params]);
@@ -98,6 +101,10 @@ function snavDrifted(QuickstartContract $contract): array {
     foreach ($contract->driftWarnings() as $warning) if (preg_match('/drift: (\S+) /', $warning, $m)) $keys[] = $m[1];
     sort($keys);
     return array_values(array_unique($keys));
+}
+/** One row of the archive's padding gone, if it has any, so a row laid in its place keeps the lock's inventory count. */
+function snavDropPad(ContractTestWriter $w): void {
+    foreach ($w->store['menuItem'] as $mid => $row) if (str_starts_with((string) ($row['title'] ?? ''), 'pad ')) { unset($w->store['menuItem'][$mid]); return; }
 }
 $snavShow = fn (ContractTestWriter $w, int $id) => JsonObjectKey::get((string) $w->store['menuItem'][$id]['params'], 'menu_show');
 
@@ -133,11 +140,13 @@ check('an apply without the snav- prefix is refused by name', $call(['operation'
 check('an apply without a request_id is refused', $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a'])['error'], 'bad_params');
 check('an unknown operation is refused', $call(['operation' => 'showcaseNav.hideAll'])['error'], 'bad_params');
 
-$store->binding = ['multilingual' => ['languages' => ['fr-FR' => ['ids' => []]]]];
-check('a site with a second language is refused, both ways', [
-    $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1'])['message'],
+$store->binding = ['contractHash' => $contract->contractHash(), 'multilingual' => ['languages' => ['fr-FR' => ['ids' => []]]]];
+// A translated site is followed language by language (multilingual-contracts.php); a binding naming a
+// language this contract carries no multilingual profile for is still refused, by the read itself.
+$refused = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-a', 'request_id' => 'r1']);
+check('a language this contract has no profile for is refused, both ways', [$refused['error'], $refused['message'],
     $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-u', 'request_id' => 'u1'])['error'],
-], ['This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.', 'contract_failed']);
+], ['contract_failed', 'This site has translations but the receiver carries no multilingual profile', 'contract_failed']);
 $store->binding = null;
 check('and nothing was written', array_map(fn ($row) => $row['params'] ?? null, $w->store['menuItem']), $original);
 
@@ -897,4 +906,183 @@ check('the showcase revert leaves the trim alone', [$kBack['status'], $kStore->b
 check('the added keys are gone again, byte for byte', array_map(fn ($id) => $kw->store['menuItem'][$id]['params'], $kIds), array_map(fn ($id) => $kOriginal[$id], $kIds));
 check('the demo trim still reverts', $kCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-ku', 'request_id' => 'k4'])['status'], 'reverted');
 snavClean('kinetic inspects clean after both reverts', $kContract);
+
+// ------------------------------------------------------------------ every language of the association group
+
+// 🔒 EVERY LANGUAGE THAT SHOWS A SHOWCASE ENTRY LOSES IT, NOT ONLY THE ONES COWORK MADE. Business 1.2.6
+// ships its editions in the source's association groups (41 of them; the gate lays vi-VN and fr-FR,
+// de-DE and an unpublished ja-JP are laid here). Each published member is hidden in the same write as
+// its source and comes back with it, byte for byte; an unpublished one shows nothing and is left alone.
+$tbSource = __DIR__ . '/../lib/contracts/tracy-business/j6/1.2.6';
+$tbEditions = json_decode(file_get_contents($tbSource . '/editions.json'), true, 512, JSON_THROW_ON_ERROR);
+$tbKeys = ['menuItem-615', 'menuItem-616', 'menuItem-617'];
+$tbRu = ['menuItem-615' => 648, 'menuItem-616' => 649, 'menuItem-617' => 650];
+$tbSite = function (array $published) use ($tbSource, $tbEditions, $tbKeys, $tbRu): array {
+    $site = snavSite($tbSource);
+    $w = $site[2];
+    $members = [];
+    foreach ($tbKeys as $key) {
+        $source = (int) substr($key, strlen('menuItem-'));
+        // The ru-RU entry is a governed row of its own, with its own operation: in the group, never followed.
+        $group = [$source, $tbRu[$key]];
+        foreach ($published as $locale => $state) {
+            $eid = (int) $tbEditions['locales'][$locale]['ids'][$key];
+            if (!isset($w->store['menuItem'][$eid])) snavDropPad($w);
+            $w->store['menuItem'][$eid] = ['id' => (string) $eid, 'language' => $locale, 'published' => $state, 'menutype' => 'tb-kit-' . substr($locale, 0, 2)]
+                + ($w->store['menuItem'][$eid] ?? $w->store['menuItem'][$source]);
+            $group[] = $eid;
+            $members[$key][$locale] = $eid;
+        }
+        foreach ($group as $mid) $w->groups['menuAssociation'][$mid] = 'tb-' . $key;
+    }
+    return [$site, $members];
+};
+$tbShow = fn (ContractTestWriter $w, int $id) => (string) (json_decode((string) $w->store['menuItem'][$id]['params'], true)['menu_show'] ?? '1');
+$tbRun = function (callable $call, string $op, string $apply, string $request): array {
+    for ($i = 0, $step = ['ok' => true, 'status' => 'running']; $i < 20 && ($step['status'] ?? '') === 'running'; $i++)
+        $step = $call(['operation' => 'showcaseNav.' . $op, 'apply_id' => $apply, 'request_id' => $request]);
+    return $step;
+};
+[[, $tbStore, $tbw, $tbContract, $tbCall], $tbMembers] = $tbSite(['vi-VN' => '1', 'fr-FR' => '1', 'de-DE' => '1', 'ja-JP' => '0']);
+$tbOriginal = array_map(fn ($row) => $row['params'] ?? null, $tbw->store['menuItem']);
+$tbApplied = $tbRun($tbCall, 'apply', 'snav-tb', 'tb1');
+$tbLeft = [];
+foreach ($tbMembers as $key => $byLocale) foreach (['en-GB' => (int) substr($key, 9)] + $byLocale as $locale => $mid)
+    if ($tbShow($tbw, $mid) !== '0') $tbLeft[] = "$key $locale";
+check('business: every published language of the group is out of the menu', [$tbApplied['status'] ?? $tbApplied['message'] ?? null, $tbLeft],
+    ['completed', ['menuItem-615 ja-JP', 'menuItem-616 ja-JP', 'menuItem-617 ja-JP']]);
+check('business: the unpublished ja-JP edition is not written', array_map(fn ($mid) => $tbw->store['menuItem'][$mid]['params'] ?? null, array_column($tbMembers, 'ja-JP')),
+    array_map(fn ($mid) => $tbOriginal[$mid], array_column($tbMembers, 'ja-JP')));
+snavClean('business: the applied site inspects clean', $tbContract);
+$tbStatus = $tbCall(['operation' => 'showcaseNav.status']);
+check('business: status says complete, nothing showing', [$tbStatus['status'], $tbStatus['remaining'], $tbStatus['showing'] ?? null], ['complete', 0, []]);
+// A language published after the apply (ja-JP) still shows the entries: status is not complete.
+foreach ($tbMembers as $byLocale) $tbw->store['menuItem'][$byLocale['ja-JP']]['published'] = '1';
+$tbStatus = $tbCall(['operation' => 'showcaseNav.status']);
+check('business: a language shown after the apply is reported still showing', [$tbStatus['status'], $tbStatus['remaining'], $tbStatus['showing'] ?? null],
+    ['incomplete', 3, ['menuItem-615' => ['ja-JP' => $tbMembers['menuItem-615']['ja-JP']], 'menuItem-616' => ['ja-JP' => $tbMembers['menuItem-616']['ja-JP']], 'menuItem-617' => ['ja-JP' => $tbMembers['menuItem-617']['ja-JP']]]]);
+// A revert then brings back exactly what the apply wrote, and leaves the new language as it stands.
+$tbBack = $tbRun($tbCall, 'revert', 'snav-tbu', 'tbu1');
+check('business: a revert restores only what the apply wrote', [$tbBack['status'] ?? $tbBack['message'] ?? null, $tbBack['conflicts'] ?? null,
+    array_map(fn ($row) => $row['params'] ?? null, $tbw->store['menuItem']) === $tbOriginal], ['reverted', [], true]);
+snavClean('business: the reverted site inspects clean', $tbContract);
+// Applied again, the language is followed; published after that apply, the next apply follows it too.
+foreach ($tbMembers as $byLocale) $tbw->store['menuItem'][$byLocale['ja-JP']]['published'] = '0';
+check('business: applied again without ja-JP', $tbRun($tbCall, 'apply', 'snav-tc', 'tc1')['status'] ?? null, 'completed');
+foreach ($tbMembers as $byLocale) $tbw->store['menuItem'][$byLocale['ja-JP']]['published'] = '1';
+$tbAgain = $tbCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-tc2', 'request_id' => 'tc2']);
+check('business: an apply then follows the new language too', [$tbAgain['status'] ?? $tbAgain['message'] ?? null, $tbAgain['moved'] ?? null, array_map(fn ($mid) => $tbShow($tbw, $mid), array_column($tbMembers, 'ja-JP'))],
+    ['completed', 3, ['0', '0', '0']]);
+check('business: and status is complete again', $tbCall(['operation' => 'showcaseNav.status'])['status'], 'complete');
+snavClean('business: the re-applied site inspects clean', $tbContract);
+$tbBack = $tbRun($tbCall, 'revert', 'snav-tcu', 'tcu1');
+check('business: the revert gives every language its menu back, byte for byte', [$tbBack['status'] ?? $tbBack['message'] ?? null, $tbBack['conflicts'] ?? null,
+    array_map(fn ($row) => $row['params'] ?? null, $tbw->store['menuItem']) === $tbOriginal], ['reverted', [], true]);
+
+// 🔒 A DEMO TRIM FOLLOWS EVERY LANGUAGE OF THE GROUP THE SAME WAY. Each listed row's published members
+// (vi-VN, fr-FR, de-DE) are hidden with it; ja-JP, unpublished, is not written. Published after the
+// trim, it is still showing: the plan says the trim is not complete, and a revert brings back exactly
+// what the trim hid.
+$tbTrim = json_decode(file_get_contents($tbSource . '/demo-trim-map.json'), true, 512, JSON_THROW_ON_ERROR);
+$tbField = ['article' => 'state', 'menuItem' => 'published'];
+$tbTrimMembers = [];
+foreach ($tbTrim['hide'] as $row) {
+    if (!isset($tbField[$row['kind']]) || $row['from'] !== '1') continue;
+    $source = (int) substr($row['key'], strlen($row['kind']) + 1);
+    $group = [$source];
+    foreach (['vi-VN' => '1', 'fr-FR' => '1', 'de-DE' => '1', 'ja-JP' => '0'] as $locale => $state) {
+        $eid = $tbEditions['locales'][$locale]['ids'][$row['key']] ?? null;
+        if ($eid === null) continue;
+        if (!isset($tbw->store[$row['kind']][$eid])) {
+            foreach ($tbw->store[$row['kind']] as $pid => $pad) if (str_starts_with((string) ($pad['title'] ?? ''), 'pad ')) { unset($tbw->store[$row['kind']][$pid]); break; }
+            $tbw->store[$row['kind']][$eid] = ['id' => (string) $eid, 'language' => $locale, 'alias' => $tbw->store[$row['kind']][$source]['alias'] . '-' . $locale] + $tbw->store[$row['kind']][$source];
+        }
+        $tbw->store[$row['kind']][$eid][$tbField[$row['kind']]] = $state;
+        $group[] = (int) $eid;
+        $tbTrimMembers[$row['key']][$locale] = (int) $eid;
+    }
+    foreach ($group as $mid) $tbw->groups[['article' => 'articleAssociation', 'menuItem' => 'menuAssociation'][$row['kind']]][$mid] = 'tbt-' . $row['key'];
+}
+$tbVisible = function () use ($tbw, $tbField): array {
+    $out = [];
+    foreach ($tbField as $kind => $field) foreach ($tbw->store[$kind] as $rid => $r) $out[$kind][$rid] = (string) ($r[$field] ?? '');
+    return $out;
+};
+$tbTrimBefore = $tbVisible();
+checkTrue('business: demo rows have editions in the group', count($tbTrimMembers) > 10);
+for ($i = 0, $tbTrimmed = ['ok' => true, 'status' => 'running']; $i < 40 && ($tbTrimmed['status'] ?? '') === 'running'; $i++)
+    $tbTrimmed = $tbCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-tb', 'request_id' => 'tbt1']);
+$tbTrimLeft = [];
+foreach ($tbTrimMembers as $key => $byLocale) foreach ($byLocale as $locale => $mid) {
+    $kind = explode('-', $key)[0];
+    if ($locale !== 'ja-JP' && (string) $tbw->store[$kind][$mid][$tbField[$kind]] !== '0') $tbTrimLeft[] = "$key $locale";
+}
+check('business: the demo trim hides every published language of the group', [$tbTrimmed['status'] ?? $tbTrimmed['message'] ?? null, $tbTrimLeft], ['completed', []]);
+$tbJa = array_filter(array_map(fn ($b) => $b['ja-JP'] ?? null, $tbTrimMembers));
+check('business: and leaves the unpublished ja-JP edition as it was', [$tbJa !== [], array_unique(array_map(fn ($key) => (string) $tbw->store[explode('-', $key)[0]][$tbJa[$key]][$tbField[explode('-', $key)[0]]], array_keys($tbJa)))], [true, ['0']]);
+snavClean('business: the trimmed site inspects clean', $tbContract);
+$tbPlan = $tbCall(['operation' => 'demoTrim.plan']);
+check('business: the plan says the trim is complete', [$tbPlan['status'], $tbPlan['remaining'], $tbPlan['showing'] ?? null], ['complete', 0, []]);
+$tbShown = $tbTrimBefore;
+foreach ($tbTrimMembers as $key => $byLocale) if (isset($byLocale['ja-JP'])) {
+    $kind = explode('-', $key)[0];
+    $tbw->store[$kind][$byLocale['ja-JP']][$tbField[$kind]] = '1';
+    $tbShown[$kind][$byLocale['ja-JP']] = '1';
+}
+$tbPlan = $tbCall(['operation' => 'demoTrim.plan']);
+check('business: a language published after the trim keeps it from being complete', [$tbPlan['status'], $tbPlan['remaining'] > 0], ['incomplete', true]);
+$tbJaShowing = [];
+// Named by the language the row carries: where the fixture found an edition id already taken, that row keeps its own.
+foreach ($tbTrimMembers as $key => $byLocale) if (isset($byLocale['ja-JP'])) $tbJaShowing[$key] = [(string) $tbw->store[explode('-', $key)[0]][$byLocale['ja-JP']]['language'] => $byLocale['ja-JP']];
+ksort($tbJaShowing);
+$tbPlanShowing = $tbPlan['showing'] ?? null;
+if (is_array($tbPlanShowing)) ksort($tbPlanShowing);
+check('business: and names each row that shows again, by language and id', $tbPlanShowing, $tbJaShowing);
+for ($i = 0, $tbTrimmed = ['ok' => true, 'status' => 'running']; $i < 40 && ($tbTrimmed['status'] ?? '') === 'running'; $i++)
+    $tbTrimmed = $tbCall(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-tbu', 'request_id' => 'tbt2']);
+check('business: the trim revert brings back exactly what the trim hid', [$tbTrimmed['status'] ?? $tbTrimmed['message'] ?? null, $tbVisible() === $tbShown], ['reverted', true]);
+snavClean('business: the untrimmed site inspects clean', $tbContract);
+unset($tbw, $tbStore, $tbContract, $tbCall, $tbOriginal);
+
+// ------------------------------------------------------------------ a language added in Joomla, under a T3 mega-menu
+
+// 🔒 A T3 STYLE IS ONE ROW FOR EVERY LANGUAGE, AND ITS SUBS FOR A TRANSLATED MENU ARE NO RULE THE MAP
+// CARRIES. Donate 1.0.7 with fr-FR added in Joomla itself, associated: the apply is refused before
+// anything is written, never a completed apply that hid the source alone; status says so up front.
+$dnSource = __DIR__ . '/../lib/contracts/ja-donate/j6/1.0.7';
+[, $dnStore, $dnw, $dnContract, $dnCall] = snavSite($dnSource);
+$dnMap = json_decode(file_get_contents($dnSource . '/showcase-nav-map.json'), true, 512, JSON_THROW_ON_ERROR);
+$dnNext = max(array_keys($dnw->store['menuItem'])) + 1;
+foreach ($dnMap['operations'] as $op) {
+    if ($op['op'] !== 'menuItem.param') continue;
+    $source = (int) substr($op['key'], strlen('menuItem-'));
+    $fr = $dnNext++;
+    snavDropPad($dnw);
+    $dnw->store['menuItem'][$fr] = ['id' => (string) $fr, 'language' => 'fr-FR', 'menutype' => 'mainmenu-fr', 'alias' => $dnw->store['menuItem'][$source]['alias'] . '-fr',
+        'path' => 'fr/' . $dnw->store['menuItem'][$source]['path'], 'title' => $dnw->store['menuItem'][$source]['title'] . ' (fr)'] + $dnw->store['menuItem'][$source];
+    $dnw->groups['menuAssociation'][$source] = $dnw->groups['menuAssociation'][$fr] = 'dn-' . $source;
+}
+$dnRows = $dnw->store;
+$dnStatus = $dnCall(['operation' => 'showcaseNav.status']);
+check('donate + fr-FR: status says the apply will refuse, and why', [$dnStatus['ok'], str_contains((string) ($dnStatus['refusal'] ?? ''), 'mega-menu')], [true, true]);
+$dnRefused = $dnCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-dn', 'request_id' => 'dn1']);
+check('donate + fr-FR: the T3 apply is refused before anything is written', [$dnRefused['error'] ?? $dnRefused['status'] ?? null,
+    str_contains((string) ($dnRefused['message'] ?? ''), 'mega-menu'), str_contains((string) ($dnRefused['message'] ?? ''), 'Nothing has been written')], ['contract_failed', true, true]);
+check('donate + fr-FR: and nothing moved', [$dnw->store == $dnRows, $dnStore->binding['showcaseNav'] ?? null], [true, null]);
+unset($dnw, $dnStore, $dnContract, $dnCall, $dnRows);
+
+// The same refusal on a site whose second language shows no showcase entry yet: a content language
+// published in Joomla is a second language, whatever its menus hold. One that is not published is
+// served nowhere, and keeps the site one language.
+foreach (['published' => ['1', true], 'unpublished' => ['0', false]] as $what => [$published, $refuses]) {
+    [, $dnStore, $dnw, , $dnCall] = snavSite($dnSource);
+    $dnw->store['language'] = [1 => ['lang_id' => '1', 'lang_code' => 'en-GB', 'published' => '1'], 2 => ['lang_id' => '2', 'lang_code' => 'fr-FR', 'published' => $published]];
+    $dnRows = $dnw->store;
+    $dnStatus = $dnCall(['operation' => 'showcaseNav.status']);
+    $dnAnswer = $dnCall(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-dn2', 'request_id' => 'dn2']);
+    check("donate + a $what fr-FR content language and no fr-FR menu: " . ($refuses ? 'refused before anything is written' : 'one language, applied'),
+        [str_contains((string) ($dnStatus['refusal'] ?? ''), 'fr-FR'), $dnAnswer['error'] ?? null, str_contains((string) ($dnAnswer['message'] ?? ''), 'Nothing has been written'), $dnw->store == $dnRows],
+        $refuses ? [true, 'contract_failed', true, true] : [false, null, false, false]);
+    unset($dnw, $dnStore, $dnCall, $dnRows);
+}
 })();

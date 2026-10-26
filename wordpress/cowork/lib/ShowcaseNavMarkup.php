@@ -113,6 +113,30 @@ final class ShowcaseNavMarkup
         return self::cut($markup, $blocks[self::locate(self::items($blocks), $path, $byPage, $pageId)]);
     }
 
+    /**
+     * The markup of a `wp_navigation` post without every entry `$match` takes (given each entry as
+     * `items()` lists it), one cut at a time in document order: an entry inside one already cut went with it.
+     *
+     * @param callable(array):bool $match
+     */
+    public static function removeEntries(string $markup, callable $match): string
+    {
+        while (true) {
+            $blocks = self::parse($markup);
+            $found = null;
+            foreach (self::items($blocks) as $item) {
+                if ($match($item)) {
+                    $found = $item;
+                    break;
+                }
+            }
+            if ($found === null) {
+                return $markup;
+            }
+            $markup = self::cut($markup, $blocks[$found['block']]);
+        }
+    }
+
     /** The markup of a template part without one entry of its `$navigation`-th inline navigation (no `ref`). */
     public static function removeInlineLink(string $markup, int $navigation, array $path, bool $byPage, ?int $pageId): string
     {

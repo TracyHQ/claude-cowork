@@ -750,6 +750,8 @@ final class WP_Fake_Db
     public string $last_error = '';
     /** @var callable|null run inside a compare-and-set UPDATE, before its compare: a customer saving the row at that instant */
     public $beforeSwap = null;
+    /** @var callable|null run once a compare-and-set has landed: a save that comes right after it */
+    public $afterSwap = null;
     /** @var array{0:string,1:array}|null the last statement prepared and its arguments, so query() can run it byte-exactly */
     private ?array $lastPrepared = null;
 
@@ -848,6 +850,9 @@ final class WP_Fake_Db
                 return 0;
             }
             WP_Fake::$posts[(int) $id] = ['post_content' => $content, 'post_modified' => $modified, 'post_modified_gmt' => $modifiedGmt] + $row;
+            if ($this->afterSwap !== null) {
+                ($this->afterSwap)((int) $id);
+            }
             return 1;
         }
         return 1;
@@ -930,6 +935,19 @@ function pll_languages_list(array $args = []): array
 function pll_get_post(int $id, string $lang = '')
 {
     return WP_Fake::$polylang ? (WP_Fake::$translations[$id][$lang] ?? false) : false;
+}
+
+/** A post's whole translation group, language => id, itself included when it has a language (what the `post_translations` term holds). */
+function pll_get_post_translations(int $id): array
+{
+    if (!WP_Fake::$polylang) {
+        return [];
+    }
+    $group = WP_Fake::$translations[$id] ?? [];
+    if (isset(WP_Fake::$postLanguage[$id])) {
+        $group[WP_Fake::$postLanguage[$id]] = $id;
+    }
+    return $group;
 }
 
 function flush_rewrite_rules(bool $hard = true): void

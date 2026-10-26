@@ -26,6 +26,7 @@ function snavSite(string $contractId, string $contractsDir, array $options = [])
     WP_Fake::$stylesheet = 'quickstart-theme';
     WP_Fake::$options = ['home' => $options['home'] ?? 'http://test.local'] + (isset($options['siteurl']) ? ['siteurl' => $options['siteurl']] : []);
     $GLOBALS['wpdb']->beforeSwap = null;
+    $GLOBALS['wpdb']->afterSwap = null;
     $fixture = __DIR__ . '/fixtures/showcase-nav/' . explode('/', $contractId)[0] . '.json';
     $source = is_file($fixture) ? json_decode((string) file_get_contents($fixture), true) : ['navigations' => [], 'templateParts' => []];
     if (isset($options['home'])) {
@@ -139,17 +140,240 @@ $status = $sdoor($E, 'showcaseNav.status');
 check('status before an apply', [$status['ok'], $status['status'], $status['remaining'], $status['hides']],
     [true, 'none', 2, ['navigation.removeLink' => 7]]);
 
-WP_Fake::$polylang = true;
-WP_Fake::$languages = [
-    'en' => ['term_id' => 5, 'name' => 'English', 'slug' => 'en', 'locale' => 'en_US', 'is_rtl' => 0, 'term_group' => 0, 'flag_code' => 'us'],
-    'de' => ['term_id' => 6, 'name' => 'Deutsch', 'slug' => 'de', 'locale' => 'de_DE', 'is_rtl' => 0, 'term_group' => 1, 'flag_code' => 'de'],
-];
-$ml = $sdoor($E, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
-check('a site with a second language is refused, both ways', [$ml['error'], $sdoor($E, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1'])['error']], ['contract_failed', 'contract_failed']);
-check('and says nothing was written', $ml['message'], 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
-check('nothing moved, nothing on record', [$sha(93), $sha(278), $sha(96), $sdoor($E, 'inspect')['showcaseNav']], [$F['navigation-93']['before'], $F['navigation-278']['before'], $dinerHeader, null]);
-WP_Fake::$polylang = false;
-WP_Fake::$languages = [];
+// ── a translated site: each language's twin of a listed navigation follows it ──────────────
+//
+// The theme serves a language its own `wp_navigation` twin (`mainmenu` → `mainmenu-de`), linking the
+// German copies of the pages. Polylang's translation group says which German entry is a showcase one.
+
+$snavGerman = static function (array $options = []) use ($DINER, $snavContracts): array {
+    $site = snavSite($DINER, $snavContracts);
+    WP_Fake::$polylang = true;
+    WP_Fake::$languages = [
+        'en' => ['term_id' => 5, 'name' => 'English', 'slug' => 'en', 'locale' => 'en_US', 'is_rtl' => 0, 'term_group' => 0, 'flag_code' => 'us'],
+        'de' => ['term_id' => 6, 'name' => 'Deutsch', 'slug' => 'de', 'locale' => 'de_DE', 'is_rtl' => 0, 'term_group' => 1, 'flag_code' => 'de'],
+    ];
+    foreach ($site['source']['navigations'] as $nav) {
+        if (!in_array($nav['slug'], $options['twins'] ?? ['mainmenu'], true)) {
+            continue;
+        }
+        // The twin links page N + 1000, the German copy of page N, under a German label.
+        $twin = (string) preg_replace_callback('~"id":(\d+)~', static fn(array $m): string => '"id":' . ((int) $m[1] + 1000), $nav['content']);
+        $twin = str_replace('"label":"', '"label":"DE ', $twin);
+        WP_Fake::$posts[$nav['id'] + 800] = ['ID' => $nav['id'] + 800, 'post_type' => 'wp_navigation', 'post_name' => $nav['slug'] . '-de',
+            'post_status' => 'publish', 'post_parent' => 0, 'post_title' => $nav['slug'] . '-de', 'post_content' => $twin];
+        preg_match_all('~"id":(\d+)~', $nav['content'], $ids);
+        foreach (array_unique(array_map('intval', $ids[1])) as $page) {
+            WP_Fake::$postLanguage[$page] = 'en';
+            WP_Fake::$postLanguage[$page + 1000] = 'de';
+            WP_Fake::$translations[$page]['de'] = $page + 1000;
+            WP_Fake::$translations[$page + 1000]['en'] = $page;
+        }
+    }
+    return $site;
+};
+$snavMonolingual = static function (): void {
+    WP_Fake::$polylang = false;
+    WP_Fake::$languages = [];
+};
+
+$t = $snavGerman();
+$T = $t['engine'];
+$twinBefore = $sha(893);
+$twinLabels = $labels(893);
+foreach ([93, 893] as $dated) {
+    WP_Fake::$posts[$dated] += ['post_modified' => '2024-03-0' . ($dated % 7) . ' 10:00:00', 'post_modified_gmt' => '2024-03-0' . ($dated % 7) . ' 09:00:00'];
+}
+$datedBefore = array_map(static fn(int $id): array => [WP_Fake::$posts[$id]['post_modified'], WP_Fake::$posts[$id]['post_modified_gmt']], [93 => 93, 893 => 893]);
+// 🔒 A SOURCE AND ITS TWINS ARE ONE BATCH. Two owners per call would cut after the two listed
+// navigations, and the German menu would show the entries the English one no longer does.
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a translated site is applied: the main menu and its German twin in the same call',
+    [$step['ok'], $step['status'], $step['moved'], $step['remaining'], $sha(93) === $F['navigation-93']['after'], $sha(893) !== $twinBefore, $sha(278)],
+    [true, 'running', 2, 1, true, true, $F['navigation-278']['before']]);
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('then the site-pages menu, which has no twin', [$step['ok'], $step['status'], $step['moved'], $step['remaining'], $step['skipped']], [true, 'completed', 1, 0, []]);
+check('the listed navigations end as the map says', [$sha(93), $sha(278)], [$F['navigation-93']['after'], $F['navigation-278']['after']]);
+check('the twin loses the German copies of the showcase entries, and nothing else',
+    $labels(893), array_values(array_filter($twinLabels, static fn(string $l): bool => !in_array($l, ['DE Home - Red', 'DE Home - Pink', 'DE Home - Green', 'DE Home - Blue'], true))));
+$record = $sdoor($T, 'inspect')['showcaseNav'];
+check('the twin has its own receipt, with the bytes it found', [$record['receipts']['navigation-893']['outcome'] ?? null, $record['receipts']['navigation-893']['before'] ?? null,
+    base64_decode((string) ($record['receipts']['navigation-893']['content'] ?? ''), true) === $t['source']['navigations'][0]['content'] ? 'source' : 'twin'],
+    ['written', $twinBefore, 'twin']);
+$back = $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('a revert brings the main menu and its German twin back in the same call',
+    [$back['status'] ?? null, $sha(93) === $F['navigation-93']['before'], $sha(893) === $twinBefore], ['running', true, true]);
+$back = ($back['status'] ?? null) === 'running' ? $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']) : $back;
+check('a revert puts back every language', [$back['ok'], $back['status'], $sha(93), $sha(278), $sha(893)],
+    [true, 'reverted', $F['navigation-93']['before'], $F['navigation-278']['before'], $twinBefore]);
+check('and the date each menu was last modified, as WordPress showed it before the apply',
+    array_map(static fn(int $id): array => [WP_Fake::$posts[$id]['post_modified'], WP_Fake::$posts[$id]['post_modified_gmt']], [93 => 93, 893 => 893]), $datedBefore);
+$snavMonolingual();
+
+// 🔒 THE DATE COMES BACK IN THE SAME WRITE AS THE BYTES, OR NOT AT ALL. A customer who saves the menu the
+// moment the revert's compare-and-set lands keeps their words and the date WordPress gave their save.
+$t = $snavGerman();
+$T = $t['engine'];
+WP_Fake::$posts[93] += ['post_modified' => '2024-03-02 10:00:00', 'post_modified_gmt' => '2024-03-02 09:00:00'];
+for ($i = 0, $step = ['status' => 'running']; $i < 5 && ($step['status'] ?? null) === 'running'; $i++)
+    $step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$customerSave = WP_Fake::$posts[93]['post_content'] . "\n<!-- wp:navigation-link {\"label\":\"Saved\",\"url\":\"/saved\",\"kind\":\"custom\"} /-->";
+$GLOBALS['wpdb']->afterSwap = static function (int $id) use ($customerSave): void {
+    if ($id !== 93) return;
+    $GLOBALS['wpdb']->afterSwap = null;
+    WP_Fake::$posts[93] = ['post_content' => $customerSave, 'post_modified' => '2031-01-01 12:00:00', 'post_modified_gmt' => '2031-01-01 11:00:00'] + WP_Fake::$posts[93];
+};
+for ($i = 0, $back = ['status' => 'running']; $i < 5 && ($back['status'] ?? null) === 'running'; $i++)
+    $back = $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+$GLOBALS['wpdb']->afterSwap = null;
+check('a save landing right after the revert\'s write keeps its words and its date',
+    [$step['status'] ?? null, $back['status'] ?? null, WP_Fake::$posts[93]['post_content'] === $customerSave, WP_Fake::$posts[93]['post_modified'], WP_Fake::$posts[93]['post_modified_gmt']],
+    ['completed', 'reverted', true, '2031-01-01 12:00:00', '2031-01-01 11:00:00']);
+$snavMonolingual();
+
+// A German entry whose page Polylang links to no English page cannot be told apart from a German
+// showcase entry: the whole apply is refused before anything is written.
+$t = $snavGerman();
+$T = $t['engine'];
+unset(WP_Fake::$translations[1085]['en'], WP_Fake::$translations[85]['de']);
+$refused = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('an unlinked translation is refused', [$refused['ok'], $refused['error'] ?? null], [false, 'contract_failed']);
+check('and the refusal names the entry and says nothing was written', [strpos($refused['message'] ?? '', 'DE Home - Red') !== false, strpos($refused['message'] ?? '', 'Nothing has been written.') !== false], [true, true]);
+check('nothing moved, nothing on record', [$sha(93), $sha(278), $sha(96), $sha(893), $sdoor($T, 'inspect')['showcaseNav']],
+    [$F['navigation-93']['before'], $F['navigation-278']['before'], $dinerHeader, $twinBefore, null]);
+$snavMonolingual();
+
+// An entry the map takes out by its path alone (a heading, no page) has nothing a translation group
+// can follow into a twin's German labels: refused the same way.
+$t = $snavGerman(['twins' => ['site-pages']]);
+$T = $t['engine'];
+$sitePagesTwin = $sha(1078);
+$refused = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a pageless showcase entry with a twin is refused', [$refused['error'] ?? null, strpos($refused['message'] ?? '', 'site-pages-de') !== false], ['contract_failed', true]);
+check('and nothing moved', [$sha(93), $sha(278), $sha(1078), $sdoor($T, 'inspect')['showcaseNav']],
+    [$F['navigation-93']['before'], $F['navigation-278']['before'], $sitePagesTwin, null]);
+$snavMonolingual();
+
+// 🔒 A TWIN IS WHAT POLYLANG LINKS, NOT ONLY WHAT IT IS NAMED. `german-mainmenu`, in the main menu's
+// translation group, follows it as `mainmenu-de` does; with both, the group (three navigations) is one
+// call even though a call takes two owners. A German menu holding no showcase entry is left alone.
+$t = $snavGerman();
+$T = $t['engine'];
+WP_Fake::$posts[1893] = ['post_name' => 'german-mainmenu', 'post_title' => 'German main menu'] + WP_Fake::$posts[893];
+WP_Fake::$posts[1893]['ID'] = 1893;
+WP_Fake::$translations[93]['de'] = 1893;
+WP_Fake::$translations[1893]['en'] = 93;
+$plainGerman = '<!-- wp:navigation-link {"label":"DE Kontakt","type":"page","id":2000,"kind":"post-type"} /-->' . "\n"
+    . '<!-- wp:navigation-link {"label":"DE Blog","url":"/de/blog","kind":"custom"} /-->';
+WP_Fake::$posts[1990] = ['ID' => 1990, 'post_type' => 'wp_navigation', 'post_name' => 'german-extra', 'post_status' => 'publish', 'post_parent' => 0,
+    'post_title' => 'German extra', 'post_content' => $plainGerman];
+WP_Fake::$postLanguage[2000] = 'de';
+$linkedBefore = $sha(1893);
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a navigation Polylang links to the main menu follows it, with the named twin, in one call',
+    [$step['ok'], $step['status'], $step['moved'], $step['remaining'], $labels(1893) === $labels(893), $sha(1893) !== $linkedBefore],
+    [true, 'running', 3, 1, true, true]);
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('and a German menu with no showcase entry is not a refusal, and is not written', [$step['status'] ?? null, $step['skipped'] ?? null, WP_Fake::$posts[1990]['post_content']],
+    ['completed', [], $plainGerman]);
+$back = $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('the linked twin comes back with its group', [$back['status'] ?? null, $sha(93) === $F['navigation-93']['before'], $sha(1893), $sha(893) === $twinBefore],
+    ['running', true, $linkedBefore, true]);
+$snavMonolingual();
+
+// A German menu that shows a showcase entry's German page, but that neither Polylang nor its name ties to
+// a listed navigation, cannot be followed: the apply is refused before anything is written, never completed.
+$t = $snavGerman();
+$T = $t['engine'];
+WP_Fake::$posts[1991] = ['ID' => 1991, 'post_type' => 'wp_navigation', 'post_name' => 'german-copy', 'post_status' => 'publish', 'post_parent' => 0,
+    'post_title' => 'German copy', 'post_content' => '<!-- wp:navigation-link {"label":"DE Home - Red","type":"page","id":1085,"kind":"post-type"} /-->'];
+$refused = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+check('a translated menu no group ties to its source is refused', [$refused['error'] ?? null, strpos($refused['message'] ?? '', 'german-copy') !== false,
+    strpos($refused['message'] ?? '', 'Nothing has been written.') !== false], ['contract_failed', true, true]);
+check('and nothing moved, nothing on record', [$sha(93), $sha(278), $sha(893), $sdoor($T, 'inspect')['showcaseNav']],
+    [$F['navigation-93']['before'], $F['navigation-278']['before'], $twinBefore, null]);
+$snavMonolingual();
+
+// A source navigation the customer edited is left as it is; its twin is left with it.
+$t = $snavGerman();
+$T = $t['engine'];
+WP_Fake::$posts[93]['post_content'] .= "\n";
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$step = ($step['status'] ?? null) === 'running' ? $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $step;
+check('a twin follows its source: left when the source is left', [$step['status'] ?? null, $sha(893) === $twinBefore, isset($step['skipped']['navigation-93']), isset($step['skipped']['navigation-893'])],
+    ['completed', true, true, true]);
+$snavMonolingual();
+
+// 🔒 A LANGUAGE ADDED AFTER THE APPLY IS NO FINISHED JOB. The customer adds French and its own
+// `mainmenu-fr`, linking the French copies of the showcase pages: status says the job is incomplete and
+// names the menu still showing them, a new apply request follows it, and the revert gives it back.
+$t = $snavGerman();
+$T = $t['engine'];
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$step = ($step['status'] ?? null) === 'running' ? $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $step;
+$germanHidden = $sha(893);
+WP_Fake::$languages['fr'] = ['term_id' => 7, 'name' => 'Français', 'slug' => 'fr', 'locale' => 'fr_FR', 'is_rtl' => 0, 'term_group' => 2, 'flag_code' => 'fr'];
+$french = (string) preg_replace_callback('~"id":(\d+)~', static fn(array $m): string => '"id":' . ((int) $m[1] + 2000), $t['source']['navigations'][0]['content']);
+WP_Fake::$posts[2893] = ['ID' => 2893, 'post_type' => 'wp_navigation', 'post_name' => 'mainmenu-fr', 'post_status' => 'publish', 'post_parent' => 0,
+    'post_title' => 'mainmenu-fr', 'post_content' => str_replace('"label":"', '"label":"FR ', $french)];
+preg_match_all('~"id":(\d+)~', $t['source']['navigations'][0]['content'], $ids);
+foreach (array_unique(array_map('intval', $ids[1])) as $page) {
+    WP_Fake::$postLanguage[$page + 2000] = 'fr';
+    WP_Fake::$translations[$page]['fr'] = $page + 2000;
+    WP_Fake::$translations[$page + 2000]['en'] = $page;
+}
+$frenchBefore = $sha(2893);
+$frenchLabels = $labels(2893);
+$status = $sdoor($T, 'showcaseNav.status');
+check('a language added after the apply leaves the job incomplete, and names the menu still showing the entries',
+    [$step['status'] ?? null, $status['status'] ?? null, $status['remaining'] ?? null, $status['showing'] ?? null, $status['refusal'] ?? null],
+    ['completed', 'incomplete', 1, ['navigation-2893' => 'fr'], null]);
+$again = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-2', 'request_id' => 'n2']);
+check('a new apply request follows the French menu out of its showcase entries, and nothing else',
+    [$again['status'] ?? null, $again['moved'] ?? null, $again['skipped'] ?? null, $labels(2893), $sha(893) === $germanHidden, $sha(93) === $F['navigation-93']['after']],
+    ['completed', 1, [], array_values(array_filter($frenchLabels, static fn(string $l): bool => !in_array($l, ['FR Home - Red', 'FR Home - Pink', 'FR Home - Green', 'FR Home - Blue'], true))), true, true]);
+$status = $sdoor($T, 'showcaseNav.status');
+check('then status is complete, nothing showing', [$status['status'] ?? null, $status['remaining'] ?? null, $status['showing'] ?? null], ['complete', 0, []]);
+for ($i = 0, $back = ['status' => 'running']; $i < 5 && ($back['status'] ?? null) === 'running'; $i++)
+    $back = $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('the revert gives every language its menu back, the late one too, byte for byte', [$back['status'] ?? null, $back['conflicts'] ?? null, $sha(93), $sha(278), $sha(893) === $twinBefore, $sha(2893)],
+    ['reverted', [], $F['navigation-93']['before'], $F['navigation-278']['before'], true, $frenchBefore]);
+unset(WP_Fake::$posts[2893]);
+$snavMonolingual();
+
+// 🔒 STATUS READS WHAT THE SITE SHOWS NOW, NOT WHAT ITS RECEIPTS SAY. The customer puts a showcase
+// entry back into the German menu the apply wrote: status says the job is incomplete and names it, a new
+// apply request takes it out again, and the revert gives back the menu as that apply found it.
+$t = $snavGerman();
+$T = $t['engine'];
+$germanShown = WP_Fake::$posts[893]['post_content'];
+$step = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']);
+$step = ($step['status'] ?? null) === 'running' ? $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-1', 'request_id' => 'n1']) : $step;
+$germanHiddenLabels = $labels(893);
+$germanReadded = $germanShown . "\n";
+WP_Fake::$posts[893]['post_content'] = $germanReadded;
+$status = $sdoor($T, 'showcaseNav.status');
+check('an entry put back in a translated menu the apply wrote leaves the job incomplete, and names it',
+    [$step['status'] ?? null, $status['status'] ?? null, $status['remaining'] ?? null, $status['showing'] ?? null], ['completed', 'incomplete', 1, ['navigation-893' => 'de']]);
+$again = $sdoor($T, 'showcaseNav.apply', ['apply_id' => 'snav-2', 'request_id' => 'n2']);
+check('a new apply request takes it out again, and nothing else',
+    [$again['status'] ?? null, $again['moved'] ?? null, $again['skipped'] ?? null, $labels(893) === $germanHiddenLabels, $sha(93) === $F['navigation-93']['after']],
+    ['completed', 1, [], true, true]);
+check('then status is complete', [$sdoor($T, 'showcaseNav.status')['status'] ?? null, $sdoor($T, 'showcaseNav.status')['showing'] ?? null], ['complete', []]);
+for ($i = 0, $back = ['status' => 'running']; $i < 5 && ($back['status'] ?? null) === 'running'; $i++)
+    $back = $sdoor($T, 'showcaseNav.revert', ['apply_id' => 'snav-r', 'request_id' => 'v1']);
+check('the revert gives back the menu as the last apply found it', [$back['status'] ?? null, $back['conflicts'] ?? null, $sha(93), WP_Fake::$posts[893]['post_content'] === $germanReadded],
+    ['reverted', [], $F['navigation-93']['before'], true]);
+$snavMonolingual();
+
+// A translated menu no group ties to its source is named by status as the reason an apply would refuse.
+$t = $snavGerman();
+$T = $t['engine'];
+WP_Fake::$posts[1991] = ['ID' => 1991, 'post_type' => 'wp_navigation', 'post_name' => 'german-copy', 'post_status' => 'publish', 'post_parent' => 0,
+    'post_title' => 'German copy', 'post_content' => '<!-- wp:navigation-link {"label":"DE Home - Red","type":"page","id":1085,"kind":"post-type"} /-->'];
+$status = $sdoor($T, 'showcaseNav.status');
+check('status says why an apply would refuse', [$status['ok'] ?? null, strpos((string) ($status['refusal'] ?? ''), 'german-copy') !== false], [true, true]);
+unset(WP_Fake::$posts[1991]);
+$snavMonolingual();
 
 // ── Diner 1.0.1: the drawer keeps the account and search pages, without the template's screens ─
 
@@ -550,9 +774,14 @@ check('links the owner moved to the other scheme are a conflict, not folded', [$
 
 // ── maps that cannot be used ────────────────────────────────────────────────────────────────
 
-$k = snavSite('tracy-business/wp7/1.1.0', $snavContracts);
+// Tracy Base 1.1.6 removes nothing: its one kit screen waits on a route no inventory proves.
+$k = snavSite('tracy-base/wp7/1.1.6', $snavContracts);
 $kStatus = $sdoor($k['engine'], 'showcaseNav.status');
 check('a map with nothing to hide applies as nothing', [$kStatus['status'], $kStatus['hides']], ['none', []]);
+// Tracy Business 1.1.0 keeps its kit screens (Style guide, 404) only in the header's mega-menu markup, outside
+// any navigation: the map removes each list item there.
+$kb = snavSite('tracy-business/wp7/1.1.0', $snavContracts);
+check('kit screens linked only from header markup are removed from it', $sdoor($kb['engine'], 'showcaseNav.status')['hides'], ['templatePart.removeBlock' => 2]);
 
 $snavCopy = sys_get_temp_dir() . '/snav-contracts-' . bin2hex(random_bytes(4));
 $copyContract = static function (string $id) use ($snavContracts, $snavCopy): string {

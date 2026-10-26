@@ -370,6 +370,137 @@ foreach ($gateContracts as $profileFile) {
         check("$id: every row of the fr-FR edition is shown once it is taken", $shown('fr-FR'), []);
         check("$id: two taken languages still make no row", $rowCount(), $before);
     }
+    // 🔒 SHOWCASE NAVIGATION AND A DEMO TRIM FOLLOW EVERY LANGUAGE, OR WRITE NOTHING. With vi-VN and
+    // fr-FR beside the source, each listed row's copies go with it in the same batch and come back with
+    // it; a copy its translation group does not hold refuses the whole apply before anything moves.
+    $copiesOf = function (string $key) use ($gs): array {
+        $out = [];
+        foreach (['vi-VN', 'fr-FR'] as $l)
+            if (isset($gs->binding['multilingual']['languages'][$l]['ids'][$key])) $out[$l] = (int) $gs->binding['multilingual']['languages'][$l]['ids'][$key];
+        return $out;
+    };
+    $gateIds = $gc->inspect()['ids'];
+    $unlinked = function (string $kind, array $keys, callable $run, string $what, callable $status) use ($id, $gw, $gs, $copiesOf) {
+        foreach ($keys as $key) {
+            $copy = $copiesOf($key)['vi-VN'] ?? null;
+            $relation = ['menuItem' => 'menuAssociation', 'article' => 'articleAssociation'][$kind];
+            if ($copy === null || !isset($gw->groups[$relation][$copy])) continue;
+            $group = $gw->groups[$relation][$copy];
+            unset($gw->groups[$relation][$copy]);
+            [$rows, $binding] = [$gw->store, $gs->binding];
+            $said = $status();
+            $refused = $run();
+            $gw->groups[$relation][$copy] = $group;
+            check("$id: and status says why $what would refuse", [$said['ok'] ?? null, str_contains((string) ($said['refusal'] ?? ''), 'association group')], [true, true]);
+            check("$id: a copy outside its source's association group refuses $what", [$refused['error'] ?? null,
+                str_contains((string) ($refused['message'] ?? ''), 'association group'), str_contains((string) ($refused['message'] ?? ''), 'Nothing has been written')], ['contract_failed', true, true]);
+            check("$id: and the refused $what wrote nothing", [$gw->store == $rows, $gs->binding == $binding], [true, true]);
+            return;
+        }
+    };
+    // A translation the customer made and associated with the source themselves is no copy this receiver
+    // made or governs, yet it is the same entry in another language: the apply follows it out of the menu
+    // with its source, and the revert gives it back byte for byte.
+    $foreign = function (string $kind, array $keys) use ($gw, $gateIds): ?array {
+        $relation = ['menuItem' => 'menuAssociation', 'article' => 'articleAssociation'][$kind];
+        foreach ($keys as $key) {
+            $source = (int) ($gateIds[$key] ?? 0);
+            if ($source < 1 || !isset($gw->groups[$relation][$source])) continue;
+            $extra = max(array_keys($gw->store[$kind])) + 1;
+            $gw->store[$kind][$extra] = ['language' => 'vi-VN', $kind === 'article' ? 'state' : 'published' => '1'] + $gw->store[$kind][$source];
+            $gw->groups[$relation][$extra] = $gw->groups[$relation][$source];
+            return ['kind' => $kind, 'key' => $key, 'id' => $extra, 'relation' => $relation, 'row' => $gw->store[$kind][$extra]];
+        }
+        return null;
+    };
+    $dropForeign = function (?array $extra) use ($gw): void {
+        if ($extra !== null) unset($gw->store[$extra['kind']][$extra['id']], $gw->groups[$extra['relation']][$extra['id']]);
+    };
+    $gateNav = is_file($dir . '/showcase-nav-map.json') ? json_decode(file_get_contents($dir . '/showcase-nav-map.json'), true) : null;
+    if (($gateNav['status'] ?? null) === 'checked') {
+        $navKeys = array_values(array_unique(array_column(array_filter($gateNav['operations'], fn ($o) => $o['op'] === 'menuItem.param'), 'key')));
+        $menuShow = fn (int $mid) => (string) (json_decode((string) ($gw->store['menuItem'][$mid]['params'] ?? '{}'), true)['menu_show'] ?? '1');
+        $paramsBefore = array_map(fn ($row) => $row['params'] ?? null, $gw->store['menuItem']);
+        checkTrue("$id: a showcase entry has copies to follow", array_filter(array_map($copiesOf, $navKeys)) !== []);
+        $unlinked('menuItem', $navKeys, fn () => $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gate-x', 'request_id' => 'gate-nav-x']), 'showcase navigation',
+            fn () => $call(['operation' => 'showcaseNav.status']));
+        $navForeign = $foreign('menuItem', $navKeys);
+        $paramsBefore = array_map(fn ($row) => $row['params'] ?? null, $gw->store['menuItem']);
+        for ($i = 0, $navStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($navStep['status'] ?? '') === 'running'; $i++)
+            $navStep = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gate', 'request_id' => 'gate-nav']);
+        if (!$step('hide the showcase entries in every language', $navStep)) continue;
+        $navShown = [];
+        foreach ($navKeys as $key)
+            foreach (['source' => (int) $gateIds[$key]] + $copiesOf($key) as $l => $mid) if ($menuShow($mid) !== '0') $navShown[] = "$key ($l)";
+        check("$id: every showcase entry is out of every language's menu", [$navStep['status'] ?? null, $navStep['skipped'] ?? null, $navShown], ['completed', [], []]);
+        if ($navForeign !== null)
+            check("$id: a translation outside this receiver's copies follows its source out of the menu", $menuShow($navForeign['id']), '0');
+        // 🔒 STATUS READS WHAT THE SITE SHOWS NOW: a copy or a translation the apply hid that the customer
+        // put back in its menu is named as showing, and the job is not complete.
+        $navCopyKey = null;
+        foreach ($navKeys as $key) if ($copiesOf($key) !== []) { $navCopyKey = $key; break; }
+        // A copy in a language the foreign translation does not hold, so each is named on its own.
+        $navCopyLanguage = (string) array_key_last($copiesOf($navCopyKey));
+        $navCopy = (int) $copiesOf($navCopyKey)[$navCopyLanguage];
+        $navReshow = [$navCopy];
+        if ($navForeign !== null) $navReshow[] = (int) $navForeign['id'];
+        foreach ($navReshow as $mid) $gw->store['menuItem'][$mid]['params'] = $paramsBefore[$mid];
+        $navStatus = $call(['operation' => 'showcaseNav.status']);
+        $navWant = [$navCopyKey => [(string) $gw->store['menuItem'][$navCopy]['language'] => $navCopy]];
+        if ($navForeign !== null) $navWant[$navForeign['key']]['vi-VN'] = (int) $navForeign['id'];
+        check("$id: a copy or translation put back in its menu after the apply leaves the job incomplete, named", [$navStatus['status'] ?? null, $navStatus['showing'] ?? null],
+            ['incomplete', $navWant]);
+        $navAgain = $call(['operation' => 'showcaseNav.apply', 'apply_id' => 'snav-gate-2', 'request_id' => 'gate-nav-2']);
+        check("$id: a new apply request takes them out again", [$navAgain['status'] ?? $navAgain['message'] ?? null, array_map($menuShow, $navReshow),
+            $call(['operation' => 'showcaseNav.status'])['status'] ?? null], ['completed', array_fill(0, count($navReshow), '0'), 'complete']);
+        for ($i = 0, $navStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($navStep['status'] ?? '') === 'running'; $i++)
+            $navStep = $call(['operation' => 'showcaseNav.revert', 'apply_id' => 'snav-gate-undo', 'request_id' => 'gate-nav-undo']);
+        if (!$step('bring the showcase entries back in every language', $navStep)) continue;
+        check("$id: the revert gives every language its menu back, byte for byte", [$navStep['status'] ?? null, $navStep['conflicts'] ?? null,
+            array_map(fn ($row) => $row['params'] ?? null, $gw->store['menuItem']) === $paramsBefore], ['reverted', [], true]);
+        if ($navForeign !== null)
+            check("$id: and the revert gives that translation back byte for byte", $gw->store['menuItem'][$navForeign['id']] ?? null, $navForeign['row']);
+        $dropForeign($navForeign);
+    }
+    $gateTrim = is_file($dir . '/demo-trim-map.json') ? json_decode(file_get_contents($dir . '/demo-trim-map.json'), true) : null;
+    if ($gateTrim !== null) {
+        $visibility = function () use ($gw): array {
+            $out = [];
+            foreach (['article' => 'state', 'menuItem' => 'published', 'module' => 'published', 'category' => 'published'] as $kind => $field)
+                foreach ($gw->store[$kind] ?? [] as $rid => $row) $out[$kind][$rid] = (string) ($row[$field] ?? '');
+            return $out;
+        };
+        $trimForeign = [];
+        foreach (['article', 'menuItem'] as $kind)
+            $trimForeign[] = $foreign($kind, array_column(array_filter($gateTrim['hide'], fn ($r) => $r['kind'] === $kind && $r['from'] === '1'), 'key'));
+        $trimForeign = array_values(array_filter($trimForeign));
+        $trimBefore = $visibility();
+        $trimKeys = array_column($gateTrim['hide'], 'key');
+        checkTrue("$id: a demo row has copies to follow", array_filter(array_map($copiesOf, $trimKeys)) !== []);
+        foreach (['article', 'menuItem'] as $kind)
+            $unlinked($kind, array_column(array_filter($gateTrim['hide'], fn ($r) => $r['kind'] === $kind), 'key'),
+                fn () => $call(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-gate-x', 'request_id' => 'gate-trim-x']), 'a demo trim',
+                fn () => $call(['operation' => 'demoTrim.plan']));
+        for ($i = 0, $trimStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($trimStep['status'] ?? '') === 'running'; $i++)
+            $trimStep = $call(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-gate', 'request_id' => 'gate-trim']);
+        if (!$step('trim the demo rows in every language', $trimStep)) continue;
+        $trimNow = $visibility();
+        $left = [];
+        foreach ($gateTrim['hide'] as $row)
+            foreach (['source' => (int) $gateIds[$row['key']]] + $copiesOf($row['key']) as $l => $rid)
+                if ($trimBefore[$row['kind']][$rid] === $row['from'] && $trimNow[$row['kind']][$rid] !== $row['to']) $left[] = $row['key'] . " ($l)";
+        check("$id: every demo row is hidden in every language", [$trimStep['status'] ?? null, $left], ['completed', []]);
+        foreach ($trimForeign as $extra)
+            check("$id: a {$extra['kind']} translation outside this receiver's copies is trimmed with its source",
+                $trimNow[$extra['kind']][$extra['id']], array_column($gateTrim['hide'], 'to', 'key')[$extra['key']]);
+        for ($i = 0, $trimStep = ['ok' => true, 'status' => 'running']; $i < 20 && ($trimStep['status'] ?? '') === 'running'; $i++)
+            $trimStep = $call(['operation' => 'demoTrim.revert', 'apply_id' => 'dtrim-gate-undo', 'request_id' => 'gate-trim-undo']);
+        if (!$step('bring the demo rows back in every language', $trimStep)) continue;
+        check("$id: the revert shows every language's demo rows again", [$trimStep['status'] ?? null, $visibility() === $trimBefore], ['reverted', true]);
+        foreach ($trimForeign as $extra)
+            check("$id: and the revert gives that {$extra['kind']} translation back byte for byte", $gw->store[$extra['kind']][$extra['id']] ?? null, $extra['row']);
+        foreach ($trimForeign as $extra) $dropForeign($extra);
+    }
     // A picture changed on the source after the languages exist reaches every one of them in the same
     // apply — measured 23/09/2026 on j-ee6vsk: a drawn photo landed on /en/careers and not on /vi/ or
     // /fr/. Words are translated; a picture is the same picture in every language.
@@ -419,3 +550,5 @@ foreach ($gateContracts as $profileFile) {
     check("$id: no row keeps the relabelled tag", array_sum(array_map(fn ($k) => count(array_filter($gw->store[$k] ?? [], fn ($r) => ($r['language'] ?? '') === 'en-US')), ['article', 'menuItem', 'module', 'category'])), 0);
     unset($lock);
 }
+// The last site the gate built is not kept for the files after it.
+unset($copiesOf, $unlinked, $foreign, $dropForeign, $navForeign, $trimForeign, $gateIds, $menuShow, $paramsBefore, $visibility, $trimBefore, $trimNow);

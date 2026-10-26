@@ -14,8 +14,32 @@
   },
   "decisionsHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
   "status": "checked",
-  "operations": [],
-  "finals": [],
+  "operations": [
+    {
+      "op": "templatePart.removeBlock",
+      "templatePart": {
+        "id": 80,
+        "slug": "header"
+      },
+      "label": "Style guide",
+      "block": {
+        "name": "core/list-item",
+        "contains": "<a href=\"/style-guide/\">"
+      },
+      "rule": "hide.kit-screen",
+      "reason": "\"Style guide\" is one of the template's own screens",
+      "key": "templatePart-80",
+      "before": "16f8b693eb3d7c1dc1c18e538cd251b46e13a07621da6658337f707b2ccbf7bc",
+      "after": "db465aca4148fb15b8c04cfdaf53a168ff9b7e42a3e70fe8fe96cfd1807ab952"
+    }
+  ],
+  "finals": [
+    {
+      "key": "templatePart-80",
+      "before": "16f8b693eb3d7c1dc1c18e538cd251b46e13a07621da6658337f707b2ccbf7bc",
+      "after": "db465aca4148fb15b8c04cfdaf53a168ff9b7e42a3e70fe8fe96cfd1807ab952"
+    }
+  ],
   "kept": [
     {
       "key": "navigation-68",
@@ -6796,7 +6820,7 @@
   ],
   "counts": {
     "links": 0,
-    "templateParts": 0,
+    "templateParts": 1,
     "kept": 615,
     "unresolved": 1
   }

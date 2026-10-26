@@ -217,6 +217,28 @@ final class ShowcaseNavProfile
         return $this->owners;
     }
 
+    /**
+     * Every owner key the map was built over: the ones it edits, and the ones it reviewed and keeps or
+     * could not resolve. A navigation it lists is the map's to decide; one it does not list may follow it.
+     *
+     * @return array<string,true>
+     */
+    public function listed(): array
+    {
+        $out = [];
+        foreach (array_keys($this->owners) as $key) {
+            $out[$key] = true;
+        }
+        foreach (['kept', 'unresolved'] as $group) {
+            foreach (is_array($this->profile[$group] ?? null) ? $this->profile[$group] : [] as $row) {
+                if (is_array($row) && is_string($row['key'] ?? null)) {
+                    $out[$row['key']] = true;
+                }
+            }
+        }
+        return $out;
+    }
+
     /** @return array<string,int> edits per operation, for a status that says what an apply would do */
     public function counts(): array
     {

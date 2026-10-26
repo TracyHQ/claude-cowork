@@ -1442,6 +1442,10 @@ final class Engine
             return $this->err('unsupported', 'This quickstart contract carries no demo-trim profile; its demo rows cannot be hidden by this plugin');
         }
         $profile = $this->contract->demoTrim();
+        // A language this contract ships no edition for has copies of the demo this profile does
+        // not list; hiding the source alone would leave them showing. Say so, write nothing.
+        $foreign = array_diff(QuickstartContract::languages(), $this->contract->editionLanguages());
+        $refusal = $foreign === [] ? null : 'This site has a language this contract carries no edition for: ' . implode(', ', $foreign) . '. Nothing has been written.';
         if ($operation === 'plan') {
             $state = $this->contract->inspectClean();
             $rows = [];
@@ -1454,9 +1458,26 @@ final class Engine
                     'state' => $status === null ? 'missing' : ($status === $row['to'] ? 'hidden' : ($status === $row['from'] ? 'pending' : 'edited')),
                 ];
             }
+            // 🔒 COMPLETE MEANS NO LANGUAGE SHOWS A DEMO ROW. A published Polylang translation of a listed
+            // row that the profile does not list (a language added since) leaves the trim `incomplete`.
+            $listed = array_flip(array_map(static fn(array $row): int => (int) $row['id'], $profile->rows()));
+            $showing = [];
+            foreach (function_exists('pll_get_post_translations') ? $profile->rows() : [] as $row) {
+                foreach ((array) pll_get_post_translations((int) $row['id']) as $language => $member) {
+                    $current = isset($listed[(int) $member]) ? null : $this->writer->read('post', (int) $member);
+                    if ($current !== null && (string) ($current['post_status'] ?? '') === $row['from']) {
+                        $showing[$row['key']][(string) $language] = (int) $member;
+                    }
+                }
+            }
+            $status = $state['demoTrim']['status'] ?? 'none';
             return $this->ok([
                 'hides' => $profile->counts(), 'rows' => $rows,
-                'status' => $state['demoTrim']['status'] ?? 'none',
+                'status' => $status === 'complete' && $showing !== [] ? 'incomplete' : $status,
+                // Unlisted translations still showing a demo row: key => language => id.
+                'showing' => $showing,
+                // Why an apply would refuse now, before anything is written; null when it would go ahead.
+                'refusal' => $refusal,
                 'languages' => QuickstartContract::languages(), 'editions' => $this->contract->editionLanguages(),
                 'profileVersion' => $profile->version(), 'profileHash' => $profile->hash(),
             ]);
@@ -1472,11 +1493,8 @@ final class Engine
         if (!is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request)) {
             return $this->err('bad_params', 'request_id required: any string, the same on a retry and new for a different change');
         }
-        // A language this contract ships no edition for has copies of the demo this profile does
-        // not list; hiding the source alone would leave them showing. Say so, write nothing.
-        $foreign = array_diff(QuickstartContract::languages(), $this->contract->editionLanguages());
-        if ($foreign !== []) {
-            return $this->err('contract_failed', 'This site has a language this contract carries no edition for: ' . implode(', ', $foreign) . '. Nothing has been written.');
+        if ($refusal !== null) {
+            return $this->err('contract_failed', $refusal);
         }
         $state = $this->contract->inspectClean();
         $trim = $state['demoTrim'];
@@ -1581,7 +1599,7 @@ final class Engine
         ]);
     }
 
-    /** Owners (one navigation or template part each, written whole) edited per call of showcaseNav.apply and .revert. */
+    /** Owners (one navigation or template part each, written whole) edited per call of showcaseNav.apply and .revert; a source and its twins are never split (`showcaseNavBatch`). */
     private const SHOWCASE_NAV_BATCH = 2;
     /** Why an owner was left alone when its compare-and-set found it changed between the read and the write. */
     private const SHOWCASE_NAV_RACED = 'it changed while it was being written';
@@ -1636,13 +1654,31 @@ final class Engine
                 return $unsupported();
             }
             $this->contract->inspect();
+            $applying = ($record['status'] ?? 'applying') !== 'reverting';
+            // 🔒 COMPLETE MEANS NO LANGUAGE SHOWS A SHOWCASE ENTRY. A translated menu the apply has not
+            // taken (a language the customer added since) leaves the job `incomplete`, named in `showing`;
+            // a new apply request takes it.
+            $showing = $usable && $record !== null && $applying ? $this->showcaseNavShowing($record, $this->showcaseNavTwins($nav)) : [];
+            $complete = ($record['status'] ?? null) === 'complete';
+            $refusal = null;
+            if ($usable && $applying) {
+                try {
+                    $refusal = $this->showcaseNavRefusal($nav, $this->showcaseNavPending($record, true));
+                } catch (RuntimeException $e) {
+                    $refusal = $e->getMessage();
+                }
+            }
             return $this->ok([
                 // A finished revert is a finished job: `reverted`, nothing remaining. What an apply would
                 // look at is `owners`, in every state.
-                'status' => $reverted !== null ? 'reverted' : ($record['status'] ?? 'none'),
+                'status' => $reverted !== null ? 'reverted' : ($complete && $showing !== [] ? 'incomplete' : ($record['status'] ?? 'none')),
                 'hides' => $usable ? $nav->counts() : [],
                 'owners' => $usable ? count($nav->owners()) : 0,
-                'remaining' => $reverted !== null ? 0 : count($this->showcaseNavPending($record, ($record['status'] ?? 'applying') !== 'reverting')),
+                'remaining' => $reverted !== null ? 0 : ($complete ? count($showing) : count($this->showcaseNavPending($record, $applying))),
+                // The translated menus still showing a showcase entry: key => language.
+                'showing' => $showing,
+                // Why an apply would refuse now, before anything is written; null when it would go ahead.
+                'refusal' => $refusal,
                 'skipped' => $this->showcaseNavSkipped($record['receipts'] ?? []),
                 // Owners a finished revert left as the customer set them; a new revert request looks again.
                 'conflicts' => $reverted !== null ? $this->showcaseNavSkipped($reverted['receipts'] ?? [], true) : [],
@@ -1664,16 +1700,17 @@ final class Engine
         if ($hide && !$usable) {
             return $unsupported();
         }
-        // 🔒 A TRANSLATED SITE IS REFUSED, NOT HALF-HIDDEN. Each language has its own navigation posts,
-        // which this map does not list: hiding the source's entries would leave the translated menus
-        // showing them. Both directions, before any write.
-        if (count(QuickstartContract::languages()) > 1) {
-            return $this->err('contract_failed', 'This site already has a second language; taking its showcase entries out of the menus would leave the translated menus showing them. Nothing has been written.');
-        }
         $this->contract->inspectClean();
         if ($hide) {
             if ($reverted !== null && $reverted['requestId'] === $request) {
                 return $this->err('conflict', 'Request ' . $request . ' applied showcase navigation that has since been reverted; a new apply needs a new request_id');
+            }
+            $reopen = ($record['status'] ?? null) === 'complete' && hash_equals((string) $record['profileHash'], $nav->hash())
+                && $this->showcaseNavShowing($record, $this->showcaseNavTwins($nav)) !== [];
+            if ($reopen) {
+                // A finished job a language has outgrown is taken up again by a new request: only the
+                // translated menus still showing an entry are pending, every receipt is kept for the revert.
+                $record = ['status' => 'applying', 'requestId' => $request, 'reopenedAt' => gmdate('c'), 'reopenApplyId' => $apply] + $record;
             }
             if (($record['status'] ?? null) === 'complete') {
                 return $this->ok(['status' => 'completed', 'moved' => 0, 'remaining' => 0, 'alreadyApplied' => true, 'applyId' => $record['applyId'],
@@ -1718,7 +1755,16 @@ final class Engine
         // What this call will look at, decided before anything is written, so an owner someone has
         // open in the editor refuses the whole call while the site is still as it was.
         $pending = $this->showcaseNavPending($next, $hide);
-        $batch = array_slice($pending, 0, self::SHOWCASE_NAV_BATCH, true);
+        // 🔒 A TRANSLATED SITE IS FOLLOWED WHOLE, OR NOT AT ALL. Each language's twin of a listed
+        // navigation (`showcaseNavTwins`) loses the entries Polylang's translation groups say are the
+        // showcase ones. A twin whose entries cannot all be told apart refuses the call before
+        // anything moves: never the source hidden and its translation still showing the entry.
+        $refusal = $hide && $nav !== null ? $this->showcaseNavRefusal($nav, $pending) : null;
+        if ($refusal !== null) {
+            return $this->err('contract_failed', $refusal . ($record === null ? ' Nothing has been written.'
+                : ' Nothing more has been written; a revert brings back what this apply has hidden so far.'));
+        }
+        $batch = self::showcaseNavBatch($pending);
         $ids = [];
         foreach ($batch as $key => $owner) {
             $ids[] = $owner['kind'] === 'navigation' ? $owner['id'] : (int) ($this->writer->read('templatePart', 0, $owner['slug'])['id'] ?? 0);
@@ -1726,7 +1772,7 @@ final class Engine
         $this->contract->refuseEditLocked($ids);
         // 🔒 THE RECORD LANDS BEFORE ANY ROW MOVES: a call that dies mid-batch leaves a site that says
         // a job is in flight, so the same request resumes it rather than being refused as drift.
-        if ($record === null || $record['status'] !== $next['status']) {
+        if ($record === null || $record['status'] !== $next['status'] || !empty($reopen)) {
             $this->contract->record('showcaseNav', $next);
         }
         $record = $next;
@@ -1774,10 +1820,11 @@ final class Engine
 
     /**
      * What the next showcase-navigation step still has to look at: on apply, every owner of the map
-     * with no settled receipt (none, or one whose write may not have landed); on revert, every owner
-     * the apply wrote, or began to write, that has not been looked at again.
+     * with no settled receipt (none, or one whose write may not have landed), then every language twin
+     * of one (`showcaseNavTwins`) the same way, so a twin is looked at after the owner it follows; on
+     * revert, every owner the apply wrote, or began to write, that has not been looked at again.
      *
-     * @return array<string,array{kind:string,id:int,slug:string,owner:?array,receipt:?array}>
+     * @return array<string,array{kind:string,id:int,slug:string,owner:?array,receipt:?array,follows?:array}>
      */
     private function showcaseNavPending(?array $record, bool $hide): array
     {
@@ -1790,6 +1837,14 @@ final class Engine
                     $out[$key] = ['kind' => $owner['kind'], 'id' => $owner['id'], 'slug' => $owner['slug'], 'owner' => $owner, 'receipt' => $receipt];
                 }
             }
+            foreach ($nav === null ? [] : $this->showcaseNavTwins($nav) as $key => $twin) {
+                $receipt = $record['receipts'][$key] ?? null;
+                if ($receipt === null || $receipt['outcome'] === 'writing'
+                    || (in_array($receipt['outcome'], ['already', 'written'], true) && !isset($receipt['reverted'])
+                        && $this->showcaseNavShowing($record, [$key => $twin]) !== [])) {
+                    $out[$key] = $twin + ['owner' => null, 'receipt' => ($receipt['outcome'] ?? null) === 'writing' ? $receipt : null];
+                }
+            }
             return $out;
         }
         foreach ($record['receipts'] ?? [] as $key => $receipt) {
@@ -1798,6 +1853,292 @@ final class Engine
             }
         }
         return $out;
+    }
+
+    /**
+     * The owners the next call takes: whole groups, in order, while they fit SHOWCASE_NAV_BATCH. A group
+     * is a source owner and every language twin that follows it (`follows.key` on apply, the receipt's
+     * `follows` on revert), so no call ends with a source hidden and its translation showing the
+     * entry, or one brought back and the other still without it.
+     *
+     * 🔒 A GROUP LARGER THAN THE BATCH IS TAKEN WHOLE. It is one navigation per site language, each one
+     * compare-and-set write behind its own receipt, the same work a call already does per owner: a call
+     * that dies inside the group leaves `writing` receipts, which the same request resumes and a revert
+     * brings back. Splitting it would leave languages apart on every call, by design.
+     *
+     * @param array<string,array> $pending
+     * @return array<string,array>
+     */
+    private static function showcaseNavBatch(array $pending): array
+    {
+        $groups = [];
+        foreach ($pending as $key => $owner) {
+            // A twin's receipt names the owner it follows by key (`showcaseNavFollow`).
+            $groups[(string) ($owner['follows']['key'] ?? $owner['receipt']['follows'] ?? $key)][$key] = $owner;
+        }
+        $batch = [];
+        foreach ($groups as $group) {
+            if ($batch !== [] && count($batch) + count($group) > self::SHOWCASE_NAV_BATCH) {
+                break;
+            }
+            $batch += $group;
+        }
+        return $batch;
+    }
+
+    /**
+     * The language twins of the navigations the map edits: on a site with more than one Polylang
+     * language, the published `wp_navigation` named after a map owner plus `-<language>` (`mainmenu` →
+     * `mainmenu-de`), the one the theme serves that language (`retirableRows` reads twins the same
+     * way). A navigation the map itself lists, edited or kept, is never a twin: the map decided it.
+     * Each twin carries what it follows: the owner, the pages whose entries the map takes out of it,
+     * and the paths of the entries it takes out by path alone, which no translation group can follow.
+     *
+     * @return array<string,array{kind:string,id:int,slug:string,follows:array{key:string,slug:string,language:string,pages:list<int>,pageless:list<string>}}>
+     */
+    private function showcaseNavTwins(ShowcaseNavProfile $nav): array
+    {
+        $source = $this->contract->sourceLanguage();
+        $languages = array_values(array_diff(QuickstartContract::languages(), [$source]));
+        if ($languages === [] || !function_exists('get_posts')) {
+            return [];
+        }
+        $listed = $nav->listed();
+        $out = [];
+        foreach ($nav->owners() as $key => $owner) {
+            if ($owner['kind'] !== 'navigation') {
+                continue; // a template part is one row for every language
+            }
+            $pages = [];
+            $pageless = [];
+            foreach ($owner['operations'] as $op) {
+                if ($op['op'] !== 'navigation.removeLink') {
+                    continue;
+                }
+                if (is_int($op['link']['pageId'] ?? null)) {
+                    $pages[] = $op['link']['pageId'];
+                } else {
+                    $pageless[] = implode(' › ', $op['path']);
+                }
+            }
+            // Polylang's own link, when it gives `wp_navigation` a translation group (Polylang Pro does):
+            // language => id. The packs and the theme go by name alone, so both are read.
+            $linked = function_exists('pll_get_post_translations') ? (array) pll_get_post_translations((int) $owner['id']) : [];
+            foreach ($languages as $language) {
+                $posts = (array) get_posts(['post_type' => 'wp_navigation', 'name' => $owner['slug'] . '-' . $language, 'post_status' => 'publish',
+                    'numberposts' => -1, 'no_found_rows' => true, 'suppress_filters' => true, 'lang' => '', 'orderby' => 'ID', 'order' => 'ASC']);
+                $linkedId = (int) ($linked[$language] ?? 0);
+                if ($linkedId > 0 && $linkedId !== (int) $owner['id'] && function_exists('get_post')) {
+                    $posts[] = get_post($linkedId);
+                }
+                foreach ($posts as $post) {
+                    $id = (int) (is_object($post) ? $post->ID : ($post['ID'] ?? 0));
+                    $status = (string) (is_object($post) ? $post->post_status : ($post['post_status'] ?? ''));
+                    $name = (string) (is_object($post) ? $post->post_name : ($post['post_name'] ?? ''));
+                    $type = (string) (is_object($post) ? $post->post_type : ($post['post_type'] ?? 'wp_navigation'));
+                    if ($id <= 0 || $status !== 'publish' || $type !== 'wp_navigation' || isset($listed['navigation-' . $id]) || isset($out['navigation-' . $id])) {
+                        continue;
+                    }
+                    $out['navigation-' . $id] = ['kind' => 'navigation', 'id' => $id, 'slug' => $name,
+                        'follows' => ['key' => $key, 'slug' => $owner['slug'], 'language' => $language, 'pages' => $pages, 'pageless' => $pageless]];
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Why an apply cannot go ahead because of a translated navigation nothing ties to a listed one; null
+     * when there is none. Every other published `wp_navigation` — neither listed by the map nor a twin —
+     * is read: one that is translated (Polylang gives it another language, its name ends in `-<language>`,
+     * or it links a page in another language) and shows the translation of a page the map takes out of
+     * its menu would keep showing that entry, and no group says which listed navigation it follows.
+     *
+     * 🔒 ONLY WHAT IS SHOWN IS REFUSED. A translated menu holding no showcase page's translation, or a
+     * page Polylang links to no source page (nothing says it is one), is left alone and is no refusal:
+     * the customer's own menus are not the map's.
+     *
+     * @param array<string,array> $twins
+     */
+    private function showcaseNavStrayRefusal(ShowcaseNavProfile $nav, array $twins): ?string
+    {
+        $source = $this->contract->sourceLanguage();
+        $languages = array_values(array_diff(QuickstartContract::languages(), [$source]));
+        if ($languages === [] || !function_exists('get_posts')) {
+            return null;
+        }
+        $hidden = [];
+        foreach ($nav->owners() as $owner) {
+            foreach ($owner['kind'] === 'navigation' ? $owner['operations'] : [] as $op) {
+                if ($op['op'] === 'navigation.removeLink' && is_int($op['link']['pageId'] ?? null)) {
+                    $hidden[$op['link']['pageId']] = true;
+                }
+            }
+        }
+        if ($hidden === []) {
+            return null;
+        }
+        $listed = $nav->listed();
+        $posts = get_posts(['post_type' => 'wp_navigation', 'post_status' => 'publish', 'numberposts' => -1, 'no_found_rows' => true,
+            'suppress_filters' => true, 'lang' => '', 'orderby' => 'ID', 'order' => 'ASC']);
+        foreach ((array) $posts as $post) {
+            $id = (int) (is_object($post) ? $post->ID : ($post['ID'] ?? 0));
+            $name = (string) (is_object($post) ? $post->post_name : ($post['post_name'] ?? ''));
+            $status = (string) (is_object($post) ? $post->post_status : ($post['post_status'] ?? ''));
+            if ($id <= 0 || $status !== 'publish' || isset($listed['navigation-' . $id]) || isset($twins['navigation-' . $id])) {
+                continue;
+            }
+            $language = QuickstartContract::postLanguage($id);
+            $translated = $language !== null && $language !== $source;
+            foreach ($languages as $other) {
+                $translated = $translated || substr($name, -strlen('-' . $other)) === '-' . $other;
+            }
+            try {
+                $blocks = ShowcaseNavMarkup::parse((string) (is_object($post) ? $post->post_content : ($post['post_content'] ?? '')));
+            } catch (RuntimeException $e) {
+                continue; // nothing in it can be told to be a showcase entry
+            }
+            $shown = null;
+            foreach (ShowcaseNavMarkup::items($blocks) as $item) {
+                if ($item['pageId'] === null || ($blocks[$item['block']]['attrs']['kind'] ?? 'post-type') !== 'post-type') {
+                    continue;
+                }
+                $pageLanguage = QuickstartContract::postLanguage($item['pageId']);
+                $translated = $translated || ($pageLanguage !== null && $pageLanguage !== $source);
+                $member = self::showcaseNavSourcePage($item['pageId'], $source);
+                if ($shown === null && $member !== null && isset($hidden[$member])) {
+                    $shown = $item;
+                }
+            }
+            if ($translated && $shown !== null) {
+                return 'Navigation ' . $name . ' (' . $id . ') is a translated menu that shows ' . implode(' › ', $shown['path'])
+                    . ', the translation of a showcase entry, but neither Polylang nor its name ties it to a navigation the map edits'
+                    . ', so it cannot be followed; link it in Polylang to its ' . $source . ' navigation, or take the entry out of it, and apply again.';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Why an apply of these pending owners would refuse before anything is written; null when it would
+     * go ahead: a translated menu nothing ties to a listed one, or a twin whose entries cannot be told apart.
+     */
+    private function showcaseNavRefusal(ShowcaseNavProfile $nav, array $pending): ?string
+    {
+        $stray = $this->showcaseNavStrayRefusal($nav, $this->showcaseNavTwins($nav));
+        if ($stray !== null) {
+            return $stray;
+        }
+        foreach ($pending as $owner) {
+            $refusal = isset($owner['follows']) ? $this->showcaseNavFollowRefusal($owner) : null;
+            if ($refusal !== null) {
+                return $refusal;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The twins that still show a showcase entry their owner no longer does: key => language. A twin
+     * whose owner the apply left as the customer had it (then the twin is left too), or one it found
+     * changed under it, is not counted; one it has not taken yet, or one that now holds an entry to
+     * lose — found with none, or written and given one back since — is. A twin whose entries cannot be
+     * told apart counts as showing.
+     *
+     * 🔒 WHAT THE SITE SHOWS NOW DECIDES, NOT THE RECEIPT: a written twin is read again. One still
+     * holding the bytes the apply wrote shows nothing; one the customer edited since is looked at.
+     *
+     * @param array<string,array> $twins
+     * @return array<string,string>
+     */
+    private function showcaseNavShowing(array $record, array $twins): array
+    {
+        $out = [];
+        foreach ($twins as $key => $twin) {
+            $receipt = $record['receipts'][$key] ?? null;
+            if ($receipt !== null && (!in_array($receipt['outcome'], ['writing', 'already', 'written'], true) || isset($receipt['reverted']))) {
+                continue;
+            }
+            if (!in_array($record['receipts'][$twin['follows']['key']]['outcome'] ?? null, ['written', 'already'], true)) {
+                continue;
+            }
+            $live = $this->showcaseNavRead('navigation', $twin['id'], $twin['slug']);
+            if ($live === null || (($receipt['outcome'] ?? null) === 'written' && hash('sha256', $live['content']) === $receipt['after'])
+                || $this->showcaseNavFollowEdit($twin, $live['content'])['content'] === $live['content']) {
+                continue;
+            }
+            $out[$key] = $twin['follows']['language'];
+        }
+        return $out;
+    }
+
+    /** Why a twin cannot follow its owner as it stands now; null when it can. */
+    private function showcaseNavFollowRefusal(array $twin): ?string
+    {
+        $live = $this->showcaseNavRead('navigation', $twin['id'], $twin['slug']);
+        return $live === null ? null : $this->showcaseNavFollowEdit($twin, $live['content'])['refusal'];
+    }
+
+    /**
+     * A twin's content without the entries that are translations of the ones the map takes out of
+     * its owner. An entry is followed through the page it links: Polylang's translation group names
+     * that page's source-language member, and the entry goes when that member is a page the map
+     * hides. A page in the source language, or one Polylang gives no language, is its own member.
+     *
+     * 🔒 WHAT CANNOT BE TOLD APART IS REFUSED, NEVER GUESSED. A linked page in another language whose
+     * group has no source member might be a showcase page's translation or the customer's own page;
+     * an entry the map takes out by path alone (a heading) has only translated labels to go by.
+     *
+     * @return array{content:?string,refusal:?string}
+     */
+    private function showcaseNavFollowEdit(array $twin, string $content): array
+    {
+        $follows = $twin['follows'];
+        $where = 'navigation ' . $twin['slug'] . ' (' . $twin['id'] . '), the ' . $follows['language'] . ' menu of ' . $follows['slug'];
+        $refuse = static fn(string $why): array => ['content' => null, 'refusal' => $why];
+        if ($follows['pageless'] !== []) {
+            return $refuse('The showcase entry ' . $follows['pageless'][0] . ' of ' . $follows['slug'] . ' links no page, so no translation group says which entry of '
+                . $where . ' is its translation; take that entry out of the translated menu by hand, or delete the translated menu, and apply again.');
+        }
+        try {
+            $blocks = ShowcaseNavMarkup::parse($content);
+        } catch (RuntimeException $e) {
+            return $refuse('The showcase entries of ' . $where . ' cannot be found: ' . $e->getMessage() . '.');
+        }
+        $source = $this->contract->sourceLanguage();
+        $members = [];
+        foreach (ShowcaseNavMarkup::items($blocks) as $item) {
+            $kind = $blocks[$item['block']]['attrs']['kind'] ?? 'post-type';
+            if ($item['pageId'] === null || $kind !== 'post-type') {
+                continue; // a custom link or a term: no page, so not a showcase page's translation
+            }
+            $member = self::showcaseNavSourcePage($item['pageId'], $source);
+            if ($member === null) {
+                return $refuse('Entry ' . implode(' › ', $item['path']) . ' of ' . $where . ' links page ' . $item['pageId']
+                    . ', which Polylang links to no ' . $source . ' page, so whether it is a showcase entry cannot be told; link it to its '
+                    . $source . ' page in Polylang, or take the entry out of the translated menu, and apply again.');
+            }
+            $members[$item['pageId']] = $member;
+        }
+        $hidden = array_flip($follows['pages']);
+        try {
+            $edited = ShowcaseNavMarkup::removeEntries($content, static fn(array $item): bool => isset($members[$item['pageId'] ?? 0])
+                && isset($hidden[$members[$item['pageId']]]));
+        } catch (RuntimeException $e) {
+            return $refuse('The showcase entries of ' . $where . ' cannot be taken out: ' . $e->getMessage() . '.');
+        }
+        return ['content' => $edited, 'refusal' => null];
+    }
+
+    /** The source-language member of a page's translation group; the page itself when it is in the source language or in none; null when the group has none. */
+    private static function showcaseNavSourcePage(int $page, string $source): ?int
+    {
+        $language = QuickstartContract::postLanguage($page);
+        if ($language === null || $language === $source) {
+            return $page;
+        }
+        $member = function_exists('pll_get_post') ? pll_get_post($page, $source) : 0;
+        return is_numeric($member) && (int) $member > 0 ? (int) $member : null;
     }
 
     /** Owners an apply left alone, with why. On a revert, the owners it could not put back. */
@@ -1834,12 +2175,14 @@ final class Engine
     }
 
     /** One owner's whole content replaced, only while it still holds `$expected`. */
-    private function showcaseNavSwap(string $kind, int $id, string $expected, string $content): bool
+    private function showcaseNavSwap(string $kind, int $id, string $expected, string $content, ?array $modified = null): bool
     {
         if (!method_exists($this->writer, 'replacePostContentIf')) {
             throw new RuntimeException('This site writer cannot compare-and-set a post; nothing has been written');
         }
-        return $this->writer->replacePostContentIf($id, $kind === 'navigation' ? 'wp_navigation' : 'wp_template_part', $expected, $content);
+        $type = $kind === 'navigation' ? 'wp_navigation' : 'wp_template_part';
+        return $modified === null ? $this->writer->replacePostContentIf($id, $type, $expected, $content)
+            : $this->writer->replacePostContentIf($id, $type, $expected, $content, (string) $modified[0], (string) $modified[1]);
     }
 
     /**
@@ -1909,6 +2252,9 @@ final class Engine
      */
     private function showcaseNavHide(array &$record, string $key, array $pending): array
     {
+        if (isset($pending['follows'])) {
+            return $this->showcaseNavFollow($record, $key, $pending);
+        }
         $owner = $pending['owner'];
         $kind = $owner['kind'];
         $base = ['kind' => $kind, 'id' => $owner['id'], 'slug' => $owner['slug'], 'before' => $owner['before'], 'after' => $owner['after']];
@@ -1955,10 +2301,52 @@ final class Engine
         }
         // The receipt, with the bytes found, lands before the write it describes.
         $receipt = ['before' => hash('sha256', $live['content']), 'after' => hash('sha256', $content)] + $base
-            + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content']), 'outcome' => 'writing', 'why' => ''];
+            + ['id' => $live['id'], 'existed' => true, 'content' => base64_encode($live['content'])] + $this->showcaseNavModified($live['id']) + ['outcome' => 'writing', 'why' => ''];
         $record['receipts'][$key] = $receipt;
         $this->contract->record('showcaseNav', $record);
         if (!$this->showcaseNavSwap($kind, $live['id'], $live['content'], $content)) {
+            return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
+        }
+        return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
+    }
+
+    /**
+     * Take the showcase entries out of one language twin, as its owner's were (`showcaseNavFollowEdit`),
+     * under the same receipt an owner gets: the bytes found land before the write, and a revert puts
+     * them back by the same compare-and-set. A twin follows only an owner that ends as the map leaves
+     * it; one the customer changed (left alone) keeps its twin as it is.
+     *
+     * @return array{receipt:array,moved:bool}
+     */
+    private function showcaseNavFollow(array &$record, string $key, array $pending): array
+    {
+        $follows = $pending['follows'];
+        $base = ['kind' => 'navigation', 'id' => $pending['id'], 'slug' => $pending['slug'], 'follows' => $follows['key'], 'language' => $follows['language']];
+        $live = $this->showcaseNavRead('navigation', $pending['id'], $pending['slug']);
+        $sha = $live === null ? null : hash('sha256', $live['content']);
+        $leave = static fn(string $outcome, string $why): array => ['receipt' => $base + ['before' => $sha, 'after' => $sha, 'outcome' => $outcome, 'why' => $why], 'moved' => false];
+        $earlier = $pending['receipt'];
+        if ($earlier !== null && $live !== null && $sha === $earlier['after']) {
+            return ['receipt' => ['outcome' => 'written', 'why' => ''] + $earlier, 'moved' => true];
+        }
+        if ($live === null) {
+            return $leave('conflict', 'the navigation is gone from this site');
+        }
+        if (!in_array($record['receipts'][$follows['key']]['outcome'] ?? null, ['written', 'already'], true)) {
+            return $leave('conflict', 'the ' . $follows['slug'] . ' navigation it translates was left as it is; so is this one');
+        }
+        $edit = $this->showcaseNavFollowEdit($pending, $live['content']);
+        if ($edit['content'] === null) {
+            return $leave('conflict', (string) $edit['refusal']);
+        }
+        if ($edit['content'] === $live['content']) {
+            return $leave('already', 'no showcase entry in this translation');
+        }
+        $receipt = $base + ['before' => $sha, 'after' => hash('sha256', $edit['content']), 'existed' => true,
+            'content' => base64_encode($live['content'])] + $this->showcaseNavModified($pending['id']) + ['outcome' => 'writing', 'why' => ''];
+        $record['receipts'][$key] = $receipt;
+        $this->contract->record('showcaseNav', $record);
+        if (!$this->showcaseNavSwap('navigation', $pending['id'], $live['content'], $edit['content'])) {
             return ['receipt' => ['outcome' => 'conflict', 'why' => self::SHOWCASE_NAV_RACED] + $receipt, 'moved' => false];
         }
         return ['receipt' => ['outcome' => 'written'] + $receipt, 'moved' => true];
@@ -1988,10 +2376,21 @@ final class Engine
         if (!is_string($found) || hash('sha256', $found) !== $receipt['before']) {
             throw new RuntimeException('The receipt of ' . $key . ' does not hold the bytes it found');
         }
-        if (!$this->showcaseNavSwap($receipt['kind'], $live['id'], $live['content'], $found)) {
+        // 🔒 THE DATE COMES BACK IN THE SAME COMPARE-AND-SET AS THE BYTES. They are the ones found, so the
+        // date they were last modified comes with them; a save that lands after this write keeps its own.
+        $modified = isset($receipt['modified'][0], $receipt['modified'][1]) ? [$receipt['modified'][0], $receipt['modified'][1]] : null;
+        if (!$this->showcaseNavSwap($receipt['kind'], $live['id'], $live['content'], $found, $modified)) {
             return $conflict(self::SHOWCASE_NAV_RACED);
         }
         return ['receipt' => ['reverted' => 'restored'], 'moved' => true];
+    }
+
+    /** An owner row's two modified columns as found, for the receipt: `modified` => [local, gmt]; nothing when the row has none. */
+    private function showcaseNavModified(int $id): array
+    {
+        $post = $this->writer->read('post', $id);
+        return isset($post['post_modified'], $post['post_modified_gmt'])
+            ? ['modified' => [(string) $post['post_modified'], (string) $post['post_modified_gmt']]] : [];
     }
 
     /**

@@ -363,11 +363,23 @@
       "reason": "not a showcase entry by any rule"
     }
   ],
-  "unresolved": [],
+  "unresolved": [
+    {
+      "key": "templatePart-143",
+      "where": "template part 143 (header), links outside its navigations",
+      "label": "Typography",
+      "path": [
+        "Typography"
+      ],
+      "pageId": null,
+      "rule": "unresolved.route-not-proven",
+      "reason": "\"Typography\" is one of the template's own screens; but what it opens cannot be read (the URL /resources/typography opens no page or post the contract carries), so no route that stays is proven"
+    }
+  ],
   "counts": {
     "links": 0,
     "templateParts": 0,
     "kept": 31,
-    "unresolved": 0
+    "unresolved": 1
   }
 }

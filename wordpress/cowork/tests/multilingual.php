@@ -241,6 +241,21 @@ check('a demo trim beside a retired set is not refused', $trim['status'], 'compl
 check('it hides the source demo rows', $trim['moved'], 3);
 check('and reports the retired edition\'s row as skipped, not moved', $trim['skipped'], [['key' => 'post-29', 'id' => 29, 'status' => 'draft', 'retired' => true]]);
 check('inspect is still clean', $mdoor($B, 'inspect')['problems'], []);
+// 🔒 A LANGUAGE ADDED AFTER THE TRIM IS NO FINISHED TRIM. French, which this contract ships no edition
+// for, holds a published translation of a demo post: the plan says the trim is incomplete, names the
+// translation still showing, and says why an apply would refuse.
+WP_Fake::$languages['fr'] = ['term_id' => 77, 'name' => 'Français', 'slug' => 'fr', 'locale' => 'fr_FR', 'is_rtl' => 0, 'term_group' => 2, 'flag_code' => 'fr'];
+WP_Fake::$posts[7026] = ['post_name' => 'fr-26', 'post_status' => 'publish'] + WP_Fake::$posts[26];
+WP_Fake::$posts[7026]['ID'] = 7026;
+WP_Fake::$postLanguage[7026] = 'fr';
+WP_Fake::$translations[26]['fr'] = 7026;
+WP_Fake::$translations[7026]['en'] = 26;
+$late = $mdoor($B, 'demoTrim.plan');
+check('a language added after the trim leaves it incomplete, and names what still shows',
+    [$late['status'] ?? null, $late['showing'] ?? null, strpos((string) ($late['refusal'] ?? ''), 'fr') !== false], ['incomplete', ['post-26' => ['fr' => 7026]], true]);
+unset(WP_Fake::$languages['fr'], WP_Fake::$posts[7026], WP_Fake::$postLanguage[7026], WP_Fake::$translations[26]['fr'], WP_Fake::$translations[7026]);
+$late = $mdoor($B, 'demoTrim.plan');
+check('without it the trim is complete again', [$late['status'] ?? null, $late['showing'] ?? null, array_key_exists('refusal', $late) ? $late['refusal'] : 'unset'], ['complete', [], null]);
 $untrim = $mdoor($B, 'demoTrim.revert', ['apply_id' => 'dtrim-b2', 'request_id' => 't2']);
 check('a demo trim revert leaves the retired row hidden', [$untrim['status'], WP_Fake::$posts[29]['post_status'], WP_Fake::$posts[26]['post_status']], ['reverted', 'draft', 'publish']);
 $res = $mdoor($B, 'multilingual.restore', ['apply_id' => 'mlang-b']);

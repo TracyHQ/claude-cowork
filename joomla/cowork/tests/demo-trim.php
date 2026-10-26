@@ -76,9 +76,11 @@ check('plan says how much a trim would hide, before anything is written', [$plan
 check('an apply without the dtrim- prefix is refused by name', $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'contract-x', 'request_id' => 'r1'])['message'], 'apply_id must start with "dtrim-"');
 check('an apply without a request_id is refused', $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-a'])['error'], 'bad_params');
 
-$trimStore->binding = ['multilingual' => ['languages' => ['fr-FR' => ['ids' => []]]]];
-check('a site that already has a translation is not trimmed', $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1'])['message'],
-    'This site already has a second language; hiding its demo rows would leave the translated copies showing. Nothing has been written.');
+$trimStore->binding = ['contractHash' => $trimContract->contractHash(), 'multilingual' => ['languages' => ['fr-FR' => ['ids' => []]]]];
+// A translated site's copies are trimmed with their sources (multilingual-contracts.php); a binding naming
+// a language this contract carries no multilingual profile for is still refused, by the read itself.
+check('a language this contract has no profile for is not trimmed', $trimCall(['operation' => 'demoTrim.apply', 'apply_id' => 'dtrim-a', 'request_id' => 'r1'])['message'],
+    'This site has translations but the receiver carries no multilingual profile');
 $trimStore->binding = null;
 
 // 🔒 VISIBILITY ONLY, AND NOTHING JOOMLA DOES AROUND IT. From here on the double behaves like the

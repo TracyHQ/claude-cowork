@@ -164,5 +164,8 @@ unset($lcManyRaw, $lcManyLeaves);
 // and drops them, one process running every test file does not. The files below start without them,
 // and without the 3000-block column above.
 unset($lcBig, $lcBigRaw, $lcBigLeaves, $lcBigRead, $lcBigSet);
-(new ReflectionProperty(LeafCodec::class, 'memo'))->setValue(null, []);
-(new ReflectionProperty(LeafCodec::class, 'memoBytes'))->setValue(null, 0);
+foreach (['memo' => [], 'memoBytes' => 0] as $lcName => $lcEmpty) {
+    $lcProperty = new ReflectionProperty(LeafCodec::class, $lcName);
+    if (PHP_VERSION_ID < 80100) $lcProperty->setAccessible(true);
+    $lcProperty->setValue(null, $lcEmpty);
+}
