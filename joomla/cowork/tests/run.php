@@ -2263,6 +2263,9 @@ require __DIR__ . "/content-search.php";
 // EngineFactory's catches log what they answer for. Each case runs in its own PHP process, so the
 // Joomla stand-ins it needs never meet the ones defined above.
 require __DIR__ . "/engine-factory-logging.php";
+// plg_system_tracyaccess is the fleet's signed plugin, byte for byte, and trusts no bare header; on
+// a site with no access key it logs nobody in. Plugin cases run against Joomla stand-ins in their own processes.
+require __DIR__ . "/tracyaccess-signed.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
