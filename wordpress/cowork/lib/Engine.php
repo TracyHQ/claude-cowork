@@ -3146,8 +3146,10 @@ final class Engine
      * The substance checksum of each range of one table's rows by an integer key column
      * ({@see RowSource::rangeChecksums}): `table` (one db.tables lists), `key` (a column), `starts`
      * (the first keys of ranges 1..n, strictly ascending integers, at most MAX_RANGE_STARTS) and
-     * `skip_columns` as site.fingerprint takes them. `ranges`: n+1 "<rows>:<xor>". A caller that
-     * kept an earlier read's ranges reads again only those that moved ({@see dbDumpAfter}).
+     * `skip_columns` as site.fingerprint takes them. `ranges`: n+1 "<rows>:<xor>"; `create`: the
+     * table's CREATE TABLE now, so rows spliced into an earlier read are headed as a read now would
+     * head them (its AUTO_INCREMENT included). A caller that kept an earlier read's ranges reads
+     * again only those that moved ({@see dbDumpAfter}).
      */
     private function dbRangeChecksums(array $p): array
     {
@@ -3187,13 +3189,14 @@ final class Engine
                 return $this->err('bad_params', "table {$table} is not one db.tables lists");
             }
             $ranges = $this->dumper->rangeChecksums($table, array_values($skip), $key, array_values($starts));
+            $create = $ranges === null ? '' : $this->dumper->createOf($table);
         } catch (Throwable $e) {
             return $this->err('dump_failed', $e->getMessage());
         }
         if ($ranges === null) {
             return $this->err('dump_failed', "table {$table} could not be read");
         }
-        return $this->ok(['table' => $table, 'key' => $key, 'ranges' => $ranges]);
+        return $this->ok(['table' => $table, 'key' => $key, 'ranges' => $ranges, 'create' => $create]);
     }
 
     /**

@@ -29,6 +29,7 @@ check('info names db.range_checksums, its version and limits', $rcInfo['info']['
 
 $rcBefore = $rcAsk(['starts' => [5, 9]]);
 check('three ranges for two starts: below 5, 5 to 8, 9 and up', [$rcBefore['ok'], count($rcBefore['ranges'])], [true, 3]);
+checkTrue('the answer carries the table\'s CREATE TABLE as a dump writes it', strpos($rcBefore['create'] ?? '', 'CREATE TABLE') === 0);
 check('each range counts its rows', array_map(fn($r) => (int) explode(':', $r)[0], $rcBefore['ranges']), [4, 4, 4]);
 
 // An edited title in row 6 moves its range alone; a hit counter moving moves nothing.

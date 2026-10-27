@@ -88,6 +88,12 @@ final class DbDumper
         return $this->src->rangeChecksums($table, $skip, $key, $starts);
     }
 
+    /** The table's CREATE TABLE as a dump of it now would write it (without the `;`). */
+    public function createOf(string $table): string
+    {
+        return rtrim($this->src->createStatement($table));
+    }
+
     /**
      * The rows of a table keyed by ONE integer column, from the first key above `$after` (null: from
      * the start), at most `$limit`, as INSERT statements: one range of rows a caller found moved
