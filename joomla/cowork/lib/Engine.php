@@ -4779,6 +4779,9 @@ final class Engine
             return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)], 'kept' => $blocked,
                 'next' => 'template.files.undo puts back the files that can go back and names the rest.']);
         }
+        if ($this->overrides !== null && ($blocked = $this->overrides->revertBlocked($entries)) !== []) {
+            return $this->err('conflict', 'Language overrides changed since this Apply; nothing was reverted.', ['kept' => $blocked]);
+        }
         // Taking a change back is a write too: not under an open editor, and not half of it.
         if (($refusal = $this->lockRefusal($this->undoRows($entries))) !== null) return $refusal;
 
@@ -5298,6 +5301,8 @@ final class Engine
      *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
      *   puts them back (deleting a file that did not exist). Nothing changes → nothing is written (`unchanged: true`).
      *
+     * English offers only unambiguous template-owned language keys and literals. Server-generated source companions constrain render
+     * matching to the exact source site-wide. New English Undo receipts refuse changed files before any restore.
      * Not part of a `content.batch`: a file is not inside the database's transaction.
      */
     private function languageOverridesDoor(array $p): array
@@ -5307,8 +5312,8 @@ final class Engine
         $locale = $p['locale'] ?? null;
         if (!is_string($template) || !preg_match(LanguageOverrides::TEMPLATE, $template))
             return $this->err('bad_params', 'template required: the folder name of a site template, e.g. ja_essence');
-        if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
-            return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
+        if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale))
+            return $this->err('bad_params', 'locale required: a Joomla language tag, e.g. en-GB or vi-VN');
         if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
         $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
         $operation = $p['operation'] ?? 'read';
@@ -5339,8 +5344,10 @@ final class Engine
             return $this->err('bad_params', 'strings required: an object of language keys to their words');
         $offered = [];
         $formats = [];
+        $literalKeys = [];
         foreach ($plan['strings'] as $row) {
             $offered[$row['key']] = $row['source'];
+            if (($row['reason'] ?? null) === 'literal') $literalKeys[$row['key']] = true;
             if (($row['reason'] ?? null) === 'date-format') $formats[$row['key']] = $row['value'];
         }
         $values = [];
@@ -5350,11 +5357,13 @@ final class Engine
             if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => 'not a string this site shows in en-GB']; continue; }
             // A date format is the language's own, never words: the read named it, and nothing else is written.
             if (isset($formats[$key]) && (!is_string($value) || trim($value) !== $formats[$key])) { $refused[] = ['key' => $key, 'reason' => 'a date format takes the language\'s own (' . $formats[$key] . ')']; continue; }
-            $why = LanguageOverrides::refusal($offered[$key], $value);
+            $why = $locale === 'en-GB' ? LanguageOverrides::englishRefusal($offered[$key], $value) : LanguageOverrides::refusal($offered[$key], $value);
             if ($why !== null) { $refused[] = ['key' => $key, 'reason' => $why]; continue; }
             $values[$key] = trim($value);
         }
         $answer = static fn(array $extra): array => $head + $extra + ($refused !== [] ? ['refused' => $refused] : []);
+        $written = count($values);
+        if ($locale === 'en-GB') foreach ($values as $key => $value) if (isset($literalKeys[$key])) $values[PageLiterals::sourceKey($key)] = $offered[$key];
         $change = $values === [] ? null : $this->overrides->change($locale, $values);
         if ($change === null) return $this->ok($answer(['written' => 0, 'unchanged' => true]));
         try {
@@ -5363,7 +5372,9 @@ final class Engine
             return $this->err('write_failed', $e->getMessage(), ['code' => 'LANGUAGE_NOT_WRITABLE']);
         }
         try {
-            $this->log->record($applyId, ['op' => 'languageOverrides', 'locale' => $locale, 'files' => $files]);
+            $entry = ['op' => 'languageOverrides', 'locale' => $locale, 'files' => $files];
+            if ($locale === 'en-GB') $entry['expected'] = [$change['path'] => hash('sha256', $change['after'])];
+            $this->log->record($applyId, $entry);
         } catch (Throwable $e) {
             try {
                 $this->overrides->restore($files);
@@ -5380,7 +5391,7 @@ final class Engine
             }
         }
         $this->stamped('content');
-        return $this->ok($answer(['written' => count($values)]));
+        return $this->ok($answer(['written' => $written, 'scope' => $locale === 'en-GB' ? 'site-wide locale/key; literals use exact source text with case and punctuation preserved' : 'site-wide locale']));
     }
 
     /**

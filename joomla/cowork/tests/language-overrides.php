@@ -68,7 +68,7 @@ if (function_exists('check')) {
     check('a short label the pack names "Footer" is that word, untranslated', $loReason['MOD_FOOTER'] ?? null, 'untranslated');
     check('an escaped quote reads as a quote', array_column($read['strings'], 'source', 'key')['TPL_BACK'] ?? null, '"Back"');
     check('nothing is overridden yet', $read['overrides'], []);
-    check('the other languages are refused', $loCall(['template' => 'ja_essence', 'locale' => 'en-GB'])['error'] ?? null, 'bad_params');
+    checkTrue('English excludes core language-pack keys', !in_array('COM_CONTENT_READ_MORE', array_column($loCall(['template' => 'ja_essence', 'locale' => 'en-GB'])['strings'] ?? [], 'key'), true));
     check('a template that is not installed is not found', $loCall(['template' => 'ja_none', 'locale' => 'vi-VN'])['error'] ?? null, 'not_found');
 
     // ---- what may be written -----------------------------------------------------------------------

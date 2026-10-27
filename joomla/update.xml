@@ -20,6 +20,25 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>English template literals can be edited through the native language override door with exact-source matching, same-file provenance and guarded Undo; no template file edits or render-time source scans.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.66</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.66</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.66/pkg_claudecowork-0.24.66.zip</downloadurl>
+        </downloads>
+        <sha256>fea86b07c6d5e0a1bb98a6b98c5fb2dba649fb4a1bfff4b4aee9059a5fd6512e</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Multilingual sites: showcase navigation and demo trim hide every language's copy of a listed entry, including the editions a template ships as a separate association group (Tracy Business 1.2.6) and languages bound after an apply; status names any language that still shows, and a new apply hides it. demoTrim writes article state by compare-and-set and never leaves a job applying.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
