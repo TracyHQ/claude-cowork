@@ -805,7 +805,7 @@ final class QuickstartContract
             }
         }
 
-        return [
+        return $this->roleFields() + [
             'bound' => $binding !== null,
             'contract' => (string) $this->id,
             'revision' => $this->revision($rows),
@@ -1048,6 +1048,41 @@ final class QuickstartContract
         }
         $row = $this->writer->read('post', $ids[0]);
         return $row === null ? ['problem' => 'Entity vanished while reading'] : ['id' => $ids[0], 'row' => $row];
+    }
+
+    /** What the agent is told about role and group; guidance only, no write rule reads either field. */
+    public const ROLE_GUIDANCE = 'Slots carry a role (the kind of content, for example offering.price) and a group (the card or item the slot belongs to). When the customer names a kind of content, such as the price of a plan, find the slots with that role inside the matching group, and change every slot of one card together so the card stays consistent. Roles are guidance only: the write rules (requiresEvidence, empty-state refusals, length limits) apply exactly as they do to a slot without a role.';
+
+    /**
+     * What each slot is, for the agent: `role` (a content family such as `offering.price`) and `group`
+     * (the card or item the slot belongs to), only for slots whose contract carries them. A contract
+     * without roles adds nothing, so a site bound to an older contract answers exactly as before.
+     * Guidance only: no write rule reads these fields.
+     *
+     * @return array<string,mixed>
+     */
+    private function roleFields(): array
+    {
+        $roles = [];
+        foreach ($this->slots() as $slot) {
+            $meta = [];
+            foreach (['role', 'group'] as $field) {
+                if (isset($slot[$field])) {
+                    $meta[$field] = $slot[$field];
+                }
+            }
+            if ($meta !== []) {
+                $roles[(string) $slot['key']] = $meta;
+            }
+        }
+        if ($roles === []) {
+            return [];
+        }
+        $out = ['slotRoles' => $roles, 'roleGuidance' => self::ROLE_GUIDANCE];
+        if (isset($this->map['roleVocabularyVersion'])) {
+            $out['roleVocabularyVersion'] = $this->map['roleVocabularyVersion'];
+        }
+        return $out;
     }
 
     /** @return array<int,array<string,mixed>> */

@@ -299,6 +299,9 @@ final class QuickstartContract
         return $this->baseEntities;
     }
     private ?array $slotsByEntity = null;
+    /** What the agent is told about role and group; guidance only, no write rule reads either field. */
+    public const ROLE_GUIDANCE = 'Slots carry a role (the kind of content, for example offering.price) and a group (the card or item the slot belongs to). When the customer names a kind of content, such as the price of a plan, find the slots with that role inside the matching group, and change every slot of one card together so the card stays consistent. Roles are guidance only: the write rules (requiresEvidence, empty-state refusals, length limits) apply exactly as they do to a slot without a role.';
+
     private function slotsFor(string $key): array {
         if ($this->slotsByEntity === null) {
             $this->loaded();
@@ -807,7 +810,10 @@ final class QuickstartContract
         foreach ($keys as $key=>$meta) {
             $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
         }
-        return $resolved + ['keys'=>$keys, 'slots'=>$slots, 'manifest'=>$this->manifest, 'contractHash'=>$this->contractHash()];
+        $out = $resolved + ['keys'=>$keys, 'slots'=>$slots, 'manifest'=>$this->manifest, 'contractHash'=>$this->contractHash()];
+        // Only a contract whose slots carry a role teaches the agent to use them; any other answers as before.
+        foreach ($slots as $list) foreach ($list as $slot) if (isset($slot['role'])) return $out + ['roleGuidance'=>self::ROLE_GUIDANCE];
+        return $out;
     }
 
     public function inspect(): array {

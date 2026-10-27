@@ -367,6 +367,13 @@ with that expected revision, an immutable `contract-` apply ID and request ID. I
 presentation before and inside the write transaction. The private
 `#__claudecowork_content_contract` table stores the installation binding and baseline.
 
+**Slot roles.** A newer contract's slots may carry `role` (the kind of content, such as
+`offering.price`) and `group` (the card or item a slot belongs to), and its content map a top-level
+`roleVocabularyVersion`. `readMapping` keeps both on each slot and adds `roleGuidance`, the text that
+tells the agent to find slots by role inside the matching group and to change one card's slots
+together. Roles are guidance: no write rule reads them, so `requiresEvidence` and the empty-state
+refusals apply unchanged, and a contract without roles answers exactly as before.
+
 `lib/contracts/tracy-apple/j6/1.1.0` is a verbatim mirror of the canonical TCH profile. `build.sh`
 makes it a release asset (below). Update the canonical TCH files first, then copy the entire profile;
 never allow an agent to submit its own presentation lock. Generic structural writes are blocked

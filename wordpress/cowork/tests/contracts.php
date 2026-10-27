@@ -550,5 +550,62 @@ check('and WPLANG as it was: absent', array_key_exists('WPLANG', WP_Fake::$optio
 check('nothing on record', $door($L, 'inspect')['sourceLanguage'], null);
 check('reverting again has nothing to take back', $door($L, 'sourceLanguage.revert', ['apply_id' => 'srclang-5', 'request_id' => 's5'])['error'], 'contract_failed');
 
+// ── slot roles: a contract that carries them reports them, one that does not answers as before ──
+
+echo "\nSlot roles\n";
+
+// A fictional contract: the test-design fixture with a role on two slots and a group on both, as a
+// newer release would carry them. Its pinned base hash is recomputed the way a regenerated profile is.
+$rolesTree = sys_get_temp_dir() . '/cc-roles-' . bin2hex(random_bytes(4));
+$rolesDir = $rolesTree . '/test-design/wp7/1.0.0';
+mkdir($rolesDir, 0777, true);
+foreach (glob($FIXTURES . '/test-design/wp7/1.0.0/*.json') as $file) {
+    copy($file, $rolesDir . '/' . basename($file));
+}
+$rolesMap = json_decode((string) file_get_contents($rolesDir . '/content-map.json'), true);
+$rolesMap['roleVocabularyVersion'] = 'example-roles/1';
+foreach ($rolesMap['slots'] as $i => $slot) {
+    if ($slot['key'] === 'home.hero.heading') {
+        $rolesMap['slots'][$i]['role'] = 'editorial.heading';
+        $rolesMap['slots'][$i]['group'] = ['id' => 'page-home.hero', 'item' => 1, 'kind' => 'section'];
+    }
+    if ($slot['key'] === 'home.hero.cta.text') {
+        $rolesMap['slots'][$i]['role'] = 'editorial.button_label';
+        $rolesMap['slots'][$i]['group'] = ['id' => 'page-home.hero', 'item' => 1, 'kind' => 'section'];
+    }
+}
+file_put_contents($rolesDir . '/content-map.json', json_encode($rolesMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+$rolesBase = DemoTrimProfile::baseHash($rolesDir);
+foreach (['demo-trim-map.json', 'editions.json'] as $name) {
+    $ext = json_decode((string) file_get_contents($rolesDir . '/' . $name), true);
+    $ext['baseHash'] = $rolesBase;
+    if (isset($ext['baseFiles']['content-map.json'])) {
+        $ext['baseFiles']['content-map.json'] = hash_file('sha256', $rolesDir . '/content-map.json');
+    }
+    file_put_contents($rolesDir . '/' . $name, json_encode($ext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+}
+
+$rs = contractSite($SITE, $rolesTree);
+$withRoles = $door($rs['engine'], 'inspect', ['contract' => 'test-design/wp7/1.0.0']);
+check('a contract with roles inspects cleanly', $withRoles['problems'], []);
+check('the slot list carries role and group', $withRoles['slotRoles']['home.hero.heading'],
+    ['role' => 'editorial.heading', 'group' => ['id' => 'page-home.hero', 'item' => 1, 'kind' => 'section']]);
+check('for every slot that has them, and only those', array_keys($withRoles['slotRoles']), ['home.hero.heading', 'home.hero.cta.text']);
+check('with the vocabulary version', $withRoles['roleVocabularyVersion'], 'example-roles/1');
+check('slot values are unchanged', $withRoles['slots']['home.hero.heading'], 'Building things');
+
+$plain = contractSite($SITE, $FIXTURES);
+$withoutRoles = $door($plain['engine'], 'inspect', ['contract' => 'test-design/wp7/1.0.0']);
+checkTrue('a contract without roles adds no role fields', !isset($withoutRoles['slotRoles']) && !isset($withoutRoles['roleVocabularyVersion']) && !isset($withoutRoles['roleGuidance']));
+check('a contract with roles tells the agent how to use them', $withRoles['roleGuidance'], QuickstartContract::ROLE_GUIDANCE);
+
+// Roles are guidance: a write goes through the same rules, with or without them.
+$bindRoles = $door($rs['engine'], 'bind', ['contract' => 'test-design/wp7/1.0.0']);
+check('a site with roles binds', $bindRoles['ok'], true);
+$applied = $door($rs['engine'], 'apply', ['expected_revision' => $bindRoles['revision'], 'apply_id' => 'contract-roles-1', 'request_id' => 'roles-1',
+    'changes' => ['home.hero.heading' => 'Building more things']]);
+check('and takes a write exactly as before', $applied['ok'], true);
+contractRootRemove($rolesTree);
+
 // Leave the fake as the next file expects it.
 WP_Fake::reset();
