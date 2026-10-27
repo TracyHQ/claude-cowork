@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { preflight, publishViaPullRequest } from './release-pr.mjs'
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const cowork = join(repo, 'wordpress', 'cowork')
@@ -50,20 +51,7 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 
 // ── 1. the same gate seat-registry grew after a deploy overwrote a newer build (tracy.ai#86) ──
 // Releasing from a stale checkout publishes a build nobody can trace back through history.
-try {
-  run('git', ['fetch', 'origin', 'main', '--quiet'])
-} catch {
-  die('could not fetch origin/main — there is no way to tell whether this checkout is current')
-}
-if (run('git', ['rev-parse', 'HEAD']) !== run('git', ['rev-parse', 'origin/main'])) {
-  die('HEAD differs from origin/main. Merge and pull --rebase before cutting a release.')
-}
-if (run('git', ['status', '--porcelain'])) {
-  die('the working tree has uncommitted changes. Commit or stash them first.')
-}
-
-const existingTags = run('git', ['tag', '--list', `wordpress-v${version}`])
-if (existingTags) die(`tag wordpress-v${version} already exists — that number has been used`)
+preflight({ run, die, tag: `wordpress-v${version}`, dryRun, staleHint: 'Merge and pull --rebase before cutting a release.' })
 
 // ── 2 & 3. two places declare the version, both written from the SAME variable ────────────────
 const zipName = `claude-cowork-${version}.zip`
@@ -112,28 +100,25 @@ if (dryRun) {
   process.exit(0)
 }
 
-// ── 6 & 7. one commit, one tag, one release ─────────────────────────────────────────────────
-run('git', ['add', 'wordpress/cowork/claude-cowork/claude-cowork.php', 'wordpress/update.json'])
-run('git', ['commit', '-m', `release(wordpress): ${version}`])
-run('git', ['tag', `wordpress-v${version}`])
-run('git', ['push', 'origin', 'HEAD', '--tags'])
-
-run('gh', [
-  'release',
-  'create',
-  `wordpress-v${version}`,
-  join(cowork, 'dist', zipName),
-  releaseManifest,
-  '--title',
-  `WordPress ${version}`,
-  '--notes',
-  `Plugin ${version}. Sites on ${version} or newer need do nothing; older ones update themselves.`
-])
+// ── 6 & 7. one commit, one tag, one release, one pull request (scripts/release-pr.mjs) ────────
+const { pr } = publishViaPullRequest({
+  run,
+  die,
+  tag: `wordpress-v${version}`,
+  files: ['wordpress/cowork/claude-cowork/claude-cowork.php', 'wordpress/update.json'],
+  message: `release(wordpress): ${version}`,
+  release: {
+    assets: [join(cowork, 'dist', zipName), releaseManifest],
+    title: `WordPress ${version}`,
+    notes: `Plugin ${version}. Sites on ${version} or newer need do nothing; older ones update themselves.`
+  },
+  prBody: `Plugin ${version}: \`wordpress/update.json\` announces the zip of the release [wordpress-v${version}](https://github.com/TracyHQ/claude-cowork/releases/tag/wordpress-v${version}), created before this PR was opened.\n\nMerged with a merge commit by \`scripts/release-wordpress.mjs\`, so the tagged commit stays in main's history.`
+})
 
 console.log(`
-✓ wordpress-v${version} released.
+✓ wordpress-v${version} released, ${pr} merged.
 
   The manifest is the single source of truth and it now points at this build. Sites running Tracy
   check it about twice a day and update themselves — nobody has to press anything. To withdraw this
-  release, set wordpress/update.json back to the previous version and push: no site is touched.
+  release, set wordpress/update.json back to the previous version in a pull request: no site is touched.
 `)

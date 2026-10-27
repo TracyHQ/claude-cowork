@@ -12,12 +12,13 @@
 //
 // A new entry is PREPENDED rather than replacing the file: Joomla picks the highest version whose
 // targetplatform matches the site, so an older site keeps finding the last version that supported
-// it. To withdraw a release, delete its entry and push — no site is touched.
+// it. To withdraw a release, delete its entry in a pull request — no site is touched.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { preflight, publishViaPullRequest } from './release-pr.mjs'
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const templateDir = join(repo, 'joomla', 'template')
@@ -43,20 +44,13 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 }
 
 // ── 1. releasing from a stale checkout publishes a build nobody can trace back ────────────────
-try {
-  run('git', ['fetch', 'origin', 'main', '--quiet'])
-} catch {
-  die('could not fetch origin/main — there is no way to tell whether this checkout is current')
-}
-if (run('git', ['rev-parse', 'HEAD']) !== run('git', ['rev-parse', 'origin/main'])) {
-  die('HEAD differs from origin/main. Merge and pull before cutting a release.')
-}
-if (run('git', ['status', '--porcelain'])) {
-  die('the working tree has uncommitted changes. Commit them first — the template is synced from TCH, and an uncommitted mirror is a release nobody can reproduce.')
-}
-if (run('git', ['tag', '--list', `joomla-template-v${version}`])) {
-  die(`tag joomla-template-v${version} already exists — that number has been used`)
-}
+preflight({
+  run,
+  die,
+  tag: `joomla-template-v${version}`,
+  dryRun,
+  dirtyHint: 'Commit them first — the template is synced from TCH, and an uncommitted mirror is a release nobody can reproduce.'
+})
 
 // ── 2. the number is the mirrored tree's, not this script's ──────────────────────────────────
 const declared = readFileSync(manifestInZip, 'utf8').match(/<version>([^<]+)<\/version>/)?.[1]?.trim()
@@ -124,33 +118,30 @@ if (dryRun) {
   process.exit(0)
 }
 
-// ── 5. one commit, one tag, one release ──────────────────────────────────────────────────────
-run('git', ['add', 'joomla/template/update.xml'])
-run('git', ['commit', '-m', `release(joomla-template): ${version}`])
-run('git', ['tag', `joomla-template-v${version}`])
-run('git', ['push', 'origin', 'HEAD', '--tags'])
-
-run('gh', [
-  'release',
-  'create',
-  `joomla-template-v${version}`,
-  join(templateDir, 'dist', zipName),
-  releaseManifest,
-  '--title',
-  `Joomla template ${version}`,
-  // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a
-  // person coming here installs first; a look release taking it would answer the wrong question on
-  // the repository page. Provisioning is unaffected either way — it resolves the extension by tag
-  // prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`), never by /releases/latest.
-  '--latest=false',
-  '--notes',
-  `Tracy template ${version}. Sites on ${version} or newer need do nothing; older ones find it under "Check For Updates".`
-])
+// ── 5. one commit, one tag, one release, one pull request (scripts/release-pr.mjs) ──────────
+const { pr } = publishViaPullRequest({
+  run,
+  die,
+  tag: `joomla-template-v${version}`,
+  files: ['joomla/template/update.xml'],
+  message: `release(joomla-template): ${version}`,
+  release: {
+    assets: [join(templateDir, 'dist', zipName), releaseManifest],
+    title: `Joomla template ${version}`,
+    // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a
+    // person coming here installs first; a look release taking it would answer the wrong question on
+    // the repository page. Provisioning is unaffected either way — it resolves the extension by tag
+    // prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`), never by /releases/latest.
+    latest: false,
+    notes: `Tracy template ${version}. Sites on ${version} or newer need do nothing; older ones find it under "Check For Updates".`
+  },
+  prBody: `\`joomla/template/update.xml\` announces the zip of the release [joomla-template-v${version}](https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-template-v${version}), created before this PR was opened.\n\nMerged with a merge commit by \`scripts/release-joomla-template.mjs\`, so the tagged commit stays in main's history.`
+})
 
 console.log(`
-✓ joomla-template-v${version} released.
+✓ joomla-template-v${version} released, ${pr} merged.
 
   joomla/template/update.xml now announces this build. A site that installed the template with an
   update server recorded finds it under Extensions → Update. To withdraw the release, delete its
-  entry from that file and push: no site is touched.
+  entry from that file in a pull request: no site is touched.
 `)

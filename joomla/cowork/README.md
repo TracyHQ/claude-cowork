@@ -129,6 +129,11 @@ A release therefore also writes the zip's sha256 into its `update.xml` entry, af
 from the zip that is uploaded (`shasum -a 256 dist/pkg_claudecowork.zip`); `tests/run.php` fails
 without it.
 
+Nobody pushes to `main`, so the release commit goes on a branch `release/…`, carries the tag
+`joomla-v<x>`, and reaches `main` through a pull request merged with a merge commit — only AFTER
+`gh release create` has attached the zip, so no site reads an `update.xml` entry whose package is
+not there yet. The template and WordPress scripts do the same through `scripts/release-pr.mjs`.
+
 ## What a release puts on a site, and who put it there (since 0.21.0)
 
 A site Tracy keeps in git sees an update of this package as a few hundred changed files nobody

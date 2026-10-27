@@ -81,6 +81,23 @@ announcement (`joomla/template/update.xml`, `wordpress/theme/update.json`), buil
 and creates the release. A site installed with the update server recorded then finds the new
 version by itself, the same way the extension does.
 
+**Nothing is pushed to `main`, a release included.** Every change reaches it through a pull
+request. The three release scripts (`release-wordpress.mjs`, `release-wordpress-theme.mjs`,
+`release-joomla-template.mjs`, sharing `scripts/release-pr.mjs`) and the Joomla extension's release
+by hand all take the same path, in this order, because installed sites read the announcement on
+`main` every quarter hour and must never see a version whose zip is not downloadable yet:
+
+1. commit the announcement on a branch `release/<tag>` and tag that commit;
+2. push the branch and the tag;
+3. create the GitHub release on the tag, with its zip;
+4. open the pull request to `main` and merge it with a **merge commit** (`gh pr merge --merge`, no
+   squash, no rebase, no `--admin`), so the tagged commit is in `main`'s history.
+
+If the merge cannot happen — a conflict, a failing check — the script stops and says so: the
+release exists, but no site is offered it until the pull request merges. Its message says how to
+finish (fix it, `gh pr merge <pr> --merge`) or roll back (`gh pr close <pr> --delete-branch`,
+`gh release delete <tag> --cleanup-tag`). `--dry-run` checks and builds and publishes nothing.
+
 ## What it is for
 
 Tracy keeps a git repository of a site: every article, page and template as files, with a

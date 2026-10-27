@@ -30,6 +30,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { preflight, publishViaPullRequest } from './release-pr.mjs'
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const themeDir = join(repo, 'wordpress', 'theme')
@@ -60,20 +61,13 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 }
 
 // ── 1. releasing from a stale checkout publishes a build nobody can trace back ────────────────
-try {
-  run('git', ['fetch', 'origin', 'main', '--quiet'])
-} catch {
-  die('could not fetch origin/main — there is no way to tell whether this checkout is current')
-}
-if (run('git', ['rev-parse', 'HEAD']) !== run('git', ['rev-parse', 'origin/main'])) {
-  die('HEAD differs from origin/main. Merge and pull before cutting a release.')
-}
-if (run('git', ['status', '--porcelain'])) {
-  die('the working tree has uncommitted changes. Commit them first — the theme is synced from TCH, and an uncommitted mirror is a release nobody can reproduce.')
-}
-if (run('git', ['tag', '--list', tagName(version)])) {
-  die(`tag ${tagName(version)} already exists — that number has been used`)
-}
+preflight({
+  run,
+  die,
+  tag: tagName(version),
+  dryRun,
+  dirtyHint: 'Commit them first — the theme is synced from TCH, and an uncommitted mirror is a release nobody can reproduce.'
+})
 
 // ── 2. the number is the mirrored tree's, not this script's ──────────────────────────────────
 const declared = readFileSync(styleFile, 'utf8').match(/^\s*Version:\s*(.+)$/m)?.[1]?.trim()
@@ -119,41 +113,34 @@ if (dryRun) {
   process.exit(0)
 }
 
-// ── 5. one commit, one tag, one release ──────────────────────────────────────────────────────
+// ── 5. one commit, one tag, one release, one pull request (scripts/release-pr.mjs) ──────────
 // The manifest can already say what this release says — the very first one, where the file was
-// written by hand before any release existed. `git commit` refuses an empty change, and refusing
-// there would leave a zip built, no tag, and nothing said about why.
+// written by hand before any release existed. Then there is nothing to commit and nothing to merge,
+// and the tag goes on the main commit that already says it.
 const manifestRel = manifestFile.slice(repo.length + 1)
-run('git', ['add', manifestRel])
-if (run('git', ['status', '--porcelain', manifestRel])) {
-  run('git', ['commit', '-m', slug === 'tracy' ? `release(wordpress-theme): ${version}` : `release(wordpress-theme ${slug}): ${version}`])
-} else {
-  console.log('· the manifest already said this version — nothing to commit')
-}
-run('git', ['tag', tagName(version)])
-run('git', ['push', 'origin', 'HEAD', '--tags'])
-
-run('gh', [
-  'release',
-  'create',
-  tagName(version),
-  join(themeDir, 'dist', zipName),
-  releaseManifest,
-  '--title',
-  slug === 'tracy' ? `WordPress theme ${version}` : `WordPress theme ${slug} ${version}`,
-  // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a
-  // person coming here installs first; a look release taking it would answer the wrong question on
-  // the repository page. Provisioning is unaffected either way — it resolves the extension by tag
-  // prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`), never by /releases/latest.
-  '--latest=false',
-  '--notes',
-  `${slug === 'tracy' ? 'Tracy theme' : `Theme ${slug}`} ${version}. Sites on ${version} or newer need do nothing; older ones update themselves.`
-])
+const { pr } = publishViaPullRequest({
+  run,
+  die,
+  tag: tagName(version),
+  files: [manifestRel],
+  message: slug === 'tracy' ? `release(wordpress-theme): ${version}` : `release(wordpress-theme ${slug}): ${version}`,
+  release: {
+    assets: [join(themeDir, 'dist', zipName), releaseManifest],
+    title: slug === 'tracy' ? `WordPress theme ${version}` : `WordPress theme ${slug} ${version}`,
+    // NOT the repository's "Latest" release. That badge is repo-wide, and the extension is what a
+    // person coming here installs first; a look release taking it would answer the wrong question on
+    // the repository page. Provisioning is unaffected either way — it resolves the extension by tag
+    // prefix and version range (`git ls-remote --tags 'wordpress-v0.6.*'`), never by /releases/latest.
+    latest: false,
+    notes: `${slug === 'tracy' ? 'Tracy theme' : `Theme ${slug}`} ${version}. Sites on ${version} or newer need do nothing; older ones update themselves.`
+  },
+  prBody: `\`${manifestRel}\` announces the zip of the release [${tagName(version)}](https://github.com/TracyHQ/claude-cowork/releases/tag/${tagName(version)}), created before this PR was opened.\n\nMerged with a merge commit by \`scripts/release-wordpress-theme.mjs\`, so the tagged commit stays in main's history.`
+})
 
 console.log(`
-✓ ${tagName(version)} released.
+✓ ${tagName(version)} released${pr ? `, ${pr} merged` : ''}.
 
-  ${manifestFile.slice(repo.length + 1)} is the single source of truth and now points at this build. Sites
+  ${manifestRel} is the single source of truth and now points at this build. Sites
   running the theme check it about twice a day and update themselves. To withdraw this release,
-  set that file back to the previous version and push: no site is touched.
+  set that file back to the previous version in a pull request: no site is touched.
 `)
