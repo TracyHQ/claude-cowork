@@ -862,6 +862,12 @@ one commit:
 `tests/run.php` fails when they disagree, because the failure is otherwise invisible: the site
 asks, gets an older number than it already has, and reports "up to date" forever.
 
+`node scripts/release-wordpress.mjs <x.y.z>` writes both, commits them on a branch
+`release/wordpress-v<x.y.z>`, tags that commit, creates the GitHub release with the zip, and only
+then opens the pull request to `main` and merges it with a merge commit: nobody pushes to `main`,
+and no site reads an `update.json` whose package is not downloadable yet. When the merge cannot
+happen it stops, the release made but not announced, and says how to finish or roll back.
+
 **Joomla and WordPress both record the update address when the extension is INSTALLED.** A site
 running a version cut before this existed has no address to ask, and stays silent until somebody
 updates it once by hand. That first update is the price of adding this late; every one after it
