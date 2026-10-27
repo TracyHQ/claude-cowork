@@ -33,8 +33,11 @@ $fitFiles=[
 ];
 foreach($fitFiles as $name=>$bytes)file_put_contents($fitRoot.'/images/'.$name,$bytes);
 $fitContract=(new ReflectionClass(QuickstartContract::class))->newInstanceWithoutConstructor();
-(new ReflectionProperty(QuickstartContract::class,'root'))->setValue($fitContract,$fitRoot);
+$fitRootProperty=new ReflectionProperty(QuickstartContract::class,'root');
+if (PHP_VERSION_ID < 80100) $fitRootProperty->setAccessible(true);
+$fitRootProperty->setValue($fitContract,$fitRoot);
 $fitCheck=new ReflectionMethod(QuickstartContract::class,'checkValue');
+if (PHP_VERSION_ID < 80100) $fitCheck->setAccessible(true);
 /** The refusal of a value, as [code, message] (null when taken). */
 $fitAnswer=function(array $slot,string $value,array $params=[]) use ($fitContract,$fitCheck):?array{
     try{$fitCheck->invoke($fitContract,$slot,$value,$params);return null;}
