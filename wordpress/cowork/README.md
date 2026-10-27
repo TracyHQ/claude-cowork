@@ -245,6 +245,14 @@ directory per `<design>/wp<major>/<version>`, copied byte-for-byte from TCH.
   uses comes from the binding, else the `claude_cowork_contract` option, else the `contract`
   parameter of `inspect`/`bind`. A corrupt store, or a bound profile this plugin does not carry,
   refuses every write with `contract_unavailable` — it never reads as an unbound site.
+**Slot roles.** A newer contract's slots may carry `role` (the kind of content, such as
+`offering.price`) and `group` (the card or item a slot belongs to), and its content map a top-level
+`roleVocabularyVersion`. `inspect` then adds `slotRoles` (`{slotKey: {role, group}}`),
+`roleVocabularyVersion` and `roleGuidance`, the text that tells the agent to find slots by role
+inside the matching group and to change one card's slots together. Roles are guidance: no write rule
+reads them, so `requiresEvidence` and the empty-state refusals apply unchanged, and a contract
+without roles answers exactly as before.
+
 - `content.contract` takes `operation`:
   - `inspect` (default): `{ok, bound, contract, revision, ids, entities[], slots{}, imageSlots{}, demoTrim, showcaseNav, sourceLanguage, multilingual, siteLanguage, problems: []}`.
     A site that does not match answers `contract_failed` with every `problems[]` named: a theme

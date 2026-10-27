@@ -195,6 +195,28 @@ $readMapping=$contract->readMapping();
 check('read mapping preserves binding, rows and jobs',[$cw->store,$cs->binding,$cs->job],$readBefore);
 check('read mapping uses bound IDs',$readMapping['ids'],$state['ids']);
 checkTrue('read mapping never exports sample values',!isset($readMapping['slots']['hero'][0]['sample']));
+// Slot roles: a fictional contract whose slots carry role and group answers with them; the one above does not.
+checkTrue('a contract without roles answers without role fields',!isset($readMapping['slots']['hero'][0]['role']) && !isset($readMapping['slots']['hero'][0]['group']));
+$rolesDir=sys_get_temp_dir().'/cowork-contract-roles-'.bin2hex(random_bytes(6));
+mkdir($rolesDir);mkdir($rolesDir.'/assets');mkdir($rolesDir.'/media/t4/optimize/css',0777,true);
+copy($contractDir.'/assets/demo.css',$rolesDir.'/assets/demo.css');
+$roleData=$data;
+$roleData['content-map']['slots'][0]['role']='editorial.heading';
+$roleData['content-map']['slots'][0]['group']=['id'=>'module-10.item.1','item'=>1,'kind'=>'module'];
+$roleData['content-map']['roleVocabularyVersion']='example-roles/1';
+unset($roleData['presentation-lock']['files'][$cache],$roleData['presentation-lock']['files'][$newCache]);
+$roleData['presentation-lock']['fileRoots']=['assets'];
+foreach($roleData as $name=>$body)file_put_contents($rolesDir.'/'.$name.'.json',json_encode($body));
+$roleStore=new TestContractStore();
+$roleContract=new QuickstartContract($cw,$roleStore,$rolesDir,$rolesDir);
+$roleContract->bind($roleContract->inspect()['snapshot']);
+$roleMapping=$roleContract->readMapping();
+check('a contract with roles keeps the role in the slot list',$roleMapping['slots']['hero'][0]['role'],'editorial.heading');
+check('and the group',$roleMapping['slots']['hero'][0]['group'],['id'=>'module-10.item.1','item'=>1,'kind'=>'module']);
+check('and tells the agent how to use them',$roleMapping['roleGuidance'],QuickstartContract::ROLE_GUIDANCE);
+checkTrue('a contract without roles gives no guidance',!isset($readMapping['roleGuidance']));
+checkTrue('a slot without a role stays without one',count($roleMapping['slots']['hero'])<2 || !isset($roleMapping['slots']['hero'][1]['role']));
+checkTrue('roles do not reveal the demo sample',!isset($roleMapping['slots']['hero'][0]['sample']));
 $cs->job=['phase'=>'copy','locale'=>'vi-VN','ids'=>[]];
 try { $contract->readMapping(); check('unfinished job refuses pure reader',true,false); }
 catch (RuntimeException $e) { check('unfinished job refuses pure reader',$e->getMessage(),'Content mapping has an unfinished language job'); }
