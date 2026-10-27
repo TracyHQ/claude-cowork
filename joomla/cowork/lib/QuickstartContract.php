@@ -12,6 +12,7 @@ require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ShowcaseNavProfile.php';
 require_once __DIR__ . '/JsonObjectKey.php';
 require_once __DIR__ . '/ContractProblem.php';
+require_once __DIR__ . '/SlotFit.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
@@ -808,11 +809,19 @@ final class QuickstartContract
         unset($resolved['missing']);
         $slots = [];
         foreach ($keys as $key=>$meta) {
-            $slots[$key] = array_map(static function ($slot) { unset($slot['sample'], $slot['label']); return $slot; }, $this->slotsOf($key, $meta));
+            $slots[$key] = array_map(static function ($slot) {
+                unset($slot['sample'], $slot['label']);
+                // Slot fit (ADR 0039) travels compact: what a write is held to, not the measured boxes.
+                if (array_key_exists('fit', $slot)) { $fit = SlotFit::of($slot); if ($fit === null) unset($slot['fit']); else $slot['fit'] = SlotFit::compact($fit); }
+                return $slot;
+            }, $this->slotsOf($key, $meta));
         }
         $out = $resolved + ['keys'=>$keys, 'slots'=>$slots, 'manifest'=>$this->manifest, 'contractHash'=>$this->contractHash()];
-        // Only a contract whose slots carry a role teaches the agent to use them; any other answers as before.
-        foreach ($slots as $list) foreach ($list as $slot) if (isset($slot['role'])) return $out + ['roleGuidance'=>self::ROLE_GUIDANCE];
+        // Only a contract whose slots carry a role (a fit) teaches the agent to use them; any other answers as before.
+        $roles = false; $fits = false;
+        foreach ($slots as $list) foreach ($list as $slot) { $roles = $roles || isset($slot['role']); $fits = $fits || isset($slot['fit']); }
+        if ($roles) $out += ['roleGuidance'=>self::ROLE_GUIDANCE];
+        if ($fits) $out += ['fitGuidance'=>SlotFit::GUIDANCE];
         return $out;
     }
 
@@ -1096,16 +1105,24 @@ final class QuickstartContract
             $this->checkDerivedLink($slot,$value,$refuse); return;
         }
         if(mb_strlen($value)>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>mb_strlen($value)]);
+        // Slot fit (ADR 0039), only on a slot that carries one and never against its own demo value.
+        $fit=SlotFit::of($slot);
+        if($fit!==null&&SlotFit::restores($slot,$value))$fit=null;
+        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {
+            if($fit!==null)SlotFit::checkKept($fit,$key,$params,$refuse);
             if(!preg_match('~^images/[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$~D',$value)||!is_file($this->root.'/'.$value))throw $refuse('SLOT_IMAGE_INVALID','Image must already exist in the site media library: '.$key);
             $resolved=realpath($this->root.'/'.$value);$imageRoot=realpath($this->root.'/images');
             if(!$resolved||!$imageRoot||strpos($resolved,$imageRoot.DIRECTORY_SEPARATOR)!==0)throw $refuse('SLOT_IMAGE_INVALID','Image escapes the site media library: '.$key);
             // the slot's own picture is stored as Joomla writes media values (`images/a.png#joomlaImage://local-images/a.png?width=…`):
             // read whole, it named no file, its shape was never known, and every shape was taken
             $before=@getimagesize($this->root.'/'.self::imagePath((string)$slot['sample']));$after=@getimagesize($this->root.'/'.$value);
-            if(!$after||($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02))throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
+            if(!$after||!$after[0]||!$after[1])throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
+            // A fit that names the box's aspect holds the picture to it; without one, the demo file's shape decides, as always.
+            if($fit!==null&&SlotFit::checkPicture($fit,$key,$after,$before,$this->root.'/'.$value,$refuse))return;
+            if($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02)throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
     }
 
@@ -1244,6 +1261,10 @@ final class QuickstartContract
         $changes=$params['changes']??($emptied?[]:null);
         if(!is_array($changes)||!(count($changes)+count($emptied))||count($changes)+count($emptied)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
         foreach($emptied as $key)if(array_key_exists($key,$changes))throw new ContractProblem('CHANGES_INVALID','A slot is both changed and emptied: '.$key,$key);
+        // `replace_kept`: kept pictures (Slot fit replace "keep") the customer asked for by name, each mapped to their words.
+        $kept=$params['replace_kept']??[];
+        if(!is_array($kept)||($kept&&array_keys($kept)===range(0,count($kept)-1))||array_filter($kept,fn($words)=>!is_string($words)))
+            throw new ContractProblem('CHANGES_INVALID','replace_kept must map picture slot keys to the customer\'s words asking for them');
         $allowed=array_column($state['slots'],null,'key');$values=[];
         $owners=$current['owners']??[];$checked=[];
         $emptying=array_fill_keys($emptied,true);
