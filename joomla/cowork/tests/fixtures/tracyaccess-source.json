@@ -1,0 +1,15 @@
+{
+  "_comment": "plg_system_tracyaccess is owned by Tracy's fleet provisioning (TracyHQ/tch, `path` below), which installs it on every site it hosts. This package carries a copy, and the self-updater installs that copy over whatever the site has: Joomla's installer does not refuse a lower version. So the copy must be the fleet's own bytes, never older. tests/tracyaccess-signed.php fails when a shipped file differs from these hashes. To take a new version: copy the directory from TCH, then update `commit`, `version` and every hash here.",
+  "repository": "TracyHQ/tch",
+  "path": "packages/fleet/tracy-fleet-operation/scripts/provision/access/joomla/plg_system_tracyaccess",
+  "commit": "59a8564ab09dc7dce74b9c03aaed8dee60de91aa",
+  "version": "0.2.0",
+  "files": {
+    "lib/AccessAssertion.php": "00d58fe7c16787e707f8bbe39d49254a06ab89105b00d1a05f90eb079c77a35e",
+    "lib/AccessJwt.php": "d1b66d56baaa92ede8865c8c43e4f878645eb19543b5bb293f5be5d71f568cf0",
+    "script.php": "92daecdf19d0bd4e94d37b6e0a53c0ef44cb497dd68ac7e97dad097a04f8ced6",
+    "services/provider.php": "3f4bc07b4079df890a91910b51157905f0983de0854656e8d31f50f2c8239969",
+    "src/Extension/TracyAccess.php": "643b57a44ab66b8e8310ea4c4685743402e4dfb2c4420ba25300c4d35e0c31a6",
+    "tracyaccess.xml": "ff8ac74f4e7011cb2516abca2ebaf9e5ecc43d7baac441947b28f111f4ef9288"
+  }
+}

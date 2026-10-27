@@ -23,18 +23,18 @@ use Joomla\Event\SubscriberInterface;
 \defined('_JEXEC') or die;
 
 /**
- * Signs a coworker in to a fleet CLONE as themselves, from the Cloudflare Access JWT that already
- * proved they hold a seat.
+ * Signs a coworker in to their Tracy site's own copy, from the assertion tracy-web signs for every
+ * request it proxies (0.2.0, P0 of the open-source line).
  *
- * This plugin exists ONLY on a clone, installed at provision time. It must never reach a
- * customer's own site: it writes to `#__users`, which is nothing the cowork component does or
- * should ever do. Kept in its own package for exactly that reason.
+ * 🔒 ONLY THE SIGNED ASSERTION IS BELIEVED. Every site's container could reach every other one over
+ * a shared Docker network, and the bare `x-tracy-email/tier/role` headers made whoever sent them a
+ * Super User. `x-tracy-assert` + `x-tracy-sig` are HMAC-SHA256 under this site's own key
+ * (`/run/tracy-access/key.json`, mounted read-only by the host), bound to this site, host, method and
+ * target, 30 s, single-use nonce (`#__tracyaccess_nonce`). No key, no valid assertion, or a nonce
+ * already taken → Joomla behaves as it would without the plugin. The Cloudflare Access JWT can only
+ * end a session, never start one.
  *
- * Why it is safe to trust a request header at the origin: the origin has no public address, only
- * a tunnel, and every request has passed Cloudflare Access. But the network is not the check —
- * the signature is. The header is verified (RS256, this clone's `aud`, the team's issuer, expiry)
- * on every request, and the bare `Cf-Access-Authenticated-User-Email` header is never trusted on
- * its own, because a header is only as good as what signed it.
+ * This plugin must never reach a customer's own site: it writes to `#__users`.
  */
 final class TracyAccess extends CMSPlugin implements SubscriberInterface, DatabaseAwareInterface
 {
@@ -61,26 +61,28 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
 
     private function syncIdentity(): void
     {
-        // WHO the viewer is — preferred from Tracy's own Worker (`x-tracy-email`), and falling back
-        // to the Cloudflare Access JWT while a clone is still fronted by Access. Both are trustworthy
-        // on the same ground: only the fleet-bar Worker reaches this origin, so a header it sets (like
-        // Cloudflare's) cannot be forged by a client. Null from both means a guest, or a request that
-        // did not come through the Worker — stand aside and let Joomla behave as it always would.
-        $email = $this->workerEmail() ?? $this->emailFromAccessJwt();
-        if ($email === null) {
+        $app     = $this->getApplication();
+        $current = $app->getIdentity();
+        $signedIn = $current instanceof User && !$current->guest;
+        $clientId = $app->isClient('administrator') ? 1 : 0;
+
+        $claims = $this->vouched();
+        if ($claims === null) {
+            $jwtEmail = $this->emailFromAccessJwt();
+            if ($jwtEmail !== null && $signedIn && strtolower((string) $current->email) === $jwtEmail) {
+                $app->logout($current->id, ['clientid' => $clientId]);
+            }
             return;
         }
 
-        $app     = $this->getApplication();
-        $current = $app->getIdentity();
+        $email = strtolower($claims['email']);
+        $signedInAsThem = $signedIn && $email !== '' && strtolower((string) $current->email) === $email;
 
-        // The tier the fleet-bar Worker vouched for. An editor gets a backend session; a viewer
-        // (and anyone the Worker did not mark editor — a missing header means no seat) reads the
-        // front-end as a guest and gets none. If they were an editor a moment ago and just lost
-        // it, end the session now rather than let a stale login outlive the downgrade.
-        if ($this->tier() !== 'editor') {
-            if ($current instanceof User && !$current->guest && strtolower((string) $current->email) === $email) {
-                $app->logout($current->id, ['clientid' => $app->isClient('administrator') ? 1 : 0]);
+        // A viewer, or a lost seat (anonymous `guest`): end the session of the person named AND any
+        // session of an account this plugin made, so a revoked seat does not outlive its cookie.
+        if ($claims['tier'] !== 'editor') {
+            if ($signedInAsThem || ($signedIn && $this->createdHere($current))) {
+                $app->logout($current->id, ['clientid' => $clientId]);
             }
             return;
         }
@@ -96,25 +98,95 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             return;
         }
 
-        // Already this person: nothing to do. Re-verifying every request is cheap; re-logging in
-        // every request is not, and would churn the session needlessly.
-        if ($current instanceof User && !$current->guest && strtolower((string) $current->email) === $email) {
-            return;
-        }
-
-        $user = $this->userForEmail($email);
-        if ($user === null) {
+        $user = $this->userForEmail($email, $claims['role']);
+        if ($user === null || $signedInAsThem) {
             return;
         }
 
         // Someone else is in this browser's session. Log them out first, so the new identity
         // does not inherit anything of the old one — two people sharing a machine must not
         // share a login.
-        if ($current instanceof User && !$current->guest) {
-            $app->logout($current->id, ['clientid' => $app->isClient('administrator') ? 1 : 0]);
+        if ($signedIn) {
+            $app->logout($current->id, ['clientid' => $clientId]);
         }
 
         $this->logIn($user);
+    }
+
+    /**
+     * The verified claims tracy-web vouched for on THIS request, or null: no assertion, no key on
+     * this site, a bad assertion (reason logged with the kid, never the key), or a nonce seen before.
+     */
+    private function vouched(): ?array
+    {
+        $assert = (string) ($_SERVER['HTTP_X_TRACY_ASSERT'] ?? '');
+        $sig    = (string) ($_SERVER['HTTP_X_TRACY_SIG'] ?? '');
+        if ($assert === '' && $sig === '') {
+            return null;
+        }
+        require_once __DIR__ . '/../../lib/AccessAssertion.php';
+        $key = \TracyAccessAssertion::loadKey(getenv('TRACY_ACCESS_KEY_FILE') ?: '/run/tracy-access/key.json');
+        if ($key === null) {
+            $this->warn('tracyaccess: assertion refused: this site has no access key');
+            return null;
+        }
+        [$claims, $why] = \TracyAccessAssertion::verify(
+            $assert,
+            $sig,
+            $key,
+            (string) ($_SERVER['HTTP_HOST'] ?? ''),
+            (string) ($_SERVER['REQUEST_METHOD'] ?? ''),
+            (string) ($_SERVER['REQUEST_URI'] ?? ''),
+            time()
+        );
+        if ($claims === null) {
+            $this->warn('tracyaccess: assertion refused (' . $why . ', kid ' . $key['kid'] . ')');
+            return null;
+        }
+        if (!$this->takeNonce($claims['nonce'], $claims['exp'])) {
+            $this->warn('tracyaccess: assertion refused (replay or nonce store error, kid ' . $key['kid'] . ')');
+            return null;
+        }
+        return $claims;
+    }
+
+    /**
+     * Takes the nonce once: a primary key on it, so two workers racing one assertion cannot both
+     * insert. False on a replay AND on any store error — an assertion that cannot be proven unused is
+     * refused. The table is created on first use.
+     */
+    private function takeNonce(string $nonce, int $exp): bool
+    {
+        $db = $this->getDatabase();
+        $table = $db->quoteName('#__tracyaccess_nonce');
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                $row = (object) ['nonce' => $nonce, 'exp' => $exp];
+                $db->insertObject('#__tracyaccess_nonce', $row);
+                if (random_int(1, 50) === 1) {
+                    $db->setQuery('DELETE FROM ' . $table . ' WHERE ' . $db->quoteName('exp') . ' < ' . (time() - 30))->execute();
+                }
+                return true;
+            } catch (\Throwable $e) {
+                if ($attempt > 0) {
+                    return false;
+                }
+                try {
+                    $db->setQuery('CREATE TABLE IF NOT EXISTS ' . $table . ' ('
+                        . ' nonce varchar(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,'
+                        . ' exp int unsigned NOT NULL, PRIMARY KEY (nonce), KEY exp (exp))')->execute();
+                } catch (\Throwable $e2) {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** True when `$user` is an account this plugin created (not the customer's own). */
+    private function createdHere(User $user): bool
+    {
+        return (int) $user->getParam('tracyaccess_created', 0) === 1;
     }
 
     /**
@@ -155,25 +227,8 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
     }
 
     /**
-     * The viewer's email as the fleet-bar Worker vouched for it, or null.
-     *
-     * Read from `x-tracy-email`, which only the Worker can set — it strips any client value before
-     * the request reaches this origin, the same guarantee that lets `x-tracy-tier` be trusted. This
-     * is what frees the clone's auto-login from Cloudflare Access: the Worker resolves identity from
-     * its own session cookie (`tracy_sess`) and hands it over here, so removing Access no longer
-     * blinds the plugin. Lower-cased to match `userForEmail`; a value without an `@` is not an email
-     * and is ignored, so a misconfigured header cannot mint a junk user.
-     */
-    private function workerEmail(): ?string
-    {
-        $value = strtolower(trim((string) ($_SERVER['HTTP_X_TRACY_EMAIL'] ?? '')));
-        return $value !== '' && strpos($value, '@') !== false ? $value : null;
-    }
-
-    /**
-     * The email from the Cloudflare Access JWT, or null — the legacy path, kept so a clone still
-     * fronted by Access (before the migration off it) keeps auto-logging in. Removed once every
-     * clone is served identity by the Worker.
+     * The email from the Cloudflare Access JWT, or null — the legacy path of a clone still fronted
+     * by Access. It carries no tier and no role, so it can END a matching session, never start one.
      */
     private function emailFromAccessJwt(): ?string
     {
@@ -198,40 +253,13 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
     }
 
     /**
-     * The CMS tier the fleet-bar Worker vouched for: 'editor' (may sign in to the backend) or
-     * 'viewer' (read-only). Read from `x-tracy-tier`, which only the Worker can set — it strips any
-     * client value before the request reaches origin, so this is trusted the way the Access
-     * assertion is. Anything that is not exactly 'editor' — a viewer, or a missing header meaning no
-     * seat — is treated as viewer, the safe side: a stray header never mints a backend login.
-     */
-    private function tier(): string
-    {
-        $value = strtolower(trim((string) ($_SERVER['HTTP_X_TRACY_TIER'] ?? '')));
-        return $value === 'editor' ? 'editor' : 'viewer';
-    }
-
-    /**
-     * The Tracy Role the fleet-bar Worker vouched for: owner|admin|developer|editor. Read from
-     * `x-tracy-role`, which only the Worker sets — it strips any client value before the request
-     * reaches origin, trusted on the same ground as `x-tracy-tier`. This is what lets the backend
-     * group follow the Role (ADR 0038) instead of collapsing everyone to one group. Anything
-     * unrecognised — including a missing header from an older Worker — falls to `editor`, the safe
-     * floor: an unknown Role never lands someone in an elevated group by accident.
-     */
-    private function role(): string
-    {
-        $value = strtolower(trim((string) ($_SERVER['HTTP_X_TRACY_ROLE'] ?? '')));
-        return \in_array($value, ['owner', 'admin', 'developer', 'editor'], true) ? $value : 'editor';
-    }
-
-    /**
      * Finds the Joomla user for this email, creating one the first time.
      *
      * Lazy on purpose: a seat is not a Joomla account until its holder actually opens the clone,
      * so there is nothing to keep in step with the seat book. The password is random and unusable
      * — the only way in is the Access JWT, which is the whole point.
      */
-    private function userForEmail(string $email): ?User
+    private function userForEmail(string $email, string $role): ?User
     {
         $db = $this->getDatabase();
         $query = $db->getQuery(true)
@@ -244,7 +272,7 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
 
         if ($id > 0) {
             $existing = new User($id);
-            $this->applyGroup($existing);
+            $this->applyGroup($existing, $role);
             return $existing;
         }
 
@@ -274,7 +302,7 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
             $this->warn('tracyaccess: could not create user for ' . $email . ': ' . implode('; ', $user->getErrors()));
             return null;
         }
-        $this->applyGroup($user);
+        $this->applyGroup($user, $role);
         return $user;
     }
 
@@ -285,13 +313,23 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
      * what this plugin is until the login below runs) cannot place anyone in a group higher than
      * its own — so `save()` silently drops an Owner into nothing above Manager. The map row is the
      * plugin's to write; it already mints these accounts, and the seat book upstream is the
-     * authority on the Role. Additive: it grants the Role's group, it does not strip whatever else
-     * the account already holds (a downgrade is handled by the seat losing editor tier, which logs
-     * the session out).
+     * authority on the Role. On an account this plugin made, a Role that no longer maps to Super
+     * Users takes that group away; the customer's own accounts are only ever granted, never stripped.
      */
-    private function applyGroup(User $user): void
+    private function applyGroup(User $user, string $role): void
     {
-        $groupId = $this->workGroupId();
+        $groupId = $this->workGroupId($role);
+        $super = $this->groupIdByTitle('Super Users', 8);
+        if ($groupId !== $super && $this->createdHere($user)
+            && in_array($super, array_map('intval', (array) $user->groups), true)) {
+            $db = $this->getDatabase();
+            $db->setQuery(
+                $db->getQuery(true)
+                    ->delete($db->quoteName('#__user_usergroup_map'))
+                    ->where($db->quoteName('user_id') . ' = ' . (int) $user->id)
+                    ->where($db->quoteName('group_id') . ' = ' . $super)
+            )->execute();
+        }
         if (in_array($groupId, array_map('intval', (array) $user->groups), true)) {
             return;
         }
@@ -326,12 +364,11 @@ final class TracyAccess extends CMSPlugin implements SubscriberInterface, Databa
      * right to do the WORK (ADR 0023), not automatically the keys to the box. An unrecognised Role
      * falls to Manager, never up.
      *
-     * The mapping keys off `x-tracy-role`, sent per request by the Worker; the flat `work_group`
+     * The mapping keys off the signed assertion's `role`; the flat `work_group`
      * param survives only as the Manager-tier override for a site that wants to name that group.
      */
-    private function workGroupId(): int
+    private function workGroupId(string $role): int
     {
-        $role = $this->role();
         if ($role === 'owner' || $role === 'admin') {
             return $this->groupIdByTitle('Super Users', 8);
         }
