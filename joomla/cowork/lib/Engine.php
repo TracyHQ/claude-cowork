@@ -93,6 +93,8 @@ final class Engine
     private const FINGERPRINT_VERSION = 2;
     /** site.fingerprint `skip_columns`: how many names, and the one shape a name may have. */
     private const MAX_SKIP_COLUMNS = 50;
+    /** db.range_checksums: how many ranges one call may name (2 000 rows a range is 10 M rows). */
+    private const MAX_RANGE_STARTS = 5000;
     private const COLUMN_NAME = '/^[A-Za-z_][A-Za-z0-9_]{0,63}$/D';
     private const MAX_READ_BYTES = 8388608; // 8 MiB, for reading a single file
     /** Object stores require every part but the last to be at least 5 MiB. A floor, not a preference. */
@@ -460,6 +462,10 @@ final class Engine
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ], 'db_range_checksums' => [
+                    'version' => 1,
+                    'max_starts' => self::MAX_RANGE_STARTS,
+                    'max_limit' => self::MAX_DB_LIMIT,
                 ], 'site_fingerprint' => [
                     'version' => self::FINGERPRINT_VERSION,
                     'max_files' => self::MAX_FINGERPRINT_FILES,
@@ -485,6 +491,10 @@ final class Engine
                 return $this->dbPurge($params);
             case 'db.dump':
                 return $this->dbDump($params);
+            case 'db.range_checksums':
+                return $this->dbRangeChecksums($params);
+            case 'db.dump_after':
+                return $this->dbDumpAfter($params);
             case 'db.dump_many':
                 return $this->dbDumpMany($params);
             case 'db.snapshot':
@@ -1085,6 +1095,94 @@ final class Engine
     {
         $this->dumpClock = $now;
         return $this;
+    }
+
+    /**
+     * The substance checksum of each range of one table's rows by an integer key column
+     * ({@see RowSource::rangeChecksums}): `table` (one db.tables lists), `key` (a column), `starts`
+     * (the first keys of ranges 1..n, strictly ascending integers, at most MAX_RANGE_STARTS) and
+     * `skip_columns` as site.fingerprint takes them. `ranges`: n+1 "<rows>:<xor>". A caller that
+     * kept an earlier read's ranges reads again only those that moved ({@see dbDumpAfter}).
+     */
+    private function dbRangeChecksums(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $table = $p['table'] ?? null;
+        $key = $p['key'] ?? null;
+        $starts = $p['starts'] ?? [];
+        $skip = $p['skip_columns'] ?? [];
+        if (!is_string($table) || $table === '') {
+            return $this->err('bad_params', 'table required');
+        }
+        if (!is_string($key) || !preg_match(self::COLUMN_NAME, $key)) {
+            return $this->err('bad_params', 'key must be a plain column name');
+        }
+        if (!is_array($starts) || count($starts) > self::MAX_RANGE_STARTS) {
+            return $this->err('bad_params', 'starts must be a list of at most ' . self::MAX_RANGE_STARTS . ' integers');
+        }
+        $previous = null;
+        foreach ($starts as $start) {
+            if (!is_int($start) || ($previous !== null && $start <= $previous)) {
+                return $this->err('bad_params', 'starts must be strictly ascending integers');
+            }
+            $previous = $start;
+        }
+        if (!is_array($skip) || count($skip) > self::MAX_SKIP_COLUMNS) {
+            return $this->err('bad_params', 'skip_columns must be a list of at most ' . self::MAX_SKIP_COLUMNS . ' column names');
+        }
+        foreach ($skip as $column) {
+            if (!is_string($column) || !preg_match(self::COLUMN_NAME, $column)) {
+                return $this->err('bad_params', 'every skip_columns entry must be a plain column name');
+            }
+        }
+        try {
+            if (!in_array($table, $this->dumper->tables(), true)) {
+                return $this->err('bad_params', "table {$table} is not one db.tables lists");
+            }
+            $ranges = $this->dumper->rangeChecksums($table, array_values($skip), $key, array_values($starts));
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        if ($ranges === null) {
+            return $this->err('dump_failed', "table {$table} could not be read");
+        }
+        return $this->ok(['table' => $table, 'key' => $key, 'ranges' => $ranges]);
+    }
+
+    /**
+     * One range of a table's rows read again ({@see DbDumper::rowsAfter}): `table`, `key` (its one
+     * integer key column), `after` (an integer, or null for the first row) and `limit` (at most
+     * MAX_DB_LIMIT). The INSERTs as `sql_b64`, with `rows` and `last`.
+     */
+    private function dbDumpAfter(array $p): array
+    {
+        if ($this->dumper === null) {
+            return $this->err('unavailable', 'db dump not wired');
+        }
+        $table = $p['table'] ?? null;
+        $key = $p['key'] ?? null;
+        $after = $p['after'] ?? null;
+        $limit = (int) ($p['limit'] ?? 1000);
+        if (!is_string($table) || $table === '' || !is_string($key) || !preg_match(self::COLUMN_NAME, $key)) {
+            return $this->err('bad_params', 'table and key required');
+        }
+        if ($after !== null && !is_int($after)) {
+            return $this->err('bad_params', 'after must be an integer or null');
+        }
+        $limit = max(1, min($limit, self::MAX_DB_LIMIT));
+        try {
+            if (!in_array($table, $this->dumper->tables(), true)) {
+                return $this->err('bad_params', "table {$table} is not one db.tables lists");
+            }
+            $chunk = $this->dumper->rowsAfter($table, $key, $after, $limit);
+        } catch (InvalidArgumentException $e) {
+            return $this->err('bad_params', $e->getMessage());
+        } catch (Throwable $e) {
+            return $this->err('dump_failed', $e->getMessage());
+        }
+        return $this->ok(['table' => $table, 'sql_b64' => base64_encode($chunk['sql']), 'rows' => $chunk['rows'], 'last' => $chunk['last']]);
     }
 
     /**

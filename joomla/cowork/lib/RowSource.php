@@ -69,6 +69,19 @@ interface RowSource
      * @param string[] $skip
      */
     public function substanceChecksum(string $table, array $skip): ?string;
+    /**
+     * The substance checksum ({@see substanceChecksum}) of each range of one table's rows by an
+     * integer key, in ONE scan: `$starts` are the first keys of ranges 1..n, strictly ascending,
+     * and range 0 holds every row below the first. `"<rows>:<xor>"` per range, n+1 of them (a range
+     * with no row is "0:0"); null when the table cannot be read. The caller compares the ranges with
+     * the same ranges of an earlier read and reads again only those that moved, instead of the whole
+     * table: a WordPress `posts` of 26 MB was read again for one edited title.
+     *
+     * @param string[] $skip
+     * @param int[] $starts
+     * @return ?array<int,string>
+     */
+    public function rangeChecksums(string $table, array $skip, string $key, array $starts): ?array;
 
     /**
      * One batch of rows: LIMIT $limit OFFSET $offset. Each row is an array of column values in

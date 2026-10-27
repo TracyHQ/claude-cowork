@@ -103,6 +103,56 @@ final class MysqliRowSource implements RowSource
     public function substanceChecksum(string $table, array $skip): ?string
     {
         $quoted = '`' . str_replace('`', '``', $table) . '`';
+        $kept = $this->keptColumns($table, $skip);
+        if ($kept === null) {
+            return null;
+        }
+        $sql = $kept === []
+            ? "SELECT COUNT(*), 0 FROM {$quoted}"
+            : 'SELECT COUNT(*), ' . $this->rowXor($kept) . ' FROM ' . $quoted;
+        $res = $this->db->query($sql);
+        if (!$res) {
+            throw new RuntimeException($this->db->error ?: 'substance checksum failed');
+        }
+        $row = $res->fetch_row();
+        return (string) ($row[0] ?? '0') . ':' . (string) ($row[1] ?? '0');
+    }
+
+    public function rangeChecksums(string $table, array $skip, string $key, array $starts): ?array
+    {
+        $quoted = '`' . str_replace('`', '``', $table) . '`';
+        $all = $this->keptColumns($table, []);
+        if ($all === null) {
+            return null;
+        }
+        if (!in_array($key, $all, true)) {
+            throw new RuntimeException("`{$key}` is not a column of `{$table}`");
+        }
+        $kept = $this->keptColumns($table, $skip) ?? [];
+        // INTERVAL(k, s1, s2, …) is 0 below s1, i from s_i up to s_{i+1}: the range of every row in
+        // one pass, by a binary search over the starts (they must ascend, which the caller checks).
+        $range = $starts === []
+            ? '0'
+            : 'INTERVAL(`' . str_replace('`', '``', $key) . '`, ' . implode(', ', array_map('intval', $starts)) . ')';
+        $sum = $kept === [] ? '0' : $this->rowXor($kept);
+        $res = $this->db->query("SELECT {$range} AS r, COUNT(*), {$sum} FROM {$quoted} GROUP BY r");
+        if (!$res) {
+            throw new RuntimeException($this->db->error ?: 'range checksums failed');
+        }
+        $out = array_fill(0, count($starts) + 1, '0:0');
+        while ($row = $res->fetch_row()) {
+            $at = (int) $row[0];
+            if ($at >= 0 && $at < count($out)) {
+                $out[$at] = (string) ($row[1] ?? '0') . ':' . (string) ($row[2] ?? '0');
+            }
+        }
+        return $out;
+    }
+
+    /** The table's columns in ordinal order, those in `$skip` left out (any case); null when it cannot be read. */
+    private function keptColumns(string $table, array $skip): ?array
+    {
+        $quoted = '`' . str_replace('`', '``', $table) . '`';
         $drop = array_map('strtolower', $skip);
         // SHOW COLUMNS answers in ordinal order, which is what keeps the concatenation stable.
         try {
@@ -120,26 +170,23 @@ final class MysqliRowSource implements RowSource
                 $kept[] = $name;
             }
         }
-        if ($kept === []) {
-            $sql = "SELECT COUNT(*), 0 FROM {$quoted}";
-        } else {
-            // CAST AS BINARY before HEX: HEX() of a DECIMAL or DOUBLE rounds it to an integer (1.40
-            // and 1.60 hex as 1 and 2), so a price edited by cents would not move the value. The
-            // binary cast is the exact text of a number and the raw bytes of a string or BLOB, with
-            // no character set or collation in between. 'N' for NULL cannot be a hex string, and
-            // 0x1f cannot be inside one, so neither NULL against '' nor a shifted value collides.
-            $parts = array_map(function ($c) {
-                return "IFNULL(HEX(CAST(`" . str_replace('`', '``', $c) . "` AS BINARY)), 'N')";
-            }, $kept);
-            $sql = 'SELECT COUNT(*), BIT_XOR(CAST(CONV(SUBSTRING(MD5(CONCAT_WS(0x1f, ' . implode(', ', $parts)
-                . ')), 1, 16), 16, 10) AS UNSIGNED)) FROM ' . $quoted;
-        }
-        $res = $this->db->query($sql);
-        if (!$res) {
-            throw new RuntimeException($this->db->error ?: 'substance checksum failed');
-        }
-        $row = $res->fetch_row();
-        return (string) ($row[0] ?? '0') . ':' . (string) ($row[1] ?? '0');
+        return $kept;
+    }
+
+    /**
+     * The XOR over rows of the first 64 bits of an MD5 of the columns named, as unsigned decimal.
+     * CAST AS BINARY before HEX: HEX() of a DECIMAL or DOUBLE rounds it to an integer (1.40 and 1.60
+     * hex as 1 and 2), so a price edited by cents would not move the value. The binary cast is the
+     * exact text of a number and the raw bytes of a string or BLOB, with no character set or
+     * collation in between. 'N' for NULL cannot be a hex string, and 0x1f cannot be inside one, so
+     * neither NULL against '' nor a shifted value collides.
+     */
+    private function rowXor(array $kept): string
+    {
+        $parts = array_map(function ($c) {
+            return "IFNULL(HEX(CAST(`" . str_replace('`', '``', $c) . "` AS BINARY)), 'N')";
+        }, $kept);
+        return 'BIT_XOR(CAST(CONV(SUBSTRING(MD5(CONCAT_WS(0x1f, ' . implode(', ', $parts) . ')), 1, 16), 16, 10) AS UNSIGNED))';
     }
 
     public function readRows(string $table, int $offset, int $limit): array

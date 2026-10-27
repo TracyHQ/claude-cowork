@@ -362,6 +362,7 @@ check('engine without dumper wired -> unavailable', $noDump['error'], 'unavailab
 
 // db.dump_many: several tables per request, so a host firewall counting requests does not ban the importer.
 require __DIR__ . "/db-dump-many.php";
+require __DIR__ . "/db-range-checksums.php";
 // One database, several sites: info.db_prefix and db.tables.prefix name this site's own prefix.
 require __DIR__ . "/db-tables-prefix.php";
 // The cheap questions "Sync from live" asks first: site.fingerprint, files.list without the sha1, files.hash.
