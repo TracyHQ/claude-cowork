@@ -379,6 +379,25 @@ tells the agent to find slots by role inside the matching group and to change on
 together. Roles are guidance: no write rule reads them, so `requiresEvidence` and the empty-state
 refusals apply unchanged, and a contract without roles answers exactly as before.
 
+**Slot fit.** A newer contract's text and image slots may carry `fit` (TCH ADR 0039, `slotFitVersion:
+"slot-fit/1"`): the shape the template was measured with. `readMapping` returns it compact on each slot
+(kind, replace, transparent, aspect, tolerance, minWidth, crop, focus for a picture; lines, maxChars,
+maxCharacters, casing, overflow for a text; no measured boxes) and adds `fitGuidance`, the text that tells
+the agent how to honour it. Unlike roles, fit is enforced by the write check (`lib/SlotFit.php`):
+
+| Slot fit says | A write is refused when | Code |
+| --- | --- | --- |
+| `replace: "keep"` (icon, avatar, signature, cut-out, decoration, map) | the apply does not name the slot in `replace_kept` (slot key mapped to the customer's words asking for that very picture) | `SLOT_PICTURE_KEPT` |
+| `aspect`, `tolerance`, `crop: "cover"` | the picture's width / height is off the box's by more than the tolerance (a logo or uncut picture is held to its demo file's shape) | `SLOT_IMAGE_INVALID` |
+| `minWidth` | the picture is narrower | `SLOT_IMAGE_TOO_SMALL` |
+| `transparent: true` | the picture has no transparent ground (a JPEG, a PNG or WebP without alpha, or, with GD, four opaque corners) | `SLOT_IMAGE_OPAQUE` |
+| `maxCharacters`, `lines` | the words are longer, or have more line breaks than the box holds; the agent is asked to rewrite, nothing is cut | `SLOT_TOO_LONG` |
+
+Putting a slot's demo value back is always taken. A slot without `fit` (every released contract
+before ADR 0039) is checked exactly as before: the 2% shape check against the demo file, the slot's
+own `maxCharacters`, and no kind, size or transparency rule. `replace_kept` joins the request hash
+only when sent, like `empty_links`.
+
 `lib/contracts/tracy-apple/j6/1.1.0` is a verbatim mirror of the canonical TCH profile. `build.sh`
 makes it a release asset (below). Update the canonical TCH files first, then copy the entire profile;
 never allow an agent to submit its own presentation lock. Generic structural writes are blocked

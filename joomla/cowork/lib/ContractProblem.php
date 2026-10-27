@@ -14,7 +14,7 @@ final class ContractProblem extends RuntimeException
 {
     /** Codes a caller can fix by sending something different; every other code is unrecoverable. */
     private const RECOVERABLE = ['SLOT_TOO_LONG', 'SLOT_EVIDENCE_REQUIRED', 'SLOT_NOT_CONTENT', 'SLOT_LINK_UNSUPPORTED',
-        'SLOT_IMAGE_INVALID', 'REVISION_STALE', 'REVISION_REQUIRED', 'WRITER_BUSY', 'CONFLICT',
+        'SLOT_IMAGE_INVALID', 'SLOT_IMAGE_TOO_SMALL', 'SLOT_IMAGE_OPAQUE', 'SLOT_PICTURE_KEPT', 'REVISION_STALE', 'REVISION_REQUIRED', 'WRITER_BUSY', 'CONFLICT',
         // Recoverable by someone else: the admin who has the record open saves and closes it.
         'SLOT_LOCKED_BY_USER'];
 

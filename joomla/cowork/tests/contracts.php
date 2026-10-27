@@ -217,6 +217,32 @@ check('and tells the agent how to use them',$roleMapping['roleGuidance'],Quickst
 checkTrue('a contract without roles gives no guidance',!isset($readMapping['roleGuidance']));
 checkTrue('a slot without a role stays without one',count($roleMapping['slots']['hero'])<2 || !isset($roleMapping['slots']['hero'][1]['role']));
 checkTrue('roles do not reveal the demo sample',!isset($roleMapping['slots']['hero'][0]['sample']));
+// Slot fit (ADR 0039): a fictional contract whose slots carry a fit answers with it, compact; the one above does not.
+checkTrue('a contract without fit answers without fit fields',!isset($readMapping['slots']['hero'][0]['fit']) && !isset($readMapping['fitGuidance']));
+$fitDir=sys_get_temp_dir().'/cowork-contract-fit-'.bin2hex(random_bytes(6));
+mkdir($fitDir);mkdir($fitDir.'/assets');
+copy($contractDir.'/assets/demo.css',$fitDir.'/assets/demo.css');
+$fitData=$roleData;
+$fitData['content-map']['slotFitVersion']='slot-fit/1';
+$fitData['content-map']['slots'][0]['fit']=['measured'=>true,'boxes'=>['desktop'=>['width'=>400,'height'=>40],'phone'=>['width'=>300,'height'=>80]],
+    'lines'=>['desktop'=>1,'phone'=>2],'maxChars'=>['desktop'=>20,'phone'=>16],'maxCharacters'=>16,'casing'=>'none','overflow'=>'rewrite'];
+$fitData['content-map']['slots'][2]['fit']=['not','an','object'];
+foreach($fitData as $name=>$body)file_put_contents($fitDir.'/'.$name.'.json',json_encode($body));
+$fitStore=new TestContractStore();
+$fitBound=new QuickstartContract($cw,$fitStore,$fitDir,$fitDir);
+$fitBound->bind($fitBound->inspect()['snapshot']);
+$fitMapping=$fitBound->readMapping();
+check('a contract with fit carries it compact in the slot list',$fitMapping['slots']['hero'][0]['fit'],
+    ['measured'=>true,'lines'=>['desktop'=>1,'phone'=>2],'maxChars'=>['desktop'=>20,'phone'=>16],'maxCharacters'=>16,'casing'=>'none','overflow'=>'rewrite']);
+check('beside its role',$fitMapping['slots']['hero'][0]['role'],'editorial.heading');
+check('and tells the agent how to use it',$fitMapping['fitGuidance'],SlotFit::GUIDANCE);
+checkTrue('a malformed fit is left out of the slot list',!array_key_exists('fit',$fitMapping['slots']['hero'][2]));
+$fitRevision=$fitBound->inspect()['revision'];
+try { $fitBound->plan(['expected_revision'=>$fitRevision,'changes'=>['hero.0'=>'A heading far too long for its box']]); check('an apply over the fit is refused',true,false); }
+catch (ContractProblem $e) { check('an apply over the fit is refused',[$e->reason,$e->extra],['SLOT_TOO_LONG',['limit'=>16,'actual'=>34]]); }
+check('an apply within the fit is planned',count($fitBound->plan(['expected_revision'=>$fitRevision,'changes'=>['hero.0'=>'Short heading']])['operations'])>0,true);
+try { $fitBound->plan(['expected_revision'=>$fitRevision,'changes'=>['hero.0'=>'Short heading'],'replace_kept'=>['hero.0']]); check('replace_kept must be a map',true,false); }
+catch (ContractProblem $e) { check('replace_kept must be a map',$e->reason,'CHANGES_INVALID'); }
 $cs->job=['phase'=>'copy','locale'=>'vi-VN','ids'=>[]];
 try { $contract->readMapping(); check('unfinished job refuses pure reader',true,false); }
 catch (RuntimeException $e) { check('unfinished job refuses pure reader',$e->getMessage(),'Content mapping has an unfinished language job'); }
