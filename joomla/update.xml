@@ -20,6 +20,25 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>The slot list carries each slot role and group, and the agent is told to use them. Carries the ja-boxing/j6/1.0.5 content contract, the first JA Boxing profile whose content map declares slot roles.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.67</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.67</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.67/pkg_claudecowork-0.24.67.zip</downloadurl>
+        </downloads>
+        <sha256>ae02a7bad43d1630ec74a159ef0012875433464cc63126395495c8dd655908bf</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Security: the bundled Tracy access plugin is now 0.2.0, the signed one Tracy's hosting installs. 0.1.4 signed in whoever sent plain identity headers; 0.2.0 believes only an assertion signed with the site's own key, and on a site without that key it signs nobody in.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
