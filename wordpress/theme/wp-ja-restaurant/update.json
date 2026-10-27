@@ -1,0 +1,9 @@
+{
+  "_comment": "The WP Restaurant theme's update announcement. Version 0.0.0 announces no released update; release-wordpress-theme.mjs writes the tested candidate version and package when it is published.",
+  "version": "0.0.0",
+  "package": "",
+  "url": "https://github.com/TracyHQ/claude-cowork",
+  "requires": "7.0",
+  "requires_php": "8.1",
+  "tested": "7.1"
+}

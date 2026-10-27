@@ -120,6 +120,8 @@ final class LanguageOverrides
         $page = array_slice($all, $offset, $limit);
         $next = $offset + count($page) < count($all) ? $offset + count($page) : null;
         return [
+            'scope' => $locale === self::SOURCE ? 'site-wide locale/key; literals use exact source text with case and punctuation preserved' : 'site-wide locale',
+            'ambiguous' => $locale === self::SOURCE ? $this->englishLiterals($template)['ambiguous'] : [],
             'strings' => $page, 'overrides' => self::parse((string) $this->bytes(self::path($locale))),
             'truncated' => $next !== null, 'total' => count($all), 'offset' => $offset, 'nextOffset' => $next,
         ];
@@ -132,6 +134,7 @@ final class LanguageOverrides
      */
     public function offered(string $template, string $locale): array
     {
+        if ($locale === self::SOURCE) return $this->englishLiterals($template)['strings'];
         $used = $this->usedKeys($template);
         $rows = [];
         $order = 0;
@@ -189,6 +192,99 @@ final class LanguageOverrides
         }
         uasort($rows, static fn(array $a, array $b): int => $a['sort'] <=> $b['sort']);
         return array_values(array_map(static fn(array $r): array => $r['row'], $rows));
+    }
+
+    /** English editing is limited to template-owned words and literals; conflicting sources in the read inventory are refused. */
+    private function englishLiterals(string $template): array
+    {
+        $groups = [];
+        foreach ($this->front($template)['literals'] as $literal => $file) {
+            $key = PageLiterals::keyOf($literal);
+            if ($key === null) continue;
+            $source = PageLiterals::sourceText($literal);
+            $groups[$key][$source] = ['file' => $file, 'source' => $source];
+        }
+        $rows = [];
+        $ambiguous = [];
+        foreach ($groups as $key => $sources) {
+            $owned = array_filter($sources, static fn(array $row): bool => strpos($row['file'], 'templates/' . $template . '/') === 0);
+            if ($owned === []) continue;
+            if (count($sources) !== 1) {
+                $ambiguous[] = ['key' => $key, 'sources' => array_keys($sources)];
+                continue;
+            }
+            $row = reset($owned);
+            $rows[] = ['key' => $key, 'source' => $row['source'], 'reason' => 'literal', 'file' => $row['file'], 'rank' => 'template'];
+        }
+        $language = [];
+        $foreign = [];
+        foreach ($this->sourceFiles($template) + $this->pluginFiles() as $file => $counterparts) {
+            foreach (self::parse((string) $this->bytes($file)) as $key => $source) {
+                if (!preg_match(self::KEY, $key) || preg_match(self::FORMAT_KEY, $key) || preg_match(self::DATE_WORD, $key) || strpos($key, 'TRACY_') === 0) continue;
+                if (!self::englishTemplateFile($file, $template)) $foreign[$key] = true;
+                if (!isset($language[$key][$source])) $language[$key][$source] = ['file' => $file, 'source' => $source];
+            }
+        }
+        foreach ($language as $key => $sources) {
+            if (isset($foreign[$key])) continue;
+            $owned = array_filter($sources, static fn(array $row): bool => self::englishTemplateFile($row['file'], $template));
+            if ($owned === []) continue;
+            if (count($sources) !== 1) { $ambiguous[] = ['key' => $key, 'sources' => array_keys($sources)]; continue; }
+            $row = reset($owned);
+            $plain = self::breakText($row['source']);
+            if ($plain === null || !self::worded($plain)) continue;
+            $rows[] = ['key' => $key, 'source' => $row['source'], 'reason' => 'template-words', 'file' => $row['file'], 'rank' => 'template'];
+        }
+        return ['strings' => $rows, 'ambiguous' => $ambiguous];
+    }
+
+    /** Joomla may install the selected template's own language file in the global language folder. */
+    private static function englishTemplateFile(string $file, string $template): bool
+    {
+        return strpos($file, 'templates/' . $template . '/language/en-GB/') === 0
+            || $file === 'language/en-GB/tpl_' . $template . '.ini'
+            || $file === 'language/en-GB/en-GB.tpl_' . $template . '.ini';
+    }
+
+    /** Plain text with simple line breaks only; attributes, other tags and encoded markup are refused. */
+    private static function breakText(string $value): ?string
+    {
+        $text = (string) preg_replace('~<br[ ]*/?>~i', '', $value);
+        return preg_match('/[<>]/', html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ? null : $text;
+    }
+
+    /** English template keys may preserve existing simple line breaks, never add markup or drop a break. */
+    public static function englishRefusal(string $source, $value): ?string
+    {
+        if (!is_string($value)) return self::refusal($source, $value);
+        if (mb_strlen($value) > self::MAX_VALUE) return 'longer than ' . self::MAX_VALUE . ' characters';
+        if (preg_match('/[\r\n\x00]/', $value)) return 'more than one line';
+        $from = self::breakText($source);
+        $to = self::breakText($value);
+        if ($from === null || $to === null) return 'only the existing simple line breaks may be kept';
+        preg_match_all('~<br[ ]*/?>~i', $source, $a);
+        preg_match_all('~<br[ ]*/?>~i', $value, $b);
+        if (count($a[0]) !== count($b[0])) return 'keep the same number of line breaks';
+        return self::refusal($from, $to);
+    }
+
+    /** New guarded language receipts are preflighted newest first, including multiple writes in one Apply. */
+    public function revertBlocked(array $entries): array
+    {
+        $virtual = [];
+        $blocked = [];
+        foreach (array_reverse($entries) as $entry) {
+            if (($entry['op'] ?? null) !== 'languageOverrides' || !isset($entry['expected'])) continue;
+            foreach (array_reverse($entry['files'] ?? []) as $file) {
+                $path = $file['path'] ?? '';
+                $this->assertDoorFile($path);
+                if (!array_key_exists($path, $virtual)) $virtual[$path] = $this->bytes($path);
+                $expected = $entry['expected'][$path] ?? null;
+                if (!is_string($expected) || !is_string($virtual[$path]) || !hash_equals($expected, hash('sha256', $virtual[$path]))) $blocked[] = $path;
+                $virtual[$path] = $file['before'] ?? null;
+            }
+        }
+        return array_values(array_unique($blocked));
     }
 
     /**

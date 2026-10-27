@@ -327,3 +327,64 @@ check('receipts: a full store refuses a new request, nothing written', [$rdFull[
 check('receipts: a full store still answers a retry of a known request', $rdApply($rdIn8, 'rw-8', 'req-8', [['new' => '+84 8'] + $rdGood[0]])['replayed'] ?? null, true);
 check('receipts: a receipt keeps no rules, so a full store stays under 1 MiB', [isset($rdAll['req-5']['answer']['rules']), strlen((string) WP_Fake::$options[RenderedWords::RECEIPTS_OPTION]) < 1048576],
     [false, true]);
+
+// Edit what the visitor sees, twice, then undo each edit. Raw theme bytes remain the one source.
+WP_Fake::reset();
+WP_Fake::$options = [];
+$rcPage = '<html><body><main><p>Original bakery note.</p><aside><p>First revision.</p></aside></main></body></html>';
+$rcSite = new FakeRenderedSite($rcPage);
+$rcLog = new FakeApplyLog();
+$rcEngine = (new Engine($WTOKEN, [], null, null, null, null, new Claude_Cowork_Site_Writer(), null, $rcLog))->renderedWordsSite($rcSite);
+$rcCall = static fn(string $action, array $params): array => $rcEngine->handle(['token' => $WTOKEN, 'action' => $action, 'params' => $params]);
+$rcInspect = static fn(string $old, array $extra = []): array => $rcCall('content.renderedWords', ['operation' => 'inspect', 'path' => '/contact-us/',
+    'targets' => [['kind' => 'text', 'old' => $old]]] + $extra);
+$rcApply = static fn(array $seen, string $apply, array $rules): array => $rcCall('content.renderedWords', ['operation' => 'apply', 'apply_id' => $apply,
+    'request_id' => $apply, 'proof' => $seen['proof'], 'expected_revision' => $seen['revision'], 'rules' => $rules]);
+$rcFirst = $rcInspect('Original bakery note.');
+$rcRawRule = ['kind' => 'text', 'anchor' => $rcFirst['targets'][0]['candidates'][0]['anchor'], 'old' => 'Original bakery note.',
+    'new' => 'First revision.', 'expected_matches' => 1];
+check('composition: first ordinary edit succeeds', $rcApply($rcFirst, 'compose-first', [$rcRawRule])['render'] ?? null, 'verified');
+$rcKey = RenderedWords::optionKey(41, 'en_US');
+$rcBefore = WP_Fake::$options[$rcKey];
+$rcSecond = $rcInspect('First revision.', ['composition' => 'whole-output']);
+$rcCandidates = $rcSecond['targets'][0]['candidates'] ?? [];
+check('composition: visible output and equal raw text at a different anchor retain distinct provenance',
+    [count($rcCandidates), $rcCandidates[0]['replaces_rule'] ?? null, isset($rcCandidates[1]['replaces_rule'])],
+    [2, RenderedWords::ruleId($rcRawRule), false]);
+$rcIncoming = ['old' => 'First revision.', 'new' => 'For bakery enquiries, contact us.', 'replaces_rule' => RenderedWords::ruleId($rcRawRule)] + $rcRawRule;
+check('composition: an ordinary raw proof cannot authorize editing a generated output',
+    $rcApply($rcInspect('Original bakery note.'), 'compose-no-proof', [$rcIncoming])['error'] ?? null, 'stale_proof');
+check('composition: an unrelated rule id is refused without a write',
+    [$rcApply($rcSecond, 'compose-wrong-id', [['replaces_rule' => str_repeat('a', 16)] + $rcIncoming])['error'] ?? null, WP_Fake::$options[$rcKey] === $rcBefore], ['drift', true]);
+$rcSite->page = str_replace('Original bakery note.', 'Changed outside Tracy.', $rcPage);
+check('composition: external raw drift is refused without a write',
+    [$rcApply($rcSecond, 'compose-drift', [$rcIncoming])['error'] ?? null, WP_Fake::$options[$rcKey] === $rcBefore], ['drift', true]);
+$rcSite->page = $rcPage;
+$rcSite->locale = 'vi';
+check('composition: a different locale cannot consume the inspected edit', $rcApply($rcSecond, 'compose-locale', [$rcIncoming])['error'] ?? null, 'drift');
+$rcSite->locale = 'en_US';
+$rcSite->post = 99;
+check('composition: a different page cannot consume the inspected edit', $rcApply($rcSecond, 'compose-page', [$rcIncoming])['error'] ?? null, 'drift');
+$rcSite->post = 41;
+check('composition: substrings of generated output are explicitly unsupported', $rcInspect('revision', ['composition' => 'whole-output'])['error'] ?? null, 'unsupported');
+$rcDone = $rcApply($rcSecond, 'compose-second', [$rcIncoming]);
+$rcStored = RenderedWords::decodeSet(WP_Fake::$options[$rcKey]);
+check('composition: second edit stores a -> c, never a -> b -> c',
+    [$rcDone['render'] ?? $rcDone, count($rcStored['rules']), $rcStored['rules'][0]['old'], $rcStored['rules'][0]['new']],
+    ['verified', 1, 'Original bakery note.', 'For bakery enquiries, contact us.']);
+check('composition: visitor gets the new output and the unrelated raw equal phrase stays',
+    [strpos($rcSite->visit('/contact-us/')['body'], '<p>For bakery enquiries, contact us.</p>') !== false,
+        strpos($rcSite->visit('/contact-us/')['body'], '<aside><p>First revision.</p></aside>') !== false], [true, true]);
+check('composition: receipt records the visible before/after', $rcDone['visible_changes'] ?? null,
+    [['anchor' => $rcRawRule['anchor'], 'before' => 'First revision.', 'after' => 'For bakery enquiries, contact us.']]);
+check('composition: identical retry replays without another revision',
+    [$rcApply($rcSecond, 'compose-second', [$rcIncoming])['replayed'] ?? null, RenderedWords::decodeSet(WP_Fake::$options[$rcKey])['revision']], [true, 2]);
+check('composition: older inspection conflicts after a newer edit', $rcApply($rcSecond, 'compose-stale', [$rcIncoming])['error'] ?? null, 'conflict');
+check('composition: older undo cannot overwrite the new edit', $rcCall('apply.revert', ['apply_id' => 'compose-first'])['error'] ?? null, 'conflict');
+check('composition: undo second restores the first rule byte-for-byte',
+    [$rcCall('apply.revert', ['apply_id' => 'compose-second'])['ok'] ?? null, WP_Fake::$options[$rcKey] === $rcBefore], [true, true]);
+check('composition: undo first restores the original visitor HTML',
+    [$rcCall('apply.revert', ['apply_id' => 'compose-first'])['ok'] ?? null, $rcSite->visit('/contact-us/')['body'] === $rcPage], [true, true]);
+$rcReceiptStore = json_decode(WP_Fake::$options[RenderedWords::RECEIPTS_OPTION], true);
+check('composition: durable receipts retain no before/after payload multiplied by request history',
+    isset($rcReceiptStore['compose-second']['answer']['visible_changes']), false);

@@ -69,6 +69,8 @@ final class WP_Fake
     public static array $strings = [];
     /** @var array<int,array{display_name:string}> user id => the columns an editor lock's holder is named by */
     public static array $users = [];
+    public static bool $multisite = false;
+    public static bool $userWriteFails = false;
     /** @var array<int,array<string,mixed>> user id => meta key => value, what `get_user_meta` answers */
     public static array $userMeta = [];
     /** @var array<string,callable> hook => the one callback `apply_filters` runs for it */
@@ -93,6 +95,8 @@ final class WP_Fake
         self::$relations = [];
         self::$recounts = [];
         self::$users = [];
+        self::$multisite = false;
+        self::$userWriteFails = false;
         self::$userMeta = [];
         self::$filters = [];
         self::$polylang = false;
@@ -998,4 +1002,13 @@ final class PLL_MO
 function pll_home_url(string $lang = ''): string
 {
     return WP_Fake::$polylang ? 'http://test.local/' . $lang . '/' : '';
+}
+
+function is_multisite(): bool { return WP_Fake::$multisite; }
+function wp_update_user(array $fields) {
+    $id = (int) $fields['ID'];
+    if (WP_Fake::$userWriteFails) return new WP_Error('user write failed');
+    if (isset($fields['display_name'])) $fields['display_name'] = apply_filters('pre_user_display_name', $fields['display_name']);
+    WP_Fake::$users[$id] = array_replace(WP_Fake::$users[$id], array_diff_key($fields, ['ID' => true]));
+    return $id;
 }

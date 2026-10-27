@@ -79,7 +79,7 @@ final class RenderedWords
     /** Elements whose content is not markup: skipped to their own end tag. */
     private const RAW_TEXT = ['script', 'style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript'];
     private const VOID = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', 'keygen'];
-    private const RULE_KEYS = ['rule_id', 'kind', 'name', 'anchor', 'old', 'new', 'expected_matches'];
+    private const RULE_KEYS = ['rule_id', 'kind', 'name', 'anchor', 'old', 'new', 'expected_matches', 'replaces_rule'];
 
     // ---- scope and storage ------------------------------------------------------------------
 
@@ -211,7 +211,77 @@ final class RenderedWords
         if (isset($rule['rule_id']) && $rule['rule_id'] !== self::ruleId($rule)) {
             return 'rule_id does not match the rule';
         }
+        if (array_key_exists('replaces_rule', $rule) && (!is_string($rule['replaces_rule']) || preg_match(self::ANCHOR, $rule['replaces_rule']) !== 1)) {
+            return 'replaces_rule is a rule id from a whole-output inspection';
+        }
         return null;
+    }
+
+    /**
+     * Inspect visible words while retaining the one raw rule that produced each whole output.
+     * Mixed raw/output matches at one anchor, substrings and outputs assembled by several rules
+     * are deliberately refused: their visible count cannot name one existing rule unambiguously.
+     * @return list<array<string,mixed>>|null
+     */
+    public static function visibleCandidates(string $html, array $rules, array $targets): ?array
+    {
+        $rendered = self::render($html, $rules);
+        if ($rules !== [] && !$rendered['applied']) return null;
+        $visible = self::candidates($rendered['html'], $targets);
+        $raw = self::candidates($html, $targets);
+        if ($visible === null || $raw === null) return null;
+        foreach ($visible as $i => &$row) {
+            foreach ($row['candidates'] as &$candidate) {
+                $outputs = array_values(array_filter($rules, static fn($rule): bool =>
+                    $rule['kind'] === $row['kind'] && ($rule['name'] ?? null) === ($row['name'] ?? null)
+                    && $rule['anchor'] === $candidate['anchor'] && strpos($rule['new'], $row['old']) !== false));
+                $rawCount = 0;
+                foreach ($raw[$i]['candidates'] as $original) {
+                    if ($original['anchor'] === $candidate['anchor']) $rawCount += $original['count'];
+                }
+                if ($outputs === []) {
+                    if ($rawCount !== $candidate['count']) return null;
+                    continue;
+                }
+                if (count($outputs) !== 1 || $rawCount !== 0 || $outputs[0]['new'] !== $row['old']
+                    || $outputs[0]['expected_matches'] !== $candidate['count']) return null;
+                $candidate['replaces_rule'] = $outputs[0]['id'];
+            }
+            unset($candidate);
+        }
+        unset($row);
+        return $visible;
+    }
+
+    /** Resolve a visible edit to its original raw source only after verifying its current provenance. */
+    public static function compose(string $html, array $existing, array $incoming): ?array
+    {
+        $out = [];
+        $ids = [];
+        foreach ($incoming as $rule) {
+            if (isset($rule['replaces_rule'])) {
+                $target = ['kind' => $rule['kind'], 'old' => $rule['old']] + ($rule['kind'] === 'attribute' ? ['name' => 'href'] : []);
+                $rows = self::visibleCandidates($html, $existing, [$target]);
+                $matched = false;
+                foreach ($rows[0]['candidates'] ?? [] as $candidate) {
+                    if ($candidate['anchor'] === $rule['anchor'] && $candidate['count'] === $rule['expected_matches']
+                        && ($candidate['replaces_rule'] ?? null) === $rule['replaces_rule']) $matched = true;
+                }
+                if (!$matched) return null;
+                $source = null;
+                foreach ($existing as $old) {
+                    if ($old['id'] === $rule['replaces_rule']) $source = $old;
+                }
+                if ($source === null) return null;
+                $rule['old'] = $source['old'];
+                unset($rule['replaces_rule'], $rule['rule_id']);
+            }
+            $id = self::ruleId($rule);
+            if (isset($ids[$id]) || self::ruleRefusal($rule) !== null) return null;
+            $ids[$id] = true;
+            $out[] = $rule;
+        }
+        return $out;
     }
 
     /**

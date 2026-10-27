@@ -12,9 +12,11 @@
  *     written as plain words, the words of a screen-reader span (`sr-only`, `visually-hidden`), and an element's own text of
  *     two words or more. `LanguageOverrides` offers each under `keyOf()` (`TRACY_LITERAL_WATCH_THE_VIDEO`, reason `literal`),
  *     so Tracy translates it like any other string and writes it into the language's override file (one revert takes it back).
- *   - `translate()`: the system plugin's output filter (onAfterRender, site pages of a language other than en-GB): an attribute
+ *   - `translate()`: the system plugin's output filter (onAfterRender, non-English site pages): an attribute
  *     of those four, or a text node, whose words are exactly a literal the override file holds a translation for, takes that
  *     translation, escaped. Nothing else of the page changes; script and style bodies are never read.
+ * English editing uses `english()`: only source-provenance pairs from the native door are applied, site-wide to the
+ * exact source text after entity decoding and whitespace normalization; case and punctuation remain significant.
  * No library dependency, like the rest of `lib/`.
  */
 final class PageLiterals
@@ -33,6 +35,39 @@ final class PageLiterals
         if (preg_match('/^(?:' . self::WORDS . ')$/D', $words) !== 1 || preg_match('/[A-Za-z]{2}/', $words) !== 1) return null;
         $key = trim((string) preg_replace('/[^A-Z0-9]+/', '_', strtoupper($words)), '_');
         return $key === '' ? null : substr(self::PREFIX . $key, 0, 120);
+    }
+
+    /** Stable exact-source metadata, separate from replacement keys. */
+    public static function sourceKey(string $key): string
+    {
+        return 'TRACY_SOURCE_' . strtoupper(hash('sha256', $key));
+    }
+
+    /** Decode HTML entities and collapse whitespace, preserving case and punctuation. */
+    public static function sourceText(string $raw): string
+    {
+        return trim((string) preg_replace('/\\s+/u', ' ', html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    }
+
+    /** English rules need server-recorded source provenance; missing or mismatched pairs are inert. */
+    public static function englishRules(array $overrides): array
+    {
+        $out = [];
+        foreach (self::fromOverrides($overrides) as $key => $value) {
+            $source = $overrides[self::sourceKey($key)] ?? null;
+            if (!is_string($source) || self::keyOf($source) !== $key || preg_match('/[<>\\r\\n\\x00]/', $source)) continue;
+            $out[$key] = ['source' => self::sourceText($source), 'value' => $value];
+        }
+        return $out;
+    }
+
+    /** Site-wide exact-source English replacements, without reading PHP inventories at render time. */
+    public static function english(string $html, array $overrides): string
+    {
+        $rules = self::englishRules($overrides);
+        $words = [];
+        foreach ($rules as $key => $rule) $words[$key] = $rule['value'];
+        return self::translate($html, $words, $rules);
     }
 
     /**
@@ -72,11 +107,12 @@ final class PageLiterals
      *
      * @param array<string,string> $words override key => translation (`fromOverrides()`)
      */
-    public static function translate(string $html, array $words): string
+    public static function translate(string $html, array $words, ?array $exact = null): string
     {
         if ($words === [] || $html === '') return $html;
-        $said = static function (string $raw) use ($words): ?string {
+        $said = static function (string $raw) use ($words, $exact): ?string {
             $key = self::keyOf(html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($exact !== null && ($key === null || !isset($exact[$key]) || self::sourceText($raw) !== $exact[$key]['source'])) return null;
             return $key !== null && isset($words[$key]) ? htmlspecialchars($words[$key], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null;
         };
         // Script and style bodies (and comments) are carried through as they are.

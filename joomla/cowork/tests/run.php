@@ -2201,6 +2201,7 @@ require __DIR__ . "/language-overrides.php";
 require __DIR__ . "/language-overrides-ranking.php";
 require __DIR__ . "/language-overrides-plugins-dates.php";
 require __DIR__ . "/language-overrides-literals.php";
+require __DIR__ . "/language-overrides-english-literals.php";
 require __DIR__ . "/language-overrides-english-pack.php";
 require __DIR__ . "/multilingual-contracts.php";
 require __DIR__ . "/showcase-nav.php";

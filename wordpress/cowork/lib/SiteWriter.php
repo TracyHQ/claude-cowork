@@ -59,7 +59,8 @@ interface SiteWriter
      * `usermeta` is an author's words a visitor reads, and nothing else of a user: the bio WordPress keeps and a theme's job
      * title or tagline (`AuthorMeta::visitorKey`), keyed by the user's id and the meta key. A person's account stays theirs.
      */
-    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'template', 'term', 'menuItem', 'usermeta'];
+    // An existing single-site author: only display_name, never account identity or ownership.
+    public const KINDS = ['post', 'postmeta', 'option', 'templatePart', 'template', 'term', 'menuItem', 'usermeta', 'author'];
 
     /**
      * The current state of one target, or null when nothing is there.

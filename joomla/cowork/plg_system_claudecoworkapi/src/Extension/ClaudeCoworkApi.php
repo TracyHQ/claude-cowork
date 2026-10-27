@@ -463,8 +463,9 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     }
 
     /**
-     * A site HTML page in a language other than en-GB: its layouts' literal words that the language's override file
-     * translates, said in that language (`PageLiterals::translate`). Any failure leaves the page as it was.
+     * A site HTML page: its layouts' literal words that the language's override file
+     * translates, said in that language (`PageLiterals::translate`). English requires exact-source provenance.
+     * Any failure leaves the page as it was.
      */
     private function translatePageLiterals(): void
     {
@@ -478,7 +479,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
                 return;
             }
             $tag = (string) $app->getLanguage()->getTag();
-            if ($tag === '' || $tag === 'en-GB' || preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag) !== 1) {
+            if ($tag === '' || preg_match('/^[a-z]{2,3}-[A-Z]{2,4}$/D', $tag) !== 1) {
                 return;
             }
             $file = JPATH_ROOT . '/language/overrides/' . $tag . '.override.ini';
@@ -486,11 +487,12 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
                 return;
             }
             EngineFactory::loadPageLiterals();
-            $words = \PageLiterals::fromOverrides(\LanguageOverrides::parse((string) file_get_contents($file)));
+            $overrides = \LanguageOverrides::parse((string) file_get_contents($file));
+            $words = $tag === 'en-GB' ? \PageLiterals::englishRules($overrides) : \PageLiterals::fromOverrides($overrides);
             if ($words === []) {
                 return;
             }
-            $this->rewriteBody(fn(string $body): string => \PageLiterals::translate($body, $words));
+            $this->rewriteBody(fn(string $body): string => $tag === 'en-GB' ? \PageLiterals::english($body, $overrides) : \PageLiterals::translate($body, $words));
         } catch (\Throwable $e) {
             // Words are never worth a page: the page keeps the layout's own.
             Log::add('claudecoworkapi page literals: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
