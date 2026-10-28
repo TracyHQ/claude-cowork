@@ -17,6 +17,7 @@ final class MysqliRowSource implements RowSource
     /** @var array<string,string[]> Key columns per table, for the same reason: the key does not
      *  change between two chunks of one dump, and SHOW KEYS is not free. */
     private array $keyCache = [];
+    private array $insertColumnCache = [];
 
     public function __construct(mysqli $db)
     {
@@ -189,13 +190,43 @@ final class MysqliRowSource implements RowSource
         return 'BIT_XOR(CAST(CONV(SUBSTRING(MD5(CONCAT_WS(0x1f, ' . implode(', ', $parts) . ')), 1, 16), 16, 10) AS UNSIGNED))';
     }
 
+    /** Explicit reads keep invisible columns and generated-column positions unambiguous. */
+    private function readColumns(string $table): array
+    {
+        if (isset($this->insertColumnCache[$table])) {
+            return $this->insertColumnCache[$table];
+        }
+        $res = $this->db->query('SHOW FULL COLUMNS FROM `' . str_replace('`', '``', $table) . '`');
+        $columns = [];
+        while ($row = $res->fetch_assoc()) {
+            if (!preg_match('/(?:VIRTUAL|STORED|PERSISTENT) GENERATED/i', (string) ($row['Extra'] ?? ''))) {
+                $columns[] = (string) $row['Field'];
+            }
+        }
+        return $this->insertColumnCache[$table] = $columns;
+    }
+
+    public function insertColumns(string $table): ?array
+    {
+        return $this->readColumns($table);
+    }
+
+    private function selectColumns(string $table, array $extra = []): string
+    {
+        $columns = array_values(array_unique(array_merge($this->readColumns($table), $extra)));
+        if ($columns === []) {
+            throw new RuntimeException("table `{$table}` has no writable columns");
+        }
+        return implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c) . '`', $columns));
+    }
+
     public function readRows(string $table, int $offset, int $limit): array
     {
         $t = $this->db->real_escape_string($table);
         // No ORDER BY and no cursor: the caller has asked for a position in a result set, and a
         // result set with no order does not have stable positions. Kept for callers that have no
         // key to page by; readRowsAfter() is what a live site is dumped with.
-        $res = $this->db->query("SELECT * FROM `{$t}` LIMIT {$limit} OFFSET {$offset}");
+        $res = $this->db->query("SELECT " . $this->selectColumns($table) . " FROM `{$t}` LIMIT {$limit} OFFSET {$offset}");
         $out = [];
         while ($row = $res->fetch_row()) {
             // mysqli hands back every column as string|null, which is exactly the shape a
@@ -274,7 +305,7 @@ final class MysqliRowSource implements RowSource
             $where = " WHERE ({$order}) > ({$values})";
         }
 
-        $res = $this->db->query("SELECT * FROM `{$t}`{$where} ORDER BY {$order} LIMIT {$limit}");
+        $res = $this->db->query("SELECT " . $this->selectColumns($table, $key) . " FROM `{$t}`{$where} ORDER BY {$order} LIMIT {$limit}");
         if (!$res) {
             throw new RuntimeException($this->db->error ?: 'read failed');
         }
@@ -296,7 +327,7 @@ final class MysqliRowSource implements RowSource
         $rows = [];
         $last = null;
         while ($row = $res->fetch_row()) {
-            $rows[] = $row;
+            $rows[] = array_slice($row, 0, count($this->readColumns($table)));
             $last = $row;
         }
         $next = null;

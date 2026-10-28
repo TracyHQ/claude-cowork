@@ -26,6 +26,9 @@ interface RowSource
     /** One table's CREATE TABLE statement (SHOW CREATE TABLE). */
     public function createStatement(string $table): string;
 
+    /** Writable columns in result order, or null for a positional INSERT. Generated columns are excluded. */
+    public function insertColumns(string $table): ?array;
+
     /** How many rows a table holds, which is what tells the caller when it is done. */
     public function rowCount(string $table): int;
 

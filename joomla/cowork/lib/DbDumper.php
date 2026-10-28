@@ -98,7 +98,7 @@ final class DbDumper
         $batch = $this->src->readRowsAfter($table, $after === null ? null : [(string) $after], $limit);
         $rows = $batch['rows'];
         $last = $batch['after'] === null ? null : (string) $batch['after'][0];
-        return ['sql' => SqlValue::insert($table, $rows), 'rows' => count($rows), 'last' => $last];
+        return ['sql' => SqlValue::insert($table, $rows, $this->src->insertColumns($table)), 'rows' => count($rows), 'last' => $last];
     }
 
     /**
@@ -160,7 +160,7 @@ final class DbDumper
         }
 
         $rows = $this->src->readRows($table, $offset, $limit);
-        $sql .= SqlValue::insert($table, $rows);
+        $sql .= SqlValue::insert($table, $rows, $this->src->insertColumns($table));
 
         $read = count($rows);
         $next = $offset + $read;
@@ -232,7 +232,7 @@ final class DbDumper
                 $read = $taken;
                 $limit = $taken;
             }
-            $sql .= SqlValue::insert($table, $rows);
+            $sql .= SqlValue::insert($table, $rows, $this->src->insertColumns($table));
             return [
                 'sql'         => $sql,
                 'next_cursor' => $this->encodeCursor(['o' => $offset + $read]),
@@ -254,7 +254,7 @@ final class DbDumper
         }
         $rows = $batch['rows'];
         $read = count($rows);
-        $sql .= SqlValue::insert($table, $rows);
+        $sql .= SqlValue::insert($table, $rows, $this->src->insertColumns($table));
 
         return [
             'sql' => $sql,
@@ -280,7 +280,7 @@ final class DbDumper
             return $count;
         }
         // 'INSERT INTO `t` VALUES ' + the tuples joined by ',' + ";\n", as SqlValue::insert writes it.
-        $bytes = strlen($sql) + strlen('INSERT INTO `' . str_replace('`', '``', $table) . '` VALUES ') + 2;
+        $bytes = strlen($sql) + strlen(SqlValue::insertPrefix($table, $this->src->insertColumns($table))) + 2;
         for ($i = 0; $i < $count - 1; $i++) {
             $bytes += strlen(SqlValue::rowTuple($rows[$i])) + ($i > 0 ? 1 : 0);
             if (!$more($bytes)) {

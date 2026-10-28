@@ -58,6 +58,7 @@ check(
     SqlValue::insert('jos_menu', [['1', 'a'], ['2', 'b']]),
     "INSERT INTO `jos_menu` VALUES ('1','a'),('2','b');\n"
 );
+check('explicit insert columns escape identifiers', SqlValue::insert('t', [['1', '3']], ['id', 'a`b']), "INSERT INTO `t` (`id`,`a``b`) VALUES ('1','3');\n");
 check('insert empty rows -> empty string', SqlValue::insert('t', []), '');
 check('table name with backtick escaped', SqlValue::insert('a`b', [['1']]), "INSERT INTO `a``b` VALUES ('1');\n");
 
