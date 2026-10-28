@@ -72,6 +72,10 @@ final class FatalGuard
      */
     public static function arm(): void
     {
+        // A notice PHP survives is not part of the answer: on a host that shows PHP's errors it was
+        // flushed ahead of the JSON with the buffer below, and the caller could not read the reply
+        // (PHP 8.5's curl_close() deprecation, 27/10/2026). It still reaches the PHP error log.
+        @ini_set('display_errors', '0');
         ob_start();
 
         register_shutdown_function(static function (): void {

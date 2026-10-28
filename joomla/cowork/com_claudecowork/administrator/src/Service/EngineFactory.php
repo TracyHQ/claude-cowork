@@ -336,9 +336,21 @@ final class EngineFactory
      * out, and `close()` so nothing downstream — a template, another plugin, an error page — gets
      * to append to what the caller will parse.
      */
+    /**
+     * The engine's answer is JSON and nothing else: a notice PHP survives (a site whose Global
+     * Configuration shows errors, a deprecation on a newer PHP) is printed ahead of the JSON and the
+     * caller can no longer read the reply — the import stopped on PHP 8.5's curl_close() deprecation,
+     * 27/10/2026. It still reaches the PHP error log.
+     */
+    private static function quietNotices(): void
+    {
+        @ini_set('display_errors', '0');
+    }
+
     /** The same authenticated reader at both doors; the site token is a service credential. */
     public static function answerContent($app, ?array $request = null): void
     {
+        self::quietNotices();
         self::loadEngine();
         require_once self::libDir() . '/ContentProjection.php';
         $app->setHeader('Content-Type', 'application/json; charset=utf-8', true);
@@ -377,6 +389,7 @@ final class EngineFactory
 
     public static function answer(CMSApplicationInterface $app): void
     {
+        self::quietNotices();
         self::loadEngine();
         // Before `build()`: the contract profile is decoded in the engine's constructor, and a
         // 43-language quickstart's lock is ~8 MB with ~6k ACL chains — more than PHP's default

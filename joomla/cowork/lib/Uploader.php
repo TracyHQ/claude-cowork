@@ -50,7 +50,11 @@ final class CurlUploader implements Uploader
         $err    = curl_error($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $hlen   = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        curl_close($ch);
+        // A no-op since PHP 8.0 and deprecated in 8.5, where a host that shows PHP's errors printed the
+        // notice ahead of the engine's JSON and the caller could no longer read the answer.
+        if (PHP_VERSION_ID < 80000) {
+            curl_close($ch);
+        }
 
         if ($errno !== 0) {
             return ['ok' => false, 'status' => $status, 'etag' => '', 'error' => "curl {$errno}: {$err}"];
