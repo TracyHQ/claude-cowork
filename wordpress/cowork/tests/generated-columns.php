@@ -50,3 +50,15 @@ foreach (['stored', 'virtual'] as $kind) {
         echo "ok - generated {$kind} {$mode} round trip\n";
     }
 }
+
+// With no writable column, the dump still has to carry the number of rows.
+$db->query('DROP TABLE IF EXISTS only_generated');
+$db->query('CREATE TABLE only_generated (value INT AS (1) VIRTUAL)');
+$db->query('INSERT INTO only_generated () VALUES (),(),()');
+$dumper = new DbDumper(new MysqliRowSource($db));
+$part = $dumper->dumpChunkFrom('only_generated', null, 10);
+$db->query('DROP TABLE only_generated');
+$db->multi_query($part['sql']);
+do { if ($result = $db->store_result()) $result->free(); } while ($db->more_results() && $db->next_result());
+if ($db->query('SELECT COUNT(*) FROM only_generated')->fetch_row()[0] !== '3') throw new RuntimeException('generated-only row count changed');
+echo "ok - generated-only table keeps every row\n";

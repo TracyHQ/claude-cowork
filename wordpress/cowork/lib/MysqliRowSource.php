@@ -215,7 +215,8 @@ final class MysqliRowSource implements RowSource
     {
         $columns = array_values(array_unique(array_merge($this->readColumns($table), $extra)));
         if ($columns === []) {
-            throw new RuntimeException("table `{$table}` has no writable columns");
+            // One sentinel per row preserves row counts for a table of generated columns only.
+            return '1';
         }
         return implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c) . '`', $columns));
     }
@@ -231,7 +232,7 @@ final class MysqliRowSource implements RowSource
         while ($row = $res->fetch_row()) {
             // mysqli hands back every column as string|null, which is exactly the shape a
             // dump needs: no type guessing, and NULL stays distinguishable from an empty string.
-            $out[] = $row;
+            $out[] = array_slice($row, 0, count($this->readColumns($table)));
         }
         return $out;
     }
