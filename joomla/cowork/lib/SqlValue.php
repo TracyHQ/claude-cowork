@@ -66,7 +66,7 @@ final class SqlValue
      * statement each: fewer bytes to move, and far fewer statements for MySQL to parse on import.
      * @param array<int,array<int,?string>> $rows
      */
-    public static function insert(string $table, array $rows): string
+    public static function insert(string $table, array $rows, ?array $columns = null): string
     {
         if (count($rows) === 0) {
             return '';
@@ -75,7 +75,15 @@ final class SqlValue
         foreach ($rows as $row) {
             $tuples[] = self::rowTuple($row);
         }
-        return 'INSERT INTO `' . str_replace('`', '``', $table) . '` VALUES '
-            . implode(',', $tuples) . ";\n";
+        return self::insertPrefix($table, $columns) . implode(',', $tuples) . ";\n";
     }
+    /** The same prefix is used for emission and chunk byte accounting. */
+    public static function insertPrefix(string $table, ?array $columns = null): string
+    {
+        $list = $columns === null ? '' : ' (' . implode(',', array_map(
+            fn($c) => '`' . str_replace('`', '``', $c) . '`', $columns
+        )) . ')';
+        return 'INSERT INTO `' . str_replace('`', '``', $table) . '`' . $list . ' VALUES ';
+    }
+
 }

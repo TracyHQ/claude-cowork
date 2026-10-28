@@ -48,6 +48,11 @@ final class FakeRowSource implements RowSource
         return $this->tables[$table]['create'] ?? '';
     }
 
+    public function insertColumns(string $table): ?array
+    {
+        return $this->tables[$table]['insertColumns'] ?? null;
+    }
+
     public function rowCount(string $table): int
     {
         return count($this->tables[$table]['rows'] ?? []);

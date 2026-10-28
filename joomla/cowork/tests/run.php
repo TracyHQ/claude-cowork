@@ -78,8 +78,17 @@ check(
     SqlValue::insert('jos_menu', [['1', 'a'], ['2', 'b']]),
     "INSERT INTO `jos_menu` VALUES ('1','a'),('2','b');\n"
 );
+check('explicit insert columns escape identifiers', SqlValue::insert('t', [['1', '3']], ['id', 'a`b']), "INSERT INTO `t` (`id`,`a``b`) VALUES ('1','3');\n");
 check('insert empty rows -> empty string', SqlValue::insert('t', []), '');
 check('table name with backtick escaped', SqlValue::insert('a`b', [['1']]), "INSERT INTO `a``b` VALUES ('1');\n");
+
+$generatedOnly = new DbDumper(new FakeRowSource(['generated_only' => [
+    'create' => 'CREATE TABLE generated_only (value INT AS (1) VIRTUAL)',
+    'rows' => [[], [], []], 'insertColumns' => [],
+]]));
+$generatedChunk = $generatedOnly->dumpChunkFrom('generated_only', null, 10);
+checkTrue('generated-only rows are emitted as empty writable tuples', strpos($generatedChunk['sql'], 'INSERT INTO `generated_only` () VALUES (),(),();') !== false);
+check('generated-only dump keeps its row count', $generatedChunk['rows'], 3);
 
 // round-trip vs Python unescape logic (spot check the same byte mapping)
 $raw = "quote:' backslash:\\ nul:\x00 nl:\n cr:\r sub:\x1a dq:\" plain";
