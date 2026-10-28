@@ -311,7 +311,7 @@ final class MysqliRowSource implements RowSource
         }
         // Which POSITIONS hold the key, resolved once per batch from the result's own metadata.
         // Resolving it from the result rather than from a second DESCRIBE keeps the two in step:
-        // whatever `SELECT *` returned is what is being indexed into.
+        // the explicit projection returned is what is being indexed into.
         $positions = [];
         foreach ($res->fetch_fields() as $index => $field) {
             $positions[$field->name] = $index;
