@@ -20,6 +20,25 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Reads and writes whole-unit HTML slots (a heading, sentence or list item the page cuts into pieces is one slot). Carries the ja-boxing/j6/1.0.8 content contract, the first on place-content-roles/3, whose Private Training email and phone have fields of their own.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.72</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.72</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.72/pkg_claudecowork-0.24.72.zip</downloadurl>
+        </downloads>
+        <sha256>0d1082492e32f86ab0e847bf6352c8f5a426edc9ad5d50819624ac9286d715a6</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Export generated-column tables safely for imports and Sync from live, preserving writable invisible columns and cursor paging.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
