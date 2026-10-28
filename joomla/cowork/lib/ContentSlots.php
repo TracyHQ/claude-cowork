@@ -23,6 +23,102 @@ final class ContentSlots
         }
         return $out;
     }
+    /**
+     * The elements Tracy's Joomla capture takes as one piece of text with `--whole-units`
+     * (capture-contract.py, UNIT_TAGS): a heading, a sentence, a list item, a caption, a cell, a button.
+     */
+    private const UNIT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'dt', 'dd', 'figcaption', 'summary', 'th', 'td', 'button', 'label'];
+    /** Python's `\s` on text, which the capture's sample collapses: ASCII whitespace, \x1c-\x1f, NEL, NBSP and the Unicode spaces. */
+    private const CAPTURE_SPACE = '/[\x{9}-\x{D}\x{1C}-\x{20}\x{85}\x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}]+/u';
+
+    /**
+     * What a slot's node holds, as the content map's sample spells it.
+     *
+     * A text node or attribute is its value, exactly as before. An element is a whole unit: capture
+     * cut it into the text slots htmlSlots() lists, then merged those into one slot on the element,
+     * its sample the pieces joined with one space, every whitespace run collapsed to one space,
+     * trimmed. The DOM's textContent is not that: `THE <br> WORKOUT` is `THE  WORKOUT` there and
+     * `THE WORKOUT` in the map, so an untouched slot read as changed by the owner.
+     */
+    public static function slotText(DOMNode $node): string
+    {
+        if (!($node instanceof DOMElement)) return (string) $node->nodeValue;
+        $pieces = array_map(static fn(DOMText $text): string => $text->data, self::unitPieces(new DOMXPath($node->ownerDocument), $node));
+        $joined = implode(' ', $pieces);
+        return trim(preg_replace(self::CAPTURE_SPACE, ' ', $joined) ?? $joined, ' ');
+    }
+
+    /**
+     * The text nodes capture merged into the unit `$unit`, in document order: the ones htmlSlots()
+     * lists (not blank, not inside script/style/svg/code, no Joomla directive) whose nearest unit
+     * element is `$unit` itself. Text inside a nested unit (a `<p>` in an `<li>`) is that unit's own.
+     * The root (`/html/body/div`) is a unit only when it holds no unit element, as capture decides.
+     *
+     * @return list<DOMText>
+     */
+    private static function unitPieces(DOMXPath $xp, DOMElement $unit): array
+    {
+        $out = [];
+        foreach ($xp->query('.//text()[normalize-space(.) != ""]', $unit) as $text) {
+            if ($xp->query('ancestor::script | ancestor::style | ancestor::svg | ancestor::code', $text)->length) continue;
+            if (IdentityTokens::hasDirective($text->nodeValue)) continue;
+            if (self::nearestUnitBelow($text, $unit)) continue;
+            $out[] = $text;
+        }
+        return $out;
+    }
+
+    /** Whether a unit element sits between `$node` and `$unit` (both excluded). */
+    private static function nearestUnitBelow(DOMNode $node, DOMElement $unit): bool
+    {
+        for ($up = $node->parentNode; $up !== null && !$up->isSameNode($unit); $up = $up->parentNode)
+            if ($up instanceof DOMElement && in_array(strtolower($up->nodeName), self::UNIT_TAGS, true)) return true;
+        return false;
+    }
+
+    /**
+     * Write a whole-unit slot: the unit's visible text becomes `$value`, one text node, and the element
+     * keeps its name and attributes.
+     *
+     * Inline markup inside the unit's text goes with that text. A whole-unit slot is the whole heading
+     * or sentence (TracyHQ/tracy#37, C1: "a title is never split into words that the build cannot
+     * rewrite as a whole"), and new words cannot be mapped back onto the demo's `<span>`, `<strong>`
+     * or `<br>`: the new text replaces the first piece, every other piece is removed, every `<br>` of
+     * the unit is removed, and an element left empty by that is removed with it (so `NO1 <span>boxing</span>`
+     * leaves no empty span). The leading space of the first piece and the trailing space of the last
+     * are kept, so an icon or a word beside the unit keeps its gap.
+     *
+     * What is NOT the unit's text stays, because removing it would break another slot or the page:
+     * an element that never held a piece (an icon `<i>`, an `<img>`, an `<svg>`), a nested unit and its
+     * text, script/style/code, a Joomla directive, and an element carrying href/src/alt/title, which
+     * htmlSlots() addresses as a slot of its own. So `Call <a href="tel:...">us</a> today` becomes
+     * `New text<a href="tel:..."></a>`: the link's url slot still resolves, its label is gone with
+     * the rest of the old sentence.
+     */
+    private static function writeUnit(DOMXPath $xp, DOMElement $unit, string $value): void
+    {
+        $doc = $unit->ownerDocument; $pieces = self::unitPieces($xp, $unit);
+        if ($pieces === []) { $unit->appendChild($doc->createTextNode($value)); return; }
+        $first = $pieces[0]; $last = $pieces[count($pieces) - 1];
+        preg_match('/^\s*/u', $first->data, $lead); preg_match('/\s*$/u', $last->data, $trail);
+        // The new text goes directly in the unit, where the child holding the first piece starts.
+        $anchor = $first; while (!$anchor->parentNode->isSameNode($unit)) $anchor = $anchor->parentNode;
+        $unit->insertBefore($doc->createTextNode($lead[0] . $value . $trail[0]), $anchor);
+        $held = [];
+        foreach ($pieces as $piece) {
+            for ($up = $piece->parentNode; !$up->isSameNode($unit); $up = $up->parentNode) $held[] = $up;
+            $piece->parentNode->removeChild($piece);
+        }
+        foreach ($xp->query('.//br', $unit) as $br) if (!self::nearestUnitBelow($br, $unit)) $br->parentNode->removeChild($br);
+        // Deepest first, so an emptied <em> inside an emptied <strong> lets the <strong> go too.
+        usort($held, static fn(DOMNode $a, DOMNode $b): int => substr_count($b->getNodePath(), '/') <=> substr_count($a->getNodePath(), '/'));
+        foreach ($held as $element) {
+            if ($element->parentNode === null) continue;
+            foreach (['href', 'src', 'alt', 'title'] as $slotAttr) if ($element->hasAttribute($slotAttr)) continue 2;
+            if (trim($element->textContent) === '' && !$xp->query('.//*', $element)->length) $element->parentNode->removeChild($element);
+        }
+    }
+
     public static function htmlPatch(string $html, array $changes): string
     {
         $doc = self::html($html); $xp = new DOMXPath($doc);
@@ -30,6 +126,7 @@ final class ContentSlots
             $nodes = $xp->query($change['xpath']);
             if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML slot is missing or ambiguous');
             $node = $nodes->item(0);
+            if ($node instanceof DOMElement) { self::writeUnit($xp, $node, (string) $change['value']); continue; }
             if (!($node instanceof DOMText) && !($node instanceof DOMAttr)) throw new RuntimeException('HTML slot is not a scalar');
             $value = $change['value'];
             // An attribute's value set from PHP is read as markup: `&` starts an entity reference, and

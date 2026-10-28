@@ -477,13 +477,13 @@ final class QuickstartContract
                 if(!is_string($value))throw new RuntimeException('Content slot is not text');
                 $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
                 if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
-                return $nodes->item(0)->nodeValue;
+                return ContentSlots::slotText($nodes->item(0));
             }
         }
         elseif(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
-            return $nodes->item(0)->nodeValue;
+            return ContentSlots::slotText($nodes->item(0));
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
         return $value;
