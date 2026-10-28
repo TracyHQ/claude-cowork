@@ -726,7 +726,10 @@ final class WordPressDerivedRows
             $body = curl_exec($handle);
             $code = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         } finally {
-            curl_close($handle);
+            // A no-op since PHP 8.0, deprecated in 8.5 (see Uploader).
+            if (PHP_VERSION_ID < 80000) {
+                curl_close($handle);
+            }
         }
         return is_string($body) ? ['code' => $code, 'body' => $body] : $none;
     }
