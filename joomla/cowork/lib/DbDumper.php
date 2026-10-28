@@ -70,6 +70,37 @@ final class DbDumper
         return $out;
     }
 
+    /** {@see RowSource::rangeChecksums}, for one table. @param string[] $skip @param int[] $starts */
+    public function rangeChecksums(string $table, array $skip, string $key, array $starts): ?array
+    {
+        return $this->src->rangeChecksums($table, $skip, $key, $starts);
+    }
+
+    /** The table's CREATE TABLE as a dump of it now would write it (without the `;`). */
+    public function createOf(string $table): string
+    {
+        return rtrim($this->src->createStatement($table));
+    }
+
+    /**
+     * The rows of a table keyed by ONE integer column, from the first key above `$after` (null: from
+     * the start), at most `$limit`, as INSERT statements: one range of rows a caller found moved
+     * ({@see rangeChecksums}), read again alone. `last` is the key of the last row answered (null
+     * when none), `rows` how many.
+     *
+     * @return array{sql:string, rows:int, last:?string}
+     */
+    public function rowsAfter(string $table, string $key, ?int $after, int $limit): array
+    {
+        if ($this->src->keyColumns($table) !== [$key]) {
+            throw new InvalidArgumentException("`{$key}` is not the one key column of `{$table}`");
+        }
+        $batch = $this->src->readRowsAfter($table, $after === null ? null : [(string) $after], $limit);
+        $rows = $batch['rows'];
+        $last = $batch['after'] === null ? null : (string) $batch['after'][0];
+        return ['sql' => SqlValue::insert($table, $rows), 'rows' => count($rows), 'last' => $last];
+    }
+
     /**
      * The substance checksum ({@see RowSource::substanceChecksum}) of every table named, one query
      * each, with the same columns left out of all of them so the values stay comparable.

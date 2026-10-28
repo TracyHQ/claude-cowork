@@ -122,6 +122,48 @@ final class FakeRowSource implements RowSource
         return $out;
     }
 
+    public function rangeChecksums(string $table, array $skip, string $key, array $starts): ?array
+    {
+        if (!isset($this->tables[$table])) {
+            return null;
+        }
+        $columns = $this->tables[$table]['columns'] ?? [];
+        $at = array_search($key, $columns, true);
+        if ($at === false) {
+            throw new RuntimeException("`{$key}` is not a column of `{$table}`");
+        }
+        $drop = array_map('strtolower', $skip);
+        $counts = array_fill(0, count($starts) + 1, 0);
+        $xors = array_fill(0, count($starts) + 1, 0);
+        foreach ($this->tables[$table]['rows'] ?? [] as $row) {
+            $values = array_values($row);
+            $k = (int) $values[$at];
+            // INTERVAL(): the number of starts at or below the key.
+            $range = 0;
+            foreach ($starts as $start) {
+                if ($k >= (int) $start) {
+                    $range++;
+                }
+            }
+            $kept = [];
+            foreach ($values as $i => $value) {
+                $name = $columns[$i] ?? "c{$i}";
+                if (!in_array(strtolower($name), $drop, true)) {
+                    $kept[] = $value === null ? 'N' : bin2hex((string) $value);
+                }
+            }
+            $counts[$range]++;
+            if ($kept !== []) {
+                $xors[$range] ^= hexdec(substr(md5(implode("\x1f", $kept)), 0, 12));
+            }
+        }
+        $out = [];
+        foreach ($counts as $i => $n) {
+            $out[] = $n . ':' . ($n === 0 ? 0 : $xors[$i]);
+        }
+        return $out;
+    }
+
     /**
      * The substance checksum in its real shape, "<rows>:<xor>", over the columns `$skip` leaves:
      * not MySQL's number, but it moves exactly when a kept column does. A table without `columns`
@@ -224,7 +266,10 @@ final class FakeRowSource implements RowSource
     {
         foreach ($a as $i => $value) {
             $other = $b[$i] ?? null;
-            $cmp = strcmp((string) $value, (string) $other);
+            // As MySQL orders an integer key: by value (10 after 9), not by its text.
+            $cmp = is_numeric($value) && is_numeric($other) && ctype_digit(ltrim((string) $value, '-')) && ctype_digit(ltrim((string) $other, '-'))
+                ? ((int) $value <=> (int) $other)
+                : strcmp((string) $value, (string) $other);
             if ($cmp !== 0) {
                 return $cmp;
             }
