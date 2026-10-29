@@ -114,6 +114,40 @@ final class DbDumper
     }
 
     /**
+     * A digest of each table's definition: its CREATE TABLE with the AUTO_INCREMENT counter left out
+     * (it moves with every insert), so a change of a column, an index, the charset or the collation
+     * reads as a changed table even when no row moved — which CHECKSUM TABLE never shows.
+     *
+     * @param string[] $tables
+     * @return array<string,?string> keyed by table, in the order given; null where it cannot be read
+     */
+    public function definitions(array $tables): array
+    {
+        $out = [];
+        foreach ($tables as $table) {
+            try {
+                $create = $this->src->createStatement($table);
+            } catch (Throwable $e) {
+                $create = '';
+            }
+            $out[$table] = $create === '' ? null : md5((string) preg_replace('/\sAUTO_INCREMENT=\d+/', '', $create));
+        }
+        return $out;
+    }
+
+    /**
+     * The database's triggers — name, table, event and timing — or null when this source cannot list
+     * them. A dump carries no trigger, so the caller says so rather than copying a site silently
+     * without them.
+     *
+     * @return list<array{name:string,table:string,event:string,timing:string}>|null
+     */
+    public function triggers(): ?array
+    {
+        return method_exists($this->src, 'triggers') ? $this->src->triggers() : null;
+    }
+
+    /**
      * The substance checksum ({@see RowSource::substanceChecksum}) of every table named, one query
      * each, with the same columns left out of all of them so the values stay comparable.
      *

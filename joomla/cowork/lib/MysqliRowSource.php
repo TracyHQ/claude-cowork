@@ -41,6 +41,25 @@ final class MysqliRowSource implements RowSource
         return $row['Create Table'] ?? '';
     }
 
+    /**
+     * The triggers of this database (information_schema.TRIGGERS), name, table, event and timing.
+     *
+     * @return list<array{name:string,table:string,event:string,timing:string}>
+     */
+    public function triggers(): array
+    {
+        $out = [];
+        $res = $this->db->query('SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE, EVENT_MANIPULATION, ACTION_TIMING'
+            . ' FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME');
+        if ($res === false) {
+            return $out;
+        }
+        while ($row = $res->fetch_row()) {
+            $out[] = ['name' => (string) $row[0], 'table' => (string) $row[1], 'event' => (string) $row[2], 'timing' => (string) $row[3]];
+        }
+        return $out;
+    }
+
     public function rowCount(string $table): int
     {
         if (!isset($this->countCache[$table])) {
