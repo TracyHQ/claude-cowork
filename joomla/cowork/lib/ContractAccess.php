@@ -13,7 +13,7 @@ final class ContractAccess {
             $seen=[];$chain=[];
             while($id) {
                 if(isset($seen[$id])||!isset($assets[$id]))throw new RuntimeException('Invalid ACL ancestry');
-                $seen[$id]=true;$row=$assets[$id];$rules=json_decode($row['rules'],true,512,JSON_THROW_ON_ERROR);
+                $seen[$id]=true;$row=$assets[$id];$rules=self::rules((string)$row['rules']);
                 if($rules)$chain[]=['name'=>$row['name'],'rules'=>$rules];
                 $id=(int)$row['parent_id'];
             }
@@ -26,9 +26,16 @@ final class ContractAccess {
             foreach($inventory[$table] as $row) {
                 if($table==='categories' && ($row['extension']??'')!=='com_content')continue;
                 $id=(int)($row['asset_id']??0);
+                // An asset_id naming no asset falls back to the component's asset, as Joomla's Access::getAssetRules does.
+                if($id && !isset($assets[$id]))$id=0;
                 $out['entityRules'][$table.'.'.$row['id']]=$chain($id?:($names[$component]??0));
             }
         }
         ksort($out['entityRules']);return $out;
+    }
+
+    /** An asset's rules column as Joomla reads it: an empty column is no rules (Access\Rules decodes '' to nothing). */
+    private static function rules(string $json): array {
+        return trim($json)===''?[]:json_decode($json,true,512,JSON_THROW_ON_ERROR);
     }
 }

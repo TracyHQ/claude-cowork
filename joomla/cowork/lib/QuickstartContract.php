@@ -1005,6 +1005,9 @@ final class QuickstartContract
             foreach($lists['module'] as $id=>$row)if(!isset($governed[(int)$id]) && self::designSystemModule($row))$counts['module']--;
         }
         $expectedCounts=$this->lock['inventoryCounts'];
+        // A kind the quickstart ships no row of is counted 0 by the capture and names no entity, so the walk
+        // above never lists it: zero rows of a kind is the same inventory as no such kind (JA Cagox j6, no fields).
+        foreach($expectedCounts as $kind=>$n)if((int)$n===0 && !isset($counts[$kind]))unset($expectedCounts[$kind]);
         foreach($languages as $locale=>$state) {
             // A taken edition's rows were already in the archive's count; only a copy adds one.
             if($this->multilingual && $this->multilingual->edition($locale))continue;
