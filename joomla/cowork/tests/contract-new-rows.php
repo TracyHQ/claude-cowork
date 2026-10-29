@@ -72,6 +72,14 @@ $nrWarnings = function () use ($nrWriter, $nrStore, $nrDir): array {
 $nrAcl = fn(array $warnings): array => array_values(array_filter($warnings, fn($w) => strpos($w, 'Access-level or ACL') === 0));
 check('new rows: the quickstart as shipped inspects clean', $nrWarnings(), []);
 
+// A kind the quickstart ships no row of: the capture counts it as 0 and names no entity of it, so the
+// site's walk never lists it. JA Cagox j6 1.0.2 has no custom field and warned "Quickstart inventory
+// changed" right after binding (29/10/2026). Zero rows of a kind is the same inventory as no such kind.
+$nrLock = json_decode(file_get_contents($nrDir . '/presentation-lock.json'), true);
+file_put_contents($nrDir . '/presentation-lock.json', json_encode(['inventoryCounts' => ['module' => 1, 'field' => 0]] + $nrLock));
+check('new rows: a kind the quickstart ships none of, counted as 0, inspects clean', $nrWarnings(), []);
+file_put_contents($nrDir . '/presentation-lock.json', json_encode($nrLock));
+
 // What content.update leaves behind: the module row, and the asset Table::store() mints under com_modules.
 $nrWriter->store['module'][255] = ['id' => '255', 'title' => 'Tracy design system', 'position' => 'header-r', 'ordering' => '0'] + $nrModule;
 $nrWriter->store['moduleAssignment'][255] = ['menuids' => '[0]'];

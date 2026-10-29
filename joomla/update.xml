@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>JA Cagox (Joomla 6, the first shop template) gets its content contract ja-cagox/j6/1.0.2: Tracy can build a customer site from it and edit its slots. Contract access reads an empty asset rules column as no rules and an asset_id that names no asset as the component's, as Joomla does.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.75</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.75</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.75/pkg_claudecowork-0.24.75.zip</downloadurl>
+        </downloads>
+        <sha256>26d16a664fc946be76af92f6c7a6c004d0441d7f87adaf10c3baa205158d9764</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Site fingerprint answers table definitions and triggers on request: Tracy's Sync from live brings a changed collation and names the triggers it does not copy.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
