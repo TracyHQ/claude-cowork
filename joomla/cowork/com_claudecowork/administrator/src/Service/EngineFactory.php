@@ -117,7 +117,7 @@ final class EngineFactory
         if ($derived !== null) {
             $writer = self::buildWriter();
             if (!$writer) return null;
-            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $db = self::database();
             // Built batch by batch, and kept between requests while the tables' fingerprint stands.
             $cache = JoomlaDerivedRows::siteCache($db, (string) self::installedVersion());
             return \QuickstartContract::derived($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT,
@@ -145,7 +145,7 @@ final class EngineFactory
         [$directory, $missing] = $valid ? self::ensureContract($configured) : [self::libDir() . '/contracts/unconfigured', null];
         $writer = self::buildWriter();
         if (!$writer) return null;
-        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        $db = self::database();
         return (new \QuickstartContract($writer, new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, $directory, $missing, self::libDir()))
             ->withFileProofs(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaFileProofStore($db));
     }
@@ -191,7 +191,7 @@ final class EngineFactory
     private static function derivedBinding(): ?array
     {
         try {
-            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $db = self::database();
             $raw = $db->setQuery('SELECT binding FROM #__claudecowork_content_contract WHERE id=1 AND LOCATE(' . $db->quote(self::DERIVED_MARK) . ', binding) > 0')->loadResult();
             $binding = $raw === null ? null : json_decode((string) $raw, true);
         } catch (\Throwable $e) {
@@ -276,14 +276,16 @@ final class EngineFactory
             self::buildDumper(),
             self::buildWalker($params),
             new \AutoUploader(120),
-            self::orNull('extensions', static fn() => new JoomlaExtensions()),
+            self::orNull('extensions', static fn() => new JoomlaExtensions(null, self::database())),
             self::buildWriter(),
             self::buildMedia(),
             self::buildLog(),
             // JPATH_ROOT and not the configured walker root: the stamp has to sit where the site
             // is SERVED from, because a preview reads it over HTTP as `/tracy-changed.json`.
             new \ChangeStamp(JPATH_ROOT),
-            self::orNull('coreUpgrader', static fn() => new JoomlaCoreUpgrader()),
+            // Joomla 3 has no com_joomlaupdate MVC to drive (`bootComponent`): `core.upgrade` answers
+            // 'unavailable' there rather than failing half way through an upgrade.
+            method_exists(Factory::class, 'getContainer') ? self::orNull('coreUpgrader', static fn() => new JoomlaCoreUpgrader()) : null,
             self::orNull('filesRestorer', static fn() => new JoomlaFilesRestorer()),
             $contract
         );
@@ -292,15 +294,19 @@ final class EngineFactory
         // the receipt's new revisions see the rows it just wrote.
         if ($contract) $engine->contentRevisions(static function () use ($contract): array {
             require_once self::libDir() . '/ContentProjection.php';
-            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => $contract, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->revisions();
+            return (new JoomlaContentReader(self::database(), static fn() => $contract, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->revisions();
         });
         // Every write refuses a row an administrator has open in the Joomla editor — on any site,
         // bound to a contract or not, since the admin's next Save would put the old words back.
         $engine->locks(static function (array $rows): array {
-            return (new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
+            return (new JoomlaContentReader(self::database(), static fn() => null, JPATH_ROOT, \Joomla\CMS\Uri\Uri::root()))->locks($rows);
         });
         // `site.identity`: Global Configuration's site name and site description, and no other key.
         $engine->siteIdentity(self::buildSiteIdentity());
+        // Joomla 3 drives no core upgrade (see the upgrader above): the answer says why.
+        if (!method_exists(Factory::class, 'getContainer')) {
+            $engine->coreUpgradeUnavailable('core upgrade is not available on Joomla 3: Tracy upgrades its own copy of the site, not the live site');
+        }
         // `template.siteSettings`: a template's logo, name, slogan and favicon, in its etc/site profiles.
         $engine->templateSiteSettings(self::buildTemplateSiteSettings());
         // `template.languageOverrides`: the site's language override files, for the strings that read in en-GB.
@@ -313,7 +319,7 @@ final class EngineFactory
         if ($contract === '' && $baseline !== null) $engine->underConstruction($baseline);
         // `content.contract derive`: this site's public rows, and its rendered pages over loopback.
         try {
-            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $db = self::database();
             // Params naming a quickstart contract (a provision whose bind is still to come) refuse derive while unbound.
             // The rows as a generator of batches, read while the map is built; it returns its own unresolved lines.
             $engine->derivedSource(new \Tracy\Component\ClaudeCowork\Site\Controller\JoomlaContractStore($db), JPATH_ROOT, static function () use ($db): array {
@@ -377,7 +383,7 @@ final class EngineFactory
             $principal=hash_hmac('sha256',$principal.':'.$scope,$configured);
             \Door::reserveMemory();
             \Door::reserveTime();
-            $reader=new JoomlaContentReader(Factory::getContainer()->get(DatabaseInterface::class),static fn()=>self::buildContract(),JPATH_ROOT,\Joomla\CMS\Uri\Uri::root());
+            $reader=new JoomlaContentReader(self::database(),static fn()=>self::buildContract(),JPATH_ROOT,\Joomla\CMS\Uri\Uri::root());
             $result=$reader->read($query,$principal);
         } catch (\ContentReadError $e) { $status=$e->status; $result=$e->body(); }
         catch (\Throwable $e) { self::logFailure('content.read',$e); $status=503; $result=['error'=>['code'=>'CONTENT_SOURCE_UNAVAILABLE','message'=>'Content source or binding could not be read']]; }
@@ -419,6 +425,27 @@ final class EngineFactory
     }
 
     /**
+     * The site's database, the one handle every collaborator below is given. Joomla 4+ hands it out
+     * of its DI container. Joomla 3 has no container: there it is `Factory::getDbo()` in the Joomla 4
+     * shape (`legacy/LegacyDatabase.php`: `bind()` and the three-argument `join()`), so
+     * Joomla 3 runs this same wiring and the same writer, log and extension manager — not a copy.
+     *
+     * @return DatabaseInterface
+     */
+    public static function database()
+    {
+        if (method_exists(Factory::class, 'getContainer')) {
+            return Factory::getContainer()->get(DatabaseInterface::class);
+        }
+        require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/legacy/LegacyDatabase.php';
+        $db = \ClaudeCoworkLegacyDatabase::of(Factory::getDbo());
+        if ($db === null) {
+            throw new \RuntimeException('only the mysqli database driver is wired on Joomla 3');
+        }
+        return $db;
+    }
+
+    /**
      * A collaborator from the site folder (`site/src/Controller`), or null — logged — when it cannot
      * be built, like every builder below. The administrator door is the way in when the front end is
      * broken, so it has to answer without that folder: what needs it answers 'unavailable', and the
@@ -443,7 +470,7 @@ final class EngineFactory
     private static function buildDumper(): ?\DbDumper
     {
         try {
-            $driver = Factory::getContainer()->get(DatabaseInterface::class)->getConnection();
+            $driver = self::database()->getConnection();
         } catch (\Throwable $e) {
             self::logFailure('buildDumper', $e);
             return null;
@@ -458,7 +485,7 @@ final class EngineFactory
     private static function dbPrefix(): ?string
     {
         try {
-            return (string) Factory::getContainer()->get(DatabaseInterface::class)->getPrefix();
+            return (string) self::database()->getPrefix();
         } catch (\Throwable $e) {
             self::logFailure('dbPrefix', $e);
             return null;
@@ -479,14 +506,14 @@ final class EngineFactory
     }
 
     /**
-     * The write side of an Apply, wired only on Joomla 4+. A site whose database cannot be reached
+     * The write side of an Apply, on Joomla 3 to 6 alike. A site whose database cannot be reached
      * leaves `content.update` reporting 'unavailable', the same honest result the read side gives
      * — never a fatal.
      */
     private static function buildWriter(): ?\SiteWriter
     {
         try {
-            return new JoomlaSiteWriter(Factory::getContainer()->get(DatabaseInterface::class));
+            return new JoomlaSiteWriter(self::database());
         } catch (\Throwable $e) {
             self::logFailure('buildWriter', $e);
             return null;
@@ -536,7 +563,7 @@ final class EngineFactory
     private static function buildTemplateSiteSettings(): ?\TemplateSiteFiles
     {
         try {
-            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $db = self::database();
             return new \TemplateSiteFiles(JPATH_ROOT, static function (string $template) use ($db): array {
                 $query = $db->getQuery(true)
                     ->select($db->quoteName('params'))
@@ -568,7 +595,7 @@ final class EngineFactory
     private static function buildTemplateFiles($params): ?\TemplateFiles
     {
         try {
-            $db = Factory::getContainer()->get(DatabaseInterface::class);
+            $db = self::database();
             return (new \TemplateFiles(JPATH_ROOT, static function () use ($db): array {
                 $query = $db->getQuery(true)
                     ->select($db->quoteName('element'))
@@ -627,7 +654,7 @@ final class EngineFactory
     private static function buildLog(): ?\ApplyLog
     {
         try {
-            return new JoomlaApplyLog(Factory::getContainer()->get(DatabaseInterface::class));
+            return new JoomlaApplyLog(self::database());
         } catch (\Throwable $e) {
             self::logFailure('buildLog', $e);
             return null;

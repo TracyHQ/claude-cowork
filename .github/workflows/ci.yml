@@ -108,6 +108,27 @@ jobs:
         run: php tests/run.php
         working-directory: joomla/cowork
 
+  # Older still: the files Joomla parses before the PHP check (7.4 is the engine's floor). Joomla 3
+  # runs on PHP 5.3.10 and up and parses these on any of them — the installer shell, the floor, the
+  # door and component entries — so a PHP 7 construct in one of them was a parse error where a sentence
+  # was owed (0.24.72 on PHP 7.3: "syntax error, unexpected '?'" at install). 5.6 is the oldest PHP
+  # this action sets up; tests/php-floor.php holds the same files to PHP 5.3 by token.
+  php56-entry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '5.6'
+
+      - name: Lint the files an old PHP parses before the check
+        working-directory: joomla/cowork
+        run: |
+          for f in script.php com_claudecowork/administrator/legacy/PhpFloor.php plg_system_claudecoworkapi/claudecoworkapi.php \
+            com_claudecowork/site/controllers/api.php com_claudecowork/site/controllers/api.json.php \
+            com_claudecowork/site/claudecowork.php com_claudecowork/site/controller.php; do php -l "$f"; done
+
   # The look a Tracy site is built in: one Joomla template and one WordPress theme, each mirrored
   # here from the repository that generates them. Nothing is compiled here, so the job asks the two
   # questions a mirror can still get wrong — does every PHP file parse, and does the zip assemble

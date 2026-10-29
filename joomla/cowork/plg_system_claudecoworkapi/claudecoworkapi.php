@@ -24,6 +24,9 @@ use Joomla\CMS\Plugin\CMSPlugin;
  * Only the door is answered here, at `onAfterInitialise` on both clients, through the component's
  * Joomla 3 wiring (`administrator/legacy/LegacyDoor.php`, the same one `controllers/api.php` uses).
  * Render stamps, favicons and the rest of `src/Extension/ClaudeCoworkApi` are Joomla 4+ only.
+ *
+ * Joomla 3 parses this file on every request, on any PHP from 5.3.10: it is written for PHP 5.3, and
+ * asks `legacy/PhpFloor.php` (PHP 5.3 too) before it loads anything else of the component.
  */
 class PlgSystemClaudecoworkapi extends CMSPlugin
 {
@@ -31,11 +34,24 @@ class PlgSystemClaudecoworkapi extends CMSPlugin
     {
         try {
             // A site that removed the component and kept the plugin must not fatal.
-            $door = JPATH_ADMINISTRATOR . '/components/com_claudecowork/legacy/LegacyDoor.php';
-            if (!is_file($door)) {
+            $component = JPATH_ADMINISTRATOR . '/components/com_claudecowork';
+            if (!is_file($component . '/legacy/LegacyDoor.php')) {
                 return;
             }
-            require_once $door;
+            // The PHP first, before any other file of the component is parsed: this runs on every page,
+            // and on PHP 5 a file that does not parse is a fatal error no catch sees. On a PHP too old
+            // for the engine the door answers php_too_old and every page is left alone.
+            if (is_file($component . '/legacy/PhpFloor.php')) {
+                require_once $component . '/legacy/PhpFloor.php';
+                if (ClaudeCoworkPhpFloor::tooOld()) {
+                    $input = Factory::getApplication()->input;
+                    if (ClaudeCoworkPhpFloor::wants($input->get('option', null, 'raw'), $input->get('task', null, 'raw'))) {
+                        ClaudeCoworkPhpFloor::answer(Factory::getApplication());
+                    }
+                    return;
+                }
+            }
+            require_once $component . '/legacy/LegacyDoor.php';
             if (!ClaudeCoworkLegacyDoor::installed() || !ClaudeCoworkLegacyDoor::wanted(Factory::getApplication()->input)) {
                 return;
             }
@@ -43,6 +59,9 @@ class PlgSystemClaudecoworkapi extends CMSPlugin
         } catch (\Throwable $e) {
             // Never let this take a page down: the request carries on to Joomla as if this plugin
             // did not exist, and the component's own controller may still answer it.
+            Log::add('claudecoworkapi: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        } catch (Exception $e) {
+            // The same on PHP 5, which has no Throwable.
             Log::add('claudecoworkapi: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }

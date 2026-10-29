@@ -36,9 +36,19 @@ final class JoomlaExtensions implements \ExtensionManager
     /** @var bool|null null: curl when PHP has it. A test passes false to take the stream copy. */
     private $useCurl;
 
-    public function __construct(?bool $useCurl = null)
+    /** @var DatabaseInterface|null The site's database as EngineFactory hands it out; null: Joomla's container. */
+    private $db;
+
+    public function __construct(?bool $useCurl = null, ?DatabaseInterface $db = null)
     {
         $this->useCurl = $useCurl;
+        $this->db = $db;
+    }
+
+    /** The database given, else the container's — Joomla 3 has no container, and EngineFactory gives it one. */
+    private function db()
+    {
+        return $this->db ?? Factory::getContainer()->get(DatabaseInterface::class);
     }
 
     /** lib/ is plain PHP outside the PSR-4 map, required from where EngineFactory requires it. */
@@ -68,7 +78,7 @@ final class JoomlaExtensions implements \ExtensionManager
      */
     public function setEnabled(string $type, string $element, ?string $folder, bool $enabled): array
     {
-        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        $db = $this->db();
 
         $where = [
             $db->quoteName('type') . ' = :type',
@@ -186,7 +196,8 @@ final class JoomlaExtensions implements \ExtensionManager
             // explicitly so this works across generations. `Installer::getInstance()` would do the
             // same on 4, but the shared instance it hands back is not database-aware on 6 either.
             $installer = new Installer();
-            $installer->setDatabase(Factory::getContainer()->get(DatabaseInterface::class));
+            // Joomla 3's Installer has no setDatabase(): it takes Joomla's own connection by itself.
+            if (method_exists($installer, 'setDatabase')) $installer->setDatabase($this->db());
             $installed = $installer->install($package['dir']);
             if (!$installed) {
                 $message = (string) $installer->getError();
@@ -209,7 +220,7 @@ final class JoomlaExtensions implements \ExtensionManager
 
     public function listInstalled(): array
     {
-        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        $db = $this->db();
         $query = $db->getQuery(true)
             ->select($db->quoteName(
                 ['name', 'type', 'element', 'folder', 'package_id', 'manifest_cache', 'enabled']
@@ -247,7 +258,7 @@ final class JoomlaExtensions implements \ExtensionManager
 
     public function coreManifest(): array
     {
-        $db = Factory::getContainer()->get(DatabaseInterface::class);
+        $db = $this->db();
 
         // Joomla 4 added `locked` as the honest core marker; `protected` had drifted into
         // "cannot be disabled" and on upgraded sites disagrees with reality row by row.
@@ -260,7 +271,7 @@ final class JoomlaExtensions implements \ExtensionManager
                 ->from($db->quoteName('#__extensions'));
             $rows = $db->setQuery($query)->loadAssocList() ?: [];
             $coreOf = static fn(array $row): bool => (int) ($row['locked'] ?? 0) === 1;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $query = $db->getQuery(true)
                 ->select($db->quoteName(['type', 'element', 'folder', 'enabled', 'manifest_cache', 'protected']))
                 ->from($db->quoteName('#__extensions'));

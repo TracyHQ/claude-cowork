@@ -25,7 +25,7 @@ final class JoomlaFilesRestorer implements \FilesRestorer
 {
     public function restore(string $getUrl): array
     {
-        $tmp     = \rtrim((string) Factory::getApplication()->getConfig()->get('tmp_path'), '/');
+        $tmp     = \rtrim((string) Factory::getApplication()->get('tmp_path'), '/');
         $tarPath = $tmp . '/cowork-restore-' . \bin2hex(\random_bytes(6)) . '.tar';
 
         try {

@@ -8,32 +8,30 @@
 
 \defined('_JEXEC') or die;
 
-use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
 
 /**
- * The Joomla 3 twin of `src/Service/EngineFactory` — the engine wired the way Joomla 3 allows, for
- * both places that answer the door there: the site's `controllers/api.php`, reached after routing,
- * and the legacy entry of `plg_system_claudecoworkapi`, reached at `onAfterInitialise` on the site
- * and the administrator alike.
+ * The Joomla 3 way in to the engine, for both places that answer the door there: the site's
+ * `controllers/api.php`, reached after routing, and the legacy entry of `plg_system_claudecoworkapi`,
+ * reached at `onAfterInitialise` on the site and the administrator alike.
  *
- * It lives on the administrator side for the same reason `EngineFactory` does: the administrator
- * door has to answer on a site whose `components/com_claudecowork` is gone or broken, and a wiring
- * kept in the site folder would go with it.
+ * It lives on the administrator side for the same reason `src/Service/EngineFactory` does: the
+ * administrator door has to answer on a site whose `components/com_claudecowork` is gone or broken,
+ * and a wiring kept in the site folder would go with it.
  *
- * Two differences from the Joomla 4 wiring, both forced by the platform:
+ * Joomla 3 is supported as Joomla 4–6 are, reads and writes alike: this class only does what Joomla 3
+ * cannot do for itself and then hands over to the SAME `EngineFactory::build()` the Joomla 4+ door
+ * uses, so both generations answer every action with the same collaborators.
  *
- * - The database connection comes from `Factory::getDbo()`, not the DI container Joomla 3 does
- *   not have.
- * - The extension installer AND the write side (SiteWriter, MediaWriter, ApplyLog) are left out
- *   (`null`), so `extension.install`, `content.update` and `media.upload` answer 'unavailable'
- *   here. Those actions are for the live sites Tracy manages on current Joomla; a Joomla 3 site
- *   is almost always one being read to be migrated OFF, where the actions that matter are the
- *   reads — the database and the files. Wiring Joomla 3's older APIs for a case that does not
- *   arise would be code to carry for no one.
+ * - The component's `src/` namespaces are registered here: Joomla 3 never reads the manifest's
+ *   `<namespace>`.
+ * - The database is `Factory::getDbo()` in the Joomla 4 shape (`LegacyDatabase.php`, through
+ *   `EngineFactory::database()`).
+ * - PHP 8's `str_starts_with`, `str_contains`, `str_ends_with` and `array_is_list`, which the
+ *   `src/` classes call and Joomla 4 ships polyfills for, are defined when PHP lacks them.
+ * - The request is read off `$app->input`; Joomla 3 has no `getInput()`.
  *
- * The engine itself (`lib/`) is byte-identical to the Joomla 4 path: the value is shared, only
- * this thin Joomla-facing shell is doubled.
+ * The one action Joomla 3 does not get is `core.upgrade` (EngineFactory says why).
  */
 final class ClaudeCoworkLegacyDoor
 {
@@ -57,101 +55,63 @@ final class ClaudeCoworkLegacyDoor
     /** Reads one request off the application, answers it, and ends the response. */
     public static function answer()
     {
-        $lib = self::libDir();
-
-        foreach (['SqlValue', 'RowSource', 'DbDumper', 'FileWalker', 'TarStream', 'Uploader', 'Extensions', 'SiteWriter', 'Token', 'Engine', 'MysqliRowSource'] as $class) {
-            require_once $lib . '/' . $class . '.php';
+        // Before anything of the engine is loaded: on a PHP too old for it, it does not parse.
+        require_once __DIR__ . '/PhpFloor.php';
+        if (\ClaudeCoworkPhpFloor::tooOld()) {
+            \ClaudeCoworkPhpFloor::answer(Factory::getApplication());
+            return;
         }
+        self::prepare();
+        @ini_set('display_errors', '0');
 
-        $app    = Factory::getApplication();
-        $params = ComponentHelper::getParams('com_claudecowork');
+        $engineFactory = '\\Tracy\\Component\\ClaudeCowork\\Administrator\\Service\\EngineFactory';
+        $engineFactory::loadEngine();
+        \Door::reserveMemory();
+        \Door::reserveTime();
 
+        $app     = Factory::getApplication();
         $request = json_decode((string) $app->input->json->getRaw(), true);
 
         if (!\is_array($request)) {
             $request = [];
         }
 
-        $token = trim((string) $params->get('token', ''));
+        if (($request['action'] ?? null) === 'content.read') {
+            $engineFactory::answerContent($app, $request);
+            return;
+        }
 
-        $engine = new \Engine(
-            $token === '' ? null : $token,
-            [
-                'php'       => PHP_VERSION,
-                'joomla'    => \defined('JVERSION') ? JVERSION : null,
-                'component' => self::installedVersion(),
-                'upload'    => \AutoUploader::capability(),
-                'db_prefix' => self::dbPrefix(),
-            ],
-            self::buildDumper(),
-            self::buildWalker($params),
-            new \AutoUploader(120),
-            null
-        );
+        echo \Timing::body($request, static function () use ($app, $request, $engineFactory) {
+            $t = \Timing::begin();
+            $engine = $engineFactory::build();
+            \Timing::end('boot', $t);
 
-        $app->setHeader('Content-Type', 'application/json', true);
-        $app->sendHeaders();
-        echo json_encode($engine->handle($request));
+            $app->setHeader('Content-Type', 'application/json', true);
+            $app->sendHeaders();
+            return $engine->handle($request);
+        });
         $app->close();
+    }
+
+    /** What Joomla 3 does not do for the `src/` classes: their namespaces, and PHP 8's functions. */
+    private static function prepare()
+    {
+        // Only a folder that is there: Joomla 3's loader throws for one that is not, and the site folder
+        // may be gone (the administrator door answers without it, its writes `unavailable`).
+        $namespaces = [
+            'Tracy\\Component\\ClaudeCowork\\Administrator' => JPATH_ADMINISTRATOR . '/components/com_claudecowork/src',
+            'Tracy\\Component\\ClaudeCowork\\Site'          => JPATH_SITE . '/components/com_claudecowork/src',
+        ];
+        foreach ($namespaces as $namespace => $path) {
+            if (is_dir($path)) {
+                \JLoader::registerNamespace($namespace, $path, false, false, 'psr4');
+            }
+        }
+        require_once __DIR__ . '/LegacyPolyfills.php';
     }
 
     private static function libDir()
     {
         return JPATH_ADMINISTRATOR . '/components/com_claudecowork/lib';
-    }
-
-    /** Reads through the connection Joomla already opened. `Factory::getDbo()` because Joomla 3
-     *  has no DI container to ask; the engine never sees credentials either way. */
-    private static function buildDumper()
-    {
-        try {
-            $driver = Factory::getDbo()->getConnection();
-        } catch (\Throwable $e) {
-            return null;
-        }
-
-        return $driver instanceof \mysqli ? new \DbDumper(new \MysqliRowSource($driver)) : null;
-    }
-
-    /** The database driver's table prefix (`#__`), so a caller can pick this site's tables. */
-    private static function dbPrefix()
-    {
-        try {
-            return (string) Factory::getDbo()->getPrefix();
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    /** An unreadable webroot leaves `files.*` reporting 'unavailable', not fatal. */
-    private static function buildWalker($params)
-    {
-        $configured = trim((string) $params->get('webroot', ''));
-
-        try {
-            return new \FileWalker($configured !== '' ? $configured : JPATH_ROOT);
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    /** This component's own version, from the manifest Joomla copied in when it installed. */
-    private static function installedVersion()
-    {
-        $manifest = JPATH_ADMINISTRATOR . '/components/com_claudecowork/claudecowork.xml';
-
-        if (!is_file($manifest)) {
-            return null;
-        }
-
-        $xml = @simplexml_load_file($manifest);
-
-        if ($xml === false) {
-            return null;
-        }
-
-        $version = trim((string) $xml->version);
-
-        return $version === '' ? null : $version;
     }
 }

@@ -7,8 +7,9 @@ echo "\nUpdate receipt\n";
 
 if (!defined('_JEXEC')) define('_JEXEC', 1);
 require_once __DIR__ . '/../script.php';
+require_once __DIR__ . '/../script-install.php';
 
-$R = 'pkg_claudecoworkInstallerScript';
+$R = 'pkg_claudecoworkInstallerSteps';
 $updaterFrame = 'Tracy\\Plugin\\System\\ClaudeCoworkUpdate\\Extension\\ClaudeCoworkUpdate::install';
 $someFrames = ['Joomla\\CMS\\Installer\\Installer::install', 'Joomla\\CMS\\Installer\\Adapter\\PackageAdapter::install'];
 
@@ -107,7 +108,8 @@ check('receipt: no apply_id is a door context without one', $ctxExt->seen, ['tri
 // The package carries the script, and the component carries the manifest the receipt hashes.
 $pkgXml = simplexml_load_file(__DIR__ . '/../pkg_claudecowork.xml');
 check('receipt: the package names its installer script', trim((string) $pkgXml->scriptfile), 'script.php');
-checkTrue('receipt: build.sh puts it in the package', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'cp script.php build/'));
+// script.php is the PHP 5.3 shell that checks the PHP; script-install.php the steps it hands over to.
+checkTrue('receipt: build.sh puts it in the package, with the steps it loads', str_contains(file_get_contents(__DIR__ . '/../build.sh'), 'cp script.php script-install.php build/'));
 $comXml = file_get_contents(__DIR__ . '/../com_claudecowork/claudecowork.xml');
 checkTrue('release manifest: the component installs it', str_contains($comXml, '<filename>tracy-release.json</filename>'));
 check('release manifest: where the receipt looks for it', $R::MANIFEST, 'administrator/components/com_claudecowork/tracy-release.json');

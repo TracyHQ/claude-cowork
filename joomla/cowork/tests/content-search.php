@@ -885,9 +885,13 @@ namespace {
         return $names[1];
     };
     $csFactoryList = $csListOf(__DIR__ . '/../com_claudecowork/administrator/src/Service/EngineFactory.php', 'function loadEngine');
-    $csLegacyList = $csListOf(__DIR__ . '/../com_claudecowork/administrator/legacy/LegacyDoor.php', 'function answer');
-    checkTrue('loading: the lists were read from the source', in_array('SiteWriter', $csFactoryList, true) && in_array('Engine', $csFactoryList, true)
-        && in_array('SiteWriter', $csLegacyList, true) && in_array('Engine', $csLegacyList, true));
+    checkTrue('loading: the list was read from the source', in_array('SiteWriter', $csFactoryList, true) && in_array('Engine', $csFactoryList, true));
+    // Since 0.24.73 the Joomla 3 door keeps no list of its own: it loads the engine through the same
+    // EngineFactory::loadEngine(), and builds it with the same EngineFactory::build().
+    $csLegacy = (string) file_get_contents(__DIR__ . '/../com_claudecowork/administrator/legacy/LegacyDoor.php');
+    checkTrue('loading: the Joomla 3 door loads and builds the engine through EngineFactory, as Joomla 4+ does',
+        strpos($csLegacy, '$engineFactory::loadEngine()') !== false && strpos($csLegacy, '$engineFactory::build()') !== false
+        && !preg_match('/foreach \(\[.*?\] as \$class\)/s', $csLegacy));
 
     // $normalizer says what the fresh PHP is made to hold:
     //   'as-is'    — nothing changed: the PHP's own Normalizer, or none where there is no intl;
@@ -960,6 +964,6 @@ PHP;
         check("loading: {$csWhat} there is no usable Normalizer", $csBare['usable'] ?? $csBare, false);
         check("loading: {$csWhat} search still answers, the needle as it came and matched as it came", $csBare['answer'] ?? ['probe' => $csBare], $csWantEcho + ['items' => [['id' => 1, 'title' => $csNfc]]]);
     }
-    $csOld = $csProbe($csLegacyList, false, 'as-is');
-    check('loading: the Joomla 3 door loads the same files and refuses a search with no writer', [$csOld['answer']['ok'] ?? $csOld, $csOld['answer']['error'] ?? null], [false, 'unavailable']);
+    $csOld = $csProbe($csFactoryList, false, 'as-is');
+    check('loading: with no writer wired a search is refused as unavailable', [$csOld['answer']['ok'] ?? $csOld, $csOld['answer']['error'] ?? null], [false, 'unavailable']);
 }
