@@ -284,3 +284,20 @@ rmdir($brTheme . '/templates');
 rmdir($brTheme . '/parts');
 rmdir($brTheme);
 WP_Fake::reset();
+
+// ── expected: every field a write changes, held to the value the caller read (#121) ──────────────
+
+WP_Fake::$posts[90] = ['ID' => 90, 'post_type' => 'post', 'post_title' => 'Hello', 'post_status' => 'publish', 'post_content' => '<p>Body</p>'];
+$exRead = $br('content.get', ['id' => 90]);
+$exTitle = $exRead['item']['post_title'] ?? null;
+check('content.get answers the title a write is held to', $exTitle, 'Hello');
+$exOk = $br('content.update', ['kind' => 'post', 'apply_id' => 'ex-1', 'id' => 90, 'fields' => ['post_title' => 'Hello from Tracy'], 'expected' => ['post_title' => 'Hello']]);
+check('a write whose expected title is the one the site holds goes', [$exOk['ok'] ?? null, WP_Fake::$posts[90]['post_title']], [true, 'Hello from Tracy']);
+// The customer renames it in wp-admin between the read and the write.
+WP_Fake::$posts[90]['post_title'] = 'Customer title in the gap';
+$exStale = $br('content.update', ['kind' => 'post', 'apply_id' => 'ex-2', 'id' => 90, 'fields' => ['post_title' => 'Tracy again'], 'expected' => ['post_title' => 'Hello from Tracy']]);
+check('a title changed since the read is refused as revision_stale, naming the field', [$exStale['ok'] ?? null, $exStale['error'] ?? null, $exStale['fields'] ?? null], [false, 'revision_stale', ['post_title']]);
+check('and nothing was written over the customer\'s title', WP_Fake::$posts[90]['post_title'], 'Customer title in the gap');
+check('no expected at all writes as before', $br('content.update', ['kind' => 'post', 'apply_id' => 'ex-3', 'id' => 90, 'fields' => ['post_title' => 'Plain']])['ok'] ?? null, true);
+check('expected that is no object is a bad call', $br('content.update', ['kind' => 'post', 'apply_id' => 'ex-4', 'id' => 90, 'fields' => ['post_title' => 'X'], 'expected' => 'Plain'])['error'] ?? null, 'bad_params');
+check('a list compares by its members, whatever their order', $br('content.update', ['kind' => 'post', 'apply_id' => 'ex-5', 'id' => 90, 'fields' => ['post_title' => 'Listed'], 'expected' => ['post_title' => 'Plain', 'missing_field' => null]])['ok'] ?? null, true);

@@ -4748,6 +4748,19 @@ final class Engine
                 return $stale;
             }
         }
+        // `expected`: the value each field must still hold, as content.get answered it. A person can
+        // change a title in wp-admin between the caller's read and this write (Sync to live, #121 of
+        // TracyHQ/tracy); compared here, on the record just read, the write is refused instead of
+        // putting the caller's value over theirs.
+        if (array_key_exists('expected', $p)) {
+            if (!is_array($p['expected'])) {
+                return $this->err('bad_params', 'expected must be an object: each field and the value content.get answered for it');
+            }
+            $stale = $this->staleFields($kind, $id, $key, $before, $p['expected']);
+            if ($stale !== null) {
+                return $stale;
+            }
+        }
         // A post write's `seo`, featured image and page template land in post meta beside the row,
         // which the row's undo cannot reach. Each meta key the write will change is read now and
         // recorded below as its own postmeta step (the value before, or absent), so apply.revert puts
@@ -4969,6 +4982,67 @@ final class Engine
      * @param array<string,mixed>|null $before The record as read for this write.
      * @return array<string,mixed>|null
      */
+    /**
+     * `expected` of content.update: null when every field still holds the value given, else the
+     * `revision_stale` refusal naming the fields that moved (`fields`) — the code a body that moved
+     * answers too, so a caller that knows only that one reads it as "changed on the site".
+     */
+    private function staleFields(string $kind, int $id, string $key, ?array $before, array $expected): ?array
+    {
+        if ($expected === []) {
+            return null;
+        }
+        $where = self::targetName(['kind' => $kind, 'id' => $id, 'key' => $key]);
+        if ($before === null) {
+            return $this->err('bad_params', "expected names the values of an existing record, and there is no {$where} to compare them with, "
+                . 'so nothing was written. Leave it out to create one, or read the record again with content.get if it was deleted.');
+        }
+        $moved = [];
+        foreach ($expected as $field => $want) {
+            if (!is_string($field) || $field === '' || $field[0] === '$') {
+                continue;
+            }
+            if (self::expectedText($before[$field] ?? null) !== self::expectedText($want)) {
+                $moved[] = $field;
+            }
+        }
+        if ($moved === []) {
+            return null;
+        }
+        return $this->err('revision_stale', "{$where} changed after it was read (" . implode(', ', $moved) . ') and no longer holds the expected values, so nothing was written. '
+            . 'Read it again with content.get and make the change on what it holds now.') + ['fields' => $moved];
+    }
+
+    /**
+     * One value of `expected` and of the record, as text for comparison, the same way for both: null as
+     * null, a boolean as 1/0, a list as its members' text sorted, an object with its keys sorted.
+     *
+     * @param mixed $value
+     */
+    private static function expectedText($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+        if (is_array($value)) {
+            if ($value === [] || array_keys($value) === range(0, count($value) - 1)) {
+                $members = array_map(static fn ($v) => is_array($v) ? (string) self::expectedText($v) : (string) (is_bool($v) ? (int) $v : $v), $value);
+                sort($members, SORT_STRING);
+                return (string) json_encode($members, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+            ksort($value, SORT_STRING);
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[(string) $k] = is_array($v) ? self::expectedText($v) : $v;
+            }
+            return (string) json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+        return (string) $value;
+    }
+
     private function staleBody(string $kind, int $id, string $key, ?array $before, string $expected): ?array
     {
         $current = $before;
