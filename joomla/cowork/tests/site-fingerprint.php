@@ -315,6 +315,25 @@ if (getenv('COWORK_TEST_SHOW_FINGERPRINT')) {
     echo json_encode(array_intersect_key($fp('info')['info'], ['site_fingerprint' => 1, 'files_list' => 1, 'files_hash' => 1]), JSON_PRETTY_PRINT) . "\n";
 }
 
+// ---- definitions: a change no row shows (#120 of TracyHQ/tracy) -----------------------------------
+
+$fpDefs = $fp('site.fingerprint', ['files' => false, 'definitions' => true])['fingerprint'];
+check('definitions answers a digest per table the checksums name', array_keys((array) $fpDefs['definitions']), ['jos_a', 'jos_b', 'jos_c']);
+check('the digest is the md5 of the CREATE TABLE', ((array) $fpDefs['definitions'])['jos_a'], md5('CREATE TABLE `jos_a` (`id` int)'));
+check('a source that cannot list triggers says so (null), never "none"', $fpDefs['triggers'], null);
+check('without definitions, the answer is as before', array_key_exists('definitions', $fp('site.fingerprint', ['files' => false])['fingerprint']), false);
+$fpDefOf = static function (string $create) use ($FPTOKEN): string {
+    $engine = new Engine($FPTOKEN, ['php' => PHP_VERSION], new DbDumper(new FakeRowSource([
+        'jos_a' => ['create' => $create, 'rows' => [['1']], 'columns' => ['id'], 'key' => ['id']],
+    ])), null);
+    return ((array) $engine->handle(['token' => $FPTOKEN, 'action' => 'site.fingerprint', 'params' => ['files' => false, 'definitions' => true]])['fingerprint']['definitions'])['jos_a'];
+};
+check('an AUTO_INCREMENT counter that moved is no change of definition',
+    $fpDefOf('CREATE TABLE `jos_a` (`id` int) AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4'),
+    $fpDefOf('CREATE TABLE `jos_a` (`id` int) AUTO_INCREMENT=98 DEFAULT CHARSET=utf8mb4'));
+checkTrue('a charset that changed is one, with every row the same',
+    $fpDefOf('CREATE TABLE `jos_a` (`id` int) DEFAULT CHARSET=utf8mb3') !== $fpDefOf('CREATE TABLE `jos_a` (`id` int) DEFAULT CHARSET=utf8mb4'));
+
 // ---- clean up -------------------------------------------------------------------------------------
 
 $fpClean = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($fpRoot, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);

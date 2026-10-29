@@ -3533,6 +3533,16 @@ final class Engine
         if ($skip !== []) {
             $answer['skip_columns'] = $skip;
         }
+        // `definitions`: each table's definition digest (a charset, collation or column change moves
+        // no row, so no checksum shows it) and the triggers no dump carries, asked once per read.
+        if (($p['definitions'] ?? false) === true && $wantSums && $tables !== null) {
+            try {
+                $answer['definitions'] = (object) $this->dumper->definitions(array_keys((array) $tables));
+                $answer['triggers'] = $this->dumper->triggers();
+            } catch (Throwable $e) {
+                return $this->err('checksum_failed', $e->getMessage());
+            }
+        }
         $answer['seconds'] = round(microtime(true) - $started, 3);
         return $this->ok(['fingerprint' => $answer]);
     }
