@@ -5605,10 +5605,20 @@ final class Engine
         return $this->ok(['files' => (int) ($result['files'] ?? 0)]);
     }
 
+    /** Why `core.upgrade` is unavailable on this site, when the host knows (null: not wired). */
+    private ?string $noUpgrader = null;
+
+    /** Say why `core.upgrade` answers unavailable here (Joomla 3: Tracy upgrades its own copy). */
+    public function coreUpgradeUnavailable(string $why): self
+    {
+        $this->noUpgrader = $why;
+        return $this;
+    }
+
     private function coreUpgrade(array $p): array
     {
         if ($this->upgrader === null) {
-            return $this->err('unavailable', 'core upgrader not wired');
+            return $this->err('unavailable', $this->noUpgrader ?? 'core upgrader not wired');
         }
         $to = (isset($p['to']) && \is_string($p['to'])) ? $p['to'] : '';
         if (!\in_array($to, ['4.4', '5.4', '6.1'], true)) {

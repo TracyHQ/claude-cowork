@@ -264,9 +264,73 @@ Both doors answer without the component's site folder (`components/com_claudecow
 lives on the administrator side, and a collaborator only the site folder has (the write side, the
 extension installer) is left out, so what needs it answers `unavailable` while the reads an import
 makes keep working. On Joomla 3 the plugin answers through its legacy entry `claudecoworkapi.php`
-(Joomla 3 loads a system plugin from that file only) and the Joomla 3 wiring
-`administrator/legacy/LegacyDoor.php`, which the site's `controllers/api.php` shares.
-`tests/e2e/admin-door.sh` checks both doors on a throwaway Joomla 3 to 6.
+(Joomla 3 loads a system plugin from that file only) and `administrator/legacy/LegacyDoor.php`,
+which the site's `controllers/api.php` shares. `tests/e2e/admin-door.sh` checks both doors on a
+throwaway Joomla 3 to 6.
+
+## Joomla 3 (0.24.73)
+
+Joomla 3.10 is supported as Joomla 4–6 are, reads and writes alike: Tracy imports it (Sync from
+live) and writes back to it (Sync to live). `LegacyDoor` only does what Joomla 3 cannot do for
+itself — it registers the component's `src/` namespaces, defines PHP 8's `str_starts_with`,
+`str_contains`, `str_ends_with` and `array_is_list` where PHP lacks them (Joomla 4 ships polyfills,
+Joomla 3 does not) and reads the request off `$app->input` — and then runs the SAME
+`EngineFactory::build()`: the same writer, apply log, extension manager, media writer and readers.
+Their one Joomla 4 dependency was the database handle out of the DI container;
+`EngineFactory::database()` hands Joomla 3 its own `Factory::getDbo()` in the Joomla 4 shape
+(`legacy/LegacyDatabase.php`: `bind()` and the three-argument `join()`). A Joomla 3 site has no
+workflows, so a created article gets no workflow association; and the core of `core.manifest` is
+`protected` (Joomla 3 has no `locked` column). The one action Joomla 3 does not get is
+`core.upgrade`: Tracy upgrades its own copy of a site, never the live one, and there is no
+`com_joomlaupdate` MVC to drive. It answers `{"ok":false,"error":"unavailable","message":"core upgrade
+is not available on Joomla 3: Tracy upgrades its own copy of the site, not the live site"}`.
+
+Until 0.24.73 the Joomla 3 door wired no writer and no extension manager, on a code comment of
+17/08/2026 rather than a decision: every write answered `unavailable`, and Tracy's import stopped at
+its first call (`core.manifest: unavailable`). `tests/e2e/joomla3-import.sh` reads a Joomla 3.10 site
+at both doors (and, given the fleet's `live-pull.mjs`, as Tracy reads it); `tests/e2e/joomla3-write.sh`
+writes, conflicts and undoes every kind Tracy's Sync to live sends, at both doors, checked in the
+database and in the administrator's lists — on Joomla 3.10 (PHP 7.4 and 8.0) and on 4–6 with the same
+answers — and, given the fleet's `scripts/lib`, runs Tracy's own `live_push.py` and `live-write.mjs`.
+
+## The oldest PHP: 7.4
+
+The engine needs PHP 7.4 (typed properties, arrow functions). On an older PHP it does not even
+parse, and that used to show as a broken site: on Joomla 3.10 / PHP 7.3 the install stopped at
+"syntax error, unexpected '?'", and a site moved to PHP 7.3 after installing answered the door with
+an HTML 500 at the front and Joomla's 403 at the administrator; on Joomla 4.4 / PHP 7.3 the system
+plugin took every page of the site down ("syntax error, unexpected 'bool'"). Measured 29/10/2026.
+
+Joomla 3 itself runs on PHP 5.3.10 and up, and many Joomla 3 sites are on 5.6 or 7.0; Joomla parses a
+file before anything in it runs. So everything Joomla parses before the check is PHP 5.3:
+
+- **Install.** The package's `script.php` is a shell in PHP 5.3 syntax. Its `preflight` refuses an
+  older PHP, nothing copied: "Claude Cowork needs PHP 7.4.0 or newer; this site runs PHP 5.6.39. Ask
+  your host to upgrade PHP on this site, then install the package again." On a PHP new enough it
+  hands every step to `pkg_claudecoworkInstallerSteps` in `script-install.php` beside it (the update
+  receipt, the profile prune). The uninstall step stays in the shell: Joomla keeps only `script.php`
+  for an uninstall. `update.xml` names `php_minimum` 7.4, so Joomla's updater does not offer the
+  release to such a site either.
+- **Door.** Every entry asks `legacy/PhpFloor.php` (PHP 5.3) before it loads any other file of the
+  component. On Joomla 3: the plugin's `claudecoworkapi.php` — parsed on every page; on PHP 5 a file
+  that does not parse is a fatal error no catch sees, so it must not even load `LegacyDoor.php` there
+  (`PhpFloor::wants()` is `lib/Door.php`'s rule, copied) — and the site's `controllers/api.php`. On
+  Joomla 4+: `ApiController::exec()`, and the plugin's `services/provider.php`, which on an old PHP
+  registers `PhpFloorDoor` — a plugin that only answers the door — instead of `ClaudeCoworkApi`, which
+  would not parse. To the site's token the door answers, HTTP 200 like every engine answer:
+
+  ```
+  {"ok":false,"error":"php_too_old","code":"php_too_old","message":"This site runs PHP 5.6.39; Claude Cowork needs PHP 7.4.0 or newer. Ask your host to upgrade PHP on this site, then try again.","php":"5.6.39","min":"7.4.0"}
+  ```
+
+  and to anyone else the engine's own `unauthorized`. Every page keeps working.
+
+`tests/php-floor.php` holds the files Joomla parses before the check to PHP 5.3 by token, and the rest
+of the entry files to PHP 7.1 (CI lints the first on PHP 5.6, the oldest it sets up);
+`tests/e2e/php-floor.sh` serves an installed Joomla 3.10 site from PHP 5.6, 7.0 and 7.3 (Joomla's own
+3.x images) and checks the pages, both doors and the refused install, and the same on Joomla 4 with
+PHP 7.3 (the only later Joomla that runs below PHP 7.4: Joomla 5 refuses PHP 7.3 with its own
+"unsupported PHP version" page).
 
 ## Render stamps for the page picker (0.18.0)
 

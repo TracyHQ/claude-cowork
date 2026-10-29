@@ -58,8 +58,9 @@ node ../../scripts/joomla-own-media.mjs com_claudecowork/administrator/lib/Quick
 # core notifies and stops there. Same package, same update, for the same reason as the two above.
 ( cd plg_system_claudecoworkupdate && zip -qr ../build/packages/plg_system_claudecoworkupdate.zip . -x '*.DS_Store' )
 cp pkg_claudecowork.xml build/
-# The package's own installer script: the update receipt (#__claudecowork_update_log).
-cp script.php build/
+# The package's own installer script: the PHP check (script.php, PHP 5.3 syntax), then the update
+# receipt (#__claudecowork_update_log) and the profile prune (script-install.php).
+cp script.php script-install.php build/
 ( cd build && zip -qr ../dist/pkg_claudecowork.zip . -x '*.DS_Store' )
 cp com_claudecowork/administrator/tracy-release.json dist/tracy-release.json
 

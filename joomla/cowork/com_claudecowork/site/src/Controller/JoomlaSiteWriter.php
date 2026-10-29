@@ -1041,7 +1041,8 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             }
             if ($hadAsset === 0 && (int) ($row->asset_id ?? 0) > 0) $this->dropMintedAsset($kind, $newId, (int) $row->asset_id);
             if ($tags !== null) $this->setTags($newId, $tags);
-            if ($kind === 'article' && $id <= 0) {
+            // Joomla 4 workflows: Joomla 3 has none, and an article's `state` is all there is.
+            if ($kind === 'article' && $id <= 0 && class_exists(\Joomla\CMS\Workflow\Workflow::class)) {
                 $workflow = new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db);
                 $stage = $workflow->getDefaultStageByCategory((int) $row->catid);
                 if ($stage) $workflow->createAssociation($newId, (int) $stage);
@@ -1802,7 +1803,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             $class = $kind === 'article' ? \Joomla\CMS\Table\Content::class : \Joomla\CMS\Table\Module::class;
             $row = new $class($this->db);
             if ($row->load($id) && !$row->delete($id)) throw new \RuntimeException((string) $row->getError());
-            if ($kind === 'article') (new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db))->deleteAssociation([$id]);
+            if ($kind === 'article' && class_exists(\Joomla\CMS\Workflow\Workflow::class)) (new \Joomla\CMS\Workflow\Workflow('com_content.article', Factory::getApplication(), $this->db))->deleteAssociation([$id]);
             if ($kind === 'module') $this->db->setQuery('DELETE FROM #__modules_menu WHERE moduleid=' . $id)->execute();
             return;
         }
@@ -1952,9 +1953,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         $name = '';
         if ($userId > 0) {
             try {
-                $user = \Joomla\CMS\Factory::getContainer()
-                    ->get(\Joomla\CMS\User\UserFactoryInterface::class)
-                    ->loadUserById($userId);
+                // Joomla 3 has no container to ask for the user factory: its Factory::getUser().
+                $user = method_exists(\Joomla\CMS\Factory::class, 'getContainer')
+                    ? \Joomla\CMS\Factory::getContainer()->get(\Joomla\CMS\User\UserFactoryInterface::class)->loadUserById($userId)
+                    : \Joomla\CMS\Factory::getUser($userId);
                 $name = $user->name ?? '';
             } catch (\Throwable $e) {
                 $name = '';

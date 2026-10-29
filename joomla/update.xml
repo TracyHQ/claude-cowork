@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Joomla 3.10 is supported as Joomla 4-6 are: Tracy can import it (Sync from live) and write back to it (Sync to live) - content, menus, modules, media, site settings, extension installs and switches, and their undo - through the same engine wiring as Joomla 4-6. On a PHP older than 7.4 the package refuses to install, naming both versions, and an installed door answers php_too_old instead of an error page; on Joomla 4 the system plugin no longer takes the site down there.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.73</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.73</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.73/pkg_claudecowork-0.24.73.zip</downloadurl>
+        </downloads>
+        <sha256>247278ee4b1f74caa5497e7c5f82463cdf5414b14662596d22c2da664e52fcff</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Reads and writes whole-unit HTML slots (a heading, sentence or list item the page cuts into pieces is one slot). Carries the ja-boxing/j6/1.0.8 content contract, the first on place-content-roles/3, whose Private Training email and phone have fields of their own.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

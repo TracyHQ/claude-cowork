@@ -2279,6 +2279,12 @@ require __DIR__ . "/engine-factory-logging.php";
 // plg_system_tracyaccess is the fleet's signed plugin, byte for byte, and trusts no bare header; on
 // a site with no access key it logs nobody in. Plugin cases run against Joomla stand-ins in their own processes.
 require __DIR__ . "/tracyaccess-signed.php";
+// Joomla 3 runs the Joomla 4+ writer, log and extension manager through Joomla 3's own database,
+// given Joomla 4's bind() and three-argument join(). Own process.
+require __DIR__ . "/joomla3-wiring.php";
+// On a PHP older than 7.4 the package refuses to install and the door answers php_too_old JSON;
+// the files that must parse there for it stay free of PHP 7.4 syntax.
+require __DIR__ . "/php-floor.php";
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);

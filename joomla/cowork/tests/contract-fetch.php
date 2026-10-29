@@ -7,6 +7,7 @@ echo "\nContract profiles: fetched, checked, pruned\n";
 require_once __DIR__ . '/../lib/ContractFetch.php';
 if (!defined('_JEXEC')) define('_JEXEC', 1);
 require_once __DIR__ . '/../script.php';
+require_once __DIR__ . '/../script-install.php';
 
 /** A source that is slow to open and to read, for PackageDownload's stream copy: one byte, then the end. */
 final class ContractFetchSlowStream
@@ -248,7 +249,7 @@ final class ContractFetchSlowStream
             ['/srv/joomla-tmp/com_claudecowork/contracts', '/var/www/html/tmp/com_claudecowork/contracts', '/var/www/html/tmp/com_claudecowork/contracts']);
 
         // ── prune ────────────────────────────────────────────────────────────────────────────────
-        $P = 'pkg_claudecoworkInstallerScript';
+        $P = 'pkg_claudecoworkInstallerSteps';
         check('prune: a derived binding holds no profile, whatever the params name',
             $P::heldProfiles(json_encode(['mode' => 'derived', 'contract' => 'derived/x']), json_encode(['contract' => 'acme/j6/1.0.0'])), []);
         check('prune: a binding that holds the mark but is no derived binding is unclear: nothing is pruned',
@@ -264,7 +265,7 @@ final class ContractFetchSlowStream
         $tree = static function () use ($tmp, $manifest): string {
             static $n = 0;
             $root = $tmp . '/prune' . (++$n);
-            $c = $root . '/' . pkg_claudecoworkInstallerScript::CONTRACTS;
+            $c = $root . '/' . pkg_claudecoworkInstallerSteps::CONTRACTS;
             foreach (['acme/j6/1.1.0' => 'acme/j6/1.0.0', 'acme/j6/1.0.0' => 'acme/j6/1.1.0', 'acme/j6/0.9.0' => null, 'other/j6/1.0.0' => null, 'other/j5/2.0.0' => null] as $id => $named) {
                 mkdir($c . '/' . $id, 0777, true);
                 file_put_contents($c . '/' . $id . '/manifest.json', $manifest($id, $named));
@@ -328,7 +329,7 @@ final class ContractFetchSlowStream
         $root = $tree();
         check('prune: no component row deletes nothing', [$P::pruneContracts($db(null, null), $root), $list($root . '/' . $P::CONTRACTS)], [null, $whole]);
         checkTrue('prune: postflight runs it, after the receipt and on its own guard, over the spare folder too',
-            strpos(file_get_contents(__DIR__ . '/../script.php'), 'self::pruneContracts(Factory::getDbo(), JPATH_ROOT, self::tmpPath());') !== false);
+            strpos(file_get_contents(__DIR__ . '/../script-install.php'), 'self::pruneContracts(Factory::getDbo(), JPATH_ROOT, self::tmpPath());') !== false);
 
         // The spare folder under tmp_path (a component folder the PHP user cannot write): the script
         // names it as ContractFetch does, prunes it with lib/contracts/, and reads kept manifests there.
@@ -350,6 +351,10 @@ final class ContractFetchSlowStream
             foreach ([$lib, $spare] as $folder) { mkdir($folder . '/zz/j6/1.0.0', 0777, true); file_put_contents($folder . '/zz/j6/1.0.0/manifest.json', $manifest('zz/j6/1.0.0')); }
             return $P::prune([$lib, $spare], ['acme/j6/1.1.0']);
         })(), ['zz/j6/1.0.0']);
+        $S = 'pkg_claudecoworkInstallerScript';
+        check('spare: the uninstall step (script.php, PHP 5.3) names the same folder',
+            [$S::SPARE, $S::spare('/srv/t/', '/var/www/html'), $S::spare(null, '/var/www/html')],
+            [ContractFetch::SPARE, ContractFetch::spareOf('/srv/t/', '/var/www/html'), ContractFetch::spareOf(null, '/var/www/html')]);
         checkTrue('spare: uninstalling the package removes the spare folder',
             strpos(file_get_contents(__DIR__ . '/../script.php'), 'self::remove($spare);') !== false);
 

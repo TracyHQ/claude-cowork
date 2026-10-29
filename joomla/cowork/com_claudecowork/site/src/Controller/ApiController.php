@@ -44,6 +44,12 @@ class ApiController extends BaseController
      */
     public function exec(): void
     {
+        // Before anything of the engine is loaded: on a PHP too old for it, it does not parse.
+        require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/legacy/PhpFloor.php';
+        if (\ClaudeCoworkPhpFloor::tooOld()) {
+            \ClaudeCoworkPhpFloor::answer($this->app ?? Factory::getApplication());
+            return;
+        }
         EngineFactory::answer($this->app ?? Factory::getApplication());
     }
 }

@@ -22,6 +22,13 @@ class ClaudeCoworkControllerApi extends BaseController
 {
     public function exec()
     {
+        // The PHP first: on a PHP too old for the engine LegacyDoor.php does not even parse (and on PHP
+        // 5 that is a fatal error), so the door answers php_too_old before it is loaded.
+        require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/legacy/PhpFloor.php';
+        if (ClaudeCoworkPhpFloor::tooOld()) {
+            ClaudeCoworkPhpFloor::answer(\Joomla\CMS\Factory::getApplication());
+            return;
+        }
         require_once JPATH_ADMINISTRATOR . '/components/com_claudecowork/legacy/LegacyDoor.php';
 
         ClaudeCoworkLegacyDoor::answer();
