@@ -2202,6 +2202,8 @@ require __DIR__ . "/source-language.php";
 require __DIR__ . "/written-source-language.php";
 // site.identity: Global Configuration's sitename and MetaDesc, through a real file on disk.
 require __DIR__ . "/site-identity.php";
+// The offline lock through site.identity, its capability, and the token's bypass in the shipped plugin.
+require __DIR__ . "/site-offline.php";
 // The home tab reads the site name alone (lib/HomeTitle.php).
 require __DIR__ . "/home-title.php";
 require __DIR__ . "/t3-offcanvas.php";

@@ -64,6 +64,12 @@ final class EngineFactory
         require_once self::libDir() . '/RenderStamps.php';
     }
 
+    /** Only the offline bypass rule, for the system plugin on a front-end request while the site is offline. */
+    public static function loadSiteOffline(): void
+    {
+        require_once self::libDir() . '/SiteOffline.php';
+    }
+
     /** Only the home-title rule, for the system plugin titling the home page by the site name alone. */
     public static function loadHomeTitle(): void
     {
@@ -303,6 +309,10 @@ final class EngineFactory
         });
         // `site.identity`: Global Configuration's site name and site description, and no other key.
         $engine->siteIdentity(self::buildSiteIdentity());
+        // The system plugin serves the real site to the token while the site is offline on Joomla 4+
+        // (ClaudeCoworkApi::decideOfflineBypass); the Joomla 3 entry does not, so there `info` does not
+        // advertise `site_offline` and Tracy does not lock a site it could not read.
+        $engine->offlineBypass(method_exists(Factory::class, 'getContainer'));
         // Joomla 3 drives no core upgrade (see the upgrader above): the answer says why.
         if (!method_exists(Factory::class, 'getContainer')) {
             $engine->coreUpgradeUnavailable('core upgrade is not available on Joomla 3: Tracy upgrades its own copy of the site, not the live site');

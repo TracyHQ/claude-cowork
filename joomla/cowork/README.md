@@ -25,7 +25,7 @@ an empty token refuses every request.
 | `content.update`, `content.delete`, `media.upload` | The write catalog (ADR 0080): sixteen kinds behind two generic verbs — `article`, `category`, `tag`, `field`, `fieldValue` (one stored custom field value, see below), `menuItem`, `menutype`, `redirect`, `banner`, `bannerClient`, `contact`, `newsfeed`, `module`, `templateStyle`, `user` (name/email/block only), `extensionParams`. Whitelisted columns only; tree-shaped kinds refuse create and never accept `alias`; delete is Joomla's own trash (`-2`), so it reverts. Plus one file under `images/` or `media/`. |
 | `media.delete` (unreleased) | Delete one image beneath `images/`; dry-run reports its size and references, and `apply.revert` restores its bytes. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
-| `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
+| `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`), whether page titles carry the site name (`sitename_pagetitles`, unreleased) and the offline lock (`offline`, `offline_message`, `display_offline_message`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those six keys of `configuration.php` and no other. While the site is offline, a front-end request carrying the token as `Authorization: Bearer` still sees the site. See "The site name and description" below. |
 | `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `template.languageOverrides` (unreleased) | The front-end language strings a site still shows in en-GB for one language — its template's own words (JA templates ship en-GB only), keys the language pack lacks or leaves in English (the en-GB words, or English reworded: vi-VN 4.2.2 "Show Profile" for en-GB "User Profile"), the column titles and captions of a T4 mega menu (`etc/navigation/*.json`, printed raw, offered as page literals), and pack strings whose translation is implausibly long for their words (vi-VN 4.2.2.1 gives "Details" the sentence of another string) — read, and set as Joomla language overrides in `language/overrides/<tag>.override.ini` under an `apply_id` so `apply.revert` takes them back. Only a key the read offers (from any page), one line of plain text with the en-GB placeholders; other override lines are kept. The read is ranked (`rank`: `template`, `used` — named by front-end code or a month/day name —, `core`, `other`) and paged (`offset`, `limit` ≤ 1500; `total`, `truncated`, `nextOffset`); `DATE_FORMAT_*` is never offered. |
 | `template.files.status`, `template.files.write`, `template.files.undo` (unreleased) | The files of the installed site templates (`templates/<name>/`, `media/templates/site/<name>/`): read their hashes, write a batch compare-and-set (each file names the hash the site must hold, PHP linted by the site's own PHP, all or nothing), and take it back only where the site still holds what was written. Off with Options › Template files; PHP only once Options › Allow PHP in template files is on (off by default). See "A template's own files" below. |
@@ -611,12 +611,12 @@ with no description of its own prints as its meta description). No other door re
 say "JA Vega - Modern Joomla Template…" (TCH ledger L24, 05/10/2026).
 
 ```
-site.identity {}                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, writable}
-site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitename_pagetitles?}}
-                                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles}, changed: [...]}
+site.identity {}                                   → {ok, fields: {sitename, MetaDesc, sitename_pagetitles, offline, offline_message, display_offline_message}, writable}
+site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitename_pagetitles?, offline?, offline_message?, display_offline_message?}}
+                                                   → {ok, fields: {…the six}, changed: [...]}
 ```
 
-- **Three keys, both ways.** A read answers exactly those (`fields` on a read may name only them);
+- **Six keys, both ways.** A read answers exactly those (`fields` on a read may name only them);
   a set takes any of them. Any other key is refused with `unsupported`, never ignored: the same file
   holds the database password and the site secret. Nothing else of the file is ever returned.
 - **Values.** Strings only, cleaned as Joomla's own Global Configuration form cleans them
@@ -637,6 +637,27 @@ site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitena
   caller, in the same undo step, so `apply.revert` takes the switch and the mark back together and a
   switch the owner turned on in the administrator keeps Joomla's own titles. A plugin older than this refuses a set naming the key with `unsupported` and
   writes nothing of that set, so a caller sends it only to a plugin that has it.
+- **The offline lock (unreleased).** A Tracy brief build locks the site on Joomla's offline page while
+  it writes, and keeps it locked if the build fails. `offline` is Global Configuration › Site Offline,
+  `0` or `1`; `display_offline_message` which message the offline page shows, `0` none, `1` the
+  custom one, `2` Joomla's default text; both integers (or the digit as a string), stored as the
+  integers Joomla's form saves; anything else is `bad_params`. `offline_message` is plain text of up
+  to 1000 characters that keeps its lines (a `<br>` is a line break too): tags are removed and it is
+  stored as Joomla's offline page prints it, raw, each line HTML-escaped and joined by `<br>`;
+  cleaning what a read answered gives it back unchanged. `offline_image` is not reachable. A set
+  purges the page cache, so no stored page is served past the lock. `apply.revert` puts the site's
+  own values back (a boolean `offline` the installer wrote comes back as the integer `0`).
+  **The bypass.** Tracy reads the site as a visitor would while it builds, so the system plugin serves
+  a front-end request carrying the site's own token as `Authorization: Bearer <token>` (the
+  credential `content.json` takes; never in the query string) the site as if it were online: it
+  switches `offline` off for that request alone at `onAfterInitialise`, logs nobody in, and keeps the
+  page out of Joomla's caches and every shared cache, like a stamped page. No header, a wrong token,
+  the token anywhere else, or a site without a token gets Joomla's own offline page; the
+  administrator login is Joomla's. `info` advertises it as `site_offline: {version: 1, fields: [the
+  three keys], bypass: "authorization-bearer"}`: check it before turning a site offline. The Joomla 3
+  entry has no bypass, so there `info` does not advertise it; a plugin older than this refuses the
+  keys with `unsupported` and writes nothing. Tested against Joomla stand-ins (`tests/site-offline.php`);
+  not yet proven on a real install.
 - **Undo.** What changed is recorded under the `apply_id` with its previous value, so `apply.revert`
   puts the site's own words back — together with the content writes of the same `apply_id`, if any. A
   value already in place is not written; when nothing changes the answer is `unchanged: true` and no

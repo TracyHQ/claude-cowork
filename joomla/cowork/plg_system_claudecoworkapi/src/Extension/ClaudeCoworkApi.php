@@ -79,6 +79,17 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  * page the site name alone, on a site where Tracy set the switch (`lib/HomeTitle.php`). Every other
  * page keeps "Page - Name". It costs one comparison on every other page.
  *
+ * ## The site while it is offline, for Tracy alone
+ *
+ * Tracy turns a site offline while a brief build writes it (`site.identity` `offline` = 1) and reads
+ * it as a visitor would to check what it wrote. A front-end request carrying the site's cowork token
+ * as `Authorization: Bearer <token>` is served the site as if it were online (`lib/SiteOffline.php`):
+ * `onAfterInitialise` switches `offline` off for that request only, before Joomla decides at render
+ * whether to print `offline.php`. Nobody is logged in, and the page is kept out of every cache like
+ * a stamped one, so the public never gets the copy Tracy saw. Every other request, a wrong token
+ * included, gets Joomla's own offline page, and the administrator is untouched. A site that is online
+ * costs one configuration read.
+ *
  * ## A layout's literal words in the site's language
  *
  * Words a front-end layout writes as a literal, with no language key (Joomla's own mod_finder
@@ -92,6 +103,9 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 {
     /** Whether this request prints render stamps. Decided once, at `onAfterInitialise`. */
     private bool $stamping = false;
+
+    /** Whether this request sees the site although it is offline (the token's bypass). Decided once, at `onAfterInitialise`. */
+    private bool $bypassingOffline = false;
 
     /** The customer's favicon as `onBeforeCompileHead` printed it, or null: `onAfterRender` keeps only it. */
     private ?string $faviconHref = null;
@@ -134,6 +148,14 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             $this->stamping = false;
             Log::add('claudecoworkapi stamps: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
+
+        try {
+            $this->decideOfflineBypass();
+        } catch (\Throwable $e) {
+            // A failure keeps the lock: the request gets the offline page, as every visitor does.
+            $this->bypassingOffline = false;
+            Log::add('claudecoworkapi offline: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
+        }
     }
 
     /**
@@ -144,7 +166,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
      */
     public function onPageCacheSetCaching(EventInterface $event): void
     {
-        if ($this->stamping) {
+        if ($this->stamping || $this->bypassingOffline) {
             self::addResult($event, false);
         }
     }
@@ -152,7 +174,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     /** Asked again at `onAfterRender`; the same answer, so no later decision can store the page. */
     public function onPageCacheIsExcluded(EventInterface $event): void
     {
-        if ($this->stamping) {
+        if ($this->stamping || $this->bypassingOffline) {
             self::addResult($event, true);
         }
     }
@@ -259,7 +281,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
     {
         $this->keepOnlyCustomerFavicon();
         $this->keepOnlyCustomerShareImage();
-        if (!$this->stamping) {
+        if (!$this->stamping && !$this->bypassingOffline) {
             return;
         }
         $app = $this->getApplication();
@@ -563,6 +585,42 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         $app->set('caching', 0);
         // Older code paths read the global configuration object rather than the application.
         if (method_exists(Factory::class, 'getConfig')) {
+            Factory::getConfig()->set('caching', 0);
+        }
+    }
+
+    /**
+     * Serve this request the site although it is offline? Only on the site client, only while the
+     * site is offline, only for the site's own token as a Bearer header (`SiteOffline::bypass`). When
+     * yes, `offline` is switched off for this request alone, before the render decides on
+     * `offline.php`, and Joomla's caching with it, as for a stamped page: the page cache must neither
+     * store this copy for the public nor answer it with one.
+     */
+    private function decideOfflineBypass(): void
+    {
+        $app = $this->getApplication();
+        // The common case: an online site, or the administrator; nothing is loaded or read.
+        if (!$app->isClient('site') || !$app->get('offline')) {
+            return;
+        }
+        if (!isset($_SERVER['HTTP_AUTHORIZATION']) && !isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            return;
+        }
+        if (!class_exists(EngineFactory::class) || !EngineFactory::installed()) {
+            return;
+        }
+        EngineFactory::loadSiteOffline();
+        $token = (string) ComponentHelper::getParams('com_claudecowork')->get('token', '');
+        if (!\SiteOffline::bypass(true, $app->get('offline'), $_SERVER, $token)) {
+            return;
+        }
+
+        $this->bypassingOffline = true;
+        $app->set('offline', 0);
+        $app->set('caching', 0);
+        // Older code paths read the global configuration object rather than the application.
+        if (method_exists(Factory::class, 'getConfig')) {
+            Factory::getConfig()->set('offline', 0);
             Factory::getConfig()->set('caching', 0);
         }
     }

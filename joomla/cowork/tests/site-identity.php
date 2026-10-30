@@ -1,7 +1,7 @@
 <?php
 // Loaded by run.php: `site.identity` reads and writes Global Configuration's site name (`sitename`),
 // site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`)
-// — and no other key of configuration.php, which also holds the
+// (the offline lock, the door's other three keys: tests/site-offline.php) — and no other key of configuration.php, which also holds the
 // database password, the site secret and the mail credentials (TCH ledger L24).
 //
 // What is real here: ConfigurationFile writing a real file on disk, read back by a fresh PHP that
@@ -158,8 +158,10 @@ if (function_exists('check')) {
     $siEngine = (new Engine($siToken, [], null, null, null, null, $siWriter, null, $siLog))->siteIdentity($siStore);
 
     $siRead = $siCall($siEngine, []);
-    check('read answers the three values and whether a set would land', $siRead,
-        ['ok' => true, 'fields' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc'], 'sitename_pagetitles' => 1], 'writable' => true]);
+    // The offline keys as this door types them: Joomla's installer writes `offline` as a boolean.
+    $siOffline = ['offline' => 0, 'offline_message' => $siConfig['offline_message'], 'display_offline_message' => 1];
+    check('read answers the six values and whether a set would land', $siRead,
+        ['ok' => true, 'fields' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc'], 'sitename_pagetitles' => 1] + $siOffline, 'writable' => true]);
     check('operation read is the default', $siCall($siEngine, ['operation' => 'read']), $siRead);
     check('no secret is in a read', $siLeaks($siRead), false);
     check('asking to read another key is refused, not answered', [$siCall($siEngine, ['fields' => ['password']])['error'], $siCall($siEngine, ['fields' => ['sitename', 'secret']])['error']], ['unsupported', 'unsupported']);
@@ -175,7 +177,7 @@ if (function_exists('check')) {
         ['bad_params', 'bad_params', 'bad_params']);
     $siOther = $siSet(['sitename' => 'Hanoi Roofing', 'password' => 'mine']);
     check('any other key is refused whole, naming the boundary', [$siOther['error'], $siOther['message']],
-        ['unsupported', 'password cannot be written through site.identity: only sitename, MetaDesc and sitename_pagetitles can. Nothing was written']);
+        ['unsupported', 'password cannot be written through site.identity: only sitename, MetaDesc, sitename_pagetitles, offline, offline_message and display_offline_message can. Nothing was written']);
     check('a page-title setting Joomla does not offer is refused', $siSet(['sitename' => 'Hanoi Roofing', 'sitename_pagetitles' => 5])['error'], 'bad_params');
     check('a value that is not a string is refused', $siSet(['sitename' => ['Hanoi']])['error'], 'bad_params');
     check('a description past Joomla\'s limit is refused', $siSet(['MetaDesc' => str_repeat('a', 301)])['error'], 'bad_params');
@@ -185,7 +187,7 @@ if (function_exists('check')) {
     $siWriter->serialized = [];
     $siDone = $siSet(['sitename' => 'Hanoi <i>Roofing</i>', 'MetaDesc' => "Roof repairs in Hanoi,\nsince 1998."]);
     check('a set writes both and answers them as stored', $siDone,
-        ['ok' => true, 'fields' => ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1], 'changed' => ['sitename', 'MetaDesc']]);
+        ['ok' => true, 'fields' => ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1] + $siOffline, 'changed' => ['sitename', 'MetaDesc']]);
     check('a set takes the write lock, naming itself', $siWriter->serialized, [['action' => 'site.identity', 'operation' => 'set', 'applyId' => 'apply-identity']]);
     $siLoaded = siLoad($siPath);
     check('the file PHP loads holds the new values', [$siLoaded['sitename'] ?? null, $siLoaded['MetaDesc'] ?? null], ['Hanoi Roofing', 'Roof repairs in Hanoi, since 1998.']);
@@ -193,7 +195,7 @@ if (function_exists('check')) {
     check('every other key is untouched: same value, same type, same order', $siLoaded, $siExpected);
     clearstatcache();
     check('the file keeps its mode', fileperms($siPath) & 07777, 0640);
-    check('a read afterwards sees the new values', $siCall($siEngine, [])['fields'], ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1]);
+    check('a read afterwards sees the new values', $siCall($siEngine, [])['fields'], ['sitename' => 'Hanoi Roofing', 'MetaDesc' => 'Roof repairs in Hanoi, since 1998.', 'sitename_pagetitles' => 1] + $siOffline);
     check('one undo step, holding only what was there', $siLog->entries('apply-identity'), [['op' => 'siteIdentity', 'before' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc']]]]);
     check('the cache is purged: a cached page still has the old <title>', $siWriter->purges, 1);
     check('no secret is in a set\'s answer', $siLeaks($siDone), false);

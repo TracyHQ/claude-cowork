@@ -12,6 +12,13 @@
  *   page title ("Site - Page"), 2 after it ("Page - Site"). An integer, as Joomla's own form stores
  *   it (`filter="integer"`). A template keeps 0, so a site Tracy named still showed the bare page
  *   title in every browser tab and search result (TCH #1013, D1).
+ * - `offline`, `offline_message`, `display_offline_message`: Global Configuration › Site Offline,
+ *   the offline message, and which message the offline page shows (0 none, 1 the custom one, 2
+ *   Joomla's default text). Tracy turns the site offline while a brief build writes it and keeps it
+ *   offline when the build fails; while it is offline, a front-end request carrying the site's
+ *   cowork token still sees the site as a visitor would ({@see SiteOffline}), so Tracy can read what
+ *   it wrote. Integers as Joomla's form stores them; the message is plain text, stored as the
+ *   escaped HTML Joomla's offline page prints raw.
  *
  * Beside them, the store keeps one key of its own, {@see HomeTitle::MARK}: the switch value Tracy
  * last set, written and undone with the switch, so the system plugin prints the home tab as the site
@@ -22,7 +29,7 @@
  * template's own words there ("JA Vega - Modern Joomla Template…"), so after Tracy wrote every page
  * in the owner's words the home page still advertised the template (TCH ledger L24, 05/10/2026).
  *
- * 🔒 THREE KEYS, BY NAME, BOTH WAYS. `configuration.php` also holds the database password, the site
+ * 🔒 SIX KEYS, BY NAME, BOTH WAYS. `configuration.php` also holds the database password, the site
  * secret, mail credentials and server paths. Nothing here reads, returns or writes any key outside
  * `FIELDS`: a read answers exactly those, and a write copies every other key through untouched.
  *
@@ -37,7 +44,7 @@ require_once __DIR__ . '/HomeTitle.php';
 interface SiteIdentityStore
 {
     /**
-     * @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int,tracy_sitename_pagetitles:?int} the values as
+     * @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int,offline:int,offline_message:string,display_offline_message:int,tracy_sitename_pagetitles:?int} the values as
      *   the site holds them now, and Tracy's mark ({@see HomeTitle::MARK}), null when absent
      */
     public function read(): array;
@@ -64,20 +71,37 @@ final class SiteIdentityUnwritable extends RuntimeException
 final class SiteIdentity
 {
     /** Every key this door can read or write. Nothing outside this list ever leaves or enters. */
-    public const FIELDS = ['sitename', 'MetaDesc', 'sitename_pagetitles'];
+    public const FIELDS = ['sitename', 'MetaDesc', 'sitename_pagetitles', 'offline', 'offline_message', 'display_offline_message'];
+
+    /** The keys of the offline lock, a subset of {@see FIELDS}; `info` advertises them as `site_offline`. */
+    public const OFFLINE_FIELDS = ['offline', 'offline_message', 'display_offline_message'];
 
     /** What the store reads and writes: the door's keys and Tracy's mark ({@see HomeTitle::MARK}), never a caller's. */
-    public const STORED = ['sitename', 'MetaDesc', 'sitename_pagetitles', HomeTitle::MARK];
+    public const STORED = ['sitename', 'MetaDesc', 'sitename_pagetitles', 'offline', 'offline_message', 'display_offline_message', HomeTitle::MARK];
 
     /** The integer key, and the values Joomla's form offers for it: 0 no, 1 before, 2 after. */
     public const PAGE_TITLES = 'sitename_pagetitles';
     public const PAGE_TITLE_VALUES = [0, 1, 2];
 
     /**
-     * Characters after cleaning. `MetaDesc` is Joomla's own limit (the Global Configuration form's
-     * `maxlength="300"`); Joomla sets none on `sitename`, which every `<title>` carries, so 200.
+     * Every integer key: the values Joomla's form offers for it, what any other value (or none) reads
+     * as — Joomla's own default — and the refusal for anything else.
      */
-    public const MAX_CHARACTERS = ['sitename' => 200, 'MetaDesc' => 300];
+    public const INTEGERS = [
+        'sitename_pagetitles' => [[0, 1, 2], 0, 'sitename_pagetitles must be 0 (no site name in page titles), 1 (before) or 2 (after)'],
+        'offline' => [[0, 1], 0, 'offline must be 0 (site online) or 1 (site offline)'],
+        'display_offline_message' => [[0, 1, 2], 1, 'display_offline_message must be 0 (no message), 1 (the custom offline_message) or 2 (Joomla\'s default message)'],
+    ];
+
+    /** The offline message: plain text that keeps its lines, stored as escaped HTML. */
+    public const OFFLINE_MESSAGE = 'offline_message';
+
+    /**
+     * Characters after cleaning. `MetaDesc` is Joomla's own limit (the Global Configuration form's
+     * `maxlength="300"`); Joomla sets none on `sitename`, which every `<title>` carries, so 200; none on
+     * the offline message either, a paragraph or two, so 1000.
+     */
+    public const MAX_CHARACTERS = ['sitename' => 200, 'MetaDesc' => 300, 'offline_message' => 1000];
 
     /** Bytes before cleaning: far above any real value, so a huge body is refused before it is parsed. */
     public const MAX_BYTES = 4096;
@@ -91,8 +115,12 @@ final class SiteIdentity
      * empty after that is refused, as Joomla's form refuses it (`required="true"`); an empty
      * `MetaDesc` is allowed and means "no site description".
      *
-     * `sitename_pagetitles` is 0, 1 or 2, as an integer or the same digit as a string, and is stored
-     * as the integer.
+     * `sitename_pagetitles` is 0, 1 or 2, `offline` 0 or 1 and `display_offline_message` 0, 1 or 2,
+     * each as an integer or the same digit as a string, and is stored as the integer.
+     *
+     * `offline_message` is cleaned the same way but keeps its lines (a `<br>` is a line break too), and
+     * is stored as Joomla's offline page prints it, raw: each line HTML-escaped, joined by `<br>`.
+     * Cleaning what a read answered gives the same value back. An empty message is allowed.
      *
      * @param mixed $value
      * @return array{value:string|int}|array{error:string}
@@ -100,15 +128,16 @@ final class SiteIdentity
     public static function clean(string $field, $value): array
     {
         if (!in_array($field, self::FIELDS, true)) return ['error' => $field . ' is not a site identity field'];
-        if ($field === self::PAGE_TITLES) {
+        if (isset(self::INTEGERS[$field])) {
+            [$allowed, , $refusal] = self::INTEGERS[$field];
             if (is_string($value) && preg_match('/^[0-9]$/D', $value)) $value = (int) $value;
-            if (!is_int($value) || !in_array($value, self::PAGE_TITLE_VALUES, true))
-                return ['error' => 'sitename_pagetitles must be 0 (no site name in page titles), 1 (before) or 2 (after)'];
+            if (!is_int($value) || !in_array($value, $allowed, true)) return ['error' => $refusal];
             return ['value' => $value];
         }
         if (!is_string($value)) return ['error' => $field . ' must be a string'];
         if (strlen($value) > self::MAX_BYTES) return ['error' => $field . ' is longer than ' . self::MAX_BYTES . ' bytes'];
         if (preg_match('//u', $value) !== 1) return ['error' => $field . ' is not valid UTF-8'];
+        if ($field === self::OFFLINE_MESSAGE) return self::cleanMessage($value);
         $text = strip_tags(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $text = (string) preg_replace('/[\r\n\t\x{0085}\x{2028}\x{2029}]+/u', ' ', $text);
         $text = (string) preg_replace('/[\x{0000}-\x{001F}\x{007F}-\x{009F}]/u', '', $text);
@@ -118,6 +147,44 @@ final class SiteIdentity
             return ['error' => $field . ' is longer than ' . self::MAX_CHARACTERS[$field] . ' characters (' . $length . ' after cleaning)'];
         if ($field === 'sitename' && $text === '') return ['error' => 'sitename cannot be empty: Joomla requires a site name'];
         return ['value' => $text];
+    }
+
+    /**
+     * The offline message as stored: tags removed (a `<br>` first becomes a line break), each line
+     * cleaned like the one-line fields, empty lines at either end dropped, then each line escaped and
+     * the lines joined by `<br>`: the HTML Joomla's offline page prints as it is.
+     *
+     * @return array{value:string}|array{error:string}
+     */
+    private static function cleanMessage(string $value): array
+    {
+        $text = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = strip_tags((string) preg_replace('#<br\s*/?>#i', "\n", $text));
+        $text = (string) preg_replace('/\r\n?|[\x{0085}\x{2028}\x{2029}]/u', "\n", $text);
+        $text = (string) preg_replace('/\t+/', ' ', $text);
+        $text = (string) preg_replace('/[\x{0000}-\x{0009}\x{000B}-\x{001F}\x{007F}-\x{009F}]/u', '', $text);
+        $lines = array_map(static fn(string $line): string => trim((string) preg_replace('/ {2,}/', ' ', $line)), explode("\n", $text));
+        while ($lines !== [] && $lines[0] === '') array_shift($lines);
+        while ($lines !== [] && end($lines) === '') array_pop($lines);
+        $plain = implode("\n", $lines);
+        $length = function_exists('mb_strlen') ? mb_strlen($plain, 'UTF-8') : (int) preg_match_all('/./su', $plain);
+        $max = self::MAX_CHARACTERS[self::OFFLINE_MESSAGE];
+        if ($length > $max) return ['error' => 'offline_message is longer than ' . $max . ' characters (' . $length . ' after cleaning)'];
+        return ['value' => implode('<br>', array_map(static fn(string $line): string => htmlspecialchars($line, ENT_QUOTES, 'UTF-8'), $lines))];
+    }
+
+    /**
+     * Whether a value is of the type the store writes for this key: an integer for the integer keys,
+     * an integer or null (absent) for the mark, a string for the texts.
+     *
+     * @param mixed $value
+     */
+    public static function storable(string $field, $value): bool
+    {
+        if (!in_array($field, self::STORED, true)) return false;
+        if ($field === HomeTitle::MARK) return is_int($value) || $value === null;
+        if (isset(self::INTEGERS[$field])) return is_int($value);
+        return is_string($value);
     }
 
     /**
@@ -133,9 +200,12 @@ final class SiteIdentity
         // The mark: absent stays absent (null), anything else is the switch value it names, or absent.
         if ($field === HomeTitle::MARK)
             return is_numeric($value) && in_array((int) $value, self::PAGE_TITLE_VALUES, true) ? (int) $value : null;
-        if ($field !== self::PAGE_TITLES) return is_scalar($value) ? (string) $value : '';
-        $number = is_numeric($value) ? (int) $value : 0;
-        return in_array($number, self::PAGE_TITLE_VALUES, true) ? $number : 0;
+        if (!isset(self::INTEGERS[$field])) return is_scalar($value) ? (string) $value : '';
+        [$allowed, $default] = self::INTEGERS[$field];
+        // Joomla's installer writes `offline` as a boolean; its form saves an integer.
+        if (is_bool($value)) $value = (int) $value;
+        $number = is_numeric($value) ? (int) $value : $default;
+        return in_array($number, $allowed, true) ? $number : $default;
     }
 }
 
@@ -201,9 +271,8 @@ final class ConfigurationFile implements SiteIdentityStore
     public function write(array $values): void
     {
         foreach ($values as $field => $value)
-            if (!in_array($field, SiteIdentity::STORED, true) || ($field === SiteIdentity::PAGE_TITLES ? !is_int($value)
-                : ($field === HomeTitle::MARK ? !is_int($value) && $value !== null : !is_string($value))))
-                throw new InvalidArgumentException('Only sitename and MetaDesc (strings) and sitename_pagetitles (an integer) are written here');
+            if (!SiteIdentity::storable((string) $field, $value))
+                throw new InvalidArgumentException('Only the site identity keys, each of its type, are written here');
         // array_merge keeps every existing key in its place and only replaces the values named; a mark of
         // null leaves the file without one, as it was before Tracy first set the switch.
         $next = array_merge($this->all(), $values);

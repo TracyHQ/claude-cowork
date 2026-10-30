@@ -32,6 +32,7 @@ require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/SiteIdentity.php';
+require_once __DIR__ . '/SiteOffline.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
 require_once __DIR__ . '/LanguageOverrides.php';
@@ -291,6 +292,20 @@ final class Engine
         return $this;
     }
 
+    /** Whether the host lets a token-carrying front-end request see the site while it is offline (lib/SiteOffline.php). */
+    private bool $offlineBypass = false;
+
+    /**
+     * Say that the host serves the real site to a front-end request carrying the token while the site
+     * is offline. With `site.identity` wired too, `info` advertises `site_offline` (SiteOffline::capability):
+     * a caller turns a site offline only where it will still be able to read it.
+     */
+    public function offlineBypass(bool $on): self
+    {
+        $this->offlineBypass = $on;
+        return $this;
+    }
+
     /** A template's logo, name, slogan and favicon files (`template.siteSettings`); null answers 'unavailable'. */
     private ?TemplateSiteFiles $templateSite = null;
 
@@ -476,7 +491,8 @@ final class Engine
                     'max_paths' => self::MAX_HASH_PATHS,
                 ], 'files_pack' => [
                     'max_paths' => self::MAX_PACK_PATHS,
-                ]] + ($this->templateFiles === null ? [] : ['template_files' => $this->templateFiles->info()])]);
+                ]] + ($this->templateFiles === null ? [] : ['template_files' => $this->templateFiles->info()])
+                    + ($this->siteIdentity === null || !$this->offlineBypass ? [] : ['site_offline' => SiteOffline::capability()])]);
             case 'site.stats':
                 return $this->siteStats();
             case 'site.fingerprint':
@@ -5124,15 +5140,19 @@ final class Engine
     }
 
     /**
-     * `site.identity` — Global Configuration's site name (`sitename`), site description (`MetaDesc`)
-     * and whether page titles carry the site name (`sitename_pagetitles`), and nothing else of
-     * configuration.php (lib/SiteIdentity.php).
+     * `site.identity` — Global Configuration's site name (`sitename`), site description (`MetaDesc`),
+     * whether page titles carry the site name (`sitename_pagetitles`) and the offline lock (`offline`,
+     * `offline_message`, `display_offline_message`), and nothing else of configuration.php
+     * (lib/SiteIdentity.php).
      *
-     * - `operation: read` (the default): `{fields: {sitename, MetaDesc, sitename_pagetitles}, writable}`
-     *   — the values as the site holds them, and whether a `set` would land now.
-     * - `operation: set`, `apply_id`, `fields`: any of the three. The two texts are strings, cleaned
-     *   as Joomla's own form cleans them (tags removed, one line) and refused past their length;
-     *   `sitename_pagetitles` is 0, 1 or 2 (no, before, after), stored as an integer.
+     * - `operation: read` (the default): `{fields: {sitename, MetaDesc, sitename_pagetitles, offline,
+     *   offline_message, display_offline_message}, writable}` — the values as the site holds them, and
+     *   whether a `set` would land now.
+     * - `operation: set`, `apply_id`, `fields`: any of the six. The texts are strings, cleaned as
+     *   Joomla's own form cleans them (tags removed, one line; the offline message keeps its lines and
+     *   is stored escaped) and refused past their length; `sitename_pagetitles` is 0, 1 or 2 (no,
+     *   before, after), `offline` 0 or 1, `display_offline_message` 0, 1 or 2 (none, custom, Joomla's
+     *   default), each stored as an integer.
      *   A field already holding that value is not written; when none changes, nothing is written or
      *   recorded (`unchanged: true`), so a retry after a lost reply adds no second undo step. What
      *   changes is recorded under the `apply_id` with its previous value, so `apply.revert` puts the
