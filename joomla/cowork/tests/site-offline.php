@@ -135,6 +135,13 @@ namespace {
             public function addResult($value): void { $this->results[] = $value; }
         }
 
+        final class SoSaveEvent implements \Joomla\Event\EventInterface
+        {
+            private SoParams $subject;
+            public function __construct(SoParams $subject) { $this->subject = $subject; }
+            public function getArgument($name, $default = null) { return $name === 'subject' ? $this->subject : $default; }
+        }
+
         $case = SO_CASE;
         $_SERVER = ['REQUEST_URI' => $case['uri'] ?? '/', 'REQUEST_METHOD' => 'GET'] + ($case['server'] ?? []);
         parse_str((string) parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY), $_GET);
@@ -145,6 +152,13 @@ namespace {
         require __DIR__ . '/../plg_system_claudecoworkapi/src/Extension/ClaudeCoworkApi.php';
         $plugin = new \Tracy\Plugin\System\ClaudeCoworkApi\Extension\ClaudeCoworkApi();
         $plugin->setApplication($app);
+        if (isset($case['save'])) {
+            // com_config's save: the configuration about to be written is the event's subject.
+            $subject = new SoParams($case['save']);
+            $plugin->onApplicationBeforeSave(new SoSaveEvent($subject));
+            echo json_encode(['saved' => $subject->values, 'logs' => SoRecord::$logs]);
+            exit(0);
+        }
         $plugin->onAfterInitialise();
         $setCaching = new SoEvent();
         $plugin->onPageCacheSetCaching($setCaching);
@@ -246,8 +260,10 @@ namespace {
         // ---- the preview key: write-only, cleared with the lock --------------------------------
         $soKey = 'preview_Key-0123456789abcdefghijKLMN';
         $soHash = hash('sha256', $soKey);
+        $soNow = time();
+        $soStored = $soHash . ':' . $soNow;
         check('a preview key is 32 to 128 URL-safe characters, stored as its SHA-256',
-            [SiteIdentity::clean('offline_preview_key', $soKey), isset(SiteIdentity::clean('offline_preview_key', str_repeat('a', 128))['value'])], [['value' => $soHash], true]);
+            [SiteIdentity::clean('offline_preview_key', $soKey, 1700000000), isset(SiteIdentity::clean('offline_preview_key', str_repeat('a', 128))['value'])], [['value' => $soHash . ':1700000000'], true]);
         $soKeyError = ['error' => 'offline_preview_key must be 32 to 128 characters of A-Z, a-z, 0-9, _ and -'];
         check('too short, too long, a space, a dot, a number or null is refused',
             [SiteIdentity::clean('offline_preview_key', str_repeat('a', 31)), SiteIdentity::clean('offline_preview_key', str_repeat('a', 129)), SiteIdentity::clean('offline_preview_key', str_repeat('a', 31) . ' '),
@@ -260,7 +276,7 @@ namespace {
         check('a set locks the site with a key, naming the key as changed and never answering it',
             [$soKeyed['ok'], $soKeyed['changed'], $soKeyed['fields']['offline_preview_key_set'] ?? null, array_key_exists('offline_preview_key', $soKeyed['fields']), str_contains(json_encode($soKeyed), $soKey), str_contains(json_encode($soKeyed), $soHash)],
             [true, ['offline', 'offline_preview_key'], true, false, false, false]);
-        check('configuration.php holds the hash, never the key', [siLoad($soPath)['tracy_offline_preview_key'] ?? null, str_contains((string) file_get_contents($soPath), $soKey)], [$soHash, false]);
+        check('configuration.php holds the hash, never the key', [str_starts_with((string) (siLoad($soPath)['tracy_offline_preview_key'] ?? ''), $soHash . ':'), str_contains((string) file_get_contents($soPath), $soKey)], [true, false]);
         $soRead = $soCall($soEngine, []);
         check('a read answers only whether a key is set', [$soRead['fields']['offline_preview_key_set'] ?? null, str_contains(json_encode($soRead), $soHash)], [true, false]);
         check('the undo step and apply.list name the key, the listing never its hash',
@@ -270,11 +286,11 @@ namespace {
         $soKeyOpen = $soSet(['offline' => 0], 'apply-key-open');
         check('offline 0 clears the key', [$soKeyOpen['changed'], siLoad($soPath)['tracy_offline_preview_key'] ?? null, $soKeyOpen['fields']['offline_preview_key_set']], [['offline', 'offline_preview_key'], '', false]);
         $soEngine->handle(['token' => $soToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-key-open']]);
-        check('reverting the clear puts the lock and its key back', [siLoad($soPath)['offline'] ?? null, siLoad($soPath)['tracy_offline_preview_key'] ?? null], [1, $soHash]);
+        check('reverting the clear puts the lock and its key back', [siLoad($soPath)['offline'] ?? null, str_starts_with((string) (siLoad($soPath)['tracy_offline_preview_key'] ?? ''), $soHash . ':')], [1, true]);
         $soEngine->handle(['token' => $soToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-key']]);
         check('reverting the lock takes the key away with it', [siLoad($soPath)['offline'] ?? null, siLoad($soPath)['tracy_offline_preview_key'] ?? null], [0, '']);
         check('a caller cannot write or read the hash key directly',
-            [$soSet(['tracy_offline_preview_key' => $soHash], 'apply-key')['error'], $soCall($soEngine, ['fields' => ['tracy_offline_preview_key']])['error'], $soCall($soEngine, ['fields' => ['offline_preview_key']])['error']],
+            [$soSet(['tracy_offline_preview_key' => $soStored], 'apply-key')['error'], $soCall($soEngine, ['fields' => ['tracy_offline_preview_key']])['error'], $soCall($soEngine, ['fields' => ['offline_preview_key']])['error']],
             ['unsupported', 'unsupported', 'unsupported']);
 
         // ---- the capability ------------------------------------------------------------------
@@ -326,27 +342,45 @@ namespace {
 
         // ---- the preview key's rule and the plugin ---------------------------------------------
         $soHeader = ['HTTP_X_TRACY_PREVIEW_KEY' => $soKey];
-        check('rule: offline, the site client and the key\'s header: the site', SiteOffline::previewBypass(true, 1, $soHeader, $soHash), true);
+        check('rule: offline, the site client and the key\'s header: the site', SiteOffline::previewBypass(true, 1, $soHeader, $soStored), true);
         check('rule: a wrong key, no header, no stored key, a forged hash, online, the administrator: no', [
-            SiteOffline::previewBypass(true, 1, ['HTTP_X_TRACY_PREVIEW_KEY' => strrev($soKey)], $soHash),
-            SiteOffline::previewBypass(true, 1, [], $soHash),
+            SiteOffline::previewBypass(true, 1, ['HTTP_X_TRACY_PREVIEW_KEY' => strrev($soKey)], $soStored),
+            SiteOffline::previewBypass(true, 1, [], $soStored),
             SiteOffline::previewBypass(true, 1, $soHeader, ''),
             SiteOffline::previewBypass(true, 1, $soHeader, 'not-a-hash'),
-            SiteOffline::previewBypass(true, 0, $soHeader, $soHash),
-            SiteOffline::previewBypass(false, 1, $soHeader, $soHash),
-            SiteOffline::previewBypass(true, 1, ['HTTP_X_TRACY_PREVIEW_KEY' => $soHash], $soHash),
+            SiteOffline::previewBypass(true, 0, $soHeader, $soStored),
+            SiteOffline::previewBypass(false, 1, $soHeader, $soStored),
+            SiteOffline::previewBypass(true, 1, ['HTTP_X_TRACY_PREVIEW_KEY' => $soHash], $soStored),
         ], array_fill(0, 7, false));
-        $soPreview = $soRequest(['previewHash' => $soHash, 'server' => $soHeader]);
+        check('rule: a key is honoured for six hours after it was set, then lapses', [
+            SiteOffline::previewBypass(true, 1, $soHeader, $soHash . ':' . ($soNow - 21600), $soNow),
+            SiteOffline::previewBypass(true, 1, $soHeader, $soHash . ':' . ($soNow - 21601), $soNow),
+            SiteOffline::previewBypass(true, 1, $soHeader, $soHash . ':' . ($soNow + 3600), $soNow),
+            SiteOffline::previewBypass(true, 1, $soHeader, $soHash, $soNow),
+        ], [true, false, false, false]);
+        $soPreview = $soRequest(['previewHash' => $soStored, 'server' => $soHeader]);
         check('plugin: the preview key header is served the site, out of every cache, reaching no door',
             [$soPreview['broken'] ?? null, $soPreview['page'] ?? null, $soPreview['caching'] ?? null, $soPreview['pageCache'] ?? null, $soPreview['cacheAllowed'] ?? null, $soPreview['logs'] ?? null],
             [null, 'site', [0, 0], [[false], [true]], false, []]);
-        check('plugin: a wrong preview key gets the offline page', $soRequest(['previewHash' => $soHash, 'server' => ['HTTP_X_TRACY_PREVIEW_KEY' => strrev($soKey)]])['page'] ?? null, 'offline');
-        check('plugin: no preview header gets the offline page', $soRequest(['previewHash' => $soHash])['page'] ?? null, 'offline');
-        check('plugin: the key in the query string gets the offline page', $soRequest(['previewHash' => $soHash, 'uri' => '/index.php?offline_preview_key=' . $soKey . '&preview_key=' . $soKey])['page'] ?? null, 'offline');
-        check('plugin: the key as a cookie gets the offline page', $soRequest(['previewHash' => $soHash, 'server' => ['HTTP_COOKIE' => 'X-Tracy-Preview-Key=' . $soKey]])['page'] ?? null, 'offline');
+        check('plugin: a wrong preview key gets the offline page', $soRequest(['previewHash' => $soStored, 'server' => ['HTTP_X_TRACY_PREVIEW_KEY' => strrev($soKey)]])['page'] ?? null, 'offline');
+        check('plugin: no preview header gets the offline page', $soRequest(['previewHash' => $soStored])['page'] ?? null, 'offline');
+        check('plugin: the key in the query string gets the offline page', $soRequest(['previewHash' => $soStored, 'uri' => '/index.php?offline_preview_key=' . $soKey . '&preview_key=' . $soKey])['page'] ?? null, 'offline');
+        check('plugin: the key as a cookie gets the offline page', $soRequest(['previewHash' => $soStored, 'server' => ['HTTP_COOKIE' => 'X-Tracy-Preview-Key=' . $soKey]])['page'] ?? null, 'offline');
         check('plugin: the header on a site holding no key gets the offline page', $soRequest(['server' => $soHeader])['page'] ?? null, 'offline');
-        check('plugin: a loopback address without the key is not a way in', $soRequest(['previewHash' => $soHash, 'server' => ['REMOTE_ADDR' => '127.0.0.1', 'HTTP_X_FORWARDED_FOR' => '127.0.0.1']])['page'] ?? null, 'offline');
-        check('plugin: the bearer token still works beside a stored key', $soRequest(['previewHash' => $soHash, 'server' => ['HTTP_AUTHORIZATION' => 'Bearer ' . $soToken]])['page'] ?? null, 'site');
+        check('plugin: a loopback address without the key is not a way in', $soRequest(['previewHash' => $soStored, 'server' => ['REMOTE_ADDR' => '127.0.0.1', 'HTTP_X_FORWARDED_FOR' => '127.0.0.1']])['page'] ?? null, 'offline');
+        check('plugin: a key set more than six hours ago gets the offline page', $soRequest(['previewHash' => $soHash . ':' . (time() - 21601), 'server' => $soHeader])['page'] ?? null, 'offline');
+        $soSave = static fn(array $config) => $soRequest(['save' => $config])['saved'] ?? null;
+        check('plugin: Global Configuration saved online clears the key, offline keeps it, other keys untouched', [
+            $soSave(['offline' => '0', 'sitename' => 'Lakeside Bakery', 'tracy_offline_preview_key' => $soStored]),
+            $soSave(['offline' => '1', 'tracy_offline_preview_key' => $soStored]),
+            $soSave(['offline' => '0', 'sitename' => 'Lakeside Bakery']),
+        ], [
+            ['offline' => '0', 'sitename' => 'Lakeside Bakery', 'tracy_offline_preview_key' => ''],
+            ['offline' => '1', 'tracy_offline_preview_key' => $soStored],
+            ['offline' => '0', 'sitename' => 'Lakeside Bakery'],
+        ]);
+        check('plugin: and it listens for that save', str_contains((string) file_get_contents(__DIR__ . '/../plg_system_claudecoworkapi/src/Extension/ClaudeCoworkApi.php'), "'onApplicationBeforeSave' => 'onApplicationBeforeSave'"), true);
+        check('plugin: the bearer token still works beside a stored key', $soRequest(['previewHash' => $soStored, 'server' => ['HTTP_AUTHORIZATION' => 'Bearer ' . $soToken]])['page'] ?? null, 'site');
 
         foreach (glob($soDir . '/*') ?: [] as $file) @unlink($file);
         @rmdir($soDir);

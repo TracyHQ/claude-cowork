@@ -129,6 +129,7 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
             'onAfterRender' => 'onAfterRender',
             'onBeforeCompileHead' => 'onBeforeCompileHead',
             'onBeforeRespond' => 'onBeforeRespond',
+            'onApplicationBeforeSave' => 'onApplicationBeforeSave',
         ];
     }
 
@@ -631,6 +632,29 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         if (method_exists(Factory::class, 'getConfig')) {
             Factory::getConfig()->set('offline', 0);
             Factory::getConfig()->set('caching', 0);
+        }
+    }
+
+    /**
+     * Global Configuration is about to be written (com_config, Joomla 4+). When it takes the site
+     * online, the offline lock's preview key goes with it (`lib/SiteIdentity.php`), so a key Tracy set
+     * for one lock never opens a later one the owner turns on by hand. The configuration about to be
+     * written is the event's subject (a Registry, position 0 on Joomla 4); it is changed in place,
+     * before the one write Joomla makes. A failure leaves the save as Joomla has it.
+     */
+    public function onApplicationBeforeSave(EventInterface $event): void
+    {
+        try {
+            $config = self::argument($event, ['subject'], 0);
+            if (!is_object($config) || !method_exists($config, 'get') || !method_exists($config, 'set')) {
+                return;
+            }
+            if ((int) $config->get('offline', 0) === 1 || (string) $config->get('tracy_offline_preview_key', '') === '') {
+                return;
+            }
+            $config->set('tracy_offline_preview_key', '');
+        } catch (\Throwable $e) {
+            Log::add('claudecoworkapi offline key: ' . $e->getMessage(), Log::WARNING, 'plg_system_claudecoworkapi');
         }
     }
 

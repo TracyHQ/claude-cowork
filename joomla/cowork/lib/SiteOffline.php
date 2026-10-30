@@ -17,7 +17,8 @@
  * `site.identity` (`offline_preview_key`) for one lock, so a reader that must never hold the site
  * token (a shell inside the site's container) can still read the site. The site stores only the
  * key's SHA-256 and compares in constant time; the key is never taken from the query string or a
- * cookie, and turning the site online clears it. Served exactly as the token bypass is.
+ * cookie, it lapses six hours after it was set, and turning the site online clears it. Served exactly
+ * as the token bypass is.
  *
  * Never by the request's address: the Joomla image's mod_remoteip rewrites REMOTE_ADDR from
  * X-Forwarded-For for any private peer, so a request through a proxy can claim to be 127.0.0.1.
@@ -48,17 +49,22 @@ final class SiteOffline
     /**
      * Whether this request is served the real site although the site is offline, by the lock's
      * preview key: a site-client request, on an offline site holding a key, whose
-     * `X-Tracy-Preview-Key` header hashes to it. No header, a malformed one or no stored key: no.
+     * `X-Tracy-Preview-Key` header hashes to it, within {@see SiteIdentity::PREVIEW_TTL} seconds of
+     * the key being set. No header, a malformed one, no stored key or a lapsed one: no.
      *
      * @param scalar|null $offline Joomla's `offline` as the application holds it
      * @param array<string,mixed> $server the request's `$_SERVER`
      * @param mixed $storedHash the configuration's {@see SiteIdentity::PREVIEW_HASH}
      */
-    public static function previewBypass(bool $siteClient, $offline, array $server, $storedHash): bool
+    public static function previewBypass(bool $siteClient, $offline, array $server, $storedHash, ?int $now = null): bool
     {
         if (!$siteClient || SiteIdentity::typed('offline', $offline) !== 1) return false;
         $stored = SiteIdentity::typed(SiteIdentity::PREVIEW_HASH, is_scalar($storedHash) ? $storedHash : null);
         if ($stored === '') return false;
+        [$stored, $at] = explode(':', $stored, 2);
+        $age = ($now ?? time()) - (int) $at;
+        // Lapsed, or set in the future (a clock moved back): either way not this lock's key.
+        if ($age > SiteIdentity::PREVIEW_TTL || $age < -300) return false;
         $key = $server[self::PREVIEW_HEADER] ?? null;
         if (!is_string($key) || preg_match(SiteIdentity::PREVIEW_KEY_PATTERN, $key) !== 1) return false;
         return hash_equals($stored, hash('sha256', $key));

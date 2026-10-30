@@ -656,8 +656,10 @@ site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitena
   administrator login is Joomla's. **The preview key.** A reader that must never hold the token (a
   shell inside the site's container) uses a key set for one lock: `offline_preview_key`, 32 to 128
   characters of `[A-Za-z0-9_-]`, write-only (a read answers `offline_preview_key_set: true|false`;
-  only its SHA-256 is stored, in `configuration.php`), cleared by `offline: 0` (with a key in the
-  same set it is `bad_params`) and taken back by `apply.revert` with the lock. While offline, a
+  only its SHA-256 and the time it was set are stored, in `configuration.php`), honoured for six
+  hours after it was set (send a new one with each lock), cleared by `offline: 0` (with a key in the
+  same set it is `bad_params`) and by a Global Configuration save that takes the site online, and
+  taken back by `apply.revert` with the lock. While offline, a
   front-end request whose `X-Tracy-Preview-Key` header matches is served as the token bypass is;
   never from the query string or a cookie. Never by address either: the Joomla image's mod_remoteip
   lets any proxied request claim `127.0.0.1`. `info` advertises it as `site_offline: {version: 1,

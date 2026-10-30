@@ -22,9 +22,10 @@
  *
  * `offline_preview_key` is write-only: a key Tracy chooses for one lock, 32 to 128 characters of
  * `[A-Za-z0-9_-]`. While the site is offline, a front-end request carrying it as
- * `X-Tracy-Preview-Key` sees the site ({@see SiteOffline::previewBypass}). Only its SHA-256 is
- * stored, as {@see PREVIEW_HASH}; a read answers `offline_preview_key_set` and never the key, and
- * setting `offline` to 0 clears it.
+ * `X-Tracy-Preview-Key` sees the site ({@see SiteOffline::previewBypass}) for {@see PREVIEW_TTL}
+ * seconds after it was set. Only its SHA-256 and the time it was set are stored, as
+ * {@see PREVIEW_HASH}; a read answers `offline_preview_key_set` and never the key. Setting `offline`
+ * to 0 clears it, here or in Global Configuration (the system plugin's `onApplicationBeforeSave`).
  *
  * Beside them, the store keeps one key of its own, {@see HomeTitle::MARK}: the switch value Tracy
  * last set, written and undone with the switch, so the system plugin prints the home tab as the site
@@ -88,8 +89,14 @@ final class SiteIdentity
     /** What a read answers in its place: whether a preview key is stored. */
     public const PREVIEW_KEY_SET = 'offline_preview_key_set';
 
-    /** The configuration key holding the preview key's SHA-256 (lowercase hex), or '' for none. */
+    /**
+     * The configuration key holding the preview key as `<SHA-256 lowercase hex>:<unix time it was set>`,
+     * or '' for none.
+     */
     public const PREVIEW_HASH = 'tracy_offline_preview_key';
+
+    /** How long a preview key is honoured after it was set: six hours, longer than any build. Tracy sends a new one with each lock. */
+    public const PREVIEW_TTL = 21600;
 
     /** A preview key as a caller sends it: 32 to 128 URL-safe characters. */
     public const PREVIEW_KEY_PATTERN = '/^[A-Za-z0-9_-]{32,128}$/D';
@@ -143,12 +150,12 @@ final class SiteIdentity
      * @param mixed $value
      * @return array{value:string|int}|array{error:string}
      */
-    public static function clean(string $field, $value): array
+    public static function clean(string $field, $value, ?int $now = null): array
     {
         if ($field === self::PREVIEW_KEY) {
             if (!is_string($value) || preg_match(self::PREVIEW_KEY_PATTERN, $value) !== 1)
                 return ['error' => 'offline_preview_key must be 32 to 128 characters of A-Z, a-z, 0-9, _ and -'];
-            return ['value' => hash('sha256', $value)];
+            return ['value' => hash('sha256', $value) . ':' . ($now ?? time())];
         }
         if (!in_array($field, self::FIELDS, true)) return ['error' => $field . ' is not a site identity field'];
         if (isset(self::INTEGERS[$field])) {
@@ -234,10 +241,10 @@ final class SiteIdentity
         return in_array($number, $allowed, true) ? $number : $default;
     }
 
-    /** A stored preview key: '' (none) or a SHA-256 as lowercase hex. */
+    /** A stored preview key: '' (none) or `<SHA-256 as lowercase hex>:<unix time>`. */
     public static function isPreviewHash(string $value): bool
     {
-        return $value === '' || preg_match('/^[0-9a-f]{64}$/D', $value) === 1;
+        return $value === '' || preg_match('/^[0-9a-f]{64}:[0-9]{1,12}$/D', $value) === 1;
     }
 }
 
