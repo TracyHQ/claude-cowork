@@ -217,7 +217,8 @@ interface SiteWriter
     /**
      * Give one existing menu item a new alias, and its branch the paths that follow from it.
      *
-     * Only for moving an archive's own row out of the way: Joomla keeps one alias per (client,
+     * For moving an archive's own row out of the way, and for `content.update` naming a menu
+     * item's `alias` (the engine checks the siblings first). Joomla keeps one alias per (client,
      * parent, language), and a quickstart that ships an edition in the language a customer asks
      * for already holds every alias its copy must take (Business: 43 editions; measured 23/09/2026
      * on j-ee6vsk, `Duplicate entry '0-1-home-vi-VN'`). Like setVisibility, not the Table: a menu
@@ -254,7 +255,7 @@ interface SiteWriter
      * The site menu items whose parent is `$parent`, read with a LOCKING read (`FOR UPDATE`) inside the
      * caller's transaction: the latest committed rows rather than its snapshot, with the gap under that
      * parent locked so a child another connection adds waits until the caller commits. Each row carries
-     * id, parent_id, lft (the menu order), menutype, language, published and params. On MariaDB with innodb_snapshot_isolation
+     * id, parent_id, lft (the menu order), menutype, language, published, params and alias. On MariaDB with innodb_snapshot_isolation
      * ON, a child committed since the snapshot makes the read throw (error 1020) instead: the caller's
      * transaction rolls back with nothing written.
      *

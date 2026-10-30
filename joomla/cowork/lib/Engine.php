@@ -492,7 +492,9 @@ final class Engine
                 ], 'files_pack' => [
                     'max_paths' => self::MAX_PACK_PATHS,
                 ]] + ($this->templateFiles === null ? [] : ['template_files' => $this->templateFiles->info()])
-                    + ($this->siteIdentity === null || !$this->offlineBypass ? [] : ['site_offline' => SiteOffline::capability()])]);
+                    + ($this->siteIdentity === null || !$this->offlineBypass ? [] : ['site_offline' => SiteOffline::capability()])
+                    // content.update kind menuItem takes `alias` (realiasMenuItemStep).
+                    + ($this->writer === null ? [] : ['menu_item_alias' => ['version' => 1]])]);
             case 'site.stats':
                 return $this->siteStats();
             case 'site.fingerprint':
@@ -4615,8 +4617,23 @@ final class Engine
             ];
             unset($fields['parent_id'], $fields['move_after']);
         }
-        if ($fields === [] && $moveTo === null) {
+        // On an EXISTING menu item, `alias` is a re-alias: the item's own path and the path of every
+        // descendant follow it (SiteWriter::realiasMenuItem), so it never reaches the column whitelist.
+        $aliasTo = null;
+        if ($kind === 'menuItem' && $id > 0 && array_key_exists('alias', $fields)) {
+            $aliasTo = $fields['alias'];
+            unset($fields['alias']);
+            if (($refusal = self::menuAliasRefusal($aliasTo)) !== null) return $this->err('bad_params', $refusal);
+        }
+        if ($fields === [] && $moveTo === null && $aliasTo === null) {
             return $this->err('bad_params', 'fields required');
+        }
+        // Every refusal of the alias (a missing item, a sibling holding it) comes before anything is written.
+        $aliasFrom = null;
+        if ($aliasTo !== null) {
+            $checked = $this->menuAliasCheck($id, $aliasTo);
+            if (isset($checked['error'])) return $checked['error'];
+            $aliasFrom = $checked['before'];
         }
 
         if ($moveTo !== null) {
@@ -4671,6 +4688,11 @@ final class Engine
             }
         }
 
+        // After the field edit, so a revert takes the alias back first, then the row as it was.
+        if ($aliasTo !== null && $aliasFrom !== $aliasTo && ($refusal = $this->realiasMenuItemStep($applyId, $id, $aliasFrom, $aliasTo, $fields !== [] || $moveTo !== null)) !== null) {
+            return $refusal;
+        }
+
         try {
             if (!$this->batching) $this->writer->purgeCache();
         } catch (Throwable $e) {
@@ -4680,6 +4702,9 @@ final class Engine
         if (!$this->batching) $this->stamped('content');
 
         $out = ['kind' => $kind, 'id' => $newId, 'created' => $fields !== [] && $before === null && $id === 0];
+        if ($aliasTo !== null) {
+            $out['alias'] = $aliasTo;
+        }
         if ($moveTo !== null) {
             $out['moved'] = true;
         }
@@ -4687,6 +4712,70 @@ final class Engine
             $out['warnings'] = [$warning];
         }
         return $this->ok($out);
+    }
+
+    /** Joomla's own shape of a menu alias, at most the column's 400 characters, and never a bare number. */
+    public const MENU_ALIAS_PATTERN = '/^[a-z0-9][a-z0-9-]*$/D';
+
+    /** Why a value cannot be a menu item's alias, or null when it can. */
+    private static function menuAliasRefusal($alias): ?string
+    {
+        if (!is_string($alias) || !preg_match(self::MENU_ALIAS_PATTERN, $alias) || strlen($alias) > 400)
+            return 'alias must be lowercase letters, digits and hyphens, starting with a letter or digit, at most 400 characters';
+        // Joomla turns an all-digit alias into a date-time one: a router reads a number as an id.
+        if (preg_match('/^[0-9]+$/D', $alias)) return 'alias cannot be only digits: Joomla reads a number in a URL as an id';
+        return null;
+    }
+
+    /**
+     * `content.update` kind `menuItem` with `fields.alias` (`info.menu_item_alias`), before anything is
+     * written: the item exists, and no sibling (same parent, front-end menu, same language) already holds
+     * the alias, as Joomla's unique index would refuse it (`conflict`).
+     *
+     * @return array{before:string}|array{error:array}
+     */
+    private function menuAliasCheck(int $id, string $alias): array
+    {
+        try {
+            $row = $this->writer->read('menuItem', $id);
+            if ($row === null) return ['error' => $this->err('not_found', 'menuItem ' . $id . ' does not exist')];
+            $before = (string) ($row['alias'] ?? '');
+            if ($before === $alias) return ['before' => $before];
+            $language = (string) ($row['language'] ?? '');
+            foreach ($this->writer->lockMenuChildren((int) ($row['parent_id'] ?? 0)) as $sibling) {
+                if ((int) ($sibling['id'] ?? 0) !== $id && (string) ($sibling['alias'] ?? '') === $alias && (string) ($sibling['language'] ?? '') === $language)
+                    return ['error' => $this->err('conflict', 'menu item ' . (int) $sibling['id'] . ' under the same parent, in ' . $language . ', already has the alias ' . $alias . '. Nothing was written')];
+            }
+        } catch (Throwable $e) {
+            return ['error' => $this->err('read_failed', $e->getMessage())];
+        }
+        return ['before' => $before];
+    }
+
+    /**
+     * The re-alias itself: the item takes the new alias and its branch the paths that follow, through
+     * the same `realiasMenuItem` a language step uses, with the same `alias` undo entry, so
+     * `apply.revert` puts the alias and every path back. The same alias again writes and records nothing.
+     *
+     * @return array|null the refusal, or null when the alias is in place
+     */
+    private function realiasMenuItemStep(string $applyId, int $id, string $before, string $alias, bool $landed): ?array
+    {
+        $extra = $landed ? ['landed' => true] : [];
+        $prefix = $landed ? 'the other changes landed (revert via apply.revert); the alias did not: ' : '';
+        try {
+            // Undo first, as a language step does: a row whose way back was not recorded is never moved.
+            $this->log->record($applyId, ['op' => 'alias', 'kind' => 'menuItem', 'id' => $id, 'before' => $before]);
+        } catch (Throwable $e) {
+            return $this->err('write_failed', $prefix . 'could not record its undo', $extra);
+        }
+        try {
+            $this->writer->realiasMenuItem($id, $alias);
+        } catch (Throwable $e) {
+            // The recorded step puts back the alias the row still holds: harmless when reverted.
+            return $this->err('write_failed', $prefix . $e->getMessage(), $extra);
+        }
+        return null;
     }
 
     /**

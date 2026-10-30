@@ -2204,6 +2204,8 @@ require __DIR__ . "/written-source-language.php";
 require __DIR__ . "/site-identity.php";
 // The offline lock through site.identity, its capability, and the token's bypass in the shipped plugin.
 require __DIR__ . "/site-offline.php";
+// content.update menuItem `alias`: a re-alias that moves the branch's paths and reverts (info.menu_item_alias).
+require __DIR__ . "/menu-item-alias.php";
 // The home tab reads the site name alone (lib/HomeTitle.php).
 require __DIR__ . "/home-title.php";
 require __DIR__ . "/t3-offcanvas.php";
