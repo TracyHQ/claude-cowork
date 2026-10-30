@@ -83,7 +83,8 @@ use Tracy\Component\ClaudeCowork\Administrator\Service\EngineFactory;
  *
  * Tracy turns a site offline while a brief build writes it (`site.identity` `offline` = 1) and reads
  * it as a visitor would to check what it wrote. A front-end request carrying the site's cowork token
- * as `Authorization: Bearer <token>` is served the site as if it were online (`lib/SiteOffline.php`):
+ * as `Authorization: Bearer <token>`, or the lock's preview key as `X-Tracy-Preview-Key`, is served
+ * the site as if it were online (`lib/SiteOffline.php`):
  * `onAfterInitialise` switches `offline` off for that request only, before Joomla decides at render
  * whether to print `offline.php`. Nobody is logged in, and the page is kept out of every cache like
  * a stamped one, so the public never gets the copy Tracy saw. Every other request, a wrong token
@@ -591,7 +592,8 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
 
     /**
      * Serve this request the site although it is offline? Only on the site client, only while the
-     * site is offline, only for the site's own token as a Bearer header (`SiteOffline::bypass`). When
+     * site is offline, only for the site's own token as a Bearer header (`SiteOffline::bypass`) or the
+     * lock's preview key as `X-Tracy-Preview-Key` (`SiteOffline::previewBypass`). When
      * yes, `offline` is switched off for this request alone, before the render decides on
      * `offline.php`, and Joomla's caching with it, as for a stamped page: the page cache must neither
      * store this copy for the public nor answer it with one.
@@ -603,15 +605,22 @@ final class ClaudeCoworkApi extends CMSPlugin implements SubscriberInterface
         if (!$app->isClient('site') || !$app->get('offline')) {
             return;
         }
-        if (!isset($_SERVER['HTTP_AUTHORIZATION']) && !isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $bearer = isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION']);
+        $preview = isset($_SERVER['HTTP_X_TRACY_PREVIEW_KEY']);
+        if (!$bearer && !$preview) {
             return;
         }
         if (!class_exists(EngineFactory::class) || !EngineFactory::installed()) {
             return;
         }
         EngineFactory::loadSiteOffline();
-        $token = (string) ComponentHelper::getParams('com_claudecowork')->get('token', '');
-        if (!\SiteOffline::bypass(true, $app->get('offline'), $_SERVER, $token)) {
+        // The lock's preview key: its hash sits in configuration.php, which Joomla already loaded.
+        $served = $preview && \SiteOffline::previewBypass(true, $app->get('offline'), $_SERVER, $app->get(\SiteIdentity::PREVIEW_HASH));
+        if (!$served && $bearer) {
+            $token = (string) ComponentHelper::getParams('com_claudecowork')->get('token', '');
+            $served = \SiteOffline::bypass(true, $app->get('offline'), $_SERVER, $token);
+        }
+        if (!$served) {
             return;
         }
 

@@ -5090,7 +5090,7 @@ final class Engine
                 $step['files'] = [$entry['path'] ?? null];
             } elseif ($op === 'siteIdentity') {
                 // Which of the two it changed, never the words: a listing is for verifying.
-                $step['fields'] = array_keys(self::identityShown(self::identityValues($entry['before'] ?? null)));
+                $step['fields'] = self::identityChanged(self::identityValues($entry['before'] ?? null));
             } elseif ($op === TemplateFiles::LOG_OP) {
                 $step['path'] = $entry['path'] ?? null;
                 $step['undo_id'] = $entry['undo_id'] ?? null;
@@ -5241,7 +5241,9 @@ final class Engine
      *   Joomla's own form cleans them (tags removed, one line; the offline message keeps its lines and
      *   is stored escaped) and refused past their length; `sitename_pagetitles` is 0, 1 or 2 (no,
      *   before, after), `offline` 0 or 1, `display_offline_message` 0, 1 or 2 (none, custom, Joomla's
-     *   default), each stored as an integer.
+     *   default), each stored as an integer. `offline_preview_key` (write-only, 32 to 128 characters of
+     *   `[A-Za-z0-9_-]`) is stored as its SHA-256; a read answers `offline_preview_key_set` instead,
+     *   and `offline: 0` clears it (with a key in the same set it is refused).
      *   A field already holding that value is not written; when none changes, nothing is written or
      *   recorded (`unchanged: true`), so a retry after a lost reply adds no second undo step. What
      *   changes is recorded under the `apply_id` with its previous value, so `apply.revert` puts the
@@ -5288,6 +5290,12 @@ final class Engine
         }
         $clean = [];
         foreach ($fields as $name => $value) {
+            if ($name === SiteIdentity::PREVIEW_KEY) {
+                $cleaned = SiteIdentity::clean($name, $value);
+                if (isset($cleaned['error'])) return $this->err('bad_params', $cleaned['error']);
+                $clean[SiteIdentity::PREVIEW_HASH] = $cleaned['value'];
+                continue;
+            }
             if (!in_array($name, SiteIdentity::FIELDS, true)) {
                 return $this->err('unsupported', substr((string) $name, 0, 60) . ' cannot be written through site.identity: only ' . self::identityList() . ' can. Nothing was written');
             }
@@ -5300,6 +5308,12 @@ final class Engine
         // Tracy's mark follows every set of the switch, in the same write and the same undo step, so the
         // system plugin knows the switch is Tracy's (lib/HomeTitle.php) until `apply.revert` takes both back.
         if (array_key_exists(SiteIdentity::PAGE_TITLES, $clean)) $clean[HomeTitle::MARK] = $clean[SiteIdentity::PAGE_TITLES];
+        // A preview key lives only as long as its lock: taking the site online clears it.
+        if (($clean['offline'] ?? null) === 0) {
+            if (($clean[SiteIdentity::PREVIEW_HASH] ?? '') !== '')
+                return $this->err('bad_params', 'offline_preview_key cannot be set with offline 0: a preview key lives only while the site is offline');
+            $clean[SiteIdentity::PREVIEW_HASH] = '';
+        }
         try {
             $before = $this->siteIdentity->read();
         } catch (Throwable $e) {
@@ -5307,7 +5321,7 @@ final class Engine
         }
         $changes = [];
         foreach ($clean as $name => $value) {
-            if ($before[$name] !== $value) $changes[$name] = $value;
+            if (($before[$name] ?? null) !== $value) $changes[$name] = $value;
         }
         if ($changes === []) {
             return $this->ok(['fields' => self::identityShown($before), 'changed' => [], 'unchanged' => true]);
@@ -5344,7 +5358,7 @@ final class Engine
             Timing::end('purge', $t);
         }
         $this->stamped('content');
-        return $this->ok(['fields' => self::identityShown(array_merge($before, $changes)), 'changed' => array_keys(self::identityShown($changes))]);
+        return $this->ok(['fields' => self::identityShown(array_merge($before, $changes)), 'changed' => self::identityChanged($changes)]);
     }
 
     /**
@@ -5356,7 +5370,24 @@ final class Engine
      */
     private static function identityShown(array $values): array
     {
-        return array_intersect_key($values, array_flip(SiteIdentity::FIELDS));
+        $shown = array_intersect_key($values, array_flip(SiteIdentity::FIELDS));
+        // The preview key is write-only: whether one is stored, never its hash.
+        if (array_key_exists(SiteIdentity::PREVIEW_HASH, $values)) $shown[SiteIdentity::PREVIEW_KEY_SET] = $values[SiteIdentity::PREVIEW_HASH] !== '';
+        return $shown;
+    }
+
+    /**
+     * The door's keys a set of stored values names, as a caller wrote them: the preview key's hash is
+     * `offline_preview_key`, Tracy's mark is never named.
+     *
+     * @param array<string,mixed> $values
+     * @return list<string>
+     */
+    private static function identityChanged(array $values): array
+    {
+        $names = array_keys(array_intersect_key($values, array_flip(SiteIdentity::FIELDS)));
+        if (array_key_exists(SiteIdentity::PREVIEW_HASH, $values)) $names[] = SiteIdentity::PREVIEW_KEY;
+        return $names;
     }
 
     /**
@@ -5618,6 +5649,8 @@ final class Engine
         foreach (SiteIdentity::FIELDS as $field) {
             if (array_key_exists($field, $before) && is_scalar($before[$field])) $out[$field] = SiteIdentity::typed($field, $before[$field]);
         }
+        if (array_key_exists(SiteIdentity::PREVIEW_HASH, $before) && is_scalar($before[SiteIdentity::PREVIEW_HASH]))
+            $out[SiteIdentity::PREVIEW_HASH] = SiteIdentity::typed(SiteIdentity::PREVIEW_HASH, $before[SiteIdentity::PREVIEW_HASH]);
         // The mark comes back as it was, absence included: null takes it out of the file.
         if (array_key_exists(HomeTitle::MARK, $before) && ($before[HomeTitle::MARK] === null || is_scalar($before[HomeTitle::MARK])))
             $out[HomeTitle::MARK] = SiteIdentity::typed(HomeTitle::MARK, $before[HomeTitle::MARK]);

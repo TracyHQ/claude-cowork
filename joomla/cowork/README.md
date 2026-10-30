@@ -653,8 +653,16 @@ site.identity {operation: "set", apply_id, fields: {sitename?, MetaDesc?, sitena
   switches `offline` off for that request alone at `onAfterInitialise`, logs nobody in, and keeps the
   page out of Joomla's caches and every shared cache, like a stamped page. No header, a wrong token,
   the token anywhere else, or a site without a token gets Joomla's own offline page; the
-  administrator login is Joomla's. `info` advertises it as `site_offline: {version: 1, fields: [the
-  three keys], bypass: "authorization-bearer"}`: check it before turning a site offline. The Joomla 3
+  administrator login is Joomla's. **The preview key.** A reader that must never hold the token (a
+  shell inside the site's container) uses a key set for one lock: `offline_preview_key`, 32 to 128
+  characters of `[A-Za-z0-9_-]`, write-only (a read answers `offline_preview_key_set: true|false`;
+  only its SHA-256 is stored, in `configuration.php`), cleared by `offline: 0` (with a key in the
+  same set it is `bad_params`) and taken back by `apply.revert` with the lock. While offline, a
+  front-end request whose `X-Tracy-Preview-Key` header matches is served as the token bypass is;
+  never from the query string or a cookie. Never by address either: the Joomla image's mod_remoteip
+  lets any proxied request claim `127.0.0.1`. `info` advertises it as `site_offline: {version: 1,
+  fields: [the three keys], bypass: "authorization-bearer", bypass_also: ["preview-key"]}`: check
+  it before turning a site offline. The Joomla 3
   entry has no bypass, so there `info` does not advertise it; a plugin older than this refuses the
   keys with `unsupported` and writes nothing. Tested against Joomla stand-ins (`tests/site-offline.php`);
   not yet proven on a real install.

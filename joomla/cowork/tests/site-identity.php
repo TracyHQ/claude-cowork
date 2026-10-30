@@ -159,7 +159,7 @@ if (function_exists('check')) {
 
     $siRead = $siCall($siEngine, []);
     // The offline keys as this door types them: Joomla's installer writes `offline` as a boolean.
-    $siOffline = ['offline' => 0, 'offline_message' => $siConfig['offline_message'], 'display_offline_message' => 1];
+    $siOffline = ['offline' => 0, 'offline_message' => $siConfig['offline_message'], 'display_offline_message' => 1, 'offline_preview_key_set' => false];
     check('read answers the six values and whether a set would land', $siRead,
         ['ok' => true, 'fields' => ['sitename' => 'ja_vega', 'MetaDesc' => $siConfig['MetaDesc'], 'sitename_pagetitles' => 1] + $siOffline, 'writable' => true]);
     check('operation read is the default', $siCall($siEngine, ['operation' => 'read']), $siRead);
@@ -228,7 +228,7 @@ if (function_exists('check')) {
     check('the mark never leaves the door: not in the answer, not in a read, not in apply.list',
         [array_keys($siTitles['fields']), array_keys($siCall($siEngine, [])['fields']),
             $siEngine->handle(['token' => $siToken, 'action' => 'apply.list', 'params' => ['apply_id' => 'apply-titles']])['steps'][0]['fields']],
-        [SiteIdentity::FIELDS, SiteIdentity::FIELDS, ['sitename', 'sitename_pagetitles']]);
+        [array_merge(SiteIdentity::FIELDS, ['offline_preview_key_set']), array_merge(SiteIdentity::FIELDS, ['offline_preview_key_set']), ['sitename', 'sitename_pagetitles']]);
     check('a caller cannot write the mark', $siSet([HomeTitle::MARK => 2], 'apply-mark')['error'], 'unsupported');
     check('the same setting again writes nothing', $siCall($siEngine, ['operation' => 'set', 'apply_id' => 'apply-titles', 'fields' => ['sitename_pagetitles' => 2]])['unchanged'] ?? null, true);
     $siEngine->handle(['token' => $siToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-titles']]);

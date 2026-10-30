@@ -13,6 +13,15 @@
  * logged in, no session is opened, and the system plugin keeps the page out of every cache. Every
  * other request gets Joomla's own offline page, and the administrator login works as Joomla has it.
  *
+ * Or a request carrying the lock's preview key as `X-Tracy-Preview-Key: <key>`: a key Tracy sets with
+ * `site.identity` (`offline_preview_key`) for one lock, so a reader that must never hold the site
+ * token (a shell inside the site's container) can still read the site. The site stores only the
+ * key's SHA-256 and compares in constant time; the key is never taken from the query string or a
+ * cookie, and turning the site online clears it. Served exactly as the token bypass is.
+ *
+ * Never by the request's address: the Joomla image's mod_remoteip rewrites REMOTE_ADDR from
+ * X-Forwarded-For for any private peer, so a request through a proxy can claim to be 127.0.0.1.
+ *
  * No Joomla dependency, like the rest of `lib/`: the system plugin hands in what Joomla holds.
  */
 
@@ -24,11 +33,35 @@ final class SiteOffline
     /** The `info` entry a caller checks before it turns a site offline: the keys, and how the bypass is asked for. */
     public const VERSION = 1;
     public const BYPASS = 'authorization-bearer';
+    /** Further ways in, beside {@see BYPASS}; a v1 reader that knows only `bypass` is unaffected. */
+    public const BYPASS_ALSO = ['preview-key'];
 
-    /** @return array{version:int,fields:list<string>,bypass:string} */
+    /** The header a preview key travels in, as PHP names it in `$_SERVER`. */
+    public const PREVIEW_HEADER = 'HTTP_X_TRACY_PREVIEW_KEY';
+
+    /** @return array{version:int,fields:list<string>,bypass:string,bypass_also:list<string>} */
     public static function capability(): array
     {
-        return ['version' => self::VERSION, 'fields' => SiteIdentity::OFFLINE_FIELDS, 'bypass' => self::BYPASS];
+        return ['version' => self::VERSION, 'fields' => SiteIdentity::OFFLINE_FIELDS, 'bypass' => self::BYPASS, 'bypass_also' => self::BYPASS_ALSO];
+    }
+
+    /**
+     * Whether this request is served the real site although the site is offline, by the lock's
+     * preview key: a site-client request, on an offline site holding a key, whose
+     * `X-Tracy-Preview-Key` header hashes to it. No header, a malformed one or no stored key: no.
+     *
+     * @param scalar|null $offline Joomla's `offline` as the application holds it
+     * @param array<string,mixed> $server the request's `$_SERVER`
+     * @param mixed $storedHash the configuration's {@see SiteIdentity::PREVIEW_HASH}
+     */
+    public static function previewBypass(bool $siteClient, $offline, array $server, $storedHash): bool
+    {
+        if (!$siteClient || SiteIdentity::typed('offline', $offline) !== 1) return false;
+        $stored = SiteIdentity::typed(SiteIdentity::PREVIEW_HASH, is_scalar($storedHash) ? $storedHash : null);
+        if ($stored === '') return false;
+        $key = $server[self::PREVIEW_HEADER] ?? null;
+        if (!is_string($key) || preg_match(SiteIdentity::PREVIEW_KEY_PATTERN, $key) !== 1) return false;
+        return hash_equals($stored, hash('sha256', $key));
     }
 
     /**

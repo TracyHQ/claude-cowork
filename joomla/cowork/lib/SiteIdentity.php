@@ -20,6 +20,12 @@
  *   it wrote. Integers as Joomla's form stores them; the message is plain text, stored as the
  *   escaped HTML Joomla's offline page prints raw.
  *
+ * `offline_preview_key` is write-only: a key Tracy chooses for one lock, 32 to 128 characters of
+ * `[A-Za-z0-9_-]`. While the site is offline, a front-end request carrying it as
+ * `X-Tracy-Preview-Key` sees the site ({@see SiteOffline::previewBypass}). Only its SHA-256 is
+ * stored, as {@see PREVIEW_HASH}; a read answers `offline_preview_key_set` and never the key, and
+ * setting `offline` to 0 clears it.
+ *
  * Beside them, the store keeps one key of its own, {@see HomeTitle::MARK}: the switch value Tracy
  * last set, written and undone with the switch, so the system plugin prints the home tab as the site
  * name alone only on a site where Tracy turned the name on ({@see HomeTitle}). No caller of the door
@@ -44,7 +50,7 @@ require_once __DIR__ . '/HomeTitle.php';
 interface SiteIdentityStore
 {
     /**
-     * @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int,offline:int,offline_message:string,display_offline_message:int,tracy_sitename_pagetitles:?int} the values as
+     * @return array{sitename:string,MetaDesc:string,sitename_pagetitles:int,offline:int,offline_message:string,display_offline_message:int,tracy_offline_preview_key:string,tracy_sitename_pagetitles:?int} the values as
      *   the site holds them now, and Tracy's mark ({@see HomeTitle::MARK}), null when absent
      */
     public function read(): array;
@@ -76,8 +82,20 @@ final class SiteIdentity
     /** The keys of the offline lock, a subset of {@see FIELDS}; `info` advertises them as `site_offline`. */
     public const OFFLINE_FIELDS = ['offline', 'offline_message', 'display_offline_message'];
 
-    /** What the store reads and writes: the door's keys and Tracy's mark ({@see HomeTitle::MARK}), never a caller's. */
-    public const STORED = ['sitename', 'MetaDesc', 'sitename_pagetitles', 'offline', 'offline_message', 'display_offline_message', HomeTitle::MARK];
+    /** The write-only key of the offline lock: a set takes it, a read never answers it. */
+    public const PREVIEW_KEY = 'offline_preview_key';
+
+    /** What a read answers in its place: whether a preview key is stored. */
+    public const PREVIEW_KEY_SET = 'offline_preview_key_set';
+
+    /** The configuration key holding the preview key's SHA-256 (lowercase hex), or '' for none. */
+    public const PREVIEW_HASH = 'tracy_offline_preview_key';
+
+    /** A preview key as a caller sends it: 32 to 128 URL-safe characters. */
+    public const PREVIEW_KEY_PATTERN = '/^[A-Za-z0-9_-]{32,128}$/D';
+
+    /** What the store reads and writes: the door's keys, the preview key's hash and Tracy's mark ({@see HomeTitle::MARK}), never a caller's. */
+    public const STORED = ['sitename', 'MetaDesc', 'sitename_pagetitles', 'offline', 'offline_message', 'display_offline_message', self::PREVIEW_HASH, HomeTitle::MARK];
 
     /** The integer key, and the values Joomla's form offers for it: 0 no, 1 before, 2 after. */
     public const PAGE_TITLES = 'sitename_pagetitles';
@@ -127,6 +145,11 @@ final class SiteIdentity
      */
     public static function clean(string $field, $value): array
     {
+        if ($field === self::PREVIEW_KEY) {
+            if (!is_string($value) || preg_match(self::PREVIEW_KEY_PATTERN, $value) !== 1)
+                return ['error' => 'offline_preview_key must be 32 to 128 characters of A-Z, a-z, 0-9, _ and -'];
+            return ['value' => hash('sha256', $value)];
+        }
         if (!in_array($field, self::FIELDS, true)) return ['error' => $field . ' is not a site identity field'];
         if (isset(self::INTEGERS[$field])) {
             [$allowed, , $refusal] = self::INTEGERS[$field];
@@ -183,6 +206,7 @@ final class SiteIdentity
     {
         if (!in_array($field, self::STORED, true)) return false;
         if ($field === HomeTitle::MARK) return is_int($value) || $value === null;
+        if ($field === self::PREVIEW_HASH) return is_string($value) && self::isPreviewHash($value);
         if (isset(self::INTEGERS[$field])) return is_int($value);
         return is_string($value);
     }
@@ -200,12 +224,20 @@ final class SiteIdentity
         // The mark: absent stays absent (null), anything else is the switch value it names, or absent.
         if ($field === HomeTitle::MARK)
             return is_numeric($value) && in_array((int) $value, self::PAGE_TITLE_VALUES, true) ? (int) $value : null;
+        // The preview key's hash: anything that is not one reads as no key.
+        if ($field === self::PREVIEW_HASH) return is_string($value) && self::isPreviewHash($value) ? $value : '';
         if (!isset(self::INTEGERS[$field])) return is_scalar($value) ? (string) $value : '';
         [$allowed, $default] = self::INTEGERS[$field];
         // Joomla's installer writes `offline` as a boolean; its form saves an integer.
         if (is_bool($value)) $value = (int) $value;
         $number = is_numeric($value) ? (int) $value : $default;
         return in_array($number, $allowed, true) ? $number : $default;
+    }
+
+    /** A stored preview key: '' (none) or a SHA-256 as lowercase hex. */
+    public static function isPreviewHash(string $value): bool
+    {
+        return $value === '' || preg_match('/^[0-9a-f]{64}$/D', $value) === 1;
     }
 }
 
