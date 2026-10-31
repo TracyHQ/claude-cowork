@@ -62,3 +62,11 @@ do {
     $crWalk=$crPart['blocksPagination']['nextCursor']===null?null:ContentReader::parse(parse_url($crPart['links']['next'],PHP_URL_QUERY));
 } while($crWalk!==null);
 check('discovery walks all 400 blocks without looping to body',$crCount,400);
+
+// The complete projection stamp covers routing/locks even when the content-only revision is held.
+$crRouted=$crRows; $crRouted['content_b']['url']='https://fixture.invalid/new-address';
+$crRoutedReader=new ContentReader($crSite,[],$crRouted,'v1','unit-secret','service',100);
+check('inventory fingerprint includes address changes beyond the first page',
+    $crRoutedReader->read(['limit'=>1])['snapshot']['inventoryRevision']!==$crList['snapshot']['inventoryRevision'],true);
+check('inventory fingerprint does not alter content snapshot revision',
+    $crRoutedReader->read(['limit'=>1])['snapshot']['revision'],'v1');

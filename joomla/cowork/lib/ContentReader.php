@@ -22,6 +22,7 @@ final class ContentReader
     private array $provenance;
     private array $contents;
     private string $revision;
+    private string $inventoryRevision;
     private string $secret;
     private string $principal;
     private int $now;
@@ -30,6 +31,7 @@ final class ContentReader
     private int $budget=self::DEFAULT_BUDGET;
     public function __construct(array $site, array $provenance, array $contents, string $revision, string $secret, string $principal, int $now, array $unresolved=[]) {
         $this->site=$site; $this->provenance=$provenance; $this->contents=$contents; $this->revision=$revision;
+        $this->inventoryRevision=hash('sha256',self::encode($contents));
         $this->secret=$secret; $this->principal=$principal; $this->now=$now; $this->unresolved=$unresolved;
     }
     public static function encode($value): string { return json_encode($value,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); }
@@ -57,7 +59,7 @@ final class ContentReader
     }
     private function envelope(array $contents, int $limit, ?string $next, ?int $total): array {
         return ['schemaVersion'=>'tracy-content/v1','view'=>'authenticated','site'=>$this->site,'provenance'=>$this->provenance,
-            'snapshot'=>['revision'=>$this->revision,'readAt'=>gmdate('Y-m-d\TH:i:s\Z',$this->now)],
+            'snapshot'=>['revision'=>$this->revision,'inventoryRevision'=>$this->inventoryRevision,'readAt'=>gmdate('Y-m-d\TH:i:s\Z',$this->now)],
             'pagination'=>['limit'=>$limit,'nextCursor'=>$next,'total'=>$total,'budget'=>$this->budget,'bytes'=>0],
             'completeness'=>['scope'=>'mapped-content','status'=>$this->unresolved?'partial':'complete','unresolved'=>$this->unresolved], 'contents'=>$contents];
     }
