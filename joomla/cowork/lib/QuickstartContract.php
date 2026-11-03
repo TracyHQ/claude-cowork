@@ -547,7 +547,51 @@ final class QuickstartContract
         $filtered=$this->changeRow($filtered,$slots,array_fill_keys(array_column($slots,'key'),MultilingualProfile::CONTENT_SLOT));
         // Compare semantic JSON, independent of whitespace or key serialization used by Joomla.
         foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='')$filtered[$col]=$this->column($filtered[$col]);
+        if($meta['kind']==='templateStyle' && isset($filtered['params']))$filtered['params']=$this->withoutStyleLogo($filtered['params'],$slots);
         return $filtered;
+    }
+    /**
+     * The params a T3 template style switches between its logo picture and its name as text, beside
+     * the pictures themselves: `logotype` (image|text), `logofootertype`, `enable_logoimage_sm`, and
+     * `sitename` (the name the header prints as text, or empty when the logo is a picture).
+     */
+    private const T3_LOGO_SWITCHES = ['logotype','logofootertype','enable_logoimage_sm','sitename'];
+    /** A T3 style param naming a logo picture (`logoimage`, `logoimage_sm`, `logofooterimage`, `logoimage_dark`). */
+    private const T3_LOGO_PICTURE = '~^logo[a-z]*image(?:_[a-z]+)?$~D';
+    /**
+     * A template style's params as the baseline holds them, its logo set left out when the contract
+     * declares the style's logo as content.
+     *
+     * 🔒 A T3 LOGO IS THE CUSTOMER'S, AND SO ARE THE SWITCHES THAT SHOW IT. A T3 template keeps its
+     * logos in every style's params (TCH capture `--template-style-logos` declares each picture a
+     * `business.logo` slot, jsonPath [key]), and the brand step writes the picture together with the
+     * switches around it: `logotype=image`, `sitename` emptied, the small-screen logo off, the footer
+     * logo or the footer name (tracy-web `brand-joomla-t3.js`). Masking the declared pictures alone left
+     * every one of those switches reading as presentation drift. Only a style whose contract declares a
+     * logo picture as a `business.logo` slot of its `params` loses them; every other param of it, and
+     * every style that declares none, is held exactly as before.
+     *
+     * @param mixed $params the column as {@see column()} decodes it
+     * @param list<array<string,mixed>> $slots the entity's slots
+     * @return mixed
+     */
+    private function withoutStyleLogo($params, array $slots) {
+        if(!is_array($params))return $params;
+        $declared=false;
+        foreach($slots as $slot)
+            if(($slot['column']??null)==='params' && ($slot['role']??null)==='business.logo' && !isset($slot['nestedJson'])
+                && is_array($slot['jsonPath']??null) && count($slot['jsonPath'])===1 && is_string($slot['jsonPath'][0])
+                && preg_match(self::T3_LOGO_PICTURE,$slot['jsonPath'][0])){$declared=true;break;}
+        if(!$declared)return $params;
+        foreach(array_keys($params) as $name)
+            if(in_array($name,self::T3_LOGO_SWITCHES,true) || preg_match(self::T3_LOGO_PICTURE,(string)$name))unset($params[$name]);
+        return $params;
+    }
+    /** A template style's whole params text as {@see presentation()} reads it: slots masked, logo set left out. */
+    private function styleParams(string $key, string $raw) {
+        $slots=array_values(array_filter($this->slotsFor($key),fn($slot)=>($slot['column']??null)==='params'));
+        $masked=$this->changeRow(['params'=>$raw],$slots,array_fill_keys(array_column($slots,'key'),MultilingualProfile::CONTENT_SLOT));
+        return $this->withoutStyleLogo($this->column($masked['params']),$slots);
     }
     /** A JSON column as the baseline holds it: decoded when it is an object or list, else its text. */
     private function column($text) {
@@ -1486,8 +1530,10 @@ final class QuickstartContract
         foreach($moved as $row) {
             if(!isset($binding['presentation'][$row['key']]))throw new RuntimeException('The baseline has no row '.$row['key']);
             if($row['kind']==='module'){$binding['presentation'][$row['key']]['published']=(string)$row['value'];continue;}
-            // A template style's whole column, as this job wrote or found it.
-            if($row['kind']==='templateStyle'){$binding['presentation'][$row['key']]['params']=$this->column((string)$row['raw']);continue;}
+            // A template style's whole column, as this job wrote or found it, held as presentation() reads it:
+            // its content slots masked (a T3 logo) and its logo switches left out, or every inspect after a
+            // mega-menu sub went would read the customer's logo as drift.
+            if($row['kind']==='templateStyle'){$binding['presentation'][$row['key']]['params']=$this->styleParams($row['key'],(string)$row['raw']);continue;}
             $params=$binding['presentation'][$row['key']]['params']??null;
             // An empty or whitespace-only column is held as its text, as the row reads it: Joomla's {} and back again.
             if(is_string($params)&&trim($params)==='')$params=[];
