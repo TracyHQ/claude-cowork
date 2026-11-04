@@ -40,14 +40,24 @@ final class TemplateSiteSettings
     /** The keys kept in the template's own settings file whatever its framework: one value for the whole site. */
     public const SITE_KEYS = [self::SHARE_KEY, self::GLYPH_KEY];
 
+    /**
+     * The picture a T4 template paints behind its pages: T4 compiles it into the page CSS as the body background, with
+     * the profile's own repeat, size, attachment and position (which the door leaves as they are). Empty drops the rule,
+     * and the template's background colour shows.
+     */
+    public const BODY_BACKGROUND_KEY = 'body_bg_img';
+
     /** Every key a T4 profile write may carry. Nothing outside this list is ever written. */
-    public const T4_KEYS = ['site_logo', 'site_logo_small', 'site_logo_dark', 'site_logo_dark_small', 'site_logo_2', 'site_name', 'site_slogan', 'other_faviconFile'];
+    public const T4_KEYS = ['site_logo', 'site_logo_small', 'site_logo_dark', 'site_logo_dark_small', 'site_logo_2', 'site_name', 'site_slogan', 'other_faviconFile', self::BODY_BACKGROUND_KEY];
 
     /** The keys a template without T4 has: its favicon and its share image. Its logo is a style param (`templateStyle`). */
     public const OTHER_KEYS = ['other_faviconFile', 'other_shareImage', 'other_glyphFaces'];
 
     /** Picture types a share image may have: the ones Facebook, Zalo and LinkedIn draw (no SVG, ICO or AVIF). */
     private const SHARE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+
+    /** Picture types a page background may have: photographs and drawings a browser paints as a CSS background (no ICO). */
+    private const BACKGROUND_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'];
 
     /** Keys holding words, not a picture. */
     private const TEXT_KEYS = ['site_name', 'site_slogan'];
@@ -122,6 +132,8 @@ final class TemplateSiteSettings
      *   `images/`, `media/` or a template's `images/`, with a picture's extension, naming a file that
      *   is on the site now. A caller uploads first (`media.upload`), under a new name each time, so a
      *   cached copy of the old picture is never what a visitor sees.
+     * - The page background ({@see BODY_BACKGROUND_KEY}): the same, but only under `images/` (where `media.upload` puts
+     *   a picture) and only a png, jpg, webp, gif or avif.
      *
      * @param mixed $value
      * @return array{value:string}|array{error:string}
@@ -158,6 +170,8 @@ final class TemplateSiteSettings
             return ['error' => $key . ' must be a picture under images/ (png, jpg, webp, gif, svg, avif or ico), named by a path relative to the site root'];
         if ($key === 'other_shareImage' && !in_array($extension, self::SHARE_EXTENSIONS, true))
             return ['error' => 'other_shareImage must be a png, jpg, webp or gif: social networks do not draw a ' . $extension . ' share image'];
+        if ($key === self::BODY_BACKGROUND_KEY && (strncmp($path, 'images/', 7) !== 0 || !in_array($extension, self::BACKGROUND_EXTENSIONS, true)))
+            return ['error' => $key . ' must be a png, jpg, webp, gif or avif under images/, named by a path relative to the site root'];
         $file = rtrim($root, '/') . '/' . $path;
         if (!is_file($file) || is_link($file)) return ['error' => $key . ': ' . $path . ' is not a file on this site; upload it first (media.upload)'];
         return ['value' => $path];
