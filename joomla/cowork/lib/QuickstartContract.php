@@ -787,6 +787,11 @@ final class QuickstartContract
             && strpos((string) ($row['content'] ?? ''), self::DESIGN_SYSTEM_MARK) !== false;
     }
 
+    /** How a row of a page the write step created says so: its `note` starts with this, and goes on with the page (TracyHQ/tracy#375). */
+    public const CREATED_PAGE_MARK = 'tracy-page:';
+    /** The kinds a created page is made of: an article, its menu item and the category that holds them apart from every listing. */
+    private const CREATED_PAGE_KINDS = ['article', 'menuItem', 'category'];
+
     /** Resolve physical identity without adopting rows, binding, or checking write invariants. */
     private function resolveRows(ContractRows $source, array $keys, ?array $binding, array $languages, ?int $switcher, bool $inventory = false): array {
         $ids=[];$rows=[];$lists=[];$missing=[];
@@ -1044,6 +1049,14 @@ final class QuickstartContract
             $governed=[];
             foreach($keys as $key=>$meta)if($meta['kind']==='module' && isset($ids[$key]))$governed[(int)$ids[$key]]=true;
             foreach($lists['module'] as $id=>$row)if(!isset($governed[(int)$id]) && self::designSystemModule($row))$counts['module']--;
+        }
+        // 🔒 NOR ARE THE ROWS OF A PAGE THE WRITE STEP CREATED (TracyHQ/tracy#375): a plan may ask for a page the template does not
+        // have, and that page is not a site that differs from its quickstart. Unless the contract governs the row itself; every
+        // row with no mark still counts. Rows are matched by their own id: `$lists` is a plain list.
+        foreach(self::CREATED_PAGE_KINDS as $kind)if(isset($counts[$kind])) {
+            $governed=[];
+            foreach($keys as $key=>$meta)if($meta['kind']===$kind && isset($ids[$key]))$governed[(int)$ids[$key]]=true;
+            foreach($lists[$kind] as $row)if(!isset($governed[(int)($row['id']??0)]) && strpos((string)($row['note']??''),self::CREATED_PAGE_MARK)===0)$counts[$kind]--;
         }
         $expectedCounts=$this->lock['inventoryCounts'];
         // A kind the quickstart ships no row of is counted 0 by the capture and names no entity, so the walk

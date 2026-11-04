@@ -474,6 +474,10 @@ final class Engine
                     'version' => 1,
                     // content.contract `rows.remove`: a hidden slot's row or element leaves the stored field.
                     'rows_remove' => 1,
+                // A page made through content.batch whose rows carry QuickstartContract::CREATED_PAGE_MARK reads as no drift. An
+                // older engine creates the rows all the same and every contract call after them warns, so a writer reads this first.
+                ], 'page_create' => [
+                    'version' => 1,
                 // lib/slot-corrections.json: which contracts this engine holds to the kit's limits, and how far.
                 ], 'slot_corrections' => SlotCorrections::ability(__DIR__ . '/slot-corrections.json'), 'db_range_checksums' => [
                     'version' => 1,
