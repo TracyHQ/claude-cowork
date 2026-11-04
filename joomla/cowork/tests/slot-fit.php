@@ -134,6 +134,32 @@ try{$fitCheck->invoke($fitContract,$text,str_repeat('c',30),[]);}catch(ContractP
 check('text: the slot\'s own limit still comes first',$fitAnswer($text,str_repeat('d',41))[1],'Content too long: hero.0');
 check('text: more lines than the box holds are refused',$fitCode($text,"One\nTwo\nThree"),'SLOT_TOO_LONG');
 check('text: as many lines as the box holds are taken',$fitCode($text,"One\nTwo"),null);
+// A fit no wider than the demo's own words is the box of those words, not a limit: an inline label grows with them (the
+// kit's rule, slot-limits.mjs). A line limit the demo itself breaks cannot refuse a value with fewer lines than the demo.
+$fitWords=fn(string $sample,array $fit)=>['fit'=>['measured'=>true]+$fit,'key'=>'label.0','type'=>'text','maxCharacters'=>2048,'sample'=>$sample];
+check('text: a limit that is the box of the demo words does not refuse a longer label',$fitCode($fitWords('MADEUP7',['maxCharacters'=>7]),'MADEUP-8'),null);
+check('text: nor at exactly the demo length plus three',$fitCode($fitWords('MADEUP7',['maxCharacters'=>10]),str_repeat('c',30)),null);
+check('text: one above that it is a limit again',$fitCode($fitWords('MADEUP7',['maxCharacters'=>11]),str_repeat('c',12)),'SLOT_TOO_LONG');
+check('text: a limit well above the demo still refuses, with the same code and words',$fitAnswer($fitWords('Made-up title',['maxCharacters'=>28]),str_repeat('d',40)),
+    ['SLOT_TOO_LONG','Content too long for its box: rewrite it shorter, at most 28 characters, keeping its meaning (never cut it or add an ellipsis): label.0']);
+check('text: the demo length is what a visitor reads, not its markers',$fitCode($fitWords('((p))Made-up((/p))'."\n\n".'((p))title((/p))',['maxCharacters'=>16]),str_repeat('d',17)),null);
+check('text: and markers do not widen it',$fitCode($fitWords('((p class="made-up"))Made-up((/p))',['maxCharacters'=>11]),str_repeat('d',12)),'SLOT_TOO_LONG');
+check('text: the box of the demo words also covers maxChars',$fitCode($fitWords('MADEUP7',['maxChars'=>['desktop'=>7,'phone'=>14]]),'MADEUP-8'),null);
+check('text: the slot\'s own limit still holds when the fit\'s does not',$fitCode(['maxCharacters'=>40]+$fitWords('MADEUP7',['maxCharacters'=>7]),str_repeat('c',41)),'SLOT_TOO_LONG');
+$fitSix="One\nTwo\nThree\nFour\nFive\nSix";
+check('text: fewer lines than a demo that breaks its line limit are taken',$fitCode($fitWords($fitSix,['lines'=>['desktop'=>1]]),"One\nTwo\nThree"),null);
+check('text: as many lines as that demo are taken',$fitCode($fitWords($fitSix,['lines'=>['desktop'=>1]]),"1\n2\n3\n4\n5\n6"),null);
+check('text: more lines than that demo are refused, at the demo\'s count',$fitAnswer($fitWords($fitSix,['lines'=>['desktop'=>1]]),"1\n2\n3\n4\n5\n6\n7"),
+    ['SLOT_TOO_LONG','Content has more lines than its box holds: rewrite it in at most 6 line(s): label.0']);
+check('text: three lines on a one line demo are still refused, with the same code and words',$fitAnswer($fitWords('Made-up',['lines'=>['desktop'=>1]]),"One\nTwo\nThree"),
+    ['SLOT_TOO_LONG','Content has more lines than its box holds: rewrite it in at most 1 line(s): label.0']);
+$fitDirect=function(array $fit,string $value,?string $sample=null):?string{
+    try{ $sample===null?SlotFit::checkText($fit,'label.0',$value,fn($code,$message)=>new RuntimeException($code)):SlotFit::checkText($fit,'label.0',$value,fn($code,$message)=>new RuntimeException($code),$sample); return null; }
+    catch(RuntimeException $e){ return $e->getMessage(); }
+};
+check('text: with no sample the character limit stays as it was',$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8'),'SLOT_TOO_LONG');
+check('text: with no sample the line limit stays as it was',$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo"),'SLOT_TOO_LONG');
+check('text: with a sample the same two are taken',[$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8','MADEUP7'),$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo","A\nB")],[null,null]);
 check('text: maxChars decides when maxCharacters is missing',$fitCode(['fit'=>array_diff_key($textFit,['maxCharacters'=>1])]+$oldText,str_repeat('e',25)),'SLOT_TOO_LONG');
 check('text: an unmeasured text keeps the slot limit only',$fitCode(['fit'=>['measured'=>false]]+$oldText,str_repeat('f',40)),null);
 check('text: the demo words are always taken back, even over a fit',$fitCode(['fit'=>['maxCharacters'=>4,'maxChars'=>['desktop'=>4]]+$textFit]+$oldText,'Demo title'),null);

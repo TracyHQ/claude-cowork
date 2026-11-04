@@ -1117,7 +1117,7 @@ final class QuickstartContract
         // Slot fit (ADR 0039), only on a slot that carries one and never against its own demo value.
         $fit=SlotFit::of($slot);
         if($fit!==null&&SlotFit::restores($slot,$value))$fit=null;
-        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse);
+        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse,(string)$slot['sample']);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {

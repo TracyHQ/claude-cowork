@@ -31,6 +31,8 @@ final class SlotFit
     private const DECODE_PIXELS = 4000000;
     /** A corner is transparent from this GD alpha (0 opaque .. 127 clear): about 247 of 255 opaque. */
     private const CLEAR_ALPHA = 4;
+    /** A box estimate of the demo words reads a few characters wider than the words: the same slack as Tracy's kit (slot-limits.mjs). */
+    private const DEMO_BOX_SLACK = 3;
 
     /** The slot's fit when it carries one as an object, else null. */
     public static function of(array $slot): ?array
@@ -96,8 +98,15 @@ final class SlotFit
         return $reference !== null;
     }
 
-    /** Words over their box are refused with a request to rewrite them shorter; nothing is ever cut. */
-    public static function checkText(array $fit, string $key, string $value, callable $refuse): void
+    /**
+     * Words over their box are refused with a request to rewrite them shorter; nothing is ever cut.
+     *
+     * With the slot's demo words as `$sample`, a measure the demo itself explains stops refusing. A character limit no more
+     * than the demo's visible length plus {@see DEMO_BOX_SLACK} is the shrink-wrapped box of those words (`CLASSES`, limit 7),
+     * not a limit: an inline label grows with its words. A line limit is at least the demo's own line count, as a value
+     * counts them. Without a sample, every limit stands as measured.
+     */
+    public static function checkText(array $fit, string $key, string $value, callable $refuse, ?string $sample = null): void
     {
         if (($fit['measured'] ?? null) !== true) return;
         $limit = $fit['maxCharacters'] ?? null;
@@ -105,14 +114,29 @@ final class SlotFit
             $all = array_filter($fit['maxChars'], 'is_int');
             $limit = $all ? min($all) : null;
         }
+        if (is_int($limit) && $sample !== null && $limit <= self::visibleLength($sample) + self::DEMO_BOX_SLACK) $limit = null;
         if (is_int($limit) && $limit > 0 && mb_strlen($value) > $limit)
             throw $refuse('SLOT_TOO_LONG', 'Content too long for its box: rewrite it shorter, at most ' . $limit . ' characters, keeping its meaning (never cut it or add an ellipsis): ' . $key,
                 ['limit' => $limit, 'actual' => mb_strlen($value)]);
         $lines = is_array($fit['lines'] ?? null) ? array_filter($fit['lines'], fn($n) => is_int($n) && $n > 0) : [];
-        $count = substr_count(str_replace("\r\n", "\n", $value), "\n") + 1;
-        if ($lines && $count > min($lines))
-            throw $refuse('SLOT_TOO_LONG', 'Content has more lines than its box holds: rewrite it in at most ' . min($lines) . ' line(s): ' . $key,
-                ['limit' => min($lines), 'actual' => $count, 'unit' => 'lines']);
+        if (!$lines) return;
+        $count = self::lineCount($value);
+        $most = $sample === null ? min($lines) : max(min($lines), self::lineCount($sample));
+        if ($count > $most)
+            throw $refuse('SLOT_TOO_LONG', 'Content has more lines than its box holds: rewrite it in at most ' . $most . ' line(s): ' . $key,
+                ['limit' => $most, 'actual' => $count, 'unit' => 'lines']);
+    }
+
+    private static function lineCount(string $text): int
+    {
+        return substr_count(str_replace("\r\n", "\n", $text), "\n") + 1;
+    }
+
+    /** What a visitor reads of a sample: no `((p))` markers, every whitespace run one space, as the kit's demoLength counts it. */
+    private static function visibleLength(string $sample): int
+    {
+        $words = preg_replace('/\(\(\/?[a-z][a-z0-9]*(?:\s[^()]*)?\/?\)\)/i', ' ', $sample);
+        return mb_strlen(trim((string) preg_replace('/\s+/u', ' ', (string) $words)));
     }
 
     /**

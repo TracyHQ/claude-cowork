@@ -457,6 +457,10 @@ the agent how to honour it. Unlike roles, fit is enforced by the write check (`l
 | `transparent: true` | the picture has no transparent ground (a JPEG, a PNG or WebP without alpha, or, with GD, four opaque corners) | `SLOT_IMAGE_OPAQUE` |
 | `maxCharacters`, `lines` | the words are longer, or have more line breaks than the box holds; the agent is asked to rewrite, nothing is cut | `SLOT_TOO_LONG` |
 
+A character limit no more than the demo's visible length plus 3 is the shrink-wrapped box of the demo's words, not a limit, and
+does not refuse (the same rule as Tracy's kit; the slot's own `maxCharacters` still holds). A line limit is at least the demo's
+own line count, so a measure the demo itself breaks cannot refuse a value with fewer lines.
+
 Putting a slot's demo value back is always taken. A slot without `fit` (every released contract
 before ADR 0039) is checked exactly as before: the 2% shape check against the demo file, the slot's
 own `maxCharacters`, and no kind, size or transparency rule. `replace_kept` joins the request hash
