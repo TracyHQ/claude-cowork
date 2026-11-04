@@ -13,7 +13,12 @@
 //               when another slot of its row goes too. Listed with that row.
 //
 // Never listed, so always refused: a slot that is empty already, one a text node or attribute addresses (its address
-// would move), and a whole column of a row (a menu item's title, a contact's email), which Joomla or a form needs.
+// would move), and a whole column of a row (a menu item's title), which Joomla needs.
+//
+// A contact's `email_to` is the one column that is listed, as unmeasured: Joomla needs no address on a contact, and the column
+// does two jobs. It is the address the page prints and where the contact form sends its mail, so with it empty the page prints
+// no address and draws no form. That is what a plan asks when a site has no address to take the form's mail. A contact form's
+// field `hint` goes with it, a word held in a field's params that nothing else reads.
 // Reproducible: keys sorted, no time, no path.
 //
 // Beside them, `rows`: where `content.contract rows.remove` may take a whole row, per entity, read from the contract's own
@@ -46,6 +51,11 @@ const movable = (slot) => !ADDRESS_MOVES.test(String(slot.xpath ?? ''))
 const occupied = (slot) => String(slot.sample ?? '').trim() !== ''
 const kindOf = (slot) => String(slot.entity).split('-')[0]
 
+/** A contact's address, or the hint of a contact form's field: words of the form, which goes when the address does. */
+const isFormWord = (slot) =>
+  (kindOf(slot) === 'contact' && slot.column === 'email_to') ||
+  (kindOf(slot) === 'field' && slot.column === 'params' && slot.jsonPath?.at(-1) === 'hint')
+
 /** @returns {{measured: string[], unmeasured: string[], withRow: Record<string, string[]>}} */
 export function hideableSlots(kit, map) {
   const frames = new Map(kit.blocks.flatMap((b) => b.frames ?? []).map((f) => [slotKeyOf(f.id), f]))
@@ -64,6 +74,10 @@ export function hideableSlots(kit, map) {
   const withRow = {}
   for (const slot of map.slots) {
     if (!occupied(slot) || !movable(slot)) continue
+    if (isFormWord(slot)) {
+      unmeasured.push(slot.key)
+      continue
+    }
     const frame = frames.get(slot.key)
     if (frame) {
       if (frame.canHide === true) measured.push(slot.key)

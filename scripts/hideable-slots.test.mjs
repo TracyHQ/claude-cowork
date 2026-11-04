@@ -18,7 +18,10 @@ const map = {
     { key: 'article-2.2', entity: 'article-2', column: 'attribs', type: 'url', sample: '/a', jsonPath: ['body'], xpath: '/html/body/div/a/@href' },
     { key: 'languageString-9.0', entity: 'languageString-9', column: 'value', type: 'text', sample: 'A made-up string' },
     { key: 'menuItem-3.0', entity: 'menuItem-3', column: 'title', type: 'text', sample: 'Made-up page' },
-    { key: 'contact-4.0', entity: 'contact-4', column: 'email_to', type: 'text', sample: 'nobody@example.invalid' }
+    { key: 'contact-4.0', entity: 'contact-4', column: 'name', type: 'text', sample: 'A made-up name' },
+    { key: 'contact-4.1', entity: 'contact-4', column: 'email_to', type: 'text', sample: 'nobody@example.invalid' },
+    { key: 'field-5.0', entity: 'field-5', column: 'label', type: 'text', sample: 'A made-up label' },
+    { key: 'field-5.1', entity: 'field-5', column: 'params', type: 'text', sample: 'A made-up hint', jsonPath: ['hint'] }
   ]
 }
 const kit = { blocks: [{ frames: [{ id: 'block-1.2', canHide: true }, { id: 'block-1.3', canHide: false }] }] }
@@ -34,7 +37,11 @@ test('a row is the index of a parallel array, or the parent of a subform field',
 test('each slot lands where the kit and its shape put it', () => {
   const out = hideableSlots(kit, map)
   assert.deepEqual(out.measured, ['module-1.2'], 'a frame the kit emptied')
-  assert.deepEqual(out.unmeasured, ['article-2.0', 'languageString-9.0', 'module-1.0'], 'word slots: no verdict')
+  assert.deepEqual(
+    out.unmeasured,
+    ['article-2.0', 'contact-4.1', 'field-5.1', 'languageString-9.0', 'module-1.0'],
+    'word slots: no verdict; a contact address and a field hint go with the form'
+  )
   assert.deepEqual(Object.keys(out.withRow), ['module-1.1'], 'a link goes with its row')
   assert.deepEqual(out.withRow['module-1.1'], ['module-1.0', 'module-1.2'])
 })
@@ -42,7 +49,7 @@ test('each slot lands where the kit and its shape put it', () => {
 test('never listed: an address that would move, an empty slot, a whole column, a frame with no verdict or no row', () => {
   const out = hideableSlots(kit, map)
   const listed = new Set([...out.measured, ...out.unmeasured, ...Object.keys(out.withRow)])
-  for (const key of ['article-2.1', 'article-2.2', 'module-1.4', 'menuItem-3.0', 'contact-4.0', 'module-1.3', 'module-1.5'])
+  for (const key of ['article-2.1', 'article-2.2', 'module-1.4', 'menuItem-3.0', 'contact-4.0', 'field-5.0', 'module-1.3', 'module-1.5'])
     assert.equal(listed.has(key), false, key)
 })
 

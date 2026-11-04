@@ -504,6 +504,8 @@ contract not listed, or listed against other bytes, empties nothing. Inspect mar
 | `unmeasured` | a word slot; the kit has no verdict on word slots, only its page can show whether it holds | alone |
 | `withRow` | a link, or a frame the kit says looks wrong emptied alone | only when another slot its row names goes in the same apply, or has gone |
 
+A contact's `email_to` is listed `unmeasured`, and it does two jobs: it is the address the page prints and where the contact form sends its mail. Joomla draws the form only while the contact has an address, so emptying it takes the printed address and the form together.
+
 Any other occupied slot named is refused `SLOT_NOT_HIDEABLE`, and so is a slot addressed by a text node or an attribute
 whatever a list says: an emptied `text()[1]` is not saved, so its slot dangles, which stops every inspect of the site, or
 `text()[2]` becomes `text()[1]` and the neighbour answers to the wrong number. A slot already empty is no refusal and no
