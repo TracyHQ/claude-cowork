@@ -78,6 +78,10 @@ final class QuickstartContract
      * @var array<string,array<string,string>>|null
      */
     private ?array $linkLayouts = null;
+    /** @var array<string,string> slot key => how the review judged it ('measured', 'unmeasured', 'withRow'): {@see loadHideable} */
+    private array $hideable = [];
+    /** @var array<string,list<string>> a 'withRow' slot's row: it is emptied only when one of these goes too, or already has */
+    private array $hideRows = [];
     /** sha256 of each layout file read by the current inspect: path => hash, or '' when it is not a plain file. */
     private array $layoutHashes = [];
 
@@ -168,6 +172,7 @@ final class QuickstartContract
         // contract that ships no list of what its demo is.
         $this->syncSourceRelabel();
         $this->linkLayouts = self::loadLinkLayouts($lib . '/link-layouts.json');
+        $this->loadHideable($lib . '/hideable-slots.json', $directory . '/content-map.json');
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
@@ -1033,6 +1038,7 @@ final class QuickstartContract
             $slot['current']=$this->currentValue($rows[$key],$slot,$parsed);
             $empty=$this->emptyLinkOf($rows[$key],$slot,$parsed);
             if($empty!==null)$slot['emptyLink']=$empty;
+            if(isset($this->hideable[$slot['key']])&&!self::addressMoves($slot))$slot['canHide']=$this->hideable[$slot['key']];
             $slots[]=$slot;
         }}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
@@ -1180,6 +1186,49 @@ final class QuickstartContract
     }
 
     /**
+     * 🔒 A SLOT IS EMPTIED ONLY WHERE THE RECEIVER'S REVIEW LISTS IT (TracyHQ/tracy#362, ADR 0044 decision 2).
+     * An empty field is conditional markup, so emptying one changes what the page draws, and `changes` refuses it
+     * (SLOT_EMPTY_STATE). Whether a block still looks whole without a slot is measured in Tracy's template kit, which no
+     * site holds: `lib/hideable-slots.json` carries the verdicts per contract, tied to the sha256 of the content map they
+     * were read against, so a re-sealed profile is never trusted on an old list. Receiver data, not contract bytes: a
+     * pinned contract hash and a site's fetched profile do not move. No list, another contract, other bytes, or an
+     * unreadable file: nothing is emptiable, and every other operation goes on as before.
+     *
+     * measured: the kit emptied this frame and the block held. unmeasured: a word or link slot the kit has no verdict on.
+     * withRow: a link, or a frame the kit says looks wrong emptied alone, that goes only when its row goes too.
+     */
+    private function loadHideable(string $file, string $mapFile): void {
+        if(!is_file($file))return;
+        $entry=json_decode((string)file_get_contents($file),true)['contracts'][(string)($this->manifest['id']??'')]??null;
+        if(!is_array($entry)||!is_string($entry['contentMapSha256']??null)||!hash_equals($entry['contentMapSha256'],(string)hash_file('sha256',$mapFile)))return;
+        foreach(['measured','unmeasured'] as $tier)
+            foreach(is_array($entry[$tier]??null)?$entry[$tier]:[] as $key)if(is_string($key))$this->hideable[$key]=$tier;
+        foreach(is_array($entry['withRow']??null)?$entry['withRow']:[] as $key=>$row)
+            if(is_string($key)&&is_array($row)&&$row){$this->hideable[$key]='withRow';$this->hideRows[$key]=$row;}
+    }
+
+    /**
+     * A slot addressed by a text node or an attribute cannot be emptied, whatever a review says. `text()[2]` is an index
+     * among the element's text nodes: an emptied node is not saved, so the next read finds the slot missing, which stops
+     * every inspect of the site, or finds its neighbour under the old number. An attribute would stay on the page, empty.
+     */
+    private static function addressMoves(array $slot): bool {
+        return isset($slot['xpath'])&&preg_match('~/(?:text\(\)(?:\[\d+\])?|@[A-Za-z-]+)$~D',(string)$slot['xpath'])===1;
+    }
+
+    /** Why this apply may not empty `$slot`, or null. @param array<string,true> $hiding the slots this apply empties */
+    private function hideRefusal(array $slot, array $hiding, array $current): ?string {
+        $key=$slot['key'];
+        // Nothing to take off: no write comes of it, whoever reviewed what.
+        if(trim((string)($current[$key]??'x'))==='')return null;
+        if(self::addressMoves($slot))return 'This slot cannot be emptied: it is one text node or attribute, and its address would move: '.$key;
+        if(!isset($this->hideable[$key]))return 'This slot cannot be emptied: the review for this contract does not list it: '.$key;
+        if($this->hideable[$key]!=='withRow')return null;
+        foreach($this->hideRows[$key] as $other)if(isset($hiding[$other])||trim((string)($current[$other]??'x'))==='')return null;
+        return 'This slot goes only with its row, and nothing else of the row is emptied: '.$key;
+    }
+
+    /**
      * A derived link: what LeafCodec reads as one (https://…, /path, index.php?…, mailto:, tel:, #anchor);
      * never protocol-relative, a backslash or a script. A derived picture: a file inside `images/`,
      * named with or without a leading slash and Joomla's `#joomlaImage://` suffix; any shape, since an
@@ -1261,9 +1310,14 @@ final class QuickstartContract
         $emptied=$params['empty_links']??[];
         if(!is_array($emptied)||($emptied&&array_keys($emptied)!==range(0,count($emptied)-1))||array_filter($emptied,fn($key)=>!is_string($key)))
             throw new ContractProblem('CHANGES_INVALID','empty_links must be a list of link slot keys');
-        $changes=$params['changes']??($emptied?[]:null);
-        if(!is_array($changes)||!(count($changes)+count($emptied))||count($changes)+count($emptied)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
+        // `empty_slots`: slots to empty, each one the receiver's review lists ({@see loadHideable}).
+        $hidden=$params['empty_slots']??[];
+        if(!is_array($hidden)||($hidden&&array_keys($hidden)!==range(0,count($hidden)-1))||array_filter($hidden,fn($key)=>!is_string($key)))
+            throw new ContractProblem('CHANGES_INVALID','empty_slots must be a list of slot keys');
+        $changes=$params['changes']??($emptied||$hidden?[]:null);
+        if(!is_array($changes)||!(count($changes)+count($emptied)+count($hidden))||count($changes)+count($emptied)+count($hidden)>1500)throw new ContractProblem('CHANGES_INVALID','Expected 1–1500 scalar content changes');
         foreach($emptied as $key)if(array_key_exists($key,$changes))throw new ContractProblem('CHANGES_INVALID','A slot is both changed and emptied: '.$key,$key);
+        foreach($hidden as $key)if(array_key_exists($key,$changes)||in_array($key,$emptied,true))throw new ContractProblem('CHANGES_INVALID','A slot is both changed and emptied: '.$key,$key);
         // `replace_kept`: kept pictures (Slot fit replace "keep") the customer asked for by name, each mapped to their words.
         $kept=$params['replace_kept']??[];
         if(!is_array($kept)||($kept&&array_keys($kept)===range(0,count($kept)-1))||array_filter($kept,fn($words)=>!is_string($words)))
@@ -1271,7 +1325,8 @@ final class QuickstartContract
         $allowed=array_column($state['slots'],null,'key');$values=[];
         $owners=$current['owners']??[];$checked=[];
         $emptying=array_fill_keys($emptied,true);
-        foreach ($changes+array_fill_keys($emptied,'') as $key => $value) {
+        $hiding=array_fill_keys($hidden,true);
+        foreach ($changes+array_fill_keys($emptied,'')+array_fill_keys($hidden,'') as $key => $value) {
             $key=(string)$key;
             $slot=$allowed[$key]??null;
             $owner=$slot===null?null:($owners[$slot['entity']]??null);
@@ -1291,6 +1346,12 @@ final class QuickstartContract
                 else $values[$key]='';
                 continue;
             }
+            if(isset($hiding[$key])) {
+                $why=$this->hideRefusal($slot,$hiding,$state['slotValues']);
+                if($why!==null)$problems[]=new ContractProblem('SLOT_NOT_HIDEABLE',$why,$key,$owner);
+                else $values[$key]='';
+                continue;
+            }
             try { $this->checkValue($slot,$value,$params); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
@@ -1306,6 +1367,8 @@ final class QuickstartContract
         foreach($values as $key=>$value)
             if(($allowed[$key]['type']??'')==='image')
                 foreach(array_keys($locales) as $locale)$values[MultilingualProfile::derivedKey($locale,$key)]=$value;
+        // Hidden in one language is hidden in all: a translation left holding the words would still print them.
+        foreach($hidden as $key)foreach(array_keys($locales) as $locale)$values[MultilingualProfile::derivedKey($locale,$key)]='';
         $operations=[];$touched=[];
         foreach($state['keys'] as $key=>$meta) {
             $row=$state['rows'][$key];$next=$this->changeRow($row,$this->slotsOf($key,$meta),$values);$fields=[];$expected=[];
@@ -1466,6 +1529,14 @@ final class QuickstartContract
         if(!$binding)throw new RuntimeException('A demo trim needs a bound site');
         $binding['demoTrim']=$record;
         foreach($moved as $key=>[$field,$value])$binding['presentation'][$key][$field]=$value;
+        return $binding;
+    }
+
+    /** The baseline with these modules' `published` at `$value`: what blocks.unpublish moved is protected from then on. */
+    public function bindingWithBlocks(array $keys, string $value): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('Unpublishing a block needs a bound site');
+        foreach($keys as $key)$binding['presentation'][$key]['published']=$value;
         return $binding;
     }
 

@@ -51,6 +51,9 @@ jobs:
       - name: Contract profile assets
         run: node --test ../../scripts/contract-assets.test.mjs
 
+      - name: Hideable slots generator
+        run: node --test ../../scripts/hideable-slots.test.mjs
+
       - name: Language check
         run: node ../../scripts/check-language.mjs com_claudecowork/administrator/lib
 

@@ -33,6 +33,9 @@ cp lib/language-packs.json com_claudecowork/administrator/lib/
 # The reviewed ACM layouts whose links content.contract may empty (empty_links): receiver data like the
 # catalog above, not contract bytes. Without it a receiver empties no link at all, again with no error.
 cp lib/link-layouts.json com_claudecowork/administrator/lib/
+# Which slots content.contract may empty (empty_slots), per contract: receiver data like the two above. Without it a
+# receiver empties no slot at all, again with no error.
+cp lib/hideable-slots.json com_claudecowork/administrator/lib/
 
 # The release manifest: every file the package puts on a site, by its webroot path, with its sha256
 # — read off the extension manifests the installer follows, after the engine copy above and before

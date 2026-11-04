@@ -34,6 +34,12 @@ function gateContractCopy(string $source): string {
         fn ($n) => $n . ':' . hash_file('sha256', $dir . '/' . $n) . "\n",
         ['manifest.json', 'content-map.json', 'presentation-lock.json']
     )));
+    // A review of every module word slot held in JSON, so the gate can hide one in every language (hide-ops.php has the rules).
+    $review = [];
+    foreach (json_decode(file_get_contents($dir . '/content-map.json'), true)['slots'] as $slot)
+        if ($slot['type'] === 'text' && isset($slot['jsonPath']) && !isset($slot['xpath']) && str_starts_with($slot['entity'], 'module-') && trim((string) $slot['sample']) !== '') $review[] = $slot['key'];
+    file_put_contents($root . '/lib/hideable-slots.json', json_encode(['contracts' => [json_decode(file_get_contents($dir . '/manifest.json'), true)['id'] => [
+        'contentMapSha256' => hash_file('sha256', $dir . '/content-map.json'), 'measured' => [], 'unmeasured' => $review, 'withRow' => []]]]));
     foreach (['multilingual-map', 'demo-trim-map', 'showcase-nav-map', 'editions'] as $name) {
         if (!is_file($source . '/' . $name . '.json')) continue;
         $profile = json_decode(file_get_contents($source . '/' . $name . '.json'), true, 512, JSON_THROW_ON_ERROR);
@@ -560,6 +566,29 @@ foreach ($gateContracts as $profileFile) {
                 $held[$l] = $copyId === null ? null : $gc->slotValue($gw->store['module'][$copyId] ?? [], $imageSlot);
             }
             check("$id: a picture changed on the source reaches every language", $held, ['vi-VN' => 'images/tracy-content/drawn.png', 'fr-FR' => 'images/tracy-content/drawn.png']);
+        }
+    }
+    // Hidden in one language is hidden in all: a translation left holding the words would still print them, and a
+    // translation of an unpublished block would still show (TracyHQ/tracy#362).
+    $hideSlot = null;
+    $copiesOf = fn (string $entity) => array_values(array_filter(array_map(fn ($l) => $gs->binding['multilingual']['languages'][$l]['ids'][$entity] ?? null, ['vi-VN', 'fr-FR'])));
+    foreach ($map['slots'] as $slot)
+        if ($slot['type'] === 'text' && isset($slot['jsonPath']) && !isset($slot['xpath']) && str_starts_with($slot['entity'], 'module-') && trim((string) $slot['sample']) !== '' && count($copiesOf($slot['entity'])) === 2) { $hideSlot = $slot; break; }
+    if ($hideSlot !== null) {
+        $hidden = $call(['operation' => 'apply', 'apply_id' => 'contract-gate-hide', 'request_id' => 'hide',
+            'expected_revision' => $call(['operation' => 'inspect'])['revision'] ?? '', 'empty_slots' => [$hideSlot['key']]]);
+        if ($step('hide a slot on the source', $hidden)) {
+            $copies = $copiesOf($hideSlot['entity']);
+            $copySlots = array_map(fn ($l) => array_column($gc->derivedSlotsFor($l, $hideSlot['entity']), null, 'sourceKey')[$hideSlot['key']] ?? $hideSlot, ['vi-VN', 'fr-FR']);
+            check("$id: a slot hidden on the source is empty on the source and in every language",
+                [$gc->slotValue($gw->store['module'][$gs->binding['ids'][$hideSlot['entity']]], $hideSlot), $gc->slotValue($gw->store['module'][$copies[0]], $copySlots[0]), $gc->slotValue($gw->store['module'][$copies[1]], $copySlots[1])], ['', '', '']);
+            $off = $call(['operation' => 'blocks.unpublish', 'apply_id' => 'contract-gate-block', 'request_id' => 'block', 'expected_revision' => $hidden['afterRevision'] ?? '', 'blocks' => [$hideSlot['entity']]]);
+            if ($step('unpublish a block on the source', $off)) {
+                check("$id: an unpublished block goes with its translations", array_map(fn ($c) => (string) $gw->store['module'][$c]['published'], $copies), ['0', '0']);
+                if ($step('bring the block back', $ge->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-gate-block']])))
+                    check("$id: and its translations come back", array_map(fn ($c) => (string) $gw->store['module'][$c]['published'], $copies), ['1', '1']);
+            }
+            $step('bring the slot back', $ge->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-gate-hide']]));
         }
     }
     if (!$step('take back fr-FR', $call(['operation' => 'multilingual.revert', 'locale' => 'fr-FR']))) continue;

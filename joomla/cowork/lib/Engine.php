@@ -382,7 +382,8 @@ final class Engine
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'media.delete', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore', 'template.files.write', 'template.files.undo'], true)
-            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set');
+            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set')
+            || ($action === 'template.languageOverrides' && ($params['operation'] ?? null) === 'setSource');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
                 'applyId' => is_string($params['apply_id'] ?? null) ? $params['apply_id'] : null];
@@ -420,6 +421,8 @@ final class Engine
         // A trim, a language step or a relabel has its own way back; the ordinary revert would take it
         // apart one row at a time and leave the baseline naming a state the site is no longer in.
         if ($contractBound && $action === 'apply.revert' && $this->log) {
+            // blocks.unpublish has a way back of its own, and it answers to the ordinary verb.
+            if (in_array('blocks', array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), true)) return $this->blocksRestore($params);
             $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias', 'showcaseNav']);
             if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a showcase-navigation change, a language step or a source relabel: take it back with its own operation (demoTrim.revert, showcaseNav.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
         }
@@ -462,6 +465,10 @@ final class Engine
                     'max_tables' => self::MAX_DUMP_MANY_TABLES,
                     'max_bytes' => self::MAX_DUMP_MANY_BYTES,
                     'max_seconds' => self::MAX_DUMP_MANY_SECONDS,
+                ], 'hide_ops' => [
+                    // content.contract `empty_slots` and `blocks.unpublish`, template.languageOverrides `setSource`. An older
+                    // engine ignores `empty_slots` beside `changes`, so a writer reads this before it counts on hiding.
+                    'version' => 1,
                 ], 'db_range_checksums' => [
                     'version' => 1,
                     'max_starts' => self::MAX_RANGE_STARTS,
@@ -2062,6 +2069,7 @@ final class Engine
             if (strpos((string)($p['operation'] ?? ''), 'showcaseNav.') === 0) return $this->showcaseNav($p);
             if (strpos((string)($p['operation'] ?? ''), 'siteLanguage.') === 0) return $this->siteLanguage($p);
             if (strpos((string)($p['operation'] ?? ''), 'sourceLanguage.') === 0) return $this->sourceLanguage($p);
+            if (($p['operation'] ?? '') === 'blocks.unpublish') return $this->blocksUnpublish($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -2074,6 +2082,7 @@ final class Engine
             // when sent, so an apply without them hashes as it always did and a retry from before them still replays.
             $asked=array_key_exists('empty_links',$p)?[$p['changes']??null,$p['evidence']??[],$p['empty_links']]:[$p['changes']??null,$p['evidence']??[]];
             if(array_key_exists('replace_kept',$p))$asked['replace_kept']=$p['replace_kept'];
+            if(array_key_exists('empty_slots',$p))$asked['empty_slots']=$p['empty_slots'];
             $hash=hash('sha256',json_encode($asked));
             foreach($this->log->entries($apply) as $entry) {
                 if (($entry['op']??'')==='contract' && $entry['request']===$request) {
@@ -2123,6 +2132,112 @@ final class Engine
         finally { $this->contract->endCall(); }
     }
 
+
+    /**
+     * `content.contract` `blocks.unpublish`: take modules of the bound contract off the site, named by entity key
+     * (`module-156`), with the module's translations (TracyHQ/tracy#362, ADR 0044 decision 2).
+     *
+     * `content.update` can write `published` too, but the row goes through Joomla's Table, which mints `#__assets` rows
+     * and moves the ACL the contract holds; a translation stays published; and every call after it warns of drift. This
+     * door moves the one column by a compare-and-set, the copies with it and the baseline in the same transaction, so
+     * the site stays clean. `expected_revision` is required. Every refusal is found first, then nothing is written, or
+     * all of it is. `apply.revert` with the same apply_id brings the blocks back ({@see blocksRestore}).
+     */
+    private function blocksUnpublish(array $p): array
+    {
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if (!$apply) throw new RuntimeException('apply_id required; it must start with "contract-"');
+        if (strpos($apply, 'contract-') !== 0) throw new RuntimeException('apply_id must start with "contract-", got "' . substr($apply, 0, 60) . '"');
+        if (!is_string($request) || !$request) throw new RuntimeException('request_id required: any string, the same on a retry and new for a different change');
+        $blocks = $p['blocks'] ?? null;
+        if (!is_array($blocks) || !$blocks || count($blocks) > 300 || array_keys($blocks) !== range(0, count($blocks) - 1) || array_filter($blocks, static fn($key) => !is_string($key)))
+            throw new ContractProblem('CHANGES_INVALID', 'blocks must be a list of 1-300 module entity keys, such as module-156');
+        if ($this->contract->isDerived()) return $this->err('unsupported', 'An imported site has no block list: use content.update kind module');
+        $hash = hash('sha256', json_encode($blocks));
+        $entries = $this->log->entries($apply);
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') !== 'blocks' || $entry['request'] !== $request) continue;
+            if (!hash_equals($entry['hash'], $hash)) throw new RuntimeException('request_id reused with different content');
+            $result = $entry['result'];
+            if (($result['afterRevision'] ?? null) !== $this->contract->inspect()['revision']) unset($result['afterRevision']);
+            return $result;
+        }
+        if ($entries) throw new RuntimeException('Use one new apply_id per content revision');
+        if (($job = $this->contract->job()) !== null)
+            return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . ': finish it, or take it back with multilingual.revert locale ' . $job['locale']);
+        $state = $this->contract->inspect();
+        if ($state['binding'] === null) throw new RuntimeException('Unpublishing a block needs a bound site');
+        $expected = $p['expected_revision'] ?? null;
+        if ($expected === null) throw new ContractProblem('REVISION_REQUIRED', 'Content changed; inspect again');
+        if (!is_string($expected) || !hash_equals($state['revision'], $expected))
+            throw new ContractProblem('REVISION_STALE', 'Content changed; inspect again', null, null, ['current' => $state['revision']]);
+        $problems = [];
+        $moving = [];
+        $already = [];
+        $rows = [];
+        foreach (array_values(array_unique($blocks)) as $key) {
+            $meta = $state['keys'][$key] ?? null;
+            if ($meta === null || $meta['kind'] !== 'module' || isset($meta['locale']) || !empty($meta['switcher'])) {
+                $problems[] = new ContractProblem('BLOCK_UNKNOWN', 'Not a module of this contract: ' . substr($key, 0, 120), substr($key, 0, 120));
+                continue;
+            }
+            $published = (string) ($state['rows'][$key]['published'] ?? '');
+            if ($published === '0') { $already[] = $key; continue; }
+            if ($published !== '1') { $problems[] = new ContractProblem('BLOCK_NOT_PUBLISHED', 'This block is neither published nor unpublished (published is ' . $published . '): ' . $key, $key); continue; }
+            $moving[] = $key;
+            $rows[] = ['module', (int) $state['ids'][$key]];
+            // A copy's visibility is derived from its source's, so the two never stand apart past this transaction.
+            foreach ($state['keys'] as $copy => $copyMeta)
+                if (($copyMeta['base'] ?? null) === $key && (string) ($state['rows'][$copy]['published'] ?? '') === '1') $rows[] = ['module', (int) $state['ids'][$copy]];
+        }
+        if ($problems) throw ContractProblem::all($problems);
+        if (!$moving) return $this->ok(['unpublished' => [], 'already' => $already, 'unchanged' => true]);
+        $this->refuseLocked($rows);
+        $result = $this->writer->transaction(function () use ($apply, $request, $hash, $moving, $already, $rows) {
+            foreach ($rows as [$kind, $id]) {
+                if (!$this->writer->setVisibilityIf($kind, $id, 'published', '1', '0'))
+                    throw new ContractProblem('CONFLICT', 'conflict: module ' . $id . ' changed while it was being written. Nothing has been written.');
+                $this->log->record($apply, ['op' => 'visibility', 'kind' => $kind, 'id' => $id, 'column' => 'published', 'before' => '1']);
+            }
+            $this->contract->rebind($this->contract->bindingWithBlocks($moving, '0'));
+            $after = $this->contract->inspect()['revision'];
+            $result = $this->ok(['unpublished' => $moving, 'already' => $already, 'afterRevision' => $after]);
+            $this->log->record($apply, ['op' => 'blocks', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $after, 'keys' => $moving]);
+            return $result;
+        });
+        try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+        $this->stamped('content');
+        return $result;
+    }
+
+    /** `apply.revert` of a blocks.unpublish: only over the revision it left, and back by the same compare-and-set. */
+    private function blocksRestore(array $p): array
+    {
+        try {
+            $apply = (string) $this->applyId($p);
+            $entries = $this->log->entries($apply);
+            $receipts = array_values(array_filter($entries, static fn($entry) => ($entry['op'] ?? '') === 'blocks'));
+            if (count($receipts) !== 1 || ($receipts[0]['afterRevision'] ?? null) !== $this->contract->inspect()['revision']) {
+                $message = 'Later content exists; revert the latest revision first';
+                return $this->err('conflict', $message, ['errors' => [ContractProblem::plain('CONFLICT', $message)]]);
+            }
+            $rows = [];
+            foreach ($entries as $entry) if (($entry['op'] ?? '') === 'visibility') $rows[] = [(string) $entry['kind'], (int) $entry['id']];
+            $this->refuseLocked($rows);
+            $this->writer->transaction(function () use ($rows, $receipts) {
+                foreach ($rows as [$kind, $id])
+                    if (!$this->writer->setVisibilityIf($kind, $id, 'published', '0', '1'))
+                        throw new ContractProblem('CONFLICT', 'conflict: module ' . $id . ' changed since it was unpublished. Nothing has been written.');
+                $this->contract->rebind($this->contract->bindingWithBlocks($receipts[0]['keys'], '1'));
+                return ['reverted' => count($rows)];
+            });
+            try { $this->log->clear($apply); } catch (Throwable $ignored) {}
+            try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
+            $this->stamped('revert');
+            return $this->ok(['reverted' => count($rows)]);
+        } catch (Throwable $error) { return $this->contractFailed($error); }
+    }
 
     /**
      * Bind an imported site to a DERIVED contract: its own rows, read through five codecs, calibrated
@@ -5411,6 +5526,11 @@ final class Engine
      *   named in `refused`, never written. The file's previous bytes are recorded under the `apply_id`, so `apply.revert`
      *   puts them back (deleting a file that did not exist). Nothing changes → nothing is written (`unchanged: true`).
      *
+     * - `operation: setSource`, `apply_id`, `template`, `strings: {KEY: words}`: the same write for en-GB, the source
+     *   language no other operation takes (TracyHQ/tracy#362). Only the keys named, and each one a word string of the
+     *   site's own en-GB files; a value is `""`, which takes the sentence off the page, or words as `set` takes them.
+     *   Anything else is left out and named in `refused`. The language files stay what the release shipped.
+     *
      * Not part of a `content.batch`: a file is not inside the database's transaction.
      */
     private function languageOverridesDoor(array $p): array
@@ -5420,7 +5540,11 @@ final class Engine
         $locale = $p['locale'] ?? null;
         if (!is_string($template) || !preg_match(LanguageOverrides::TEMPLATE, $template))
             return $this->err('bad_params', 'template required: the folder name of a site template, e.g. ja_essence');
-        if (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
+        $source = ($p['operation'] ?? null) === 'setSource';
+        if ($source) {
+            if (($locale ?? 'en-GB') !== 'en-GB') return $this->err('bad_params', 'setSource writes en-GB, the source language: use set for another');
+            $locale = 'en-GB';
+        } elseif (!is_string($locale) || !preg_match(LanguageOverrides::LOCALE, $locale) || $locale === 'en-GB')
             return $this->err('bad_params', 'locale required: a Joomla language tag other than en-GB, e.g. vi-VN');
         if (!$this->overrides->hasTemplate($template)) return $this->err('not_found', 'No site template ' . $template . ' is installed');
         $head = ['template' => $template, 'locale' => $locale, 'path' => LanguageOverrides::path($locale)];
@@ -5437,10 +5561,11 @@ final class Engine
                 return $this->err('read_failed', $e->getMessage());
             }
         }
-        if ($operation !== 'set') return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
+        if ($operation !== 'set' && !$source) return $this->err('bad_params', 'Unknown template.languageOverrides operation: use read or set');
         try {
             // Every page's strings, not one page's: a key read on a later page is as writable as one on the first.
-            $plan = ['strings' => $this->overrides->offered($template, $locale)];
+            $plan = ['strings' => $source ? [] : $this->overrides->offered($template, $locale)];
+            $own = $source ? $this->overrides->sourceStrings($template) : [];
         } catch (Throwable $e) {
             return $this->err('read_failed', $e->getMessage());
         }
@@ -5456,11 +5581,13 @@ final class Engine
             $offered[$row['key']] = $row['source'];
             if (($row['reason'] ?? null) === 'date-format') $formats[$row['key']] = $row['value'];
         }
+        $offered += $own;
         $values = [];
         $refused = [];
         foreach ($strings as $key => $value) {
             $key = strtoupper((string) $key);
-            if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => 'not a string this site shows in en-GB']; continue; }
+            if (!isset($offered[$key])) { $refused[] = ['key' => substr($key, 0, 120), 'reason' => $source ? 'not a string of this site\'s en-GB files' : 'not a string this site shows in en-GB']; continue; }
+            if ($source && $value === '') { $values[$key] = ''; continue; }
             // A date format is the language's own, never words: the read named it, and nothing else is written.
             if (isset($formats[$key]) && (!is_string($value) || trim($value) !== $formats[$key])) { $refused[] = ['key' => $key, 'reason' => 'a date format takes the language\'s own (' . $formats[$key] . ')']; continue; }
             $why = LanguageOverrides::refusal($offered[$key], $value);

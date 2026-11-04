@@ -192,6 +192,21 @@ final class LanguageOverrides
     }
 
     /**
+     * Every word string of the site's own en-GB front end and plugin language files: what `setSource` may name. Date
+     * formats are configuration, and another template's words are not this site's.
+     *
+     * @return array<string,string> key => en-GB words
+     */
+    public function sourceStrings(string $template): array
+    {
+        $out = [];
+        foreach (array_merge(array_keys($this->sourceFiles($template)), array_keys($this->pluginFiles())) as $file)
+            foreach (self::parse((string) $this->bytes($file)) as $key => $source)
+                if (!isset($out[$key]) && preg_match(self::KEY, $key) && !preg_match(self::FORMAT_KEY, $key)) $out[$key] = $source;
+        return $out;
+    }
+
+    /**
      * Whether a literal is a date format that puts the month's name before the day (`F j, Y`, `M d, Y`): the English order a
      * language's own format replaces. A format with the day first, or with no month name or no day, is left as it is.
      */

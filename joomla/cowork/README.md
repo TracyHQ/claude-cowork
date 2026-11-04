@@ -486,6 +486,44 @@ slot stays bound and occupied in the contract (inspect reports no drift), `apply
 and writing a link into it later shows the button again. The review covers Tracy Business j6 1.2.1's
 layouts; a JoomlArt layout that prints `<a href="">` whatever its link holds (JA Phio's hero) is not on it.
 
+**Hiding a slot (`empty_slots`, unreleased).** An apply may name slots to empty: `empty_slots: ["module-430.1", …]`,
+alone or beside `changes` and `empty_links`, sharing their limit of 1500. Hidden means gone from the HTML and from the
+admin, never CSS. `changes` still refuses an empty value on an occupied slot (`SLOT_EMPTY_STATE`). Whether a block holds
+without a slot is measured in Tracy's template kit, which no site holds, so `lib/hideable-slots.json` carries the
+verdicts per contract, written by `scripts/hideable-slots.mjs` and tied to the sha256 of the content map they were read
+against. It is receiver data, not contract bytes: no pinned hash moves, and a site's fetched profile stays valid. A
+contract not listed, or listed against other bytes, empties nothing. Inspect marks a listed slot `canHide`:
+
+| `canHide` | Meaning | Taken |
+| --- | --- | --- |
+| `measured` | a picture frame the kit emptied, and the block held | alone |
+| `unmeasured` | a word slot; the kit has no verdict on word slots, only its page can show whether it holds | alone |
+| `withRow` | a link, or a frame the kit says looks wrong emptied alone | only when another slot its row names goes in the same apply, or has gone |
+
+Any other occupied slot named is refused `SLOT_NOT_HIDEABLE`, and so is a slot addressed by a text node or an attribute
+whatever a list says: an emptied `text()[1]` is not saved, so its slot dangles, which stops every inspect of the site, or
+`text()[2]` becomes `text()[1]` and the neighbour answers to the wrong number. A slot already empty is no refusal and no
+write. A hidden slot is emptied in every language the site carries. `apply.revert` puts it back, and writing words into
+it later shows it again. Nothing removes a row: rows are parallel arrays, and removing one renumbers the slots after it.
+
+**Unpublishing a block (`blocks.unpublish`, unreleased).** `content.contract`, `operation: "blocks.unpublish"`, `apply_id`
+(`contract-…`), `request_id`, `expected_revision`, `blocks: ["module-156", …]` (1 to 300). It accepts the contract's own
+module entities and nothing else (`BLOCK_UNKNOWN`), a module neither published nor unpublished is refused
+(`BLOCK_NOT_PUBLISHED`), and all refusals are found before anything is written. It answers `unpublished`, `already` and
+`afterRevision`. `content.update` writes `published` too, but through Joomla's Table, which moves the row's asset; its
+translations stay published; and every later call warns of drift. This door moves one column by compare-and-set, the
+translations with it and the baseline in one transaction. `apply.revert` brings the blocks back, only over the revision it
+left. An imported (derived) site has no block list: `content.update` is its door.
+
+**Source language overrides (`setSource`, unreleased).** `template.languageOverrides`, `operation: "setSource"`, `apply_id`,
+`template`, `strings: {"TPL_SOME_CONSTANT": ""}`. `read` and `set` still refuse en-GB. Only the keys named are written, each
+one a word string of the site's own en-GB files, and a value is `""`, which takes the sentence off the page, or one line of
+words with the source's placeholders. Anything else is named in `refused`. The language files stay what the release
+shipped, and `apply.revert` puts the override file's bytes back. A constant the contract also names as a `languageString`
+row moves the inspect revision, so inspect again after it.
+
+`info.hide_ops` says an engine has these three: an older one ignores `empty_slots` beside `changes`.
+
 Release activation is separate from source availability: 0.14.0 has been tested as a local package,
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.
