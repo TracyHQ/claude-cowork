@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Template style logos of a T3 template are contract content: a declared logo picture slot is not presentation drift.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.80</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.80</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.80/pkg_claudecowork-0.24.80.zip</downloadurl>
+        </downloads>
+        <sha256>8e79d6c9eb8a96548aabc126a0d915c88df6e778d17a45da00b3f148aeee9a0b</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Carries the ja-boxing/j6/1.0.10 content contract (JA Boxing, Joomla 6).</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
