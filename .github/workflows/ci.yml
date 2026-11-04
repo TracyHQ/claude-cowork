@@ -54,6 +54,9 @@ jobs:
       - name: Hideable slots generator
         run: node --test ../../scripts/hideable-slots.test.mjs
 
+      - name: Slot corrections generator
+        run: node --test ../../scripts/slot-corrections.test.mjs
+
       - name: Language check
         run: node ../../scripts/check-language.mjs com_claudecowork/administrator/lib
 

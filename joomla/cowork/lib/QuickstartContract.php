@@ -14,6 +14,7 @@ require_once __DIR__ . '/ShowcaseNavProfile.php';
 require_once __DIR__ . '/JsonObjectKey.php';
 require_once __DIR__ . '/ContractProblem.php';
 require_once __DIR__ . '/SlotFit.php';
+require_once __DIR__ . '/SlotCorrections.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/LeafCodec.php';
 require_once __DIR__ . '/DerivedMap.php';
@@ -81,6 +82,8 @@ final class QuickstartContract
     private ?array $linkLayouts = null;
     /** @var array<string,string> slot key => how the review judged it ('measured', 'unmeasured', 'withRow'): {@see loadHideable} */
     private array $hideable = [];
+    /** What `lib/slot-corrections.json` says of this contract's slots; null when nothing applies. */
+    private ?SlotCorrections $corrections = null;
     /** @var array<string,list<string>> a 'withRow' slot's row: it is emptied only when one of these goes too, or already has */
     private array $hideRows = [];
     /** @var array<string,list<array>> entity => the rows the review proves: {@see loadHideable} */
@@ -178,6 +181,7 @@ final class QuickstartContract
         $this->syncSourceRelabel();
         $this->linkLayouts = self::loadLinkLayouts($lib . '/link-layouts.json');
         $this->loadHideable($lib . '/hideable-slots.json', $directory . '/content-map.json');
+        $this->corrections = SlotCorrections::load($lib . '/slot-corrections.json', (string)($this->manifest['id'] ?? ''), $directory . '/content-map.json');
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
@@ -317,9 +321,14 @@ final class QuickstartContract
         if ($this->slotsByEntity === null) {
             $this->loaded();
             $this->slotsByEntity = [];
-            foreach ($this->map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $slot;
+            foreach ($this->map['slots'] as $slot) $this->slotsByEntity[$slot['entity']][] = $this->corrected($slot);
         }
         return $this->slotsByEntity[$key] ?? [];
+    }
+
+    /** A slot as it is held now. The map itself stays as released: it is what the contract hash is the digest of. */
+    private function corrected(array $slot): array {
+        return $this->corrections === null ? $slot : $this->corrections->apply($slot);
     }
 
     /**
@@ -427,7 +436,7 @@ final class QuickstartContract
     private function slotsOf(string $key, array $meta): array {
         if (!empty($meta['switcher'])) return [];
         if (!isset($meta['locale'])) return $this->standing($key, $this->slotsFor($key));
-        return $this->standing($meta['base'], $this->multilingual->derivedSlots($meta['locale'], $meta['base'], $this->lock['entities'][$meta['base']]));
+        return $this->standing($meta['base'], array_map([$this, 'corrected'], $this->multilingual->derivedSlots($meta['locale'], $meta['base'], $this->lock['entities'][$meta['base']])));
     }
 
     /** These slots of `$base` as they stand after what `rows.remove` took: a removed one is gone, a later one has stepped down. */
@@ -853,7 +862,7 @@ final class QuickstartContract
         $roles = false; $fits = false;
         foreach ($slots as $list) foreach ($list as $slot) { $roles = $roles || isset($slot['role']); $fits = $fits || isset($slot['fit']); }
         if ($roles) $out += ['roleGuidance'=>self::ROLE_GUIDANCE];
-        if ($fits) $out += ['fitGuidance'=>SlotFit::GUIDANCE];
+        if ($fits) $out += ['fitGuidance'=>SlotFit::GUIDANCE.($this->corrections!==null&&$this->corrections->hasIcons()?' '.SlotFit::ICON_GUIDANCE:'')];
         return $out;
     }
 
@@ -1132,10 +1141,12 @@ final class QuickstartContract
         // not have (a TikTok page, a legal name) must be emptied, or the demo's value is shown instead.
         if(empty($slot['siteIdentity'])) {
             if(trim($value)==='' && trim($slot['sample'])!=='')throw $refuse('SLOT_EMPTY_STATE','Content cannot remove an occupied slot: '.$key);
-            if(trim($value)!=='' && trim($slot['sample'])==='')throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
+            if(trim($value)!=='' && trim($slot['sample'])==='' && empty($slot['opensEmpty']))throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
         }
         if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
         if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        // A slot a correction opened holds an alt its template prints unescaped: a double quote would close the attribute.
+        if(!empty($slot['opensEmpty'])&&strpos($value,'"')!==false)throw $refuse('SLOT_NOT_CONTENT','A double quote breaks this picture\'s alt: rewrite it without one: '.$key);
         // An imported site stores links and pictures in whatever form it grew; a quickstart's rules below
         // were written for the forms its own profile ships, and stay exactly as they are. A derived
         // slot's length limit is sized from its old words, which says nothing about a link or a file
@@ -1160,6 +1171,7 @@ final class QuickstartContract
             // read whole, it named no file, its shape was never known, and every shape was taken
             $before=@getimagesize($this->root.'/'.self::imagePath((string)$slot['sample']));$after=@getimagesize($this->root.'/'.$value);
             if(!$after||!$after[0]||!$after[1])throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
+            if($fit!==null)SlotFit::checkIcon($fit,$key,$after,$this->root.'/'.$value,$params,$refuse);
             // A fit that names the box's aspect holds the picture to it; without one, the demo file's shape decides, as always.
             if($fit!==null&&SlotFit::checkPicture($fit,$key,$after,$before,$this->root.'/'.$value,$refuse,(string)$slot['sample']))return;
             if($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02)throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
@@ -1448,7 +1460,7 @@ final class QuickstartContract
     public function slotValue(array $row, array $slot): string { return $this->currentValue($row,$slot); }
     /** The slots of one entity's copy in a language, keyed for that copy. */
     public function derivedSlotsFor(string $locale, string $baseKey): array {
-        return $this->standing($baseKey,$this->profile()->derivedSlots($locale,$baseKey,$this->lockFields($baseKey)));
+        return $this->standing($baseKey,array_map([$this,'corrected'],$this->profile()->derivedSlots($locale,$baseKey,$this->lockFields($baseKey))));
     }
 
     /* ------------------------------------------------------------ multilingual */

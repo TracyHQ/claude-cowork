@@ -2,7 +2,7 @@
 /**
  * Slot fit (TCH ADR 0039): what a slot of a newer content map says about the SHAPE of what goes in it,
  * measured at capture from the rendered demo. A picture says its kind (photo, icon, cut-out...), whether
- * a build may replace it (`replace`: photo, logo or keep), whether it needs a transparent ground, the
+ * a build may replace it (`replace`: photo, logo or keep, or icon from a SlotCorrections list), whether it needs a transparent ground, the
  * aspect of its box and the narrowest source that stays sharp. A text says how many characters and
  * lines its box holds, and that a longer text is rewritten, never cut (`overflow: "rewrite"`).
  *
@@ -24,6 +24,9 @@ final class SlotFit
         . 'A picture whose fit.transparent is true needs a cut-out: a PNG or WebP with a transparent background. Ask the customer for one, or produce one by removing the background; an opaque picture is refused. '
         . 'A text has fit.maxCharacters and fit.lines: when the customer\'s words are longer, rewrite them shorter so they keep their meaning; never cut them or add an ellipsis. A text over its fit is refused. '
         . 'Write in normal case: fit.casing says how the template already shows the words (upper means the template capitalises them).';
+
+    /** Said beside the guidance only when a correction opened an icon of this contract (SlotCorrections). */
+    public const ICON_GUIDANCE = 'A picture whose fit.replace is "icon" takes an icon drawn on a transparent ground, in the shape of the one it replaces: a photograph or any other opaque picture is refused, unless the customer asks for that very picture as above.';
 
     /** Relative aspect tolerance when a fit names none; the same 2% the shape check always used. */
     private const TOLERANCE = 0.02;
@@ -73,6 +76,20 @@ final class SlotFit
         if (is_string($asked) && trim($asked) !== '' && strlen($asked) <= 2000) return;
         $kind = is_string($fit['kind'] ?? null) ? $fit['kind'] : 'picture';
         throw $refuse('SLOT_PICTURE_KEPT', 'This picture is a ' . $kind . ' the template keeps: leave it, or send replace_kept with the customer\'s words that ask for this very picture: ' . $key, ['kind' => $kind]);
+    }
+
+    /**
+     * A kept icon a correction opened (fit.replace "icon") takes a drawing, not a photo: without the customer's words for
+     * this very picture, only a file whose corner reads transparent passes. One that cannot be read (no GD, too large)
+     * stays refused, as a kept picture is. With their words it goes on to the rules any kept picture meets.
+     */
+    public static function checkIcon(array $fit, string $key, array $size, string $file, array $params, callable $refuse): void
+    {
+        if (($fit['replace'] ?? null) !== 'icon') return;
+        $asked = $params['replace_kept'][$key] ?? null;
+        if (is_string($asked) && trim($asked) !== '' && strlen($asked) <= 2000) return;
+        if (self::transparent($file, $size) === true) return;
+        throw $refuse('SLOT_PICTURE_KEPT', 'This picture is an icon the template keeps unless it is drawn on a transparent ground, and this image is opaque: leave it, draw it on a transparent ground, or send replace_kept with the customer\'s words that ask for this very picture: ' . $key, ['kind' => 'icon']);
     }
 
     /**

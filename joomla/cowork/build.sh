@@ -36,6 +36,9 @@ cp lib/link-layouts.json com_claudecowork/administrator/lib/
 # Which slots content.contract may empty (empty_slots), per contract: receiver data like the two above. Without it a
 # receiver empties no slot at all, again with no error.
 cp lib/hideable-slots.json com_claudecowork/administrator/lib/
+# What Tracy's kit knows better than a released contract, per contract: receiver data like the three above. Without it a
+# receiver holds every slot to its contract, again with no error.
+cp lib/slot-corrections.json com_claudecowork/administrator/lib/
 
 # The release manifest: every file the package puts on a site, by its webroot path, with its sha256
 # — read off the extension manifests the installer follows, after the engine copy above and before

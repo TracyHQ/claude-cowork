@@ -474,7 +474,8 @@ final class Engine
                     'version' => 1,
                     // content.contract `rows.remove`: a hidden slot's row or element leaves the stored field.
                     'rows_remove' => 1,
-                ], 'db_range_checksums' => [
+                // lib/slot-corrections.json: which contracts this engine holds to the kit's limits, and how far.
+                ], 'slot_corrections' => SlotCorrections::ability(__DIR__ . '/slot-corrections.json'), 'db_range_checksums' => [
                     'version' => 1,
                     'max_starts' => self::MAX_RANGE_STARTS,
                     'max_limit' => self::MAX_DB_LIMIT,

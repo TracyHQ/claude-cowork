@@ -541,6 +541,19 @@ published menu item opens directly is skipped: at that address Joomla prints the
 not the category's. Menu modules get no such stamps for the same reason.
 
 
+**Slot corrections (unreleased).** A released contract is never edited and a bound site stores its hash, so what Tracy's
+template kit knows better than the contract rides beside it: `lib/slot-corrections.json`, written by
+`scripts/slot-corrections.mjs` and tied to the sha256 of the content map it was read against. It is receiver data, not
+contract bytes: the map stays as released, and only the slots handed out are corrected. A contract not listed, or listed
+against other bytes, is held as before, and so is a slot the list does not name. `info.slot_corrections` says, per contract,
+how many slots each rule reaches.
+
+| Rule | Reaches | Then |
+| --- | --- | --- |
+| `limits` | a text whose measured fit is under the kit's limit, capped by the map | `fit.maxCharacters` is the kit's; over it is still `SLOT_TOO_LONG` |
+| `icons` | a kept icon on a transparent ground | `fit.replace` is `icon`: a transparent drawing is taken; an opaque picture is still `SLOT_PICTURE_KEPT` unless `replace_kept` names it, and then meets `SLOT_IMAGE_OPAQUE` |
+| `alts` | a gallery alt with an empty sample beside an occupied picture | it takes its limit and may be filled; a double quote is `SLOT_NOT_CONTENT`, because the template prints the alt unescaped |
+
 `content.contract` `rows.remove` (`slots`, `keep`, `expected_revision`, `apply_id`, `request_id`; `info.hide_ops.rows_remove`) takes a hidden slot out of the stored field, box and all. A slot leaves with its row when the review proves one (`hideable-slots.json` `rows`: parallel lists under one parent, or a subform's numbered keys) and nothing of that row stays; otherwise, in an HTML field, with its own element, and with each parent that leaves empty. An element holding a slot in `keep`, or one written since the quickstart and not named, never goes: its slot gives up only its own text or alt, or is refused by name. The baseline moves by the same ops in the same transaction, so the rest of the row still compares and a later slot steps down into the gap. There is no `apply.revert`: a removed slot answers `SLOT_UNKNOWN`, is listed in inspect's `removedSlots`, and comes back only on a new site. A site that carries translations refuses it.
 ## Contract profiles: one release asset each (unreleased)
 
