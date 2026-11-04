@@ -2,11 +2,11 @@
   "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v2",
   "profileVersion": "1.0.0",
   "contract": "ja-diner/j6/1.0.5",
-  "baseHash": "c9fb5953b93c97534fb2f2a4d63e34f072b527b74e20f89500ab4a060496706a",
+  "baseHash": "2400cc6f46dbc4e7cbad645f7de359c68e19bfad7ac5a885f75c51e6e5c0d6c8",
   "baseFiles": {
-    "manifest.json": "b9da50d97828b8f4a31df30f40195a0cdd24d72a82235a710a633fdcb98a6a29",
-    "content-map.json": "a9d18df7fc88f37722ac762ca0212ba577b98852389b1e7fa4bb2567902ba395",
-    "presentation-lock.json": "b24e33ccec82ed7830c7353e19c43c1404d09c91749fe55122bc9e000a1fdc0e"
+    "manifest.json": "019455aeb679e18de3f51fde173508dd6f96a8e61996eb178fd3194a86f65dd3",
+    "content-map.json": "007259d97a25603720db82d46bdb59c2fb5804bced36146eccb2787fc2f106e2",
+    "presentation-lock.json": "e8de147cd2daa6fe4d302649cae046c1fe8bf003794dce2e258ec0549c5af40e"
   },
   "inputs": {},
   "decisionsHash": "c5377f4f3e41701fab915f6daf6d7abc6c9f38d14ed149574d9950317b963f73",
