@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Carries the ja-boxing/j6/1.0.10 content contract (JA Boxing, Joomla 6).</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.79</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.79</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.79/pkg_claudecowork-0.24.79.zip</downloadurl>
+        </downloads>
+        <sha256>eed7f4ecf63f7bb56db6deeb7dc71912c07d15bf38066a61d19f6c09a96b3cf6</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>template.siteSettings writes the page background of a T4 template (body_bg_img, a picture under images/), with undo.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
