@@ -2234,6 +2234,8 @@ require __DIR__ . "/contract-json-columns.php";
 require __DIR__ . "/contract-authors.php";
 require __DIR__ . "/contract-language-strings.php";
 require __DIR__ . "/contract-site-settings.php";
+// T3 logos: a template style's logo params as content slots, and the switches around them not drift.
+require __DIR__ . "/contract-template-style-logos.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";
