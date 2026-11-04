@@ -22,6 +22,10 @@ $hoBand = $hoAcm('Made-up band', [':type' => 'tpl:band', 'band' => ['band[title]
 $hoHtml = ['title' => 'Made-up prose', 'module' => 'mod_custom', 'position' => 'masthead', 'published' => '1', 'publish_up' => null, 'publish_down' => null,
     'ordering' => '3', 'access' => '1', 'showtitle' => '0', 'language' => '*', 'client_id' => '0',
     'content' => '<div><p>A whole made-up sentence</p><span>A loose made-up word</span> and more <a href="/made-up">made-up</a></div>', 'params' => '{"style":"0"}'];
+// Two whole units as a real footer block holds them: one with line breaks around its words, and one whose words sit between two elements.
+$hoLines = ['title' => 'Made-up lines', 'module' => 'mod_custom', 'position' => 'footer', 'published' => '1', 'publish_up' => null, 'publish_down' => null,
+    'ordering' => '4', 'access' => '1', 'showtitle' => '0', 'language' => '*', 'client_id' => '0',
+    'content' => "<a href=\"#\" class=\"made-up-link\">A made-up phone</a>\n<p class=\"made-up-gap\">\n  A made-up street<br/>A made-up town\n</p>\n<p class=\"made-up-beside\"><i class=\"made-up-icon\"></i>A made-up word<i class=\"made-up-mark\"></i></p>", 'params' => '{"style":"0"}'];
 $hoJson = fn(string $key, string $entity, array $path, string $type, string $sample) => ['key' => $key, 'entity' => $entity, 'column' => 'params', 'type' => $type,
     'sample' => $sample, 'maxCharacters' => 2048, 'requiresEvidence' => false, 'jsonPath' => $path, 'nestedJson' => 'jatools-config'];
 $hoSlots = [
@@ -36,26 +40,29 @@ $hoSlots = [
     ['key' => 'prose.unit', 'entity' => 'prose', 'column' => 'content', 'type' => 'text', 'sample' => 'A whole made-up sentence', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/div/p'],
     ['key' => 'prose.node', 'entity' => 'prose', 'column' => 'content', 'type' => 'text', 'sample' => 'A loose made-up word', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/div/span/text()'],
     ['key' => 'prose.href', 'entity' => 'prose', 'column' => 'content', 'type' => 'url', 'sample' => '/made-up', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/div/a/@href'],
+    ['key' => 'lines.0', 'entity' => 'lines', 'column' => 'content', 'type' => 'text', 'sample' => 'A made-up phone', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/a/text()'],
+    ['key' => 'lines.1', 'entity' => 'lines', 'column' => 'content', 'type' => 'text', 'sample' => 'A made-up street A made-up town', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/p[1]'],
+    ['key' => 'lines.2', 'entity' => 'lines', 'column' => 'content', 'type' => 'text', 'sample' => 'A made-up word', 'maxCharacters' => 80, 'requiresEvidence' => false, 'xpath' => '/html/body/div/p[2]'],
 ];
 $hoStore = new TestContractStore();
 $hoEntities = [];
-foreach (['cards' => 10, 'band' => 11, 'prose' => 12] as $key => $id) $hoEntities[] = ['key' => $key, 'kind' => 'module', 'sourceId' => $id, 'identity' => ['title' => ['cards' => 'Made-up cards', 'band' => 'Made-up band', 'prose' => 'Made-up prose'][$key]]];
+foreach (['cards' => 10, 'band' => 11, 'prose' => 12, 'lines' => 13] as $key => $id) $hoEntities[] = ['key' => $key, 'kind' => 'module', 'sourceId' => $id, 'identity' => ['title' => ['cards' => 'Made-up cards', 'band' => 'Made-up band', 'prose' => 'Made-up prose', 'lines' => 'Made-up lines'][$key]]];
 $hoFiles = [
     'manifest' => ['id' => 'test-hide/j6/1.0.0'],
     'content-map' => ['entities' => $hoEntities, 'slots' => $hoSlots, 'pages' => []],
-    'presentation-lock' => ['entities' => ['cards' => $hoCards, 'band' => $hoBand, 'prose' => $hoHtml],
-        'assignments' => [['moduleid' => 10, 'menuid' => 0], ['moduleid' => 11, 'menuid' => 0], ['moduleid' => 12, 'menuid' => 0]],
-        'fileRoots' => [], 'files' => [], 'inventoryCounts' => ['module' => 3], 'access' => $hoStore->acl],
+    'presentation-lock' => ['entities' => ['cards' => $hoCards, 'band' => $hoBand, 'prose' => $hoHtml, 'lines' => $hoLines],
+        'assignments' => [['moduleid' => 10, 'menuid' => 0], ['moduleid' => 11, 'menuid' => 0], ['moduleid' => 12, 'menuid' => 0], ['moduleid' => 13, 'menuid' => 0]],
+        'fileRoots' => [], 'files' => [], 'inventoryCounts' => ['module' => 4], 'access' => $hoStore->acl],
 ];
 foreach ($hoFiles as $name => $body) file_put_contents($hoDir . '/' . $name . '.json', json_encode($body));
 $hoMapHash = hash_file('sha256', $hoDir . '/content-map.json');
 $hoReview = fn(?string $hash = null, string $id = 'test-hide/j6/1.0.0') => json_encode(['contracts' => [$id => ['contentMapSha256' => $hash ?? $hoMapHash,
-    'measured' => ['cards.2', 'prose.node'], 'unmeasured' => ['cards.0', 'cards.3', 'band.0', 'prose.unit'], 'withRow' => ['cards.1' => ['cards.0', 'cards.2'], 'cards.5' => ['cards.3', 'cards.4']]]]]);
+    'measured' => ['cards.2', 'prose.node'], 'unmeasured' => ['cards.0', 'cards.3', 'band.0', 'prose.unit', 'lines.1', 'lines.2'], 'withRow' => ['cards.1' => ['cards.0', 'cards.2'], 'cards.5' => ['cards.3', 'cards.4']]]]]);
 file_put_contents($hoRoot . '/lib/hideable-slots.json', $hoReview());
 
 $hoLog = new FakeApplyLog();
 $hoWriter = new ContractTestWriter($hoLog, $hoStore);
-foreach (['cards' => [110, $hoCards], 'band' => [111, $hoBand], 'prose' => [112, $hoHtml]] as [$id, $row]) {
+foreach (['cards' => [110, $hoCards], 'band' => [111, $hoBand], 'prose' => [112, $hoHtml], 'lines' => [113, $hoLines]] as [$id, $row]) {
     $hoWriter->store['module'][$id] = ['id' => (string) $id] + $row;
     $hoWriter->store['moduleAssignment'][$id] = ['menuids' => '[0]'];
 }
@@ -76,7 +83,7 @@ $hoTiers = function () use ($hoDoor): array {
 /* ------------------------------------------------ what inspect says may be emptied */
 check('info says this engine has these abilities', $hoEngine->handle(['token' => $WTOKEN, 'action' => 'info'])['info']['hide_ops'] ?? null, ['version' => 1]);
 check('inspect names each slot the review lists, and how it was judged', $hoTiers(), [
-    'band.0' => 'unmeasured', 'cards.0' => 'unmeasured', 'cards.1' => 'withRow', 'cards.2' => 'measured', 'cards.3' => 'unmeasured', 'cards.5' => 'withRow', 'prose.unit' => 'unmeasured']);
+    'band.0' => 'unmeasured', 'cards.0' => 'unmeasured', 'cards.1' => 'withRow', 'cards.2' => 'measured', 'cards.3' => 'unmeasured', 'cards.5' => 'withRow', 'lines.1' => 'unmeasured', 'lines.2' => 'unmeasured', 'prose.unit' => 'unmeasured']);
 
 /* ------------------------------------------------ refusals: nothing is written */
 $hoRevision = $hoContract->inspect()['revision'];
@@ -131,6 +138,32 @@ $hoBack = $hoApply('on-again', ['changes' => ['cards.0' => 'Words again']]);
 check('words written into an emptied slot show again', [$hoBack['ok'], $hoRead('cards[title]', 0)], [true, 'Words again']);
 $hoEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-on-again']]);
 $hoEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-off-2']]);
+
+/* ------------------------------------------------ an emptied unit keeps its place in the row */
+// The check masks a slot's words in the row and in the baseline, and the two must match byte for byte. A unit with a line
+// break around its words, or with its words between two elements, must mask the same once it is emptied.
+$hoLinesRevision = $hoContract->inspect()['revision'];
+$hoLinesOff = $hoApply('lines-off', ['empty_slots' => ['lines.1', 'lines.2'], 'changes' => ['lines.0' => 'A changed made-up phone']]);
+check('a unit with line breaks around its words and a unit between two elements are emptied with no drift', [$hoLinesOff['ok'], $hoLinesOff['message'] ?? null], [true, null]);
+$hoLinesNow = array_column($hoDoor(['operation' => 'inspect'])['slots'], 'current', 'key');
+check('both read empty, the neighbour holds its write, and the check still holds', [$hoLinesNow['lines.1'], $hoLinesNow['lines.2'], $hoLinesNow['lines.0'], $hoContract->driftWarnings()], ['', '', 'A changed made-up phone', []]);
+checkTrue('the emptied words leave the page', strpos($hoWriter->store['module'][113]['content'], 'A made-up street') === false && strpos($hoWriter->store['module'][113]['content'], 'A made-up word') === false);
+$hoLinesOn = $hoApply('lines-on', ['changes' => ['lines.1' => 'Made-up words again', 'lines.2' => 'Made-up words back']]);
+check('words go back into both, in their old place, with no drift', [$hoLinesOn['ok'], $hoContract->driftWarnings(), $hoWriter->store['module'][113]['content']],
+    [true, [], "<a href=\"#\" class=\"made-up-link\">A changed made-up phone</a>\n<p class=\"made-up-gap\">\n  Made-up words again\n</p>\n<p class=\"made-up-beside\"><i class=\"made-up-icon\"></i>Made-up words back<i class=\"made-up-mark\"></i></p>"]);
+$hoEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-lines-on']]);
+$hoEngine->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-lines-off']]);
+check('and the emptying is taken back whole', [$hoContract->inspect()['revision'], $hoWriter->store['module'][113]['content']], [$hoLinesRevision, $hoLines['content']]);
+
+/* ------------------------------------------------ a drift names where the two values part */
+$hoLinesKept = $hoWriter->store['module'][113]['content'];
+$hoWriter->store['module'][113]['content'] = str_replace('made-up-mark', 'made-up-moved', $hoLinesKept);
+$hoLinesDrift = (new QuickstartContract($hoWriter, $hoStore, $hoRoot, $hoDir));
+$hoLinesDrift->inspect();
+$hoDriftText = implode("\n", $hoLinesDrift->driftWarnings());
+$hoWriter->store['module'][113]['content'] = $hoLinesKept;
+checkTrue('a drift far into a long value shows both sides from where they part: ' . $hoDriftText,
+    strpos($hoDriftText, 'made-up-mark') !== false && strpos($hoDriftText, 'made-up-moved') !== false);
 
 /* ------------------------------------------------ a receiver with no review for this contract empties nothing */
 $hoFresh = fn() => new QuickstartContract($hoWriter, $hoStore, $hoRoot, $hoDir);
@@ -256,6 +289,7 @@ $hoBoxBy = [];
 foreach ($hoBoxMap['slots'] as $hoSlot) $hoBoxBy[$hoSlot['entity']][] = $hoSlot;
 $hoBoxWrong = [];
 $hoBoxEmptied = 0;
+$hoBoxDrifted = [];
 foreach ($hoBoxBy as $hoEntity => $hoEntitySlots) {
     if (!array_intersect_key(array_flip(array_column($hoEntitySlots, 'key')), $hoBoxListed) || strpos($hoEntity, 'languageString-') === 0) continue;
     $hoRow = $hoBoxLock['entities'][$hoEntity];
@@ -268,8 +302,15 @@ foreach ($hoBoxBy as $hoEntity => $hoEntitySlots) {
         if (trim($hoGot) !== trim($hoWant)) $hoBoxWrong[] = $hoSlot['key'] . ' reads ' . json_encode(substr($hoGot, 0, 40));
         elseif ($hoWant === '') $hoBoxEmptied++;
     }
+    // The contract's own check: emptied, then masked, the row must match the masked baseline. And so must words written back.
+    $hoMask = array_fill_keys(array_column($hoEntitySlots, 'key'), MultilingualProfile::CONTENT_SLOT);
+    $hoBaseline = $hoBox->patch($hoRow, $hoEntitySlots, $hoMask);
+    if ($hoBox->patch($hoPatched, $hoEntitySlots, $hoMask) !== $hoBaseline) $hoBoxDrifted[] = $hoEntity . ' emptied';
+    $hoWords = array_map(fn() => 'Made-up words', array_intersect_key($hoBoxListed, $hoBefore));
+    if ($hoBox->patch($hoBox->patch($hoPatched, $hoEntitySlots, $hoWords), $hoEntitySlots, $hoMask) !== $hoBaseline) $hoBoxDrifted[] = $hoEntity . ' with words again';
 }
 check('every listed slot of the shipped review empties, and no neighbour moves', array_slice($hoBoxWrong, 0, 5), []);
+check('every row of the shipped review, emptied or written again, matches its baseline under the mask', $hoBoxDrifted, []);
 checkTrue('and that covered the review', $hoBoxEmptied > 700);
 unset($hoBoxLock, $hoBoxMap, $hoBoxBy, $hoBoxEntry, $hoBoxListed, $hoBox, $hoPatched, $hoRow);
 gc_collect_cycles();

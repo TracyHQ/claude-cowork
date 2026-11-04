@@ -28,6 +28,8 @@ final class ContentSlots
      * (capture-contract.py, UNIT_TAGS): a heading, a sentence, a list item, a caption, a cell, a button.
      */
     private const UNIT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'dt', 'dd', 'figcaption', 'summary', 'th', 'td', 'button', 'label'];
+    /** The comment an emptied unit holds in place of its words, see writeUnit(). */
+    private const EMPTIED_UNIT = 'emptied-slot';
     /** Python's `\s` on text, which the capture's sample collapses: ASCII whitespace, \x1c-\x1f, NEL, NBSP and the Unicode spaces. */
     private const CAPTURE_SPACE = '/[\x{9}-\x{D}\x{1C}-\x{20}\x{85}\x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}]+/u';
 
@@ -94,16 +96,31 @@ final class ContentSlots
      * htmlSlots() addresses as a slot of its own. So `Call <a href="tel:...">us</a> today` becomes
      * `New text<a href="tel:..."></a>`: the link's url slot still resolves, its label is gone with
      * the rest of the old sentence.
+     *
+     * Emptying a unit leaves a comment where its words started. The words were what told the next write where to go: without
+     * them, the gaps before and after run together into one blank text and the elements around them say nothing of the place,
+     * so the masked row no longer matches the masked baseline, and words written back land at the end of the unit. The comment
+     * draws nothing, is no text node, and takes no index among the elements, so no other slot's address moves.
      */
     private static function writeUnit(DOMXPath $xp, DOMElement $unit, string $value): void
     {
         $doc = $unit->ownerDocument; $pieces = self::unitPieces($xp, $unit);
-        if ($pieces === []) { $unit->appendChild($doc->createTextNode($value)); return; }
+        $mark = $xp->query('./comment()[. = "' . self::EMPTIED_UNIT . '"]', $unit)->item(0);
+        if ($pieces === []) {
+            if ($mark === null) $unit->appendChild($doc->createTextNode($value));
+            elseif ($value !== '') $unit->replaceChild($doc->createTextNode($value), $mark);
+            return;
+        }
         $first = $pieces[0]; $last = $pieces[count($pieces) - 1];
         preg_match('/^\s*/u', $first->data, $lead); preg_match('/\s*$/u', $last->data, $trail);
         // The new text goes directly in the unit, where the child holding the first piece starts.
         $anchor = $first; while (!$anchor->parentNode->isSameNode($unit)) $anchor = $anchor->parentNode;
-        $unit->insertBefore($doc->createTextNode($lead[0] . $value . $trail[0]), $anchor);
+        if ($value === '') {
+            $unit->insertBefore($doc->createTextNode($lead[0]), $anchor);
+            $unit->insertBefore($doc->createComment(self::EMPTIED_UNIT), $anchor);
+            $unit->insertBefore($doc->createTextNode($trail[0]), $anchor);
+        } else $unit->insertBefore($doc->createTextNode($lead[0] . $value . $trail[0]), $anchor);
+        if ($mark !== null) $unit->removeChild($mark);
         $held = [];
         foreach ($pieces as $piece) {
             for ($up = $piece->parentNode; !$up->isSameNode($unit); $up = $up->parentNode) $held[] = $up;

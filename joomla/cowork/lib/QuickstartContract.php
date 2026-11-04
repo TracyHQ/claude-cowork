@@ -554,6 +554,18 @@ final class QuickstartContract
         foreach(['params','attribs','metadata','images','urls'] as $col)if(isset($filtered[$col])&&$filtered[$col]!=='')$filtered[$col]=$this->column($filtered[$col]);
         return $filtered;
     }
+    /**
+     * The two values of a drifted field, cut where they part. Cut from their start, a long body shows the same 60 characters
+     * twice and hides the difference; both are JSON here, so a line break or a stray space can be read too.
+     */
+    private static function driftPair($want, $got): string {
+        $a=(string)json_encode($want,JSON_UNESCAPED_SLASHES);$b=(string)json_encode($got,JSON_UNESCAPED_SLASHES);
+        $at=0;$shorter=min(strlen($a),strlen($b));
+        while($at<$shorter&&$a[$at]===$b[$at])$at++;
+        $from=$at<40?0:$at-20;
+        $cut=static fn(string $text):string=>($from?'...':'').substr($text,$from,60).(strlen($text)>$from+60?'...':'');
+        return '['.($from?'from byte '.$at.': ':'').'want '.$cut($a).' got '.$cut($b).']';
+    }
     /** A JSON column as the baseline holds it: decoded when it is an object or list, else its text. */
     private function column($text) {
         $decoded=json_decode((string)$text,true);
@@ -940,7 +952,7 @@ final class QuickstartContract
                 // failure nothing they can act on, and the fields are the site's own column names,
                 // not its words — every content value is already masked by the time it gets here.
                 $differ=[];
-                foreach($expected as $field=>$value)if(!array_key_exists($field,$actual)||$actual[$field]!=$value)$differ[]=$field.' [want '.substr(json_encode($value),0,60).' got '.substr(json_encode($actual[$field]??null),0,60).']';
+                foreach($expected as $field=>$value)if(!array_key_exists($field,$actual)||$actual[$field]!=$value)$differ[]=$field.' '.self::driftPair($value,$actual[$field]??null);
                 foreach($actual as $field=>$value)if(!array_key_exists($field,$expected))$differ[]=$field.' (unexpected)';
                 $this->drift('Presentation drift: '.$key.' — '.implode(', ',$differ));
             }
