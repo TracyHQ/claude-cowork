@@ -26,7 +26,7 @@ an empty token refuses every request.
 | `media.delete` (unreleased) | Delete one image beneath `images/`; dry-run reports its size and references, and `apply.revert` restores its bytes. |
 | `apply.revert`, `apply.list` | Every edit above is recorded under the caller's `apply_id`, so a whole deliverable goes back to exactly what was there. |
 | `site.identity` (unreleased) | Global Configuration's site name (`sitename`), site description (`MetaDesc`) and whether page titles carry the site name (`sitename_pagetitles`, unreleased) — read, and set under an `apply_id` so `apply.revert` takes it back. Those three keys of `configuration.php` and no other. See "The site name and description" below. |
-| `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
+| `template.siteSettings` (unreleased) | A template's logo, logo for dark backgrounds and small screens, name, slogan and favicon: the eight logo/name/favicon keys of a T4 site profile (`templates/<t>/local/etc/site/<profile>.json`) and its page background (`body_bg_img`, 0.24.78), or the favicon of a template without T4. Read, and set under an `apply_id` so `apply.revert` takes it back. See "A template's logo, name and favicon" below. |
 | `template.languageOverrides` (unreleased) | The front-end language strings a site still shows in en-GB for one language — its template's own words (JA templates ship en-GB only), keys the language pack lacks or leaves in English (the en-GB words, or English reworded: vi-VN 4.2.2 "Show Profile" for en-GB "User Profile"), the column titles and captions of a T4 mega menu (`etc/navigation/*.json`, printed raw, offered as page literals), and pack strings whose translation is implausibly long for their words (vi-VN 4.2.2.1 gives "Details" the sentence of another string) — read, and set as Joomla language overrides in `language/overrides/<tag>.override.ini` under an `apply_id` so `apply.revert` takes them back. Only a key the read offers (from any page), one line of plain text with the en-GB placeholders; other override lines are kept. The read is ranked (`rank`: `template`, `used` — named by front-end code or a month/day name —, `core`, `other`) and paged (`offset`, `limit` ≤ 1500; `total`, `truncated`, `nextOffset`); `DATE_FORMAT_*` is never offered. |
 | `template.files.status`, `template.files.write`, `template.files.undo` (unreleased) | The files of the installed site templates (`templates/<name>/`, `media/templates/site/<name>/`): read their hashes, write a batch compare-and-set (each file names the hash the site must hold, PHP linted by the site's own PHP, all or nothing), and take it back only where the site still holds what was written. Off with Options › Template files; PHP only once Options › Allow PHP in template files is on (off by default). See "A template's own files" below. |
 | Contract profiles fetched, not shipped (unreleased) | The package carries no contract profile, only their index (`lib/contracts.json`). A site held to a profile fetches that one from the release it runs, checks it against the index's sha256 and size, and keeps it; installing or updating the package removes the profiles the site is not held to. See "Contract profiles: one release asset each" below. |
@@ -673,9 +673,9 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
         → {ok, template, framework, keys, changed: [<paths>], cleared, profiles | settings, skipped?}
 ```
 
-- **Nine keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
-  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`, and
-  `other_shareImage` (unreleased; in `fields` only, one for the whole site, see below). On any
+- **Ten keys, by name.** On T4: `site_logo`, `site_logo_small`, `site_logo_dark`,
+  `site_logo_dark_small`, `site_logo_2`, `site_name`, `site_slogan`, `other_faviconFile`,
+  `body_bg_img` (0.24.78, see below), and `other_shareImage` (unreleased; in `fields` only, one for the whole site, see below). On any
   other template: `other_faviconFile` and `other_shareImage` (unreleased; its logo is a template
   style param, written with `content.update` kind `templateStyle`). Any other key is refused with `unsupported`, never
   ignored, and nothing is written.
@@ -695,6 +695,12 @@ template.siteSettings {operation: "set", apply_id, template, fields?: {...}, pro
   (its hash in the name): static files are cached up to four hours, and a new name is never stale.
   Empty clears a picture. A name or slogan is cleaned as `site.identity` cleans words, up to 200
   characters; empty lets T4 show the global site name.
+- **The page background (0.24.78).** `body_bg_img` is the picture T4 paints behind its pages: T4
+  compiles it into the page CSS as the body background, with the profile's own `body_bg_img_repeat`,
+  `_size`, `_attachment` and `_position`, which the door does not write. It is a png, jpg, webp, gif
+  or avif under `images/` only (where `media.upload` puts it; anything else is `bad_params`). Empty
+  drops the rule, and the template's own background colour shows. JA Boxing paints it behind the
+  heading of its inner pages. A plugin before 0.24.78 refuses the key with `unsupported`.
 - **Undo.** One step per set, recorded under the `apply_id`: each file's previous bytes, or that it
   did not exist and which folders were made for it. `apply.revert` puts the bytes back, or deletes
   the file and the `local/` folders it made — a template that had no `local/` has none again. A

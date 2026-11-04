@@ -64,6 +64,15 @@ if (function_exists('check')) {
     checkTrue('a name past 200 characters is refused', isset(TemplateSiteSettings::clean('site_slogan', str_repeat('a', 201), $tsRoot)['error']));
     check('a value must be a string', TemplateSiteSettings::clean('site_name', 5, $tsRoot), ['error' => 'site_name must be a string']);
     check('no other key is a site setting', TemplateSiteSettings::clean('body_font_family', 'Arial', $tsRoot), ['error' => 'body_font_family is not a site setting this door writes']);
+    check('the page background is a picture under images/ that exists on the site', TemplateSiteSettings::clean('body_bg_img', '/images/tracy-brand/7777aaaa.jpg', $tsRoot), ['value' => 'images/tracy-brand/7777aaaa.jpg']);
+    check('an empty page background clears it', TemplateSiteSettings::clean('body_bg_img', ' ', $tsRoot), ['value' => '']);
+    check('a page background not uploaded yet is refused, saying how to upload it', TemplateSiteSettings::clean('body_bg_img', 'images/tracy-brand/9999ffff.webp', $tsRoot),
+        ['error' => 'body_bg_img: images/tracy-brand/9999ffff.webp is not a file on this site; upload it first (media.upload)']);
+    foreach (['media/templates/site/ja_spa/images/bg.png', 'templates/ja_spa/images/bg.jpg', 'images/tracy-brand/4444dddd.ico', 'images/tracy-brand/6666ffff.svg'] as $tsBad)
+        check('a page background must be a photograph or drawing under images/: ' . $tsBad, TemplateSiteSettings::clean('body_bg_img', $tsBad, $tsRoot),
+            ['error' => 'body_bg_img must be a png, jpg, webp, gif or avif under images/, named by a path relative to the site root']);
+    foreach (['../images/bg.png', 'images/../configuration.php', 'images/./bg.png', 'https://cdn.example/bg.png', '//cdn.example/images/bg.png', 'images/bg.php', 'images/a b.png'] as $tsBad)
+        checkTrue('an unusable page background path is refused: ' . $tsBad, isset(TemplateSiteSettings::clean('body_bg_img', $tsBad, $tsRoot)['error']));
 
     // ---- the JSON edit keeps every other byte --------------------------------------------------
     check('a key in place is replaced where it stands, every other byte kept',
@@ -91,7 +100,7 @@ if (function_exists('check')) {
     // ---- set: refusals ----------------------------------------------------------------------------
     $tsOther = $tsSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png', 'body_font_family' => 'Arial']]);
     check('a key outside the whitelist is refused whole, naming the boundary', [$tsOther['error'], $tsOther['message']],
-        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile, other_shareImage, other_glyphFaces can. Nothing was written']);
+        ['unsupported', 'body_font_family cannot be written through template.siteSettings: only site_logo, site_logo_small, site_logo_dark, site_logo_dark_small, site_logo_2, site_name, site_slogan, other_faviconFile, body_bg_img, other_shareImage, other_glyphFaces can. Nothing was written']);
     check('the same inside a profile', $tsSet(['profiles' => ['default' => ['other_backToTop' => true]]])['error'], 'unsupported');
     check('a set needs an apply_id', $tsCall($tsEngine, ['operation' => 'set', 'template' => 'ja_spa', 'fields' => ['site_name' => 'A']])['error'], 'bad_params');
     check('a set needs fields or profiles', [$tsSet([])['error'], $tsSet(['fields' => []])['error'], $tsSet(['fields' => ['A']])['error']], ['bad_params', 'bad_params', 'bad_params']);
@@ -200,6 +209,24 @@ if (function_exists('check')) {
     $tsForged = $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-forged']]);
     check('an undo row outside the door\'s files fails and writes nothing', [isset($tsForged['failed']), is_file($tsRoot . '/configuration.php')], [true, false]);
 
+    // ---- the page background (body_bg_img): one picture behind every page, then cleared ------------
+    $tsOptimize();
+    $tsBg = $tsSet(['fields' => ['body_bg_img' => 'images/tracy-brand/7777aaaa.jpg']], 'apply-bg');
+    check('a page background goes into every profile a style uses', [$tsBg['ok'], $tsBg['changed']],
+        [true, ['templates/ja_spa/local/etc/site/default.json', 'templates/ja_spa/local/etc/site/logo-light.json']]);
+    check('default.json: the key is replaced where it stands, its repeat, size and position kept', $tsLocal('default'),
+        str_replace('"body_bg_img":""', '"body_bg_img":"images\/tracy-brand\/7777aaaa.jpg"', $tsSpaDefault));
+    check('logo-light.json, which has no such key: it is added at the end', $tsLocal('logo-light'),
+        substr($tsSpaLight, 0, -1) . ',"body_bg_img":"images\/tracy-brand\/7777aaaa.jpg"}');
+    check('the answer reads it back, and T4\'s optimize cache is empty', [$tsBg['profiles']['default']['settings']['body_bg_img'], $tsOptimized()], ['images/tracy-brand/7777aaaa.jpg', []]);
+    check('a page background outside images/ is refused and writes nothing', [$tsSet(['fields' => ['body_bg_img' => 'templates/ja_spa/images/bg.jpg']], 'apply-bg-bad')['error'], $tsLog->entries('apply-bg-bad')], ['bad_params', []]);
+    $tsBgClear = $tsSet(['fields' => ['body_bg_img' => '']], 'apply-bg-clear');
+    check('an empty page background clears it in both profiles', [json_decode((string) $tsLocal('default'), true)['body_bg_img'], json_decode((string) $tsLocal('logo-light'), true)['body_bg_img'], $tsBgClear['ok']], ['', '', true]);
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-bg-clear']]);
+    check('reverting the clear puts the picture back', json_decode((string) $tsLocal('default'), true)['body_bg_img'], 'images/tracy-brand/7777aaaa.jpg');
+    $tsEngine->handle(['token' => $tsToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'apply-bg']]);
+    check('reverting the set leaves the template as shipped, no local/ folder', [$tsLocal('default'), $tsLocal('logo-light'), is_dir($tsRoot . '/templates/ja_spa/local')], [null, null, false]);
+
     // ---- an undo that cannot be recorded leaves nothing behind ------------------------------------
     $tsNoLog = (new Engine($tsToken, [], null, null, null, null, null, null, new FailingApplyLog()))->templateSiteSettings($tsFiles);
     $tsLost = $tsCall($tsNoLog, ['operation' => 'set', 'apply_id' => 'a', 'template' => 'ja_spa', 'fields' => ['site_name' => 'Hanoi Roofing']]);
@@ -212,6 +239,7 @@ if (function_exists('check')) {
         ['t3', ['other_faviconFile', 'other_shareImage', 'other_glyphFaces'], ['other_faviconFile' => '', 'other_shareImage' => '', 'other_glyphFaces' => '']]);
     $tsMoodSet = static fn(array $params, string $apply = 'apply-mood') => $tsCall($tsEngine, ['operation' => 'set', 'apply_id' => $apply, 'template' => 'ja_mood'] + $params);
     check('a T3 template refuses the T4 profile keys: its logo is a style param (templateStyle)', $tsMoodSet(['fields' => ['site_logo' => 'images/tracy-brand/1111aaaa.png']])['error'], 'unsupported');
+    check('and the page background: T3 keeps no site profile', $tsMoodSet(['fields' => ['body_bg_img' => 'images/tracy-brand/7777aaaa.jpg']])['error'], 'unsupported');
     check('and refuses profiles', $tsMoodSet(['profiles' => ['default' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]])['error'], 'unsupported');
     check('an empty favicon on a T3 template with none set changes nothing', $tsMoodSet(['fields' => ['other_faviconFile' => '']])['unchanged'] ?? null, true);
     $tsMoodDone = $tsMoodSet(['fields' => ['other_faviconFile' => 'images/tracy-brand/5555eeee.png']]);
