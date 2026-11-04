@@ -1130,7 +1130,7 @@ final class QuickstartContract
             $before=@getimagesize($this->root.'/'.self::imagePath((string)$slot['sample']));$after=@getimagesize($this->root.'/'.$value);
             if(!$after||!$after[0]||!$after[1])throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
             // A fit that names the box's aspect holds the picture to it; without one, the demo file's shape decides, as always.
-            if($fit!==null&&SlotFit::checkPicture($fit,$key,$after,$before,$this->root.'/'.$value,$refuse))return;
+            if($fit!==null&&SlotFit::checkPicture($fit,$key,$after,$before,$this->root.'/'.$value,$refuse,(string)$slot['sample']))return;
             if($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02)throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
     }

@@ -65,13 +65,28 @@ $photoFit=['measured'=>true,'kind'=>'photo','replace'=>'photo','transparent'=>fa
     'boxes'=>['desktop'=>['width'=>704,'height'=>300],'phone'=>['width'=>358,'height'=>153]],'aspect'=>2.3467,'tolerance'=>0.02,'minWidth'=>1056,'crop'=>'cover'];
 $photo=$oldPicture+['fit'=>$photoFit];
 check('fit: a photo cut to the box is taken',$fitCode($photo,'images/demo/wide-class.jpg'),null);
-check('fit: the box decides the shape, not the demo file',$fitCode($photo,'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: the box decides the shape, not the demo file',$fitCode($photo,'images/demo/photo-square.jpg'),'SLOT_IMAGE_INVALID');
 $fitTall=$fitAnswer($photo,'images/demo/tall.jpg');
 check('fit: the refusal says which shape to crop to',$fitTall,['SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot: crop it to 2.3467 (width / height) keeping the subject: gallery.1']);
 check('fit: a picture under minWidth is refused',$fitCode($photo,'images/demo/small-wide.jpg'),'SLOT_IMAGE_TOO_SMALL');
 try{$fitCheck->invoke($fitContract,$photo,'images/demo/small-wide.jpg',[]);}catch(ContractProblem $e){check('fit: the size refusal carries the floor and the width',[$e->extra,$e->toArray()['severity']],[['limit'=>1056,'actual'=>750],'recoverable']);}
-check('fit: a wider tolerance is read from the fit',$fitCode(['fit'=>['tolerance'=>0.2]+$photoFit]+$oldPicture,'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: a wider tolerance is read from the fit',$fitCode(['fit'=>['tolerance'=>0.2]+$photoFit]+$oldPicture,'images/demo/photo-square.jpg'),'SLOT_IMAGE_INVALID');
 check('fit: the demo picture itself is always taken back',$fitCode($photo,'images/demo/class.jpg'),null);
+// The demo explains itself: a picture of its shape passes the aspect rule, one as wide as it passes the width rule.
+file_put_contents($fitRoot.'/images/demo/class-big.jpg',$fitJpg(2400,1600));
+$ownSample=fn(array $extra,string $sample='')=>['fit'=>$extra+$photoFit]+($sample===''?[]:['sample'=>$sample])+$oldPicture;
+check('fit: a picture of the demo shape and wider than the demo is taken though the box asks another shape',$fitCode($photo,'images/demo/class-big.jpg'),null);
+check('fit: a picture of the demo shape but narrower than the demo is still too small',$fitCode($photo,'images/demo/class-copy.jpg'),'SLOT_IMAGE_TOO_SMALL');
+file_put_contents($fitRoot.'/images/demo/class-twin.jpg',$fitJpg(1200,800));
+check('fit: a width floor above the demo is met by a picture as wide as the demo (file written)',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/class-twin.jpg'),null);
+check('fit: narrower than the demo stays under that floor',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/class-copy.jpg'),'SLOT_IMAGE_TOO_SMALL');
+check('fit: a shape that is neither the box nor the demo is refused',$fitCode($photo,'images/demo/tall.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: a picture of the box shape narrower than the demo still follows the width floor',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/small-wide.jpg'),'SLOT_IMAGE_TOO_SMALL');
+$gone='images/demo/gone.jpg#joomlaImage://local-images/demo/gone.jpg?width=1200&height=800';
+check('fit: the demo size is read from its stored value when its file is gone',$fitCode($ownSample(['source'=>null],$gone),'images/demo/class-big.jpg'),null);
+check('fit: and the width floor too',$fitCode($ownSample(['source'=>null,'minWidth'=>2160],$gone),'images/demo/class-twin.jpg'),null);
+check('fit: with no demo size anywhere the rules stand as measured',$fitCode($ownSample(['source'=>null],'images/demo/gone.jpg'),'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: the demo size can come from the fit source',$fitCode($ownSample([],'images/demo/gone.jpg'),'images/demo/class-big.jpg'),null);
 check('fit: an unmeasured photo keeps the demo shape check',$fitCode($oldPicture+['fit'=>['measured'=>false,'kind'=>'photo','replace'=>'photo']],'images/demo/class-copy.jpg'),null);
 check('fit: an unmeasured photo still refuses another shape',$fitCode($oldPicture+['fit'=>['measured'=>false,'kind'=>'photo','replace'=>'photo']],'images/demo/tall.jpg'),'SLOT_IMAGE_INVALID');
 
