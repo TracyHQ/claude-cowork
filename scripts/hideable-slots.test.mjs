@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { hideableSlots, rowOf, slotKeyOf } from './hideable-slots.mjs'
+import { reviewedRows, hideableSlots, rowOf, slotKeyOf } from './hideable-slots.mjs'
 
 // A made-up block: one list of two rows, a lone sentence and a few slots no one may empty.
 const json = (key, path, type, sample) => ({ key, entity: key.split('.')[0], column: 'params', type, sample, jsonPath: path })
@@ -53,4 +53,31 @@ test('a canHide false frame with a row is listed to go with it', () => {
   )
   assert.deepEqual(out.withRow['module-1.2'], ['module-1.0', 'module-1.1'])
   assert.deepEqual(out.measured, [])
+})
+
+test('rows: lists of one length under one parent are one table, with every list of that length, slot or not', () => {
+  const lock = { entities: { 'module-1': { params: JSON.stringify({ 'jatools-config': JSON.stringify({ grid: { title: ['a', 'b'], link: ['#', '#'], ids: [['1'], ['2']], columns: ['3'] } }) }) } } }
+  const slot = (key, step, i) => ({ key, entity: 'module-1', column: 'params', nestedJson: 'jatools-config', type: 'text', jsonPath: ['grid', step, i], sample: 'x' })
+  const map = { slots: [slot('module-1.0', 'title', 0), slot('module-1.1', 'title', 1), slot('module-1.2', 'link', 0), slot('module-1.3', 'link', 1)] }
+  assert.deepEqual(reviewedRows({ blocks: [] }, map, lock), {
+    'module-1': [{ column: 'params', nestedJson: 'jatools-config', parent: ['grid'], arrays: ['ids', 'link', 'title'], count: 2 }]
+  })
+})
+
+test('rows: lists of two lengths above one prove nothing, and neither does a kit row across two indexes', () => {
+  const body = (grid) => ({ entities: { 'module-1': { params: JSON.stringify({ 'jatools-config': JSON.stringify({ grid }) }) } } })
+  const slot = (key, step, i) => ({ key, entity: 'module-1', column: 'params', nestedJson: 'jatools-config', type: 'text', jsonPath: ['grid', step, i], sample: 'x' })
+  const map = { slots: [slot('module-1.0', 'title', 0), slot('module-1.1', 'link', 1)] }
+  assert.deepEqual(reviewedRows({ blocks: [] }, map, body({ title: ['a', 'b'], link: ['#', '#', '#'] })), {})
+  const kit = { blocks: [{ lists: [{ rows: [{ slots: ['block-1.0', 'block-1.1'] }] }] }] }
+  assert.deepEqual(reviewedRows(kit, map, body({ title: ['a', 'b'], link: ['#', '#'] })), {})
+})
+
+test('rows: a subform row is a key named after its parent, and a parent with any other key is none', () => {
+  const lock = (features) => ({ entities: { 'article-1': { attribs: JSON.stringify({ features }) } } })
+  const map = { slots: [{ key: 'article-1.0', entity: 'article-1', column: 'attribs', type: 'text', jsonPath: ['features', 'features0', 'title'], sample: 'x' }] }
+  assert.deepEqual(reviewedRows({ blocks: [] }, map, lock({ features0: { title: 'x' }, features1: { title: 'y' } })), {
+    'article-1': [{ column: 'attribs', parent: ['features'], keys: ['features0', 'features1'] }]
+  })
+  assert.deepEqual(reviewedRows({ blocks: [] }, map, lock({ features0: { title: 'x' }, other: { title: 'y' } })), {})
 })

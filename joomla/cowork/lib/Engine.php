@@ -421,6 +421,9 @@ final class Engine
         // A trim, a language step or a relabel has its own way back; the ordinary revert would take it
         // apart one row at a time and leave the baseline naming a state the site is no longer in.
         if ($contractBound && $action === 'apply.revert' && $this->log) {
+            // A removed row has no way back: the words it held are gone from the site, and only a new site brings it back.
+            if (in_array('rows', array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), true))
+                return $this->err('conflict', 'A removed row comes back only on a new site', ['errors' => [ContractProblem::plain('CONFLICT', 'A removed row comes back only on a new site')]]);
             // blocks.unpublish has a way back of its own, and it answers to the ordinary verb.
             if (in_array('blocks', array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), true)) return $this->blocksRestore($params);
             $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias', 'showcaseNav']);
@@ -469,6 +472,8 @@ final class Engine
                     // content.contract `empty_slots` and `blocks.unpublish`, template.languageOverrides `setSource`. An older
                     // engine ignores `empty_slots` beside `changes`, so a writer reads this before it counts on hiding.
                     'version' => 1,
+                    // content.contract `rows.remove`: a hidden slot's row or element leaves the stored field.
+                    'rows_remove' => 1,
                 ], 'db_range_checksums' => [
                     'version' => 1,
                     'max_starts' => self::MAX_RANGE_STARTS,
@@ -2070,6 +2075,7 @@ final class Engine
             if (strpos((string)($p['operation'] ?? ''), 'siteLanguage.') === 0) return $this->siteLanguage($p);
             if (strpos((string)($p['operation'] ?? ''), 'sourceLanguage.') === 0) return $this->sourceLanguage($p);
             if (($p['operation'] ?? '') === 'blocks.unpublish') return $this->blocksUnpublish($p);
+            if (($p['operation'] ?? '') === 'rows.remove') return $this->rowsRemove($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -2209,6 +2215,53 @@ final class Engine
         try { $this->writer->purgeCache(); } catch (Throwable $ignored) {}
         $this->stamped('content');
         return $result;
+    }
+
+    /**
+     * `content.contract` `rows.remove`: a slot the plan hides leaves the stored field with its row or element, so its box goes
+     * too. `slots` go; `keep` names what the writer keeps or fills, and whatever holds one stays. The baseline moves by the
+     * same ops in the same transaction, so the rest of the row still compares. No `apply.revert`: a removed row comes back only
+     * on a new site, and a slot it took answers SLOT_UNKNOWN and is listed in inspect's `removedSlots`.
+     */
+    private function rowsRemove(array $p): array
+    {
+        $apply = $this->applyId($p);
+        $request = $p['request_id'] ?? '';
+        if (!$apply || strpos($apply, 'contract-') !== 0) throw new RuntimeException('apply_id required; it must start with "contract-"');
+        if (!is_string($request) || !$request) throw new RuntimeException('request_id required: any string, the same on a retry and new for a different change');
+        $list = static fn($value): bool => is_array($value) && (!$value || array_keys($value) === range(0, count($value) - 1)) && !array_filter($value, static fn($key) => !is_string($key));
+        $slots = $p['slots'] ?? null; $keep = $p['keep'] ?? [];
+        if (!$list($slots) || !$slots || count($slots) > 1500 || !$list($keep)) throw new ContractProblem('CHANGES_INVALID', 'slots must be a list of 1-1500 slot keys, and keep a list of slot keys');
+        if ($this->contract->isDerived()) return $this->err('unsupported', 'An imported site has no reviewed rows');
+        $hash = hash('sha256', json_encode([$slots, $keep]));
+        $entries = $this->log->entries($apply);
+        foreach ($entries as $entry) {
+            if (($entry['op'] ?? '') !== 'rows' || $entry['request'] !== $request) continue;
+            if (!hash_equals($entry['hash'], $hash)) throw new RuntimeException('request_id reused with different content');
+            $result = $entry['result'];
+            if (($result['afterRevision'] ?? null) !== $this->contract->inspect()['revision']) unset($result['afterRevision']);
+            return $result;
+        }
+        if ($entries) throw new RuntimeException('Use one new apply_id per content revision');
+        if (($job = $this->contract->job()) !== null)
+            return $this->err('conflict', 'A language job is in flight for ' . $job['locale'] . ' at phase ' . $job['phase'] . ': finish it, or take it back with multilingual.revert locale ' . $job['locale']);
+        $state = $this->contract->inspect();
+        if ($state['binding'] === null) throw new RuntimeException('Removing a row needs a bound site');
+        $expected = $p['expected_revision'] ?? null;
+        if ($expected === null) throw new ContractProblem('REVISION_REQUIRED', 'Content changed; inspect again');
+        if (!is_string($expected) || !hash_equals($state['revision'], $expected))
+            throw new ContractProblem('REVISION_STALE', 'Content changed; inspect again', null, null, ['current' => $state['revision']]);
+        $plan = $this->contract->removalPlan($slots, $keep, $state);
+        if (!$plan['operations']) return $this->ok(['removed' => [], 'already' => $plan['already'], 'unchanged' => true]);
+        $rows = array_map(static fn($op) => [$op['kind'], (int) $op['id']], $plan['operations']);
+        $this->refuseLocked($rows);
+        return $this->contentBatch(['apply_id' => $apply, 'request_id' => $request, 'operations' => $plan['operations']], function ($result) use ($apply, $request, $hash, $plan) {
+            $this->contract->rebind($this->contract->bindingWithRemoval($plan['ops'], $plan['removed']));
+            $after = $this->contract->inspect()['revision'];
+            $result += ['removed' => $plan['removed'], 'already' => $plan['already'], 'afterRevision' => $after];
+            $this->log->record($apply, ['op' => 'rows', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $after]);
+            return $result;
+        });
     }
 
     /** `apply.revert` of a blocks.unpublish: only over the revision it left, and back by the same compare-and-set. */

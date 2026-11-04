@@ -15,6 +15,12 @@
 // Never listed, so always refused: a slot that is empty already, one a text node or attribute addresses (its address
 // would move), and a whole column of a row (a menu item's title, a contact's email), which Joomla or a form needs.
 // Reproducible: keys sorted, no time, no path.
+//
+// Beside them, `rows`: where `content.contract rows.remove` may take a whole row, per entity, read from the contract's own
+// rows and held against the kit's. Lists: lists of one length under one parent, read across by index, the way an ACM's
+// repeater prints them; every list of that length goes in, slot or not, or the row would part from it. Keys: a subform's
+// `name0`, `name1` under `name`. A parent with lists of two lengths above one proves nothing, and neither does a kit row
+// that spans two indexes, so neither is listed and a slot there is refused by name.
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -72,6 +78,85 @@ export function hideableSlots(kit, map) {
   return { measured: measured.sort(), unmeasured: unmeasured.sort(), withRow: sorted }
 }
 
+const JSON_COLUMNS = ['params', 'attribs', 'images', 'urls', 'metadata']
+
+/** One entity's decoded JSON columns, with `jatools-config` opened: [{ column, nestedJson, body }]. */
+function bodiesOf(row) {
+  const out = []
+  for (const column of JSON_COLUMNS) {
+    let body = null
+    try {
+      body = JSON.parse(row?.[column] ?? 'null')
+    } catch {}
+    if (!body || typeof body !== 'object') continue
+    out.push({ column, nestedJson: null, body })
+    if (typeof body['jatools-config'] === 'string')
+      out.push({ column, nestedJson: 'jatools-config', body: JSON.parse(body['jatools-config']) })
+  }
+  return out
+}
+
+/** Which row of a table each kit row's slots say they are in: false when one kit row spans two indexes of a parent. */
+function kitAgrees(kit, map, list) {
+  const bySlot = new Map(map.slots.map((s) => [s.key, s]))
+  const depth = list.parent.length
+  for (const block of kit.blocks ?? [])
+    for (const kitList of block.lists ?? [])
+      for (const row of kitList.rows ?? []) {
+        const indexes = new Set()
+        for (const entry of row.slots ?? []) {
+          const slot = bySlot.get(slotKeyOf(typeof entry === 'string' ? entry : entry?.id))
+          const path = slot?.jsonPath
+          if (!slot || slot.entity !== list.entity || slot.column !== list.column || !Array.isArray(path)) continue
+          if ((slot.nestedJson ?? null) !== list.nestedJson) continue
+          if (JSON.stringify(path.slice(0, depth)) !== JSON.stringify(list.parent)) continue
+          if (list.arrays.includes(path[depth]) && Number.isInteger(path[depth + 1])) indexes.add(path[depth + 1])
+        }
+        if (indexes.size > 1) return false
+      }
+  return true
+}
+
+/** @returns {Record<string, object[]>} entity to its provable rows; lists sorted by name, so the file is reproducible */
+export function reviewedRows(kit, map, lock) {
+  const out = {}
+  const seen = new Set()
+  for (const slot of map.slots) {
+    const path = slot.jsonPath
+    if (!Array.isArray(path) || path.length < 2 || !WORD_KINDS.has(kindOf(slot))) continue
+    const nestedJson = slot.nestedJson ?? null
+    const place = bodiesOf(lock.entities?.[slot.entity]).find((b) => b.column === slot.column && b.nestedJson === nestedJson)
+    if (!place) continue
+    const walk = (steps) => steps.reduce((value, step) => (value && typeof value === 'object' ? value[step] : undefined), place.body)
+    const add = (parent, entry) => {
+      const id = JSON.stringify([slot.entity, slot.column, nestedJson, parent])
+      if (seen.has(id)) return
+      seen.add(id)
+      const list = { column: slot.column, ...(nestedJson ? { nestedJson } : {}), parent, ...entry }
+      if (entry.arrays && !kitAgrees(kit, map, { entity: slot.entity, column: slot.column, nestedJson, parent, arrays: entry.arrays })) return
+      ;(out[slot.entity] ??= []).push(list)
+    }
+    for (let at = 0; at < path.length; at++) {
+      const parent = path.slice(0, at)
+      const holder = walk(parent)
+      if (!holder || typeof holder !== 'object' || Array.isArray(holder)) continue
+      const step = path[at]
+      if (Number.isInteger(path[at + 1]) && Array.isArray(holder[step])) {
+        const lists = Object.entries(holder).filter(([, value]) => Array.isArray(value))
+        const long = new Set(lists.map(([, value]) => value.length).filter((n) => n > 1))
+        if (long.size === 1 && holder[step].length > 1)
+          add(parent, { arrays: lists.filter(([, v]) => v.length === holder[step].length).map(([k]) => k).sort(), count: holder[step].length })
+      } else if (at > 0 && String(path[at - 1]) !== '' && typeof holder[step] === 'object') {
+        const name = String(path[at - 1])
+        const keys = Object.keys(holder)
+        if (keys.length && keys.every((k) => k.startsWith(name) && /^\d+$/.test(k.slice(name.length))))
+          add(parent, { keys: keys.sort() })
+      }
+    }
+  }
+  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : 1)))
+}
+
 function main([kitFile, profile, out]) {
   if (!kitFile || !profile || !out) throw new Error('usage: hideable-slots.mjs <template-kit.json> <contract profile dir> <hideable-slots.json>')
   const kit = JSON.parse(readFileSync(kitFile, 'utf8'))
@@ -79,11 +164,13 @@ function main([kitFile, profile, out]) {
   const id = JSON.parse(readFileSync(join(profile, 'manifest.json'), 'utf8')).id
   if (kit.contract !== id) throw new Error(`the kit is of ${kit.contract}, the profile is ${id}`)
   const file = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : { contracts: {} }
-  const entry = hideableSlots(kit, JSON.parse(mapBytes.toString('utf8')))
+  const map = JSON.parse(mapBytes.toString('utf8'))
+  const lock = JSON.parse(readFileSync(join(profile, 'presentation-lock.json'), 'utf8'))
+  const entry = { ...hideableSlots(kit, map), rows: reviewedRows(kit, map, lock) }
   file.contracts[id] = { contentMapSha256: createHash('sha256').update(mapBytes).digest('hex'), ...entry }
   file.contracts = Object.fromEntries(Object.entries(file.contracts).sort(([a], [b]) => (a < b ? -1 : 1)))
   writeFileSync(out, `${JSON.stringify(file, null, 2)}\n`)
-  console.log(`${id}: ${entry.measured.length} measured, ${entry.unmeasured.length} unmeasured, ${Object.keys(entry.withRow).length} with their row`)
+  console.log(`${id}: ${entry.measured.length} measured, ${entry.unmeasured.length} unmeasured, ${Object.keys(entry.withRow).length} with their row, rows on ${Object.keys(entry.rows).length} entities`)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(2))

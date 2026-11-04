@@ -1643,6 +1643,588 @@
           "module-182.13",
           "module-182.5"
         ]
+      },
+      "rows": {
+        "article-14": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-15": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-16": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-18": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-19": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-2": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0",
+              "classes-info1"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-20": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-21": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-22": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-23": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-24": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-25": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-26": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-27": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "module-157": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[img-icon]",
+              "features-intro[img-light-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-162": [
+          {
+            "column": "params",
+            "parent": [
+              "menuitem_config"
+            ],
+            "arrays": [
+              "background",
+              "description",
+              "item_id",
+              "title"
+            ],
+            "count": 15
+          }
+        ],
+        "module-163": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-165": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-166": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "gallery",
+              "isotope[gallery]"
+            ],
+            "arrays": [
+              "isotope[gallery][alt]",
+              "isotope[gallery][img]",
+              "isotope[gallery][selectitem]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-167": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-171": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "social"
+            ],
+            "arrays": [
+              "social-intro[font-icon]",
+              "social-intro[link]",
+              "social-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-172": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 2
+          }
+        ],
+        "module-177": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[align-media]",
+              "features-intro[info-desc]",
+              "features-intro[info-email-label]",
+              "features-intro[info-email]",
+              "features-intro[info-link]",
+              "features-intro[info-note]",
+              "features-intro[info-phone-label]",
+              "features-intro[info-phone]",
+              "features-intro[info-title]",
+              "features-intro[intro-img]"
+            ],
+            "count": 2
+          }
+        ],
+        "module-178": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 8
+          }
+        ],
+        "module-179": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro",
+              "features-intro[list]"
+            ],
+            "arrays": [
+              "features-intro[list][id_video]",
+              "features-intro[list][img]",
+              "features-intro[list][link]",
+              "features-intro[list][title]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-180": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "hero"
+            ],
+            "arrays": [
+              "hero[social-intro][font-icon]",
+              "hero[social-intro][link]",
+              "hero[social-intro][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-181": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-182": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-188": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-189": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-190": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[img-icon]",
+              "features-intro[img-light-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ]
       }
     }
   }

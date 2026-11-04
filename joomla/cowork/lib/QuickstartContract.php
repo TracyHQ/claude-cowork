@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
+require_once __DIR__ . '/SlotRemoval.php';
 require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/LanguageStrings.php';
 require_once __DIR__ . '/SiteSettingRows.php';
@@ -82,6 +83,10 @@ final class QuickstartContract
     private array $hideable = [];
     /** @var array<string,list<string>> a 'withRow' slot's row: it is emptied only when one of these goes too, or already has */
     private array $hideRows = [];
+    /** @var array<string,list<array>> entity => the rows the review proves: {@see loadHideable} */
+    private array $reviewedRows = [];
+    /** @var array<string,list<array>>|null entity => the ops `rows.remove` left in the baseline, read once per binding */
+    private ?array $removalOps = null;
     /** sha256 of each layout file read by the current inspect: path => hash, or '' when it is not a plain file. */
     private array $layoutHashes = [];
 
@@ -421,8 +426,18 @@ final class QuickstartContract
     /** The slots of one entity, base or derived — the derived ones re-keyed from their source's. */
     private function slotsOf(string $key, array $meta): array {
         if (!empty($meta['switcher'])) return [];
-        if (!isset($meta['locale'])) return $this->slotsFor($key);
-        return $this->multilingual->derivedSlots($meta['locale'], $meta['base'], $this->lock['entities'][$meta['base']]);
+        if (!isset($meta['locale'])) return $this->standing($key, $this->slotsFor($key));
+        return $this->standing($meta['base'], $this->multilingual->derivedSlots($meta['locale'], $meta['base'], $this->lock['entities'][$meta['base']]));
+    }
+
+    /** These slots of `$base` as they stand after what `rows.remove` took: a removed one is gone, a later one has stepped down. */
+    private function standing(string $base, array $slots): array {
+        if ($this->removalOps === null) $this->removalOps = $this->store->load()['rowsRemoved']['ops'] ?? [];
+        $ops = $this->removalOps[$base] ?? [];
+        if (!$ops) return $slots;
+        $out = [];
+        foreach ($slots as $slot) { $moved = SlotRemoval::slot($slot, $ops); if ($moved !== null) $out[] = $moved; }
+        return $out;
     }
 
     private function changeRow(array $row, array $slots, array $values): array {
@@ -1042,6 +1057,7 @@ final class QuickstartContract
         if(isset($binding['showcaseNav']))$snapshot['showcaseNav']=$binding['showcaseNav'];
         if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
+        if(isset($binding['rowsRemoved']))$snapshot['rowsRemoved']=$binding['rowsRemoved'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $t=Timing::begin();
@@ -1051,6 +1067,8 @@ final class QuickstartContract
             $empty=$this->emptyLinkOf($rows[$key],$slot,$parsed);
             if($empty!==null)$slot['emptyLink']=$empty;
             if(isset($this->hideable[$slot['key']])&&!self::addressMoves($slot))$slot['canHide']=$this->hideable[$slot['key']];
+            $row=$this->rowOf($key,$slot);
+            if($row!==null)$slot['row']=$row['id'];
             $slots[]=$slot;
         }}
         $slotValues=[];foreach($slots as $slot)$slotValues[$slot['key']]=$slot['current'];
@@ -1061,6 +1079,7 @@ final class QuickstartContract
             'slots'=>$slots,'pages'=>$this->map['pages'],'rows'=>$rows,'ids'=>$ids,'keys'=>$keys,'localeMaps'=>$localeMaps,
             'assignments'=>$assignments,'slotValues'=>$slotValues,
             'languages'=>array_keys($binding['multilingual']['languages'] ?? []),
+            'removedSlots'=>array_fill_keys($binding['rowsRemoved']['slots']??[],'removed'),
             'binding'=>$binding,'job'=>$job,'switcher'=>$switcher,'demoTrim'=>$trim['status']??null,
             // A finished revert's record only answers that revert again: no showcase navigation is applied.
             'showcaseNav'=>($binding['showcaseNav']['status']??null)==='reverted'?null:($binding['showcaseNav']['status']??null)];
@@ -1217,6 +1236,7 @@ final class QuickstartContract
             foreach(is_array($entry[$tier]??null)?$entry[$tier]:[] as $key)if(is_string($key))$this->hideable[$key]=$tier;
         foreach(is_array($entry['withRow']??null)?$entry['withRow']:[] as $key=>$row)
             if(is_string($key)&&is_array($row)&&$row){$this->hideable[$key]='withRow';$this->hideRows[$key]=$row;}
+        if(is_array($entry['rows']??null))$this->reviewedRows=$entry['rows'];
     }
 
     /**
@@ -1342,7 +1362,7 @@ final class QuickstartContract
             $key=(string)$key;
             $slot=$allowed[$key]??null;
             $owner=$slot===null?null:($owners[$slot['entity']]??null);
-            if($slot===null||!is_string($value)){$problems[]=new ContractProblem('SLOT_UNKNOWN','Unknown content slot or non-string value',$key,$owner);continue;}
+            if($slot===null||!is_string($value)){$problems[]=new ContractProblem('SLOT_UNKNOWN',isset($state['removedSlots'][$key])?'This slot left the site with its row or element, and comes back only on a new site: '.$key:'Unknown content slot or non-string value',$key,$owner);continue;}
             // One revision check per content, named by the first changed slot that lives in it.
             if($byContent!==null&&!isset($checked[$owner??"\0".$key])) {
                 $checked[$owner??"\0".$key]=true;
@@ -1428,7 +1448,7 @@ final class QuickstartContract
     public function slotValue(array $row, array $slot): string { return $this->currentValue($row,$slot); }
     /** The slots of one entity's copy in a language, keyed for that copy. */
     public function derivedSlotsFor(string $locale, string $baseKey): array {
-        return $this->profile()->derivedSlots($locale,$baseKey,$this->lockFields($baseKey));
+        return $this->standing($baseKey,$this->profile()->derivedSlots($locale,$baseKey,$this->lockFields($baseKey)));
     }
 
     /* ------------------------------------------------------------ multilingual */
@@ -1549,6 +1569,155 @@ final class QuickstartContract
         $binding=$this->store->load();
         if(!$binding)throw new RuntimeException('Unpublishing a block needs a bound site');
         foreach($keys as $key)$binding['presentation'][$key]['published']=$value;
+        return $binding;
+    }
+
+    /* ------------------------------------------------------------ rows.remove */
+
+    /**
+     * The reviewed row a slot stands in, in its place now: `lib/hideable-slots.json` `rows`, per entity, each read from the
+     * contract's own rows and checked against the kit's. Lists: `arrays` under `parent` are one table, read across by index
+     * (an ACM's repeater). Keys: each of `keys` under `parent` is one row (a Joomla subform's `name0`, `name1`).
+     */
+    private function rowOf(string $entity, array $slot): ?array {
+        $path=$slot['jsonPath']??null;
+        if(!is_array($path))return null;
+        foreach($this->reviewedRows[$entity]??[] as $row) {
+            if(!is_array($row['parent']??null)||($row['column']??null)!==$slot['column']||($row['nestedJson']??null)!==($slot['nestedJson']??null))continue;
+            $at=count($row['parent']);
+            if(array_slice($path,0,$at)!==$row['parent'])continue;
+            $step=$path[$at]??null;
+            if(isset($row['arrays'])&&in_array($step,$row['arrays'],true)&&is_int($path[$at+1]??null))
+                return ['id'=>$entity.'|'.json_encode($row['parent']).'#'.$path[$at+1],'list'=>$row,'index'=>$path[$at+1]];
+            if(isset($row['keys'])&&in_array($step,$row['keys'],true))
+                return ['id'=>$entity.'|'.json_encode($row['parent']).'.'.$step,'list'=>$row,'key'=>$step];
+        }
+        return null;
+    }
+
+    /** Why this row's stored shape is not the one reviewed, or null: a table whose lists no longer run together proves nothing. */
+    private function rowUnproved(array $row, array $stored): ?string {
+        $list=$row['list'];
+        $body=json_decode(is_string($stored[$list['column']]??null)?$stored[$list['column']]:'null',true);
+        if(isset($list['nestedJson']))$body=is_array($body)&&is_string($body[$list['nestedJson']]??null)?json_decode($body[$list['nestedJson']],true):null;
+        $parent=is_array($body)?SlotRemoval::at($body,$list['parent']):null;
+        if(!is_array($parent))return 'its row is not where the review found it';
+        if(isset($row['key']))return array_key_exists($row['key'],$parent)?null:'its row is not where the review found it';
+        $count=null;
+        foreach($list['arrays'] as $name) {
+            if(!is_array($parent[$name]??null)||array_keys($parent[$name])!==range(0,count($parent[$name])-1))return 'one of its row\'s lists is no list: '.$name;
+            if($count!==null&&count($parent[$name])!==$count)return 'the lists of its row no longer run together: '.$name;
+            $count=count($parent[$name]);
+        }
+        foreach($parent as $name=>$value)
+            if(!in_array($name,$list['arrays'],true)&&is_array($value)&&$value!==[]&&array_keys($value)===range(0,count($value)-1)&&count($value)===$count&&$count>1)
+                return 'another list runs beside its row that the review does not name: '.$name;
+        return null;
+    }
+
+    /** Whether a slot still holds what the quickstart shipped: only such a slot may leave without being named. */
+    private static function untouched(array $slot, array $values): bool {
+        $strip=static fn(string $text):string=>trim(explode('#joomlaImage',$text,2)[0]);
+        return $strip((string)($values[$slot['key']]??''))===$strip((string)($slot['sample']??''));
+    }
+
+    /**
+     * What `rows.remove` would do, without doing any of it. A named slot takes its reviewed row when nothing else of the row
+     * stays; otherwise, in an HTML field, its own element or text ({@see ContentSlots::removalOps}). A slot in `$keep`, or one
+     * written since the quickstart and not named, stays, and so does whatever holds it. Anything else is refused by name.
+     *
+     * @param list<string> $slots @param list<string> $keep
+     * @return array{operations:list<array>,ops:array<string,list<array>>,removed:list<string>,already:list<string>}
+     */
+    public function removalPlan(array $slots, array $keep, array $state): array {
+        if($state['languages']||$state['switcher']!==null||$state['job'])throw new ContractProblem('CHANGES_INVALID','Rows cannot be removed from a site that carries translations: their copies would part from the source');
+        $all=array_column($state['slots'],null,'key');
+        $held=array_fill_keys($keep,true);$named=array_fill_keys($slots,true);
+        $problems=[];$already=[];$ops=[];$byEntity=[];
+        foreach($state['slots'] as $slot)$byEntity[$slot['entity']][]=$slot;
+        $fields=[];$rows=[];
+        foreach(array_keys($named) as $key) {
+            if(isset($state['removedSlots'][$key])){$already[]=$key;continue;}
+            $slot=$all[$key]??null;
+            if($slot===null){$problems[]=new ContractProblem('SLOT_UNKNOWN','Unknown content slot: '.$key,$key);continue;}
+            if(isset($held[$key])){$problems[]=new ContractProblem('CHANGES_INVALID','A slot is both kept and removed: '.$key,$key);continue;}
+            if(isset($slot['leaf'])){$problems[]=new ContractProblem('SLOT_NOT_REMOVABLE','This slot cannot be removed: it is not in a row or an HTML field this door reads: '.$key,$key);continue;}
+            $row=$this->rowOf($slot['entity'],$slot);
+            if($row!==null) {
+                $members=array_filter($byEntity[$slot['entity']],fn($other)=>($this->rowOf($slot['entity'],$other)['id']??null)===$row['id']);
+                $stays=array_filter($members,fn($other)=>isset($held[$other['key']])||(!isset($named[$other['key']])&&!self::untouched($other,$state['slotValues'])));
+                if(!$stays) {
+                    $unproved=$this->rowUnproved($row,$state['rows'][$slot['entity']]);
+                    if($unproved!==null){$problems[]=new ContractProblem('SLOT_NOT_REMOVABLE','This slot cannot be removed: '.$unproved.': '.$key,$key);continue;}
+                    $rows[$row['id']]=['row'=>$row,'entity'=>$slot['entity']];
+                    continue;
+                }
+                if(!isset($slot['xpath'])){$problems[]=new ContractProblem('SLOT_NOT_REMOVABLE','This slot cannot be removed: its row holds a slot that stays ('.reset($stays)['key'].'): '.$key,$key);continue;}
+            }
+            if(!isset($slot['xpath'])){$problems[]=new ContractProblem('SLOT_NOT_REMOVABLE','This slot cannot be removed: no reviewed row holds it and it is not in an HTML field: '.$key,$key);continue;}
+            $field=json_encode([$slot['entity'],$slot['column'],$slot['nestedJson']??null,$slot['jsonPath']??null]);
+            $fields[$field]=['slot'=>$slot,'going'=>($fields[$field]['going']??[])+[$key=>true]];
+        }
+        // A field inside a row that goes leaves with that row, and needs no node taken out first.
+        foreach($fields as $field=>$place) {
+            $entity=$place['slot']['entity'];$row=$this->rowOf($entity,$place['slot']);
+            if($row!==null&&isset($rows[$row['id']]))continue;
+            $inField=array_values(array_filter($byEntity[$entity],static fn($other)=>isset($other['xpath'])&&$other['column']===$place['slot']['column']&&($other['nestedJson']??null)===($place['slot']['nestedJson']??null)&&($other['jsonPath']??null)===($place['slot']['jsonPath']??null)));
+            $keptHere=[];
+            foreach($inField as $other)if(isset($held[$other['key']])||(!isset($place['going'][$other['key']])&&!self::untouched($other,$state['slotValues'])))$keptHere[$other['key']]=true;
+            $html=(string)$this->fieldText($state['rows'][$entity],$place['slot']);
+            $found=ContentSlots::removalOps($html,$inField,$place['going'],$keptHere);
+            foreach($found['refused'] as $key=>$why)$problems[]=new ContractProblem('SLOT_NOT_REMOVABLE','This slot cannot be removed: '.$why,$key);
+            $where=array_intersect_key($place['slot'],array_flip(['column','nestedJson','jsonPath']));
+            foreach($found['ops'] as $op)$ops[$entity][]=$op+$where;
+        }
+        if($problems)throw ContractProblem::all($problems);
+        // Highest index first, so every op's address holds when its turn comes.
+        uasort($rows,static fn(array $a,array $b):int=>($b['row']['index']??0)<=>($a['row']['index']??0));
+        foreach($rows as $item) {
+            $row=$item['row'];$list=$row['list'];
+            $base=['column'=>$list['column'],'parent'=>$list['parent']]+(isset($list['nestedJson'])?['nestedJson'=>$list['nestedJson']]:[]);
+            $ops[$item['entity']][]=isset($row['key'])?['op'=>'key','key'=>$row['key']]+$base:['op'=>'index','arrays'=>$list['arrays'],'index'=>$row['index']]+$base;
+        }
+        $operations=[];$removed=[];
+        foreach($ops as $entity=>$list) {
+            $row=$state['rows'][$entity];$fieldsNext=[];$expected=[];
+            foreach($list as $op) {
+                $column=$op['column'];
+                $fieldsNext[$column]=SlotRemoval::apply((string)($fieldsNext[$column]??$row[$column]),$op);
+                $expected[$column]=$row[$column];
+            }
+            $operations[]=['kind'=>$state['keys'][$entity]['kind'],'id'=>$state['ids'][$entity],'fields'=>$fieldsNext,'expected'=>$expected];
+            foreach($byEntity[$entity] as $slot)if(SlotRemoval::slot($slot,$list)===null)$removed[]=$slot['key'];
+        }
+        return ['operations'=>$operations,'ops'=>$ops,'removed'=>$removed,'already'=>$already];
+    }
+
+    /** The HTML text a slot's address is read in. */
+    private function fieldText(array $row, array $slot) {
+        $value=$row[$slot['column']];
+        if(!isset($slot['jsonPath']))return $value;
+        $body=json_decode($value,true,512,JSON_THROW_ON_ERROR);
+        if(isset($slot['nestedJson']))$body=json_decode($body[$slot['nestedJson']],true,512,JSON_THROW_ON_ERROR);
+        return SlotRemoval::at($body,$slot['jsonPath']);
+    }
+
+    /** The baseline after these ops: the same removal on the masked row, so whatever else the row holds still compares. */
+    public function bindingWithRemoval(array $ops, array $removed): array {
+        $binding=$this->store->load();
+        if(!$binding)throw new RuntimeException('Removing a row needs a bound site');
+        foreach($ops as $entity=>$list) {
+            foreach($list as $op) {
+                $column=$op['column'];
+                $binding['rowsRemoved']['ops'][$entity][]=$op;
+                $held=$binding['presentation'][$entity][$column]??null;
+                if($held===null)continue;
+                $text=is_array($held)?json_encode($held,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR):(string)$held;
+                $next=SlotRemoval::apply($text,$op);
+                $binding['presentation'][$entity][$column]=is_array($held)?json_decode($next,true,512,JSON_THROW_ON_ERROR):$next;
+            }
+        }
+        $binding['rowsRemoved']['slots']=array_values(array_unique(array_merge($binding['rowsRemoved']['slots']??[],$removed)));
         return $binding;
     }
 
@@ -1676,7 +1845,7 @@ final class QuickstartContract
         return $stored == $snapshot;
     }
     /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
-    public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->syncSourceRelabel(); }
+    public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->removalOps=null; $this->syncSourceRelabel(); }
 
     /* ------------------------------------------------------------ source relabel */
 

@@ -540,6 +540,8 @@ alias, confirmed by building the route Joomla's category/tag view builds). A cat
 published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
 not the category's. Menu modules get no such stamps for the same reason.
 
+
+`content.contract` `rows.remove` (`slots`, `keep`, `expected_revision`, `apply_id`, `request_id`; `info.hide_ops.rows_remove`) takes a hidden slot out of the stored field, box and all. A slot leaves with its row when the review proves one (`hideable-slots.json` `rows`: parallel lists under one parent, or a subform's numbered keys) and nothing of that row stays; otherwise, in an HTML field, with its own element, and with each parent that leaves empty. An element holding a slot in `keep`, or one written since the quickstart and not named, never goes: its slot gives up only its own text or alt, or is refused by name. The baseline moves by the same ops in the same transaction, so the rest of the row still compares and a later slot steps down into the gap. There is no `apply.revert`: a removed slot answers `SLOT_UNKNOWN`, is listed in inspect's `removedSlots`, and comes back only on a new site. A site that carries translations refuses it.
 ## Contract profiles: one release asset each (unreleased)
 
 The package used to carry every profile under `lib/contracts/`: 225 of them, 530 MB unpacked, a 70 MB
