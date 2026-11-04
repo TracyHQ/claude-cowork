@@ -20,7 +20,7 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
-        <description>Template style logos of a T3 template are contract content: a declared logo picture slot is not presentation drift.</description>
+        <description>Carries the ja-diner/j6/1.0.5 content contract (JA Diner j6 1.0.5 profile, T3 logo slots): template style logos of a T3 template are contract content, a declared logo picture slot is not presentation drift.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
         <client>site</client>
@@ -29,7 +29,7 @@
         <downloads>
             <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.80/pkg_claudecowork-0.24.80.zip</downloadurl>
         </downloads>
-        <sha256>8e79d6c9eb8a96548aabc126a0d915c88df6e778d17a45da00b3f148aeee9a0b</sha256>
+        <sha256>1cd759d24ccbe95b5de90041a78fcb0740b9ef768b12d552fca3a810d8310f38</sha256>
         <tags>
             <tag>stable</tag>
         </tags>
