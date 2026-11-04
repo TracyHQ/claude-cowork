@@ -177,6 +177,23 @@ foreach ($scBoxMap['slots'] as $scSlotIn) {
     if (!$scListed && $scIs !== $scSlotIn) $scBoxWrong[] = $scSlotIn['key'];
 }
 check('a Boxing slot not listed is the slot the map holds, byte for byte', $scBoxWrong, []);
+// Every opened picture and alt written into the row the contract's own lock holds: each one is a shape a real write will meet.
+$scBoxLock = json_decode((string) file_get_contents($scBoxDir . '/presentation-lock.json'), true);
+$scBoxValues = array_fill_keys($scBoxEntry['icons'], 'images/made-up/icon.png') + array_fill_keys(array_keys($scBoxEntry['alts']), 'A made-up picture of a made-up place.');
+$scBoxBy = [];
+foreach ($scBoxMap['slots'] as $scSlotIn) if (isset($scBoxValues[$scSlotIn['key']])) $scBoxBy[$scSlotIn['entity']] = true;
+$scBoxMissed = [];
+$scBoxRead = 0;
+foreach (array_keys($scBoxBy) as $scEntity) {
+    $scRow = $scBoxLock['entities'][$scEntity];
+    $scEntitySlots = $scBoxSlotsFor($scEntity);
+    $scPatched = $scBox->patch($scRow, $scEntitySlots, array_intersect_key($scBoxValues, array_flip(array_column($scEntitySlots, 'key'))));
+    foreach ($scEntitySlots as $scOne) {
+        $scWant = $scBoxValues[$scOne['key']] ?? $scBox->slotValue($scRow, $scOne);
+        if ($scBox->slotValue($scPatched, $scOne) === $scWant) $scBoxRead += isset($scBoxValues[$scOne['key']]) ? 1 : 0; else $scBoxMissed[] = $scOne['key'];
+    }
+}
+check('each opened slot takes its value in its real row, and the rest of the row holds', [$scBoxRead, $scBoxMissed], [54, []]);
 $scInfo = $scEngine->handle(['token' => $WTOKEN, 'action' => 'info'])['info']['slot_corrections'] ?? null;
 check('info says what this engine corrects, per contract', [$scInfo['version'] ?? null, $scInfo['contracts']['ja-boxing/j6/1.0.10'] ?? null], [1, ['limits' => 185, 'icons' => 48, 'alts' => 6]]);
 unset($scShipped, $scBoxMap, $scBox);
