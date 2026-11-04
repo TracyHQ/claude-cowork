@@ -81,7 +81,7 @@ $hoTiers = function () use ($hoDoor): array {
 };
 
 /* ------------------------------------------------ what inspect says may be emptied */
-check('info says this engine has these abilities', $hoEngine->handle(['token' => $WTOKEN, 'action' => 'info'])['info']['hide_ops'] ?? null, ['version' => 1]);
+check('info says this engine has these abilities', $hoEngine->handle(['token' => $WTOKEN, 'action' => 'info'])['info']['hide_ops'] ?? null, ['version' => 1, 'rows_remove' => 1]);
 check('inspect names each slot the review lists, and how it was judged', $hoTiers(), [
     'band.0' => 'unmeasured', 'cards.0' => 'unmeasured', 'cards.1' => 'withRow', 'cards.2' => 'measured', 'cards.3' => 'unmeasured', 'cards.5' => 'withRow', 'lines.1' => 'unmeasured', 'lines.2' => 'unmeasured', 'prose.unit' => 'unmeasured']);
 
