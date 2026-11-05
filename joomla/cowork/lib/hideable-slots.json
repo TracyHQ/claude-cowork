@@ -2228,6 +2228,2234 @@
           }
         ]
       }
+    },
+    "ja-boxing/j6/1.0.11": {
+      "contentMapSha256": "1cef392b292b18261ec68c13f8c15329f938aa20a9adafb741d1b74a8dde0dc8",
+      "measured": [
+        "article-18.14",
+        "article-19.14",
+        "article-20.14",
+        "article-21.14",
+        "article-22.14",
+        "article-23.14",
+        "article-24.14",
+        "article-25.14",
+        "article-26.14",
+        "article-27.14",
+        "module-156.0",
+        "module-156.1",
+        "module-157.12",
+        "module-157.13",
+        "module-157.14",
+        "module-157.15",
+        "module-157.16",
+        "module-157.17",
+        "module-157.18",
+        "module-157.19",
+        "module-163.0",
+        "module-163.1",
+        "module-163.2",
+        "module-163.3",
+        "module-166.10",
+        "module-166.5",
+        "module-166.6",
+        "module-166.7",
+        "module-166.8",
+        "module-166.9",
+        "module-178.0",
+        "module-178.1",
+        "module-178.2",
+        "module-178.3",
+        "module-178.4",
+        "module-178.5",
+        "module-178.6",
+        "module-178.7",
+        "module-180.0",
+        "module-182.0",
+        "module-182.1",
+        "module-182.2",
+        "module-182.3",
+        "module-183.0",
+        "module-183.3",
+        "module-183.4",
+        "module-190.12",
+        "module-190.13",
+        "module-190.14",
+        "module-190.15",
+        "module-190.16",
+        "module-190.17",
+        "module-190.18",
+        "module-190.19"
+      ],
+      "unmeasured": [
+        "article-14.10",
+        "article-14.12",
+        "article-14.13",
+        "article-14.14",
+        "article-14.17",
+        "article-14.18",
+        "article-14.21",
+        "article-14.22",
+        "article-14.25",
+        "article-14.26",
+        "article-14.29",
+        "article-14.30",
+        "article-14.31",
+        "article-14.32",
+        "article-14.34",
+        "article-14.35",
+        "article-14.41",
+        "article-14.42",
+        "article-14.47",
+        "article-14.48",
+        "article-14.53",
+        "article-14.54",
+        "article-14.7",
+        "article-14.8",
+        "article-14.9",
+        "article-15.10",
+        "article-15.11",
+        "article-15.12",
+        "article-15.15",
+        "article-15.16",
+        "article-15.19",
+        "article-15.20",
+        "article-15.23",
+        "article-15.24",
+        "article-15.27",
+        "article-15.28",
+        "article-15.29",
+        "article-15.30",
+        "article-15.32",
+        "article-15.33",
+        "article-15.39",
+        "article-15.40",
+        "article-15.45",
+        "article-15.46",
+        "article-15.51",
+        "article-15.52",
+        "article-15.7",
+        "article-15.8",
+        "article-16.10",
+        "article-16.12",
+        "article-16.13",
+        "article-16.14",
+        "article-16.17",
+        "article-16.18",
+        "article-16.21",
+        "article-16.22",
+        "article-16.25",
+        "article-16.26",
+        "article-16.29",
+        "article-16.30",
+        "article-16.31",
+        "article-16.32",
+        "article-16.34",
+        "article-16.35",
+        "article-16.41",
+        "article-16.42",
+        "article-16.47",
+        "article-16.48",
+        "article-16.53",
+        "article-16.54",
+        "article-16.7",
+        "article-16.8",
+        "article-16.9",
+        "article-17.15",
+        "article-17.59",
+        "article-17.60",
+        "article-17.61",
+        "article-17.62",
+        "article-17.63",
+        "article-17.64",
+        "article-17.65",
+        "article-18.16",
+        "article-18.18",
+        "article-18.20",
+        "article-18.22",
+        "article-18.24",
+        "article-18.26",
+        "article-18.28",
+        "article-18.30",
+        "article-18.32",
+        "article-18.34",
+        "article-18.36",
+        "article-18.38",
+        "article-19.16",
+        "article-19.18",
+        "article-19.20",
+        "article-19.22",
+        "article-19.24",
+        "article-19.26",
+        "article-19.28",
+        "article-19.30",
+        "article-19.32",
+        "article-19.34",
+        "article-19.36",
+        "article-19.38",
+        "article-2.10",
+        "article-2.11",
+        "article-2.12",
+        "article-2.13",
+        "article-2.15",
+        "article-2.16",
+        "article-2.17",
+        "article-2.20",
+        "article-2.21",
+        "article-2.24",
+        "article-2.25",
+        "article-2.28",
+        "article-2.29",
+        "article-2.32",
+        "article-2.33",
+        "article-2.34",
+        "article-2.35",
+        "article-2.37",
+        "article-2.38",
+        "article-2.44",
+        "article-2.45",
+        "article-2.50",
+        "article-2.51",
+        "article-2.56",
+        "article-2.57",
+        "article-2.7",
+        "article-2.8",
+        "article-2.9",
+        "article-20.16",
+        "article-20.18",
+        "article-20.20",
+        "article-20.22",
+        "article-20.24",
+        "article-20.26",
+        "article-20.28",
+        "article-20.30",
+        "article-20.32",
+        "article-20.34",
+        "article-20.36",
+        "article-20.38",
+        "article-21.16",
+        "article-21.18",
+        "article-21.20",
+        "article-21.22",
+        "article-21.24",
+        "article-21.26",
+        "article-21.28",
+        "article-21.30",
+        "article-21.32",
+        "article-21.34",
+        "article-21.36",
+        "article-21.38",
+        "article-22.16",
+        "article-22.18",
+        "article-22.20",
+        "article-22.22",
+        "article-22.24",
+        "article-22.26",
+        "article-22.28",
+        "article-22.30",
+        "article-22.32",
+        "article-22.34",
+        "article-22.36",
+        "article-22.38",
+        "article-23.16",
+        "article-23.18",
+        "article-23.20",
+        "article-23.22",
+        "article-23.24",
+        "article-23.26",
+        "article-23.28",
+        "article-23.30",
+        "article-23.32",
+        "article-23.34",
+        "article-23.36",
+        "article-23.38",
+        "article-24.16",
+        "article-24.18",
+        "article-24.20",
+        "article-24.22",
+        "article-24.24",
+        "article-24.26",
+        "article-24.28",
+        "article-24.30",
+        "article-24.32",
+        "article-24.34",
+        "article-24.36",
+        "article-24.38",
+        "article-25.16",
+        "article-25.18",
+        "article-25.20",
+        "article-25.22",
+        "article-25.24",
+        "article-25.26",
+        "article-25.28",
+        "article-25.30",
+        "article-25.32",
+        "article-25.34",
+        "article-25.36",
+        "article-25.38",
+        "article-26.16",
+        "article-26.18",
+        "article-26.20",
+        "article-26.22",
+        "article-26.24",
+        "article-26.26",
+        "article-26.28",
+        "article-26.30",
+        "article-26.32",
+        "article-26.34",
+        "article-26.36",
+        "article-26.38",
+        "article-27.16",
+        "article-27.18",
+        "article-27.20",
+        "article-27.22",
+        "article-27.24",
+        "article-27.26",
+        "article-27.28",
+        "article-27.30",
+        "article-27.32",
+        "article-27.34",
+        "article-27.36",
+        "article-27.38",
+        "contact-1.3",
+        "field-1.1",
+        "languageString-10831042.0",
+        "languageString-112732346.0",
+        "languageString-135820122.0",
+        "languageString-139204367.0",
+        "languageString-166748343.0",
+        "languageString-169039348.0",
+        "languageString-182937349.0",
+        "languageString-219823601.0",
+        "languageString-231238131.0",
+        "languageString-234398682.0",
+        "languageString-256948293.0",
+        "languageString-27872773.0",
+        "languageString-30910664.0",
+        "languageString-34322868.0",
+        "languageString-37868544.0",
+        "languageString-44242957.0",
+        "languageString-46373076.0",
+        "languageString-50724917.0",
+        "languageString-58440578.0",
+        "languageString-76896395.0",
+        "languageString-90793445.0",
+        "module-156.2",
+        "module-156.3",
+        "module-156.4",
+        "module-156.5",
+        "module-157.0",
+        "module-157.1",
+        "module-157.2",
+        "module-157.20",
+        "module-157.3",
+        "module-157.4",
+        "module-157.5",
+        "module-157.6",
+        "module-157.7",
+        "module-158.0",
+        "module-158.1",
+        "module-159.0",
+        "module-159.1",
+        "module-160.0",
+        "module-160.6",
+        "module-161.0",
+        "module-161.1",
+        "module-161.3",
+        "module-162.0",
+        "module-162.1",
+        "module-162.10",
+        "module-162.11",
+        "module-162.12",
+        "module-162.13",
+        "module-162.14",
+        "module-162.15",
+        "module-162.16",
+        "module-162.17",
+        "module-162.18",
+        "module-162.19",
+        "module-162.2",
+        "module-162.20",
+        "module-162.21",
+        "module-162.22",
+        "module-162.23",
+        "module-162.24",
+        "module-162.25",
+        "module-162.26",
+        "module-162.27",
+        "module-162.28",
+        "module-162.29",
+        "module-162.3",
+        "module-162.30",
+        "module-162.4",
+        "module-162.5",
+        "module-162.6",
+        "module-162.7",
+        "module-162.8",
+        "module-162.9",
+        "module-163.12",
+        "module-163.13",
+        "module-163.14",
+        "module-163.15",
+        "module-163.16",
+        "module-163.17",
+        "module-163.18",
+        "module-163.4",
+        "module-163.5",
+        "module-163.6",
+        "module-163.7",
+        "module-165.0",
+        "module-165.2",
+        "module-165.3",
+        "module-165.4",
+        "module-165.5",
+        "module-165.6",
+        "module-165.7",
+        "module-165.8",
+        "module-165.9",
+        "module-166.0",
+        "module-166.1",
+        "module-166.17",
+        "module-166.18",
+        "module-166.19",
+        "module-166.2",
+        "module-166.3",
+        "module-166.4",
+        "module-167.0",
+        "module-167.1",
+        "module-167.10",
+        "module-167.11",
+        "module-167.12",
+        "module-167.13",
+        "module-167.14",
+        "module-167.15",
+        "module-167.16",
+        "module-167.17",
+        "module-167.18",
+        "module-167.19",
+        "module-167.2",
+        "module-167.20",
+        "module-167.21",
+        "module-167.22",
+        "module-167.23",
+        "module-167.3",
+        "module-167.4",
+        "module-167.5",
+        "module-167.6",
+        "module-167.7",
+        "module-167.8",
+        "module-167.9",
+        "module-169.0",
+        "module-171.0",
+        "module-171.1",
+        "module-171.10",
+        "module-171.11",
+        "module-171.2",
+        "module-171.3",
+        "module-171.8",
+        "module-171.9",
+        "module-172.0",
+        "module-172.1",
+        "module-172.10",
+        "module-172.11",
+        "module-172.2",
+        "module-172.3",
+        "module-172.4",
+        "module-172.5",
+        "module-172.6",
+        "module-172.7",
+        "module-172.8",
+        "module-172.9",
+        "module-175.2",
+        "module-177.10",
+        "module-177.11",
+        "module-177.12",
+        "module-177.13",
+        "module-177.14",
+        "module-177.15",
+        "module-177.16",
+        "module-177.2",
+        "module-177.3",
+        "module-177.6",
+        "module-177.7",
+        "module-177.8",
+        "module-177.9",
+        "module-178.10",
+        "module-178.11",
+        "module-178.12",
+        "module-178.13",
+        "module-178.14",
+        "module-178.15",
+        "module-178.24",
+        "module-178.25",
+        "module-178.26",
+        "module-178.27",
+        "module-178.28",
+        "module-178.29",
+        "module-178.30",
+        "module-178.31",
+        "module-178.32",
+        "module-178.8",
+        "module-178.9",
+        "module-179.0",
+        "module-179.1",
+        "module-179.13",
+        "module-179.14",
+        "module-179.2",
+        "module-179.3",
+        "module-179.4",
+        "module-179.5",
+        "module-180.1",
+        "module-180.11",
+        "module-180.12",
+        "module-180.13",
+        "module-180.14",
+        "module-180.15",
+        "module-180.2",
+        "module-180.3",
+        "module-180.4",
+        "module-180.5",
+        "module-180.6",
+        "module-181.0",
+        "module-181.1",
+        "module-181.18",
+        "module-181.19",
+        "module-181.2",
+        "module-181.20",
+        "module-181.3",
+        "module-181.4",
+        "module-181.5",
+        "module-182.12",
+        "module-182.13",
+        "module-182.14",
+        "module-182.15",
+        "module-182.16",
+        "module-182.17",
+        "module-182.18",
+        "module-182.4",
+        "module-182.5",
+        "module-182.6",
+        "module-182.7",
+        "module-183.1",
+        "module-183.2",
+        "module-183.5",
+        "module-183.6",
+        "module-183.7",
+        "module-183.8",
+        "module-184.1",
+        "module-184.2",
+        "module-188.0",
+        "module-188.1",
+        "module-188.10",
+        "module-188.11",
+        "module-188.12",
+        "module-188.13",
+        "module-188.14",
+        "module-188.15",
+        "module-188.16",
+        "module-188.17",
+        "module-188.18",
+        "module-188.19",
+        "module-188.2",
+        "module-188.20",
+        "module-188.21",
+        "module-188.22",
+        "module-188.23",
+        "module-188.3",
+        "module-188.4",
+        "module-188.5",
+        "module-188.6",
+        "module-188.7",
+        "module-188.8",
+        "module-188.9",
+        "module-189.0",
+        "module-189.1",
+        "module-189.10",
+        "module-189.11",
+        "module-189.12",
+        "module-189.13",
+        "module-189.14",
+        "module-189.15",
+        "module-189.16",
+        "module-189.17",
+        "module-189.18",
+        "module-189.19",
+        "module-189.2",
+        "module-189.20",
+        "module-189.21",
+        "module-189.22",
+        "module-189.23",
+        "module-189.3",
+        "module-189.4",
+        "module-189.5",
+        "module-189.6",
+        "module-189.7",
+        "module-189.8",
+        "module-189.9",
+        "module-190.0",
+        "module-190.1",
+        "module-190.2",
+        "module-190.20",
+        "module-190.3",
+        "module-190.4",
+        "module-190.5",
+        "module-190.6",
+        "module-190.7",
+        "module-191.0",
+        "module-191.1"
+      ],
+      "withRow": {
+        "article-14.15": [
+          "article-14.16",
+          "article-14.17",
+          "article-14.18"
+        ],
+        "article-14.16": [
+          "article-14.15",
+          "article-14.17",
+          "article-14.18"
+        ],
+        "article-14.19": [
+          "article-14.20",
+          "article-14.21",
+          "article-14.22"
+        ],
+        "article-14.20": [
+          "article-14.19",
+          "article-14.21",
+          "article-14.22"
+        ],
+        "article-14.23": [
+          "article-14.24",
+          "article-14.25",
+          "article-14.26"
+        ],
+        "article-14.24": [
+          "article-14.23",
+          "article-14.25",
+          "article-14.26"
+        ],
+        "article-14.27": [
+          "article-14.28",
+          "article-14.29",
+          "article-14.30"
+        ],
+        "article-14.28": [
+          "article-14.27",
+          "article-14.29",
+          "article-14.30"
+        ],
+        "article-14.33": [
+          "article-14.34",
+          "article-14.35"
+        ],
+        "article-14.40": [
+          "article-14.41",
+          "article-14.42"
+        ],
+        "article-14.46": [
+          "article-14.47",
+          "article-14.48"
+        ],
+        "article-14.52": [
+          "article-14.53",
+          "article-14.54"
+        ],
+        "article-15.13": [
+          "article-15.14",
+          "article-15.15",
+          "article-15.16"
+        ],
+        "article-15.14": [
+          "article-15.13",
+          "article-15.15",
+          "article-15.16"
+        ],
+        "article-15.17": [
+          "article-15.18",
+          "article-15.19",
+          "article-15.20"
+        ],
+        "article-15.18": [
+          "article-15.17",
+          "article-15.19",
+          "article-15.20"
+        ],
+        "article-15.21": [
+          "article-15.22",
+          "article-15.23",
+          "article-15.24"
+        ],
+        "article-15.22": [
+          "article-15.21",
+          "article-15.23",
+          "article-15.24"
+        ],
+        "article-15.25": [
+          "article-15.26",
+          "article-15.27",
+          "article-15.28"
+        ],
+        "article-15.26": [
+          "article-15.25",
+          "article-15.27",
+          "article-15.28"
+        ],
+        "article-15.31": [
+          "article-15.32",
+          "article-15.33"
+        ],
+        "article-15.38": [
+          "article-15.39",
+          "article-15.40"
+        ],
+        "article-15.44": [
+          "article-15.45",
+          "article-15.46"
+        ],
+        "article-15.50": [
+          "article-15.51",
+          "article-15.52"
+        ],
+        "article-16.15": [
+          "article-16.16",
+          "article-16.17",
+          "article-16.18"
+        ],
+        "article-16.16": [
+          "article-16.15",
+          "article-16.17",
+          "article-16.18"
+        ],
+        "article-16.19": [
+          "article-16.20",
+          "article-16.21",
+          "article-16.22"
+        ],
+        "article-16.20": [
+          "article-16.19",
+          "article-16.21",
+          "article-16.22"
+        ],
+        "article-16.23": [
+          "article-16.24",
+          "article-16.25",
+          "article-16.26"
+        ],
+        "article-16.24": [
+          "article-16.23",
+          "article-16.25",
+          "article-16.26"
+        ],
+        "article-16.27": [
+          "article-16.28",
+          "article-16.29",
+          "article-16.30"
+        ],
+        "article-16.28": [
+          "article-16.27",
+          "article-16.29",
+          "article-16.30"
+        ],
+        "article-16.33": [
+          "article-16.34",
+          "article-16.35"
+        ],
+        "article-16.40": [
+          "article-16.41",
+          "article-16.42"
+        ],
+        "article-16.46": [
+          "article-16.47",
+          "article-16.48"
+        ],
+        "article-16.52": [
+          "article-16.53",
+          "article-16.54"
+        ],
+        "article-18.15": [
+          "article-18.16",
+          "article-18.17",
+          "article-18.18"
+        ],
+        "article-18.17": [
+          "article-18.15",
+          "article-18.16",
+          "article-18.18"
+        ],
+        "article-18.19": [
+          "article-18.20",
+          "article-18.21",
+          "article-18.22"
+        ],
+        "article-18.21": [
+          "article-18.19",
+          "article-18.20",
+          "article-18.22"
+        ],
+        "article-18.23": [
+          "article-18.24",
+          "article-18.25",
+          "article-18.26"
+        ],
+        "article-18.25": [
+          "article-18.23",
+          "article-18.24",
+          "article-18.26"
+        ],
+        "article-18.27": [
+          "article-18.28",
+          "article-18.29",
+          "article-18.30"
+        ],
+        "article-18.29": [
+          "article-18.27",
+          "article-18.28",
+          "article-18.30"
+        ],
+        "article-18.31": [
+          "article-18.32",
+          "article-18.33",
+          "article-18.34"
+        ],
+        "article-18.33": [
+          "article-18.31",
+          "article-18.32",
+          "article-18.34"
+        ],
+        "article-18.35": [
+          "article-18.36",
+          "article-18.37",
+          "article-18.38"
+        ],
+        "article-18.37": [
+          "article-18.35",
+          "article-18.36",
+          "article-18.38"
+        ],
+        "article-19.15": [
+          "article-19.16",
+          "article-19.17",
+          "article-19.18"
+        ],
+        "article-19.17": [
+          "article-19.15",
+          "article-19.16",
+          "article-19.18"
+        ],
+        "article-19.19": [
+          "article-19.20",
+          "article-19.21",
+          "article-19.22"
+        ],
+        "article-19.21": [
+          "article-19.19",
+          "article-19.20",
+          "article-19.22"
+        ],
+        "article-19.23": [
+          "article-19.24",
+          "article-19.25",
+          "article-19.26"
+        ],
+        "article-19.25": [
+          "article-19.23",
+          "article-19.24",
+          "article-19.26"
+        ],
+        "article-19.27": [
+          "article-19.28",
+          "article-19.29",
+          "article-19.30"
+        ],
+        "article-19.29": [
+          "article-19.27",
+          "article-19.28",
+          "article-19.30"
+        ],
+        "article-19.31": [
+          "article-19.32",
+          "article-19.33",
+          "article-19.34"
+        ],
+        "article-19.33": [
+          "article-19.31",
+          "article-19.32",
+          "article-19.34"
+        ],
+        "article-19.35": [
+          "article-19.36",
+          "article-19.37",
+          "article-19.38"
+        ],
+        "article-19.37": [
+          "article-19.35",
+          "article-19.36",
+          "article-19.38"
+        ],
+        "article-2.18": [
+          "article-2.19",
+          "article-2.20",
+          "article-2.21"
+        ],
+        "article-2.19": [
+          "article-2.18",
+          "article-2.20",
+          "article-2.21"
+        ],
+        "article-2.22": [
+          "article-2.23",
+          "article-2.24",
+          "article-2.25"
+        ],
+        "article-2.23": [
+          "article-2.22",
+          "article-2.24",
+          "article-2.25"
+        ],
+        "article-2.26": [
+          "article-2.27",
+          "article-2.28",
+          "article-2.29"
+        ],
+        "article-2.27": [
+          "article-2.26",
+          "article-2.28",
+          "article-2.29"
+        ],
+        "article-2.30": [
+          "article-2.31",
+          "article-2.32",
+          "article-2.33"
+        ],
+        "article-2.31": [
+          "article-2.30",
+          "article-2.32",
+          "article-2.33"
+        ],
+        "article-2.36": [
+          "article-2.37",
+          "article-2.38"
+        ],
+        "article-2.43": [
+          "article-2.44",
+          "article-2.45"
+        ],
+        "article-2.49": [
+          "article-2.50",
+          "article-2.51"
+        ],
+        "article-2.55": [
+          "article-2.56",
+          "article-2.57"
+        ],
+        "article-20.15": [
+          "article-20.16",
+          "article-20.17",
+          "article-20.18"
+        ],
+        "article-20.17": [
+          "article-20.15",
+          "article-20.16",
+          "article-20.18"
+        ],
+        "article-20.19": [
+          "article-20.20",
+          "article-20.21",
+          "article-20.22"
+        ],
+        "article-20.21": [
+          "article-20.19",
+          "article-20.20",
+          "article-20.22"
+        ],
+        "article-20.23": [
+          "article-20.24",
+          "article-20.25",
+          "article-20.26"
+        ],
+        "article-20.25": [
+          "article-20.23",
+          "article-20.24",
+          "article-20.26"
+        ],
+        "article-20.27": [
+          "article-20.28",
+          "article-20.29",
+          "article-20.30"
+        ],
+        "article-20.29": [
+          "article-20.27",
+          "article-20.28",
+          "article-20.30"
+        ],
+        "article-20.31": [
+          "article-20.32",
+          "article-20.33",
+          "article-20.34"
+        ],
+        "article-20.33": [
+          "article-20.31",
+          "article-20.32",
+          "article-20.34"
+        ],
+        "article-20.35": [
+          "article-20.36",
+          "article-20.37",
+          "article-20.38"
+        ],
+        "article-20.37": [
+          "article-20.35",
+          "article-20.36",
+          "article-20.38"
+        ],
+        "article-21.15": [
+          "article-21.16",
+          "article-21.17",
+          "article-21.18"
+        ],
+        "article-21.17": [
+          "article-21.15",
+          "article-21.16",
+          "article-21.18"
+        ],
+        "article-21.19": [
+          "article-21.20",
+          "article-21.21",
+          "article-21.22"
+        ],
+        "article-21.21": [
+          "article-21.19",
+          "article-21.20",
+          "article-21.22"
+        ],
+        "article-21.23": [
+          "article-21.24",
+          "article-21.25",
+          "article-21.26"
+        ],
+        "article-21.25": [
+          "article-21.23",
+          "article-21.24",
+          "article-21.26"
+        ],
+        "article-21.27": [
+          "article-21.28",
+          "article-21.29",
+          "article-21.30"
+        ],
+        "article-21.29": [
+          "article-21.27",
+          "article-21.28",
+          "article-21.30"
+        ],
+        "article-21.31": [
+          "article-21.32",
+          "article-21.33",
+          "article-21.34"
+        ],
+        "article-21.33": [
+          "article-21.31",
+          "article-21.32",
+          "article-21.34"
+        ],
+        "article-21.35": [
+          "article-21.36",
+          "article-21.37",
+          "article-21.38"
+        ],
+        "article-21.37": [
+          "article-21.35",
+          "article-21.36",
+          "article-21.38"
+        ],
+        "article-22.15": [
+          "article-22.16",
+          "article-22.17",
+          "article-22.18"
+        ],
+        "article-22.17": [
+          "article-22.15",
+          "article-22.16",
+          "article-22.18"
+        ],
+        "article-22.19": [
+          "article-22.20",
+          "article-22.21",
+          "article-22.22"
+        ],
+        "article-22.21": [
+          "article-22.19",
+          "article-22.20",
+          "article-22.22"
+        ],
+        "article-22.23": [
+          "article-22.24",
+          "article-22.25",
+          "article-22.26"
+        ],
+        "article-22.25": [
+          "article-22.23",
+          "article-22.24",
+          "article-22.26"
+        ],
+        "article-22.27": [
+          "article-22.28",
+          "article-22.29",
+          "article-22.30"
+        ],
+        "article-22.29": [
+          "article-22.27",
+          "article-22.28",
+          "article-22.30"
+        ],
+        "article-22.31": [
+          "article-22.32",
+          "article-22.33",
+          "article-22.34"
+        ],
+        "article-22.33": [
+          "article-22.31",
+          "article-22.32",
+          "article-22.34"
+        ],
+        "article-22.35": [
+          "article-22.36",
+          "article-22.37",
+          "article-22.38"
+        ],
+        "article-22.37": [
+          "article-22.35",
+          "article-22.36",
+          "article-22.38"
+        ],
+        "article-23.15": [
+          "article-23.16",
+          "article-23.17",
+          "article-23.18"
+        ],
+        "article-23.17": [
+          "article-23.15",
+          "article-23.16",
+          "article-23.18"
+        ],
+        "article-23.19": [
+          "article-23.20",
+          "article-23.21",
+          "article-23.22"
+        ],
+        "article-23.21": [
+          "article-23.19",
+          "article-23.20",
+          "article-23.22"
+        ],
+        "article-23.23": [
+          "article-23.24",
+          "article-23.25",
+          "article-23.26"
+        ],
+        "article-23.25": [
+          "article-23.23",
+          "article-23.24",
+          "article-23.26"
+        ],
+        "article-23.27": [
+          "article-23.28",
+          "article-23.29",
+          "article-23.30"
+        ],
+        "article-23.29": [
+          "article-23.27",
+          "article-23.28",
+          "article-23.30"
+        ],
+        "article-23.31": [
+          "article-23.32",
+          "article-23.33",
+          "article-23.34"
+        ],
+        "article-23.33": [
+          "article-23.31",
+          "article-23.32",
+          "article-23.34"
+        ],
+        "article-23.35": [
+          "article-23.36",
+          "article-23.37",
+          "article-23.38"
+        ],
+        "article-23.37": [
+          "article-23.35",
+          "article-23.36",
+          "article-23.38"
+        ],
+        "article-24.15": [
+          "article-24.16",
+          "article-24.17",
+          "article-24.18"
+        ],
+        "article-24.17": [
+          "article-24.15",
+          "article-24.16",
+          "article-24.18"
+        ],
+        "article-24.19": [
+          "article-24.20",
+          "article-24.21",
+          "article-24.22"
+        ],
+        "article-24.21": [
+          "article-24.19",
+          "article-24.20",
+          "article-24.22"
+        ],
+        "article-24.23": [
+          "article-24.24",
+          "article-24.25",
+          "article-24.26"
+        ],
+        "article-24.25": [
+          "article-24.23",
+          "article-24.24",
+          "article-24.26"
+        ],
+        "article-24.27": [
+          "article-24.28",
+          "article-24.29",
+          "article-24.30"
+        ],
+        "article-24.29": [
+          "article-24.27",
+          "article-24.28",
+          "article-24.30"
+        ],
+        "article-24.31": [
+          "article-24.32",
+          "article-24.33",
+          "article-24.34"
+        ],
+        "article-24.33": [
+          "article-24.31",
+          "article-24.32",
+          "article-24.34"
+        ],
+        "article-24.35": [
+          "article-24.36",
+          "article-24.37",
+          "article-24.38"
+        ],
+        "article-24.37": [
+          "article-24.35",
+          "article-24.36",
+          "article-24.38"
+        ],
+        "article-25.15": [
+          "article-25.16",
+          "article-25.17",
+          "article-25.18"
+        ],
+        "article-25.17": [
+          "article-25.15",
+          "article-25.16",
+          "article-25.18"
+        ],
+        "article-25.19": [
+          "article-25.20",
+          "article-25.21",
+          "article-25.22"
+        ],
+        "article-25.21": [
+          "article-25.19",
+          "article-25.20",
+          "article-25.22"
+        ],
+        "article-25.23": [
+          "article-25.24",
+          "article-25.25",
+          "article-25.26"
+        ],
+        "article-25.25": [
+          "article-25.23",
+          "article-25.24",
+          "article-25.26"
+        ],
+        "article-25.27": [
+          "article-25.28",
+          "article-25.29",
+          "article-25.30"
+        ],
+        "article-25.29": [
+          "article-25.27",
+          "article-25.28",
+          "article-25.30"
+        ],
+        "article-25.31": [
+          "article-25.32",
+          "article-25.33",
+          "article-25.34"
+        ],
+        "article-25.33": [
+          "article-25.31",
+          "article-25.32",
+          "article-25.34"
+        ],
+        "article-25.35": [
+          "article-25.36",
+          "article-25.37",
+          "article-25.38"
+        ],
+        "article-25.37": [
+          "article-25.35",
+          "article-25.36",
+          "article-25.38"
+        ],
+        "article-26.15": [
+          "article-26.16",
+          "article-26.17",
+          "article-26.18"
+        ],
+        "article-26.17": [
+          "article-26.15",
+          "article-26.16",
+          "article-26.18"
+        ],
+        "article-26.19": [
+          "article-26.20",
+          "article-26.21",
+          "article-26.22"
+        ],
+        "article-26.21": [
+          "article-26.19",
+          "article-26.20",
+          "article-26.22"
+        ],
+        "article-26.23": [
+          "article-26.24",
+          "article-26.25",
+          "article-26.26"
+        ],
+        "article-26.25": [
+          "article-26.23",
+          "article-26.24",
+          "article-26.26"
+        ],
+        "article-26.27": [
+          "article-26.28",
+          "article-26.29",
+          "article-26.30"
+        ],
+        "article-26.29": [
+          "article-26.27",
+          "article-26.28",
+          "article-26.30"
+        ],
+        "article-26.31": [
+          "article-26.32",
+          "article-26.33",
+          "article-26.34"
+        ],
+        "article-26.33": [
+          "article-26.31",
+          "article-26.32",
+          "article-26.34"
+        ],
+        "article-26.35": [
+          "article-26.36",
+          "article-26.37",
+          "article-26.38"
+        ],
+        "article-26.37": [
+          "article-26.35",
+          "article-26.36",
+          "article-26.38"
+        ],
+        "article-27.15": [
+          "article-27.16",
+          "article-27.17",
+          "article-27.18"
+        ],
+        "article-27.17": [
+          "article-27.15",
+          "article-27.16",
+          "article-27.18"
+        ],
+        "article-27.19": [
+          "article-27.20",
+          "article-27.21",
+          "article-27.22"
+        ],
+        "article-27.21": [
+          "article-27.19",
+          "article-27.20",
+          "article-27.22"
+        ],
+        "article-27.23": [
+          "article-27.24",
+          "article-27.25",
+          "article-27.26"
+        ],
+        "article-27.25": [
+          "article-27.23",
+          "article-27.24",
+          "article-27.26"
+        ],
+        "article-27.27": [
+          "article-27.28",
+          "article-27.29",
+          "article-27.30"
+        ],
+        "article-27.29": [
+          "article-27.27",
+          "article-27.28",
+          "article-27.30"
+        ],
+        "article-27.31": [
+          "article-27.32",
+          "article-27.33",
+          "article-27.34"
+        ],
+        "article-27.33": [
+          "article-27.31",
+          "article-27.32",
+          "article-27.34"
+        ],
+        "article-27.35": [
+          "article-27.36",
+          "article-27.37",
+          "article-27.38"
+        ],
+        "article-27.37": [
+          "article-27.35",
+          "article-27.36",
+          "article-27.38"
+        ],
+        "module-156.6": [
+          "module-156.0",
+          "module-156.1",
+          "module-156.2",
+          "module-156.3",
+          "module-156.4",
+          "module-156.5"
+        ],
+        "module-161.2": [
+          "module-161.0",
+          "module-161.1",
+          "module-161.3",
+          "module-161.4"
+        ],
+        "module-161.4": [
+          "module-161.0",
+          "module-161.1",
+          "module-161.2",
+          "module-161.3"
+        ],
+        "module-163.10": [
+          "module-163.14",
+          "module-163.2",
+          "module-163.6"
+        ],
+        "module-163.11": [
+          "module-163.15",
+          "module-163.3",
+          "module-163.7"
+        ],
+        "module-163.8": [
+          "module-163.0",
+          "module-163.12",
+          "module-163.4"
+        ],
+        "module-163.9": [
+          "module-163.1",
+          "module-163.13",
+          "module-163.5"
+        ],
+        "module-165.1": [
+          "module-165.0",
+          "module-165.2",
+          "module-165.6"
+        ],
+        "module-171.4": [
+          "module-171.0",
+          "module-171.8"
+        ],
+        "module-171.5": [
+          "module-171.1",
+          "module-171.9"
+        ],
+        "module-171.6": [
+          "module-171.10",
+          "module-171.2"
+        ],
+        "module-171.7": [
+          "module-171.11",
+          "module-171.3"
+        ],
+        "module-177.0": [
+          "module-177.10",
+          "module-177.12",
+          "module-177.14",
+          "module-177.16",
+          "module-177.2",
+          "module-177.4",
+          "module-177.6",
+          "module-177.8"
+        ],
+        "module-177.1": [
+          "module-177.11",
+          "module-177.13",
+          "module-177.15",
+          "module-177.3",
+          "module-177.5",
+          "module-177.7",
+          "module-177.9"
+        ],
+        "module-177.4": [
+          "module-177.0",
+          "module-177.10",
+          "module-177.12",
+          "module-177.14",
+          "module-177.16",
+          "module-177.2",
+          "module-177.6",
+          "module-177.8"
+        ],
+        "module-177.5": [
+          "module-177.1",
+          "module-177.11",
+          "module-177.13",
+          "module-177.15",
+          "module-177.3",
+          "module-177.7",
+          "module-177.9"
+        ],
+        "module-178.16": [
+          "module-178.0",
+          "module-178.24",
+          "module-178.8"
+        ],
+        "module-178.17": [
+          "module-178.1",
+          "module-178.25",
+          "module-178.9"
+        ],
+        "module-178.18": [
+          "module-178.10",
+          "module-178.2",
+          "module-178.26"
+        ],
+        "module-178.19": [
+          "module-178.11",
+          "module-178.27",
+          "module-178.3"
+        ],
+        "module-178.20": [
+          "module-178.12",
+          "module-178.28",
+          "module-178.4"
+        ],
+        "module-178.21": [
+          "module-178.13",
+          "module-178.29",
+          "module-178.5"
+        ],
+        "module-178.22": [
+          "module-178.14",
+          "module-178.30",
+          "module-178.6"
+        ],
+        "module-178.23": [
+          "module-178.15",
+          "module-178.31",
+          "module-178.7"
+        ],
+        "module-179.10": [
+          "module-179.4"
+        ],
+        "module-179.11": [
+          "module-179.5"
+        ],
+        "module-179.6": [
+          "module-179.0"
+        ],
+        "module-179.7": [
+          "module-179.1"
+        ],
+        "module-179.8": [
+          "module-179.2"
+        ],
+        "module-179.9": [
+          "module-179.3"
+        ],
+        "module-180.10": [
+          "module-180.15",
+          "module-180.6"
+        ],
+        "module-180.7": [
+          "module-180.0",
+          "module-180.1",
+          "module-180.12",
+          "module-180.2",
+          "module-180.3"
+        ],
+        "module-180.8": [
+          "module-180.13",
+          "module-180.4"
+        ],
+        "module-180.9": [
+          "module-180.14",
+          "module-180.5"
+        ],
+        "module-181.10": [
+          "module-181.16",
+          "module-181.4"
+        ],
+        "module-181.11": [
+          "module-181.17",
+          "module-181.5"
+        ],
+        "module-181.12": [
+          "module-181.0",
+          "module-181.6"
+        ],
+        "module-181.13": [
+          "module-181.1",
+          "module-181.7"
+        ],
+        "module-181.14": [
+          "module-181.2",
+          "module-181.8"
+        ],
+        "module-181.15": [
+          "module-181.3",
+          "module-181.9"
+        ],
+        "module-181.16": [
+          "module-181.10",
+          "module-181.4"
+        ],
+        "module-181.17": [
+          "module-181.11",
+          "module-181.5"
+        ],
+        "module-181.6": [
+          "module-181.0",
+          "module-181.12"
+        ],
+        "module-181.7": [
+          "module-181.1",
+          "module-181.13"
+        ],
+        "module-181.8": [
+          "module-181.14",
+          "module-181.2"
+        ],
+        "module-181.9": [
+          "module-181.15",
+          "module-181.3"
+        ],
+        "module-182.10": [
+          "module-182.14",
+          "module-182.2",
+          "module-182.6"
+        ],
+        "module-182.11": [
+          "module-182.15",
+          "module-182.3",
+          "module-182.7"
+        ],
+        "module-182.8": [
+          "module-182.0",
+          "module-182.12",
+          "module-182.4"
+        ],
+        "module-182.9": [
+          "module-182.1",
+          "module-182.13",
+          "module-182.5"
+        ]
+      },
+      "rows": {
+        "article-14": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-15": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-16": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-18": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-19": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-2": [
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-info"
+            ],
+            "keys": [
+              "classes-info0",
+              "classes-info1"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "classes-features"
+            ],
+            "keys": [
+              "classes-features0",
+              "classes-features1",
+              "classes-features2",
+              "classes-features3"
+            ]
+          },
+          {
+            "column": "attribs",
+            "parent": [
+              "exer-features"
+            ],
+            "keys": [
+              "exer-features0",
+              "exer-features1",
+              "exer-features2",
+              "exer-features3"
+            ]
+          }
+        ],
+        "article-20": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-21": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-22": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-23": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-24": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-25": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-26": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "article-27": [
+          {
+            "column": "attribs",
+            "parent": [
+              "learning-features"
+            ],
+            "keys": [
+              "learning-features0",
+              "learning-features1",
+              "learning-features2",
+              "learning-features3",
+              "learning-features4",
+              "learning-features5"
+            ]
+          }
+        ],
+        "module-157": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[img-icon]",
+              "features-intro[img-light-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-162": [
+          {
+            "column": "params",
+            "parent": [
+              "menuitem_config"
+            ],
+            "arrays": [
+              "background",
+              "description",
+              "item_id",
+              "title"
+            ],
+            "count": 15
+          }
+        ],
+        "module-163": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-165": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-166": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "gallery",
+              "isotope[gallery]"
+            ],
+            "arrays": [
+              "isotope[gallery][alt]",
+              "isotope[gallery][img]",
+              "isotope[gallery][selectitem]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-167": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-171": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "social"
+            ],
+            "arrays": [
+              "social-intro[font-icon]",
+              "social-intro[link]",
+              "social-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-172": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 2
+          }
+        ],
+        "module-177": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[align-media]",
+              "features-intro[info-desc]",
+              "features-intro[info-email-label]",
+              "features-intro[info-email]",
+              "features-intro[info-link]",
+              "features-intro[info-note]",
+              "features-intro[info-phone-label]",
+              "features-intro[info-phone]",
+              "features-intro[info-title]",
+              "features-intro[intro-img]"
+            ],
+            "count": 2
+          }
+        ],
+        "module-178": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 8
+          }
+        ],
+        "module-179": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro",
+              "features-intro[list]"
+            ],
+            "arrays": [
+              "features-intro[list][id_video]",
+              "features-intro[list][img]",
+              "features-intro[list][link]",
+              "features-intro[list][title]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-180": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "hero"
+            ],
+            "arrays": [
+              "hero[social-intro][font-icon]",
+              "hero[social-intro][link]",
+              "hero[social-intro][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-181": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 6
+          }
+        ],
+        "module-182": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "teams",
+              "teams-intro[data]"
+            ],
+            "arrays": [
+              "teams-intro[data][img]",
+              "teams-intro[data][link]",
+              "teams-intro[data][team-info]",
+              "teams-intro[data][title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-188": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-189": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[img-icon]",
+              "features-intro[info]",
+              "features-intro[item-info]",
+              "features-intro[link-btn]",
+              "features-intro[price]",
+              "features-intro[title-btn]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ],
+        "module-190": [
+          {
+            "column": "params",
+            "nestedJson": "jatools-config",
+            "parent": [
+              "features-intro"
+            ],
+            "arrays": [
+              "features-intro[description]",
+              "features-intro[img-icon]",
+              "features-intro[img-light-icon]",
+              "features-intro[link]",
+              "features-intro[title]"
+            ],
+            "count": 4
+          }
+        ]
+      }
     }
   }
 }
