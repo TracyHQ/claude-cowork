@@ -39,6 +39,7 @@ require_once __DIR__ . '/LanguageOverrides.php';
 require_once __DIR__ . '/TemplateFiles.php';
 require_once __DIR__ . '/LanguageStrings.php';
 require_once __DIR__ . '/SiteSettingRows.php';
+require_once __DIR__ . '/TemplateConfigRows.php';
 
 final class Engine
 {
@@ -4566,6 +4567,15 @@ final class Engine
                         $ids[$key] = $this->writeSiteSetting($apply, (int) ($step['id'] ?? 0), (string) $step['fields']['value'], is_array($step['expected'] ?? null) ? $step['expected'] : null);
                         continue;
                     }
+                    // A T4 layout or navigation profile is a file, not a row: only the content contract writes it here, and
+                    // only its `value` (the file's whole text).
+                    if ($kind === TemplateConfigRows::KIND) {
+                        if ($verify === null || !is_array($step['fields']) || array_keys($step['fields']) !== ['value']) throw new RuntimeException('kind not allowed in a content batch');
+                        $key = $step['key'] ?? (string) $index;
+                        if (!is_string($key) || isset($ids[$key])) throw new RuntimeException('operation keys must be unique strings');
+                        $ids[$key] = $this->writeTemplateConfig($apply, (int) ($step['id'] ?? 0), (string) $step['fields']['value'], is_array($step['expected'] ?? null) ? $step['expected'] : null);
+                        continue;
+                    }
                     // Identity and installed executable settings require their own privileged door. One exception: the
                     // content contract (it alone passes $verify) writes an author's display NAME, a slot the profile
                     // declares because visitors read it under every post; never another column of the account.
@@ -4672,6 +4682,23 @@ final class Engine
     {
         if ($this->templateSite === null) throw new RuntimeException('template site settings not wired');
         $planned = $this->contract->siteSettingChange($id, $value, $expected);
+        if ($planned['change'] === null) return $id;
+        $files = $this->templateSite->write([$planned['change']]);
+        $this->batchSiteFiles[] = $files;
+        $this->log->record($apply, ['op' => 'siteSettings', 'files' => $files]);
+        $this->templateSite->clearOptimize();
+        return $id;
+    }
+
+    /**
+     * Write one T4 layout or navigation profile of a contract apply into its `local/` copy, recorded like a site setting
+     * (op `siteSettings`: apply.revert puts the previous bytes back, deleting a file, and the folders, that did not exist).
+     * Answers the profile's row id.
+     */
+    private function writeTemplateConfig(string $apply, int $id, string $value, ?array $expected): int
+    {
+        if ($this->templateSite === null) throw new RuntimeException('template site settings not wired');
+        $planned = $this->contract->templateConfigChange($id, $value, $expected);
         if ($planned['change'] === null) return $id;
         $files = $this->templateSite->write([$planned['change']]);
         $this->batchSiteFiles[] = $files;

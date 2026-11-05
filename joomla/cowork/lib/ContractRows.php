@@ -32,24 +32,30 @@ final class ContractRows
     /** @var (callable(): array<int,array>)|null the `siteSetting` rows a contract names (SiteSettingRows::rows) */
     private $siteSettings;
 
+    /** @var (callable(): array<int,array>)|null the `templateConfig` rows a contract names (TemplateConfigRows::rows) */
+    private $templateConfigs;
+
     /**
      * @param (callable(): array<int,array>)|null $languageStrings the rows of kind `languageString`, by id: they are
      * strings of language files, not rows of the writer's tables (lib/LanguageStrings.php). Without it the kind has none.
      * @param (callable(): array<int,array>)|null $siteSettings the rows of kind `siteSetting`, by id: logos of a T4 profile
      * file (lib/SiteSettingRows.php), likewise not rows of the writer's tables.
+     * @param (callable(): array<int,array>)|null $templateConfigs the rows of kind `templateConfig`, by id: whole T4 layout
+     * and navigation profile files (lib/TemplateConfigRows.php), likewise not rows of the writer's tables.
      */
-    public function __construct(SiteWriter $writer, ?callable $languageStrings = null, ?callable $siteSettings = null)
+    public function __construct(SiteWriter $writer, ?callable $languageStrings = null, ?callable $siteSettings = null, ?callable $templateConfigs = null)
     {
         $this->writer = $writer;
         $this->bulk = $writer instanceof BulkSiteReader;
         $this->languageStrings = $languageStrings;
         $this->siteSettings = $siteSettings;
+        $this->templateConfigs = $templateConfigs;
     }
 
-    /** A kind that is lines of files, not rows of the writer's tables: language strings and T4 site settings. */
+    /** A kind that is lines of files, not rows of the writer's tables: language strings and T4 site settings and profiles. */
     private static function fromFiles(string $kind): bool
     {
-        return $kind === 'languageString' || $kind === 'siteSetting';
+        return $kind === 'languageString' || $kind === 'siteSetting' || $kind === 'templateConfig';
     }
 
     /**
@@ -66,9 +72,12 @@ final class ContractRows
                 foreach ($this->languageStrings ? ($this->languageStrings)() : [] as $id => $row) $rows[(int) $id] = $row;
             } elseif ($kind === 'siteSetting') {
                 foreach ($this->siteSettings ? ($this->siteSettings)() : [] as $id => $row) $rows[(int) $id] = $row;
-            } elseif ($kind === 'userProfile') {
+            } elseif ($kind === 'templateConfig') {
+                foreach ($this->templateConfigs ? ($this->templateConfigs)() : [] as $id => $row) $rows[(int) $id] = $row;
+            } elseif ($kind === 'userProfile' || $kind === 'fieldValue') {
                 // Never read whole (it is one value per author and key): its list rows name the author
-                // (`user_id`) and the field, which is what a contract entity is matched by.
+                // (`user_id`) and the field, which is what a contract entity is matched by. A custom field's
+                // stored value likewise: its list rows name the field and context and the item (`item_id`).
                 for ($offset = 0; $offset < self::LIMIT; $offset += 100) {
                     $page = $this->writer->list($kind, $offset, 100);
                     foreach ($page as $item) $rows[(int) $item['id']] = $item;
