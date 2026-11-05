@@ -20,6 +20,46 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>content.update renames an existing menu item's address through alias, with an alias undo entry.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.81</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.81</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.81/pkg_claudecowork-0.24.81.zip</downloadurl>
+        </downloads>
+        <sha256>30597c2c2730131ed45cc5956045052d032ba396614599ad048acde86346df1b</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Carries the ja-diner/j6/1.0.5 content contract (JA Diner j6 1.0.5 profile, T3 logo slots): template style logos of a T3 template are contract content, a declared logo picture slot is not presentation drift.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.80</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.80</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.80/pkg_claudecowork-0.24.80.zip</downloadurl>
+        </downloads>
+        <sha256>c843a19b8f684ea516501d1f22ffc6e71f98574dc605930eedc44395017e2dc6</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Carries the ja-boxing/j6/1.0.10 content contract (JA Boxing, Joomla 6).</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

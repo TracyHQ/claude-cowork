@@ -876,7 +876,7 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
         // A LOCKING read: the latest committed rows, not this transaction's snapshot, and a gap lock on the
         // (client_id, parent_id, …) unique index so a child inserted under $parent waits for our commit.
         $query = $db->getQuery(true)
-            ->select($db->quoteName(['id', 'parent_id', 'lft', 'menutype', 'language', 'published', 'params']))
+            ->select($db->quoteName(['id', 'parent_id', 'lft', 'menutype', 'language', 'published', 'params', 'alias']))
             ->from($db->quoteName('#__menu'))
             ->where($db->quoteName('client_id') . ' = 0')
             ->where($db->quoteName('parent_id') . ' = ' . (int) $parent)

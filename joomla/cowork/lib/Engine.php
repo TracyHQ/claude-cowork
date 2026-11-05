@@ -4772,8 +4772,70 @@ final class Engine
             ];
             unset($fields['parent_id'], $fields['move_after']);
         }
-        if ($fields === [] && $moveTo === null) {
+        // On an EXISTING tree node, `alias` is a RENAME of its address, not a column: a menu item's
+        // path, and the path of every item under it, is built from the alias chain, so a raw write
+        // would leave the branch on stale paths. Peeled off here and routed through
+        // realiasMenuItem(), the writer's own path-chain rename, with the same `alias` undo entry a
+        // language step records, so apply.revert puts the old address back. The value is made URL
+        // safe the way Joomla makes an alias (lower case ASCII, words joined by hyphens), and a
+        // sibling already answering at that address refuses the call instead of taking it.
+        $realias = null;
+        $aliasNow = null;
+        if ($id > 0 && array_key_exists('alias', $fields) && in_array($kind, ['menuItem', 'category', 'tag'], true)) {
+            $asked = self::urlSafeAlias(is_scalar($fields['alias']) ? (string) $fields['alias'] : '');
+            unset($fields['alias']);
+            if ($asked === '') {
+                return $this->err('bad_params', 'alias must hold at least one letter or digit');
+            }
+            try {
+                $row = $this->writer->read($kind, $id);
+            } catch (Throwable $e) {
+                return $this->err('read_failed', $e->getMessage());
+            }
+            if ($row === null) {
+                return $this->err('write_failed', 'target does not exist in this scope');
+            }
+            $aliasNow = (string) ($row['alias'] ?? '');
+            if ($asked !== $aliasNow) {
+                if ($kind !== 'menuItem') {
+                    // A category's or a tag's path also names every article and child under it; that
+                    // rename is not this door's yet, and a refusal says so rather than dropping it.
+                    return $this->err('unsupported', "the alias of a {$kind} cannot be changed through content.update: only a menuItem's can");
+                }
+                if ((int) ($row['home'] ?? 0) === 1) {
+                    return $this->err('unsupported', 'the home menu item answers at the site root; its alias is not renamed');
+                }
+                try {
+                    $holder = $this->menuAliasHolder($id, (int) ($row['parent_id'] ?? 0), (string) ($row['language'] ?? '*'), $asked);
+                } catch (Throwable $e) {
+                    return $this->err('read_failed', $e->getMessage());
+                }
+                if ($holder !== null) {
+                    return $this->err('alias_taken', "menu item {$holder} under the same parent already answers at the alias {$asked}", ['holder' => $holder]);
+                }
+                $realias = $asked;
+            }
+            if ($fields === [] && $moveTo === null && $realias === null) {
+                // Already at that address: nothing to write, and nothing to undo.
+                return $this->ok(['kind' => $kind, 'id' => $id, 'created' => false, 'alias' => $aliasNow]);
+            }
+        }
+        if ($fields === [] && $moveTo === null && $realias === null) {
             return $this->err('bad_params', 'fields required');
+        }
+
+        if ($realias !== null) {
+            try {
+                // Undo first, as a language step does: a row whose way back was not recorded is never renamed.
+                $this->log->record($applyId, ['op' => 'alias', 'kind' => $kind, 'id' => $id, 'before' => $aliasNow]);
+            } catch (Throwable $e) {
+                return $this->err('write_failed', 'nothing was renamed: could not record its undo');
+            }
+            try {
+                $this->writer->realiasMenuItem($id, $realias);
+            } catch (Throwable $e) {
+                return $this->err('write_failed', $e->getMessage());
+            }
         }
 
         if ($moveTo !== null) {
@@ -4813,8 +4875,8 @@ final class Engine
                 if ($this->batching && $before !== null) $this->inFlight = [$kind, $id, $before];
                 $newId = $this->writer->write($kind, $id, $fields);
             } catch (Throwable $e) {
-                return $moveTo !== null
-                    ? $this->err('write_failed', 'the move landed (revert via apply.revert); the field update failed: ' . $e->getMessage(), ['landed' => true])
+                return $moveTo !== null || $realias !== null
+                    ? $this->err('write_failed', 'the move or rename landed (revert via apply.revert); the field update failed: ' . $e->getMessage(), ['landed' => true])
                     : $this->err('write_failed', $e->getMessage());
             }
 
@@ -4840,10 +4902,48 @@ final class Engine
         if ($moveTo !== null) {
             $out['moved'] = true;
         }
+        if ($aliasNow !== null) {
+            // The address the row answers at now: a caller tells a rename that landed from a door
+            // that dropped the field by this key alone.
+            $out['alias'] = $realias ?? $aliasNow;
+        }
         if ($kind === 'redirect' && ($warning = $this->redirectPluginWarning()) !== null) {
             $out['warnings'] = [$warning];
         }
         return $this->ok($out);
+    }
+
+    /**
+     * An alias as Joomla makes one (OutputFilter::stringURLSafe without unicode slugs): accents
+     * dropped to ASCII, lower case, every run of other characters one hyphen, none at either end.
+     * Pure, so the engine keeps no Joomla dependency.
+     */
+    public static function urlSafeAlias(string $value): string
+    {
+        $value = trim($value);
+        if ($value !== '' && function_exists('iconv') && preg_match('/[^\x00-\x7F]/', $value)) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+            if (is_string($ascii)) $value = $ascii;
+        }
+        $value = strtolower($value);
+        $value = (string) preg_replace('/[^a-z0-9]+/', '-', $value);
+        return trim($value, '-');
+    }
+
+    /**
+     * The sibling menu item that already answers at `$alias` under `$parent`, or null. Joomla keeps
+     * one alias per (client, parent, language), and an item in all languages (`*`) shares its
+     * address with every language, so `*` on either side counts as the same language.
+     */
+    private function menuAliasHolder(int $id, int $parent, string $language, string $alias): ?int
+    {
+        foreach ($this->writer->lockMenuChildren($parent) as $sibling) {
+            $sid = (int) ($sibling['id'] ?? 0);
+            if ($sid === $id || (string) ($sibling['alias'] ?? '') !== $alias) continue;
+            $theirs = (string) ($sibling['language'] ?? '*');
+            if ($theirs === $language || $theirs === '*' || $language === '*') return $sid;
+        }
+        return null;
     }
 
     /**

@@ -2232,6 +2232,8 @@ require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";
 require __DIR__ . "/content-extras.php";
 require __DIR__ . "/contract-ops-locks.php";
+// content.update renames an existing menu item's address through `fields: { alias }`, with its undo.
+require __DIR__ . "/menu-item-alias.php";
 // multilingual.retire and .restore in bulk: the engine on the Business archive (the gate's doubles,
 // above), the real writer and undo log over SQLite. Early, while the suite still has memory to spare.
 require __DIR__ . "/multilingual-retire-bulk.php";
@@ -2240,6 +2242,8 @@ require __DIR__ . "/contract-json-columns.php";
 require __DIR__ . "/contract-authors.php";
 require __DIR__ . "/contract-language-strings.php";
 require __DIR__ . "/contract-site-settings.php";
+// T3 logos: a template style's logo params as content slots, and the switches around them not drift.
+require __DIR__ . "/contract-template-style-logos.php";
 require __DIR__ . "/identity-install.php";
 require __DIR__ . "/render-stamps.php";
 require __DIR__ . "/content-writer-creates.php";
