@@ -83,6 +83,19 @@ final class FileWalker
                                 return false;
                             }
                         }
+                        // A folder this PHP may not open is left out and named, not the end of the
+                        // walk: RecursiveDirectoryIterator throws "Failed to open directory:
+                        // Permission denied" on descending into it, and one such folder (a
+                        // `certificates/thumbs` the host made unreadable) stopped every import of
+                        // a Joomla 6 site, eleven times running (05/11/2026).
+                        if (!$this->openable($current->getPathname())) {
+                            $this->noteUnreadable($rel . '/');
+                            return false;
+                        }
+                    } elseif (!$current->isReadable()) {
+                        // A file this PHP may not read: left out and named, as a folder is.
+                        $this->noteUnreadable($this->relative($current->getPathname()));
+                        return false;
                     }
                     return true;
                 }
@@ -97,6 +110,57 @@ final class FileWalker
         sort($out, SORT_STRING);
         $this->pathCache = $out;
         return $out;
+    }
+
+    /** How many unreadable paths an answer names; past it, only their count. */
+    public const UNREADABLE_NAMED = 50;
+
+    /** @var string[] Folders (ending in `/`) and files the walk could not read, first ones only. */
+    private array $unreadable = [];
+    private int $unreadableCount = 0;
+
+    private function openable(string $dir): bool
+    {
+        $handle = @opendir($dir);
+        if ($handle === false) {
+            return false;
+        }
+        closedir($handle);
+        return true;
+    }
+
+    private function noteUnreadable(string $rel): void
+    {
+        $this->unreadableCount++;
+        if (count($this->unreadable) < self::UNREADABLE_NAMED) {
+            $this->unreadable[] = $rel;
+        }
+    }
+
+    /**
+     * What the walk left out because this PHP could not read it — folders end in `/` — as the
+     * caller's answer carries it: `{paths, count}`, the first UNREADABLE_NAMED paths in walk order.
+     * Empty when the walk has not run or read everything. The caller says so to the person instead
+     * of an archive silently short of them.
+     *
+     * @return array{paths?: string[], count?: int}
+     */
+    public function unreadable(): array
+    {
+        if ($this->unreadableCount === 0) {
+            return [];
+        }
+        $paths = $this->unreadable;
+        sort($paths, SORT_STRING);
+        return ['paths' => $paths, 'count' => $this->unreadableCount];
+    }
+
+    /** A file the pack found unreadable after the walk listed it (its mode changed meanwhile). */
+    public function markUnreadable(string $rel): void
+    {
+        if (!in_array($rel, $this->unreadable, true)) {
+            $this->noteUnreadable($rel);
+        }
     }
 
     private function relative(string $abs): string
