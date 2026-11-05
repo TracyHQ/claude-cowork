@@ -2221,6 +2221,12 @@ require __DIR__ . "/contract-rows.php";
 require __DIR__ . "/content-revisions.php";
 require __DIR__ . "/contract-atomic.php";
 require __DIR__ . "/empty-links.php";
+// Hiding for real: emptying a reviewed slot, unpublishing a block, en-GB overrides for named constants.
+require __DIR__ . "/hide-ops.php";
+require __DIR__ . "/rows-remove.php";
+require __DIR__ . "/page-create.php";
+// What the kit knows better than a released contract, beside it: limits, kept icons, gallery alts.
+require __DIR__ . "/slot-corrections.php";
 require __DIR__ . "/content-addresses.php";
 require __DIR__ . "/content-locks.php";
 require __DIR__ . "/content-natives.php";

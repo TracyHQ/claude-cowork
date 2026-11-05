@@ -28,6 +28,8 @@ final class ContentSlots
      * (capture-contract.py, UNIT_TAGS): a heading, a sentence, a list item, a caption, a cell, a button.
      */
     private const UNIT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'dt', 'dd', 'figcaption', 'summary', 'th', 'td', 'button', 'label'];
+    /** The comment an emptied unit holds in place of its words, see writeUnit(). */
+    private const EMPTIED_UNIT = 'emptied-slot';
     /** Python's `\s` on text, which the capture's sample collapses: ASCII whitespace, \x1c-\x1f, NEL, NBSP and the Unicode spaces. */
     private const CAPTURE_SPACE = '/[\x{9}-\x{D}\x{1C}-\x{20}\x{85}\x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}]+/u';
 
@@ -94,16 +96,31 @@ final class ContentSlots
      * htmlSlots() addresses as a slot of its own. So `Call <a href="tel:...">us</a> today` becomes
      * `New text<a href="tel:..."></a>`: the link's url slot still resolves, its label is gone with
      * the rest of the old sentence.
+     *
+     * Emptying a unit leaves a comment where its words started. The words were what told the next write where to go: without
+     * them, the gaps before and after run together into one blank text and the elements around them say nothing of the place,
+     * so the masked row no longer matches the masked baseline, and words written back land at the end of the unit. The comment
+     * draws nothing, is no text node, and takes no index among the elements, so no other slot's address moves.
      */
     private static function writeUnit(DOMXPath $xp, DOMElement $unit, string $value): void
     {
         $doc = $unit->ownerDocument; $pieces = self::unitPieces($xp, $unit);
-        if ($pieces === []) { $unit->appendChild($doc->createTextNode($value)); return; }
+        $mark = $xp->query('./comment()[. = "' . self::EMPTIED_UNIT . '"]', $unit)->item(0);
+        if ($pieces === []) {
+            if ($mark === null) $unit->appendChild($doc->createTextNode($value));
+            elseif ($value !== '') $unit->replaceChild($doc->createTextNode($value), $mark);
+            return;
+        }
         $first = $pieces[0]; $last = $pieces[count($pieces) - 1];
         preg_match('/^\s*/u', $first->data, $lead); preg_match('/\s*$/u', $last->data, $trail);
         // The new text goes directly in the unit, where the child holding the first piece starts.
         $anchor = $first; while (!$anchor->parentNode->isSameNode($unit)) $anchor = $anchor->parentNode;
-        $unit->insertBefore($doc->createTextNode($lead[0] . $value . $trail[0]), $anchor);
+        if ($value === '') {
+            $unit->insertBefore($doc->createTextNode($lead[0]), $anchor);
+            $unit->insertBefore($doc->createComment(self::EMPTIED_UNIT), $anchor);
+            $unit->insertBefore($doc->createTextNode($trail[0]), $anchor);
+        } else $unit->insertBefore($doc->createTextNode($lead[0] . $value . $trail[0]), $anchor);
+        if ($mark !== null) $unit->removeChild($mark);
         $held = [];
         foreach ($pieces as $piece) {
             for ($up = $piece->parentNode; !$up->isSameNode($unit); $up = $up->parentNode) $held[] = $up;
@@ -139,10 +156,150 @@ final class ContentSlots
             $node->nodeValue = $value;
         }
         $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
+        return self::saved($doc, $xp, $seen);
+    }
+    private static function saved(DOMDocument $doc, DOMXPath $xp, string $seen): string
+    {
         $restore = self::shieldTokens($xp, $seen);
         $root = $xp->query('//*[@id="contract-root"]')->item(0); $out = '';
         foreach ($root->childNodes as $child) $out .= $doc->saveHTML($child);
         return $restore === [] ? $out : strtr($out, $restore);
+    }
+
+    /** The comment a removed element leaves: two text nodes around it stay two, so no text address moves. It draws nothing. */
+    private const REMOVED_NODE = 'removed-slot';
+    private const ROOT = '/html/body/div';
+
+    /**
+     * Takes one node out of an HTML field, by the address {@see removalOps} found. A field left with nothing but blanks and
+     * comments is the empty string: a template's `if ($field)` draws no box around it.
+     */
+    public static function removeNode(string $html, array $op): string
+    {
+        if ($op['xpath'] === self::ROOT) return '';
+        $doc = self::html($html); $xp = new DOMXPath($doc);
+        $nodes = $xp->query((string) $op['xpath']);
+        if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML node to remove is missing or ambiguous');
+        $node = $nodes->item(0);
+        if ($node instanceof DOMAttr) $node->ownerElement->removeAttributeNode($node);
+        elseif ($node instanceof DOMElement) $node->parentNode->replaceChild($doc->createComment(self::REMOVED_NODE), $node);
+        else $node->parentNode->removeChild($node);
+        $root = $xp->query('//*[@id="contract-root"]')->item(0);
+        foreach ($root->childNodes as $child)
+            if (!($child instanceof DOMComment) && !($child instanceof DOMText && trim($child->data) === '')) return self::saved($doc, $xp, $html);
+        return '';
+    }
+
+    /**
+     * Which nodes of one HTML field go when `$going` slots are hidden: their smallest own element or text, and each parent
+     * those leave with nothing in it.
+     *
+     * Read from the field, not from any one template. A slot's element goes when every slot in it may go. Its parent goes
+     * when nothing is left in it; one left with only decoration (an icon, no slot) goes only when a sibling element of the
+     * same name and class proves it a repeated row, and otherwise the slot is refused by name: its box would stay. An element
+     * holding a slot in `$held` (one the writer keeps or fills) never goes: its slot gives up only its own text or alt.
+     *
+     * @param list<array> $slots every slot of this field as it now stands
+     * @param array<string,true> $going @param array<string,true> $held
+     * @return array{ops:list<array{op:string,xpath:string}>,refused:array<string,string>} ops in reverse document order, each
+     *   address true when it is taken, because everything after it has gone first
+     */
+    public static function removalOps(string $html, array $slots, array $going, array $held): array
+    {
+        $doc = self::html($html); $xp = new DOMXPath($doc);
+        $root = $xp->query('//*[@id="contract-root"]')->item(0);
+        $nodes = []; $refused = [];
+        foreach ($slots as $slot) {
+            $found = $xp->query((string) $slot['xpath']);
+            if ($found === false || $found->length !== 1) {
+                if (isset($going[$slot['key']])) $refused[$slot['key']] = 'its address is missing or ambiguous on this site: ' . $slot['key'];
+                continue;
+            }
+            $nodes[$slot['key']] = $found->item(0);
+        }
+        $holder = static fn(DOMNode $node): DOMElement => $node instanceof DOMAttr ? $node->ownerElement : ($node instanceof DOMElement ? $node : $node->parentNode);
+        $inside = static function (DOMNode $node, DOMElement $element): bool {
+            for ($up = $node instanceof DOMAttr ? $node->ownerElement : $node; $up !== null; $up = $up->parentNode) if ($up->isSameNode($element)) return true;
+            return false;
+        };
+        $holdsKept = static function (DOMElement $element) use (&$nodes, $held, $inside): bool {
+            foreach ($nodes as $key => $node) if (isset($held[$key]) && $inside($node, $element)) return true;
+            return false;
+        };
+        $holdsSlot = static function (DOMNode $node) use (&$nodes, $inside): bool {
+            if (!($node instanceof DOMElement)) return false;
+            foreach ($nodes as $slotNode) if ($inside($slotNode, $node)) return true;
+            return false;
+        };
+        $taken = []; $texts = []; $attrs = [];
+        foreach ($nodes as $key => $node) {
+            if (!isset($going[$key])) continue;
+            $element = $holder($node);
+            if ($element->isSameNode($root) && !($node instanceof DOMElement)) {
+                if ($node instanceof DOMAttr) $refused[$key] = 'an attribute of the field itself cannot be removed: ' . $key;
+                else $texts[] = $node;
+                continue;
+            }
+            if (!$holdsKept($element)) { $taken[] = $element; continue; }
+            if ($node instanceof DOMText) { $texts[] = $node; continue; }
+            if ($node instanceof DOMAttr && in_array($node->nodeName, ['alt', 'title'], true)) { $attrs[] = $node; continue; }
+            $refused[$key] = 'its element holds a slot that stays, so it cannot be removed: ' . $key;
+        }
+        $isGone = static function (DOMNode $node, array $list): bool {
+            foreach ($list as $item) if ($item->isSameNode($node)) return true;
+            return false;
+        };
+        // What is left in `$element` once these go: nothing, decoration only, or something that stays.
+        $left = static function (DOMElement $element) use (&$taken, &$texts, $isGone, $holdsSlot): string {
+            $state = 'nothing';
+            foreach ($element->childNodes as $child) {
+                if ($child instanceof DOMComment || $isGone($child, $taken) || $isGone($child, $texts)) continue;
+                if ($child instanceof DOMText) { if (trim($child->data) !== '') return 'stays'; continue; }
+                if ($child instanceof DOMElement && strtolower($child->nodeName) === 'br') continue;
+                if ($holdsSlot($child)) return 'stays';
+                $state = 'decoration';
+            }
+            return $state;
+        };
+        $repeats = static function (DOMElement $element): bool {
+            foreach ($element->parentNode->childNodes as $other)
+                if ($other instanceof DOMElement && !$other->isSameNode($element) && $other->nodeName === $element->nodeName && $other->getAttribute('class') === $element->getAttribute('class')) return true;
+            return false;
+        };
+        for ($climbed = true; $climbed;) {
+            $climbed = false;
+            foreach ($taken as $element) {
+                if ($element->isSameNode($root)) continue;
+                $parent = $element->parentNode;
+                if ($isGone($parent, $taken) || !($parent instanceof DOMElement)) continue;
+                if ($parent->isSameNode($root)) {
+                    if ($left($root) === 'nothing') { $taken[] = $root; $climbed = true; break 2; }
+                    continue;
+                }
+                $state = $left($parent);
+                if ($state === 'stays' || $holdsKept($parent)) continue;
+                if ($state === 'nothing' || $repeats($parent)) { $taken[] = $parent; $climbed = true; continue; }
+                foreach ($nodes as $key => $node) if (isset($going[$key]) && $inside($node, $parent))
+                    $refused[$key] = 'its parent keeps markup of its own and has no repeated sibling to prove it a row, so the box would stay: ' . $key;
+            }
+        }
+        if ($taken !== [] && $left($root) === 'nothing') $taken[] = $root;
+        if ($isGone($root, $taken)) return ['ops' => [['op' => 'node', 'xpath' => self::ROOT]], 'refused' => $refused];
+        $inTaken = static function (DOMNode $node) use (&$taken, $inside, $holder): bool {
+            foreach ($taken as $element) if (!$node->isSameNode($element) && $inside($node, $element)) return true;
+            return false;
+        };
+        $out = [];
+        foreach (array_merge($taken, $texts, $attrs) as $node) {
+            if ($inTaken($node)) continue;
+            $path = $node->getNodePath();
+            $out[$path] = ['op' => 'node', 'xpath' => $path];
+        }
+        // Later nodes first, so each address still holds when its turn comes.
+        $order = [];
+        foreach ($xp->query('.//node() | .//@*', $root) as $i => $node) $order[$node->getNodePath()] = $i;
+        uksort($out, static fn(string $a, string $b): int => ($order[$b] ?? 0) <=> ($order[$a] ?? 0));
+        return ['ops' => array_values($out), 'refused' => $refused];
     }
     /**
      * libxml 2.9 (the Joomla site image, php:8.3-cli) percent-encodes `{` and `}` in every href, src

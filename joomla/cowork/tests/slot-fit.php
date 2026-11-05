@@ -65,13 +65,28 @@ $photoFit=['measured'=>true,'kind'=>'photo','replace'=>'photo','transparent'=>fa
     'boxes'=>['desktop'=>['width'=>704,'height'=>300],'phone'=>['width'=>358,'height'=>153]],'aspect'=>2.3467,'tolerance'=>0.02,'minWidth'=>1056,'crop'=>'cover'];
 $photo=$oldPicture+['fit'=>$photoFit];
 check('fit: a photo cut to the box is taken',$fitCode($photo,'images/demo/wide-class.jpg'),null);
-check('fit: the box decides the shape, not the demo file',$fitCode($photo,'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: the box decides the shape, not the demo file',$fitCode($photo,'images/demo/photo-square.jpg'),'SLOT_IMAGE_INVALID');
 $fitTall=$fitAnswer($photo,'images/demo/tall.jpg');
 check('fit: the refusal says which shape to crop to',$fitTall,['SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot: crop it to 2.3467 (width / height) keeping the subject: gallery.1']);
 check('fit: a picture under minWidth is refused',$fitCode($photo,'images/demo/small-wide.jpg'),'SLOT_IMAGE_TOO_SMALL');
 try{$fitCheck->invoke($fitContract,$photo,'images/demo/small-wide.jpg',[]);}catch(ContractProblem $e){check('fit: the size refusal carries the floor and the width',[$e->extra,$e->toArray()['severity']],[['limit'=>1056,'actual'=>750],'recoverable']);}
-check('fit: a wider tolerance is read from the fit',$fitCode(['fit'=>['tolerance'=>0.2]+$photoFit]+$oldPicture,'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: a wider tolerance is read from the fit',$fitCode(['fit'=>['tolerance'=>0.2]+$photoFit]+$oldPicture,'images/demo/photo-square.jpg'),'SLOT_IMAGE_INVALID');
 check('fit: the demo picture itself is always taken back',$fitCode($photo,'images/demo/class.jpg'),null);
+// The demo explains itself: a picture of its shape passes the aspect rule, one as wide as it passes the width rule.
+file_put_contents($fitRoot.'/images/demo/class-big.jpg',$fitJpg(2400,1600));
+$ownSample=fn(array $extra,string $sample='')=>['fit'=>$extra+$photoFit]+($sample===''?[]:['sample'=>$sample])+$oldPicture;
+check('fit: a picture of the demo shape and wider than the demo is taken though the box asks another shape',$fitCode($photo,'images/demo/class-big.jpg'),null);
+check('fit: a picture of the demo shape but narrower than the demo is still too small',$fitCode($photo,'images/demo/class-copy.jpg'),'SLOT_IMAGE_TOO_SMALL');
+file_put_contents($fitRoot.'/images/demo/class-twin.jpg',$fitJpg(1200,800));
+check('fit: a width floor above the demo is met by a picture as wide as the demo (file written)',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/class-twin.jpg'),null);
+check('fit: narrower than the demo stays under that floor',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/class-copy.jpg'),'SLOT_IMAGE_TOO_SMALL');
+check('fit: a shape that is neither the box nor the demo is refused',$fitCode($photo,'images/demo/tall.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: a picture of the box shape narrower than the demo still follows the width floor',$fitCode($ownSample(['minWidth'=>2160]),'images/demo/small-wide.jpg'),'SLOT_IMAGE_TOO_SMALL');
+$gone='images/demo/gone.jpg#joomlaImage://local-images/demo/gone.jpg?width=1200&height=800';
+check('fit: the demo size is read from its stored value when its file is gone',$fitCode($ownSample(['source'=>null],$gone),'images/demo/class-big.jpg'),null);
+check('fit: and the width floor too',$fitCode($ownSample(['source'=>null,'minWidth'=>2160],$gone),'images/demo/class-twin.jpg'),null);
+check('fit: with no demo size anywhere the rules stand as measured',$fitCode($ownSample(['source'=>null],'images/demo/gone.jpg'),'images/demo/class-copy.jpg'),'SLOT_IMAGE_INVALID');
+check('fit: the demo size can come from the fit source',$fitCode($ownSample([],'images/demo/gone.jpg'),'images/demo/class-big.jpg'),null);
 check('fit: an unmeasured photo keeps the demo shape check',$fitCode($oldPicture+['fit'=>['measured'=>false,'kind'=>'photo','replace'=>'photo']],'images/demo/class-copy.jpg'),null);
 check('fit: an unmeasured photo still refuses another shape',$fitCode($oldPicture+['fit'=>['measured'=>false,'kind'=>'photo','replace'=>'photo']],'images/demo/tall.jpg'),'SLOT_IMAGE_INVALID');
 
@@ -134,6 +149,32 @@ try{$fitCheck->invoke($fitContract,$text,str_repeat('c',30),[]);}catch(ContractP
 check('text: the slot\'s own limit still comes first',$fitAnswer($text,str_repeat('d',41))[1],'Content too long: hero.0');
 check('text: more lines than the box holds are refused',$fitCode($text,"One\nTwo\nThree"),'SLOT_TOO_LONG');
 check('text: as many lines as the box holds are taken',$fitCode($text,"One\nTwo"),null);
+// A fit no wider than the demo's own words is the box of those words, not a limit: an inline label grows with them (the
+// kit's rule, slot-limits.mjs). A line limit the demo itself breaks cannot refuse a value with fewer lines than the demo.
+$fitWords=fn(string $sample,array $fit)=>['fit'=>['measured'=>true]+$fit,'key'=>'label.0','type'=>'text','maxCharacters'=>2048,'sample'=>$sample];
+check('text: a limit that is the box of the demo words does not refuse a longer label',$fitCode($fitWords('MADEUP7',['maxCharacters'=>7]),'MADEUP-8'),null);
+check('text: nor at exactly the demo length plus three',$fitCode($fitWords('MADEUP7',['maxCharacters'=>10]),str_repeat('c',30)),null);
+check('text: one above that it is a limit again',$fitCode($fitWords('MADEUP7',['maxCharacters'=>11]),str_repeat('c',12)),'SLOT_TOO_LONG');
+check('text: a limit well above the demo still refuses, with the same code and words',$fitAnswer($fitWords('Made-up title',['maxCharacters'=>28]),str_repeat('d',40)),
+    ['SLOT_TOO_LONG','Content too long for its box: rewrite it shorter, at most 28 characters, keeping its meaning (never cut it or add an ellipsis): label.0']);
+check('text: the demo length is what a visitor reads, not its markers',$fitCode($fitWords('((p))Made-up((/p))'."\n\n".'((p))title((/p))',['maxCharacters'=>16]),str_repeat('d',17)),null);
+check('text: and markers do not widen it',$fitCode($fitWords('((p class="made-up"))Made-up((/p))',['maxCharacters'=>11]),str_repeat('d',12)),'SLOT_TOO_LONG');
+check('text: the box of the demo words also covers maxChars',$fitCode($fitWords('MADEUP7',['maxChars'=>['desktop'=>7,'phone'=>14]]),'MADEUP-8'),null);
+check('text: the slot\'s own limit still holds when the fit\'s does not',$fitCode(['maxCharacters'=>40]+$fitWords('MADEUP7',['maxCharacters'=>7]),str_repeat('c',41)),'SLOT_TOO_LONG');
+$fitSix="One\nTwo\nThree\nFour\nFive\nSix";
+check('text: fewer lines than a demo that breaks its line limit are taken',$fitCode($fitWords($fitSix,['lines'=>['desktop'=>1]]),"One\nTwo\nThree"),null);
+check('text: as many lines as that demo are taken',$fitCode($fitWords($fitSix,['lines'=>['desktop'=>1]]),"1\n2\n3\n4\n5\n6"),null);
+check('text: more lines than that demo are refused, at the demo\'s count',$fitAnswer($fitWords($fitSix,['lines'=>['desktop'=>1]]),"1\n2\n3\n4\n5\n6\n7"),
+    ['SLOT_TOO_LONG','Content has more lines than its box holds: rewrite it in at most 6 line(s): label.0']);
+check('text: three lines on a one line demo are still refused, with the same code and words',$fitAnswer($fitWords('Made-up',['lines'=>['desktop'=>1]]),"One\nTwo\nThree"),
+    ['SLOT_TOO_LONG','Content has more lines than its box holds: rewrite it in at most 1 line(s): label.0']);
+$fitDirect=function(array $fit,string $value,?string $sample=null):?string{
+    try{ $sample===null?SlotFit::checkText($fit,'label.0',$value,fn($code,$message)=>new RuntimeException($code)):SlotFit::checkText($fit,'label.0',$value,fn($code,$message)=>new RuntimeException($code),$sample); return null; }
+    catch(RuntimeException $e){ return $e->getMessage(); }
+};
+check('text: with no sample the character limit stays as it was',$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8'),'SLOT_TOO_LONG');
+check('text: with no sample the line limit stays as it was',$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo"),'SLOT_TOO_LONG');
+check('text: with a sample the same two are taken',[$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8','MADEUP7'),$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo","A\nB")],[null,null]);
 check('text: maxChars decides when maxCharacters is missing',$fitCode(['fit'=>array_diff_key($textFit,['maxCharacters'=>1])]+$oldText,str_repeat('e',25)),'SLOT_TOO_LONG');
 check('text: an unmeasured text keeps the slot limit only',$fitCode(['fit'=>['measured'=>false]]+$oldText,str_repeat('f',40)),null);
 check('text: the demo words are always taken back, even over a fit',$fitCode(['fit'=>['maxCharacters'=>4,'maxChars'=>['desktop'=>4]]+$textFit]+$oldText,'Demo title'),null);

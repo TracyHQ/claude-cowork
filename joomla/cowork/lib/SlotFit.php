@@ -2,7 +2,7 @@
 /**
  * Slot fit (TCH ADR 0039): what a slot of a newer content map says about the SHAPE of what goes in it,
  * measured at capture from the rendered demo. A picture says its kind (photo, icon, cut-out...), whether
- * a build may replace it (`replace`: photo, logo or keep), whether it needs a transparent ground, the
+ * a build may replace it (`replace`: photo, logo or keep, or icon from a SlotCorrections list), whether it needs a transparent ground, the
  * aspect of its box and the narrowest source that stays sharp. A text says how many characters and
  * lines its box holds, and that a longer text is rewritten, never cut (`overflow: "rewrite"`).
  *
@@ -25,12 +25,17 @@ final class SlotFit
         . 'A text has fit.maxCharacters and fit.lines: when the customer\'s words are longer, rewrite them shorter so they keep their meaning; never cut them or add an ellipsis. A text over its fit is refused. '
         . 'Write in normal case: fit.casing says how the template already shows the words (upper means the template capitalises them).';
 
+    /** Said beside the guidance only when a correction opened an icon of this contract (SlotCorrections). */
+    public const ICON_GUIDANCE = 'A picture whose fit.replace is "icon" takes an icon drawn on a transparent ground, in the shape of the one it replaces: a photograph or any other opaque picture is refused, unless the customer asks for that very picture as above.';
+
     /** Relative aspect tolerance when a fit names none; the same 2% the shape check always used. */
     private const TOLERANCE = 0.02;
     /** Pictures larger than this are not decoded to read their corners: the header decides (memory on a shared host). */
     private const DECODE_PIXELS = 4000000;
     /** A corner is transparent from this GD alpha (0 opaque .. 127 clear): about 247 of 255 opaque. */
     private const CLEAR_ALPHA = 4;
+    /** A box estimate of the demo words reads a few characters wider than the words: the same slack as Tracy's kit (slot-limits.mjs). */
+    private const DEMO_BOX_SLACK = 3;
 
     /** The slot's fit when it carries one as an object, else null. */
     public static function of(array $slot): ?array
@@ -74,21 +79,43 @@ final class SlotFit
     }
 
     /**
+     * A kept icon a correction opened (fit.replace "icon") takes a drawing, not a photo: without the customer's words for
+     * this very picture, only a file whose corner reads transparent passes. One that cannot be read (no GD, too large)
+     * stays refused, as a kept picture is. With their words it goes on to the rules any kept picture meets.
+     */
+    public static function checkIcon(array $fit, string $key, array $size, string $file, array $params, callable $refuse): void
+    {
+        if (($fit['replace'] ?? null) !== 'icon') return;
+        $asked = $params['replace_kept'][$key] ?? null;
+        if (is_string($asked) && trim($asked) !== '' && strlen($asked) <= 2000) return;
+        if (self::transparent($file, $size) === true) return;
+        throw $refuse('SLOT_PICTURE_KEPT', 'This picture is an icon the template keeps unless it is drawn on a transparent ground, and this image is opaque: leave it, draw it on a transparent ground, or send replace_kept with the customer\'s words that ask for this very picture: ' . $key, ['kind' => 'icon']);
+    }
+
+    /**
      * Shape, size and ground of a new picture against its fit. `$size` is getimagesize() of the new file,
      * `$before` of the demo file (false when unreadable), `$file` the new file on disk.
      * Returns false when the fit names no aspect, so the caller keeps its own shape check.
+     *
+     * The demo picture explains what it is: a picture of the demo's own shape passes the aspect rule, and one at least as wide
+     * as the demo passes the width rule, because a contract cannot ask for more than its own sample has. The demo's size is the
+     * file's when readable (`$before`), else the one its stored value states (`$sample`, `?width=&height=`), else the fit's
+     * `source`. With no size known, both rules stand as measured.
      */
-    public static function checkPicture(array $fit, string $key, array $size, $before, string $file, callable $refuse): bool
+    public static function checkPicture(array $fit, string $key, array $size, $before, string $file, callable $refuse, ?string $sample = null): bool
     {
         $actual = $size[0] / $size[1];
         $reference = self::referenceAspect($fit);
         $tolerance = self::number($fit['tolerance'] ?? null);
         $tolerance = $tolerance !== null && $tolerance <= 0.2 ? $tolerance : self::TOLERANCE;
-        if ($reference !== null && abs($actual / $reference - 1) > $tolerance)
+        $demo = self::demoSize($fit, $before, $sample);
+        if ($reference !== null && $demo !== null && abs($actual / ($demo[0] / $demo[1]) - 1) <= $tolerance) $demoShape = true;
+        else $demoShape = false;
+        if ($reference !== null && !$demoShape && abs($actual / $reference - 1) > $tolerance)
             throw $refuse('SLOT_IMAGE_INVALID', 'Image aspect ratio does not match its slot: crop it to ' . round($reference, 4) . ' (width / height) keeping the subject: ' . $key,
                 ['expected' => round($reference, 4), 'actual' => round($actual, 4), 'tolerance' => $tolerance]);
         $minWidth = $fit['minWidth'] ?? null;
-        if (is_int($minWidth) && $minWidth > 0 && $size[0] < $minWidth)
+        if (is_int($minWidth) && $minWidth > 0 && $size[0] < $minWidth && !($demo !== null && $size[0] >= $demo[0]))
             throw $refuse('SLOT_IMAGE_TOO_SMALL', 'Image is too small for its slot: it must be at least ' . $minWidth . ' pixels wide to stay sharp, this one is ' . $size[0] . '; use a larger original: ' . $key,
                 ['limit' => $minWidth, 'actual' => (int)$size[0]]);
         if (($fit['transparent'] ?? null) === true && self::transparent($file, $size) === false)
@@ -96,8 +123,15 @@ final class SlotFit
         return $reference !== null;
     }
 
-    /** Words over their box are refused with a request to rewrite them shorter; nothing is ever cut. */
-    public static function checkText(array $fit, string $key, string $value, callable $refuse): void
+    /**
+     * Words over their box are refused with a request to rewrite them shorter; nothing is ever cut.
+     *
+     * With the slot's demo words as `$sample`, a measure the demo itself explains stops refusing. A character limit no more
+     * than the demo's visible length plus {@see DEMO_BOX_SLACK} is the shrink-wrapped box of those words (`CLASSES`, limit 7),
+     * not a limit: an inline label grows with its words. A line limit is at least the demo's own line count, as a value
+     * counts them. Without a sample, every limit stands as measured.
+     */
+    public static function checkText(array $fit, string $key, string $value, callable $refuse, ?string $sample = null): void
     {
         if (($fit['measured'] ?? null) !== true) return;
         $limit = $fit['maxCharacters'] ?? null;
@@ -105,14 +139,38 @@ final class SlotFit
             $all = array_filter($fit['maxChars'], 'is_int');
             $limit = $all ? min($all) : null;
         }
+        if (is_int($limit) && $sample !== null && $limit <= self::visibleLength($sample) + self::DEMO_BOX_SLACK) $limit = null;
         if (is_int($limit) && $limit > 0 && mb_strlen($value) > $limit)
             throw $refuse('SLOT_TOO_LONG', 'Content too long for its box: rewrite it shorter, at most ' . $limit . ' characters, keeping its meaning (never cut it or add an ellipsis): ' . $key,
                 ['limit' => $limit, 'actual' => mb_strlen($value)]);
         $lines = is_array($fit['lines'] ?? null) ? array_filter($fit['lines'], fn($n) => is_int($n) && $n > 0) : [];
-        $count = substr_count(str_replace("\r\n", "\n", $value), "\n") + 1;
-        if ($lines && $count > min($lines))
-            throw $refuse('SLOT_TOO_LONG', 'Content has more lines than its box holds: rewrite it in at most ' . min($lines) . ' line(s): ' . $key,
-                ['limit' => min($lines), 'actual' => $count, 'unit' => 'lines']);
+        if (!$lines) return;
+        $count = self::lineCount($value);
+        $most = $sample === null ? min($lines) : max(min($lines), self::lineCount($sample));
+        if ($count > $most)
+            throw $refuse('SLOT_TOO_LONG', 'Content has more lines than its box holds: rewrite it in at most ' . $most . ' line(s): ' . $key,
+                ['limit' => $most, 'actual' => $count, 'unit' => 'lines']);
+    }
+
+    private static function lineCount(string $text): int
+    {
+        return substr_count(str_replace("\r\n", "\n", $text), "\n") + 1;
+    }
+
+    /** What a visitor reads of a sample: no `((p))` markers, every whitespace run one space, as the kit's demoLength counts it. */
+    private static function visibleLength(string $sample): int
+    {
+        $words = preg_replace('/\(\(\/?[a-z][a-z0-9]*(?:\s[^()]*)?\/?\)\)/i', ' ', $sample);
+        return mb_strlen(trim((string) preg_replace('/\s+/u', ' ', (string) $words)));
+    }
+
+    /** The demo picture's [width, height], or null when nothing says it. */
+    private static function demoSize(array $fit, $before, ?string $sample): ?array
+    {
+        if (is_array($before) && ($before[0] ?? 0) > 0 && ($before[1] ?? 0) > 0) return [(int)$before[0], (int)$before[1]];
+        if ($sample !== null && preg_match('/[?&]width=(\d+)&height=(\d+)/', $sample, $m) && (int)$m[1] > 0 && (int)$m[2] > 0) return [(int)$m[1], (int)$m[2]];
+        $w = self::number($fit['source']['width'] ?? null); $h = self::number($fit['source']['height'] ?? null);
+        return $w !== null && $h !== null ? [$w, $h] : null;
     }
 
     /**

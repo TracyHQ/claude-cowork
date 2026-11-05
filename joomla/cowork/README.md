@@ -458,6 +458,10 @@ the agent how to honour it. Unlike roles, fit is enforced by the write check (`l
 | `transparent: true` | the picture has no transparent ground (a JPEG, a PNG or WebP without alpha, or, with GD, four opaque corners) | `SLOT_IMAGE_OPAQUE` |
 | `maxCharacters`, `lines` | the words are longer, or have more line breaks than the box holds; the agent is asked to rewrite, nothing is cut | `SLOT_TOO_LONG` |
 
+A character limit no more than the demo's visible length plus 3 is the shrink-wrapped box of the demo's words, not a limit, and
+does not refuse (the same rule as Tracy's kit; the slot's own `maxCharacters` still holds). A line limit is at least the demo's
+own line count, so a measure the demo itself breaks cannot refuse a value with fewer lines.
+
 Putting a slot's demo value back is always taken. A slot without `fit` (every released contract
 before ADR 0039) is checked exactly as before: the 2% shape check against the demo file, the slot's
 own `maxCharacters`, and no kind, size or transparency rule. `replace_kept` joins the request hash
@@ -487,6 +491,46 @@ slot stays bound and occupied in the contract (inspect reports no drift), `apply
 and writing a link into it later shows the button again. The review covers Tracy Business j6 1.2.1's
 layouts; a JoomlArt layout that prints `<a href="">` whatever its link holds (JA Phio's hero) is not on it.
 
+**Hiding a slot (`empty_slots`, unreleased).** An apply may name slots to empty: `empty_slots: ["module-430.1", …]`,
+alone or beside `changes` and `empty_links`, sharing their limit of 1500. Hidden means gone from the HTML and from the
+admin, never CSS. `changes` still refuses an empty value on an occupied slot (`SLOT_EMPTY_STATE`). Whether a block holds
+without a slot is measured in Tracy's template kit, which no site holds, so `lib/hideable-slots.json` carries the
+verdicts per contract, written by `scripts/hideable-slots.mjs` and tied to the sha256 of the content map they were read
+against. It is receiver data, not contract bytes: no pinned hash moves, and a site's fetched profile stays valid. A
+contract not listed, or listed against other bytes, empties nothing. Inspect marks a listed slot `canHide`:
+
+| `canHide` | Meaning | Taken |
+| --- | --- | --- |
+| `measured` | a picture frame the kit emptied, and the block held | alone |
+| `unmeasured` | a word slot; the kit has no verdict on word slots, only its page can show whether it holds | alone |
+| `withRow` | a link, or a frame the kit says looks wrong emptied alone | only when another slot its row names goes in the same apply, or has gone |
+
+A contact's `email_to` is listed `unmeasured`, and it does two jobs: it is the address the page prints and where the contact form sends its mail. Joomla draws the form only while the contact has an address, so emptying it takes the printed address and the form together.
+
+Any other occupied slot named is refused `SLOT_NOT_HIDEABLE`, and so is a slot addressed by a text node or an attribute
+whatever a list says: an emptied `text()[1]` is not saved, so its slot dangles, which stops every inspect of the site, or
+`text()[2]` becomes `text()[1]` and the neighbour answers to the wrong number. A slot already empty is no refusal and no
+write. A hidden slot is emptied in every language the site carries. `apply.revert` puts it back, and writing words into
+it later shows it again. Nothing removes a row: rows are parallel arrays, and removing one renumbers the slots after it.
+
+**Unpublishing a block (`blocks.unpublish`, unreleased).** `content.contract`, `operation: "blocks.unpublish"`, `apply_id`
+(`contract-…`), `request_id`, `expected_revision`, `blocks: ["module-156", …]` (1 to 300). It accepts the contract's own
+module entities and nothing else (`BLOCK_UNKNOWN`), a module neither published nor unpublished is refused
+(`BLOCK_NOT_PUBLISHED`), and all refusals are found before anything is written. It answers `unpublished`, `already` and
+`afterRevision`. `content.update` writes `published` too, but through Joomla's Table, which moves the row's asset; its
+translations stay published; and every later call warns of drift. This door moves one column by compare-and-set, the
+translations with it and the baseline in one transaction. `apply.revert` brings the blocks back, only over the revision it
+left. An imported (derived) site has no block list: `content.update` is its door.
+
+**Source language overrides (`setSource`, unreleased).** `template.languageOverrides`, `operation: "setSource"`, `apply_id`,
+`template`, `strings: {"TPL_SOME_CONSTANT": ""}`. `read` and `set` still refuse en-GB. Only the keys named are written, each
+one a word string of the site's own en-GB files, and a value is `""`, which takes the sentence off the page, or one line of
+words with the source's placeholders. Anything else is named in `refused`. The language files stay what the release
+shipped, and `apply.revert` puts the override file's bytes back. A constant the contract also names as a `languageString`
+row moves the inspect revision, so inspect again after it.
+
+`info.hide_ops` says an engine has these three: an older one ignores `empty_slots` beside `changes`.
+
 Release activation is separate from source availability: 0.14.0 has been tested as a local package,
 but the default TCH build recipe must also be migrated and pinned before claiming all new sites
 use the content contract. The published 1.1.0 profile is not the later, locally modified 8212 demo.
@@ -499,6 +543,21 @@ alias, confirmed by building the route Joomla's category/tag view builds). A cat
 published menu item opens directly is skipped: at that address Joomla prints the menu item's title,
 not the category's. Menu modules get no such stamps for the same reason.
 
+
+**Slot corrections (unreleased).** A released contract is never edited and a bound site stores its hash, so what Tracy's
+template kit knows better than the contract rides beside it: `lib/slot-corrections.json`, written by
+`scripts/slot-corrections.mjs` and tied to the sha256 of the content map it was read against. It is receiver data, not
+contract bytes: the map stays as released, and only the slots handed out are corrected. A contract not listed, or listed
+against other bytes, is held as before, and so is a slot the list does not name. `info.slot_corrections` says, per contract,
+how many slots each rule reaches.
+
+| Rule | Reaches | Then |
+| --- | --- | --- |
+| `limits` | a text whose measured fit is under the kit's limit, capped by the map | `fit.maxCharacters` is the kit's; over it is still `SLOT_TOO_LONG` |
+| `icons` | a kept icon on a transparent ground | `fit.replace` is `icon`: a transparent drawing is taken; an opaque picture is still `SLOT_PICTURE_KEPT` unless `replace_kept` names it, and then meets `SLOT_IMAGE_OPAQUE` |
+| `alts` | a gallery alt with an empty sample beside an occupied picture | it takes its limit and may be filled; a double quote is `SLOT_NOT_CONTENT`, because the template prints the alt unescaped |
+
+`content.contract` `rows.remove` (`slots`, `keep`, `expected_revision`, `apply_id`, `request_id`; `info.hide_ops.rows_remove`) takes a hidden slot out of the stored field, box and all. A slot leaves with its row when the review proves one (`hideable-slots.json` `rows`: parallel lists under one parent, or a subform's numbered keys) and nothing of that row stays; otherwise, in an HTML field, with its own element, and with each parent that leaves empty. An element holding a slot in `keep`, or one written since the quickstart and not named, never goes: its slot gives up only its own text or alt, or is refused by name. The baseline moves by the same ops in the same transaction, so the rest of the row still compares and a later slot steps down into the gap. There is no `apply.revert`: a removed slot answers `SLOT_UNKNOWN`, is listed in inspect's `removedSlots`, and comes back only on a new site. A site that carries translations refuses it.
 ## Contract profiles: one release asset each (unreleased)
 
 The package used to carry every profile under `lib/contracts/`: 225 of them, 530 MB unpacked, a 70 MB
