@@ -32,6 +32,7 @@ require_once __DIR__ . '/VisibleText.php';
 require_once __DIR__ . '/JoomlaLocks.php';
 require_once __DIR__ . '/Timing.php';
 require_once __DIR__ . '/SiteIdentity.php';
+require_once __DIR__ . '/ExtensionParams.php';
 require_once __DIR__ . '/TemplateSiteSettings.php';
 require_once __DIR__ . '/TemplateSiteFiles.php';
 require_once __DIR__ . '/LanguageOverrides.php';
@@ -382,7 +383,7 @@ final class Engine
         // `site.identity` and `template.siteSettings` write only on `set`; a read takes no lock, so it never waits on an apply.
         $writes = in_array($action,
             ['content.contract', 'content.batch', 'content.update', 'content.delete', 'media.upload', 'media.delete', 'apply.revert', 'extension.install', 'extension.enable', 'db.restore', 'db.rollback', 'db.cleanup', 'db.purge', 'core.upgrade', 'files.restore', 'template.files.write', 'template.files.undo'], true)
-            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides'], true) && ($params['operation'] ?? null) === 'set')
+            || (in_array($action, ['site.identity', 'template.siteSettings', 'template.languageOverrides', 'extension.params'], true) && ($params['operation'] ?? null) === 'set')
             || ($action === 'template.languageOverrides' && ($params['operation'] ?? null) === 'setSource');
         if (!$this->writing && !$this->reading && !$readOnly && $this->writer && method_exists($this->writer, 'serialize') && $writes) {
             $holder = ['action' => $action, 'operation' => is_string($params['operation'] ?? null) ? $params['operation'] : null,
@@ -479,7 +480,10 @@ final class Engine
                 ], 'page_create' => [
                     'version' => 1,
                 // lib/slot-corrections.json: which contracts this engine holds to the kit's limits, and how far.
-                ], 'slot_corrections' => SlotCorrections::ability(__DIR__ . '/slot-corrections.json'), 'db_range_checksums' => [
+                ], 'slot_corrections' => SlotCorrections::ability(__DIR__ . '/slot-corrections.json'),
+                // extension.params: which keys of which extensions this engine reads and sets (lib/ExtensionParams.php).
+                // An older engine answers bad_action, so a writer reads this before it counts on moving a map.
+                'extension_params' => ExtensionParams::ability(), 'db_range_checksums' => [
                     'version' => 1,
                     'max_starts' => self::MAX_RANGE_STARTS,
                     'max_limit' => self::MAX_DB_LIMIT,
@@ -534,6 +538,8 @@ final class Engine
                 return $this->extensionInstall($params);
             case 'extension.enable':
                 return $this->extensionEnable($params);
+            case 'extension.params':
+                return $this->extensionParamsDoor($params);
             case 'content.list':
                 return $this->contentList($params);
             case 'content.get':
@@ -5416,6 +5422,93 @@ final class Engine
      * server cannot write is refused the same way, with `code: CONFIG_NOT_WRITABLE`, and nothing is
      * written. Not part of a `content.batch`: a file is not inside the database's transaction.
      */
+    /**
+     * `extension.params`: read or set the named params of a named extension (lib/ExtensionParams.php), every
+     * other key of its params kept as the site holds it. `{operation: read|set, type, folder, element}`, and on
+     * `set` an `apply_id` and `set: {key: value}`. The set goes through `content.update` `extensionParams`, so it
+     * is one undo entry of that apply_id and `apply.revert` takes it back; nothing is written when any value is
+     * refused. An answer names only the allowed keys, never the rest of the column (a plugin's API key lives there).
+     */
+    private function extensionParamsDoor(array $p): array
+    {
+        if ($this->writer === null) {
+            return $this->err('unavailable', 'site writer not wired');
+        }
+        $operation = $p['operation'] ?? 'read';
+        if ($operation !== 'read' && $operation !== 'set') {
+            return $this->err('bad_params', 'Unknown extension.params operation: use read or set');
+        }
+        $type = isset($p['type']) && is_string($p['type']) ? trim($p['type']) : '';
+        $element = isset($p['element']) && is_string($p['element']) ? trim($p['element']) : '';
+        $folder = isset($p['folder']) && is_string($p['folder']) && trim($p['folder']) !== '' ? trim($p['folder']) : null;
+        if ($type === '' || $element === '') {
+            return $this->err('bad_params', 'type and element required (and folder for a plugin)');
+        }
+        $extensionKey = ExtensionParams::key($type, $folder, $element);
+        $keys = ExtensionParams::keysOf($type, $folder, $element);
+        if ($keys === null) {
+            return $this->err('unsupported', substr($extensionKey, 0, 120) . ' has no params this door writes: only ' . implode(', ', array_keys(ExtensionParams::ALLOWED)));
+        }
+        $clean = [];
+        if ($operation === 'set') {
+            if ($this->log === null) {
+                return $this->err('unavailable', 'apply log not wired');
+            }
+            if ($this->applyId($p) === null) {
+                return $this->err('bad_params', 'apply_id required');
+            }
+            $set = $p['set'] ?? null;
+            if (!is_array($set) || $set === [] || array_keys($set) === range(0, count($set) - 1)) {
+                return $this->err('bad_params', 'set required: an object with any of ' . implode(', ', $keys));
+            }
+            foreach ($set as $name => $value) {
+                if (!in_array($name, $keys, true)) {
+                    return $this->err('unsupported', substr((string) $name, 0, 60) . " cannot be written for {$extensionKey}: only " . implode(', ', $keys) . ' can. Nothing was written');
+                }
+                $cleaned = ExtensionParams::clean($extensionKey, $name, $value);
+                if (isset($cleaned['error'])) {
+                    return $this->err('bad_params', $cleaned['error'] . '. Nothing was written');
+                }
+                $clean[$name] = $cleaned['value'];
+            }
+        }
+        try {
+            $id = null;
+            for ($offset = 0; $id === null; $offset += 500) {
+                $page = $this->writer->list('extensionParams', $offset, 500);
+                foreach ($page as $row) {
+                    $rowFolder = isset($row['folder']) && $row['folder'] !== '' ? (string) $row['folder'] : null;
+                    if ((string) ($row['type'] ?? '') === $type && (string) ($row['element'] ?? '') === $element && $rowFolder === $folder
+                        && (int) ($row['client_id'] ?? 0) === 0) {
+                        $id = (int) ($row['extension_id'] ?? $row['id'] ?? 0);
+                        break;
+                    }
+                }
+                if (count($page) < 500) break;
+            }
+            $row = $id ? $this->writer->read('extensionParams', $id) : null;
+        } catch (Throwable $e) {
+            return $this->err('read_failed', $e->getMessage());
+        }
+        if ($row === null) {
+            return $this->err('not_found', "no extension {$extensionKey} is installed");
+        }
+        $extension = ['type' => $type, 'folder' => $folder, 'element' => $element, 'id' => $id, 'enabled' => (int) ($row['enabled'] ?? 0) === 1];
+        if ($operation === 'read') {
+            return $this->ok(['extension' => $extension, 'params' => ExtensionParams::shown($row['params'] ?? null, $keys), 'writable' => $keys]);
+        }
+        $merged = ExtensionParams::merge(isset($row['params']) ? (string) $row['params'] : null, $clean);
+        if (isset($merged['error'])) {
+            return $this->err('write_failed', $merged['error']);
+        }
+        $changed = $merged['json'] !== (string) ($row['params'] ?? '');
+        if ($changed) {
+            $written = $this->contentUpdate(['apply_id' => $p['apply_id'], 'kind' => 'extensionParams', 'id' => $id, 'fields' => ['params' => $merged['json']]]);
+            if (empty($written['ok'])) return $written;
+        }
+        return $this->ok(['extension' => $extension, 'params' => ExtensionParams::shown($merged['json'], array_keys($clean)), 'changed' => $changed]);
+    }
+
     private function siteIdentityDoor(array $p): array
     {
         if ($this->siteIdentity === null) {
