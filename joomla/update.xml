@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>The hide doors for Tracy's write step: info.hide_ops, rows.remove, slot corrections beside a released contract, a page the write step creates reads as no drift, and hide for real (empty a reviewed slot, unpublish a block, en-GB overrides).</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.82</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.82</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.82/pkg_claudecowork-0.24.82.zip</downloadurl>
+        </downloads>
+        <sha256>d145d7f06bdebeba78eb8d90f07930335a9198dcb30529e819571e228770432a</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>content.update renames an existing menu item's address through alias, with an alias undo entry.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
