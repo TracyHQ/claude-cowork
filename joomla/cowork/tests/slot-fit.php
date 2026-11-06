@@ -177,7 +177,7 @@ check('text: with no sample the line limit stays as it was',$fitDirect(['measure
 check('text: with a sample the same two are taken',[$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8','MADEUP7'),$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo","A\nB")],[null,null]);
 check('text: maxChars decides when maxCharacters is missing',$fitCode(['fit'=>array_diff_key($textFit,['maxCharacters'=>1])]+$oldText,str_repeat('e',25)),'SLOT_TOO_LONG');
 // The fit counts the characters a visitor reads: emphasis codes and HTML tags are not words, an entity is one character,
-// a line break is one space, every whitespace run is one. The slot's own storage limit still counts the raw string.
+// a line break is one space, every whitespace run is one.
 $fitSeen=fn(int $limit)=>['fit'=>['measured'=>true,'maxCharacters'=>$limit],'key'=>'heading.0','type'=>'text','maxCharacters'=>2048,'sample'=>'Hi'];
 check('text: emphasis codes are not counted (44 raw, 21 seen, limit 21)',$fitCode($fitSeen(21),'Why((br/))((span))fennels((/span)) choose us'),null);
 check('text: an entity is one character',$fitCode($fitSeen(14),'Fennel &amp; co &#8217;s'),null);
@@ -194,7 +194,30 @@ check('text: HTML tags are not counted',$fitDirect(['measured'=>true,'maxCharact
 check('text: a self-closing tag with a space is one space',$fitDirect(['measured'=>true,'maxCharacters'=>21],'Why<br />fennels choose us'),null);
 check('text: visible words between tags over the fit are still refused',$fitDirect(['measured'=>true,'maxCharacters'=>21],'Why<br/><span>fennel growers</span> choose us'),'SLOT_TOO_LONG');
 check('text: tags written as text are still words',$fitCode($fitSeen(10),'&lt;span&gt;Fennel'),'SLOT_TOO_LONG');
-check('text: the slot\'s own storage limit still counts the raw string',$fitAnswer(['maxCharacters'=>30]+$fitSeen(22),'Why((br/))((span))fennels((/span)) choose us')[1],'Content too long: heading.0');
+// The slot's own maxCharacters is sized from its demo words, so it counts what a visitor reads too: a heading whose codes
+// make it 45 characters raw and 22 on the page fits a 42 character slot (JA Boxing's module headings), with or without fit.
+$fitHeading=['key'=>'module-9.20','entity'=>'module-9','column'=>'params','type'=>'text','maxCharacters'=>42,'sample'=>'THE((br/)) ((span))DRILL((/span))'];
+$fitCodes='Why((br/))((span))quillets((/span)) choose us';
+check('slot limit: the codes make the words 45 characters raw',mb_strlen($fitCodes),45);
+check('slot limit: codes over the slot limit raw, visible words within it, are taken',$fitCode($fitHeading,$fitCodes),null);
+check('slot limit: and taken beside a fit too',$fitCode(['fit'=>['measured'=>true,'maxCharacters'=>468]]+$fitHeading,$fitCodes),null);
+$fitSlotExtra=null;try{$fitCheck->invoke($fitContract,['maxCharacters'=>20]+$fitHeading,$fitCodes,[]);}catch(ContractProblem $e){$fitSlotExtra=[$e->reason,$e->getMessage(),$e->extra];}
+check('slot limit: visible words over it are refused as always, with the visible length',$fitSlotExtra,
+    ['SLOT_TOO_LONG','Content too long: module-9.20',['limit'=>20,'actual'=>22]]);
+check('slot limit: plain words over it are refused as always',$fitCode($fitHeading,str_repeat('q',43)),'SLOT_TOO_LONG');
+// A column of fixed width (a module title is VARCHAR(100)) stores the raw string, so there the limit still counts it.
+$fitTitleExtra=null;try{$fitCheck->invoke($fitContract,['column'=>'title','maxCharacters'=>42]+$fitHeading,$fitCodes,[]);}catch(ContractProblem $e){$fitTitleExtra=$e->extra;}
+check('slot limit: a fixed width column still counts the raw string',$fitTitleExtra,['limit'=>42,'actual'=>45]);
+// A translation is held to the same count before it is written.
+$fitEngine=(new ReflectionClass(Engine::class))->newInstanceWithoutConstructor();
+$fitTranslation=new ReflectionMethod(Engine::class,'translationProblems');
+if (PHP_VERSION_ID < 80100) $fitTranslation->setAccessible(true);
+$fitTranslated=fn(array $slot,string $value)=>array_column($fitTranslation->invoke($fitEngine,[['source'=>$slot['sample']]+$slot],[$slot['key']=>$value]),'problem');
+check('translation: codes over the slot limit raw, visible words within it, are taken',$fitTranslated($fitHeading,$fitCodes),[]);
+check('translation: visible words over it are refused with the visible length',$fitTranslated(['maxCharacters'=>20]+$fitHeading,$fitCodes),
+    ['module-9.20: is 22 characters, over the slot limit of 20']);
+check('translation: a fixed width column still counts the raw string',$fitTranslated(['column'=>'title']+$fitHeading,$fitCodes),
+    ['module-9.20: is 45 characters, over the slot limit of 42']);
 check('text: an unmeasured text keeps the slot limit only',$fitCode(['fit'=>['measured'=>false]]+$oldText,str_repeat('f',40)),null);
 check('text: the demo words are always taken back, even over a fit',$fitCode(['fit'=>['maxCharacters'=>4,'maxChars'=>['desktop'=>4]]+$textFit]+$oldText,'Demo title'),null);
 
