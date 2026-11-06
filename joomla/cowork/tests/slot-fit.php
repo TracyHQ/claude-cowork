@@ -176,6 +176,25 @@ check('text: with no sample the character limit stays as it was',$fitDirect(['me
 check('text: with no sample the line limit stays as it was',$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo"),'SLOT_TOO_LONG');
 check('text: with a sample the same two are taken',[$fitDirect(['measured'=>true,'maxCharacters'=>7],'MADEUP-8','MADEUP7'),$fitDirect(['measured'=>true,'lines'=>['desktop'=>1]],"One\nTwo","A\nB")],[null,null]);
 check('text: maxChars decides when maxCharacters is missing',$fitCode(['fit'=>array_diff_key($textFit,['maxCharacters'=>1])]+$oldText,str_repeat('e',25)),'SLOT_TOO_LONG');
+// The fit counts the characters a visitor reads: emphasis codes and HTML tags are not words, an entity is one character,
+// a line break is one space, every whitespace run is one. The slot's own storage limit still counts the raw string.
+$fitSeen=fn(int $limit)=>['fit'=>['measured'=>true,'maxCharacters'=>$limit],'key'=>'heading.0','type'=>'text','maxCharacters'=>2048,'sample'=>'Hi'];
+check('text: emphasis codes are not counted (44 raw, 21 seen, limit 21)',$fitCode($fitSeen(21),'Why((br/))((span))fennels((/span)) choose us'),null);
+check('text: an entity is one character',$fitCode($fitSeen(14),'Fennel &amp; co &#8217;s'),null);
+check('text: a line break counts as one space, not nothing',$fitCode($fitSeen(12),'Fennel((br/))groves'),'SLOT_TOO_LONG');
+check('text: and as one space only',$fitCode($fitSeen(13),'Fennel((br/))groves'),null);
+check('text: an inline emphasis inside a word adds no space',$fitCode($fitSeen(6),'Fen((span))nel((/span))'),null);
+check('text: visible words over the fit are still refused',$fitAnswer($fitSeen(21),'Why((br/))((span))fennel growers((/span)) choose us'),
+    ['SLOT_TOO_LONG','Content too long for its box: rewrite it shorter, at most 21 characters, keeping its meaning (never cut it or add an ellipsis): heading.0']);
+$fitSeenExtra=null;try{$fitCheck->invoke($fitContract,$fitSeen(10),'((span))Fennel((/span)) groves',[]);}catch(ContractProblem $e){$fitSeenExtra=$e->extra;}
+check('text: the refusal carries the visible length',$fitSeenExtra,['limit'=>10,'actual'=>13]);
+// A contract write still refuses real markup before it is measured; SlotFit itself counts tags as it counts codes.
+check('text: a contract write still refuses real markup',$fitCode($fitSeen(21),'Why<br/>fennels choose us'),'SLOT_NOT_CONTENT');
+check('text: HTML tags are not counted',$fitDirect(['measured'=>true,'maxCharacters'=>21],'Why<br/><span class="hl">fennels</span> choose us'),null);
+check('text: a self-closing tag with a space is one space',$fitDirect(['measured'=>true,'maxCharacters'=>21],'Why<br />fennels choose us'),null);
+check('text: visible words between tags over the fit are still refused',$fitDirect(['measured'=>true,'maxCharacters'=>21],'Why<br/><span>fennel growers</span> choose us'),'SLOT_TOO_LONG');
+check('text: tags written as text are still words',$fitCode($fitSeen(10),'&lt;span&gt;Fennel'),'SLOT_TOO_LONG');
+check('text: the slot\'s own storage limit still counts the raw string',$fitAnswer(['maxCharacters'=>30]+$fitSeen(22),'Why((br/))((span))fennels((/span)) choose us')[1],'Content too long: heading.0');
 check('text: an unmeasured text keeps the slot limit only',$fitCode(['fit'=>['measured'=>false]]+$oldText,str_repeat('f',40)),null);
 check('text: the demo words are always taken back, even over a fit',$fitCode(['fit'=>['maxCharacters'=>4,'maxChars'=>['desktop'=>4]]+$textFit]+$oldText,'Demo title'),null);
 
