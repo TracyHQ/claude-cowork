@@ -38,6 +38,6 @@
     "release": "quickstart/ja-impact/j6",
     "repository": "JoomlArt-Products/joomlart-products"
   },
-  "coworkContractVersion": "0.24.85",
+  "coworkContractVersion": "0.24.86",
   "mode": "content-recommendation"
 }

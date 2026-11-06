@@ -2,9 +2,9 @@
   "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
   "profileVersion": "1.0.0",
   "contract": "ja-vega/j6/1.0.9",
-  "baseHash": "2a891721434d01bf6f758b8b07f639fcc3749de670217b79c286067b64b4b080",
+  "baseHash": "0b90e63bf6f2bdb70b6dc28a3095457a36bc28091f09248a851065f11c1a222f",
   "baseFiles": {
-    "manifest.json": "7118f486bd94701c961139b13ce465015be9a206f59236972a926bdf5f40936a",
+    "manifest.json": "9fd543650ac3a1059c8743c5a960aa15e110e8febeb3fd3529df1d7002c26a72",
     "content-map.json": "852d4ae69ea6a3c9d401baf84f67cb3fa668b3d38b5cfff59cfb37ff038bdd30",
     "presentation-lock.json": "44252229d0808f018e4a5fd97fad171ca772ee0a9c742f171c4257b619c92744"
   },
