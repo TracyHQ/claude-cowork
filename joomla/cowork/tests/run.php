@@ -1125,6 +1125,9 @@ class FakeSiteWriterBase implements SiteWriter
             // Like an auto-increment key: a new row never takes an id a row already holds.
             do $id = $this->nextId++; while (isset($this->store[$kind][$id]));
         }
+        // The real writer writes `params` alone on an extension row: the installer's columns stay.
+        if ($kind === 'extensionParams' && isset($this->store[$kind][$id]))
+            $fields = ['params' => $fields['params'] ?? $this->store[$kind][$id]['params'] ?? null] + $this->store[$kind][$id];
         $this->store[$kind][$id] = $fields;
         return $id;
     }
@@ -2225,6 +2228,7 @@ require __DIR__ . "/empty-links.php";
 require __DIR__ . "/hide-ops.php";
 require __DIR__ . "/rows-remove.php";
 require __DIR__ . "/page-create.php";
+require __DIR__ . "/extension-params.php";
 // What the kit knows better than a released contract, beside it: limits, kept icons, gallery alts.
 require __DIR__ . "/slot-corrections.php";
 require __DIR__ . "/content-addresses.php";
