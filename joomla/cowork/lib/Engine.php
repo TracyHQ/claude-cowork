@@ -1657,8 +1657,8 @@ final class Engine
                 $abs = $this->walker->archivePath($path);
 
                 // Made unreadable since the walk listed it: left out and named (`unreadable`), never
-                // the end of the whole pack. Only before its header: once a header is out, the entry
-                // is finished with zeros below, as for a file that shrank.
+                // the end of the whole pack. Once its header has been emitted, refusing preserves
+                // the upload cursor instead of passing a corrupt file off as a readable copy.
                 if ($entryOffset === 0 && !is_readable($abs)) {
                     $this->walker->markUnreadable($path);
                     $qi++;
@@ -1706,16 +1706,9 @@ final class Engine
                 if ($entryOffset < $contentEnd) {
                     $fh = @fopen($abs, 'rb');
                     if ($fh === false) {
-                        // Its header is already out (this part or an earlier one): the entry is
-                        // finished with zeros so the archive stays whole, and the file is named.
-                        $this->walker->markUnreadable($path);
-                        $want = min($contentEnd - $entryOffset, $target - strlen($buf));
-                        $buf         .= str_repeat("\0", $want);
-                        $entryOffset += $want;
-                        if (strlen($buf) >= $target) {
-                            break;
-                        }
-                        continue;
+                        // An earlier part may already hold this entry's header. Never substitute
+                        // zeros for content we could not read: keep the cursor for a later resume.
+                        return $this->err('read_failed', "cannot open {$path}");
                     }
                     fseek($fh, $entryOffset - $headerEnd);
                     while ($entryOffset < $contentEnd && strlen($buf) < $target) {
