@@ -158,6 +158,24 @@ final class SlotFit
         return substr_count(str_replace("\r\n", "\n", $text), "\n") + 1;
     }
 
+    /**
+     * Columns of a fixed width that store a text slot's raw string: there the slot's `maxCharacters` guards what the
+     * column can hold (a module title is VARCHAR(100)), so it counts every character written, codes and all.
+     */
+    private const FIXED_WIDTH_COLUMNS = ['title', 'name', 'alias', 'label', 'con_position', 'telephone', 'mobile', 'email_to'];
+
+    /**
+     * The length a slot's own `maxCharacters` is compared with. A text slot's limit is sized from its demo words, so it
+     * counts what a visitor reads ({@see seenLength}); a text in a fixed width column, a link or a picture path counts
+     * its raw string.
+     */
+    public static function slotLength(array $slot, string $value): int
+    {
+        if (($slot['type'] ?? null) !== 'text' || !is_string($slot['column'] ?? null)
+            || in_array($slot['column'], self::FIXED_WIDTH_COLUMNS, true)) return mb_strlen($value);
+        return self::seenLength($value);
+    }
+
     /** What a visitor reads of a sample: no `((p))` markers, every whitespace run one space, as the kit's demoLength counts it. */
     private static function visibleLength(string $sample): int
     {
@@ -171,7 +189,7 @@ final class SlotFit
      * that only styles words (`span`, `strong`, ...) adds nothing, so emphasis inside a word does not split it; any other
      * tag (`br`, `p`, ...) is one space. Tags written as text (`&lt;span&gt;`) stay words, since they are decoded last.
      */
-    private static function seenLength(string $value): int
+    public static function seenLength(string $value): int
     {
         $inline = '(?:span|strong|em|b|i|u|s|small|mark|sup|sub|a|abbr|code)';
         $words = preg_replace([

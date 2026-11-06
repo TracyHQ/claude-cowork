@@ -4420,7 +4420,8 @@ final class Engine
             $source = (string) $slot['source'];
             if (trim($value) === '' && trim($source) !== '') { $say('is empty but its source is not'); continue; }
             if (trim($value) !== '' && trim($source) === '') { $say('fills a slot the source leaves empty'); continue; }
-            if (mb_strlen($value) > $slot['maxCharacters']) { $say('is ' . mb_strlen($value) . ' characters, over the slot limit of ' . $slot['maxCharacters']); continue; }
+            $length = SlotFit::slotLength($slot, $value);
+            if ($length > $slot['maxCharacters']) { $say('is ' . $length . ' characters, over the slot limit of ' . $slot['maxCharacters']); continue; }
             if (preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries control characters'); continue; }
             // An angle bracket is markup only where the source has none — the rule, and the
             // measurement behind it, are in MultilingualProfile::markupIntroduced().
