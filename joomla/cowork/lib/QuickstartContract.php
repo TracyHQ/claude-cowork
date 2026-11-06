@@ -4,6 +4,7 @@ require_once __DIR__ . '/SlotRemoval.php';
 require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/LanguageStrings.php';
 require_once __DIR__ . '/SiteSettingRows.php';
+require_once __DIR__ . '/TemplateConfigRows.php';
 require_once __DIR__ . '/ContractAccess.php';
 require_once __DIR__ . '/MultilingualProfile.php';
 require_once __DIR__ . '/JoomlaLocks.php';
@@ -519,7 +520,7 @@ final class QuickstartContract
     }
     /** This call's rows (see ContractRows), the template language strings the contract names among them. */
     private function contractRows(): ContractRows {
-        return new ContractRows($this->writer, fn(): array => $this->languageStringRows(), fn(): array => $this->siteSettingRows());
+        return new ContractRows($this->writer, fn(): array => $this->languageStringRows(), fn(): array => $this->siteSettingRows(), fn(): array => $this->templateConfigRows());
     }
     /** The `languageString` rows of every string the contract names, by id (lib/LanguageStrings.php). */
     private function languageStringRows(): array {
@@ -536,6 +537,39 @@ final class QuickstartContract
         $wanted=[];
         foreach($this->baseEntities() as $entity)if($entity['kind']===SiteSettingRows::KIND)$wanted[]=$entity['identity'];
         return $wanted ? (new SiteSettingRows($this->siteSettingFiles()))->rows($wanted) : [];
+    }
+    /** The identities of the T4 layout and navigation profiles the contract names. */
+    private function templateConfigsWanted(): array {
+        $wanted=[];
+        foreach($this->baseEntities() as $entity)if($entity['kind']===TemplateConfigRows::KIND)$wanted[]=$entity['identity'];
+        return $wanted;
+    }
+    /** The `templateConfig` rows of every layout and navigation profile the contract names, by id (lib/TemplateConfigRows.php). */
+    private function templateConfigRows(): array {
+        $wanted=$this->templateConfigsWanted();
+        return $wanted ? (new TemplateConfigRows($this->siteSettingFiles()))->rows($wanted) : [];
+    }
+    /**
+     * The profile file change a contract apply makes for one `templateConfig` operation, checked against the text the plan
+     * read (`expected`): written whole to the profile's `local/` copy, never the template's file. Null when nothing changes.
+     *
+     * @return array{change:?array{path:string,before:?string,after:string}}
+     */
+    public function templateConfigChange(int $id, string $value, ?array $expected): array {
+        $this->ready();
+        $row=$this->templateConfigRows()[$id]??null;
+        if($row===null)throw new RuntimeException('Not a template profile of this contract: '.$id);
+        if($expected!==null && array_key_exists('value',$expected) && (string)$expected['value']!==$row['value'])
+            throw new ContractProblem('CONFLICT','conflict: the template profile '.$row['group'].' '.$row['profile'].' changed');
+        return ['change'=>(new TemplateConfigRows($this->siteSettingFiles()))->change($row,$value)];
+    }
+    /** Whether a site-relative path is the `local/` copy of a layout or navigation profile the contract names (it writes it). */
+    private function namedConfigFile(string $path): bool {
+        $file=TemplateSiteSettings::configFile($path);
+        if($file===null)return false;
+        foreach($this->templateConfigsWanted() as $identity)
+            if([(string)($identity['template']??''),(string)($identity['group']??''),(string)($identity['profile']??'')]===$file)return true;
+        return false;
     }
     /**
      * The profile file change a contract apply makes for one `siteSetting` operation, checked against the value the plan
@@ -728,6 +762,8 @@ final class QuickstartContract
             if($this->generatedCache($path) && !is_link($file))continue;
             // A site profile `template.siteSettings` writes (logo, name, favicon): the customer's, not the design's.
             if(TemplateSiteSettings::isDoorFile($path) && !is_link($file))continue;
+            // A layout or navigation profile's local copy the contract writes (a mega menu's words): the customer's too.
+            if($this->namedConfigFile($path) && !is_link($file))continue;
             if(is_link($file)||!is_file($file)){$this->drift('Presentation asset changed: '.$path);continue;}
             $st=@stat($file);
             $key=$st===false?null:[(int)$st['size'],(int)$st['mtime'],(int)$st['ctime'],(int)$st['ino']];
@@ -754,6 +790,7 @@ final class QuickstartContract
                 $link=$file->isLink();
                 if(!$link && ($this->generatedCache($relative) || $this->unlistedStyleCache($relative)))continue;
                 if(!$link && TemplateSiteSettings::isDoorFile($relative))continue;
+                if(!$link && $this->namedConfigFile($relative))continue;
                 if(!$link && $this->ownMedia($relative))continue;
                 if(!isset($this->lock['files'][$relative]))$this->drift('Unexpected presentation file: '.$relative);
             }
@@ -1081,8 +1118,9 @@ final class QuickstartContract
         $counts=array_map('count',$lists);
         // Accounts are not quickstart inventory: every provision adds the owner's own (an author's name and
         // picture are slots, the people on the site are not counted), unless the lock counts them itself.
-        // A template's language strings and T4 logos are not rows at all (lib/LanguageStrings.php, lib/SiteSettingRows.php): only the keys the contract names are read.
-        foreach(['user','userProfile',LanguageStrings::KIND,SiteSettingRows::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
+        // A template's language strings, T4 logos and T4 layout and navigation profiles are not rows at all (lib/LanguageStrings.php,
+        // lib/SiteSettingRows.php, lib/TemplateConfigRows.php): only the keys and files the contract names are read.
+        foreach(['user','userProfile','fieldValue',LanguageStrings::KIND,SiteSettingRows::KIND,TemplateConfigRows::KIND] as $people)if(!isset($this->lock['inventoryCounts'][$people]))unset($counts[$people]);
         // 🔒 TRACY'S OWN DESIGN-SYSTEM MODULE IS NOT A ROW THE SITE GAINED (David, 10/10/2026). Tracy's
         // design-system slot puts a system on a site as one mod_custom it writes through content.update
         // and marks with `<style id="tracy-ds-slot"`; every contract call after it warned "Quickstart

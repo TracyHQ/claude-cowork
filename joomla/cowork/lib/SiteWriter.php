@@ -92,14 +92,14 @@ final class FieldValueKey
 /**
  * `#__user_profiles` has no id column either: a profile field is named by (user_id, profile_key). Only the fields a visitor
  * reads on an author's page are this door's (`FIELDS`: the bio Joomla's own profile plugin keeps, the job title and tagline
- * T4 templates print; TracyHQ/tch#1013, "Collaborator & Editor" on 17 pages of dev g60-ess-j-full), so the pair is packed
+ * T4 templates print, the address JA Impact prints under "Live in"; TracyHQ/tch#1013, "Collaborator & Editor" on 17 pages of dev g60-ess-j-full), so the pair is packed
  * as user_id × SPAN + the field's place in that list. A person's account (password, groups, other profile keys) is never one.
  */
 final class UserProfileKey
 {
     public const SPAN = 100;
     /** The profile keys a visitor reads, in the order their place in a key names them. Append only. */
-    public const FIELDS = ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline', 'profile.user_avatar'];
+    public const FIELDS = ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline', 'profile.user_avatar', 'profile.address1'];
 
     public static function encode(int $userId, string $profileKey): int
     {

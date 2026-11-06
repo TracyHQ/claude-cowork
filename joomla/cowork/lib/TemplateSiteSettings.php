@@ -124,6 +124,18 @@ final class TemplateSiteSettings
     }
 
     /**
+     * Whether a site-relative path is the `local/` copy of a T4 layout or navigation profile, the file a content contract
+     * writes for a `templateConfig` row (lib/TemplateConfigRows.php). Answers [template, group, profile], or null.
+     *
+     * @return array{0:string,1:string,2:string}|null
+     */
+    public static function configFile(string $relative): ?array
+    {
+        if (!preg_match('~^templates/([A-Za-z0-9_-]+)/local/etc/(layout|navigation)/([^/]+)\.json$~D', $relative, $m)) return null;
+        return preg_match(self::TEMPLATE, $m[1]) && preg_match(self::PROFILE, $m[3]) ? [$m[1], $m[2], $m[3]] : null;
+    }
+
+    /**
      * One value as it will be written, or why it is refused.
      *
      * - A name or a slogan: a string, tags removed and made one line as Joomla's own forms clean
