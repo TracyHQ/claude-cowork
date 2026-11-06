@@ -1250,7 +1250,9 @@ final class QuickstartContract
             if(strlen($value)>self::DERIVED_LINK_BYTES)throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>self::DERIVED_LINK_BYTES,'actual'=>strlen($value)]);
             $this->checkDerivedLink($slot,$value,$refuse); return;
         }
-        if(mb_strlen($value)>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>mb_strlen($value)]);
+        // A text slot's own limit counts the characters a visitor reads (SlotFit::slotLength); a fixed width column, a link and a picture path count raw.
+        $length=SlotFit::slotLength($slot,$value);
+        if($length>$slot['maxCharacters'])throw $refuse('SLOT_TOO_LONG','Content too long: '.$key,['limit'=>(int)$slot['maxCharacters'],'actual'=>$length]);
         // Slot fit (ADR 0039), only on a slot that carries one and never against its own demo value.
         $fit=SlotFit::of($slot);
         if($fit!==null&&SlotFit::restores($slot,$value))$fit=null;
