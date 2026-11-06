@@ -76,7 +76,10 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
                 // The administrator's note. A copied article carries its source's: the Business
                 // archive marks every article (`tb:pilot`, `tb:pages`…), and a copy made without it
                 // failed the language's own inspect (23/09/2026, j-ee6vsk).
-                'note'],
+                'note',
+                // The byline the site prints under the title in place of the account's name (JA Kinetic's
+                // blog authors): a quickstart contract binds it as a text slot.
+                'created_by_alias'],
             'create'  => true,
             'trash'   => 'state',
         ],
@@ -175,7 +178,9 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
             'columns' => ['name', 'alias', 'con_position', 'address', 'suburb', 'country', 'postcode',
                 'telephone', 'fax', 'misc', 'email_to', 'mobile', 'webpage', 'published',
                 'catid', 'access', 'ordering', 'params', 'language', 'metadesc', 'metakey',
-                'metadata', 'featured', 'publish_up', 'publish_down'],
+                'metadata', 'featured', 'publish_up', 'publish_down',
+                // The contact's picture the Contact page shows: a contract declares it as an image slot.
+                'image'],
             'create'  => true,
             'trash'   => 'published',
         ],
@@ -580,6 +585,34 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
                 'name' => (string) ($row['name'] ?? ''),
                 'field' => substr((string) $row['profile_key'], strlen('profile.')),
                 'value' => $words,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * The stored custom field values that hold one row for their (field, item) pair, as a contract entity is matched: the
+     * field's `name` and `context` (`com_users.user`, `com_content.article`), the item's id, and the value. A multiple-value
+     * pair (several rows) is left out, as read() answers none for it.
+     */
+    private function listFieldValues(int $offset, int $limit): array
+    {
+        $query = $this->db->getQuery(true)
+            ->select(['v.field_id', 'v.item_id', 'MIN(v.value) AS value', 'f.name', 'f.context'])
+            ->from($this->db->quoteName('#__fields_values', 'v'))
+            ->join('INNER', $this->db->quoteName('#__fields', 'f') . ' ON f.id = v.field_id')
+            ->group(['v.field_id', 'v.item_id', 'f.name', 'f.context'])
+            ->having('COUNT(*) = 1')
+            ->order(['v.field_id ASC', 'v.item_id ASC']);
+        $out = [];
+        foreach ($this->db->setQuery($query, $offset, $limit)->loadAssocList() ?: [] as $row) {
+            if (!ctype_digit((string) $row['item_id']) || (int) $row['item_id'] < 1) continue;
+            $out[] = [
+                'id' => \FieldValueKey::encode((int) $row['field_id'], (int) $row['item_id']),
+                'field' => (string) $row['name'],
+                'context' => (string) $row['context'],
+                'item_id' => (int) $row['item_id'],
+                'value' => (string) ($row['value'] ?? ''),
             ];
         }
         return $out;
@@ -1427,8 +1460,9 @@ final class JoomlaSiteWriter implements \SiteWriter, \BulkSiteReader, \Searchabl
 
     public function list(string $kind, int $offset, int $limit): array
     {
-        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment', 'fieldValue'], true)) return [];
+        if (in_array($kind, ['articleAssociation', 'menuAssociation', 'moduleAssignment'], true)) return [];
         if ($kind === 'userProfile') return $this->listUserProfiles($offset, $limit);
+        if ($kind === 'fieldValue') return $this->listFieldValues($offset, $limit);
         if ($kind === 'languageFilter') return $this->db->setQuery("SELECT extension_id AS id, enabled, params FROM #__extensions WHERE type='plugin' AND folder='system' AND element='languagefilter'")->loadAssocList();
         return $this->rows($kind, $offset, $limit, null);
     }

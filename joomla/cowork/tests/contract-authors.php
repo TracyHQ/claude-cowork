@@ -59,7 +59,7 @@ check('authors: the profile binds beside an account it does not name', $auCall([
 $auState = $auContract->inspect();
 check('authors: the name, job title and picture read back', array_column($auState['slots'], 'current', 'key'), array_column($auSlots, 'sample', 'key'));
 check('authors: the people on a site are not inventory, so the owner\'s account is no drift', $auContract->driftWarnings(), []);
-check('an author\'s job title is a profile field a visitor reads, its picture too', \UserProfileKey::FIELDS, ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline', 'profile.user_avatar']);
+check('an author\'s job title is a profile field a visitor reads, its picture too', \UserProfileKey::FIELDS, ['profile.aboutme', 'profile.user_jobtitle', 'profile.user_tagline', 'profile.user_avatar', 'profile.address1']);
 
 $auApplied = $auCall(['operation' => 'apply', 'apply_id' => 'contract-authors-1', 'request_id' => 'au-1', 'expected_revision' => $auState['revision'],
     'changes' => ['user-44.0' => 'Dana Stokes', "userProfile-{$auJob}.0" => 'Coach']]);

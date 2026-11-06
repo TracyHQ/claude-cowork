@@ -140,9 +140,10 @@ final class SlotFit
             $limit = $all ? min($all) : null;
         }
         if (is_int($limit) && $sample !== null && $limit <= self::visibleLength($sample) + self::DEMO_BOX_SLACK) $limit = null;
-        if (is_int($limit) && $limit > 0 && mb_strlen($value) > $limit)
+        $seen = is_int($limit) && $limit > 0 ? self::seenLength($value) : 0;
+        if (is_int($limit) && $limit > 0 && $seen > $limit)
             throw $refuse('SLOT_TOO_LONG', 'Content too long for its box: rewrite it shorter, at most ' . $limit . ' characters, keeping its meaning (never cut it or add an ellipsis): ' . $key,
-                ['limit' => $limit, 'actual' => mb_strlen($value)]);
+                ['limit' => $limit, 'actual' => $seen]);
         $lines = is_array($fit['lines'] ?? null) ? array_filter($fit['lines'], fn($n) => is_int($n) && $n > 0) : [];
         if (!$lines) return;
         $count = self::lineCount($value);
@@ -157,11 +158,46 @@ final class SlotFit
         return substr_count(str_replace("\r\n", "\n", $text), "\n") + 1;
     }
 
+    /**
+     * Columns of a fixed width that store a text slot's raw string: there the slot's `maxCharacters` guards what the
+     * column can hold (a module title is VARCHAR(100)), so it counts every character written, codes and all.
+     */
+    private const FIXED_WIDTH_COLUMNS = ['title', 'name', 'alias', 'label', 'con_position', 'telephone', 'mobile', 'email_to'];
+
+    /**
+     * The length a slot's own `maxCharacters` is compared with. A text slot's limit is sized from its demo words, so it
+     * counts what a visitor reads ({@see seenLength}); a text in a fixed width column, a link or a picture path counts
+     * its raw string.
+     */
+    public static function slotLength(array $slot, string $value): int
+    {
+        if (($slot['type'] ?? null) !== 'text' || !is_string($slot['column'] ?? null)
+            || in_array($slot['column'], self::FIXED_WIDTH_COLUMNS, true)) return mb_strlen($value);
+        return self::seenLength($value);
+    }
+
     /** What a visitor reads of a sample: no `((p))` markers, every whitespace run one space, as the kit's demoLength counts it. */
     private static function visibleLength(string $sample): int
     {
         $words = preg_replace('/\(\(\/?[a-z][a-z0-9]*(?:\s[^()]*)?\/?\)\)/i', ' ', $sample);
         return mb_strlen(trim((string) preg_replace('/\s+/u', ' ', (string) $words)));
+    }
+
+    /**
+     * The characters a visitor reads of a value, which is what a box's character limit measures: HTML tags and `((tag))`
+     * emphasis codes are not words, an entity is the one character it shows, every whitespace run is one space. A tag
+     * that only styles words (`span`, `strong`, ...) adds nothing, so emphasis inside a word does not split it; any other
+     * tag (`br`, `p`, ...) is one space. Tags written as text (`&lt;span&gt;`) stay words, since they are decoded last.
+     */
+    public static function seenLength(string $value): int
+    {
+        $inline = '(?:span|strong|em|b|i|u|s|small|mark|sup|sub|a|abbr|code)';
+        $words = preg_replace([
+            '~<\s*/?\s*' . $inline . '(?:\s[^<>]*)?/?\s*>|\(\(/?' . $inline . '(?:\s[^()]*)?/?\)\)~i',
+            '~<\s*/?\s*[a-z][a-z0-9-]*(?:\s[^<>]*)?/?\s*>|\(\(/?[a-z][a-z0-9]*(?:\s[^()]*)?/?\)\)~i',
+        ], ['', ' '], $value);
+        $words = html_entity_decode((string) $words, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return mb_strlen(trim((string) preg_replace('/[\s\x{00A0}]+/u', ' ', $words)));
     }
 
     /** The demo picture's [width, height], or null when nothing says it. */

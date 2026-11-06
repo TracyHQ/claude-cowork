@@ -20,6 +20,46 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>A text slot's own length limit counts the characters a visitor reads, as its fit does: emphasis codes no longer make a heading too long.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.85</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.85</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.85/pkg_claudecowork-0.24.85.zip</downloadurl>
+        </downloads>
+        <sha256>0ad0c6f455f107df66cb04631b1dad7007373311652f4f2db3580c558a28bcf4</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
+        <description>Slot fit counts the characters a visitor reads: tags, entities and whitespace no longer count toward a slot's length.</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.84</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.84</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.84/pkg_claudecowork-0.24.84.zip</downloadurl>
+        </downloads>
+        <sha256>78088dae0bbab7a330c2ed07aa44ae9f0bf32fea8dcce5ae00d8bbff54e26a39</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>extension.params: read or set the map of System - JA Google Map (locations, zoom) without touching the plugin's other params, and the JA Boxing j6 1.0.11 contract profile.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>

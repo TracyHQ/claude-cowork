@@ -74,6 +74,33 @@ final class TemplateSiteFiles
     }
 
     /**
+     * Where T4 reads one layout or navigation profile (the local copy, the template's, the base theme's) and its text; null
+     * when no file holds it.
+     *
+     * @return array{path:string,bytes:string}|null
+     */
+    public function configProfile(string $template, string $group, string $profile): ?array
+    {
+        $source = preg_match(TemplateSiteSettings::PROFILE, $profile) ? $this->source($template, $profile, $group) : null;
+        $bytes = $source === null ? null : $this->bytes($source);
+        return $bytes === null ? null : ['path' => $source, 'bytes' => $bytes];
+    }
+
+    /**
+     * The change that makes a layout or navigation profile read `$text`: written whole to its `local/` copy, which T4 reads
+     * before the template's file. Null when T4 already reads that text.
+     *
+     * @return array{path:string,before:?string,after:string}|null
+     */
+    public function configChange(string $template, string $group, string $profile, string $text): ?array
+    {
+        $now = $this->configProfile($template, $group, $profile);
+        if ($now !== null && $now['bytes'] === $text) return null;
+        $local = $this->localPath($template, $profile, $group);
+        return ['path' => $local, 'before' => $this->bytes($local), 'after' => $text];
+    }
+
+    /**
      * The change that makes one profile key read `$value`: written to the profile's `local/` copy, every other byte kept, the
      * same file `template.siteSettings` writes. Null when the profile already says so. `$value` is cleaned by the caller.
      *
@@ -201,7 +228,7 @@ final class TemplateSiteFiles
             if ($before !== null && !is_string($before)) throw new RuntimeException('Unreadable undo step for ' . $path);
             $made = is_array($entry['made'] ?? null) ? $entry['made'] : [];
             foreach ($made as $folder)
-                if (!is_string($folder) || !preg_match('~^templates/[A-Za-z0-9_-]+/local(/etc(/site)?)?$~D', $folder) || strpos($path, $folder . '/') !== 0)
+                if (!is_string($folder) || !preg_match('~^templates/[A-Za-z0-9_-]+/local(/etc(/(site|layout|navigation))?)?$~D', $folder) || strpos($path, $folder . '/') !== 0)
                     throw new RuntimeException('Unreadable undo step for ' . $path);
             $file = $this->root . '/' . $path;
             if ($before === null) {
@@ -252,18 +279,18 @@ final class TemplateSiteFiles
     }
 
     /** Where T4 reads a profile from, site-relative: the local copy, the template's, the base theme's. */
-    private function source(string $template, string $profile): ?string
+    private function source(string $template, string $profile, string $group = 'site'): ?string
     {
         $base = preg_match('~<basetheme>\s*([A-Za-z0-9_-]+)\s*</basetheme>~', (string) $this->manifest($template), $m) ? $m[1] : 'base';
-        foreach ([$this->localPath($template, $profile), 'templates/' . $template . '/etc/site/' . $profile . '.json',
-            'plugins/system/t4/themes/' . $base . '/etc/site/' . $profile . '.json'] as $candidate)
+        foreach ([$this->localPath($template, $profile, $group), 'templates/' . $template . '/etc/' . $group . '/' . $profile . '.json',
+            'plugins/system/t4/themes/' . $base . '/etc/' . $group . '/' . $profile . '.json'] as $candidate)
             if (is_file($this->root . '/' . $candidate) && !is_link($this->root . '/' . $candidate)) return $candidate;
         return null;
     }
 
-    private function localPath(string $template, string $profile): string
+    private function localPath(string $template, string $profile, string $group = 'site'): string
     {
-        return 'templates/' . $template . '/local/etc/site/' . $profile . '.json';
+        return 'templates/' . $template . '/local/etc/' . $group . '/' . $profile . '.json';
     }
 
     private function faviconPath(string $template): string
@@ -283,7 +310,7 @@ final class TemplateSiteFiles
     /** Refuse any path that is not one of the door's files, or that reaches one through a link. */
     private function assertDoorFile(string $path): void
     {
-        if (!TemplateSiteSettings::isDoorFile($path)) throw new RuntimeException('Not a template site settings file: ' . substr($path, 0, 120));
+        if (!TemplateSiteSettings::isDoorFile($path) && TemplateSiteSettings::configFile($path) === null) throw new RuntimeException('Not a template site settings file: ' . substr($path, 0, 120));
         $parts = explode('/', $path);
         for ($i = 2; $i <= count($parts); $i++)
             if (is_link($this->root . '/' . implode('/', array_slice($parts, 0, $i)))) throw new RuntimeException('Refusing to write through a link: ' . $path);

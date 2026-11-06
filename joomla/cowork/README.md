@@ -463,6 +463,15 @@ A character limit no more than the demo's visible length plus 3 is the shrink-wr
 does not refuse (the same rule as Tracy's kit; the slot's own `maxCharacters` still holds). A line limit is at least the demo's
 own line count, so a measure the demo itself breaks cannot refuse a value with fewer lines.
 
+The fit's character limit counts what a visitor reads of the value (unreleased): `((tag))` emphasis codes and HTML tags
+are not characters, an entity is the one character it shows, and every whitespace run is one space. A tag that only
+styles words (`span`, `strong`, `em`, ...) adds nothing; any other (`br`, `p`, ...) is one space. So
+`Why((br/))((span))families((/span)) choose us` is 22 characters, not 45. The slot's own `maxCharacters` is sized from its
+demo words, so a text slot's counts the same visible characters (unreleased), on a write and on a translation; only a text
+in a fixed width column (`title`, `name`, `alias`, `label`, a contact's phone, position or email) still counts the raw
+string, since there the limit guards what the column holds. A link or a picture path counts raw. A write with a real `<`
+or `>` is still `SLOT_NOT_CONTENT` before it is measured.
+
 Putting a slot's demo value back is always taken. A slot without `fit` (every released contract
 before ADR 0039) is checked exactly as before: the 2% shape check against the demo file, the slot's
 own `maxCharacters`, and no kind, size or transparency rule. `replace_kept` joins the request hash
