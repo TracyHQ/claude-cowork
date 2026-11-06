@@ -352,11 +352,11 @@ final class Engine
             case 'db.dump_many':
                 return $this->dbDumpMany($params);
             case 'files.list':
-                return $this->filesList($params);
+                return $this->withUnreadable($this->filesList($params));
             case 'files.hash':
-                return $this->filesHash($params);
+                return $this->withUnreadable($this->filesHash($params));
             case 'files.pack':
-                return $this->filesPack($params);
+                return $this->withUnreadable($this->filesPack($params));
             case 'file.read':
                 return $this->fileRead($params);
             case 'plugin.list':
@@ -3565,6 +3565,20 @@ final class Engine
      *
      * @param array<string,mixed> $p
      */
+    /**
+     * A walk's answer with what it left out because this PHP could not read it (FileWalker::
+     * unreadable): `unreadable: {paths, count}`, only when there is something to say. The caller
+     * tells the person which folders to give read access to, rather than an archive silently short.
+     */
+    private function withUnreadable(array $answer): array
+    {
+        if ($this->walker === null || empty($answer['ok'])) {
+            return $answer;
+        }
+        $left = $this->walker->unreadable();
+        return $left === [] ? $answer : $answer + ['unreadable' => $left];
+    }
+
     private function filesPack(array $p): array
     {
         if ($this->walker === null) {
@@ -3661,6 +3675,22 @@ final class Engine
                 // For the ARCHIVE, not for a caller — see FileWalker::archivePath.
                 $abs = $this->walker->archivePath($path);
 
+                // Made unreadable since the walk listed it: left out and named (`unreadable`), never
+                // the end of the whole pack. Once its header has been emitted, refusing preserves
+                // the upload cursor instead of passing a corrupt file off as a readable copy.
+                if ($entryOffset === 0 && !is_readable($abs)) {
+                    $this->walker->markUnreadable($path);
+                    $qi++;
+                    if ($only === null && $qi >= count($queue)) {
+                        $more = $this->walker->pathsAfter($path, self::PACK_LOOKAHEAD);
+                        if ($more !== []) {
+                            $queue = $more;
+                            $qi = 0;
+                        }
+                    }
+                    continue;
+                }
+
                 // A tar entry must be EXACTLY as long as its own header says, and the header for
                 // an entry spanning parts was written in an earlier request. A webroot is not
                 // frozen while a pack runs — it takes minutes on a real site, and a log grows, a
@@ -3693,8 +3723,10 @@ final class Engine
 
                 // ── the content ────────────────────────────────────────────────────────────
                 if ($entryOffset < $contentEnd) {
-                    $fh = fopen($abs, 'rb');
+                    $fh = @fopen($abs, 'rb');
                     if ($fh === false) {
+                        // An earlier part may already hold this entry's header. Never substitute
+                        // zeros for content we could not read: keep the cursor for a later resume.
                         return $this->err('read_failed', "cannot open {$path}");
                     }
                     fseek($fh, $entryOffset - $headerEnd);
