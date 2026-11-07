@@ -1894,6 +1894,8 @@ require __DIR__ . '/pattern-list.php';
 require __DIR__ . '/content-batch.php';
 // Image slots: a picture from the media library into a core/image block of a sealed site.
 require __DIR__ . '/image-slots.php';
+// A post's title, excerpt and featured picture as slots (TracyHQ/tracy#452).
+require __DIR__ . '/post-field-slots.php';
 // media.usage on a sealed site: options the presentation lock pins (uses imageSite() above).
 require __DIR__ . '/media-usage-pinned.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.

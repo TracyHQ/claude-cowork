@@ -1,0 +1,81 @@
+{
+    "schemaVersion": "tracy-quickstart-content-map/wordpress/v1",
+    "entities": [
+        {
+            "key": "page-home",
+            "kind": "page",
+            "identity": {
+                "postType": "page",
+                "slug": "home"
+            }
+        },
+        {
+            "key": "post-spring-tips",
+            "kind": "post",
+            "identity": {
+                "postType": "post",
+                "slug": "spring-tips"
+            }
+        }
+    ],
+    "slots": [
+        {
+            "key": "home.hero.eyebrow",
+            "entity": "page-home",
+            "target": {
+                "block": "hero.eyebrow",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Established 2004",
+            "maxCharacters": 80,
+            "label": "home — hero.eyebrow"
+        },
+        {
+            "key": "post-spring-tips.title",
+            "entity": "post-spring-tips",
+            "target": {
+                "field": "post_title"
+            },
+            "type": "text",
+            "sample": "Spring garden tips",
+            "maxCharacters": 80,
+            "label": "post-spring-tips — title"
+        },
+        {
+            "key": "post-spring-tips.excerpt",
+            "entity": "post-spring-tips",
+            "target": {
+                "field": "post_excerpt"
+            },
+            "type": "text",
+            "sample": "What to do before the first warm week.",
+            "maxCharacters": 96,
+            "label": "post-spring-tips — excerpt"
+        },
+        {
+            "key": "post-spring-tips.post.intro",
+            "entity": "post-spring-tips",
+            "target": {
+                "block": "post.intro",
+                "attr": "content"
+            },
+            "type": "text",
+            "sample": "Three small changes make a garden ready for the first warm week.",
+            "maxCharacters": 148,
+            "label": "post-spring-tips — post.intro"
+        },
+        {
+            "key": "post-spring-tips.featured-image",
+            "entity": "post-spring-tips",
+            "target": {
+                "meta": "_thumbnail_id"
+            },
+            "type": "image",
+            "sample": "wp-content/uploads/2026/09/spring.jpg",
+            "sampleId": 92,
+            "maxCharacters": 255,
+            "label": "post-spring-tips — featured image"
+        }
+    ]
+}
