@@ -781,6 +781,16 @@ final class QuickstartContract
                 $block = (string) ($slot['target']['block'] ?? '');
                 $attr = (string) ($slot['target']['attr'] ?? 'content');
                 try {
+                    $target = self::rowTarget($slot, $kind);
+                    if ($target !== 'block') {
+                        // A post's own field or its featured picture: outside post_content, so the
+                        // skeleton is not touched (TCH `capture-inventory.mjs` masks blocks only).
+                        $slotValues[$slot['key']] = $this->rowSlotValue($row, $slot, $id);
+                        if ($target === 'meta') {
+                            $imageSlots[$slot['key']] = $slot['sample'];
+                        }
+                        continue;
+                    }
                     $slotValues[$slot['key']] = self::getBlockValue($content, $block, $attr);
                     if (($slot['type'] ?? '') === 'image') {
                         // Not masked: the demo picture goes back, so a page nobody touched hashes
@@ -907,6 +917,20 @@ final class QuickstartContract
                 $parts[$key] = ['templatePart', hash('sha256', (string) ($row['content'] ?? ''))];
             } else {
                 $parts[$key] = [(string) ($row['post_status'] ?? ''), hash('sha256', (string) ($row['post_content'] ?? ''))];
+                // A post's own fields and featured picture move the revision too, but only for an
+                // entity whose slots name them: every other entity hashes exactly as before.
+                $own = [];
+                foreach ($this->slotsFor($key) as $slot) {
+                    if (in_array($slot['target']['field'] ?? null, self::POST_FIELD_TARGETS, true)) {
+                        $own[$slot['key']] = (string) ($row[$slot['target']['field']] ?? '');
+                    } elseif (in_array($slot['target']['meta'] ?? null, self::POST_META_TARGETS, true)) {
+                        $meta = $this->writer->read('postmeta', (int) ($row['ID'] ?? 0), $slot['target']['meta']);
+                        $own[$slot['key']] = $meta === null ? null : (string) $meta['value'];
+                    }
+                }
+                if ($own !== []) {
+                    $parts[$key][] = $own;
+                }
             }
         }
         return hash('sha256', (string) json_encode($parts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
@@ -1083,6 +1107,72 @@ final class QuickstartContract
             $out['roleVocabularyVersion'] = $this->map['roleVocabularyVersion'];
         }
         return $out;
+    }
+
+    /** The fields of a post row a slot may name by `target.field`: plain text, written as given. */
+    public const POST_FIELD_TARGETS = ['post_title', 'post_excerpt'];
+    /** The post meta a slot may name by `target.meta`: the featured picture, an attachment id. Nothing else. */
+    public const POST_META_TARGETS = ['_thumbnail_id'];
+
+    /**
+     * Where on a page or post row one slot lives: `block` (a named block of post_content), `field`
+     * (one of POST_FIELD_TARGETS, a text slot) or `meta` (one of POST_META_TARGETS, an image slot
+     * of a post). Anything else is refused by name, so a profile can never reach an arbitrary
+     * column or meta key of the row (TracyHQ/tracy#452).
+     *
+     * @throws RuntimeException naming the unsupported target
+     */
+    private static function rowTarget(array $slot, string $kind): string
+    {
+        $target = is_array($slot['target'] ?? null) ? $slot['target'] : [];
+        $field = array_key_exists('field', $target);
+        $meta = array_key_exists('meta', $target);
+        if (!$field && !$meta) {
+            return 'block';
+        }
+        if ($kind !== 'page' && $kind !== 'post') {
+            throw new RuntimeException('only a page or a post has fields and meta');
+        }
+        if (array_key_exists('block', $target) || ($field && $meta)) {
+            throw new RuntimeException('a slot names one target: a block, a field or a meta key');
+        }
+        if ($field) {
+            if (!in_array($target['field'], self::POST_FIELD_TARGETS, true)) {
+                throw new RuntimeException('unsupported post field ' . (is_string($target['field']) ? $target['field'] : '?'));
+            }
+            if (($slot['type'] ?? '') !== 'text') {
+                throw new RuntimeException('a post field takes a text slot');
+            }
+            return 'field';
+        }
+        if (!in_array($target['meta'], self::POST_META_TARGETS, true)) {
+            throw new RuntimeException('unsupported post meta ' . (is_string($target['meta']) ? $target['meta'] : '?'));
+        }
+        if ($kind !== 'post' || ($slot['type'] ?? '') !== 'image') {
+            throw new RuntimeException('the featured picture is an image slot of a post');
+        }
+        if (!is_string($slot['sample'] ?? null) || !is_int($slot['sampleId'] ?? null)) {
+            throw new RuntimeException('an image slot needs sample and sampleId');
+        }
+        return 'meta';
+    }
+
+    /**
+     * The value of a field or meta slot of a post row: the field as stored, or the featured
+     * picture as the uploads path its attachment names ('' when the post has none).
+     */
+    private function rowSlotValue(array $row, array $slot, int $postId): string
+    {
+        if (isset($slot['target']['field'])) {
+            return (string) ($row[(string) $slot['target']['field']] ?? '');
+        }
+        $thumb = $this->writer->read('postmeta', $postId, (string) $slot['target']['meta']);
+        $attachment = (int) ($thumb['value'] ?? 0);
+        if ($attachment <= 0) {
+            return '';
+        }
+        $file = $this->writer->read('postmeta', $attachment, '_wp_attached_file');
+        return $file === null ? '' : 'wp-content/uploads/' . ltrim((string) $file['value'], '/');
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -1294,8 +1384,31 @@ final class QuickstartContract
                 $field = 'post_content';
             }
             $next = $content;
+            // A post's own fields go in the same row write as its blocks; its featured picture is
+            // a postmeta write of its own, so its undo is the meta it replaced (or none).
+            $fields = [];
+            $metas = [];
             foreach ($target['changes'] as [$slot, $new, $key]) {
                 try {
+                    $where = $target['kind'] === 'templatePart' ? 'block' : self::rowTarget($slot, 'post');
+                    if ($where === 'field') {
+                        if ((string) ($row[(string) $slot['target']['field']] ?? '') !== $new) {
+                            $fields[(string) $slot['target']['field']] = $new;
+                        }
+                        continue;
+                    }
+                    if ($where === 'meta') {
+                        $attachment = $this->imageIds[$new] ?? null;
+                        if ($attachment === null) {
+                            throw new RuntimeException('the featured picture needs the attachment id of its picture');
+                        }
+                        $metaKey = (string) $slot['target']['meta'];
+                        $current = $this->writer->read('postmeta', $target['id'], $metaKey);
+                        if ($current === null || (int) $current['value'] !== (int) $attachment) {
+                            $metas[$metaKey] = (int) $attachment;
+                        }
+                        continue;
+                    }
                     $next = self::setBlockValue($next, (string) ($slot['target']['block'] ?? ''), (string) ($slot['target']['attr'] ?? 'content'), $new,
                         ($slot['type'] ?? '') === 'image' ? ($this->imageIds[$new] ?? null) : null);
                 } catch (RuntimeException $e) {
@@ -1303,7 +1416,13 @@ final class QuickstartContract
                 }
             }
             if ($next !== $content) {
-                $operations[] = ['kind' => $target['kind'], 'id' => $target['id'], 'key' => $target['key'], 'fields' => [$field => $next]];
+                $fields = [$field => $next] + $fields;
+            }
+            if ($fields !== []) {
+                $operations[] = ['kind' => $target['kind'], 'id' => $target['id'], 'key' => $target['key'], 'fields' => $fields];
+            }
+            foreach ($metas as $metaKey => $attachment) {
+                $operations[] = ['kind' => 'postmeta', 'id' => $target['id'], 'key' => $metaKey, 'fields' => ['value' => $attachment]];
             }
         }
         if ($errors !== []) {

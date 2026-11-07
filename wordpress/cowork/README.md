@@ -261,6 +261,14 @@ without roles answers exactly as before.
     slot masked as `{{slot}}` — except an image slot, which is put back to its demo picture
     (`sample` + `sampleId`), so a page nobody touched hashes to the bytes it shipped as.
     `imageSlots` maps each image slot to that demo picture: a new one must have its shape.
+    A slot of a page or post names a block by `metadata.name` (`target.block`), or, on a post row
+    (unreleased, TracyHQ/tracy#452), one of exactly three other targets: `target.field:
+    "post_title"` or `"post_excerpt"` (a text slot, read and written as the field's plain text) and,
+    on a post only, `target.meta: "_thumbnail_id"` (an image slot: the featured picture, read as the
+    uploads path of the attachment it names, written as that attachment's id in its own `postmeta`
+    step, so `apply.revert` puts back the picture the post had or takes off one it did not have).
+    These are outside `post_content`, so the skeleton does not mask them; they move `revision`.
+    Any other field or meta key is a problem by name, and such a profile does not bind.
   - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
     problem: the baseline is the released lock, never a snapshot of the site as found.
   - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:
