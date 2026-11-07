@@ -269,6 +269,22 @@ without roles answers exactly as before.
     step, so `apply.revert` puts back the picture the post had or takes off one it did not have).
     These are outside `post_content`, so the skeleton does not mask them; they move `revision`.
     Any other field or meta key is a problem by name, and such a profile does not bind.
+    Two more doors (unreleased, TracyHQ/tracy#459). A text slot of a block with `"markup": "inline"`
+    keeps the element's inline markup: it reads the inner HTML in the content map's notation
+    (`Lemon Rice Bowl ((span class="price"))$12((/span))`, `((br/))`) and writes it back as HTML built
+    from a fixed allowlist (`span` with `class`, `strong`, `em`, `b`, `i`, `br`, `a` with
+    `href`/`class`/`target`/`rel`, `sup`, `sub`), then through `wp_kses` with that same allowlist. A
+    class must be one the slot's demo uses or its `markupClasses` lists; a link passes the URL rules
+    of a `url` slot; raw HTML, any other tag or attribute (block tags, scripts, styles, `style`, event
+    attributes) and unbalanced tags are refused by name (`SLOT_NOT_CONTENT`). The limit counts the
+    words, not the markup; `inspect` lists each such slot under `markupSlots`. And the manifest may
+    declare the pictures its theme points at (`themePictures: {options: [...], postMeta: [...]}`):
+    an image slot may then name one of those options (`target.option`, the option entity's own name)
+    or meta keys (`target.meta`, on a page or a post), read as the uploads path of the attachment
+    id it holds and written as the attachment id of a media library picture in the slot's shape.
+    An option must start with the theme's own prefix (`wp-ja-diner` gives `wp_ja_diner_`) and a
+    meta key must not start with `_`, or the profile is refused whole; an undeclared one is a problem
+    by name. `_thumbnail_id` is unchanged.
   - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
     problem: the baseline is the released lock, never a snapshot of the site as found.
   - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:

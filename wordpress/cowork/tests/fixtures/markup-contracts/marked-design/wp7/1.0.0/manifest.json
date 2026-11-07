@@ -1,0 +1,11 @@
+{
+    "schemaVersion": "tracy-quickstart-contract/v1",
+    "id": "marked-design/wp7/1.0.0",
+    "platform": "wordpress",
+    "theme": "test-theme",
+    "mode": "content-only",
+    "themePictures": {
+        "options": ["test_theme_blog_banner_image"],
+        "postMeta": ["tt_intro_image"]
+    }
+}
