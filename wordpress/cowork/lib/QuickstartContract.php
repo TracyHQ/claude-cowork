@@ -22,6 +22,7 @@
 
 require_once __DIR__ . '/SiteWriter.php';
 require_once __DIR__ . '/IdentityTokens.php';
+require_once __DIR__ . '/InlineMarkup.php';
 require_once __DIR__ . '/DemoTrimProfile.php';
 require_once __DIR__ . '/ShowcaseNavMarkup.php';
 require_once __DIR__ . '/ShowcaseNavProfile.php';
@@ -119,6 +120,10 @@ final class QuickstartContract
     private ?ImageLibrary $images;
     /** @var array<string,int> attachment id of each picture an apply's checks resolved, by path */
     private array $imageIds = [];
+    /** @var string[] options of the theme that hold a picture's attachment id (manifest `themePictures.options`) */
+    private array $themeOptions = [];
+    /** @var string[] post meta keys of the theme that hold a picture's attachment id (manifest `themePictures.postMeta`) */
+    private array $themeMeta = [];
 
     /** @var callable|null `fn(): list<row>|Generator` the site's own rows, in DerivedMap's shape, or their batches (WordPressDerivedRows) */
     private $derivedRows = null;
@@ -259,6 +264,7 @@ final class QuickstartContract
             throw new ContractUnavailable('The content map of ' . $id . ' has no entities or slots');
         }
         $this->manifest = $files['manifest'];
+        [$this->themeOptions, $this->themeMeta] = self::themePictures($files['manifest'], $id);
         $this->map = $files['content-map'];
         $this->lock = $files['presentation-lock'];
         $this->derived = false;
@@ -696,6 +702,7 @@ final class QuickstartContract
         $entities = [];
         $slotValues = [];
         $imageSlots = [];
+        $markupSlots = [];
         $lockEntities = isset($this->lock['entities']) && is_array($this->lock['entities']) ? $this->lock['entities'] : [];
         foreach ($this->entities() as $entity) {
             $key = (string) ($entity['key'] ?? '');
@@ -766,6 +773,19 @@ final class QuickstartContract
             if ($kind === 'option') {
                 $siteIdentity = $this->isSiteIdentity($key);
                 foreach ($slots as $slot) {
+                    if (array_key_exists('markup', $slot)) {
+                        $problems[] = 'Slot ' . $slot['key'] . ': inline markup is for a text slot of a block';
+                        continue;
+                    }
+                    if (($slot['type'] ?? '') === 'image') {
+                        try {
+                            $slotValues[$slot['key']] = $this->optionPicture($row['value'], $slot, (string) ($identity['name'] ?? ''));
+                            $imageSlots[$slot['key']] = $slot['sample'];
+                        } catch (RuntimeException $e) {
+                            $problems[] = 'Slot ' . $slot['key'] . ': ' . $e->getMessage();
+                        }
+                        continue;
+                    }
                     $value = $this->optionSlotValue($row['value'], $slot, $siteIdentity);
                     if ($value === null) {
                         $problems[] = 'Option slot is not text: ' . $slot['key'];
@@ -781,7 +801,8 @@ final class QuickstartContract
                 $block = (string) ($slot['target']['block'] ?? '');
                 $attr = (string) ($slot['target']['attr'] ?? 'content');
                 try {
-                    $target = self::rowTarget($slot, $kind);
+                    $target = $this->rowTarget($slot, $kind);
+                    $marked = $this->markedSlot($slot, $target);
                     if ($target !== 'block') {
                         // A post's own field or its featured picture: outside post_content, so the
                         // skeleton is not touched (TCH `capture-inventory.mjs` masks blocks only).
@@ -789,6 +810,13 @@ final class QuickstartContract
                         if ($target === 'meta') {
                             $imageSlots[$slot['key']] = $slot['sample'];
                         }
+                        continue;
+                    }
+                    if ($marked) {
+                        // The words and their inline markup, in the content map's notation; masked as any text.
+                        $slotValues[$slot['key']] = self::getBlockMarkup($content, $block);
+                        $markupSlots[$slot['key']] = $this->markupAllowed($slot, self::blockTypeOf($content, $block));
+                        $masked = self::setBlockValue($masked, $block, $attr, self::SLOT_MASK);
                         continue;
                     }
                     $slotValues[$slot['key']] = self::getBlockValue($content, $block, $attr);
@@ -825,6 +853,8 @@ final class QuickstartContract
             // Which slots take a picture, and the demo picture each replaces: its shape is the
             // shape a new one must have.
             'imageSlots' => $imageSlots,
+            // Which text slots keep inline markup, and the tags and classes each may carry (TracyHQ/tracy#459).
+            'markupSlots' => $markupSlots,
             'rows' => $rows,
             'demoTrim' => $trim,
             'showcaseNav' => self::showcaseNavRecord($binding),
@@ -923,7 +953,7 @@ final class QuickstartContract
                 foreach ($this->slotsFor($key) as $slot) {
                     if (in_array($slot['target']['field'] ?? null, self::POST_FIELD_TARGETS, true)) {
                         $own[$slot['key']] = (string) ($row[$slot['target']['field']] ?? '');
-                    } elseif (in_array($slot['target']['meta'] ?? null, self::POST_META_TARGETS, true)) {
+                    } elseif (in_array($slot['target']['meta'] ?? null, array_merge(self::POST_META_TARGETS, $this->themeMeta), true)) {
                         $meta = $this->writer->read('postmeta', (int) ($row['ID'] ?? 0), $slot['target']['meta']);
                         $own[$slot['key']] = $meta === null ? null : (string) $meta['value'];
                     }
@@ -1122,7 +1152,7 @@ final class QuickstartContract
      *
      * @throws RuntimeException naming the unsupported target
      */
-    private static function rowTarget(array $slot, string $kind): string
+    private function rowTarget(array $slot, string $kind): string
     {
         $target = is_array($slot['target'] ?? null) ? $slot['target'] : [];
         $field = array_key_exists('field', $target);
@@ -1145,10 +1175,14 @@ final class QuickstartContract
             }
             return 'field';
         }
-        if (!in_array($target['meta'], self::POST_META_TARGETS, true)) {
+        $theme = in_array($target['meta'], $this->themeMeta, true);
+        if (!$theme && !in_array($target['meta'], self::POST_META_TARGETS, true)) {
             throw new RuntimeException('unsupported post meta ' . (is_string($target['meta']) ? $target['meta'] : '?'));
         }
-        if ($kind !== 'post' || ($slot['type'] ?? '') !== 'image') {
+        if ($theme && ($slot['type'] ?? '') !== 'image') {
+            throw new RuntimeException('a theme picture is an image slot');
+        }
+        if (!$theme && ($kind !== 'post' || ($slot['type'] ?? '') !== 'image')) {
             throw new RuntimeException('the featured picture is an image slot of a post');
         }
         if (!is_string($slot['sample'] ?? null) || !is_int($slot['sampleId'] ?? null)) {
@@ -1166,13 +1200,130 @@ final class QuickstartContract
         if (isset($slot['target']['field'])) {
             return (string) ($row[(string) $slot['target']['field']] ?? '');
         }
-        $thumb = $this->writer->read('postmeta', $postId, (string) $slot['target']['meta']);
-        $attachment = (int) ($thumb['value'] ?? 0);
+        $meta = $this->writer->read('postmeta', $postId, (string) $slot['target']['meta']);
+        return $this->attachmentPath((int) ($meta['value'] ?? 0));
+    }
+
+    /**
+     * The options and post meta keys a profile's manifest declares as holding a picture of its theme
+     * (`themePictures: {options: [...], postMeta: [...]}`, TracyHQ/tracy#459). An option must carry the
+     * theme's own prefix (`wp-ja-diner` → `wp_ja_diner_…`) and a meta key must not be one WordPress
+     * protects (`_…`), so a declaration can never reach a core setting or an attachment's own record.
+     * A declaration that does not hold refuses the profile whole, like any extension of it.
+     *
+     * @return array{0:string[],1:string[]}
+     */
+    private static function themePictures(array $manifest, string $id): array
+    {
+        if (!array_key_exists('themePictures', $manifest)) {
+            return [[], []];
+        }
+        $declared = $manifest['themePictures'];
+        $options = is_array($declared) ? ($declared['options'] ?? []) : null;
+        $meta = is_array($declared) ? ($declared['postMeta'] ?? []) : null;
+        $names = static function ($list): bool {
+            if (!is_array($list) || array_values($list) !== $list) {
+                return false;
+            }
+            foreach ($list as $name) {
+                if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $name)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (!$names($options) || !$names($meta)) {
+            throw new ContractUnavailable($id . ': themePictures declares options and postMeta as lists of names');
+        }
+        $theme = (string) ($manifest['theme'] ?? '');
+        $prefix = str_replace('-', '_', $theme) . '_';
+        foreach ($options as $name) {
+            if ($theme === '' || strpos($name, $prefix) !== 0 || $name === $prefix) {
+                throw new ContractUnavailable($id . ': theme picture option ' . $name . ' is not one of the theme ' . $theme . ' (its name starts ' . $prefix . ')');
+            }
+        }
+        foreach ($meta as $name) {
+            if ($name[0] === '_') {
+                throw new ContractUnavailable($id . ': theme picture meta ' . $name . ' is a protected key');
+            }
+        }
+        return [$options, $meta];
+    }
+
+    /**
+     * The picture a theme option holds: an image slot of a declared option, read as the uploads path of
+     * the attachment its id names ('' for none).
+     *
+     * @param mixed $value the option's stored value
+     * @throws RuntimeException naming what does not hold
+     */
+    private function optionPicture($value, array $slot, string $option): string
+    {
+        if (!in_array($option, $this->themeOptions, true)) {
+            throw new RuntimeException('undeclared theme picture option ' . $option);
+        }
+        if (isset($slot['target']['field']) || !is_string($slot['sample'] ?? null) || !is_int($slot['sampleId'] ?? null)) {
+            throw new RuntimeException('a theme picture option is one image slot with sample and sampleId');
+        }
+        if (!is_int($value) && !(is_string($value) && preg_match('/^\d*$/D', $value))) {
+            throw new RuntimeException('the option does not hold an attachment id');
+        }
+        return $this->attachmentPath((int) $value);
+    }
+
+    /** The uploads path of an attachment, as an image slot reads it; '' when it names none. */
+    private function attachmentPath(int $attachment): string
+    {
         if ($attachment <= 0) {
             return '';
         }
         $file = $this->writer->read('postmeta', $attachment, '_wp_attached_file');
         return $file === null ? '' : 'wp-content/uploads/' . ltrim((string) $file['value'], '/');
+    }
+
+    /**
+     * Whether a slot keeps its inline markup (`"markup": "inline"`): only a text slot of a block's
+     * text, with `markupClasses` (when given) a list of class names. Anything else is refused by name.
+     *
+     * @throws RuntimeException
+     */
+    private function markedSlot(array $slot, string $where): bool
+    {
+        if (!array_key_exists('markup', $slot)) {
+            return false;
+        }
+        if ($slot['markup'] !== 'inline') {
+            throw new RuntimeException('unsupported markup ' . (is_string($slot['markup']) ? $slot['markup'] : '?'));
+        }
+        if ($where !== 'block' || ($slot['type'] ?? '') !== 'text'
+            || !in_array((string) ($slot['target']['attr'] ?? 'content'), ['content', 'text'], true)) {
+            throw new RuntimeException('inline markup is for a text slot of a block');
+        }
+        if (array_key_exists('markupClasses', $slot) && !InlineMarkup::classNames($slot['markupClasses'])) {
+            throw new RuntimeException('markupClasses holds a value that is not a class name');
+        }
+        return true;
+    }
+
+    /**
+     * What a marked-up slot may carry: the inline tags (no link inside a button, which is a link) and
+     * the classes its demo uses plus its `markupClasses`.
+     *
+     * @return array{tags:string[],classes:string[]}
+     */
+    private function markupAllowed(array $slot, string $blockType = ''): array
+    {
+        $classes = InlineMarkup::classesOf((string) ($slot['sample'] ?? ''));
+        foreach (is_array($slot['markupClasses'] ?? null) ? $slot['markupClasses'] : [] as $class) {
+            if (is_string($class) && !in_array($class, $classes, true)) {
+                $classes[] = $class;
+            }
+        }
+        $tags = array_keys(InlineMarkup::ALLOWED);
+        if ($blockType === 'button') {
+            $tags = array_values(array_diff($tags, ['a']));
+        }
+        return ['tags' => $tags, 'classes' => $classes];
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -1356,6 +1507,11 @@ final class QuickstartContract
                 $value = $current === null ? null : $current['value'];
                 $next = $value;
                 foreach ($target['changes'] as [$slot, $new]) {
+                    if (($slot['type'] ?? '') === 'image') {
+                        // A theme picture option holds the attachment id, as WordPress stores it: a string.
+                        $next = (string) ($this->imageIds[$new] ?? '');
+                        continue;
+                    }
                     if (isset($slot['target']['field'])) {
                         if (!is_array($next)) {
                             $next = [];
@@ -1390,7 +1546,7 @@ final class QuickstartContract
             $metas = [];
             foreach ($target['changes'] as [$slot, $new, $key]) {
                 try {
-                    $where = $target['kind'] === 'templatePart' ? 'block' : self::rowTarget($slot, 'post');
+                    $where = $target['kind'] === 'templatePart' ? 'block' : $this->rowTarget($slot, 'post');
                     if ($where === 'field') {
                         if ((string) ($row[(string) $slot['target']['field']] ?? '') !== $new) {
                             $fields[(string) $slot['target']['field']] = $new;
@@ -1400,12 +1556,21 @@ final class QuickstartContract
                     if ($where === 'meta') {
                         $attachment = $this->imageIds[$new] ?? null;
                         if ($attachment === null) {
-                            throw new RuntimeException('the featured picture needs the attachment id of its picture');
+                            throw new RuntimeException('a picture slot needs the attachment id of its picture');
                         }
                         $metaKey = (string) $slot['target']['meta'];
                         $current = $this->writer->read('postmeta', $target['id'], $metaKey);
                         if ($current === null || (int) $current['value'] !== (int) $attachment) {
                             $metas[$metaKey] = (int) $attachment;
+                        }
+                        continue;
+                    }
+                    if (($slot['markup'] ?? null) === 'inline') {
+                        $name = (string) ($slot['target']['block'] ?? '');
+                        if ($new !== self::getBlockMarkup($next, $name)) {
+                            $html = InlineMarkup::kses(InlineMarkup::htmlOf($new, $this->markupAllowed($slot)['classes'],
+                                fn(string $url): bool => $this->urlAllowed($url), self::blockTypeOf($next, $name) !== 'button'));
+                            $next = self::setBlockHtml($next, $name, $html);
                         }
                         continue;
                     }
@@ -1676,13 +1841,23 @@ final class QuickstartContract
         if (preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) {
             throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Markup and control characters are not content: ' . $key, $key);
         }
-        if (IdentityTokens::hasDirective($value)) {
+        // A marked-up slot: its markup comes in the notation, its words are what the rules below count.
+        $marked = ($slot['markup'] ?? null) === 'inline';
+        $words = $marked ? InlineMarkup::wordsOf($value) : $value;
+        if (IdentityTokens::hasDirective($words)) {
             throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, 'Template directives are not content: ' . $key, $key);
         }
         $max = (int) ($slot['maxCharacters'] ?? 1000);
-        if (mb_strlen($value) > $max) {
-            throw new ContractProblem(ContractProblem::SLOT_TOO_LONG, 'Content too long: ' . $key . ' (' . mb_strlen($value) . ' > ' . $max . ')', $key, null,
-                ['limit' => $max, 'actual' => mb_strlen($value)]);
+        if (mb_strlen($words) > $max) {
+            throw new ContractProblem(ContractProblem::SLOT_TOO_LONG, 'Content too long: ' . $key . ' (' . mb_strlen($words) . ' > ' . $max . ')', $key, null,
+                ['limit' => $max, 'actual' => mb_strlen($words)]);
+        }
+        if ($marked) {
+            try {
+                InlineMarkup::htmlOf($value, $this->markupAllowed($slot)['classes'], fn(string $url): bool => $this->urlAllowed($url));
+            } catch (RuntimeException $e) {
+                throw new ContractProblem(ContractProblem::SLOT_NOT_CONTENT, $e->getMessage() . ': ' . $key, $key);
+            }
         }
         $isUrl = ($slot['type'] ?? '') === 'url' || ($slot['target']['attr'] ?? '') === 'url';
         if ($isUrl && $value !== '' && !$this->urlAllowed($value)) {
@@ -2394,6 +2569,41 @@ final class QuickstartContract
             throw new RuntimeException('unsupported block attribute ' . $attr);
         }
         return substr($markup, 0, $found['start']) . $opening . $inner . substr($markup, $found['innerEnd']);
+    }
+
+    /** The block type (`paragraph`, `button`, ...) of the block named `$name`. */
+    private static function blockTypeOf(string $markup, string $name): string
+    {
+        return self::findBlock($markup, $name)['block'];
+    }
+
+    /** The element (or a button's link) of a text block, split as setBlockValue splits it: [before, inner, after]. */
+    private static function textElement(array $found, string $inner, string $name): array
+    {
+        $pattern = $found['block'] === 'button'
+            ? '/^([\s\S]*?<a\b[^>]*>)([\s\S]*?)(<\/a>[\s\S]*)$/D'
+            : '/^(\s*<([a-z0-9]+)\b[^>]*>)([\s\S]*?)(<\/\2>\s*)$/D';
+        if (!preg_match($pattern, $inner, $m)) {
+            throw new RuntimeException('block ' . $name . ' has no text element to read');
+        }
+        return $found['block'] === 'button' ? [$m[1], $m[2], $m[3]] : [$m[1], $m[3], $m[4]];
+    }
+
+    /** A marked-up slot's value: the element's inner HTML in the content map's notation (InlineMarkup). */
+    public static function getBlockMarkup(string $markup, string $name): string
+    {
+        $found = self::findBlock($markup, $name);
+        $inner = substr($markup, $found['innerStart'], $found['innerEnd'] - $found['innerStart']);
+        return InlineMarkup::notationOf(self::textElement($found, $inner, $name)[1]);
+    }
+
+    /** Write HTML already built and checked (InlineMarkup::htmlOf) as the element's inner HTML; every byte around it stays. */
+    public static function setBlockHtml(string $markup, string $name, string $html): string
+    {
+        $found = self::findBlock($markup, $name);
+        $inner = substr($markup, $found['innerStart'], $found['innerEnd'] - $found['innerStart']);
+        [$before, , $after] = self::textElement($found, $inner, $name);
+        return substr($markup, 0, $found['innerStart']) . $before . $html . $after . substr($markup, $found['innerEnd']);
     }
 
     /** The inverse of setBlockValue: the text of the element (or of a button's link), or the link's href. */

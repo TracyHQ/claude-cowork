@@ -1896,6 +1896,9 @@ require __DIR__ . '/content-batch.php';
 require __DIR__ . '/image-slots.php';
 // A post's title, excerpt and featured picture as slots (TracyHQ/tracy#452).
 require __DIR__ . '/post-field-slots.php';
+// Text slots that keep their inline markup, and pictures a theme option or meta points at (TracyHQ/tracy#459).
+require __DIR__ . '/inline-markup-slots.php';
+require __DIR__ . '/theme-picture-slots.php';
 // media.usage on a sealed site: options the presentation lock pins (uses imageSite() above).
 require __DIR__ . '/media-usage-pinned.php';
 // Render stamps for Tracy's element picker: owners, the query-loop and listing cases, gating, caches.

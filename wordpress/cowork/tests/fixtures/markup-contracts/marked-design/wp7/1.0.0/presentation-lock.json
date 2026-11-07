@@ -1,0 +1,30 @@
+{
+    "schemaVersion": "tracy-quickstart-presentation-lock/wordpress/v1",
+    "options": {
+        "stylesheet": "test-theme",
+        "template": "test-theme"
+    },
+    "fileRoots": [
+        "wp-content/themes/test-theme"
+    ],
+    "files": {
+        "wp-content/themes/test-theme/style.css": "cee549a6be78437da980942ee76c1649f4d1b4ca1af9eeeed5b0c98e12f0b18e",
+        "wp-content/themes/test-theme/theme.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    "entities": {
+        "page-menu": {
+            "post_type": "page",
+            "post_name": "menu",
+            "post_status": "publish",
+            "post_parent": 0,
+            "skeleton": "332a69a88042116331e4fb8459c73950c5437e1b2ccd66bced60fd5d80eaab12"
+        },
+        "post-spring-notes": {
+            "post_type": "post",
+            "post_name": "spring-notes",
+            "post_status": "publish",
+            "post_parent": 0,
+            "skeleton": "d00b8746edc61249647875f2ce94e78f1dba232a46644043d33d0d78d3103305"
+        }
+    }
+}

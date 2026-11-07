@@ -1,0 +1,79 @@
+{
+    "schemaVersion": "tracy-quickstart-content-map/wordpress/v1",
+    "entities": [
+        { "key": "page-menu", "kind": "page", "identity": { "postType": "page", "slug": "menu" } },
+        { "key": "post-spring-notes", "kind": "post", "identity": { "postType": "post", "slug": "spring-notes" } },
+        { "key": "option-blog-banner", "kind": "option", "identity": { "name": "test_theme_blog_banner_image" } }
+    ],
+    "slots": [
+        {
+            "key": "menu.menu.title",
+            "entity": "page-menu",
+            "target": { "block": "menu.title", "attr": "content" },
+            "type": "text",
+            "markup": "inline",
+            "markupClasses": ["text-muted"],
+            "sample": "Our ((span class=\"text-accent\"))Menu((/span))((br/))this season",
+            "maxCharacters": 60,
+            "label": "menu — menu.title"
+        },
+        {
+            "key": "menu.dish.one",
+            "entity": "page-menu",
+            "target": { "block": "dish.one", "attr": "content" },
+            "type": "text",
+            "markup": "inline",
+            "sample": "Lemon Rice Bowl ((span class=\"price\"))$12((/span))",
+            "maxCharacters": 40,
+            "label": "menu — dish.one"
+        },
+        {
+            "key": "menu.menu.cta",
+            "entity": "page-menu",
+            "target": { "block": "menu.cta", "attr": "content" },
+            "type": "text",
+            "markup": "inline",
+            "sample": "Book a table ((a class=\"btn-link\" href=\"/reservation/\"))today((/a)).",
+            "maxCharacters": 80,
+            "label": "menu — menu.cta"
+        },
+        {
+            "key": "menu.menu.note",
+            "entity": "page-menu",
+            "target": { "block": "menu.note", "attr": "content" },
+            "type": "text",
+            "sample": "Open daily from noon.",
+            "maxCharacters": 80,
+            "label": "menu — menu.note"
+        },
+        {
+            "key": "post-spring-notes.post.intro",
+            "entity": "post-spring-notes",
+            "target": { "block": "post.intro", "attr": "content" },
+            "type": "text",
+            "sample": "Three new plates arrive with the first warm week.",
+            "maxCharacters": 120,
+            "label": "post-spring-notes — post.intro"
+        },
+        {
+            "key": "post-spring-notes.intro-image",
+            "entity": "post-spring-notes",
+            "target": { "meta": "tt_intro_image" },
+            "type": "image",
+            "sample": "wp-content/uploads/2026/09/plates.jpg",
+            "sampleId": 92,
+            "maxCharacters": 255,
+            "label": "post-spring-notes — list picture"
+        },
+        {
+            "key": "blog.banner",
+            "entity": "option-blog-banner",
+            "target": { "option": "test_theme_blog_banner_image" },
+            "type": "image",
+            "sample": "wp-content/uploads/2026/09/banner.jpg",
+            "sampleId": 93,
+            "maxCharacters": 255,
+            "label": "Blog banner"
+        }
+    ]
+}
