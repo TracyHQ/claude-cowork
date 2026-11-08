@@ -37,7 +37,7 @@ function markedSite(string $fixtures, string $menu, string $post): array
     WP_Fake::reset();
     WP_Fake::$stylesheet = 'test-theme';
     WP_Fake::$options = ['stylesheet' => 'test-theme', 'template' => 'test-theme', 'home' => 'http://test.local',
-        'test_theme_blog_banner_image' => '93'];
+        'test_theme_blog_banner_image' => '93', 'test_theme_contact_phone' => '(555) 010-2030'];
     WP_Fake::$posts[10] = ['ID' => 10, 'post_type' => 'page', 'post_name' => 'menu', 'post_status' => 'publish', 'post_parent' => 0, 'post_title' => 'Menu', 'post_content' => $menu];
     WP_Fake::$posts[20] = ['ID' => 20, 'post_type' => 'post', 'post_name' => 'spring-notes', 'post_status' => 'publish', 'post_parent' => 0,
         'post_title' => 'Spring notes', 'post_excerpt' => '', 'post_content' => $post];
@@ -76,6 +76,7 @@ function markedVariant(callable $edit): array
     return [
         'inspect' => $inspect['problems'] ?? null,
         'answer' => $inspect,
+        'engine' => $engine,
         'bind' => $engine->handle(['token' => $GLOBALS['WTOKEN'], 'action' => 'content.contract', 'params' => ['operation' => 'bind', 'contract' => 'marked-design/wp7/1.0.0']])['ok'] ?? null,
     ];
 }

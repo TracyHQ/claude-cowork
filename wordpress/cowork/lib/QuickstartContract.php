@@ -124,6 +124,8 @@ final class QuickstartContract
     private array $themeOptions = [];
     /** @var string[] post meta keys of the theme that hold a picture's attachment id (manifest `themePictures.postMeta`) */
     private array $themeMeta = [];
+    /** @var string[]|null options of the theme that hold a text of the business (manifest `themeTexts.options`); null when the manifest declares none */
+    private ?array $themeTexts = null;
 
     /** @var callable|null `fn(): list<row>|Generator` the site's own rows, in DerivedMap's shape, or their batches (WordPressDerivedRows) */
     private $derivedRows = null;
@@ -265,6 +267,7 @@ final class QuickstartContract
         }
         $this->manifest = $files['manifest'];
         [$this->themeOptions, $this->themeMeta] = self::themePictures($files['manifest'], $id);
+        $this->themeTexts = self::themeTexts($files['manifest'], $id);
         $this->map = $files['content-map'];
         $this->lock = $files['presentation-lock'];
         $this->derived = false;
@@ -709,6 +712,15 @@ final class QuickstartContract
             $kind = (string) ($entity['kind'] ?? '');
             $identity = is_array($entity['identity'] ?? null) ? $entity['identity'] : [];
             $found = $this->find($kind, $identity, $binding !== null && $kind !== 'option' ? (int) ($binding['ids'][$key] ?? 0) : 0);
+            if (isset($found['problem']) && $kind === 'option' && $this->isDeclaredThemeText($key, (string) ($identity['name'] ?? ''))) {
+                // A text option of the theme that the site has not stored yet reads empty; the first apply creates it
+                // and its undo takes it away again.
+                $entities[] = ['key' => $key, 'kind' => $kind, 'id' => null, 'language' => null, 'status' => null];
+                foreach ($this->slotsFor($key) as $slot) {
+                    $slotValues[$slot['key']] = '';
+                }
+                continue;
+            }
             if (isset($found['problem']) && $kind === 'option' && $this->isSiteIdentity($key)) {
                 // The released archive carries no identity row (Tracy Business wp7 1.2.0, 1.3.0):
                 // absent is the all-empty identity the theme renders, and the first apply creates it.
@@ -784,6 +796,18 @@ final class QuickstartContract
                         } catch (RuntimeException $e) {
                             $problems[] = 'Slot ' . $slot['key'] . ': ' . $e->getMessage();
                         }
+                        continue;
+                    }
+                    $named = (string) ($slot['target']['option'] ?? '');
+                    if ($named !== '' && $named !== (string) ($identity['name'] ?? '')) {
+                        $problems[] = 'Slot ' . $slot['key'] . ': the slot names ' . $named . ', not the option of its entity ' . (string) ($identity['name'] ?? '');
+                        continue;
+                    }
+                    // A profile that declares `themeTexts` holds every text option other than the site's own name and
+                    // tagline to that list: nothing undeclared is read or written.
+                    if ($this->themeTexts !== null && !isset($slot['target']['field'])
+                        && !in_array((string) ($identity['name'] ?? ''), ['blogname', 'blogdescription'], true) && !in_array((string) ($identity['name'] ?? ''), $this->themeTexts, true)) {
+                        $problems[] = 'Slot ' . $slot['key'] . ': undeclared theme text option ' . (string) ($identity['name'] ?? '');
                         continue;
                     }
                     $value = $this->optionSlotValue($row['value'], $slot, $siteIdentity);
@@ -1251,6 +1275,37 @@ final class QuickstartContract
     }
 
     /**
+     * The options a profile's manifest declares as holding a text of the business that its theme prints
+     * (`themeTexts: {options: [...]}`, TracyHQ/tracy#459): a phone, an address, a website. An option must carry the
+     * theme's own prefix (`wp-ja-diner` → `wp_ja_diner_…`), so a declaration can never reach a core setting. A
+     * declaration that does not hold refuses the profile whole, like any extension of it. Null when none is declared.
+     *
+     * @return string[]|null
+     */
+    private static function themeTexts(array $manifest, string $id): ?array
+    {
+        if (!array_key_exists('themeTexts', $manifest)) {
+            return null;
+        }
+        $declared = $manifest['themeTexts'];
+        $options = is_array($declared) ? ($declared['options'] ?? null) : null;
+        if (!is_array($options) || array_values($options) !== $options) {
+            throw new ContractUnavailable($id . ': themeTexts declares options as a list of names');
+        }
+        $theme = (string) ($manifest['theme'] ?? '');
+        $prefix = str_replace('-', '_', $theme) . '_';
+        foreach ($options as $name) {
+            if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $name)) {
+                throw new ContractUnavailable($id . ': themeTexts declares options as a list of names');
+            }
+            if ($theme === '' || strpos($name, $prefix) !== 0 || $name === $prefix) {
+                throw new ContractUnavailable($id . ': theme text option ' . $name . ' is not one of the theme ' . $theme . ' (its name starts ' . $prefix . ')');
+            }
+        }
+        return $options;
+    }
+
+    /**
      * The picture a theme option holds: an image slot of a declared option, read as the uploads path of
      * the attachment its id names ('' for none).
      *
@@ -1344,6 +1399,31 @@ final class QuickstartContract
      * creates it) and may lack fields: both read empty, as the theme renders them (Tracy
      * `tasks/spec-danh-tinh-site-wordpress.md`: a missing field is empty, never the demo value).
      */
+    /** Is this option entity a theme text option the manifest declares, every slot of it the whole option as text? */
+    private function isDeclaredThemeText(string $key, string $name): bool
+    {
+        if ($this->themeTexts === null || !in_array($name, $this->themeTexts, true)) {
+            return false;
+        }
+        $slots = $this->slotsFor($key);
+        foreach ($slots as $slot) {
+            if (($slot['target']['option'] ?? null) !== $name || isset($slot['target']['field']) || ($slot['type'] ?? 'text') === 'image') {
+                return false;
+            }
+        }
+        return $slots !== [];
+    }
+
+    /** Plain text as WordPress stores it: one line, or the lines of a `multiline` slot. */
+    private static function plainText(string $value, bool $multiline): string
+    {
+        if (function_exists('sanitize_text_field')) {
+            return (string) ($multiline ? sanitize_textarea_field($value) : sanitize_text_field($value));
+        }
+        $value = trim(strip_tags(str_replace("\r\n", "\n", $value)));
+        return $multiline ? implode("\n", array_map('trim', explode("\n", $value))) : trim((string) preg_replace('/\s+/', ' ', $value));
+    }
+
     private function isSiteIdentity(string $key): bool
     {
         $slots = $this->slotsFor($key);
@@ -1518,7 +1598,8 @@ final class QuickstartContract
                         }
                         $next[(string) $slot['target']['field']] = $new;
                     } else {
-                        $next = $new;
+                        $next = isset($slot['target']['option']) && $this->themeTexts !== null && in_array($target['key'], $this->themeTexts, true)
+                            ? self::plainText($new, ($slot['multiline'] ?? false) === true) : $new;
                     }
                 }
                 if ($next !== $value) {
