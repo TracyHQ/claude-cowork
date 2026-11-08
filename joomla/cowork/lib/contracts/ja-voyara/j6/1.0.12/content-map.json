@@ -25231,11 +25231,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -25276,11 +25276,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -25321,11 +25321,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -25366,11 +25366,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -25411,11 +25411,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -25456,11 +25456,11 @@
         "include_info"
       ],
       "label": "Diving the Maldives: beyond the resort / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-108.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -30803,11 +30803,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -30848,11 +30848,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -30893,11 +30893,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -30938,11 +30938,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -30983,11 +30983,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -31028,11 +31028,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -31073,11 +31073,11 @@
         "include_info"
       ],
       "label": "Walking the Kungsleden under midnight sun / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-214.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32253,11 +32253,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32298,11 +32298,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32343,11 +32343,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32388,11 +32388,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32433,11 +32433,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32478,11 +32478,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -32523,11 +32523,11 @@
         "include_info"
       ],
       "label": "Acclimatising for Kilimanjaro the slow way / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-215.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -33634,11 +33634,11 @@
         "include_info"
       ],
       "label": "The W Trek minus the high-season crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-216.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -33679,11 +33679,11 @@
         "include_info"
       ],
       "label": "The W Trek minus the high-season crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-216.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -33724,11 +33724,11 @@
         "include_info"
       ],
       "label": "The W Trek minus the high-season crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-216.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -33769,11 +33769,11 @@
         "include_info"
       ],
       "label": "The W Trek minus the high-season crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-216.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35108,11 +35108,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35153,11 +35153,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35198,11 +35198,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35243,11 +35243,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35288,11 +35288,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35333,11 +35333,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -35378,11 +35378,11 @@
         "include_info"
       ],
       "label": "Nepal Manaslu Circuit teahouse by teahouse / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-217.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36489,11 +36489,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36534,11 +36534,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36579,11 +36579,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36624,11 +36624,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36669,11 +36669,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -36714,11 +36714,11 @@
         "include_info"
       ],
       "label": "Scrambling the Drakensberg amphitheatre / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-218.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -37894,11 +37894,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -37939,11 +37939,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -37984,11 +37984,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -38029,11 +38029,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -38074,11 +38074,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -38119,11 +38119,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -38164,11 +38164,11 @@
         "include_info"
       ],
       "label": "Hut to hut across the Tour du Mont Blanc / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-219.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41250,11 +41250,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41295,11 +41295,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41340,11 +41340,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41385,11 +41385,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41430,11 +41430,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41475,11 +41475,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -41520,11 +41520,11 @@
         "include_info"
       ],
       "label": "A long weekend in the Azores: volcanoes and silence / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-224.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -42997,11 +42997,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -43042,11 +43042,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -43087,11 +43087,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -43132,11 +43132,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -43177,11 +43177,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -43222,11 +43222,11 @@
         "include_info"
       ],
       "label": "Dawn at Angkor: why you must arrive before the crowds / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-225.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44630,11 +44630,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44675,11 +44675,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44720,11 +44720,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44765,11 +44765,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44810,11 +44810,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44855,11 +44855,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -44900,11 +44900,11 @@
         "include_info"
       ],
       "label": "Where to eat in Naples: the real pizza city / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-226.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46446,11 +46446,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46491,11 +46491,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46536,11 +46536,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46581,11 +46581,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46626,11 +46626,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -46671,11 +46671,11 @@
         "include_info"
       ],
       "label": "The slow train from Hanoi to Danang / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-227.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48712,11 +48712,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48757,11 +48757,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48802,11 +48802,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48847,11 +48847,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48892,11 +48892,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48937,11 +48937,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -48982,11 +48982,11 @@
         "include_info"
       ],
       "label": "Chasing the northern lights in northern Finland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-229.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50459,11 +50459,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50504,11 +50504,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50549,11 +50549,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50594,11 +50594,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50639,11 +50639,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50684,11 +50684,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -50729,11 +50729,11 @@
         "include_info"
       ],
       "label": "Marrakech beyond the medina: riads, gardens and quiet corners / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-230.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52612,11 +52612,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52657,11 +52657,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52702,11 +52702,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52747,11 +52747,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52792,11 +52792,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52837,11 +52837,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -52882,11 +52882,11 @@
         "include_info"
       ],
       "label": "Japan's Kumano Kodo pilgrim trails / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-231.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54079,11 +54079,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54124,11 +54124,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54169,11 +54169,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54214,11 +54214,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54259,11 +54259,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54304,11 +54304,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -54349,11 +54349,11 @@
         "include_info"
       ],
       "label": "Crossing Corsica end to end on the GR20 / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-232.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55654,11 +55654,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55699,11 +55699,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55744,11 +55744,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55789,11 +55789,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55834,11 +55834,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55879,11 +55879,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -55924,11 +55924,11 @@
         "include_info"
       ],
       "label": "Island-hopping the Cyclades by ferry / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-233.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57304,11 +57304,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57349,11 +57349,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57394,11 +57394,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57439,11 +57439,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57484,11 +57484,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57529,11 +57529,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -57574,11 +57574,11 @@
         "include_info"
       ],
       "label": "Tracking black rhino on foot in Damaraland / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-234.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60217,11 +60217,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60262,11 +60262,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60307,11 +60307,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60352,11 +60352,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60397,11 +60397,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60442,11 +60442,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -60487,11 +60487,11 @@
         "include_info"
       ],
       "label": "Trekking the Laugavegur trail across Iceland's highlands / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-238.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62588,11 +62588,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62633,11 +62633,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62678,11 +62678,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62723,11 +62723,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62768,11 +62768,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -62813,11 +62813,11 @@
         "include_info"
       ],
       "label": "Slow days on the Andaman beaches of Koh Lanta / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-241.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64193,11 +64193,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64238,11 +64238,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64283,11 +64283,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64328,11 +64328,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64373,11 +64373,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -64418,11 +64418,11 @@
         "include_info"
       ],
       "label": "Snorkelling with whale sharks off Mafia Island / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-242.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -65798,11 +65798,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -65843,11 +65843,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -65888,11 +65888,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -65933,11 +65933,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -65978,11 +65978,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -66023,11 +66023,11 @@
         "include_info"
       ],
       "label": "Riding the Death Railway through Kanchanaburi / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-243.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67403,11 +67403,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67448,11 +67448,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67493,11 +67493,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67538,11 +67538,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67583,11 +67583,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67628,11 +67628,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -67673,11 +67673,11 @@
         "include_info"
       ],
       "label": "Eating your way around a Lisbon tasca crawl / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-244.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69451,11 +69451,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69496,11 +69496,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69541,11 +69541,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69586,11 +69586,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69631,11 +69631,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -69676,11 +69676,11 @@
         "include_info"
       ],
       "label": "Walking the Nakasendo between Magome and Tsumago / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-246.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -71921,11 +71921,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -71966,11 +71966,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -72011,11 +72011,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -72056,11 +72056,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -72101,11 +72101,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -72146,11 +72146,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -72191,11 +72191,11 @@
         "include_info"
       ],
       "label": "Finding the quiet beaches of the Algarve / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-249.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73709,11 +73709,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73754,11 +73754,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73799,11 +73799,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73844,11 +73844,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73889,11 +73889,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73934,11 +73934,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -73979,11 +73979,11 @@
         "include_info"
       ],
       "label": "Birding the cloud forest of Monteverde / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-250.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75290,11 +75290,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75335,11 +75335,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75380,11 +75380,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75425,11 +75425,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75470,11 +75470,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -75515,11 +75515,11 @@
         "include_info"
       ],
       "label": "The Tazara Railway: Dar es Salaam to the Zambian border / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-251.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79673,11 +79673,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79718,11 +79718,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79763,11 +79763,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79808,11 +79808,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79853,11 +79853,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79898,11 +79898,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -79943,11 +79943,11 @@
         "include_info"
       ],
       "label": "Via ferrata in the Italian Dolomites / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-258.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -112967,11 +112967,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113012,11 +113012,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113057,11 +113057,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113102,11 +113102,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113147,11 +113147,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113192,11 +113192,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113237,11 +113237,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -113282,11 +113282,11 @@
         "include_info"
       ],
       "label": "Okavango Delta Mokoro Safari / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-372.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114588,11 +114588,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114633,11 +114633,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114678,11 +114678,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114723,11 +114723,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114768,11 +114768,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114813,11 +114813,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114858,11 +114858,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114903,11 +114903,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -114948,11 +114948,11 @@
         "include_info"
       ],
       "label": "Volcanoes Gorilla Trek and Kigali / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-373.tour-include.8",
         "item": 8,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116392,11 +116392,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116437,11 +116437,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116482,11 +116482,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116527,11 +116527,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116572,11 +116572,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116617,11 +116617,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116662,11 +116662,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -116707,11 +116707,11 @@
         "include_info"
       ],
       "label": "Nile Cruise: Luxor to Aswan / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-374.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118013,11 +118013,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118058,11 +118058,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118103,11 +118103,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118148,11 +118148,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118193,11 +118193,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118238,11 +118238,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118283,11 +118283,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -118328,11 +118328,11 @@
         "include_info"
       ],
       "label": "Sossusvlei Dunes and Deadvlei / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-375.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119639,11 +119639,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119684,11 +119684,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119729,11 +119729,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119774,11 +119774,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119819,11 +119819,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119864,11 +119864,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119909,11 +119909,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -119954,11 +119954,11 @@
         "include_info"
       ],
       "label": "Inca Trail to Machu Picchu / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-376.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121265,11 +121265,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121310,11 +121310,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121355,11 +121355,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121400,11 +121400,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121445,11 +121445,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121490,11 +121490,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121535,11 +121535,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -121580,11 +121580,11 @@
         "include_info"
       ],
       "label": "Patagonia: Fitz Roy Trek in El Chaltén / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-377.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122748,11 +122748,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122793,11 +122793,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122838,11 +122838,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122883,11 +122883,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122928,11 +122928,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -122973,11 +122973,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -123018,11 +123018,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -123063,11 +123063,11 @@
         "include_info"
       ],
       "label": "Bolivia: Uyuni Salt Flats and Altiplano / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-378.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124512,11 +124512,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124557,11 +124557,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124602,11 +124602,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124647,11 +124647,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124692,11 +124692,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124737,11 +124737,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124782,11 +124782,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -124827,11 +124827,11 @@
         "include_info"
       ],
       "label": "Galápagos Islands Small-Ship Cruise / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-379.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126133,11 +126133,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126178,11 +126178,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126223,11 +126223,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126268,11 +126268,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126313,11 +126313,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126358,11 +126358,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126403,11 +126403,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -126448,11 +126448,11 @@
         "include_info"
       ],
       "label": "Colombia's Coffee Triangle and Cocora Valley / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-380.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -127823,11 +127823,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -127868,11 +127868,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -127913,11 +127913,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -127958,11 +127958,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -128003,11 +128003,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -128048,11 +128048,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -128093,11 +128093,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -128138,11 +128138,11 @@
         "include_info"
       ],
       "label": "Canadian Rockies: Icefields Parkway Road Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-381.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129661,11 +129661,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129706,11 +129706,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129751,11 +129751,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129796,11 +129796,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129841,11 +129841,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129886,11 +129886,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129931,11 +129931,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -129976,11 +129976,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -130021,11 +130021,11 @@
         "include_info"
       ],
       "label": "Everest Base Camp Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-382.tour-include.8",
         "item": 8,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131608,11 +131608,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131653,11 +131653,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131698,11 +131698,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131743,11 +131743,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131788,11 +131788,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131833,11 +131833,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131878,11 +131878,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -131923,11 +131923,11 @@
         "include_info"
       ],
       "label": "Annapurna Circuit and Poon Hill Panorama / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-383.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133367,11 +133367,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133412,11 +133412,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133457,11 +133457,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133502,11 +133502,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133547,11 +133547,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133592,11 +133592,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133637,11 +133637,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -133682,11 +133682,11 @@
         "include_info"
       ],
       "label": "Bhutan Druk Path Trek and Paro Cultural Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-384.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135195,11 +135195,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135240,11 +135240,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135285,11 +135285,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135330,11 +135330,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135375,11 +135375,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135420,11 +135420,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135465,11 +135465,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -135510,11 +135510,11 @@
         "include_info"
       ],
       "label": "Ladakh Markha Valley Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-385.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137028,11 +137028,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137073,11 +137073,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137118,11 +137118,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137163,11 +137163,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137208,11 +137208,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137253,11 +137253,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137298,11 +137298,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -137343,11 +137343,11 @@
         "include_info"
       ],
       "label": "Kyrgyzstan Tian Shan and Song-Kol Lake Trek / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-386.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -138994,11 +138994,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139039,11 +139039,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139084,11 +139084,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139129,11 +139129,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139174,11 +139174,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139219,11 +139219,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139264,11 +139264,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -139309,11 +139309,11 @@
         "include_info"
       ],
       "label": "Tajikistan Pamir Highway Overland Journey / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-387.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140615,11 +140615,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140660,11 +140660,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140705,11 +140705,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140750,11 +140750,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140795,11 +140795,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140840,11 +140840,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140885,11 +140885,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -140930,11 +140930,11 @@
         "include_info"
       ],
       "label": "Almaty and the Trans-Ili Alatau Mountains / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-388.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142241,11 +142241,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142286,11 +142286,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142331,11 +142331,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142376,11 +142376,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142421,11 +142421,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142466,11 +142466,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142511,11 +142511,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -142556,11 +142556,11 @@
         "include_info"
       ],
       "label": "Kiso Valley Post Towns: Narai to Nezame-no-Toko / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-389.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144053,11 +144053,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144098,11 +144098,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144143,11 +144143,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144188,11 +144188,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144233,11 +144233,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144278,11 +144278,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144323,11 +144323,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -144368,11 +144368,11 @@
         "include_info"
       ],
       "label": "Walking the Shikoku 88-Temple Pilgrim Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-390.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -145812,11 +145812,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -145857,11 +145857,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -145902,11 +145902,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -145947,11 +145947,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -145992,11 +145992,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -146037,11 +146037,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -146082,11 +146082,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -146127,11 +146127,11 @@
         "include_info"
       ],
       "label": "Kamikochi and the Northern Japan Alps / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-391.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147502,11 +147502,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147547,11 +147547,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147592,11 +147592,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147637,11 +147637,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147682,11 +147682,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147727,11 +147727,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147772,11 +147772,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -147817,11 +147817,11 @@
         "include_info"
       ],
       "label": "Daisetsuzan Winter Wilderness, Hokkaido / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-392.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149202,11 +149202,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149247,11 +149247,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149292,11 +149292,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149337,11 +149337,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149382,11 +149382,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149427,11 +149427,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149472,11 +149472,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -149517,11 +149517,11 @@
         "include_info"
       ],
       "label": "Kyoto and Nara: Temples, Gardens and Old Capitals / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-393.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -150940,11 +150940,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -150985,11 +150985,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151030,11 +151030,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151075,11 +151075,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151120,11 +151120,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151165,11 +151165,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151210,11 +151210,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -151255,11 +151255,11 @@
         "include_info"
       ],
       "label": "Seoul to Gyeongju: Korea's Royal Heritage Trail / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-394.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152561,11 +152561,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152606,11 +152606,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152651,11 +152651,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152696,11 +152696,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152741,11 +152741,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152786,11 +152786,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152831,11 +152831,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -152876,11 +152876,11 @@
         "include_info"
       ],
       "label": "The Ha Giang Loop: karst mountains and mist by motorbike / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-395.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154187,11 +154187,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154232,11 +154232,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154277,11 +154277,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154322,11 +154322,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154367,11 +154367,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154412,11 +154412,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154457,11 +154457,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -154502,11 +154502,11 @@
         "include_info"
       ],
       "label": "Luang Prabang and the Mekong slow boat to the Golden Triangle / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-396.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155744,11 +155744,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155789,11 +155789,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155834,11 +155834,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155879,11 +155879,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155924,11 +155924,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -155969,11 +155969,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -156014,11 +156014,11 @@
         "include_info"
       ],
       "label": "Flores to Komodo: dragons, phinisi decks and pink-sand bays / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-397.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157394,11 +157394,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157439,11 +157439,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157484,11 +157484,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157529,11 +157529,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157574,11 +157574,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157619,11 +157619,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157664,11 +157664,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -157709,11 +157709,11 @@
         "include_info"
       ],
       "label": "Palawan island-hopping: El Nido's lagoons to Coron's wrecks / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-398.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159084,11 +159084,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.0",
         "item": 0,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159129,11 +159129,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.1",
         "item": 1,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159174,11 +159174,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.2",
         "item": 2,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159219,11 +159219,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.3",
         "item": 3,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159264,11 +159264,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.4",
         "item": 4,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159309,11 +159309,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.5",
         "item": 5,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159354,11 +159354,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.6",
         "item": 6,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
@@ -159399,11 +159399,11 @@
         "include_info"
       ],
       "label": "Wild Borneo: orangutans, river safaris and Sabah's rainforest / include_info",
-      "role": "offering.description",
+      "role": "package.feature_item",
       "group": {
         "id": "article-399.tour-include.7",
         "item": 7,
-        "kind": "service"
+        "kind": "claim"
       },
       "fit": {
         "measured": true,
