@@ -2,31 +2,16 @@
   "schemaVersion": "tracy-quickstart-showcase-nav/joomla/v1",
   "profileVersion": "1.0.0",
   "contract": "ja-voyara/j6/1.0.12",
-  "baseHash": "9f723c5aa69194297c334ba9fb2a034edc060a472bc227cc5dcb6e762af4eebf",
+  "baseHash": "65e2276093af74f44de2e85f60a6c6a887ffe4a4c6ab4f8b40ce543384b31a93",
   "baseFiles": {
     "manifest.json": "897489b649536906753f46c8b9517cdc2cdd0e7b0c35af5fbd057623febcd5fe",
-    "content-map.json": "2a68725b01c66d4682f3eb23b710215b6a0d8feb99fed1d5edbc37b959d4a7f8",
+    "content-map.json": "5842836cbe11915bb61f30871f3b5b695cdcfa595858041baaa9f9a9e1012ab3",
     "presentation-lock.json": "425bf05cce746f39d266de4e351f2961e8519093fc35db4b5ebf1774d0b0add0"
   },
   "inputs": {},
-  "decisionsHash": "64170fd482d424d463eb269527269bc9b2bf93ea1ffea51814cb40b5584af2f1",
+  "decisionsHash": "43cf075dc6e809d5ffee103888caa0bb17dcb47c4cec1eb95ca0db8fb568db69",
   "status": "checked",
   "operations": [
-    {
-      "op": "menuItem.param",
-      "key": "menuItem-224",
-      "identity": {
-        "path": "pages",
-        "menutype": "mainmenu",
-        "language": "*"
-      },
-      "label": "Pages",
-      "path": "menu_show",
-      "from": "1",
-      "to": "0",
-      "rule": "hide.decision",
-      "reason": "the \"Pages\" branch is the template's demo kit (sample user screens, Joomla's own pages, sample content views), not a page of the customer's business: Tracy customer sites never show it in navigation (product decision, 25/10/2026); the page and its URL keep working"
-    },
     {
       "op": "menuItem.param",
       "key": "menuItem-260",
@@ -254,21 +239,6 @@
     },
     {
       "op": "menuItem.param",
-      "key": "menuItem-276",
-      "identity": {
-        "path": "pages/landing",
-        "menutype": "mainmenu",
-        "language": "*"
-      },
-      "label": "Landing",
-      "path": "menu_show",
-      "from": "1",
-      "to": "0",
-      "rule": "hide.decision",
-      "reason": "\"Landing\" sits in the \"Pages\" branch, which is the template's demo kit (sample user screens, Joomla's own pages, sample content views), not a page of the customer's business: Tracy customer sites never show it in navigation (product decision, 25/10/2026); the page and its URL keep working"
-    },
-    {
-      "op": "menuItem.param",
       "key": "menuItem-277",
       "identity": {
         "path": "pages/about",
@@ -491,6 +461,13 @@
       "reason": "no rule hides it"
     },
     {
+      "key": "menuItem-276",
+      "label": "Landing",
+      "where": "mainmenu/pages/landing",
+      "rule": "keep.only-route-to-content",
+      "reason": "the only menu route to article:212: a branch hide may not take real content along"
+    },
+    {
       "key": "menuItem-320",
       "label": "Destinations",
       "where": "footer-explore/all-destinations",
@@ -642,14 +619,22 @@
       "label": "[Global] Offcanvas Menu",
       "where": "mod_menu@off-canvas",
       "rule": "keep.default",
-      "reason": "renders mainmenu: 23 entries stay"
+      "reason": "renders mainmenu: 25 entries stay"
     }
   ],
-  "unresolved": [],
+  "unresolved": [
+    {
+      "key": "menuItem-224",
+      "label": "Pages",
+      "where": "mainmenu/pages",
+      "rule": "unresolved.decision-conflict",
+      "reason": "decided hidden, but it holds menuItem-276, which stays"
+    }
+  ],
   "counts": {
-    "menuItems": 21,
+    "menuItems": 19,
     "modules": 0,
-    "kept": 45,
-    "unresolved": 0
+    "kept": 46,
+    "unresolved": 1
   }
 }
