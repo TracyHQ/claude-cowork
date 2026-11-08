@@ -285,6 +285,12 @@ without roles answers exactly as before.
     An option must start with the theme's own prefix (`wp-ja-diner` gives `wp_ja_diner_`) and a
     meta key must not start with `_`, or the profile is refused whole; an undeclared one is a problem
     by name. `_thumbnail_id` is unchanged.
+    It may also declare texts its theme prints from options of its own (`themeTexts: {options:
+    [...]}`, e.g. a phone or opening hours): a text slot names the option as its entity and as
+    `target.option` (`multiline: true` keeps line breaks). Same prefix rule; once declared, any
+    other text option except `blogname` and `blogdescription` is a problem by name. A value is
+    stored as plain text (`sanitize_text_field`, or `sanitize_textarea_field` for a multiline slot);
+    an option the site has not stored reads empty, and the revert takes it away again.
   - `bind` — inspect, then store the binding. Refused when already bound (`conflict`) or on any
     problem: the baseline is the released lock, never a snapshot of the site as found.
   - `apply` — `expected_revision`, `apply_id` (prefix `contract-`), `request_id`, `changes:

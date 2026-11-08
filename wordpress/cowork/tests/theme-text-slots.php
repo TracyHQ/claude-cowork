@@ -70,3 +70,44 @@ check('the option holds the words', WP_Fake::$options['test_theme_contact_phone'
 check('it reads back, and is not drift', [$ttdoor('inspect')['slots']['theme.contact-phone'] ?? null, $ttdoor('inspect')['problems']], ['+1 555 010 9999', []]);
 check('the revert puts the demo phone back', [(bool) ($tt->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-tt1']])['ok'] ?? false), WP_Fake::$options['test_theme_contact_phone']],
     [true, '(555) 010-2030']);
+
+// ── plain text, an option not stored yet, and the option the slot's entity names ────────────
+
+// (The plugin's own plain-text rules are checked here: the test host defines no sanitize_text_field.)
+$withHours = static function (array $manifest, array $map) use ($withPhone): array {
+    [$manifest, $map] = $withPhone($manifest, $map);
+    $manifest['themeTexts']['options'][] = 'test_theme_hours';
+    $map['entities'][] = ['key' => 'option-hours', 'kind' => 'option', 'identity' => ['name' => 'test_theme_hours']];
+    $map['slots'][] = ['key' => 'theme.hours', 'entity' => 'option-hours', 'target' => ['option' => 'test_theme_hours'],
+        'type' => 'text', 'multiline' => true, 'sample' => "Mon-Fri 9-5\nSat 10-2", 'maxCharacters' => 120, 'label' => 'Opening hours'];
+    return [$manifest, $map];
+};
+$hours = markedVariant($withHours);
+check('a declared option the site has not stored yet is no problem and binds', [$hours['inspect'], $hours['bind']], [[], true]);
+$hx = $hours['engine'];
+$hdoor = static function (string $operation, array $params = []) use ($hx, $WTOKEN): array {
+    return $hx->handle(['token' => $WTOKEN, 'action' => 'content.contract', 'params' => ['operation' => $operation, 'contract' => 'marked-design/wp7/1.0.0'] + $params]);
+};
+$hinsp = $hdoor('inspect');
+check('it reads empty', $hinsp['slots']['theme.hours'], '');
+$hwrite = $hdoor('apply', ['expected_revision' => $hinsp['revision'], 'apply_id' => 'contract-hh1', 'request_id' => 'hh1',
+    'changes' => ['theme.hours' => "Mon-Fri 9-5  \n Sat 10-2", 'theme.contact-phone' => "  +1 555\n0199 "]]);
+check('both land', $hwrite['ok'] ?? $hwrite, true);
+check('a multiline slot keeps its lines, a one-line slot is one line', [WP_Fake::$options['test_theme_hours'], WP_Fake::$options['test_theme_contact_phone']],
+    ["Mon-Fri 9-5\nSat 10-2", '+1 555 0199']);
+check('the revert restores the phone and takes away the option that did not exist',
+    [(bool) ($hx->handle(['token' => $WTOKEN, 'action' => 'apply.revert', 'params' => ['apply_id' => 'contract-hh1']])['ok'] ?? false),
+        WP_Fake::$options['test_theme_contact_phone'], array_key_exists('test_theme_hours', WP_Fake::$options)],
+    [true, '(555) 010-2030', false]);
+check('markup is not text', $hdoor('apply', ['expected_revision' => $hdoor('inspect')['revision'], 'apply_id' => 'contract-hh2', 'request_id' => 'hh2',
+    'changes' => ['theme.hours' => '<b>9-5</b>']])['errors'][0]['code'] ?? null, 'SLOT_NOT_CONTENT');
+check('an option no slot names is never written', array_key_exists('test_theme_hours', WP_Fake::$options) || WP_Fake::$options['home'] !== 'http://test.local', false);
+
+$mismatch = markedVariant(static function (array $m, array $p) use ($withPhone): array {
+    [$m, $p] = $withPhone($m, $p);
+    $m['themeTexts']['options'][] = 'test_theme_other';
+    $p['entities'][count($p['entities']) - 1]['identity']['name'] = 'home';
+    return [$m, $p];
+});
+check('a declared name on a slot whose entity is another option is refused, so a declaration never opens a core option', [$mismatch['inspect'], $mismatch['bind']],
+    [['Slot theme.contact-phone: the slot names test_theme_contact_phone, not the option of its entity home'], false]);
