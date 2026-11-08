@@ -124,6 +124,8 @@ final class QuickstartContract
     private array $themeOptions = [];
     /** @var string[] post meta keys of the theme that hold a picture's attachment id (manifest `themePictures.postMeta`) */
     private array $themeMeta = [];
+    /** @var string[]|null options of the theme that hold a text of the business (manifest `themeTexts.options`); null when the manifest declares none */
+    private ?array $themeTexts = null;
 
     /** @var callable|null `fn(): list<row>|Generator` the site's own rows, in DerivedMap's shape, or their batches (WordPressDerivedRows) */
     private $derivedRows = null;
@@ -265,6 +267,7 @@ final class QuickstartContract
         }
         $this->manifest = $files['manifest'];
         [$this->themeOptions, $this->themeMeta] = self::themePictures($files['manifest'], $id);
+        $this->themeTexts = self::themeTexts($files['manifest'], $id);
         $this->map = $files['content-map'];
         $this->lock = $files['presentation-lock'];
         $this->derived = false;
@@ -786,6 +789,14 @@ final class QuickstartContract
                         }
                         continue;
                     }
+                    $named = (string) ($slot['target']['option'] ?? '');
+                    // A profile that declares `themeTexts` holds every text option other than the site's own name and
+                    // tagline to that list: nothing undeclared is read or written.
+                    if ($this->themeTexts !== null && !isset($slot['target']['field'])
+                        && !in_array($named, ['blogname', 'blogdescription'], true) && !in_array($named, $this->themeTexts, true)) {
+                        $problems[] = 'Slot ' . $slot['key'] . ': undeclared theme text option ' . $named;
+                        continue;
+                    }
                     $value = $this->optionSlotValue($row['value'], $slot, $siteIdentity);
                     if ($value === null) {
                         $problems[] = 'Option slot is not text: ' . $slot['key'];
@@ -1248,6 +1259,37 @@ final class QuickstartContract
             }
         }
         return [$options, $meta];
+    }
+
+    /**
+     * The options a profile's manifest declares as holding a text of the business that its theme prints
+     * (`themeTexts: {options: [...]}`, TracyHQ/tracy#459): a phone, an address, a website. An option must carry the
+     * theme's own prefix (`wp-ja-diner` → `wp_ja_diner_…`), so a declaration can never reach a core setting. A
+     * declaration that does not hold refuses the profile whole, like any extension of it. Null when none is declared.
+     *
+     * @return string[]|null
+     */
+    private static function themeTexts(array $manifest, string $id): ?array
+    {
+        if (!array_key_exists('themeTexts', $manifest)) {
+            return null;
+        }
+        $declared = $manifest['themeTexts'];
+        $options = is_array($declared) ? ($declared['options'] ?? null) : null;
+        if (!is_array($options) || array_values($options) !== $options) {
+            throw new ContractUnavailable($id . ': themeTexts declares options as a list of names');
+        }
+        $theme = (string) ($manifest['theme'] ?? '');
+        $prefix = str_replace('-', '_', $theme) . '_';
+        foreach ($options as $name) {
+            if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $name)) {
+                throw new ContractUnavailable($id . ': themeTexts declares options as a list of names');
+            }
+            if ($theme === '' || strpos($name, $prefix) !== 0 || $name === $prefix) {
+                throw new ContractUnavailable($id . ': theme text option ' . $name . ' is not one of the theme ' . $theme . ' (its name starts ' . $prefix . ')');
+            }
+        }
+        return $options;
     }
 
     /**
