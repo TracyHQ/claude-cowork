@@ -19,6 +19,15 @@ try {
     $db->query('CREATE VIEW wp_z_view AS SELECT * FROM `wp_tick``name`');
     $db->query('CREATE VIEW wp_a_view AS SELECT * FROM wp_z_view');
     $db->query('CREATE VIEW wp_empty_view AS SELECT * FROM wp_z_view WHERE id < 0');
+    $db->query("CREATE VIEW wp_literal_view AS SELECT 'literal `{$source}`. stays literal' AS note");
+    $db->query("CREATE TABLE `{$target}`.outside (id INT)");
+    $db->query("CREATE VIEW wp_external_view AS SELECT * FROM `{$target}`.outside");
+    $refused = false;
+    try { (new MysqliRowSource($db))->views(); } catch (RuntimeException $error) {
+        $refused = strpos($error->getMessage(), 'another database') !== false;
+    }
+    if (!$refused) throw new RuntimeException('external database dependency accepted');
+    $db->query('DROP VIEW wp_external_view');
     $src = new MysqliRowSource($db);
     $dump = new DbDumper($src);
     $views = $dump->views();
@@ -41,6 +50,7 @@ try {
         if ($db->query("SELECT * FROM `{$view}` ORDER BY id")->fetch_all() !== $expected) throw new RuntimeException('view round trip differs');
     }
     if ($db->query('SELECT COUNT(*) FROM wp_empty_view')->fetch_row()[0] !== '0') throw new RuntimeException('empty view lost');
+    if ($db->query('SELECT note FROM wp_literal_view')->fetch_row()[0] !== "literal `{$source}`. stays literal") throw new RuntimeException('view literal rewritten');
     $db->query("DROP DATABASE `{$source}`");
     if ($db->query('SELECT * FROM wp_a_view ORDER BY id')->fetch_all() !== $expected) throw new RuntimeException('copy still depends on source');
     echo "ok - backtick identifiers, dependent and empty views round trip independently\n";
