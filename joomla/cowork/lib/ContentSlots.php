@@ -104,6 +104,10 @@ final class ContentSlots
      */
     private static function writeUnit(DOMXPath $xp, DOMElement $unit, string $value): void
     {
+        // The same editable words need no remapping around this unit's excluded CODE.
+        if ($value !== '' && $value === self::slotText($unit))
+            foreach ($xp->query('.//code', $unit) as $code)
+                if (!self::nearestUnitBelow($code, $unit)) return;
         $doc = $unit->ownerDocument; $pieces = self::unitPieces($xp, $unit);
         $mark = $xp->query('./comment()[. = "' . self::EMPTIED_UNIT . '"]', $unit)->item(0);
         if ($pieces === []) {
