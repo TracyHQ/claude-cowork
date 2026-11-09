@@ -18,6 +18,8 @@ try {
     $db->query("INSERT INTO `wp_tick``name` VALUES (1,'literal `{$source}`. stays literal'),(2,'two')");
     $db->query('CREATE VIEW wp_z_view AS SELECT * FROM `wp_tick``name`');
     $db->query('CREATE VIEW wp_a_view AS SELECT * FROM wp_z_view');
+    $db->query('CREATE VIEW wp_a_join_view AS SELECT a.id, a.note FROM (wp_z_view a JOIN wp_z_view b ON a.id=b.id)');
+    $db->query('CREATE VIEW wp_a_nested_view AS SELECT a.id, a.note FROM wp_z_view a WHERE EXISTS (SELECT 1 FROM wp_z_view b WHERE a.id=b.id)');
     $db->query('CREATE VIEW wp_empty_view AS SELECT * FROM wp_z_view WHERE id < 0');
     $db->query("CREATE VIEW wp_literal_view AS SELECT 'literal `{$source}`. stays literal' AS note");
     $db->query("CREATE TABLE `{$target}`.outside (id INT)");
@@ -28,6 +30,16 @@ try {
     }
     if (!$refused) throw new RuntimeException('external database dependency accepted');
     $db->query('DROP VIEW wp_external_view');
+    $db->query("CREATE VIEW wp_external_view AS SELECT a.id FROM `wp_tick``name` a, `{$target}`.outside b WHERE a.id=b.id");
+    $refused = false;
+    try { (new MysqliRowSource($db))->views(); } catch (RuntimeException $error) {
+        $refused = strpos($error->getMessage(), 'another database') !== false;
+    }
+    if (!$refused) throw new RuntimeException('comma join external database dependency accepted');
+    $db->query('DROP VIEW wp_external_view');
+    // A SELECT-list comma followed by a table alias must not create a self-dependency.
+    $db->query('CREATE VIEW wp_alias_view AS SELECT wp_alias_view.id, wp_alias_view.note FROM `wp_tick``name` AS wp_alias_view');
+    $db->query('CREATE VIEW `wp_quote\'view` AS SELECT id, note FROM `wp_tick``name`');
     $src = new MysqliRowSource($db);
     $dump = new DbDumper($src);
     $views = $dump->views();
@@ -46,14 +58,17 @@ try {
     }
     $db->select_db($target);
     importSql($db, $sql);
-    foreach (['wp_z_view', 'wp_a_view'] as $view) {
+    foreach (['wp_z_view', 'wp_a_view', 'wp_alias_view', 'wp_a_join_view', 'wp_a_nested_view', "wp_quote'view"] as $view) {
         if ($db->query("SELECT * FROM `{$view}` ORDER BY id")->fetch_all() !== $expected) throw new RuntimeException('view round trip differs');
     }
     if ($db->query('SELECT COUNT(*) FROM wp_empty_view')->fetch_row()[0] !== '0') throw new RuntimeException('empty view lost');
     if ($db->query('SELECT note FROM wp_literal_view')->fetch_row()[0] !== "literal `{$source}`. stays literal") throw new RuntimeException('view literal rewritten');
     $db->query("DROP DATABASE `{$source}`");
     if ($db->query('SELECT * FROM wp_a_view ORDER BY id')->fetch_all() !== $expected) throw new RuntimeException('copy still depends on source');
-    echo "ok - backtick identifiers, dependent and empty views round trip independently\n";
+    foreach (array_keys($views) as $view) {
+        $db->query('SELECT * FROM `' . str_replace('`', '``', $view) . '`')->free();
+    }
+    echo "ok - escaped identifiers, aliases, joins, nested and empty views round trip independently\n";
 } finally {
     $db->query("DROP DATABASE IF EXISTS `{$source}`");
     $db->query("DROP DATABASE IF EXISTS `{$target}`");

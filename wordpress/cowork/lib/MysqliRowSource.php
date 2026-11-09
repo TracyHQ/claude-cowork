@@ -45,7 +45,6 @@ final class MysqliRowSource implements RowSource
     public function views(): array
     {
         $schema = (string) $this->db->query('SELECT DATABASE()')->fetch_row()[0];
-        $schemaPrefix = '`' . str_replace('`', '``', $schema) . '`.';
         $rows = $this->db->query("SHOW FULL TABLES WHERE Table_type = 'VIEW'");
         $views = [];
         $dependencies = [];
@@ -60,27 +59,64 @@ final class MysqliRowSource implements RowSource
                 throw new RuntimeException('view definition unavailable');
             }
             $create = 'CREATE OR REPLACE SQL SECURITY INVOKER VIEW ' . substr($create, $start + 6);
-            // Preserve quoted SQL literals while removing only the source schema's identifier.
-            $parts = preg_split('/(\'(?:\\\\.|\'\'|[^\'\\\\])*\'|"(?:\\\\.|""|[^"\\\\])*")/s', $create, -1, PREG_SPLIT_DELIM_CAPTURE);
+            // Tokenize identifiers and literals separately: commas in SELECT expressions are
+            // not table dependencies, and quotes inside a backtick identifier are not literals.
+            preg_match_all('/`(?:``|[^`])*`|\'(?:\\\\.|\'\'|[^\'\\\\])*\'|"(?:\\\\.|""|[^"\\\\])*"|[a-zA-Z_][a-zA-Z_0-9$]*|\s+|./s', $create, $matches);
+            $tokens = $matches[0];
+            $significant = [];
+            foreach ($tokens as $position => $token) {
+                if (trim($token) !== '') $significant[] = $position;
+            }
             $deps = [];
-            foreach ($parts as $index => $part) {
-                if ($index % 2 !== 0) {
+            $depth = 0;
+            $inFrom = [false];
+            $expectTable = false;
+            foreach ($significant as $offset => $position) {
+                $token = $tokens[$position];
+                $keyword = strtoupper($token);
+                if ($token === '(') {
+                    $depth++;
+                    // Parenthesized joins inherit a table list; subqueries start their own.
+                    $inFrom[$depth] = $expectTable;
                     continue;
                 }
-                preg_match_all('/(?:\b(?:FROM|JOIN)\s+|,\s*)(?:' . preg_quote($schemaPrefix, '/') . ')?`((?:``|[^`])+)`/i', $part, $matches);
-                foreach ($matches[1] as $dependency) {
-                    $deps[] = str_replace('``', '`', $dependency);
+                if ($token === ')') {
+                    unset($inFrom[$depth]);
+                    $depth--;
+                    $expectTable = false;
+                    continue;
                 }
-                if (preg_match_all('/\b(?:FROM|JOIN)\s+`((?:``|[^`])+)`\s*\./i', $part, $qualified)) {
-                    foreach ($qualified[1] as $referencedSchema) {
-                        if (str_replace('``', '`', $referencedSchema) !== $schema) {
-                            throw new RuntimeException('view depends on another database; export it separately');
-                        }
+                if ($keyword === 'FROM' || $keyword === 'JOIN') {
+                    $inFrom[$depth] = true;
+                    $expectTable = true;
+                    continue;
+                }
+                if (in_array($keyword, ['WHERE', 'GROUP', 'HAVING', 'ORDER', 'LIMIT', 'UNION', 'EXCEPT', 'INTERSECT'], true)) {
+                    $inFrom[$depth] = false;
+                    $expectTable = false;
+                    continue;
+                }
+                if ($token === ',' && ($inFrom[$depth] ?? false)) {
+                    $expectTable = true;
+                    continue;
+                }
+                if (!$expectTable) continue;
+                $expectTable = false;
+                if ($token[0] !== '`') continue;
+                $identifier = str_replace('``', '`', substr($token, 1, -1));
+                $dot = $significant[$offset + 1] ?? null;
+                $next = $significant[$offset + 2] ?? null;
+                if ($dot !== null && $next !== null && $tokens[$dot] === '.') {
+                    if ($identifier !== $schema) {
+                        throw new RuntimeException('view depends on another database; export it separately');
                     }
+                    $tokens[$position] = '';
+                    $tokens[$dot] = '';
+                    $identifier = str_replace('``', '`', substr($tokens[$next], 1, -1));
                 }
-                $parts[$index] = str_replace($schemaPrefix, '', $part);
+                $deps[] = $identifier;
             }
-            $views[$name] = implode('', $parts);
+            $views[$name] = implode('', $tokens);
             $dependencies[$name] = array_unique($deps);
         }
         $ordered = [];
