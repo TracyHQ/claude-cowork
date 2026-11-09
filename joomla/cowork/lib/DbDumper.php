@@ -38,6 +38,12 @@ final class DbDumper
         return $this->src->tables();
     }
 
+    /** View DDL is appended after all base tables by the importer. */
+    public function views(): array
+    {
+        return method_exists($this->src, 'views') ? $this->src->views() : [];
+    }
+
     /**
      * Row counts and sizes per table, for sizing a dump before running it.
      * @return array<string,array{rows:int,bytes:int}>
@@ -256,6 +262,10 @@ final class DbDumper
             if ($state === null) {
                 $sql .= "-- no unique NOT NULL key: paged by offset, rows may shift if the site writes here\n";
             }
+            $signature = $this->src->substanceChecksum($table, []);
+            if ($signature === null || ($state !== null && ($state['h'] ?? null) !== $signature)) {
+                throw new RuntimeException('table without a unique key changed during export; retry while writes are paused');
+            }
             $offset = is_array($state) && isset($state['o']) ? (int) $state['o'] : 0;
             $rows = $this->src->readRows($table, $offset, $limit);
             $read = count($rows);
@@ -266,10 +276,13 @@ final class DbDumper
                 $read = $taken;
                 $limit = $taken;
             }
+            if ($this->src->substanceChecksum($table, []) !== $signature) {
+                throw new RuntimeException('table without a unique key changed during export; retry while writes are paused');
+            }
             $sql .= SqlValue::insert($table, $rows, $this->src->insertColumns($table));
             return [
                 'sql'         => $sql,
-                'next_cursor' => $this->encodeCursor(['o' => $offset + $read]),
+                'next_cursor' => $this->encodeCursor(['o' => $offset + $read, 'h' => $signature]),
                 'done'        => $this->finished($read, $limit),
                 'rows'        => $read,
                 'total'       => $total,
