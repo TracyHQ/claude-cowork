@@ -1001,3 +1001,20 @@ sed 's/ data-tracy-src="[^"]*"//g; s#<template data-tracy-owner="[^"]*"></templa
 ```
 
 Measured 27/09/2026 on WordPress 7.1.2 with the Tracy theme (single post with a related-posts loop inside a synced pattern, the posts page, a category archive, the front page): plain pages identical, stamped pages identical to them once the stamps are removed, and the related-post teasers stamped with their own posts.
+
+### Database import integrity
+
+`db.tables` optionally includes `views`, an object mapping view names to portable CREATE VIEW
+statements in dependency order. Importers skip these names while dumping base tables and append
+their definitions afterwards. Empty views are included. Definitions omit the source definer and
+use SQL SECURITY INVOKER on the copy. Views that depend on another database are refused. The
+companion Tracy importer update consumes this metadata; older importers do not preserve views.
+
+Keyless row cursors carry a content checksum. If rows change between pages or during a page read,
+the engine refuses the export; retry while writes are paused. This requires scanning the keyless
+table on each page. It is a mutation guard, not a transaction snapshot of the whole database.
+The legacy numeric-offset API retains its old semantics.
+
+`tests/import-integrity.php` reads `TRACY_TEST_DB_HOST`, `TRACY_TEST_DB_USER` and
+`TRACY_TEST_DB_PASSWORD` from the environment. It creates two temporary schemas, removed in
+`finally`. The test account needs permission to create databases.

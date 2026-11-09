@@ -36,9 +36,73 @@ final class MysqliRowSource implements RowSource
 
     public function createStatement(string $table): string
     {
-        $res = $this->db->query('SHOW CREATE TABLE `' . $this->db->real_escape_string($table) . '`');
+        $res = $this->db->query('SHOW CREATE TABLE `' . str_replace('`', '``', $table) . '`');
         $row = $res->fetch_assoc();
         return $row['Create Table'] ?? '';
+    }
+
+    /** Portable view definitions, ordered after any views they depend on. */
+    public function views(): array
+    {
+        $schema = (string) $this->db->query('SELECT DATABASE()')->fetch_row()[0];
+        $schemaPrefix = '`' . str_replace('`', '``', $schema) . '`.';
+        $rows = $this->db->query("SHOW FULL TABLES WHERE Table_type = 'VIEW'");
+        $views = [];
+        $dependencies = [];
+        while ($row = $rows->fetch_row()) {
+            $name = (string) $row[0];
+            $quoted = '`' . str_replace('`', '``', $name) . '`';
+            $definition = $this->db->query('SHOW CREATE VIEW ' . $quoted)->fetch_assoc();
+            $create = (string) ($definition['Create View'] ?? '');
+            // SHOW CREATE VIEW emits a server-generated prefix. Carry no source account to the copy.
+            $start = strpos($create, ' VIEW ');
+            if ($start === false) {
+                throw new RuntimeException('view definition unavailable');
+            }
+            $create = 'CREATE OR REPLACE SQL SECURITY INVOKER VIEW ' . substr($create, $start + 6);
+            // Preserve quoted SQL literals while removing only the source schema's identifier.
+            $parts = preg_split('/(\'(?:\\\\.|\'\'|[^\'\\\\])*\'|"(?:\\\\.|""|[^"\\\\])*")/s', $create, -1, PREG_SPLIT_DELIM_CAPTURE);
+            $deps = [];
+            foreach ($parts as $index => $part) {
+                if ($index % 2 !== 0) {
+                    continue;
+                }
+                preg_match_all('/(?:\b(?:FROM|JOIN)\s+|,\s*)(?:' . preg_quote($schemaPrefix, '/') . ')?`((?:``|[^`])+)`/i', $part, $matches);
+                foreach ($matches[1] as $dependency) {
+                    $deps[] = str_replace('``', '`', $dependency);
+                }
+                if (preg_match_all('/\b(?:FROM|JOIN)\s+`((?:``|[^`])+)`\s*\./i', $part, $qualified)) {
+                    foreach ($qualified[1] as $referencedSchema) {
+                        if (str_replace('``', '`', $referencedSchema) !== $schema) {
+                            throw new RuntimeException('view depends on another database; export it separately');
+                        }
+                    }
+                }
+                $parts[$index] = str_replace($schemaPrefix, '', $part);
+            }
+            $views[$name] = implode('', $parts);
+            $dependencies[$name] = array_unique($deps);
+        }
+        $ordered = [];
+        $pending = $views;
+        while ($pending !== []) {
+            $advanced = false;
+            foreach ($pending as $name => $create) {
+                $waiting = array_filter($dependencies[$name], static function ($dependency) use ($pending): bool {
+                    return array_key_exists($dependency, $pending);
+                });
+                if ($waiting !== []) {
+                    continue;
+                }
+                $ordered[$name] = $create;
+                unset($pending[$name]);
+                $advanced = true;
+            }
+            if (!$advanced) {
+                throw new RuntimeException('view dependencies could not be ordered');
+            }
+        }
+        return $ordered;
     }
 
     /**
@@ -63,7 +127,7 @@ final class MysqliRowSource implements RowSource
     public function rowCount(string $table): int
     {
         if (!isset($this->countCache[$table])) {
-            $res = $this->db->query('SELECT COUNT(*) c FROM `' . $this->db->real_escape_string($table) . '`');
+            $res = $this->db->query('SELECT COUNT(*) c FROM `' . str_replace('`', '``', $table) . '`');
             $this->countCache[$table] = (int) ($res->fetch_assoc()['c'] ?? 0);
         }
         return $this->countCache[$table];
@@ -242,7 +306,7 @@ final class MysqliRowSource implements RowSource
 
     public function readRows(string $table, int $offset, int $limit): array
     {
-        $t = $this->db->real_escape_string($table);
+        $t = str_replace('`', '``', $table);
         // No ORDER BY and no cursor: the caller has asked for a position in a result set, and a
         // result set with no order does not have stable positions. Kept for callers that have no
         // key to page by; readRowsAfter() is what a live site is dumped with.
@@ -261,7 +325,7 @@ final class MysqliRowSource implements RowSource
         if (isset($this->keyCache[$table])) {
             return $this->keyCache[$table];
         }
-        $t = $this->db->real_escape_string($table);
+        $t = str_replace('`', '``', $table);
         // One query answers both halves. SHOW KEYS reports Non_unique, Null and Seq_in_index,
         // which is everything the choice needs; information_schema would answer the same at the
         // cost of a join and of permissions some shared hosts do not grant.
@@ -310,7 +374,7 @@ final class MysqliRowSource implements RowSource
         if ($key === []) {
             throw new RuntimeException("table `{$table}` has no unique NOT NULL key to page by");
         }
-        $t = $this->db->real_escape_string($table);
+        $t = str_replace('`', '``', $table);
         $order = implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c) . '`', $key));
 
         $where = '';
@@ -362,8 +426,8 @@ final class MysqliRowSource implements RowSource
 
     public function renameTable(string $from, string $to): void
     {
-        $f = $this->db->real_escape_string($from);
-        $t = $this->db->real_escape_string($to);
+        $f = str_replace('`', '``', $from);
+        $t = str_replace('`', '``', $to);
         if (!$this->db->query("RENAME TABLE `{$f}` TO `{$t}`")) {
             throw new RuntimeException($this->db->error ?: 'rename failed');
         }
@@ -371,7 +435,7 @@ final class MysqliRowSource implements RowSource
 
     public function dropTable(string $table): void
     {
-        $t = $this->db->real_escape_string($table);
+        $t = str_replace('`', '``', $table);
         if (!$this->db->query("DROP TABLE `{$t}`")) {
             throw new RuntimeException($this->db->error ?: 'drop failed');
         }
