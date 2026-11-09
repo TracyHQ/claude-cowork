@@ -2366,5 +2366,18 @@ chmod("$lockTmp/images/zz-later.png", 0644);
 chmod("$lockTmp/images/secret.png", 0644);
 exec('rm -rf ' . escapeshellarg($lockTmp));
 
+// A no-key cursor must detect writes instead of silently skipping shifted rows.
+$guardSource = new FakeRowSource(['jos_import_guard' => ['create' => 'CREATE TABLE jos_import_guard (note TEXT)', 'rows' => [['one'], ['two'], ['three']]]]);
+$guardDump = new DbDumper($guardSource);
+$guardFirst = $guardDump->dumpChunkFrom('jos_import_guard', null, 1);
+$guardSource->deleteRow('jos_import_guard', 0);
+$guardRefused = false;
+try {
+    $guardDump->dumpChunkFrom('jos_import_guard', $guardFirst['next_cursor'], 1);
+} catch (RuntimeException $error) {
+    $guardRefused = strpos($error->getMessage(), 'changed during export') !== false;
+}
+checkTrue('keyless mutation refuses an incomplete database copy', $guardRefused);
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed ? 1 : 0);
