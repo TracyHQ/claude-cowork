@@ -1205,6 +1205,19 @@ $stuck = $pkgEngine->handle(['token' => 'a-token-at-least-16', 'action' => 'plug
 check('an upgrade that did not land is an error', $stuck['ok'], false);
 check('and it is told apart from an install failure', $stuck['error'], 'update_failed');
 
+// A no-key cursor must detect writes instead of silently skipping shifted rows.
+$guardSource = new FakeRowSource(['wp_log' => ['create' => 'CREATE TABLE wp_log (note TEXT)', 'rows' => [['one'], ['two'], ['three']]]]);
+$guardDump = new DbDumper($guardSource);
+$guardFirst = $guardDump->dumpChunkFrom('wp_log', null, 1);
+$guardSource->deleteRow('wp_log', 0);
+$guardRefused = false;
+try {
+    $guardDump->dumpChunkFrom('wp_log', $guardFirst['next_cursor'], 1);
+} catch (RuntimeException $error) {
+    $guardRefused = strpos($error->getMessage(), 'changed during export') !== false;
+}
+checkTrue('keyless mutation refuses an incomplete database copy', $guardRefused);
+
 // ------------------------------------------------------------ update manifest --
 // The Plugins screen asks raw.githubusercontent for update.json and compares it against the
 // header of the copy on disk. Two files must therefore agree about one number, and nothing but

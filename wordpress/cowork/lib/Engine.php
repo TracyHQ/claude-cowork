@@ -3060,6 +3060,7 @@ final class Engine
         }
         try {
             $tables = $this->dumper->tables();
+            $views = $this->dumper->views();
         } catch (Throwable $e) {
             return $this->err('dump_failed', $e->getMessage());
         }
@@ -3067,6 +3068,9 @@ final class Engine
         // several sites share can pick its tables. The list itself stays whole: db.cleanup,
         // db.restore and db.purge work on `_tracy_trash_` names, outside any prefix.
         $answer = ['tables' => $tables];
+        if ($views !== []) {
+            $answer['views'] = $views;
+        }
         if (isset($this->info['db_prefix']) && is_string($this->info['db_prefix'])) {
             $answer['prefix'] = $this->info['db_prefix'];
         }
