@@ -52,6 +52,11 @@ try {
     $db->query('CREATE VIEW jos_alias_view AS SELECT jos_alias_view.id, jos_alias_view.note FROM `jos_tick``name` AS jos_alias_view');
     $db->query('CREATE VIEW `jos_quote\'view` AS SELECT id, note FROM `jos_tick``name`');
     $src = new MysqliRowSource($db);
+    // Joomla keeps its own snapshot operation; escaped identifiers must survive that path too.
+    $src->copyTable('jos_tick`name', 'jos_copy`name');
+    $src->renameTable('jos_copy`name', 'jos_renamed`name');
+    if ($db->query('SELECT * FROM `jos_renamed``name` ORDER BY id')->fetch_all() !== $db->query('SELECT * FROM `jos_tick``name` ORDER BY id')->fetch_all()) throw new RuntimeException('snapshot copy changed rows');
+    $src->dropTable('jos_renamed`name');
     $dump = new DbDumper($src);
     $views = $dump->views();
     if (array_search('jos_z_view', array_keys($views), true) >= array_search('jos_a_view', array_keys($views), true)) throw new RuntimeException('view order incorrect');
