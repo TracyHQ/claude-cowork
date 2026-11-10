@@ -81,6 +81,7 @@ final class ContentSlots
     public static function htmlSlots(string $html): array
     {
         $doc = self::html($html); $xpath = new DOMXPath($doc); $out = [];
+        $inert = self::inertPreSources($html, $xpath, $html);
         $svgPaths = SvgScalar::paths($html);
         foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title | //*[@id="contract-root"]//svg/@aria-label') as $node) {
             $element = $node instanceof DOMAttr ? $node->ownerElement : $node->parentNode;
@@ -89,7 +90,8 @@ final class ContentSlots
             } elseif ($xpath->query('ancestor-or-self::script | ancestor-or-self::style', $element)->length) continue;
             if ($xpath->query('ancestor-or-self::code', $element)->length && !self::literalPreNode($node)) continue;
             // Joomla content-plugin directives select modules/fields and are executable structure.
-            if (IdentityTokens::hasDirective($node->nodeValue)) continue;
+            if (IdentityTokens::hasDirective($node->nodeValue)
+                && !self::inertBraceSource($inert[$node->getNodePath()] ?? [])) continue;
             $out[] = ['xpath' => $node->getNodePath(), 'type' => $node->nodeName === 'src' ? 'image' : ($node->nodeName === 'href' ? 'url' : 'text'), 'sample' => $node->nodeValue];
         }
         return $out;
@@ -216,7 +218,7 @@ final class ContentSlots
         return SvgScalar::patch($html, $changes, static fn(string $raw, array $rest): string => self::domPatch($raw, $rest));
     }
 
-    /** Retain inert numeric brace spelling in an unchanged literal leaf, never admit it as a slot. */
+    /** Map original numeric brace source spans to their unique literal DOM receivers. */
     private static function inertPreSources(string $html, DOMXPath $xp, string $seen): array
     {
         if (!preg_match('/&#(?:0*12[35]|x0*7[bd]);/i', $html)) return [];
@@ -255,6 +257,35 @@ final class ContentSlots
         return $out;
     }
 
+    /** All braces must come from numeric references, with the same decoded bytes as the real receiver. */
+    private static function inertBraceSource(array $fragment): bool
+    {
+        if (!isset($fragment['raw'], $fragment['value'])) return false;
+        $rest = preg_replace('/&#(?:0*12[35]|x0*7[bd]);/i', '', $fragment['raw']);
+        $rest = html_entity_decode($rest, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return strpbrk($rest, '{}') === false
+            && html_entity_decode($fragment['raw'], ENT_QUOTES | ENT_HTML5, 'UTF-8') === $fragment['value'];
+    }
+
+    /** Resolve a candidate against the actual current column, including nested JSON-HTML. No map flag grants it. */
+    public static function inertLiteralBraceSlot(array $row, array $slot): bool
+    {
+        if (!self::literalPreSlot($slot)) return false;
+        try {
+            $html = $row[$slot['column']] ?? null;
+            if (isset($slot['jsonPath'])) {
+                $html = json_decode($html, true, 512, JSON_THROW_ON_ERROR);
+                if (isset($slot['nestedJson'])) $html = json_decode($html[$slot['nestedJson']], true, 512, JSON_THROW_ON_ERROR);
+                foreach ($slot['jsonPath'] as $key) $html = is_array($html) ? ($html[$key] ?? null) : null;
+            }
+            if (!is_string($html)) return false;
+            $xp = new DOMXPath(self::html($html)); $nodes = $xp->query($slot['xpath']);
+            if (!$nodes || $nodes->length !== 1 || !self::literalPreNode($nodes->item(0))) return false;
+            $sources = self::inertPreSources($html, $xp, $html);
+            return self::inertBraceSource($sources[$nodes->item(0)->getNodePath()] ?? []);
+        } catch (Throwable $error) { return false; }
+    }
+
     private static function domPatch(string $html, array $changes): string
     {
         $doc = self::html($html); $xp = new DOMXPath($doc);
@@ -268,6 +299,9 @@ final class ContentSlots
             if ($node instanceof DOMElement) { self::writeUnit($xp, $node, (string) $change['value']); continue; }
             if (!($node instanceof DOMText) && !($node instanceof DOMAttr)) throw new RuntimeException('HTML slot is not a scalar');
             $value = $change['value'];
+            if (self::literalPreNode($node) && IdentityTokens::hasDirective((string) $value)
+                && !self::inertBraceSource($inert[$node->getNodePath()] ?? []))
+                throw new RuntimeException('Literal brace content needs an inert source receiver');
             // An attribute's value set from PHP is read as markup: `&` starts an entity reference, and
             // a bare one (`?a=1&b=2`, "Sales & Marketing") emptied the attribute on libxml 2.9 and was
             // dropped on 2.13. So every `&` that does not begin a complete reference is written as
@@ -281,9 +315,13 @@ final class ContentSlots
         $restore = [];
         foreach ($inert as $fragment) {
             $node = $fragment['node'];
-            if ($node->data !== $fragment['value'] || !self::literalPreNode($node)
-                || !$xp->query('ancestor::*[@id="contract-root"]', $node)->length) continue;
-            $node->data = $fragment['token']; $restore[$fragment['token']] = $fragment['raw'];
+            if (!self::literalPreNode($node) || !$xp->query('ancestor::*[@id="contract-root"]', $node)->length) continue;
+            $raw = $fragment['raw'];
+            if ($node->data !== $fragment['value']) {
+                if (!self::inertBraceSource($fragment)) continue;
+                $raw = strtr(htmlspecialchars($node->data, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'), ['{' => '&#123;', '}' => '&#125;']);
+            }
+            $node->data = $fragment['token']; $restore[$fragment['token']] = $raw;
         }
         $saved = self::saved($doc, $xp, $seen);
         foreach ($restore as $token => $raw)

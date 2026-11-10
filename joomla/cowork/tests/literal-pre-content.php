@@ -72,6 +72,145 @@ $lpRead = static function (string $html, string $path): string {
 };
 $lpPath = '/html/body/div/pre/code/text()';
 
+// Source-backed brace content: this selection leaves unrelated normal cases untouched.
+$lpBraceOnly = $lpStandalone && in_array('--literal-braces', $_SERVER['argv'] ?? [], true);
+$lpBraceHtml = '<p>Before</p><pre><code>&#123;field 1&#125;</code></pre>';
+$lpBraceSlots = array_values(array_filter(ContentSlots::htmlSlots($lpBraceHtml), static fn($s) => $s['xpath'] === $lpPath));
+$lpCheck('encoded canonical macro-looking example is literal content', array_column($lpBraceSlots, 'sample'), ['{field 1}']);
+$lpBraceValue = "  {loadposition Synthetic}\nλ < X &amp; > {Next}  ";
+$lpBraceExpected = '<p>Before</p><pre><code>  &#123;loadposition Synthetic&#125;' . "\n" . 'λ &lt; X &amp;amp; &gt; &#123;Next&#125;  </code></pre>';
+try { $lpBracePatched = ContentSlots::htmlPatch($lpBraceHtml, [['xpath' => $lpPath, 'value' => $lpBraceValue]]); }
+catch (Throwable $lpBraceError) { $lpBracePatched = $lpBraceError->getMessage(); }
+$lpCheck('changed capable CODE emits only numeric braces and escaped text', $lpBracePatched, $lpBraceExpected);
+if ($lpBracePatched === $lpBraceExpected)
+    $lpCheck('changed brace case whitespace angles and entity-looking text read back exact', $lpRead($lpBracePatched, $lpPath), $lpBraceValue);
+$lpCheck('same capable value keeps inert raw encoding', ContentSlots::htmlPatch($lpBraceHtml, [['xpath' => $lpPath, 'value' => '{field 1}']]), $lpBraceHtml);
+foreach (['<pre><code>{field 1}</code></pre>', '<pre><code>&#123;field 1}</code></pre>',
+    '<pre><code>&#123;field 1&rcub;</code></pre>', '<pre><code>&#123;field 1&#125;<b>nested</b></code></pre>',
+    '<pre>mixed<code>&#123;field 1&#125;</code></pre>', '<pre><code>&#123;field 1&#125;<!--gap-->tail</code></pre>',
+    '<p>&#123;field 1&#125;</p>', '<code>&#123;field 1&#125;</code>',
+    '<!-- <pre><code>&#123;field 1&#125;</code></pre> --><pre><code>{field 1}</code></pre>'] as $lpBraceBad) {
+    $lpCheck('raw mixed named nested ordinary or fake source does not gain capture capability',
+        array_values(array_filter(ContentSlots::htmlSlots($lpBraceBad), static fn($s) => $s['sample'] === '{field 1}')), []);
+}
+
+foreach (['config: ${SYNTHETIC}', 'notify: ${ALERT}', 'names := []string{Alpha, Beta}', 'query{job="synthetic"}', 'token: ${NEXT}'] as $lpBraceGrammar) {
+    $lpBraceEncoded = strtr(htmlspecialchars($lpBraceGrammar, ENT_NOQUOTES | ENT_HTML5, 'UTF-8'), ['{' => '&#123;', '}' => '&#125;']);
+    $lpCheck('synthetic code grammar is captured only from inert source', array_column(ContentSlots::htmlSlots('<pre><code>' . $lpBraceEncoded . '</code></pre>'), 'sample'), [$lpBraceGrammar]);
+}
+foreach (['<pre><code>{field 1}</code></pre>', '<pre><code>&#123;field 1}</code></pre>',
+    '<pre><code>&#123;field 1&rcub;</code></pre>', '<pre><code>&#123;field 1&#125;<b>nested</b></code></pre>',
+    '<pre>mixed<code>&#123;field 1&#125;</code></pre>', '<pre><code>&#123;field 1&#125;<!--gap-->tail</code></pre>',
+    '<pre><code>&#123;field 1&#125;</code></pre><pre><code>&#123;field 2&#125;</code></pre>'] as $lpBraceBad) {
+    $lpCheck('capability fails closed on actual raw mixed named nested or ambiguous source', ContentSlots::inertLiteralBraceSlot(
+        ['content' => $lpBraceBad], ['column' => 'content', 'type' => 'text', 'xpath' => $lpPath, 'inertLiteralBrace' => true]), false);
+}
+foreach (['&#x7B;field 1&#x7D;', '&#000123;field 1&#000125;'] as $lpBraceSpelling) {
+    $lpBraceVariant = '<pre><code>' . $lpBraceSpelling . '</code></pre>';
+    $lpCheck('numeric spellings prove the actual receiver including equivalent text[1] address', ContentSlots::inertLiteralBraceSlot(
+        ['content' => $lpBraceVariant], ['column' => 'content', 'type' => 'text', 'xpath' => $lpPath . '[1]']), true);
+    $lpCheck('sibling serialization preserves original numeric spelling', ContentSlots::htmlPatch('<p>Before</p>' . $lpBraceVariant,
+        [['xpath' => '/html/body/div/p/text()', 'value' => 'After']]), '<p>After</p>' . $lpBraceVariant);
+}
+foreach (['<pre><code>&#123;field 1&#125;</code></pre', '<textarea><pre><code>&#123;field 1&#125;</code></pre></textarea>',
+    '<template><pre><code>&#123;field 1&#125;</code></pre></template>', '<pre><code>&amp;#123;field 1&amp;#125;</code></pre>'] as $lpBraceBad)
+    $lpCheck('unclosed raw-text or double-encoded source has no capability', ContentSlots::inertLiteralBraceSlot(
+        ['content' => $lpBraceBad], ['column' => 'content', 'type' => 'text', 'xpath' => $lpPath]), false);
+$lpBraceInjection = '</code><script>{field 1}</script>';
+$lpBraceInjectionHtml = ContentSlots::htmlPatch('<pre><code>&#123;field 1&#125;</code></pre>', [['xpath' => $lpPath, 'value' => $lpBraceInjection]]);
+$lpCheck('markup-looking replacement stays literal escaped source', $lpBraceInjectionHtml, '<pre><code>&lt;/code&gt;&lt;script&gt;&#123;field 1&#125;&lt;/script&gt;</code></pre>');
+$lpCheck('markup-looking replacement exact readback', $lpRead($lpBraceInjectionHtml, $lpPath), $lpBraceInjection);
+try { ContentSlots::htmlPatch('<pre><code>plain</code></pre>', [['xpath' => $lpPath, 'value' => '{field 1}']]); $lpBraceRawRefused = false; }
+catch (RuntimeException $lpBraceError) { $lpBraceRawRefused = true; }
+$lpCheck('unproven direct CODE writer cannot emit raw macro syntax', $lpBraceRawRefused, true);
+$lpBraceDir = sys_get_temp_dir() . '/cowork-brace-capability-' . bin2hex(random_bytes(6));
+mkdir($lpBraceDir);
+try {
+    $lpBraceStore = new LiteralPreStore(); $lpBraceLog = new LiteralPreLog();
+    $lpBraceWriter = new LiteralPreWriter($lpBraceLog, $lpBraceStore);
+    $lpBraceHtml = '<p>Before</p><pre><code>&#123;field 1&#125;</code></pre><pre><code>plain</code></pre>';
+    $lpBraceRow = ['id' => '902', 'title' => 'Encoded brace example', 'module' => 'mod_custom', 'position' => 'main',
+        'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0', 'content' => $lpBraceHtml,
+        'params' => json_encode(['example' => $lpBraceHtml, 'config' => json_encode(['example' => $lpBraceHtml])])];
+    $lpBraceWriter->rows = ['module' => [902 => $lpBraceRow], 'moduleAssignment' => [902 => ['id' => '902', 'menuids' => '[0]']]];
+    $lpBraceSlot = ['key' => 'brace.code', 'entity' => 'brace', 'column' => 'content', 'type' => 'text',
+        'sample' => '{field 1}', 'xpath' => '/html/body/div/pre[1]/code/text()', 'maxCharacters' => 500];
+    $lpBraceFiles = ['manifest' => ['id' => 'brace-capability/test/v1'],
+        'content-map' => ['entities' => [['key' => 'brace', 'kind' => 'module', 'sourceId' => 1,
+            'identity' => ['title' => 'Encoded brace example']]], 'slots' => [$lpBraceSlot,
+            array_replace($lpBraceSlot, ['key' => 'brace.json', 'column' => 'params', 'jsonPath' => ['example']]),
+            array_replace($lpBraceSlot, ['key' => 'brace.nested', 'column' => 'params', 'nestedJson' => 'config', 'jsonPath' => ['example']]),
+            array_replace($lpBraceSlot, ['key' => 'brace.prose', 'sample' => 'Before', 'xpath' => '/html/body/div/p/text()']),
+            array_replace($lpBraceSlot, ['key' => 'brace.raw', 'sample' => 'plain', 'xpath' => '/html/body/div/pre[2]/code/text()'])], 'pages' => []],
+        'presentation-lock' => ['entities' => ['brace' => array_diff_key($lpBraceRow, ['id' => true])],
+            'assignments' => [['moduleid' => 1, 'menuid' => 0]], 'fileRoots' => [], 'files' => [],
+            'inventoryCounts' => ['module' => 1], 'access' => $lpBraceStore->access()]];
+    foreach ($lpBraceFiles as $lpBraceName => $lpBraceFile) file_put_contents($lpBraceDir . '/' . $lpBraceName . '.json', json_encode($lpBraceFile));
+    $lpBraceContract = new QuickstartContract($lpBraceWriter, $lpBraceStore, $lpBraceDir, $lpBraceDir);
+    $lpBraceEngine = new Engine('literal-brace-test-token', [], null, null, null, null, $lpBraceWriter, null, $lpBraceLog, null, null, null, $lpBraceContract);
+    $lpBraceCall = static fn(string $action, array $params = []) => $lpBraceEngine->handle(['token' => 'literal-brace-test-token', 'action' => $action, 'params' => $params]);
+    $lpBraceBefore = $lpBraceCall('content.contract');
+    $lpCheck('capability public inspect identity', [$lpBraceBefore['ok'], $lpBraceBefore['contract'] ?? null], [true, 'brace-capability/test/v1']);
+    $lpCheck('capability public bind', $lpBraceCall('content.contract', ['operation' => 'bind'])['ok'], true);
+    $lpBraceBaseline = $lpBraceStore->binding;
+    $lpBraceValue = "  {loadposition Synthetic}\nλ < X &amp; > {Next}  ";
+    $lpBraceChanges = ['brace.code' => $lpBraceValue, 'brace.json' => $lpBraceValue, 'brace.nested' => $lpBraceValue];
+    $lpBraceParams = ['expected_revision' => $lpBraceBefore['revision'], 'changes' => $lpBraceChanges];
+    try { $lpBracePlan = count($lpBraceContract->plan($lpBraceParams)['operations']); } catch (ContractProblem $lpBraceError) { $lpBracePlan = $lpBraceError->reason; }
+    $lpCheck('capability revision-aware bound plan', $lpBracePlan, 1);
+    $lpBraceState = $lpBraceContract->inspect();
+    $lpBraceTranslation = new ReflectionMethod(Engine::class, 'translationProblems');
+    if (PHP_VERSION_ID < 80100) $lpBraceTranslation->setAccessible(true);
+    $lpBraceTranslated = ['key' => MultilingualProfile::derivedKey('vi-VN', 'brace.code'), 'sourceKey' => 'brace.code', 'source' => '{field 1}'] + $lpBraceSlot;
+    $lpCheck('translation validator uses resolved source capability', $lpBraceTranslation->invoke($lpBraceEngine,
+        [$lpBraceTranslated], [$lpBraceTranslated['key'] => $lpBraceValue], $lpBraceState), []);
+    $lpBraceForged = array_replace($lpBraceTranslated, ['xpath' => '/html/body/div/p/text()', 'inertLiteralBrace' => true]);
+    $lpCheck('forged translation address cannot borrow CODE capability', count($lpBraceTranslation->invoke($lpBraceEngine,
+        [$lpBraceForged], [$lpBraceForged['key'] => '{field 1}'], $lpBraceState)) > 0, true);
+    $lpCheck('translation without actual resolved rows has no capability', count($lpBraceTranslation->invoke($lpBraceEngine,
+        [$lpBraceTranslated], [$lpBraceTranslated['key'] => '{field 1}'])) > 0, true);
+    $lpBraceApplied = $lpBraceCall('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-brace-capability',
+        'request_id' => 'brace-capability-1'] + $lpBraceParams);
+    $lpCheck('capability public bound HTML JSONHTML and nested JSONHTML apply', $lpBraceApplied['ok'], true);
+    if ($lpBraceApplied['ok']) {
+        $lpBraceExpected = '<p>Before</p><pre><code>  &#123;loadposition Synthetic&#125;' . "\n" . 'λ &lt; X &amp;amp; &gt; &#123;Next&#125;  </code></pre><pre><code>plain</code></pre>';
+        $lpBraceActual = $lpBraceWriter->rows['module'][902]; $lpBraceJson = json_decode($lpBraceActual['params'], true);
+        $lpCheck('all three stored source representations stay inert', [$lpBraceActual['content'], $lpBraceJson['example'], json_decode($lpBraceJson['config'], true)['example']], array_fill(0, 3, $lpBraceExpected));
+        $lpBraceAfter = $lpBraceCall('content.contract');
+        $lpCheck('all three public decoded readbacks are exact', array_intersect_key(array_column($lpBraceAfter['slots'], 'current', 'key'), $lpBraceChanges), $lpBraceChanges);
+        $lpCheck('bound revision advances with stable baseline and warnings', [$lpBraceAfter['revision'] !== $lpBraceBefore['revision'], $lpBraceStore->binding, $lpBraceAfter['warnings'] ?? []], [true, $lpBraceBaseline, []]);
+        foreach (['brace.raw', 'brace.prose'] as $lpBraceBadKey) {
+            $lpBraceSaved = [$lpBraceWriter->rows, $lpBraceLog->rows, $lpBraceStore->binding];
+            $lpBraceRefused = $lpBraceCall('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-brace-forged',
+                'request_id' => 'brace-forged-1', 'expected_revision' => $lpBraceAfter['revision'], 'inertLiteralBrace' => true, 'changes' => [$lpBraceBadKey => '{field 1}']]);
+            $lpCheck('caller boolean cannot make raw CODE or ordinary prose capable', [$lpBraceRefused['ok'], $lpBraceRefused['errors'][0]['code'] ?? null], [false, 'SLOT_NOT_CONTENT']);
+            $lpCheck('refusal leaves rows receipt baseline unchanged', [$lpBraceWriter->rows, $lpBraceLog->rows, $lpBraceStore->binding], $lpBraceSaved);
+        }
+        $lpCheck('capable write has actual contract receipt', count(array_filter($lpBraceLog->entries('contract-brace-capability'), static fn($e) => $e['op'] === 'contract')), 1);
+        $lpCheck('capable actual receipt revert', $lpBraceCall('apply.revert', ['apply_id' => 'contract-brace-capability'])['ok'], true);
+        $lpCheck('capable revert restores exact original row revision and baseline', [$lpBraceWriter->rows['module'][902], $lpBraceCall('content.contract')['revision'], $lpBraceStore->binding], [$lpBraceRow, $lpBraceBefore['revision'], $lpBraceBaseline]);
+        // The decoded text and map are unchanged; only actual current source encoding was removed.
+        $lpBraceWriter->rows['module'][902]['content'] = str_replace(['&#123;', '&#125;'], ['{', '}'], $lpBraceHtml);
+        $lpBraceUnproven = $lpBraceCall('content.contract');
+        $lpBraceSaved = [$lpBraceWriter->rows, $lpBraceLog->rows, $lpBraceStore->binding];
+        $lpBraceRefused = $lpBraceCall('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-brace-source-lost',
+            'request_id' => 'brace-source-lost-1', 'expected_revision' => $lpBraceUnproven['revision'], 'inertLiteralBrace' => true, 'changes' => ['brace.code' => '{field 1}']]);
+        $lpCheck('actual current raw source cannot borrow original map capability', [$lpBraceRefused['ok'], $lpBraceRefused['errors'][0]['code'] ?? null], [false, 'SLOT_NOT_CONTENT']);
+        $lpCheck('lost source capability refusal preserves every state', [$lpBraceWriter->rows, $lpBraceLog->rows, $lpBraceStore->binding], $lpBraceSaved);
+        $lpBraceUnprovenState = $lpBraceContract->inspect();
+        $lpCheck('translation rechecks actual raw row despite same decoded source', count($lpBraceTranslation->invoke($lpBraceEngine,
+            [$lpBraceTranslated], [$lpBraceTranslated['key'] => '{field 1}'], $lpBraceUnprovenState)) > 0, true);
+
+    }
+} finally {
+    foreach (glob($lpBraceDir . '/*.json') as $lpBraceFile) unlink($lpBraceFile);
+    rmdir($lpBraceDir);
+}
+if ($lpBraceOnly) {
+    if ($lpFailed) throw new RuntimeException($lpFailed . ' source-backed brace assertions failed');
+    return;
+}
+
 // A focused standalone selection runs this regression without replaying older literal-PRE cases.
 $lpInertOnly = $lpStandalone && in_array('--inert-braces', $_SERVER['argv'] ?? [], true);
 foreach (['&#123;loadposition synthetic&#125;', '&#x7B;field 1&#x7D;', '&#000123;emailcloak=off&#000125;'] as $lpInertBody) {
@@ -80,8 +219,9 @@ foreach (['&#123;loadposition synthetic&#125;', '&#x7B;field 1&#x7D;', '&#000123
     $lpCheck('inert brace source survives sibling edit: ' . $lpInertBody,
         $lpInertAfter, '<p>After</p><pre><code>' . $lpInertBody . '</code></pre>');
     $lpCheck('inert brace decoded CODE unchanged', $lpRead($lpInertAfter, $lpPath), $lpRead($lpInertHtml, $lpPath));
-    $lpCheck('inert directive remains excluded from capture', array_values(array_filter(ContentSlots::htmlSlots($lpInertAfter),
-        static fn($s) => $s['xpath'] === $lpPath)), []);
+    $lpCheck('source-encoded canonical example is captured as inert content', array_values(array_filter(ContentSlots::htmlSlots($lpInertAfter),
+        static fn($s) => $s['xpath'] === $lpPath)), [['xpath' => $lpPath, 'type' => 'text',
+            'sample' => html_entity_decode($lpInertBody, ENT_QUOTES | ENT_HTML5, 'UTF-8')]]);
 }
 $lpInertMultiple = '<p>Before</p><pre><code>&#123;loadposition one&#125;</code></pre><pre><code>&#123;field 1&#125;</code></pre>';
 $lpCheck('multiple inert source spans retain independent receivers', ContentSlots::htmlPatch($lpInertMultiple,

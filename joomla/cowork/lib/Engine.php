@@ -4134,7 +4134,7 @@ final class Engine
                 // is rows tagged `zh-CN` on a site where Joomla has never heard of `zh-CN`.
                 if ($plan['package'] !== null && !$this->languagePackPresent($locale))
                     return $this->err('contract_failed', 'Install the ' . $locale . ' language pack before applying it');
-                $missing = $this->translationProblems($plan['slots'], $translations);
+                $missing = $this->translationProblems($plan['slots'], $translations, $state);
                 // The full list, not a sample of it: the caller's only way to fix a translation is
                 // to ask again for exactly the slots that failed, and a truncated list turns that
                 // into guess-and-retry over a thousand of them.
@@ -4445,9 +4445,10 @@ final class Engine
     }
 
     /** Every reason a supplied translation cannot be used, named one slot at a time. */
-    private function translationProblems(array $slots, array $translations): array
+    private function translationProblems(array $slots, array $translations, array $state = []): array
     {
         $out = [];
+        $sources = array_column($state['slots'] ?? [], null, 'key');
         foreach ($slots as $slot) {
             if ($slot['type'] !== 'text') continue;
             $key = $slot['key'];
@@ -4462,8 +4463,14 @@ final class Engine
             if (preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/u', $value)) { $say('carries control characters'); continue; }
             // An angle bracket is markup only where the source has none — the rule, and the
             // measurement behind it, are in MultilingualProfile::markupIntroduced().
-            if (MultilingualProfile::markupIntroduced($source, $value)) { $say('carries markup its source does not'); continue; }
-            if (IdentityTokens::hasDirective($value)) { $say('carries a Joomla plugin directive'); continue; }
+            $sourceSlot = $sources[$slot['sourceKey'] ?? $key] ?? null;
+            $sameAddress = $sourceSlot !== null && ($sourceSlot['current'] ?? null) === $source;
+            foreach (['type', 'column', 'xpath', 'jsonPath', 'nestedJson', 'leaf'] as $part)
+                if (($slot[$part] ?? null) !== ($sourceSlot[$part] ?? null)) $sameAddress = false;
+            // Only this call's inspected source row can grant literal-brace semantics to a translation.
+            $inert = $sameAddress && ContentSlots::inertLiteralBraceSlot($state['rows'][$sourceSlot['entity']] ?? [], $sourceSlot);
+            if (!$inert && MultilingualProfile::markupIntroduced($source, $value)) { $say('carries markup its source does not'); continue; }
+            if (!$inert && IdentityTokens::hasDirective($value)) { $say('carries a Joomla plugin directive'); continue; }
             foreach (MultilingualProfile::preservationErrors($source, $value) as $lost) $say($lost);
         }
         return $out;

@@ -1226,7 +1226,7 @@ final class QuickstartContract
      * Throws the slot's FIRST problem as a ContractProblem; the message is the one this rule has
      * always said, the code and numbers are what an agent acts on.
      */
-    private function checkValue(array $slot, string $value, array $params): void {
+    private function checkValue(array $slot, string $value, array $params, array $row = []): void {
         $key=$slot['key'];
         $refuse=fn(string $code,string $message,array $extra=[])=>new ContractProblem($code,$message,$key,null,$extra);
         if (!empty($slot['requiresEvidence']) && $value!==$slot['sample']) {
@@ -1242,7 +1242,7 @@ final class QuickstartContract
         }
         $literalPre = ContentSlots::literalPreSlot($slot); // inspect already validated the current row's DOM.
         if(preg_match($literalPre ? '/[\x00-\x08\x0b\x0c\x0e-\x1f]/u' : '/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
-        if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        if(IdentityTokens::hasDirective($value) && !ContentSlots::inertLiteralBraceSlot($row,$slot))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
         // A slot a correction opened holds an alt its template prints unescaped: a double quote would close the attribute.
         if(!empty($slot['opensEmpty'])&&strpos($value,'"')!==false)throw $refuse('SLOT_NOT_CONTENT','A double quote breaks this picture\'s alt: rewrite it without one: '.$key);
         // An imported site stores links and pictures in whatever form it grew; a quickstart's rules below
@@ -1496,7 +1496,7 @@ final class QuickstartContract
                 else $values[$key]='';
                 continue;
             }
-            try { $this->checkValue($slot,$value,$params); }
+            try { $this->checkValue($slot,$value,$params,$state['rows'][$slot['entity']]??[]); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
         }
