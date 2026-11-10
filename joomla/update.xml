@@ -29,7 +29,7 @@
         <downloads>
             <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.94/pkg_claudecowork-0.24.94.zip</downloadurl>
         </downloads>
-        <sha256>732411ebe35955aa755d8eb6faa14e76afa09236010e4a5a3a60246fe2260aed</sha256>
+        <sha256>6684fd196ad1f83c8e3a8cee631c0ec18defdb1bb0973ad9ee70b0f8f80bb426</sha256>
         <tags>
             <tag>stable</tag>
         </tags>
