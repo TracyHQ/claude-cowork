@@ -120,5 +120,21 @@
         "tb-sys-social[url]": "plain"
       }
     }
+  },
+  "audioLayouts": {
+    "35c1db4bbd79371b44745541599806e51f4f45ea2e4de77419a7a5defacbe2bd": {
+      "template": "ja_symphony",
+      "path": "templates/ja_symphony/html/layouts/joomla/content/audio.php",
+      "reviewed": "2026-11-10: conditional source row omission; exact receiver and ordinary caller/source bytes. No playback claim.",
+      "fields": {
+        "ctm_audio.audio-src": "hidden"
+      },
+      "files": {
+        "templates/ja_symphony/html/com_content/article/default.php": "3a2b48d76a1487ed0ebe51e5f0e9f424188d9f7faa6a356ffb5799f6adb99c86",
+        "templates/ja_symphony/templateDetails.xml": "33c77f8efcd039e10bc70d826941d9414797d381d163a6273c5b6183bdd06f9b",
+        "libraries/src/Layout/FileLayout.php": "032186742c8c772df84d6625f9b3fd7b86ca097e59ee495e4c19a9e85c42e8d0",
+        "libraries/src/Layout/LayoutHelper.php": "4a4b5c879a3c8641852786e7a6233b663518e03e0e8433de1c2aa3eb8301cd19"
+      }
+    }
   }
 }
