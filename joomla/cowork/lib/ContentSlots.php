@@ -11,12 +11,39 @@ final class ContentSlots
         libxml_clear_errors(); libxml_use_internal_errors($old);
         return $doc;
     }
+    /** A map address is only a candidate; every read/write also checks the current DOM. */
+    public static function literalPreSlot(array $slot): bool
+    {
+        return ($slot['type'] ?? null) === 'text' && !isset($slot['leaf']) && is_string($slot['xpath'] ?? null)
+            && preg_match('~^/html/body/div(?:/[a-z][a-z0-9-]*(?:\[[1-9][0-9]*\])?)*/pre(?:\[[1-9][0-9]*\])?/code(?:\[[1-9][0-9]*\])?/text\(\)(?:\[1\])?$~D', $slot['xpath']) === 1;
+    }
+
+    /** Only one literal DOMText in one CODE child of PRE; no highlight or sibling nodes. */
+    public static function literalPreNode(DOMNode $node): bool
+    {
+        $code = $node->parentNode; $pre = $code ? $code->parentNode : null;
+        if ($node->nodeType !== XML_TEXT_NODE || !($code instanceof DOMElement) || $code->tagName !== 'code'
+            || !($pre instanceof DOMElement) || $pre->tagName !== 'pre'
+            || $code->childNodes->length !== 1 || $pre->childNodes->length !== 1) return false;
+        return !(new DOMXPath($node->ownerDocument))->query('ancestor::script | ancestor::style | ancestor::svg | ancestor::pre | ancestor::code', $pre)->length;
+    }
+
+    /** Reject stale or forged code addresses even when the requested value contains no markup. */
+    public static function checkCodeNode(DOMNode $node, array $slot): void
+    {
+        $element = $node instanceof DOMAttr ? $node->ownerElement : $node;
+        $inside = (new DOMXPath($node->ownerDocument))->query('ancestor-or-self::code', $element)->length;
+        if ((self::literalPreSlot($slot) || $inside) && (!self::literalPreSlot($slot) || !self::literalPreNode($node)))
+            throw new RuntimeException('HTML code slot is not one literal PRE/CODE text leaf');
+    }
+
     public static function htmlSlots(string $html): array
     {
         $doc = self::html($html); $xpath = new DOMXPath($doc); $out = [];
         foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title') as $node) {
             $element = $node instanceof DOMAttr ? $node->ownerElement : $node->parentNode;
-            if ($xpath->query('ancestor-or-self::script | ancestor-or-self::style | ancestor-or-self::svg | ancestor-or-self::code', $element)->length) continue;
+            if ($xpath->query('ancestor-or-self::script | ancestor-or-self::style | ancestor-or-self::svg', $element)->length) continue;
+            if ($xpath->query('ancestor-or-self::code', $element)->length && !self::literalPreNode($node)) continue;
             // Joomla content-plugin directives select modules/fields and are executable structure.
             if (IdentityTokens::hasDirective($node->nodeValue)) continue;
             $out[] = ['xpath' => $node->getNodePath(), 'type' => $node->nodeName === 'src' ? 'image' : ($node->nodeName === 'href' ? 'url' : 'text'), 'sample' => $node->nodeValue];
@@ -147,6 +174,7 @@ final class ContentSlots
             $nodes = $xp->query($change['xpath']);
             if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML slot is missing or ambiguous');
             $node = $nodes->item(0);
+            self::checkCodeNode($node, ['type' => 'text', 'xpath' => $change['xpath']]);
             if ($node instanceof DOMElement) { self::writeUnit($xp, $node, (string) $change['value']); continue; }
             if (!($node instanceof DOMText) && !($node instanceof DOMAttr)) throw new RuntimeException('HTML slot is not a scalar');
             $value = $change['value'];
@@ -157,10 +185,20 @@ final class ContentSlots
             // `&#38;`, `&copy;`) is decoded as before, so a value that already spells `&amp;` is not
             // escaped twice; a name with no `;` (`&copy=2`, `&lang=en`) is text.
             if ($node instanceof DOMAttr) $value = preg_replace('/&(?!(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#x[0-9A-Fa-f]+);)/', '&amp;', (string) $value);
-            $node->nodeValue = $value;
+            if (self::literalPreNode($node)) $node->data = (string) $value;
+            else $node->nodeValue = $value;
         }
         $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
-        return self::saved($doc, $xp, $seen);
+        $saved = self::saved($doc, $xp, $seen);
+        $readback = null;
+        foreach ($changes as $change) if (self::literalPreSlot(['type' => 'text', 'xpath' => $change['xpath']])) {
+            $readback = $readback ?? new DOMXPath(self::html($saved));
+            $nodes = $readback->query($change['xpath']);
+            if (!$nodes || $nodes->length !== 1 || !self::literalPreNode($nodes->item(0))
+                || self::slotText($nodes->item(0)) !== (string) $change['value'])
+                throw new RuntimeException('Literal PRE text did not read back exactly');
+        }
+        return $saved;
     }
     private static function saved(DOMDocument $doc, DOMXPath $xp, string $seen): string
     {

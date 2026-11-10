@@ -507,12 +507,14 @@ final class QuickstartContract
                 if(!is_string($value))throw new RuntimeException('Content slot is not text');
                 $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
                 if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+                ContentSlots::checkCodeNode($nodes->item(0), $slot);
                 return ContentSlots::slotText($nodes->item(0));
             }
         }
         elseif(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+            ContentSlots::checkCodeNode($nodes->item(0), $slot);
             return ContentSlots::slotText($nodes->item(0));
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
@@ -1238,7 +1240,8 @@ final class QuickstartContract
             if(trim($value)==='' && trim($slot['sample'])!=='')throw $refuse('SLOT_EMPTY_STATE','Content cannot remove an occupied slot: '.$key);
             if(trim($value)!=='' && trim($slot['sample'])==='' && empty($slot['opensEmpty']))throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
         }
-        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
+        $literalPre = ContentSlots::literalPreSlot($slot); // inspect already validated the current row's DOM.
+        if(preg_match($literalPre ? '/[\x00-\x08\x0b\x0c\x0e-\x1f]/u' : '/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
         if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
         // A slot a correction opened holds an alt its template prints unescaped: a double quote would close the attribute.
         if(!empty($slot['opensEmpty'])&&strpos($value,'"')!==false)throw $refuse('SLOT_NOT_CONTENT','A double quote breaks this picture\'s alt: rewrite it without one: '.$key);
@@ -1256,7 +1259,7 @@ final class QuickstartContract
         // Slot fit (ADR 0039), only on a slot that carries one and never against its own demo value.
         $fit=SlotFit::of($slot);
         if($fit!==null&&SlotFit::restores($slot,$value))$fit=null;
-        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse,(string)$slot['sample']);
+        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse,(string)$slot['sample'],$literalPre);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {

@@ -2199,6 +2199,7 @@ require __DIR__ . "/demo-trim.php";
 require __DIR__ . "/identity.php";
 // A heading, sentence or list item captured whole (`--whole-units`): read as its capture sample, written in place.
 require __DIR__ . "/whole-unit-slots.php";
+require __DIR__ . "/literal-pre-content.php";
 require __DIR__ . "/site-language.php";
 require __DIR__ . "/site-language-titles.php";
 require __DIR__ . "/source-language.php";
