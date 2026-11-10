@@ -101,16 +101,28 @@ $asFixture = static function (array $options = []) use ($asRoot): array {
     file_put_contents($root . '/' . $receiverPath, $receiver); file_put_contents($root . '/' . $callerPath, $caller);
     $review = ['template' => 'ja_symphony', 'path' => $receiverPath, 'fields' => ['ctm_audio.audio-src' => 'hidden'], 'files' => [$callerPath => hash('sha256', $caller)]];
     file_put_contents($root . '/lib/link-layouts.json', json_encode(['layouts' => [], 'audioLayouts' => [hash('sha256', $receiver) => $review]]));
-    $row = ['id' => '114', 'title' => 'Synthetic audio article', 'alias' => 'synthetic-audio', 'state' => '1', 'access' => '1', 'language' => '*', 'introtext' => '', 'fulltext' => '', 'attribs' => json_encode(['article_layout' => '', 'ctm_audio' => ['audio-src' => ['images/audio/old.mp3'], 'audio-title' => ['Synthetic track'], 'audio-apple' => ['https://shop.example/item']]])];
-    $slot = ['key' => 'article-14.audio.0', 'entity' => 'article-14', 'column' => 'attribs', 'type' => 'url', 'sample' => 'images/audio/old.mp3', 'maxCharacters' => 2048, 'requiresEvidence' => true, 'jsonPath' => ['ctm_audio', 'audio-src', 0], 'role' => 'business.audio', 'group' => ['id' => 'article-14.audio.0', 'kind' => 'business', 'item' => 0]];
+    $track = $options['track'] ?? 0;
+    $row = ['id' => '114', 'title' => 'Synthetic audio article', 'alias' => 'synthetic-audio', 'state' => '1', 'access' => '1', 'language' => '*', 'introtext' => '', 'fulltext' => '', 'attribs' => json_encode(['article_layout' => '', 'ctm_audio' => ['audio-src' => [$track => 'images/audio/old.mp3'], 'audio-title' => [$track => 'Synthetic track'], 'audio-apple' => [$track => 'https://shop.example/item']]])];
+    if (!empty($options['omitLayout'])) { $params = json_decode($row['attribs'], true); unset($params['article_layout']); $row['attribs'] = json_encode($params); }
+    $slot = ['key' => 'article-14.audio.' . $track, 'entity' => 'article-14', 'column' => 'attribs', 'type' => 'url', 'sample' => 'images/audio/old.mp3', 'maxCharacters' => 2048, 'requiresEvidence' => true, 'jsonPath' => ['ctm_audio', 'audio-src', $options['pointer'] ?? $track], 'role' => 'business.audio', 'group' => ['id' => 'article-14.audio.' . $track, 'kind' => 'business', 'item' => $track]];
     if (isset($options['slot'])) $slot = array_replace($slot, $options['slot']);
     $ordinary = ['key' => 'article-14.title', 'entity' => 'article-14', 'column' => 'title', 'type' => 'text', 'sample' => $row['title'], 'maxCharacters' => 40];
-    $link = ['key' => 'article-14.shop', 'entity' => 'article-14', 'column' => 'attribs', 'jsonPath' => ['ctm_audio', 'audio-apple', 0], 'type' => 'url', 'sample' => 'https://shop.example/item', 'maxCharacters' => 2048];
+    $link = ['key' => 'article-14.shop', 'entity' => 'article-14', 'column' => 'attribs', 'jsonPath' => ['ctm_audio', 'audio-apple', $track], 'type' => 'url', 'sample' => 'https://shop.example/item', 'maxCharacters' => 2048];
     $store = new AudioSourceStore(); $log = new AudioSourceLog(); $writer = new AudioSourceWriter($log, $store);
     $writer->rows = ['article' => [114 => $row], 'templateStyle' => [7 => ['id' => '7', 'title' => 'Default', 'template' => 'ja_symphony', 'client_id' => '0', 'home' => '1', 'params' => '{}']], 'menuItem' => []];
-    $map = ['roleVocabularyVersion' => $options['vocabulary'] ?? '3', 'entities' => [['key' => 'article-14', 'kind' => 'article', 'sourceId' => 14, 'identity' => ['title' => $row['title']]]], 'slots' => [$slot, $ordinary, $link], 'pages' => []];
+    if (isset($options['styles'])) $writer->rows['templateStyle'] = $options['styles'];
+    if (isset($options['menus'])) $writer->rows['menuItem'] = $options['menus'];
+    $map = ['roleVocabularyVersion' => $options['vocabulary'] ?? 'place-content-roles/3', 'entities' => [['key' => 'article-14', 'kind' => 'article', 'sourceId' => 14, 'identity' => ['title' => $row['title']]]], 'slots' => [$slot, $ordinary, $link], 'pages' => []];
     $files = ['manifest' => ['id' => 'audio/test/1'], 'content-map' => $map, 'presentation-lock' => ['entities' => ['article-14' => array_diff_key($row, ['id' => true])], 'assignments' => [], 'fileRoots' => [], 'files' => [], 'inventoryCounts' => ['article' => 1], 'access' => $store->access()]];
-    foreach ($files as $name => $data) file_put_contents($dir . '/' . $name . '.json', json_encode($data));
+    if (!empty($options['secondArticle'])) {
+        $other = array_replace($row, ['id' => '115', 'title' => 'Second synthetic audio']);
+        $writer->rows['article'][115] = $other;
+        $files['content-map']['entities'][] = ['key' => 'article-15', 'kind' => 'article', 'sourceId' => 15, 'identity' => ['title' => $other['title']]];
+        $files['content-map']['slots'][] = array_replace($slot, ['key' => 'article-15.audio.' . $track, 'entity' => 'article-15', 'group' => ['id' => 'article-15.audio.' . $track, 'kind' => 'business', 'item' => $track]]);
+        $files['presentation-lock']['entities']['article-15'] = array_diff_key($other, ['id' => true]);
+        $files['presentation-lock']['inventoryCounts']['article'] = 2;
+    }
+    foreach ($files as $name => $data) file_put_contents($dir . '/' . $name . '.json', json_encode($data, JSON_PRESERVE_ZERO_FRACTION));
     if (!empty($options['forgedReview'])) file_put_contents($root . '/lib/hideable-slots.json', json_encode(['contracts' => ['audio/test/1' => ['contentMapSha256' => hash_file('sha256', $dir . '/content-map.json'), 'measured' => [$slot['key']]]]]));
     $contract = new QuickstartContract($writer, $store, $root, $dir);
     $engine = new Engine('synthetic-audio-test-token', [], null, null, null, null, $writer, null, $log, null, null, null, $contract);
@@ -124,6 +136,7 @@ $asApply = static function (array $f, array $params): array {
 };
 $asError = static fn(array $result) => $result['errors'][0]['code'] ?? $result['error']['code'] ?? null;
 try {
+    if (!in_array('--actual-source', $_SERVER['argv'] ?? [], true)) {
     $f = $asFixture();
     $asCheck('public inspect resolves actual article identity', [$f['before']['ok'], $f['contract']->inspect()['ids']['article-14']], [true, 114]);
     $asCheck('only exact reviewed receiver exposes conditional hide', array_column($f['before']['slots'], 'canHide', 'key'), ['article-14.audio.0' => true]);
@@ -167,12 +180,12 @@ try {
         if ($mutation === 'edited') file_put_contents($g['root'] . '/' . $g['receiverPath'], '<?php echo "unconditional";');
         elseif ($mutation === 'missing') unlink($g['root'] . '/' . $g['receiverPath']);
         elseif ($mutation === 'caller') file_put_contents($g['root'] . '/' . $g['callerPath'], '<?php echo "other";');
-        elseif ($mutation === 'other-template') $g['writer']->rows['templateStyle'][8] = ['id' => '8', 'template' => 'other', 'client_id' => '0'];
+        elseif ($mutation === 'other-template') $g['writer']->rows['templateStyle'][8] = ['id' => '8', 'template' => 'other', 'client_id' => '0', 'home' => '1', 'params' => '{}'];
         elseif ($mutation === 'unknown-style') unset($g['writer']->rows['templateStyle'][7]['client_id']);
         elseif ($mutation === 'row-layout') { $data = json_decode($g['writer']->rows['article'][114]['attribs'], true); $data['article_layout'] = 'alternate'; $g['writer']->rows['article'][114]['attribs'] = json_encode($data); }
         elseif ($mutation === 'receiver-symlink') { $path = $g['root'] . '/' . $g['receiverPath']; copy($path, $g['root'] . '/same.php'); unlink($path); symlink($g['root'] . '/same.php', $path); }
-        elseif ($mutation === 'menu-audio') $g['writer']->rows['menuItem'][9] = ['id' => '9', 'client_id' => '0', 'link' => 'index.php?option=com_content&view=article', 'params' => json_encode(['ctm_audio' => ['audio-src' => ['https://other.example/a.mp3']]])];
-        elseif ($mutation === 'menu-layout') $g['writer']->rows['menuItem'][9] = ['id' => '9', 'client_id' => '0', 'link' => 'index.php?option=com_content&view=article&layout=other', 'params' => '{}'];
+        elseif ($mutation === 'menu-audio') $g['writer']->rows['menuItem'][9] = ['id' => '9', 'client_id' => '0', 'published' => '1', 'template_style_id' => '0', 'link' => 'index.php?option=com_content&view=article&id=114', 'params' => json_encode(['ctm_audio' => ['audio-src' => ['https://other.example/a.mp3']]])];
+        elseif ($mutation === 'menu-layout') $g['writer']->rows['menuItem'][9] = ['id' => '9', 'client_id' => '0', 'published' => '1', 'template_style_id' => '0', 'link' => 'index.php?option=com_content&view=article&id=114&layout=other', 'params' => '{}'];
         else {
             $path = ['local' => '/templates/ja_symphony/local/html/layouts/joomla/content/audio.php', 'component' => '/templates/ja_symphony/html/layouts/com_content/joomla/content/audio.php', 'suffix' => '/templates/ja_symphony/html/layouts/joomla/content/audio.en-GB.php'][$mutation];
             if (!is_dir(dirname($g['root'] . $path))) mkdir(dirname($g['root'] . $path), 0777, true); file_put_contents($g['root'] . $path, '<?php echo "override";');
@@ -193,9 +206,73 @@ try {
         $asCheck('absent or invalid trusted source registry closes only eligibility ' . $mutation, isset(array_column($guard->inspect()['slots'], null, 'key')['article-14.audio.0']['canHide']), false);
     }
     $registry = json_decode(file_get_contents(__DIR__ . '/../lib/link-layouts.json'), true);
-    $review = $registry['audioLayouts']['35c1db4bbd79371b44745541599806e51f4f45ea2e4de77419a7a5defacbe2bd'] ?? [];
+    $review = $registry['audioLayouts']['6fc6559656efa56d13e554e6010e9c17f5a4169ccc6388e135b22505015ab1bf'] ?? [];
     $asCheck('shipped audio source review pins corrected owner-aware receiver', [$review['path'] ?? null, $review['fields'] ?? null, count($review['files'] ?? [])], ['templates/ja_symphony/html/layouts/joomla/content/audio.php', ['ctm_audio.audio-src' => 'hidden'], 4]);
     $r = ($f['call'])('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-audio-stale', 'request_id' => 'audio-stale', 'expected_revision' => 'stale', 'changes' => ['article-14.audio.0' => 'https://audio.example/new.mp3'], 'evidence' => ['article-14.audio.0' => 'Synthetic source']]);
     $asCheck('ordinary stale revision guard remains', $asError($r), 'REVISION_STALE');
+
+    }
+    // Actual capture emits the named V3 vocabulary and preserves sparse object pointer strings.
+    foreach ([[0, 0], [0, '0'], [2, 2], [2, '2']] as [$track, $pointer]) {
+        $f = $asFixture(['track' => $track, 'pointer' => $pointer]); $key = 'article-14.audio.' . $track;
+        $state = ($f['call'])('content.contract'); $slot = array_column($state['slots'], null, 'key')[$key];
+        $asCheck('actual V3 shape exposes only proved owner ' . json_encode($pointer), $slot['canHide'] ?? false, true);
+        $asCheck('producer pointer type stays unchanged ' . json_encode($pointer), $slot['jsonPath'][2], $pointer);
+        $r = $asApply($f, ['changes' => [$key => 'https://audio.example/New.MP3?token=a%2Fb'], 'evidence' => [$key => 'Synthetic customer source']]);
+        $asCheck('actual shape public apply ' . json_encode($pointer), $r['ok'], true);
+        if ($r['ok']) {
+            $asCheck('actual shape exact readback', array_column(($f['call'])('content.contract')['slots'], 'current', 'key')[$key], 'https://audio.example/New.MP3?token=a%2Fb');
+            $asCheck('actual shape public revert', ($f['call'])('apply.revert', ['apply_id' => $r['testApplyId']])['ok'], true);
+            $asCheck('actual shape revert exact sparse bytes', $f['writer']->rows['article'][114], $f['row']);
+        }
+        $r = $asApply($f, ['empty_slots' => [$key]]);
+        $asCheck('actual shape public absence', $r['ok'], true);
+        if ($r['ok']) {
+            $asCheck('actual shape absence keeps row keys', array_keys(json_decode($f['writer']->rows['article'][114]['attribs'], true)['ctm_audio']['audio-src']), [$track]);
+            $asCheck('actual shape absence revert', ($f['call'])('apply.revert', ['apply_id' => $r['testApplyId']])['ok'], true);
+            $asCheck('actual shape absence restores exact bytes', $f['writer']->rows['article'][114], $f['row']);
+        }
+    }
+    foreach (['3', 'place-content-roles/2'] as $version) {
+        $f = $asFixture(['vocabulary' => $version]);
+        $asCheck('fake or old vocabulary refuses', $asError($asApply($f, ['empty_slots' => ['article-14.audio.0']])), 'SLOT_NOT_HIDEABLE');
+    }
+    foreach (['-1', '+0', '00', '02', '2.0', '2e0', ' 2', (string) PHP_INT_MAX . '0', -1, 2.0] as $pointer) {
+        $f = $asFixture(['track' => 2, 'pointer' => $pointer]);
+        $asCheck('noncanonical pointer fails closed ' . json_encode($pointer), ($f['before']['ok'] ? $asApply($f, ['empty_slots' => ['article-14.audio.2']])['ok'] : false), false);
+    }
+    $style = ['id' => '7', 'title' => 'Default', 'template' => 'ja_symphony', 'client_id' => '0', 'home' => '1', 'params' => '{}'];
+    $menu = ['id' => '104', 'client_id' => '0', 'published' => '1', 'template_style_id' => '0', 'link' => 'index.php?option=com_content&view=form&layout=edit', 'params' => '{}'];
+    $cases = [
+        'unrelated content form/edit' => ['menus' => [104 => $menu]],
+        'unrelated category/videos' => ['menus' => [125 => array_replace($menu, ['id' => '125', 'link' => 'index.php?option=com_content&view=category&layout=ja_symphony:videos&id=15'])]],
+        'different direct article alternate layout' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=115&layout=other'])]],
+        'unassigned installed site styles' => ['styles' => [7 => $style, 8 => ['id' => '8', 'template' => 'cassiopeia', 'client_id' => '0', 'home' => '0', 'params' => '{}']]],
+        'assigned Symphony style' => ['styles' => [7 => $style, 8 => array_replace($style, ['id' => '8', 'home' => '0'])], 'menus' => [104 => array_replace($menu, ['template_style_id' => '8'])]],
+        'matching direct default' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=114&layout=default'])]],
+    ];
+    foreach ($cases as $label => $options) {
+        $f = $asFixture($options);
+        $asCheck('actual selection allows ' . $label, $asApply($f, ['empty_slots' => ['article-14.audio.0']])['ok'], true);
+    }
+    $cases = [
+        'matching direct alternate' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=114&layout=other'])]],
+        'matching direct audio override' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=114', 'params' => '{"ctm_audio":{}}'])]],
+        'matching direct params layout' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=114', 'params' => '{"article_layout":"other"}'])]],
+        'unknown matching params' => ['menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=114', 'params' => '{'])]],
+        'missing assigned style' => ['menus' => [104 => array_replace($menu, ['template_style_id' => '99'])]],
+        'assigned different template' => ['styles' => [7 => $style, 8 => ['id' => '8', 'template' => 'cassiopeia', 'client_id' => '0', 'home' => '0', 'params' => '{}']], 'menus' => [104 => array_replace($menu, ['template_style_id' => '8'])]],
+        'unknown article layout inheritance' => ['omitLayout' => true],
+        'missing default style' => ['styles' => [7 => array_replace($style, ['home' => '0'])]],
+        'unknown menu client' => ['menus' => [104 => array_diff_key($menu, ['client_id' => true])]],
+    ];
+    foreach ($cases as $label => $options) {
+        $f = $asFixture($options);
+        $asCheck('actual selection refuses ' . $label, $asError($asApply($f, ['empty_slots' => ['article-14.audio.0']])), 'SLOT_NOT_HIDEABLE');
+        $asCheck('unproved actual selection refuses replacement ' . $label, $asApply($f, ['changes' => ['article-14.audio.0' => 'https://audio.example/new.mp3'], 'evidence' => ['article-14.audio.0' => 'Synthetic source']])['ok'], false);
+    }
+    $f = $asFixture(['secondArticle' => true, 'menus' => [104 => array_replace($menu, ['link' => 'index.php?option=com_content&view=article&id=115&layout=other'])]]);
+    $slots = array_column(($f['call'])('content.contract')['slots'], null, 'key');
+    $asCheck('source proof is cached per actual article, never reused for another owner', [$slots['article-14.audio.0']['canHide'] ?? false, $slots['article-15.audio.0']['canHide'] ?? false], [true, false]);
 } finally { $asRemove($asRoot); }
 if ($asStandalone) { echo 'Audio source assertions: ' . $asCount . ', failures: ' . $asFailures . PHP_EOL; exit($asFailures ? 1 : 0); }

@@ -122,7 +122,7 @@
     }
   },
   "audioLayouts": {
-    "35c1db4bbd79371b44745541599806e51f4f45ea2e4de77419a7a5defacbe2bd": {
+    "6fc6559656efa56d13e554e6010e9c17f5a4169ccc6388e135b22505015ab1bf": {
       "template": "ja_symphony",
       "path": "templates/ja_symphony/html/layouts/joomla/content/audio.php",
       "reviewed": "2026-11-10: conditional source row omission; exact receiver and ordinary caller/source bytes. No playback claim.",

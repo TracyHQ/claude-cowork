@@ -85,7 +85,7 @@ final class QuickstartContract
     private array $audioLayouts = [];
     /** Recomputed from actual rows and source bytes on every inspect, never from slot/caller flags. */
     private array $audioHideable = [];
-    private ?bool $audioReceiverProved = null;
+    private array $audioReceiverProved = [];
     /** @var array<string,string> slot key => how the review judged it ('measured', 'unmeasured', 'withRow'): {@see loadHideable} */
     private array $hideable = [];
     /** What `lib/slot-corrections.json` says of this contract's slots; null when nothing applies. */
@@ -966,7 +966,7 @@ final class QuickstartContract
         $inspect=Timing::begin();
         $this->drift = [];
         $this->layoutHashes = [];
-        $this->audioHideable = []; $this->audioReceiverProved = null;
+        $this->audioHideable = []; $this->audioReceiverProved = [];
         $this->files();
         $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
@@ -1181,7 +1181,7 @@ final class QuickstartContract
             if($empty!==null)$slot['emptyLink']=$empty;
             if(self::audioCandidate($slot)) {
                 unset($slot['canHide']);
-                if($this->audioSlot($slot)&&$meta['kind']==='article'&&$this->audioRow($rows[$key],$slot)&&$this->audioReceiver($source)) {
+                if($this->audioSlot($slot)&&$meta['kind']==='article'&&$this->audioRow($rows[$key],$slot)&&$this->audioReceiver($source,$rows[$key])) {
                     $this->audioHideable[$slot['key']]=true; $slot['canHide']=true;
                 }
             } elseif(isset($this->hideable[$slot['key']])&&!self::addressMoves($slot))$slot['canHide']=$this->hideable[$slot['key']];
@@ -1302,18 +1302,21 @@ final class QuickstartContract
     /** Roles alone never change a write rule: the trusted V3 address, entity and original row must all agree. */
     private function audioSlot(array $slot): bool {
         $path=$slot['jsonPath']??null; $entity=$slot['entity']??''; $group=$slot['group']??[];
-        return !$this->derivedMode&&($this->map['roleVocabularyVersion']??null)==='3'
+        $index=is_array($path)?($path[2]??null):null;
+        // Object keys stay strings in capture pointers; only their canonical bounded integer identity is shared.
+        $validIndex=is_int($index)?$index>=0:(is_string($index)&&preg_match('/^(0|[1-9][0-9]*)$/D',$index)&&(string)(int)$index===$index);
+        return !$this->derivedMode&&($this->map['roleVocabularyVersion']??null)==='place-content-roles/3'
             &&($this->baseEntities()[$entity]['kind']??null)==='article'&&preg_match('/^article-[1-9][0-9]*$/D',$entity)
             &&($slot['type']??null)==='url'&&($slot['role']??null)==='business.audio'&&($slot['column']??null)==='attribs'
             &&($slot['leaf']??null)===null
             &&!isset($slot['nestedJson'])&&!isset($slot['xpath'])&&is_array($path)&&count($path)===3
-            &&array_slice($path,0,2)===['ctm_audio','audio-src']&&is_int($path[2])&&$path[2]>=0
-            &&($group['id']??null)===$entity.'.audio.'.$path[2]&&($group['item']??null)===$path[2]&&($group['kind']??null)==='business';
+            &&array_slice($path,0,2)===['ctm_audio','audio-src']&&$validIndex
+            &&($group['id']??null)===$entity.'.audio.'.$index&&($group['item']??null)===(int)$index&&($group['kind']??null)==='business';
     }
 
     private function audioRow(array $row, array $slot): bool {
         $params=json_decode((string)($row['attribs']??''),true); $index=$slot['jsonPath'][2];
-        return is_array($params)&&in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true)
+        return is_array($params)&&array_key_exists('article_layout',$params)&&in_array($params['article_layout'],['','default','_:default','ja_symphony:default'],true)
             &&is_array($params['ctm_audio']['audio-src']??null)&&is_string($params['ctm_audio']['audio-src'][$index]??null)
             &&is_string($params['ctm_audio']['audio-title'][$index]??'')&&json_encode($params['ctm_audio']['audio-title'][$index]??'')!==false;
     }
@@ -1363,9 +1366,10 @@ final class QuickstartContract
     }
 
     /** Conservative ordinary Joomla/T4 source selection: unknown styles, alternate layouts or competing overrides close hiding. */
-    private function audioReceiver(ContractRows $source): bool {
-        if($this->audioReceiverProved!==null)return $this->audioReceiverProved;
-        $this->audioReceiverProved=false;
+    private function audioReceiver(ContractRows $source, array $row): bool {
+        $id=(int)($row['id']??0); if($id<=0)return false;
+        if(isset($this->audioReceiverProved[$id]))return $this->audioReceiverProved[$id];
+        $this->audioReceiverProved[$id]=false;
         $root=realpath($this->root); if(!$root)return false;
         if(class_exists('Joomla\\CMS\\Layout\\LayoutHelper',false)&&\Joomla\CMS\Layout\LayoutHelper::$defaultBasePath!=='')return false;
         $file='templates/ja_symphony/html/layouts/joomla/content/audio.php';
@@ -1375,23 +1379,40 @@ final class QuickstartContract
         if($review===null)return false;
         foreach($review['files'] as $path=>$pin)if(realpath($root.'/'.$path)!==$root.'/'.$path||!is_file($root.'/'.$path)||!hash_equals($pin,(string)hash_file('sha256',$root.'/'.$path)))return false;
         $styles=$source->all('templateStyle'); if(!$styles||count($styles)>1000)return false;
-        $siteStyles=0;
+        $siteStyles=[]; $selected=[];
         foreach($styles as $style) {
             if(!isset($style['client_id']))return false;
             if((string)$style['client_id']!=='0')continue;
-            $siteStyles++; $params=json_decode((string)($style['params']??''),true);
-            if(($style['template']??null)!=='ja_symphony'||!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true))return false;
+            if(!isset($style['id'],$style['home']))return false;
+            $styleId=(int)$style['id']; if($styleId<=0)return false;
+            $siteStyles[$styleId]=$style;
+            if(!in_array((string)$style['home'],['','0'],true))$selected[$styleId]=true;
         }
-        if(!$siteStyles)return false;
+        if(!$selected)return false;
         $menus=$source->all('menuItem'); if(count($menus)>1000)return false;
         foreach($menus as $menu) {
-            if(strpos((string)($menu['link']??''),'option=com_content')===false)continue;
-            $params=json_decode((string)($menu['params']??''),true); parse_str((string)parse_url((string)$menu['link'],PHP_URL_QUERY),$query);
-            if(!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true)||!in_array($query['layout']??'',['','default','blog','list'],true))return false;
+            if(!isset($menu['client_id'],$menu['published']))return false;
+            if((string)$menu['client_id']!=='0'||(string)$menu['published']!=='1')continue;
+            $styleId=$menu['template_style_id']??null;
+            if(!is_scalar($styleId)||!preg_match('/^(0|[1-9][0-9]*)$/D',(string)$styleId)||(string)(int)$styleId!==(string)$styleId)return false;
+            if((int)$styleId>0)$selected[(int)$styleId]=true;
+            parse_str((string)parse_url((string)($menu['link']??''),PHP_URL_QUERY),$query);
+            if(($query['option']??null)!=='com_content'||($query['view']??null)!=='article')continue;
+            if(!is_scalar($query['id']??null)||!preg_match('/^[1-9][0-9]*$/D',(string)$query['id']))return false;
+            if((string)$query['id']!==(string)$id)continue;
+            // HtmlView gives a matching article menu priority; form/category query layouts never select this receiver.
+            $params=json_decode((string)($menu['params']??''),true);
+            if(!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true)
+                ||!in_array($query['layout']??'',['','default'],true))return false;
+        }
+        foreach(array_keys($selected) as $styleId) {
+            $style=$siteStyles[$styleId]??null; if($style===null)return false;
+            $params=json_decode((string)($style['params']??''),true);
+            if(($style['template']??null)!=='ja_symphony'||!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true))return false;
         }
         foreach(['templates/*/local/html','templates/*/html/layouts/com_content/joomla/content/audio*.php','components/com_content/layouts/joomla/content/audio*.php','layouts/joomla/content/audio*.php'] as $pattern)if(glob($root.'/'.$pattern))return false;
         foreach(glob($root.'/templates/*/html/layouts/joomla/content/audio*.php')?:[] as $path)if($path!==$full)return false;
-        return $this->audioReceiverProved=true;
+        return $this->audioReceiverProved[$id]=true;
     }
 
     /**
