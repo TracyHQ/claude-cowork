@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/IdentityTokens.php';
+require_once __DIR__ . '/SvgScalar.php';
 /** Scalar slots only: JSON leaves or text/URL/media nodes in existing HTML. */
 final class ContentSlots
 {
@@ -40,9 +41,12 @@ final class ContentSlots
     public static function htmlSlots(string $html): array
     {
         $doc = self::html($html); $xpath = new DOMXPath($doc); $out = [];
-        foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title') as $node) {
+        $svgPaths = SvgScalar::paths($html);
+        foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title | //*[@id="contract-root"]//svg/@aria-label') as $node) {
             $element = $node instanceof DOMAttr ? $node->ownerElement : $node->parentNode;
-            if ($xpath->query('ancestor-or-self::script | ancestor-or-self::style | ancestor-or-self::svg', $element)->length) continue;
+            if ($xpath->query('ancestor-or-self::svg', $element)->length) {
+                if (!SvgScalar::eligible($node) || !in_array($element->getNodePath(), $svgPaths, true)) continue;
+            } elseif ($xpath->query('ancestor-or-self::script | ancestor-or-self::style', $element)->length) continue;
             if ($xpath->query('ancestor-or-self::code', $element)->length && !self::literalPreNode($node)) continue;
             // Joomla content-plugin directives select modules/fields and are executable structure.
             if (IdentityTokens::hasDirective($node->nodeValue)) continue;
@@ -168,6 +172,11 @@ final class ContentSlots
     }
 
     public static function htmlPatch(string $html, array $changes): string
+    {
+        return SvgScalar::patch($html, $changes, static fn(string $raw, array $rest): string => self::domPatch($raw, $rest));
+    }
+
+    private static function domPatch(string $html, array $changes): string
     {
         $doc = self::html($html); $xp = new DOMXPath($doc);
         foreach ($changes as $change) {
