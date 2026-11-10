@@ -216,9 +216,50 @@ final class ContentSlots
         return SvgScalar::patch($html, $changes, static fn(string $raw, array $rest): string => self::domPatch($raw, $rest));
     }
 
+    /** Retain inert numeric brace spelling in an unchanged literal leaf, never admit it as a slot. */
+    private static function inertPreSources(string $html, DOMXPath $xp, string $seen): array
+    {
+        if (!preg_match('/&#(?:0*12[35]|x0*7[bd]);/i', $html)) return [];
+        $tags = LeafCodec::htmlTags($html); $fragments = [];
+        do $stem = 'inertpre' . bin2hex(random_bytes(12)); while (strpos($seen, $stem) !== false);
+        foreach ($tags as $i => $pre) {
+            if (($pre[1][0] ?? '') !== '' || strtolower($pre[2][0] ?? '') !== 'pre' || !isset($tags[$i + 3])) continue;
+            [$code, $codeEnd, $preEnd] = array_slice($tags, $i + 1, 3);
+            $start = $code[0][1] + strlen($code[0][0]);
+            $body = substr($html, $start, $codeEnd[0][1] - $start);
+            if (($code[1][0] ?? '') !== '' || strtolower($code[2][0] ?? '') !== 'code'
+                || $code[0][1] !== $pre[0][1] + strlen($pre[0][0])
+                || preg_match('~/\s*>$~', $pre[0][0]) || preg_match('~/\s*>$~', $code[0][0])
+                || !preg_match('~^</code\s*>$~iD', $codeEnd[0][0]) || !preg_match('~^</pre\s*>$~iD', $preEnd[0][0])
+                || $preEnd[0][1] !== $codeEnd[0][1] + strlen($codeEnd[0][0])
+                || strpos($body, '<') !== false || !preg_match('/&#(?:0*12[35]|x0*7[bd]);/i', $body)) continue;
+            $fragments[] = ['start' => $start, 'raw' => $body, 'token' => $stem . 'x' . count($fragments)];
+        }
+        if ($fragments === []) return [];
+        $probe = $html;
+        foreach (array_reverse($fragments) as $fragment)
+            $probe = substr_replace($probe, $fragment['token'], $fragment['start'], strlen($fragment['raw']));
+        $probeXp = new DOMXPath(self::html($probe)); $out = [];
+        foreach ($fragments as $fragment) {
+            $nodes = $probeXp->query('//code/text()[.="' . $fragment['token'] . '"]');
+            if ($nodes->length === 0) continue; // A lexical lookalike inside a comment or raw-text element.
+            if ($nodes->length !== 1) throw new RuntimeException('Inert PRE source receiver is ambiguous');
+            $node = $nodes->item(0);
+            if (!self::literalPreNode($node) || $probeXp->query('ancestor::textarea | ancestor::noscript | ancestor::template | ancestor::title | ancestor::xmp | ancestor::iframe | ancestor::noembed | ancestor::noframes | ancestor::plaintext', $node)->length) continue;
+            $path = $node->getNodePath(); $original = $xp->query($path);
+            if ($original->length !== 1 || !self::literalPreNode($original->item(0)) || isset($out[$path]))
+                throw new RuntimeException('Inert PRE source has no unique literal receiver');
+            $fragment['node'] = $original->item(0); $fragment['value'] = $fragment['node']->data;
+            $out[$path] = $fragment;
+        }
+        return $out;
+    }
+
     private static function domPatch(string $html, array $changes): string
     {
         $doc = self::html($html); $xp = new DOMXPath($doc);
+        $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
+        $inert = self::inertPreSources($html, $xp, $seen);
         foreach ($changes as $change) {
             $nodes = $xp->query($change['xpath']);
             if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML slot is missing or ambiguous');
@@ -237,8 +278,17 @@ final class ContentSlots
             if (self::literalPreNode($node)) $node->data = (string) $value;
             else $node->nodeValue = $value;
         }
-        $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
+        $restore = [];
+        foreach ($inert as $fragment) {
+            $node = $fragment['node'];
+            if ($node->data !== $fragment['value'] || !self::literalPreNode($node)
+                || !$xp->query('ancestor::*[@id="contract-root"]', $node)->length) continue;
+            $node->data = $fragment['token']; $restore[$fragment['token']] = $fragment['raw'];
+        }
         $saved = self::saved($doc, $xp, $seen);
+        foreach ($restore as $token => $raw)
+            if (substr_count($saved, $token) !== 1) throw new RuntimeException('HTML write lost an inert PRE source receiver');
+        if ($restore !== []) $saved = strtr($saved, $restore);
         $readback = null;
         foreach ($changes as $change) if (self::literalPreSlot(['type' => 'text', 'xpath' => $change['xpath']])) {
             $readback = $readback ?? new DOMXPath(self::html($saved));

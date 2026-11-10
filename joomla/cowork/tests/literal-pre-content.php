@@ -71,6 +71,96 @@ $lpRead = static function (string $html, string $path): string {
     return ContentSlots::slotText($nodes->item(0));
 };
 $lpPath = '/html/body/div/pre/code/text()';
+
+// A focused standalone selection runs this regression without replaying older literal-PRE cases.
+$lpInertOnly = $lpStandalone && in_array('--inert-braces', $_SERVER['argv'] ?? [], true);
+foreach (['&#123;loadposition synthetic&#125;', '&#x7B;field 1&#x7D;', '&#000123;emailcloak=off&#000125;'] as $lpInertBody) {
+    $lpInertHtml = '<p>Before</p><pre><code>' . $lpInertBody . '</code></pre>';
+    $lpInertAfter = ContentSlots::htmlPatch($lpInertHtml, [['xpath' => '/html/body/div/p/text()', 'value' => 'After']]);
+    $lpCheck('inert brace source survives sibling edit: ' . $lpInertBody,
+        $lpInertAfter, '<p>After</p><pre><code>' . $lpInertBody . '</code></pre>');
+    $lpCheck('inert brace decoded CODE unchanged', $lpRead($lpInertAfter, $lpPath), $lpRead($lpInertHtml, $lpPath));
+    $lpCheck('inert directive remains excluded from capture', array_values(array_filter(ContentSlots::htmlSlots($lpInertAfter),
+        static fn($s) => $s['xpath'] === $lpPath)), []);
+}
+$lpInertMultiple = '<p>Before</p><pre><code>&#123;loadposition one&#125;</code></pre><pre><code>&#123;field 1&#125;</code></pre>';
+$lpCheck('multiple inert source spans retain independent receivers', ContentSlots::htmlPatch($lpInertMultiple,
+    [['xpath' => '/html/body/div/p/text()', 'value' => 'After']]), str_replace('Before', 'After', $lpInertMultiple));
+$lpCheck('a changed CODE leaf is not restored over its replacement', ContentSlots::htmlPatch(
+    '<p>Before</p><pre><code>&#123;field 1&#125;</code></pre>', [['xpath' => $lpPath, 'value' => 'Plain replacement']]),
+    '<p>Before</p><pre><code>Plain replacement</code></pre>');
+$lpInertComment = '<!-- <pre><code>&#123;field 9&#125;</code></pre> --><p>Before</p><pre><code>&#123;field 1&#125;</code></pre>';
+$lpCheck('a comment cannot supply the source receiver', ContentSlots::htmlPatch($lpInertComment,
+    [['xpath' => '/html/body/div/p/text()', 'value' => 'After']]), str_replace('Before', 'After', $lpInertComment));
+foreach (['<pre><code>&#123;field 1&#125;<span>nested</span></code></pre>',
+    '<pre><code>&#123;field 1&#125;<!--gap-->tail</code></pre>', '<pre>mixed<code>&#123;field 1&#125;</code></pre>',
+    '<pre><code>&#123;field 1&#125;</code></pre><pre><code>&#123;field 2&#125;</code></pre>'] as $lpInertBad) {
+    try { ContentSlots::htmlPatch($lpInertBad, [['xpath' => $lpPath, 'value' => 'Replacement']]); $lpInertRefused = false; }
+    catch (RuntimeException $lpInertError) { $lpInertRefused = true; }
+    $lpCheck('inert source does not widen malformed or ambiguous CODE writes', $lpInertRefused, true);
+}
+$lpCheck('raw plugin directive capture still refuses', ContentSlots::htmlSlots('<pre><code>{loadposition synthetic}</code></pre>'), []);
+$lpInertDir = sys_get_temp_dir() . '/cowork-inert-braces-' . bin2hex(random_bytes(6));
+mkdir($lpInertDir);
+try {
+    $lpInertStore = new LiteralPreStore(); $lpInertLog = new LiteralPreLog();
+    $lpInertWriter = new LiteralPreWriter($lpInertLog, $lpInertStore);
+    $lpInertHtml = '<p>Before</p><pre><code>&#123;loadposition synthetic&#125;</code></pre><pre><code>safe</code></pre>';
+    $lpInertRow = ['id' => '901', 'title' => 'Inert brace example', 'module' => 'mod_custom', 'position' => 'main',
+        'published' => '1', 'access' => '1', 'language' => '*', 'client_id' => '0', 'content' => $lpInertHtml,
+        'params' => json_encode(['example' => $lpInertHtml])];
+    $lpInertWriter->rows = ['module' => [901 => $lpInertRow], 'moduleAssignment' => [901 => ['id' => '901', 'menuids' => '[0]']]];
+    $lpInertSlot = ['key' => 'inert.prose', 'entity' => 'inert', 'column' => 'content', 'type' => 'text',
+        'sample' => 'Before', 'xpath' => '/html/body/div/p/text()', 'maxCharacters' => 200];
+    $lpInertFiles = ['manifest' => ['id' => 'inert-braces/test/v1'],
+        'content-map' => ['entities' => [['key' => 'inert', 'kind' => 'module', 'sourceId' => 1,
+            'identity' => ['title' => 'Inert brace example']]], 'slots' => [$lpInertSlot,
+            array_replace($lpInertSlot, ['key' => 'inert.jsonProse', 'column' => 'params', 'jsonPath' => ['example']]),
+            array_replace($lpInertSlot, ['key' => 'inert.code', 'sample' => 'safe', 'xpath' => '/html/body/div/pre[2]/code/text()'])], 'pages' => []],
+        'presentation-lock' => ['entities' => ['inert' => array_diff_key($lpInertRow, ['id' => true])],
+            'assignments' => [['moduleid' => 1, 'menuid' => 0]], 'fileRoots' => [], 'files' => [],
+            'inventoryCounts' => ['module' => 1], 'access' => $lpInertStore->access()]];
+    foreach ($lpInertFiles as $lpInertName => $lpInertFile) file_put_contents($lpInertDir . '/' . $lpInertName . '.json', json_encode($lpInertFile));
+    $lpInertContract = new QuickstartContract($lpInertWriter, $lpInertStore, $lpInertDir, $lpInertDir);
+    $lpInertEngine = new Engine('inert-braces-test-token', [], null, null, null, null, $lpInertWriter, null, $lpInertLog, null, null, null, $lpInertContract);
+    $lpInertCall = static fn(string $action, array $params = []) => $lpInertEngine->handle(['token' => 'inert-braces-test-token', 'action' => $action, 'params' => $params]);
+    $lpInertBefore = $lpInertCall('content.contract');
+    if (!$lpInertBefore['ok']) throw new RuntimeException(json_encode($lpInertBefore));
+    $lpCheck('inert public inspect and identity', [$lpInertBefore['ok'], $lpInertBefore['contract']], [true, 'inert-braces/test/v1']);
+    $lpCheck('inert public bind', $lpInertCall('content.contract', ['operation' => 'bind'])['ok'], true);
+    $lpInertBaseline = $lpInertStore->binding;
+    $lpInertParams = ['expected_revision' => $lpInertBefore['revision'], 'changes' => ['inert.prose' => 'After', 'inert.jsonProse' => 'After']];
+    $lpCheck('inert revision-aware plan', count($lpInertContract->plan($lpInertParams)['operations']), 1);
+    $lpInertApply = $lpInertCall('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-inert-sibling',
+        'request_id' => 'inert-sibling-1'] + $lpInertParams);
+    $lpCheck('inert public bound sibling apply', $lpInertApply['ok'], true);
+    $lpInertExpected = str_replace('Before', 'After', $lpInertHtml);
+    $lpCheck('bound content retains encoded source', $lpInertWriter->rows['module'][901]['content'], $lpInertExpected);
+    $lpCheck('bound JSON HTML retains encoded source', json_decode($lpInertWriter->rows['module'][901]['params'], true)['example'], $lpInertExpected);
+    $lpCheck('bound decoded CODE exact', $lpRead($lpInertWriter->rows['module'][901]['content'], '/html/body/div/pre[1]/code/text()'), '{loadposition synthetic}');
+    $lpInertAfter = $lpInertCall('content.contract');
+    $lpCheck('inert inspect/readback', array_column($lpInertAfter['slots'], 'current', 'key'),
+        ['inert.prose' => 'After', 'inert.jsonProse' => 'After', 'inert.code' => 'safe']);
+    $lpCheck('inert revision advances', $lpInertAfter['revision'] !== $lpInertBefore['revision'], true);
+    $lpCheck('inert baseline and warnings unchanged', [$lpInertStore->binding, $lpInertAfter['warnings'] ?? []], [$lpInertBaseline, []]);
+    $lpInertState = [$lpInertWriter->rows, $lpInertLog->rows, $lpInertStore->binding];
+    $lpInertRaw = $lpInertCall('content.contract', ['operation' => 'apply', 'apply_id' => 'contract-inert-refusal',
+        'request_id' => 'inert-refusal-1', 'expected_revision' => $lpInertAfter['revision'], 'changes' => ['inert.code' => '{loadposition synthetic}']]);
+    $lpCheck('inert protection does not permit raw directive write', [$lpInertRaw['ok'], $lpInertRaw['errors'][0]['code'] ?? null], [false, 'SLOT_NOT_CONTENT']);
+    $lpCheck('inert directive refusal keeps rows receipts baseline', [$lpInertWriter->rows, $lpInertLog->rows, $lpInertStore->binding], $lpInertState);
+    $lpCheck('inert actual contract receipt', count(array_filter($lpInertLog->entries('contract-inert-sibling'), static fn($e) => $e['op'] === 'contract')), 1);
+    $lpCheck('inert actual receipt revert', $lpInertCall('apply.revert', ['apply_id' => 'contract-inert-sibling'])['ok'], true);
+    $lpCheck('inert exact original row and baseline restored', [$lpInertWriter->rows['module'][901], $lpInertStore->binding], [$lpInertRow, $lpInertBaseline]);
+    $lpCheck('inert original revision restored', $lpInertCall('content.contract')['revision'], $lpInertBefore['revision']);
+} finally {
+    foreach (glob($lpInertDir . '/*.json') as $lpInertFile) unlink($lpInertFile);
+    rmdir($lpInertDir);
+}
+if ($lpInertOnly) {
+    if ($lpFailed) throw new RuntimeException($lpFailed . ' inert brace assertions failed');
+    return;
+}
+
 foreach (["a <= b\nnext < value", "λ < value &amp; &lt; &amp;lt;", "a <\tb"] as $lpRaw) {
     $lpRawHtml = '<PRE title="quoted > boundary"><CODE>' . $lpRaw . '</CODE></PRE>';
     $lpDecoded = html_entity_decode($lpRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
