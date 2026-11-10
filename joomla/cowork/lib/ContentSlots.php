@@ -6,11 +6,51 @@ final class ContentSlots
 {
     public static function html(string $html): DOMDocument
     {
+        $html = self::preservePreComparisons($html);
         $doc = new DOMDocument('1.0', 'UTF-8');
         $old = libxml_use_internal_errors(true);
         $doc->loadHTML('<?xml encoding="UTF-8"><html><body><div id="contract-root">' . $html . '</div></body></html>', LIBXML_NONET);
         libxml_clear_errors(); libxml_use_internal_errors($old);
         return $doc;
+    }
+
+    /** libxml's HTML4 parser drops non-tag comparisons inside otherwise literal CODE. */
+    private static function preservePreComparisons(string $html): string
+    {
+        $tags = LeafCodec::htmlTags($html); $blocked = []; $edits = []; $end = 0;
+        $raw = ['script', 'style', 'textarea', 'noscript', 'template', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'plaintext'];
+        for ($i = 0; $i < count($tags); $i++) {
+            $tag = $tags[$i]; $name = strtolower($tag[2][0] ?? ''); $close = ($tag[1][0] ?? '') === '/';
+            $gap = substr($html, $end, $tag[0][1] - $end);
+            $end = $tag[0][1] + strlen($tag[0][0]);
+            if ($blocked && in_array(end($blocked), $raw, true)) {
+                if ($close && $name === end($blocked) && $name !== 'plaintext') array_pop($blocked);
+                continue;
+            }
+            // shortcut: ambiguous lexical gaps keep the old parse; broaden only with a proved source case.
+            if (strpos($gap, '<') !== false) return $html;
+            if ($name === '') continue; // The tokenizer consumes comments including their apparent tags.
+            if (!$blocked && !$close && $name === 'pre' && isset($tags[$i + 3])) {
+                [$code, $codeEnd, $preEnd] = array_slice($tags, $i + 1, 3);
+                $bodyStart = $code[0][1] + strlen($code[0][0]);
+                $body = substr($html, $bodyStart, $codeEnd[0][1] - $bodyStart);
+                if ($code[0][1] === $end && ($code[1][0] ?? '') === '' && strtolower($code[2][0] ?? '') === 'code'
+                    && !preg_match('~/\s*>$~', $tag[0][0]) && !preg_match('~/\s*>$~', $code[0][0])
+                    && preg_match('~^</code\s*>$~iD', $codeEnd[0][0]) && preg_match('~^</pre\s*>$~iD', $preEnd[0][0])
+                    && $preEnd[0][1] === $codeEnd[0][1] + strlen($codeEnd[0][0])
+                    && !preg_match('/<(?![=\x09-\x0D ])/D', $body)) {
+                    if (!IdentityTokens::hasDirective(html_entity_decode($body, ENT_QUOTES | ENT_HTML5, 'UTF-8')) && strpos($body, '<') !== false)
+                        $edits[] = [$bodyStart, strlen($body), str_replace('<', '&lt;', $body)];
+                    $i += 3; $end = $preEnd[0][1] + strlen($preEnd[0][0]);
+                    continue;
+                }
+            }
+            if (!$close && (in_array($name, $raw, true) || in_array($name, ['pre', 'code', 'svg'], true))) $blocked[] = $name;
+            elseif ($close && $blocked && $name === end($blocked)) array_pop($blocked);
+        }
+        if (strpos(substr($html, $end), '<') !== false) return $html;
+        foreach (array_reverse($edits) as [$offset, $length, $value]) $html = substr_replace($html, $value, $offset, $length);
+        return $html;
     }
     /** A map address is only a candidate; every read/write also checks the current DOM. */
     public static function literalPreSlot(array $slot): bool

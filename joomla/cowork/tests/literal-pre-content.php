@@ -71,6 +71,42 @@ $lpRead = static function (string $html, string $path): string {
     return ContentSlots::slotText($nodes->item(0));
 };
 $lpPath = '/html/body/div/pre/code/text()';
+foreach (["a <= b\nnext < value", "λ < value &amp; &lt; &amp;lt;", "a <\tb"] as $lpRaw) {
+    $lpRawHtml = '<PRE title="quoted > boundary"><CODE>' . $lpRaw . '</CODE></PRE>';
+    $lpDecoded = html_entity_decode($lpRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $lpRawSlots = array_values(array_filter(ContentSlots::htmlSlots($lpRawHtml), static fn($s) => $s['xpath'] === $lpPath));
+    $lpCheck('raw comparison capture preserves decoded bytes: ' . $lpRaw, $lpRawSlots[0]['sample'] ?? null, $lpDecoded);
+    $lpCheck('shared current-value reader preserves raw comparison: ' . $lpRaw, $lpRead($lpRawHtml, $lpPath), $lpDecoded);
+    foreach ([$lpDecoded, "new <= value & literal"] as $lpReplacement) {
+        $lpCheck('raw comparison write/readback', $lpRead(ContentSlots::htmlPatch($lpRawHtml,
+            [['xpath' => $lpPath, 'value' => $lpReplacement]]), $lpPath), $lpReplacement);
+    }
+}
+$lpNativeDom = static function (string $html): string {
+    $doc = new DOMDocument('1.0', 'UTF-8'); $old = libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8"><html><body><div id="contract-root">' . $html . '</div></body></html>', LIBXML_NONET);
+    libxml_clear_errors(); libxml_use_internal_errors($old);
+    return $doc->saveHTML();
+};
+foreach ([
+    '<script>"<pre><code>a <= b</code></pre>"</script>',
+    '<style>/* <pre><code>a <= b</code></pre> */</style>',
+    '<textarea><pre><code>a <= b</code></pre></textarea>',
+    '<svg><pre><code>a <= b</code></pre></svg>',
+    '<div title="<pre><code>a <= b</code></pre>">Text</div>',
+    '<!-- <pre><code>a <= b</code></pre> -->',
+    '<pre><pre><code>a <= b</code></pre></pre>',
+    '<pre><code>a <= b<span>nested</span></code></pre>',
+    '<pre><code>a <= b<!-- comment --></code></pre>',
+    '<pre>mixed<code>a <= b</code></pre>',
+    '<pre><code>a <= b</code>',
+    '<pre><code>a <= b<Widget>other</Widget></code></pre>',
+    '<div title="unterminated <pre><code>a <= b</code></pre>',
+    '<pre><code>{loadposition demo} a <= b</code></pre>'
+] as $lpUnsupported) {
+    $lpCheck('unsupported comparator context keeps native parse: ' . $lpUnsupported,
+        ContentSlots::html($lpUnsupported)->saveHTML(), $lpNativeDom($lpUnsupported));
+}
 $lpSample = "SELECT <Widget>\n\tA &amp; B ((strong))Case((/strong))";
 $lpHtml = '<h2>Before</h2><pre><code>' . htmlspecialchars($lpSample, ENT_NOQUOTES, 'UTF-8') . '</code></pre><p>After</p>';
 $lpSlots = ContentSlots::htmlSlots($lpHtml);
