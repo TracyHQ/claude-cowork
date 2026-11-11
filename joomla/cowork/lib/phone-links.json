@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "contracts": {
+    "ja-diner/j6/1.0.8": {
+      "contentMapSha256": "6df56fb093a69d27c69e841e1fa3275e0a088e9b5fd925198ca5690907c28635",
+      "slots": [
+        "module-111.0",
+        "module-111.1",
+        "article-28.16"
+      ]
+    }
+  }
+}
