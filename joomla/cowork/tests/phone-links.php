@@ -94,4 +94,16 @@ check('national phone wrapper undo succeeds',$plUndo($plNational['apply_id'])['o
 $plInvented=$plParams('footer.0','0845550110','+668455550110');check('national phone never invents a country code',$plCall($plInvented)['ok'],false);
 $plWriter->store['module'][11]['content']=$plHtml;
 check('national fixture restores exact outer baseline',[$plWriter->store,$plStore->binding],$plInitial);
+foreach ([['(084) 555-0110','0845550110'],['+44 (20) 7946 0123','+442079460123'],['0044 (20) 7946 0123','+442079460123']] as [$shown,$tel]) {
+    $plWriter->store['module'][11]['content']=str_replace('+97143535071',$shown,$plHtml);
+    $formatted=$plParams('footer.0',$shown,$tel);$answer=$plCall($formatted);
+    check('formatted phone wraps exact text and dial target '.$shown,$answer['readBack']??null,['text'=>$shown,'href'=>'tel:'.$tel]);
+    check('formatted phone wrapper restores through undo '.$shown,$plUndo($formatted['apply_id'])['ok'],true);
+}
+foreach (['Call 0845550110','tel:0845550110','<b>0845550110</b>',"0845550110\n", "084\t5550110",'(084 5550110','084) 5550110','()0845550110'] as $shown) {
+    $refused=false;try{PhoneLinks::target($shown,'0845550110');}catch(ContractProblem $e){$refused=true;}
+    check('formatted phone refuses prose markup controls or unbalanced groups '.json_encode($shown),$refused,true);
+}
+$plWriter->store['module'][11]['content']=$plHtml;
+check('formatted phone fixtures restore exact outer baseline',[$plWriter->store,$plStore->binding],$plInitial);
 foreach (glob($plDir.'/*') as $f)unlink($f);unlink($plRoot.'/lib/phone-links.json');rmdir($plDir);rmdir($plRoot.'/lib');rmdir($plRoot);
