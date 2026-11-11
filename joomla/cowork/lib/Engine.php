@@ -4845,9 +4845,9 @@ final class Engine
         // On an EXISTING tree node, `alias` is a RENAME of its address, not a column: a menu item's
         // path, and the path of every item under it, is built from the alias chain, so a raw write
         // would leave the branch on stale paths. Peeled off here and routed through
-        // realiasMenuItem(), the writer's own path-chain rename, with the same `alias` undo entry a
-        // language step records, so apply.revert puts the old address back. The value is made URL
-        // safe the way Joomla makes an alias (lower case ASCII, words joined by hyphens), and a
+        // realiasMenuItem(), the writer's own path-chain rename, with a distinct `menuAlias` undo
+        // entry so a bound site's language-step guard still permits this ordinary revert. The value
+        // is made URL safe the way Joomla makes an alias (lower case ASCII, words joined by hyphens), and a
         // sibling already answering at that address refuses the call instead of taking it.
         $realias = null;
         $aliasNow = null;
@@ -4897,7 +4897,7 @@ final class Engine
         if ($realias !== null) {
             try {
                 // Undo first, as a language step does: a row whose way back was not recorded is never renamed.
-                $this->log->record($applyId, ['op' => 'alias', 'kind' => $kind, 'id' => $id, 'before' => $aliasNow]);
+                $this->log->record($applyId, ['op' => 'menuAlias', 'kind' => $kind, 'id' => $id, 'before' => $aliasNow]);
             } catch (Throwable $e) {
                 return $this->err('write_failed', 'nothing was renamed: could not record its undo');
             }
@@ -5280,7 +5280,7 @@ final class Engine
     {
         $rows = [];
         foreach ($entries as $entry)
-            if (in_array($entry['op'] ?? '', ['content', 'move', 'alias', 'visibility'], true) && is_string($entry['kind'] ?? null))
+            if (in_array($entry['op'] ?? '', ['content', 'move', 'alias', 'menuAlias', 'visibility'], true) && is_string($entry['kind'] ?? null))
                 $rows[] = [$entry['kind'], (int) ($entry['id'] ?? 0)];
         return $rows;
     }
@@ -5349,7 +5349,7 @@ final class Engine
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
         if ($op === 'batch' || $op === 'contract') { return; }
-        if ($op === 'alias') {
+        if ($op === 'alias' || $op === 'menuAlias') {
             $this->writer->realiasMenuItem((int) ($entry['id'] ?? 0), (string) ($entry['before'] ?? ''));
             return;
         }

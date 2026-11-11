@@ -24,8 +24,8 @@ if (function_exists('check')) {
     check('alias: a menu item takes a new alias', [$maOut['ok'], $maOut['alias'], $maWriter->store['menuItem'][11]['alias']], [true, 'tennis', 'tennis']);
     check('alias: its path and the path of the item under it follow',
         [$maWriter->store['menuItem'][11]['path'], $maWriter->store['menuItem'][13]['path']], ['classes/tennis', 'classes/tennis/schedule']);
-    check('alias: the rename is recorded as the alias undo a language step uses', $maLog->entries('MA1'),
-        [['op' => 'alias', 'kind' => 'menuItem', 'id' => 11, 'before' => 'group-boxing']]);
+    check('alias: the rename records an ordinary menu alias undo', $maLog->entries('MA1'),
+        [['op' => 'menuAlias', 'kind' => 'menuItem', 'id' => 11, 'before' => 'group-boxing']]);
     $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'MA1']]);
     check('alias: apply.revert puts the old address back, branch included',
         [$maWriter->store['menuItem'][11]['alias'], $maWriter->store['menuItem'][11]['path'], $maWriter->store['menuItem'][13]['path']],
@@ -69,5 +69,51 @@ if (function_exists('check')) {
     [$maWriter, $maLog, $maEngine] = $maFresh();
     $maOut = $maUpdate($maEngine, 'MA6', 'menuItem', 11, ['alias' => 'tennis', 'title' => 'Tennis']);
     check('alias: a rename and a field write land together, each with its undo',
-        [$maOut['ok'], $maOut['alias'], array_column($maLog->entries('MA6'), 'op')], [true, 'tennis', ['alias', 'content']]);
+        [$maOut['ok'], $maOut['alias'], array_column($maLog->entries('MA6'), 'op')], [true, 'tennis', ['menuAlias', 'content']]);
+    // A normal route repair on a bound site must not be mistaken for a language operation.
+    [$maWriter, $maLog] = $maFresh();
+    $maWriter->store['menuItem'][117] = ['alias' => 'contact', 'path' => 'contact', 'parent_id' => 1, 'language' => '*', 'home' => 0, 'client_id' => 0, 'title' => 'Contact us'];
+    $maStore = new TestContractStore();
+    $maStore->binding = ['contractHash' => 'bound-route-test'];
+    $maContract = QuickstartContract::derived($maWriter, $maStore, sys_get_temp_dir(), function (): array {
+        throw new RuntimeException('An ordinary route rename must not rebuild the contract');
+    });
+    $maEngine = new Engine($maToken, [], null, null, null, null, $maWriter, null, $maLog, null, null, null, $maContract);
+    $maApply = 'c30-contact-us-route-mwc70hbk-451dad';
+    $maOut = $maUpdate($maEngine, $maApply, 'menuItem', 117, ['alias' => 'contact-us']);
+    check('alias: a bound-site contact route rename succeeds', [$maOut['ok'], $maWriter->store['menuItem'][117]['path']], [true, 'contact-us']);
+    $maBack = $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => $maApply]]);
+    check('alias: a bound-site ordinary rename can be reverted', $maBack, ['ok' => true, 'reverted' => 1]);
+    check('alias: the bound-site route and receipt are restored', [$maWriter->store['menuItem'][117]['alias'], $maWriter->store['menuItem'][117]['path'], $maLog->entries($maApply)], ['contact', 'contact', []]);
+
+    $maOut = $maUpdate($maEngine, 'bound-alias-and-title', 'menuItem', 117, ['alias' => 'contact-us', 'title' => 'Get in touch']);
+    check('alias: a bound-site rename can include a title write', [$maOut['ok'], array_column($maLog->entries('bound-alias-and-title'), 'op')], [true, ['menuAlias', 'content']]);
+    $maSavedEntries = $maLog->entries('bound-alias-and-title');
+    $maWritten = $maWriter->store;
+    $maEngine->locks(fn(array $rows): array => ['menuItem:117' => ['userId' => 42, 'name' => 'Editor']]);
+    $maLocked = $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'bound-alias-and-title']]);
+    check('alias: an open editor refuses the whole ordinary rename undo', [$maLocked['ok'], $maWriter->store, $maLog->entries('bound-alias-and-title')], [false, $maWritten, $maSavedEntries]);
+    $maEngine->locks(fn(array $rows): array => []);
+    $maBack = $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'bound-alias-and-title']]);
+    check('alias: after the editor closes both ordinary changes revert', [$maBack, $maWriter->store['menuItem'][117]['alias'], $maWriter->store['menuItem'][117]['title']], [['ok' => true, 'reverted' => 2], 'contact', 'Contact us']);
+    $maOut = $maUpdate($maEngine, 'bound-alias-only-lock', 'menuItem', 117, ['alias' => 'contact-us']);
+    $maEngine->locks(fn(array $rows): array => ['menuItem:117' => ['userId' => 42, 'name' => 'Editor']]);
+    $maLocked = $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => 'bound-alias-only-lock']]);
+    check('alias: an alias-only receipt still checks the open editor', [$maLocked['ok'], $maWriter->store['menuItem'][117]['alias'], count($maLog->entries('bound-alias-only-lock'))], [false, 'contact-us', 1]);
+    $maEngine->locks(fn(array $rows): array => []);
+
+    // Historical language receipts stay behind their own restore operation, even alias-only chunks.
+    foreach ([
+        [['op' => 'alias', 'kind' => 'menuItem', 'id' => 117, 'before' => 'language-before']],
+        [['op' => 'alias', 'kind' => 'menuItem', 'id' => 117, 'before' => 'language-before'], ['op' => 'languageDefaults', 'before' => []]],
+        [['op' => 'relabel', 'from' => 'en-GB', 'to' => 'en-US']],
+        [['op' => 'menuAlias', 'kind' => 'menuItem', 'id' => 117, 'before' => 'ordinary-before'], ['op' => 'alias', 'kind' => 'menuItem', 'id' => 117, 'before' => 'language-before']],
+    ] as $maN => $maLanguageEntries) {
+        $maLanguageApply = 'language-guard-' . $maN;
+        foreach ($maLanguageEntries as $maEntry) $maLog->record($maLanguageApply, $maEntry);
+        $maBefore = $maWriter->store;
+        $maRefused = $maEngine->handle(['token' => $maToken, 'action' => 'apply.revert', 'params' => ['apply_id' => $maLanguageApply]]);
+        check('alias: generic revert preserves language receipt guard ' . $maN,
+            [$maRefused['ok'], $maRefused['error'], $maWriter->store, $maLog->entries($maLanguageApply)], [false, 'bad_params', $maBefore, $maLanguageEntries]);
+    }
 }
