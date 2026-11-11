@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { reviewedRows, hideableSlots, rowOf, slotKeyOf } from './hideable-slots.mjs'
+// Keep the shipped Diner receiver entry covered by the existing CI generator command.
+import './hideable-diner.test.mjs'
 
 // A made-up block: one list of two rows, a lone sentence and a few slots no one may empty.
 const json = (key, path, type, sample) => ({ key, entity: key.split('.')[0], column: 'params', type, sample, jsonPath: path })
