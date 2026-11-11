@@ -1082,3 +1082,45 @@ Protocol b0a40e0 discovery: an oversized body with mapped blocks returns 413 wit
 authorization. Each block continuation retains the snapshot and original expiry; changing the
 principal, owner or block is rejected. Stop block scanning when `blocksPagination.nextCursor`
 is null; the full-content self link is not another block segment. This does not chunk bodyHtml.
+
+### Exact stored-HTML phone links
+
+`info.phone_links` advertises version 1, `storage: "html"`, `scalar: false` and the exact reviewed contract keys, tied to
+that release's content-map SHA-256. A caller must check the capability before calling it. This is a semantic phone-link
+operation, with no caller-supplied HTML and no general article write permission. A contract not in the review, derived or
+multilingual content, scalar contact telephone/mobile fields, prose, ambiguous paths and existing anchors are unsupported.
+
+Read `content.contract {operation:"inspect"}` first. Its `contract`, immutable `contractHash`, current `revision` and
+slot `current` supply the proof for one call. Inspect also exposes `phoneLinks: {version: 1, storage: "html", scalar: false, match: "whole-slot", supportedKeys: [...]}` for this bound contract; a missing capability on an older receiver means unsupported. `expected` is the whole numeric slot value, never a phone substring inside prose:
+
+```json
+{
+  "operation": "phone.link",
+  "contract": "ja-diner/j6/1.0.8",
+  "contract_hash": "<contractHash from inspect>",
+  "expected_revision": "<revision from inspect>",
+  "key": "article-28.16",
+  "expected": "+97143535071",
+  "tel": "+97143535071",
+  "apply_id": "contract-phone-<unique attempt>",
+  "request_id": "phone-<unique request>"
+}
+```
+
+The caller chooses only a phone fact approved for display. The receiver independently requires that the exact current
+slot is a reviewed `contact.phone` text node and that the canonical numeric target dials precisely those digits. A verified national target stays national, including its leading zero; a country code is never inferred.
+It wraps that node in one `a[href="tel:…"]`, preserves the remaining DOM and declared sibling slot identities, updates
+only that wrapper's presentation baseline and verifies the actual wrapper and stored phone. `afterRevision` is the
+resulting contract revision; `readBack` holds the verified text and href. An identical committed request replays its
+receipt; a fresh request for the same already verified wrapper reports `already: true` without writing. Reusing an ID
+with different content, stale revisions, mismatched targets or changed wrapper output refuses.
+
+`apply.revert` with that new apply ID restores the original stored row and slot-path/presentation baseline, newest
+revision first. A changed phone cannot be written through the ordinary contract slot while its wrapper is active: undo
+it first. Structural contract operations also require active wrappers to be undone. Ordinary text changes elsewhere
+remain subject to their existing contract rules. Presentation drift is not accepted as proof of a valid phone link.
+
+The reviewed Diner 1.0.8 keys are `module-111.0`, `module-111.1` and `article-28.16`. Released contract files are unchanged.
+A future template release needs a separate exact-map review; no version automatically inherits this permission. Contact
+scalar fields remain unsupported and need a legitimate template renderer fix. This capability alone does not establish
+that every editorial phone mention is callable or that a personalized site passes visual acceptance.

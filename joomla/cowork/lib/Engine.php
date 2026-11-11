@@ -428,6 +428,7 @@ final class Engine
                 return $this->err('conflict', 'A removed row comes back only on a new site', ['errors' => [ContractProblem::plain('CONFLICT', 'A removed row comes back only on a new site')]]);
             // blocks.unpublish has a way back of its own, and it answers to the ordinary verb.
             if (in_array('blocks', array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), true)) return $this->blocksRestore($params);
+            if (in_array('phoneLink', array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), true)) return $this->phoneLinkRestore($params);
             $own = array_intersect(array_column($this->log->entries($params['apply_id'] ?? ''), 'op'), ['visibility', 'relabel', 'languageDefaults', 'alias', 'showcaseNav']);
             if ($own !== []) return $this->err('bad_params', 'This apply_id is a demo trim, a showcase-navigation change, a language step or a source relabel: take it back with its own operation (demoTrim.revert, showcaseNav.revert, multilingual.restore, siteLanguage.revert, sourceLanguage.revert)');
         }
@@ -482,6 +483,7 @@ final class Engine
                     'version' => 1,
                 // lib/slot-corrections.json: which contracts this engine holds to the kit's limits, and how far.
                 ], 'slot_corrections' => SlotCorrections::ability(__DIR__ . '/slot-corrections.json'),
+                'phone_links' => PhoneLinks::ability(__DIR__),
                 // extension.params: which keys of which extensions this engine reads and sets (lib/ExtensionParams.php).
                 // An older engine answers bad_action, so a writer reads this before it counts on moving a map.
                 'extension_params' => ExtensionParams::ability(), 'db_range_checksums' => [
@@ -2113,10 +2115,14 @@ final class Engine
             }
             if (($p['operation'] ?? 'inspect') === 'inspect') {
                 $state=$this->contract->inspect();
+                $state['contractHash'] = $this->contract->contractHash();
+                $state['phoneLinks'] = $this->contract->phoneLinkCapability($state);
                 foreach(['rows','snapshot','keys','ids','localeMaps','assignments','slotValues','binding'] as $internal)unset($state[$internal]);
                 if($state['job'])$state['job']=['locale'=>$state['job']['locale'],'phase'=>$state['job']['phase']];
                 return $this->ok($state);
             }
+            if (!in_array($p['operation'] ?? '', ['apply', 'phone.link'], true) && !empty($this->contract->binding()['phoneLinks']['slots']))
+                throw new ContractProblem('PHONE_LINK_CONFLICT', 'Undo active phone links before structural contract operations');
             if (strpos((string)($p['operation'] ?? ''), 'multilingual.') === 0) return $this->multilingual($p);
             if (strpos((string)($p['operation'] ?? ''), 'demoTrim.') === 0) return $this->demoTrim($p);
             if (strpos((string)($p['operation'] ?? ''), 'showcaseNav.') === 0) return $this->showcaseNav($p);
@@ -2124,6 +2130,7 @@ final class Engine
             if (strpos((string)($p['operation'] ?? ''), 'sourceLanguage.') === 0) return $this->sourceLanguage($p);
             if (($p['operation'] ?? '') === 'blocks.unpublish') return $this->blocksUnpublish($p);
             if (($p['operation'] ?? '') === 'rows.remove') return $this->rowsRemove($p);
+            if (($p['operation'] ?? '') === 'phone.link') return $this->phoneLink($p);
             if (($p['operation'] ?? '') !== 'apply') throw new RuntimeException('Unknown contract operation');
             $apply=$this->applyId($p);$request=$p['request_id']??'';
             // Two refusals, each naming the id it is about. One sentence for both read as "neither id
@@ -2299,6 +2306,7 @@ final class Engine
         if ($expected === null) throw new ContractProblem('REVISION_REQUIRED', 'Content changed; inspect again');
         if (!is_string($expected) || !hash_equals($state['revision'], $expected))
             throw new ContractProblem('REVISION_STALE', 'Content changed; inspect again', null, null, ['current' => $state['revision']]);
+        if (!empty($state['binding']['phoneLinks']['slots'])) throw new ContractProblem('PHONE_LINK_CONFLICT', 'Undo active phone links before removing rows');
         $plan = $this->contract->removalPlan($slots, $keep, $state);
         if (!$plan['operations']) return $this->ok(['removed' => [], 'already' => $plan['already'], 'unchanged' => true]);
         $rows = array_map(static fn($op) => [$op['kind'], (int) $op['id']], $plan['operations']);
@@ -2310,6 +2318,67 @@ final class Engine
             $this->log->record($apply, ['op' => 'rows', 'request' => $request, 'hash' => $hash, 'result' => $result, 'afterRevision' => $after]);
             return $result;
         });
+    }
+
+    /** A semantic contract phone wrapper, never caller-supplied HTML or a general article exception. */
+    private function phoneLink(array $p): array
+    {
+        $apply = $this->applyId($p); $request = $p['request_id'] ?? '';
+        if (!$apply || strpos($apply, 'contract-') !== 0 || !is_string($request) || !preg_match(self::REQUEST_ID_SHAPE, $request))
+            throw new ContractProblem('PHONE_LINK_INVALID', 'A fresh contract apply_id and request_id are required');
+        $hash = hash('sha256', json_encode(array_intersect_key($p, array_flip(['contract', 'contract_hash', 'key', 'expected', 'tel'])), JSON_THROW_ON_ERROR));
+        $entries = $this->log->entries($apply);
+        foreach ($entries as $entry) if (($entry['op'] ?? '') === 'phoneLink' && $entry['request'] === $request) {
+            if (!hash_equals($entry['hash'], $hash)) throw new ContractProblem('PHONE_LINK_CONFLICT', 'request_id reused with different phone content');
+            $state = $this->contract->inspect();
+            if ($entry['afterRevision'] !== $state['revision']) throw new ContractProblem('REVISION_STALE', 'Later content exists; inspect again');
+            return $entry['result'];
+        }
+        if ($entries) throw new ContractProblem('PHONE_LINK_CONFLICT', 'Use one new apply_id for each phone link');
+        $state = $this->contract->inspect();
+        if (!is_string($p['expected_revision'] ?? null) || !hash_equals($state['revision'], $p['expected_revision']))
+            throw new ContractProblem('REVISION_STALE', 'Content changed; inspect again');
+        $plan = $this->contract->phoneLinkPlan($p, $state);
+        if ($plan['already']) return $this->ok(['key' => $plan['key'], 'already' => true, 'afterRevision' => $state['revision'], 'tel' => $p['tel'], 'readBack' => ['text' => $p['expected'], 'href' => 'tel:' . $p['tel']]]);
+        $op = $plan['operation']; $this->refuseLocked([[$op['kind'], (int) $op['id']]]);
+        $before = $state['binding'];
+        $result = $this->contentBatch(['apply_id' => $apply, 'request_id' => $request, 'operations' => [$op]], function ($answer) use ($plan, $before, $apply, $request, $hash) {
+            $this->contract->rebind($plan['binding']);
+            $after = $this->contract->inspect();
+            $active = array_column($after['slots'], null, 'key')[$plan['key']];
+            $record = $plan['binding']['phoneLinks']['slots'][$plan['key']];
+            if (!ContentSlots::phoneLinked((string) $after['rows'][$active['entity']][$active['column']], $active, $record['expected'], $record['tel']) || ($after['slotValues'][$plan['key']] ?? null) !== $record['expected'])
+                throw new ContractProblem('PHONE_LINK_READBACK', 'The linked phone did not read back');
+            $answer += ['key' => $plan['key'], 'already' => false, 'afterRevision' => $after['revision'], 'tel' => $record['tel'], 'readBack' => ['text' => $record['expected'], 'href' => 'tel:' . $record['tel']]];
+            $this->log->record($apply, ['op' => 'phoneLink', 'request' => $request, 'hash' => $hash, 'beforeBinding' => $before, 'afterRevision' => $after['revision'], 'result' => $answer]);
+            return $answer;
+        });
+        if (!$result['ok']) $this->contract->rebind($before);
+        return $result;
+    }
+
+    /** The wrapper and its exact slot-path baseline are undone together, newest revision first. */
+    private function phoneLinkRestore(array $p): array
+    {
+        $afterBinding = $this->contract->binding();
+        try {
+            $entries = $this->log->entries((string) $this->applyId($p));
+            $own = array_values(array_filter($entries, static fn($e) => ($e['op'] ?? '') === 'phoneLink'));
+            if (count($own) !== 1 || $own[0]['afterRevision'] !== $this->contract->inspect()['revision'])
+                throw new ContractProblem('CONFLICT', 'Later content exists; revert the latest revision first');
+            $this->batching = true;
+            $result = $this->writer->transaction(function () use ($p, $own) {
+                $answer = $this->applyRevert($p);
+                if (!$answer['ok'] || !empty($answer['failed'])) throw new ContractProblem('CONFLICT', 'Phone link undo did not finish');
+                $this->contract->rebind($own[0]['beforeBinding']);
+                $this->contract->inspect();
+                return $answer;
+            });
+            return $result;
+        } catch (Throwable $error) {
+            $this->contract->rebind($afterBinding);
+            return $this->contractFailed($error);
+        } finally { $this->batching = false; }
     }
 
     /** `apply.revert` of a blocks.unpublish: only over the revision it left, and back by the same compare-and-set. */
@@ -5348,7 +5417,7 @@ final class Engine
     private function revertOne(array $entry): void
     {
         $op = isset($entry['op']) && is_string($entry['op']) ? $entry['op'] : '';
-        if ($op === 'batch' || $op === 'contract') { return; }
+        if ($op === 'batch' || $op === 'contract' || $op === 'phoneLink') { return; }
         if ($op === 'alias' || $op === 'menuAlias') {
             $this->writer->realiasMenuItem((int) ($entry['id'] ?? 0), (string) ($entry['before'] ?? ''));
             return;

@@ -2234,6 +2234,7 @@ require __DIR__ . "/empty-links.php";
 require __DIR__ . "/hide-ops.php";
 require __DIR__ . "/rows-remove.php";
 require __DIR__ . "/rows-remove-diner.php";
+require __DIR__ . "/phone-links.php";
 require __DIR__ . "/page-create.php";
 require __DIR__ . "/extension-params.php";
 // What the kit knows better than a released contract, beside it: limits, kept icons, gallery alts.

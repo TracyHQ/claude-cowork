@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/ContentSlots.php';
+require_once __DIR__ . '/PhoneLinks.php';
 require_once __DIR__ . '/SlotRemoval.php';
 require_once __DIR__ . '/ContractRows.php';
 require_once __DIR__ . '/LanguageStrings.php';
@@ -25,7 +26,7 @@ require_once __DIR__ . '/TemplateSiteSettings.php';
 interface ContractStore {
     public function load(): ?array;
     public function save(array $binding): void;
-    /** Replace a baseline wholesale. Only a validated language apply or its revert may call this. */
+    /** Replace a baseline wholesale. Only a validated structural contract operation or its revert may call this. */
     public function replace(array $binding): void;
     /**
      * The language job in flight, or null.
@@ -85,6 +86,7 @@ final class QuickstartContract
     private array $hideable = [];
     /** What `lib/slot-corrections.json` says of this contract's slots; null when nothing applies. */
     private ?SlotCorrections $corrections = null;
+    private array $phoneSlots = [];
     /** @var array<string,list<string>> a 'withRow' slot's row: it is emptied only when one of these goes too, or already has */
     private array $hideRows = [];
     /** @var array<string,list<array>> entity => the rows the review proves: {@see loadHideable} */
@@ -183,6 +185,7 @@ final class QuickstartContract
         $this->linkLayouts = self::loadLinkLayouts($lib . '/link-layouts.json');
         $this->loadHideable($lib . '/hideable-slots.json', $directory . '/content-map.json');
         $this->corrections = SlotCorrections::load($lib . '/slot-corrections.json', (string)($this->manifest['id'] ?? ''), $directory . '/content-map.json');
+        $this->phoneSlots = PhoneLinks::review($lib . '/phone-links.json', (string)($this->manifest['id'] ?? ''), $directory . '/content-map.json');
         $trimFile = $directory . '/demo-trim-map.json';
         if (is_file($trimFile)) {
             $raw = file_get_contents($trimFile);
@@ -444,9 +447,12 @@ final class QuickstartContract
     private function standing(string $base, array $slots): array {
         if ($this->removalOps === null) $this->removalOps = $this->store->load()['rowsRemoved']['ops'] ?? [];
         $ops = $this->removalOps[$base] ?? [];
-        if (!$ops) return $slots;
+
         $out = [];
         foreach ($slots as $slot) { $moved = SlotRemoval::slot($slot, $ops); if ($moved !== null) $out[] = $moved; }
+        $paths = $this->store->load()['phoneLinks']['paths'] ?? [];
+        foreach ($out as &$slot) if (isset($paths[$slot['key']])) $slot['xpath'] = $paths[$slot['key']];
+        unset($slot);
         return $out;
     }
 
@@ -1162,6 +1168,7 @@ final class QuickstartContract
         if(isset($binding['siteLanguage']))$snapshot['siteLanguage']=$binding['siteLanguage'];
         if(isset($binding['sourceRelabel']))$snapshot['sourceRelabel']=$binding['sourceRelabel'];
         if(isset($binding['rowsRemoved']))$snapshot['rowsRemoved']=$binding['rowsRemoved'];
+        if(isset($binding['phoneLinks']))$snapshot['phoneLinks']=$binding['phoneLinks'];
         $revisionRows=[];
         foreach($rows as $key=>$row)$revisionRows[$key]=array_intersect_key($row,$this->lock['entities'][$keys[$key]['lockKey']]);
         $t=Timing::begin();
@@ -1493,6 +1500,8 @@ final class QuickstartContract
                 else $values[$key]='';
                 continue;
             }
+            $linked = $state['binding']['phoneLinks']['slots'][$key] ?? null;
+            if ($linked !== null && $value !== $linked['expected']) { $problems[] = new ContractProblem('PHONE_LINK_CONFLICT', 'Undo this phone link before changing its phone text', $key, $owner); continue; }
             try { $this->checkValue($slot,$value,$params); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
@@ -1830,6 +1839,57 @@ final class QuickstartContract
         return $binding;
     }
 
+    /** The exact optional write boundary of this bound single-language contract. */
+    public function phoneLinkCapability(array $state): array {
+        $keys = [];
+        if (!$this->derivedMode && $state['binding'] !== null && $state['languages'] === [] && $state['job'] === null) {
+            foreach ($state['slots'] as $slot)
+                if (in_array($slot['key'], $this->phoneSlots, true) && ($slot['role'] ?? '') === 'contact.phone'
+                    && ($slot['type'] ?? '') === 'text' && isset($slot['xpath']) && !isset($slot['jsonPath'])) $keys[] = $slot['key'];
+        }
+        return ['version' => 1, 'storage' => 'html', 'scalar' => false, 'match' => 'whole-slot', 'supportedKeys' => $keys];
+    }
+
+    /** A reviewed exact phone wrapper, including the same operation on the masked baseline. */
+    public function phoneLinkPlan(array $params, array $state): array {
+        $key = $params['key'] ?? null; $expected = $params['expected'] ?? null; $tel = $params['tel'] ?? null;
+        if ($this->derivedMode || !is_string($key) || !in_array($key, $this->phoneSlots, true))
+            throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'This contract has no reviewed stored-HTML phone slot at this key');
+        if (($params['contract'] ?? null) !== $state['contract'] || ($params['contract_hash'] ?? null) !== $this->contractHash())
+            throw new ContractProblem('PHONE_LINK_CONTRACT', 'The exact bound contract identity is required');
+        if (!is_string($expected) || !is_string($tel)) throw new ContractProblem('PHONE_LINK_INVALID', 'expected and tel must be strings');
+        PhoneLinks::target($expected, $tel);
+        $binding = $state['binding'];
+        if ($binding === null || $state['languages'] !== [] || $state['job'] !== null)
+            throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'Phone links require a bound single-language site without an active language job');
+        $existing = $binding['phoneLinks']['slots'][$key] ?? null;
+        if ($existing !== null) {
+            if ($existing['expected'] !== $expected || $existing['tel'] !== $tel) throw new ContractProblem('PHONE_LINK_CONFLICT', 'Undo the existing phone link first', $key);
+            if (($state['slotValues'][$key] ?? null) !== $expected) throw new ContractProblem('PHONE_LINK_STALE', 'The linked phone text changed', $key);
+            $active = array_column($state['slots'], null, 'key')[$key] ?? null;
+            if (!$active || !ContentSlots::phoneLinked((string) $state['rows'][$active['entity']][$active['column']], $active, $expected, $tel))
+                throw new ContractProblem('PHONE_LINK_STALE', 'The exact phone wrapper changed; inspect again', $key);
+            return ['already' => true, 'key' => $key];
+        }
+        $slot = array_column($state['slots'], null, 'key')[$key] ?? null;
+        if (!$slot || ($slot['role'] ?? '') !== 'contact.phone' || ($slot['type'] ?? '') !== 'text' || !isset($slot['xpath']) || isset($slot['jsonPath']))
+            throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'Only a reviewed plain HTML contact.phone text node is supported', $key);
+        if (($state['slotValues'][$key] ?? null) !== $expected) throw new ContractProblem('PHONE_LINK_STALE', 'The phone text changed; inspect again', $key);
+        $entity = $slot['entity']; $column = $slot['column']; $meta = $state['keys'][$entity];
+        $row = $state['rows'][$entity];
+        $siblings = array_values(array_filter($state['slots'], static fn($s) => $s['entity'] === $entity));
+        $changed = ContentSlots::phoneLink((string) $row[$column], $slot, $siblings, $expected, $tel);
+        $masked = $binding['presentation'][$entity][$column] ?? null;
+        if (!is_string($masked)) throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'The phone has no stored HTML presentation baseline', $key);
+        $baseline = ContentSlots::phoneLink($masked, $slot, $siblings, MultilingualProfile::CONTENT_SLOT, $tel);
+        if ($baseline['paths'] !== $changed['paths']) throw new ContractProblem('PHONE_LINK_STALE', 'The stored phone structure differs from its reviewed baseline', $key);
+        $binding['presentation'][$entity][$column] = $baseline['html'];
+        $binding['phoneLinks']['paths'] = array_replace($binding['phoneLinks']['paths'] ?? [], $changed['paths']);
+        $binding['phoneLinks']['slots'][$key] = ['expected' => $expected, 'tel' => $tel];
+        return ['already' => false, 'key' => $key, 'binding' => $binding,
+            'operation' => ['kind' => $meta['kind'], 'id' => $state['ids'][$entity], 'expected' => [$column => $row[$column]], 'fields' => [$column => $changed['html']]]];
+    }
+
     /* ------------------------------------------------------------ showcase navigation */
 
     /**
@@ -1955,7 +2015,7 @@ final class QuickstartContract
         unset($stored['counts'], $snapshot['counts']);
         return $stored == $snapshot;
     }
-    /** Only a validated language apply or revert replaces a baseline; content applies re-save an identical one. */
+    /** Validated structural contract operations and their undo replace a baseline; ordinary content applies preserve it. */
     public function rebind(array $binding): void { $this->ready(); $this->store->replace($binding); $this->removalOps=null; $this->syncSourceRelabel(); }
 
     /* ------------------------------------------------------------ source relabel */
