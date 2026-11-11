@@ -52,6 +52,12 @@ check('normal contract apply of the same phone succeeds',$plSame['ok'],true);
 check('same phone text preserves exact anchor rows and presentation baseline',[$plWriter->store,$plStore->binding],$plBeforeSame);
 check('same-text apply undo succeeds without removing the wrapper',$plUndo('contract-phone-same')['ok'],true);
 check('same-text apply undo preserves exact wrapper baseline',[$plWriter->store,$plStore->binding],$plBeforeSame);
+foreach (['empty_slots','empty_links'] as $emptyKind) {
+    $plEmpty=$plCall(['operation'=>'apply','apply_id'=>'contract-phone-'.$emptyKind,'request_id'=>'empty-phone','expected_revision'=>$plContract->inspect()['revision'],$emptyKind=>['footer.0']]);
+    check('active phone wrapper refuses '.$emptyKind.' before ordinary hide handling',$plEmpty['errors'][0]['code']??null,'PHONE_LINK_CONFLICT');
+}
+check('refused phone emptying preserves exact anchor and baseline',[$plWriter->store,$plStore->binding],$plBeforeSame);
+
 
 $plLinked=$plWriter->store['module'][11]['content'];
 $plWriter->store['module'][11]['content']=str_replace('tel:+97143535071','tel:+97143535079',$plLinked);
