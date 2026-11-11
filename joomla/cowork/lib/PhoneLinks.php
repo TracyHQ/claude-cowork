@@ -25,10 +25,11 @@ final class PhoneLinks
 
     public static function target(string $expected, string $tel): void
     {
-        if (!preg_match('/^(?:\+[1-9]|[0-9])[0-9]{5,14}$/D', $tel) || !preg_match('/^(?:\+|00)?[0-9][0-9 ().-]*[0-9]$/D', $expected))
+        $shown = trim($expected, ' ');
+        if (!preg_match('/^(?:\+[1-9]|[0-9])[0-9]{5,14}$/D', $tel) || !preg_match('/^(?:\+|00)?(?:[0-9]+|\([0-9]+\))(?:[ .-]*(?:[0-9]+|\([0-9]+\)))*$/D', $shown))
             throw new ContractProblem('PHONE_LINK_INVALID', 'An exact phone and canonical numeric tel target are required');
-        $digits = preg_replace('/[^0-9]/', '', $expected);
-        if (strpos($expected, '00') === 0) $digits = substr($digits, 2);
+        $digits = preg_replace('/[^0-9]/', '', $shown);
+        if (strpos($shown, '00') === 0) $digits = substr($digits, 2);
         if (!hash_equals(strpos($tel, '+') === 0 ? substr($tel, 1) : $tel, $digits))
             throw new ContractProblem('PHONE_LINK_INVALID', 'The tel target must dial exactly the expected phone');
     }
