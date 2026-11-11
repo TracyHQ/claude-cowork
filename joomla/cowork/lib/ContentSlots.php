@@ -136,6 +136,43 @@ final class ContentSlots
         }
     }
 
+    /** Read back the exact wrapper, including its dial target; an unrelated link never counts. */
+    public static function phoneLinked(string $html, array $slot, string $expected, string $tel): bool
+    {
+        $xp = new DOMXPath(self::html($html)); $found = $xp->query($slot['xpath']);
+        if ($found === false || $found->length !== 1 || !($found->item(0) instanceof DOMText)) return false;
+        $node = $found->item(0); $parent = $node->parentNode;
+        return $parent instanceof DOMElement && strtolower($parent->tagName) === 'a'
+            && $parent->attributes->length === 1 && $parent->getAttribute('href') === 'tel:' . $tel
+            && $parent->childNodes->length === 1 && trim($node->nodeValue) === $expected;
+    }
+
+    /** One reviewed phone text node gains a tel anchor; every other declared node keeps its identity. */
+    public static function phoneLink(string $html, array $slot, array $slots, string $expected, string $tel): array
+    {
+        $doc = self::html($html); $xp = new DOMXPath($doc);
+        $nodes = $xp->query($slot['xpath']);
+        if ($nodes === false || $nodes->length !== 1 || !($nodes->item(0) instanceof DOMText))
+            throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'The phone slot must identify exactly one text node', $slot['key']);
+        $node = $nodes->item(0);
+        if ($xp->query('ancestor::a | ancestor::script | ancestor::style | ancestor::code | ancestor::textarea', $node)->length)
+            throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'The phone text is already linked or in protected markup', $slot['key']);
+        if (trim($node->nodeValue) !== $expected)
+            throw new ContractProblem('PHONE_LINK_STALE', 'The phone text changed; inspect again', $slot['key']);
+        $tracked = [];
+        foreach ($slots as $other) {
+            if (($other['column'] ?? null) !== $slot['column'] || !isset($other['xpath']) || isset($other['jsonPath'])) continue;
+            $found = $xp->query($other['xpath']);
+            if ($found === false || $found->length !== 1)
+                throw new ContractProblem('PHONE_LINK_UNSUPPORTED', 'A sibling slot is missing or ambiguous', $other['key']);
+            $tracked[$other['key']] = $found->item(0);
+        }
+        $anchor = $doc->createElement('a'); $anchor->setAttribute('href', 'tel:' . $tel);
+        $node->parentNode->replaceChild($anchor, $node); $anchor->appendChild($node);
+        $paths = []; foreach ($tracked as $key => $trackedNode) $paths[$key] = $trackedNode->getNodePath();
+        return ['html' => self::saved($doc, $xp, $html), 'paths' => $paths];
+    }
+
     public static function htmlPatch(string $html, array $changes): string
     {
         $doc = self::html($html); $xp = new DOMXPath($doc);
