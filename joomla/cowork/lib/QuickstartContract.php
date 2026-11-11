@@ -1489,6 +1489,8 @@ final class QuickstartContract
                 elseif(!hash_equals($current['revisions'][$owner],$byContent[$owner]))
                     $problems[]=new ContractProblem('REVISION_STALE','Content changed; read it again: '.$owner,$key,$owner,['current'=>$current['revisions'][$owner]]);
             }
+            $linked = $state['binding']['phoneLinks']['slots'][$key] ?? null;
+            if ($linked !== null && $value !== $linked['expected']) { $problems[] = new ContractProblem('PHONE_LINK_CONFLICT', 'Undo this phone link before changing its phone text', $key, $owner); continue; }
             if(isset($emptying[$key])) {
                 if(!isset($slot['emptyLink']))$problems[]=new ContractProblem('SLOT_LINK_NOT_EMPTIABLE','This link cannot be taken off: its layout is not known to draw nothing without it: '.$key,$key,$owner);
                 else $values[$key]='';
@@ -1500,8 +1502,6 @@ final class QuickstartContract
                 else $values[$key]='';
                 continue;
             }
-            $linked = $state['binding']['phoneLinks']['slots'][$key] ?? null;
-            if ($linked !== null && $value !== $linked['expected']) { $problems[] = new ContractProblem('PHONE_LINK_CONFLICT', 'Undo this phone link before changing its phone text', $key, $owner); continue; }
             try { $this->checkValue($slot,$value,$params); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
