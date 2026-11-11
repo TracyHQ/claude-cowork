@@ -1700,10 +1700,16 @@ $upd = simplexml_load_file(__DIR__ . '/../../update.xml');
 $pkgVersion = trim((string) $pkg->version);
 
 check('the component carries the package version', trim((string) $com->version), $pkgVersion);
-check('update.xml names that version too', trim((string) $upd->update->version), $pkgVersion);
+// An RC keeps the stable feed unchanged; stable packages still require exact package/feed parity.
+require __DIR__ . '/update-release-identity.php';
+$json = json_decode(file_get_contents(__DIR__ . '/../../update.json'), true);
+check('the installed package and stable updater doors have consistent release identities',
+    updateReleaseIdentityErrors($pkgVersion, trim((string) $upd->update->version), (string) ($json['version'] ?? '')), []);
+$announcedVersion = strpos($pkgVersion, '-') === false ? $pkgVersion : trim((string) $upd->update->version);
+check('update.xml names the announced stable version', trim((string) $upd->update->version), $announcedVersion);
 check('and points at that version\'s release asset',
     trim((string) $upd->update->downloads->downloadurl),
-    "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+    "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$announcedVersion}/pkg_claudecowork-{$announcedVersion}.zip");
 check('update.xml is about the package, not the component alone', trim((string) $upd->update->element), 'pkg_claudecowork');
 // Joomla's ExtensionAdapter starts every <update> at client_id 1 and changes it only when the entry
 // names a <client>. A package is installed with client_id 0, so an entry without one never matches
@@ -1777,10 +1783,10 @@ check('the package declares where to ask',
 // does: the raw.githubusercontent path is compiled into every desk already installed on somebody's
 // machine, so it is a published address. Tidying it inwards would 404 them all, silently.
 $json = json_decode(file_get_contents(__DIR__ . '/../../update.json'), true);
-check('update.json names the package version', $json['version'] ?? null, $pkgVersion);
+check('update.json names the same announced stable version', $json['version'] ?? null, $announcedVersion);
 checkTrue(
     'and points at that version\'s release asset',
-    ($json['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$pkgVersion}/pkg_claudecowork-{$pkgVersion}.zip");
+    ($json['package'] ?? '') === "https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v{$announcedVersion}/pkg_claudecowork-{$announcedVersion}.zip");
 
 // --- core.upgrade: the one write that moves a Joomla version --------------------------------
 // The engine validates the target and delegates the site-touching work to a CoreUpgrader, so
