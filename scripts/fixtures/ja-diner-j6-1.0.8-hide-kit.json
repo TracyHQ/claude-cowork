@@ -1,0 +1,1290 @@
+{
+  "_source": {
+    "file": "TCH packages/cms/tracy-joomla-quickstart/contracts/ja-diner/j6/1.0.8/template-kit.json",
+    "sha256": "1e349e22c297abaf8b7661cf97ae0f7204de75bb7522b9fe13a11cbaaca08884",
+    "projection": "blocks[].id, frames[].id/canHide, lists[].id/rows[].slots[].id only"
+  },
+  "contract": "ja-diner/j6/1.0.8",
+  "blocks": [
+    {
+      "id": "block-113",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "header",
+      "frames": [
+        {
+          "id": "templateStyle-9.0",
+          "canHide": true
+        },
+        {
+          "id": "templateStyle-9.1",
+          "canHide": null
+        },
+        {
+          "id": "templateStyle-10.0",
+          "canHide": true
+        },
+        {
+          "id": "templateStyle-10.1",
+          "canHide": null
+        },
+        {
+          "id": "templateStyle-11.0",
+          "canHide": true
+        },
+        {
+          "id": "templateStyle-11.1",
+          "canHide": null
+        },
+        {
+          "id": "templateStyle-12.0",
+          "canHide": true
+        },
+        {
+          "id": "templateStyle-12.1",
+          "canHide": null
+        },
+        {
+          "id": "templateStyle-13.0",
+          "canHide": true
+        },
+        {
+          "id": "templateStyle-13.1",
+          "canHide": null
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "block-94",
+      "frames": [
+        {
+          "id": "block-94.0",
+          "canHide": true
+        },
+        {
+          "id": "block-94.1",
+          "canHide": true
+        },
+        {
+          "id": "block-94.picture-2",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-94.slide",
+          "rows": [
+            {
+              "slots": [
+                "block-94.0",
+                "block-94.2",
+                "block-94.4",
+                "block-94.6",
+                "block-94.8",
+                "block-94.10",
+                "block-94.12"
+              ]
+            },
+            {
+              "slots": [
+                "block-94.1",
+                "block-94.3",
+                "block-94.5",
+                "block-94.7",
+                "block-94.9",
+                "block-94.11",
+                "block-94.13"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-96",
+      "frames": [
+        {
+          "id": "block-96.1",
+          "canHide": false
+        },
+        {
+          "id": "block-96.2",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-96.dish",
+          "rows": [
+            {
+              "slots": [
+                "block-96.1",
+                "block-96.3",
+                "block-96.5",
+                "block-96.7"
+              ]
+            },
+            {
+              "slots": [
+                "block-96.2",
+                "block-96.4",
+                "block-96.6",
+                "block-96.8"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-97",
+      "frames": [
+        {
+          "id": "block-97.0",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-100.dish",
+          "rows": [
+            {
+              "slots": [
+                "block-100.2",
+                "block-100.12",
+                "block-100.22"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.3",
+                "block-100.13",
+                "block-100.23"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.4",
+                "block-100.14",
+                "block-100.24"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.5",
+                "block-100.15",
+                "block-100.25"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.6",
+                "block-100.16",
+                "block-100.26"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.7",
+                "block-100.17",
+                "block-100.27"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.8",
+                "block-100.18",
+                "block-100.28"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.9",
+                "block-100.19",
+                "block-100.29"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.10",
+                "block-100.20",
+                "block-100.30"
+              ]
+            },
+            {
+              "slots": [
+                "block-100.11",
+                "block-100.21",
+                "block-100.31"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block-101.dish",
+          "rows": [
+            {
+              "slots": [
+                "block-101.2",
+                "block-101.12",
+                "block-101.22"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.3",
+                "block-101.13",
+                "block-101.23"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.4",
+                "block-101.14",
+                "block-101.24"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.5",
+                "block-101.15",
+                "block-101.25"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.6",
+                "block-101.16",
+                "block-101.26"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.7",
+                "block-101.17",
+                "block-101.27"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.8",
+                "block-101.18",
+                "block-101.28"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.9",
+                "block-101.19",
+                "block-101.29"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.10",
+                "block-101.20",
+                "block-101.30"
+              ]
+            },
+            {
+              "slots": [
+                "block-101.11",
+                "block-101.21",
+                "block-101.31"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "block-102.dish",
+          "rows": [
+            {
+              "slots": [
+                "block-102.2",
+                "block-102.12",
+                "block-102.22"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.3",
+                "block-102.13",
+                "block-102.23"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.4",
+                "block-102.14",
+                "block-102.24"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.5",
+                "block-102.15",
+                "block-102.25"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.6",
+                "block-102.16",
+                "block-102.26"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.7",
+                "block-102.17",
+                "block-102.27"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.8",
+                "block-102.18",
+                "block-102.28"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.9",
+                "block-102.19",
+                "block-102.29"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.10",
+                "block-102.20",
+                "block-102.30"
+              ]
+            },
+            {
+              "slots": [
+                "block-102.11",
+                "block-102.21",
+                "block-102.31"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-103",
+      "frames": [],
+      "lists": [
+        {
+          "id": "block-103.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-109",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-110",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-111",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-106",
+      "frames": [
+        {
+          "id": "block-106.23",
+          "canHide": false
+        },
+        {
+          "id": "block-106.24",
+          "canHide": null
+        },
+        {
+          "id": "block-106.25",
+          "canHide": false
+        },
+        {
+          "id": "block-106.26",
+          "canHide": false
+        },
+        {
+          "id": "block-106.27",
+          "canHide": false
+        },
+        {
+          "id": "block-106.28",
+          "canHide": false
+        },
+        {
+          "id": "block-106.29",
+          "canHide": false
+        },
+        {
+          "id": "block-106.30",
+          "canHide": false
+        },
+        {
+          "id": "block-106.31",
+          "canHide": false
+        },
+        {
+          "id": "block-106.32",
+          "canHide": false
+        },
+        {
+          "id": "block-106.picture-2",
+          "canHide": true
+        },
+        {
+          "id": "block-106.picture-3",
+          "canHide": true
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-j-pages_login",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-127",
+      "frames": [
+        {
+          "id": "block-127.3",
+          "canHide": false
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-our-blog",
+      "frames": [
+        {
+          "id": "body-our-blog.picture-13",
+          "canHide": null
+        }
+      ],
+      "lists": [
+        {
+          "id": "menuItem-108.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-120",
+      "frames": [
+        {
+          "id": "block-120.0",
+          "canHide": false
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "block-119",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-107",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "block-108",
+      "frames": [],
+      "lists": [
+        {
+          "id": "block-108.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-contact-us",
+      "frames": [
+        {
+          "id": "contact-1.16",
+          "canHide": true
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-j-pages_registration",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "body-joomla-content_all-categories",
+      "frames": [
+        {
+          "id": "body-joomla-content_all-categories.picture-1",
+          "canHide": null
+        },
+        {
+          "id": "body-joomla-content_all-categories.picture-2",
+          "canHide": null
+        },
+        {
+          "id": "body-joomla-content_all-categories.picture-3",
+          "canHide": null
+        },
+        {
+          "id": "body-joomla-content_all-categories.picture-4",
+          "canHide": null
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-joomla-content_fetured-articles",
+      "frames": [],
+      "lists": [
+        {
+          "id": "menuItem-128.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-joomla-content_tagged-items",
+      "frames": [
+        {
+          "id": "body-joomla-content_tagged-items.picture-18",
+          "canHide": null
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-other-pages_error-page",
+      "frames": [
+        {
+          "id": "article-9.5",
+          "canHide": false
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-other-pages_offline-page",
+      "frames": [
+        {
+          "id": "article-8.5",
+          "canHide": false
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-about-us",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "body-reservation",
+      "frames": [
+        {
+          "id": "article-28.0",
+          "canHide": false
+        },
+        {
+          "id": "article-28.12",
+          "canHide": false
+        },
+        {
+          "id": "body-reservation.picture-3",
+          "canHide": true
+        }
+      ],
+      "lists": []
+    },
+    {
+      "id": "body-password-reset",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "body-username-reminder-request",
+      "frames": [],
+      "lists": []
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_3-cocktail-bar-alchemist-set-to-open-at-mediacity-in-salford-quays",
+      "frames": [
+        {
+          "id": "article-3.7",
+          "canHide": false
+        },
+        {
+          "id": "article-3.8",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-3.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_4-we-ve-been-nominated-for-the-britain-restaurant-awards",
+      "frames": [
+        {
+          "id": "article-4.4",
+          "canHide": false
+        },
+        {
+          "id": "article-4.17",
+          "canHide": false
+        },
+        {
+          "id": "article-4.24",
+          "canHide": false
+        },
+        {
+          "id": "article-4.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-4.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_11-restaurant-guide_5-three-broomsticks-welcomes-new-chef-caleb-nunez",
+      "frames": [
+        {
+          "id": "article-5.4",
+          "canHide": false
+        },
+        {
+          "id": "article-5.17",
+          "canHide": false
+        },
+        {
+          "id": "article-5.24",
+          "canHide": false
+        },
+        {
+          "id": "article-5.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-5.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_6-three-broomsticks-s-autumn-menu-unveiled",
+      "frames": [
+        {
+          "id": "article-6.4",
+          "canHide": false
+        },
+        {
+          "id": "article-6.17",
+          "canHide": false
+        },
+        {
+          "id": "article-6.24",
+          "canHide": false
+        },
+        {
+          "id": "article-6.25",
+          "canHide": true
+        },
+        {
+          "id": "body-our-blog_10-restaurant-news_6-three-broomsticks-s-autumn-menu-unveiled.picture-4",
+          "canHide": null
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-6.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_10-4-habits-that-can-improve-your-customer-service",
+      "frames": [
+        {
+          "id": "article-10.4",
+          "canHide": false
+        },
+        {
+          "id": "article-10.17",
+          "canHide": false
+        },
+        {
+          "id": "article-10.24",
+          "canHide": false
+        },
+        {
+          "id": "article-10.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-10.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_11-8-trends-trickling-down-to-mainstream-menus",
+      "frames": [
+        {
+          "id": "article-11.4",
+          "canHide": false
+        },
+        {
+          "id": "article-11.17",
+          "canHide": false
+        },
+        {
+          "id": "article-11.24",
+          "canHide": false
+        },
+        {
+          "id": "article-11.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-11.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_12-starbucks-brings-under-armour-exec-on-board",
+      "frames": [
+        {
+          "id": "article-12.4",
+          "canHide": false
+        },
+        {
+          "id": "article-12.17",
+          "canHide": false
+        },
+        {
+          "id": "article-12.24",
+          "canHide": false
+        },
+        {
+          "id": "article-12.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-12.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_13-inside-olive-garden-s-never-ending-pasta-pass",
+      "frames": [
+        {
+          "id": "article-13.4",
+          "canHide": false
+        },
+        {
+          "id": "article-13.17",
+          "canHide": false
+        },
+        {
+          "id": "article-13.24",
+          "canHide": false
+        },
+        {
+          "id": "article-13.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-13.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business_14-century-old-nathan-s-famous-aims-for-youth-with-new-look",
+      "frames": [
+        {
+          "id": "article-14.4",
+          "canHide": false
+        },
+        {
+          "id": "article-14.17",
+          "canHide": false
+        },
+        {
+          "id": "article-14.24",
+          "canHide": false
+        },
+        {
+          "id": "article-14.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-14.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_9-restaurant-marketing_15-did-ihop-s-publicity-stunt-hurt-applebee-s",
+      "frames": [
+        {
+          "id": "article-15.4",
+          "canHide": false
+        },
+        {
+          "id": "article-15.17",
+          "canHide": false
+        },
+        {
+          "id": "article-15.24",
+          "canHide": false
+        },
+        {
+          "id": "article-15.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-15.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_9-restaurant-marketing_16-buffalo-wild-wings-considers-adding-sports-betting",
+      "frames": [
+        {
+          "id": "article-16.4",
+          "canHide": false
+        },
+        {
+          "id": "article-16.17",
+          "canHide": false
+        },
+        {
+          "id": "article-16.24",
+          "canHide": false
+        },
+        {
+          "id": "article-16.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-16.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_9-restaurant-marketing_17-this-week-s-restaurant-nightmares-language-people",
+      "frames": [
+        {
+          "id": "article-17.4",
+          "canHide": false
+        },
+        {
+          "id": "article-17.17",
+          "canHide": false
+        },
+        {
+          "id": "article-17.24",
+          "canHide": false
+        },
+        {
+          "id": "article-17.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-17.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_9-restaurant-marketing_18-jason-alexander-is-kfc-s-new-colonel",
+      "frames": [
+        {
+          "id": "article-18.4",
+          "canHide": false
+        },
+        {
+          "id": "article-18.17",
+          "canHide": false
+        },
+        {
+          "id": "article-18.24",
+          "canHide": false
+        },
+        {
+          "id": "article-18.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-18.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_19-10-most-alluring-ltos-on-menus-in-july",
+      "frames": [
+        {
+          "id": "article-19.4",
+          "canHide": false
+        },
+        {
+          "id": "article-19.17",
+          "canHide": false
+        },
+        {
+          "id": "article-19.24",
+          "canHide": false
+        },
+        {
+          "id": "article-19.25",
+          "canHide": true
+        },
+        {
+          "id": "body-our-blog_10-restaurant-news_19-10-most-alluring-ltos-on-menus-in-july.picture-4",
+          "canHide": null
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-19.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_20-newk-s-eatery-steals-a-dinner-booster-from-supermarkets",
+      "frames": [
+        {
+          "id": "article-20.4",
+          "canHide": false
+        },
+        {
+          "id": "article-20.17",
+          "canHide": false
+        },
+        {
+          "id": "article-20.24",
+          "canHide": false
+        },
+        {
+          "id": "article-20.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-20.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_21-this-week-s-5-head-spinning-restaurant-moments-1-more-inch",
+      "frames": [
+        {
+          "id": "article-21.4",
+          "canHide": false
+        },
+        {
+          "id": "article-21.17",
+          "canHide": false
+        },
+        {
+          "id": "article-21.24",
+          "canHide": false
+        },
+        {
+          "id": "article-21.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-21.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_22-5-of-the-summer-s-craziest-restaurant-marketing-stunts",
+      "frames": [
+        {
+          "id": "article-22.4",
+          "canHide": false
+        },
+        {
+          "id": "article-22.17",
+          "canHide": false
+        },
+        {
+          "id": "article-22.24",
+          "canHide": false
+        },
+        {
+          "id": "article-22.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-22.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog--start-12",
+      "frames": [],
+      "lists": [
+        {
+          "id": "body-our-blog--start-12.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_2-restaurant-business",
+      "frames": [],
+      "lists": [
+        {
+          "id": "category-2.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_9-restaurant-marketing",
+      "frames": [],
+      "lists": [
+        {
+          "id": "category-9.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news",
+      "frames": [
+        {
+          "id": "body-our-blog_10-restaurant-news.picture-8",
+          "canHide": null
+        }
+      ],
+      "lists": [
+        {
+          "id": "category-10.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_11-restaurant-guide",
+      "frames": [],
+      "lists": [
+        {
+          "id": "category-11.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-component_tags_tag_food",
+      "frames": [],
+      "lists": [
+        {
+          "id": "tag-4.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-component_tags_tag_meet",
+      "frames": [],
+      "lists": [
+        {
+          "id": "tag-5.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-component_tags_tag_menu",
+      "frames": [],
+      "lists": [
+        {
+          "id": "tag-3.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_11-restaurant-guide_24-efforts-to-curb-soda-consumption-bring-results-on-both-coasts",
+      "frames": [
+        {
+          "id": "article-24.4",
+          "canHide": false
+        },
+        {
+          "id": "article-24.17",
+          "canHide": false
+        },
+        {
+          "id": "article-24.24",
+          "canHide": false
+        },
+        {
+          "id": "article-24.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-24.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-joomla-content_fetured-articles--start-4",
+      "frames": [],
+      "lists": [
+        {
+          "id": "body-joomla-content_fetured-articles--start-4.items",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_10-restaurant-news_23-burger-king-takes-a-stand-on-the-pink-tax",
+      "frames": [
+        {
+          "id": "article-23.4",
+          "canHide": false
+        },
+        {
+          "id": "article-23.17",
+          "canHide": false
+        },
+        {
+          "id": "article-23.24",
+          "canHide": false
+        },
+        {
+          "id": "article-23.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-23.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_11-restaurant-guide_26-from-ihop-to-ihob-just-how-big-was-the-chain-s-name-reveal",
+      "frames": [
+        {
+          "id": "article-26.4",
+          "canHide": false
+        },
+        {
+          "id": "article-26.17",
+          "canHide": false
+        },
+        {
+          "id": "article-26.24",
+          "canHide": false
+        },
+        {
+          "id": "article-26.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-26.article",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "body-our-blog_11-restaurant-guide_25-how-restaurants-can-promote-a-james-beard-recognition",
+      "frames": [
+        {
+          "id": "article-25.4",
+          "canHide": false
+        },
+        {
+          "id": "article-25.17",
+          "canHide": false
+        },
+        {
+          "id": "article-25.24",
+          "canHide": false
+        },
+        {
+          "id": "article-25.25",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "article-25.article",
+          "rows": []
+        }
+      ]
+    }
+  ]
+}

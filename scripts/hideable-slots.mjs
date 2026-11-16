@@ -15,10 +15,19 @@
 // Never listed, so always refused: a slot that is empty already, one a text node or attribute addresses (its address
 // would move), and a whole column of a row (a menu item's title), which Joomla needs.
 //
-// A contact's `email_to` is the one column that is listed, as unmeasured: Joomla needs no address on a contact, and the column
-// does two jobs. It is the address the page prints and where the contact form sends its mail, so with it empty the page prints
-// no address and draws no form. That is what a plan asks when a site has no address to take the form's mail. A contact form's
-// field `hint` goes with it, a word held in a field's params that nothing else reads.
+// A contact's `email_to` is listed as unmeasured: Joomla needs no address on a contact, and the column does two jobs. It is the
+// address the page prints and where the contact form sends its mail, so with it empty the page prints no address and draws no
+// form. That is what a plan asks when a site has no address to take the form's mail. A contact form's field `hint` goes with
+// it, a word held in a field's params that nothing else reads.
+//
+// A contact's other printed lines are listed as unmeasured too: com_contact's default_address.php (and the template overrides
+// that keep it, JA Diner's among them) prints the street, suburb, state, postcode, country, telephone, mobile, fax, web page and
+// position each only when it holds something, so emptying one takes that line off the page and nothing else. Joomla needs
+// none of them; only the name is required, which is never listed. The contact's own links `linka`..`linke` (params) are printed
+// by default_links.php only with an address, so an address may go alone and its link goes with it; a link's name goes only
+// beside its address (withRow), since a name alone prints the address in its place. A plan hides them when the business has
+// no street address or no such profile (Arabian Tea House on JA Diner 1.0.8, dev 16/11/2026: the demo's street, its web page
+// and its Twitter link stayed on the contact page, refused as not listed).
 // Reproducible: keys sorted, no time, no path.
 //
 // Beside them, `rows`: where `content.contract rows.remove` may take a whole row, per entity, read from the contract's own
@@ -56,6 +65,31 @@ const isFormWord = (slot) =>
   (kindOf(slot) === 'contact' && slot.column === 'email_to') ||
   (kindOf(slot) === 'field' && slot.column === 'params' && slot.jsonPath?.at(-1) === 'hint')
 
+/** The contact columns com_contact prints only when they hold something; emptying one takes its line off the page. */
+const CONTACT_LINES = new Set(['address', 'suburb', 'state', 'postcode', 'country', 'telephone', 'mobile', 'fax', 'webpage', 'con_position'])
+/** A contact's own link address in its params, and the name printed for it. */
+const CONTACT_LINK = /^link([a-e])$/
+const CONTACT_LINK_NAME = /^link([a-e])_name$/
+/** The params key of a contact slot held at the top of its params (`["linka"]`), else null. */
+const paramOf = (slot) => (slot.column === 'params' && slot.jsonPath?.length === 1 ? String(slot.jsonPath[0]) : null)
+
+/**
+ * A contact slot's tier: `unmeasured`, or the address slot a link name goes with, or null when it is not one of them.
+ * @returns {'unmeasured' | { withRow: string[] } | null}
+ */
+function contactTier(slot, map) {
+  if (kindOf(slot) !== 'contact') return null
+  if (CONTACT_LINES.has(slot.column) && !slot.jsonPath) return 'unmeasured'
+  const key = paramOf(slot)
+  if (key && CONTACT_LINK.test(key)) return 'unmeasured'
+  const pair = key ? CONTACT_LINK_NAME.exec(key) : null
+  if (!pair) return null
+  const address = map.slots.find(
+    (s) => s.entity === slot.entity && paramOf(s) === `link${pair[1]}` && occupied(s) && movable(s)
+  )
+  return address ? { withRow: [address.key] } : null
+}
+
 /** @returns {{measured: string[], unmeasured: string[], withRow: Record<string, string[]>}} */
 export function hideableSlots(kit, map) {
   const frames = new Map(kit.blocks.flatMap((b) => b.frames ?? []).map((f) => [slotKeyOf(f.id), f]))
@@ -76,6 +110,15 @@ export function hideableSlots(kit, map) {
     if (!occupied(slot) || !movable(slot)) continue
     if (isFormWord(slot)) {
       unmeasured.push(slot.key)
+      continue
+    }
+    const contact = contactTier(slot, map)
+    if (contact === 'unmeasured') {
+      unmeasured.push(slot.key)
+      continue
+    }
+    if (contact) {
+      withRow[slot.key] = contact.withRow
       continue
     }
     const frame = frames.get(slot.key)

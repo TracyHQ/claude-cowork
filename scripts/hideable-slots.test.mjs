@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { reviewedRows, hideableSlots, rowOf, slotKeyOf } from './hideable-slots.mjs'
+// Keep the shipped Diner receiver entry covered by the existing CI generator command.
+import './hideable-diner.test.mjs'
 
 // A made-up block: one list of two rows, a lone sentence and a few slots no one may empty.
 const json = (key, path, type, sample) => ({ key, entity: key.split('.')[0], column: 'params', type, sample, jsonPath: path })
@@ -51,6 +53,32 @@ test('never listed: an address that would move, an empty slot, a whole column, a
   const listed = new Set([...out.measured, ...out.unmeasured, ...Object.keys(out.withRow)])
   for (const key of ['article-2.1', 'article-2.2', 'module-1.4', 'menuItem-3.0', 'contact-4.0', 'field-5.0', 'module-1.3', 'module-1.5'])
     assert.equal(listed.has(key), false, key)
+})
+
+test('a contact prints each line only when it holds something: its lines and link addresses may go, a link name only with its address', () => {
+  const contact = (key, column, sample, jsonPath) => ({ key, entity: 'contact-7', column, type: 'text', sample, ...(jsonPath ? { jsonPath } : {}) })
+  const out = hideableSlots(
+    { blocks: [] },
+    {
+      slots: [
+        contact('contact-7.0', 'name', 'A made-up house'),
+        contact('contact-7.1', 'address', '1 Made-up Road'),
+        contact('contact-7.2', 'telephone', '000 555 0100'),
+        { ...contact('contact-7.3', 'webpage', 'https://made-up.invalid'), type: 'url' },
+        contact('contact-7.4', 'params', 'twitter', ['linkd_name']),
+        { ...contact('contact-7.5', 'params', 'https://made-up.invalid/t', ['linkd']), type: 'url' },
+        // A name whose link has no address prints nothing already: not listed.
+        contact('contact-7.6', 'params', 'pinterest', ['linke_name']),
+        { ...contact('contact-7.7', 'params', '', ['linke']), type: 'url' },
+        // A column the view needs, or one the contact view does not print as a line, is never listed.
+        contact('contact-7.8', 'alias', 'made-up-house'),
+        contact('contact-7.9', 'params', 'a made-up setting', ['show_email'])
+      ]
+    }
+  )
+  assert.deepEqual(out.unmeasured, ['contact-7.1', 'contact-7.2', 'contact-7.3', 'contact-7.5'])
+  assert.deepEqual(out.withRow, { 'contact-7.4': ['contact-7.5'] })
+  assert.deepEqual(out.measured, [])
 })
 
 test('a canHide false frame with a row is listed to go with it', () => {
