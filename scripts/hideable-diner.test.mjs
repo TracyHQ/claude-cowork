@@ -20,7 +20,17 @@ test('Diner receiver review is exactly generated from the released kit metadata 
     ...hideableSlots(kit, map), rows: reviewedRows(kit, map, lock)
   })
   assert.equal(entry.contentMapSha256, '6df56fb093a69d27c69e841e1fa3275e0a088e9b5fd925198ca5690907c28635')
-  assert.deepEqual([entry.measured.length, entry.unmeasured.length, Object.keys(entry.withRow).length], [29, 250, 26])
+  assert.deepEqual([entry.measured.length, entry.unmeasured.length, Object.keys(entry.withRow).length], [29, 258, 30])
+})
+
+// Arabian Tea House on JA Diner 1.0.8 (dev, 16/11/2026): the plan hid the demo's street, web page and Twitter link of the
+// contact page, and each was refused as not listed, so the demo's "1600 Amphitheatre Parkway" stayed on the page.
+test('Diner contact: the street, the web page and each social link may go; a link name only with its address', () => {
+  for (const key of ['contact-1.1', 'contact-1.5', 'contact-1.9', 'contact-1.11', 'contact-1.13', 'contact-1.15'])
+    assert.equal(entry.unmeasured.includes(key), true, key)
+  assert.deepEqual(entry.withRow['contact-1.14'], ['contact-1.15'])
+  assert.deepEqual(entry.withRow['contact-1.8'], ['contact-1.9'])
+  assert.equal(entry.unmeasured.includes('contact-1.0'), false, 'the name Joomla needs')
 })
 
 test('Diner menu removal includes all three parallel arrays and preserves the surrounding module settings', () => {
