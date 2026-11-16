@@ -1,7 +1,7 @@
 {
   "_source": {
     "file": "TCH packages/cms/tracy-joomla-quickstart/contracts/ja-diner/j6/1.0.8/template-kit.json",
-    "sha256": "1e349e22c297abaf8b7661cf97ae0f7204de75bb7522b9fe13a11cbaaca08884",
+    "sha256": "9d9e13809a7db54388e45e95693155ae666ac8fd0c2ac8a673ac0ab44320c9ef",
     "projection": "blocks[].id, frames[].id/canHide, lists[].id/rows[].slots[].id only"
   },
   "contract": "ja-diner/j6/1.0.8",
@@ -97,6 +97,45 @@
                 "block-94.9",
                 "block-94.11",
                 "block-94.13"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-95",
+      "frames": [
+        {
+          "id": "block-95.3",
+          "canHide": false
+        },
+        {
+          "id": "block-95.4",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-95.section",
+          "rows": [
+            {
+              "slots": [
+                "block-95.3",
+                "block-95.5",
+                "block-95.7",
+                "block-95.9",
+                "block-95.11"
+              ]
+            },
+            {
+              "slots": [
+                "block-95.4",
+                "block-95.6",
+                "block-95.8",
+                "block-95.10",
+                "block-95.12",
+                "block-95.12.icon"
               ]
             }
           ]
@@ -386,6 +425,35 @@
       ]
     },
     {
+      "id": "block-104",
+      "frames": [
+        {
+          "id": "block-104.0",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-104.person",
+          "rows": []
+        },
+        {
+          "id": "block-104.quote",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-127",
+      "frames": [
+        {
+          "id": "block-127.3",
+          "canHide": false
+        }
+      ],
+      "lists": []
+    },
+    {
       "id": "block-109",
       "frames": [],
       "lists": []
@@ -457,16 +525,6 @@
     {
       "id": "body-j-pages_login",
       "frames": [],
-      "lists": []
-    },
-    {
-      "id": "block-127",
-      "frames": [
-        {
-          "id": "block-127.3",
-          "canHide": false
-        }
-      ],
       "lists": []
     },
     {
@@ -590,6 +648,275 @@
         }
       ],
       "lists": []
+    },
+    {
+      "id": "block-116",
+      "frames": [
+        {
+          "id": "block-116.0",
+          "canHide": true
+        },
+        {
+          "id": "block-116.picture-2",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-116.event",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-117",
+      "frames": [
+        {
+          "id": "block-117.0",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-117.event",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-115",
+      "frames": [
+        {
+          "id": "block-115.0",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-115.event",
+          "rows": []
+        }
+      ]
+    },
+    {
+      "id": "block-121",
+      "frames": [
+        {
+          "id": "block-121.0",
+          "canHide": false
+        },
+        {
+          "id": "block-121.1",
+          "canHide": false
+        },
+        {
+          "id": "block-121.2",
+          "canHide": false
+        },
+        {
+          "id": "block-121.3",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-121.gallery",
+          "rows": [
+            {
+              "slots": [
+                "block-121.0",
+                "block-121.4"
+              ]
+            },
+            {
+              "slots": [
+                "block-121.1",
+                "block-121.5"
+              ]
+            },
+            {
+              "slots": [
+                "block-121.2",
+                "block-121.6"
+              ]
+            },
+            {
+              "slots": [
+                "block-121.3",
+                "block-121.7"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-122",
+      "frames": [
+        {
+          "id": "block-122.0",
+          "canHide": false
+        },
+        {
+          "id": "block-122.1",
+          "canHide": false
+        },
+        {
+          "id": "block-122.2",
+          "canHide": false
+        },
+        {
+          "id": "block-122.3",
+          "canHide": false
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-122.gallery",
+          "rows": [
+            {
+              "slots": [
+                "block-122.0",
+                "block-122.4"
+              ]
+            },
+            {
+              "slots": [
+                "block-122.1",
+                "block-122.5"
+              ]
+            },
+            {
+              "slots": [
+                "block-122.2",
+                "block-122.6"
+              ]
+            },
+            {
+              "slots": [
+                "block-122.3",
+                "block-122.7"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-123",
+      "frames": [
+        {
+          "id": "block-123.2",
+          "canHide": true
+        },
+        {
+          "id": "block-123.3",
+          "canHide": true
+        },
+        {
+          "id": "block-123.4",
+          "canHide": true
+        },
+        {
+          "id": "block-123.5",
+          "canHide": true
+        },
+        {
+          "id": "block-123.6",
+          "canHide": true
+        },
+        {
+          "id": "block-123.7",
+          "canHide": true
+        },
+        {
+          "id": "block-123.8",
+          "canHide": true
+        },
+        {
+          "id": "block-123.9",
+          "canHide": true
+        }
+      ],
+      "lists": [
+        {
+          "id": "block-123.member",
+          "rows": [
+            {
+              "slots": [
+                "block-123.2",
+                "block-123.10",
+                "block-123.18",
+                "block-123.26",
+                "block-123.34"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.3",
+                "block-123.11",
+                "block-123.19",
+                "block-123.27",
+                "block-123.35"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.4",
+                "block-123.12",
+                "block-123.20",
+                "block-123.28",
+                "block-123.36"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.5",
+                "block-123.13",
+                "block-123.21",
+                "block-123.29",
+                "block-123.37"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.6",
+                "block-123.14",
+                "block-123.22",
+                "block-123.30",
+                "block-123.38"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.7",
+                "block-123.15",
+                "block-123.23",
+                "block-123.31",
+                "block-123.39"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.8",
+                "block-123.16",
+                "block-123.24",
+                "block-123.32",
+                "block-123.40"
+              ]
+            },
+            {
+              "slots": [
+                "block-123.9",
+                "block-123.17",
+                "block-123.25",
+                "block-123.33",
+                "block-123.41"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "body-about-us",
