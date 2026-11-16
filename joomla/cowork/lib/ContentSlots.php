@@ -309,7 +309,9 @@ final class ContentSlots
             // `&#38;`, `&copy;`) is decoded as before, so a value that already spells `&amp;` is not
             // escaped twice; a name with no `;` (`&copy=2`, `&lang=en`) is text.
             if ($node instanceof DOMAttr) $value = preg_replace('/&(?!(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#x[0-9A-Fa-f]+);)/', '&amp;', (string) $value);
-            if (self::literalPreNode($node)) $node->data = (string) $value;
+            // HTML parsers normalize CR LF and lone CR to LF (libxml 2.14+ does, older ones kept CR), so a
+            // literal PRE value is written with LF breaks and reads back the same on every libxml.
+            if (self::literalPreNode($node)) $node->data = self::lineBreaks((string) $value);
             else $node->nodeValue = $value;
         }
         $restore = [];
@@ -332,10 +334,14 @@ final class ContentSlots
             $readback = $readback ?? new DOMXPath(self::html($saved));
             $nodes = $readback->query($change['xpath']);
             if (!$nodes || $nodes->length !== 1 || !self::literalPreNode($nodes->item(0))
-                || self::slotText($nodes->item(0)) !== (string) $change['value'])
+                || self::slotText($nodes->item(0)) !== self::lineBreaks((string) $change['value']))
                 throw new RuntimeException('Literal PRE text did not read back exactly');
         }
         return $saved;
+    }
+    private static function lineBreaks(string $text): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", $text);
     }
     private static function saved(DOMDocument $doc, DOMXPath $xp, string $seen): string
     {

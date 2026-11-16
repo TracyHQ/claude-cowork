@@ -348,7 +348,7 @@ $lpCheck('literal write/readback does not interpret entities', $lpRead($lpPatche
 foreach (["Case\tTAB\nLine", "A\r\nB", "&lt;b&gt; &amp; &#38;", "Unicode λ 😀"] as $lpLiteral) {
     try { $lpRoundTrip = $lpRead(ContentSlots::htmlPatch($lpHtml, [['xpath' => $lpPath, 'value' => $lpLiteral]]), $lpPath); }
     catch (RuntimeException $lpError) { $lpRoundTrip = $lpError->getMessage(); }
-    $lpCheck('decoded literal round trip: ' . json_encode($lpLiteral), $lpRoundTrip, $lpLiteral);
+    $lpCheck('decoded literal round trip: ' . json_encode($lpLiteral), $lpRoundTrip, str_replace("\r\n", "\n", $lpLiteral));
 }
 $lpCheck('wrapper and sibling owners stay', (new DOMXPath(ContentSlots::html($lpPatched)))->query('/html/body/div/pre/code | /html/body/div/h2 | /html/body/div/p')->length, 3);
 foreach (['<code>inline</code>', '<pre><code><span>nested</span></code></pre>', '<pre>outside<code>mixed</code></pre>', '<pre><code>one<!--gap-->two</code></pre>'] as $lpBad) {
