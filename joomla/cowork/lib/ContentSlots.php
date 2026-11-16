@@ -1,24 +1,97 @@
 <?php
 require_once __DIR__ . '/IdentityTokens.php';
+require_once __DIR__ . '/SvgScalar.php';
 /** Scalar slots only: JSON leaves or text/URL/media nodes in existing HTML. */
 final class ContentSlots
 {
     public static function html(string $html): DOMDocument
     {
+        $html = self::preservePreComparisons($html);
         $doc = new DOMDocument('1.0', 'UTF-8');
         $old = libxml_use_internal_errors(true);
         $doc->loadHTML('<?xml encoding="UTF-8"><html><body><div id="contract-root">' . $html . '</div></body></html>', LIBXML_NONET);
         libxml_clear_errors(); libxml_use_internal_errors($old);
         return $doc;
     }
+
+    /** libxml's HTML4 parser drops non-tag comparisons inside otherwise literal CODE. */
+    private static function preservePreComparisons(string $html): string
+    {
+        $tags = LeafCodec::htmlTags($html); $blocked = []; $edits = []; $end = 0;
+        $raw = ['script', 'style', 'textarea', 'noscript', 'template', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'plaintext'];
+        for ($i = 0; $i < count($tags); $i++) {
+            $tag = $tags[$i]; $name = strtolower($tag[2][0] ?? ''); $close = ($tag[1][0] ?? '') === '/';
+            $gap = substr($html, $end, $tag[0][1] - $end);
+            $end = $tag[0][1] + strlen($tag[0][0]);
+            if ($blocked && in_array(end($blocked), $raw, true)) {
+                if ($close && $name === end($blocked) && $name !== 'plaintext') array_pop($blocked);
+                continue;
+            }
+            // shortcut: ambiguous lexical gaps keep the old parse; broaden only with a proved source case.
+            if (strpos($gap, '<') !== false) return $html;
+            if ($name === '') continue; // The tokenizer consumes comments including their apparent tags.
+            if (!$blocked && !$close && $name === 'pre' && isset($tags[$i + 3])) {
+                [$code, $codeEnd, $preEnd] = array_slice($tags, $i + 1, 3);
+                $bodyStart = $code[0][1] + strlen($code[0][0]);
+                $body = substr($html, $bodyStart, $codeEnd[0][1] - $bodyStart);
+                if ($code[0][1] === $end && ($code[1][0] ?? '') === '' && strtolower($code[2][0] ?? '') === 'code'
+                    && !preg_match('~/\s*>$~', $tag[0][0]) && !preg_match('~/\s*>$~', $code[0][0])
+                    && preg_match('~^</code\s*>$~iD', $codeEnd[0][0]) && preg_match('~^</pre\s*>$~iD', $preEnd[0][0])
+                    && $preEnd[0][1] === $codeEnd[0][1] + strlen($codeEnd[0][0])
+                    && !preg_match('/<(?![=\x09-\x0D ])/D', $body)) {
+                    if (!IdentityTokens::hasDirective(html_entity_decode($body, ENT_QUOTES | ENT_HTML5, 'UTF-8')) && strpos($body, '<') !== false)
+                        $edits[] = [$bodyStart, strlen($body), str_replace('<', '&lt;', $body)];
+                    $i += 3; $end = $preEnd[0][1] + strlen($preEnd[0][0]);
+                    continue;
+                }
+            }
+            if (!$close && (in_array($name, $raw, true) || in_array($name, ['pre', 'code', 'svg'], true))) $blocked[] = $name;
+            elseif ($close && $blocked && $name === end($blocked)) array_pop($blocked);
+        }
+        if (strpos(substr($html, $end), '<') !== false) return $html;
+        foreach (array_reverse($edits) as [$offset, $length, $value]) $html = substr_replace($html, $value, $offset, $length);
+        return $html;
+    }
+    /** A map address is only a candidate; every read/write also checks the current DOM. */
+    public static function literalPreSlot(array $slot): bool
+    {
+        return ($slot['type'] ?? null) === 'text' && !isset($slot['leaf']) && is_string($slot['xpath'] ?? null)
+            && preg_match('~^/html/body/div(?:/[a-z][a-z0-9-]*(?:\[[1-9][0-9]*\])?)*/pre(?:\[[1-9][0-9]*\])?/code(?:\[[1-9][0-9]*\])?/text\(\)(?:\[1\])?$~D', $slot['xpath']) === 1;
+    }
+
+    /** Only one literal DOMText in one CODE child of PRE; no highlight or sibling nodes. */
+    public static function literalPreNode(DOMNode $node): bool
+    {
+        $code = $node->parentNode; $pre = $code ? $code->parentNode : null;
+        if ($node->nodeType !== XML_TEXT_NODE || !($code instanceof DOMElement) || $code->tagName !== 'code'
+            || !($pre instanceof DOMElement) || $pre->tagName !== 'pre'
+            || $code->childNodes->length !== 1 || $pre->childNodes->length !== 1) return false;
+        return !(new DOMXPath($node->ownerDocument))->query('ancestor::script | ancestor::style | ancestor::svg | ancestor::pre | ancestor::code', $pre)->length;
+    }
+
+    /** Reject stale or forged code addresses even when the requested value contains no markup. */
+    public static function checkCodeNode(DOMNode $node, array $slot): void
+    {
+        $element = $node instanceof DOMAttr ? $node->ownerElement : $node;
+        $inside = (new DOMXPath($node->ownerDocument))->query('ancestor-or-self::code', $element)->length;
+        if ((self::literalPreSlot($slot) || $inside) && (!self::literalPreSlot($slot) || !self::literalPreNode($node)))
+            throw new RuntimeException('HTML code slot is not one literal PRE/CODE text leaf');
+    }
+
     public static function htmlSlots(string $html): array
     {
         $doc = self::html($html); $xpath = new DOMXPath($doc); $out = [];
-        foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title') as $node) {
+        $inert = self::inertPreSources($html, $xpath, $html);
+        $svgPaths = SvgScalar::paths($html);
+        foreach ($xpath->query('//*[@id="contract-root"]//text()[normalize-space(.) != ""] | //*[@id="contract-root"]//@href | //*[@id="contract-root"]//@src | //*[@id="contract-root"]//@alt | //*[@id="contract-root"]//@title | //*[@id="contract-root"]//svg/@aria-label') as $node) {
             $element = $node instanceof DOMAttr ? $node->ownerElement : $node->parentNode;
-            if ($xpath->query('ancestor-or-self::script | ancestor-or-self::style | ancestor-or-self::svg | ancestor-or-self::code', $element)->length) continue;
+            if ($xpath->query('ancestor-or-self::svg', $element)->length) {
+                if (!SvgScalar::eligible($node) || !in_array($element->getNodePath(), $svgPaths, true)) continue;
+            } elseif ($xpath->query('ancestor-or-self::script | ancestor-or-self::style', $element)->length) continue;
+            if ($xpath->query('ancestor-or-self::code', $element)->length && !self::literalPreNode($node)) continue;
             // Joomla content-plugin directives select modules/fields and are executable structure.
-            if (IdentityTokens::hasDirective($node->nodeValue)) continue;
+            if (IdentityTokens::hasDirective($node->nodeValue)
+                && !self::inertBraceSource($inert[$node->getNodePath()] ?? [])) continue;
             $out[] = ['xpath' => $node->getNodePath(), 'type' => $node->nodeName === 'src' ? 'image' : ($node->nodeName === 'href' ? 'url' : 'text'), 'sample' => $node->nodeValue];
         }
         return $out;
@@ -104,6 +177,10 @@ final class ContentSlots
      */
     private static function writeUnit(DOMXPath $xp, DOMElement $unit, string $value): void
     {
+        // The same editable words need no remapping around this unit's excluded CODE.
+        if ($value !== '' && $value === self::slotText($unit))
+            foreach ($xp->query('.//code', $unit) as $code)
+                if (!self::nearestUnitBelow($code, $unit)) return;
         $doc = $unit->ownerDocument; $pieces = self::unitPieces($xp, $unit);
         $mark = $xp->query('./comment()[. = "' . self::EMPTIED_UNIT . '"]', $unit)->item(0);
         if ($pieces === []) {
@@ -138,14 +215,93 @@ final class ContentSlots
 
     public static function htmlPatch(string $html, array $changes): string
     {
+        return SvgScalar::patch($html, $changes, static fn(string $raw, array $rest): string => self::domPatch($raw, $rest));
+    }
+
+    /** Map original numeric brace source spans to their unique literal DOM receivers. */
+    private static function inertPreSources(string $html, DOMXPath $xp, string $seen): array
+    {
+        if (!preg_match('/&#(?:0*12[35]|x0*7[bd]);/i', $html)) return [];
+        $tags = LeafCodec::htmlTags($html); $fragments = [];
+        do $stem = 'inertpre' . bin2hex(random_bytes(12)); while (strpos($seen, $stem) !== false);
+        foreach ($tags as $i => $pre) {
+            if (($pre[1][0] ?? '') !== '' || strtolower($pre[2][0] ?? '') !== 'pre' || !isset($tags[$i + 3])) continue;
+            [$code, $codeEnd, $preEnd] = array_slice($tags, $i + 1, 3);
+            $start = $code[0][1] + strlen($code[0][0]);
+            $body = substr($html, $start, $codeEnd[0][1] - $start);
+            if (($code[1][0] ?? '') !== '' || strtolower($code[2][0] ?? '') !== 'code'
+                || $code[0][1] !== $pre[0][1] + strlen($pre[0][0])
+                || preg_match('~/\s*>$~', $pre[0][0]) || preg_match('~/\s*>$~', $code[0][0])
+                || !preg_match('~^</code\s*>$~iD', $codeEnd[0][0]) || !preg_match('~^</pre\s*>$~iD', $preEnd[0][0])
+                || $preEnd[0][1] !== $codeEnd[0][1] + strlen($codeEnd[0][0])
+                || strpos($body, '<') !== false || !preg_match('/&#(?:0*12[35]|x0*7[bd]);/i', $body)) continue;
+            $fragments[] = ['start' => $start, 'raw' => $body, 'token' => $stem . 'x' . count($fragments)];
+        }
+        if ($fragments === []) return [];
+        $probe = $html;
+        foreach (array_reverse($fragments) as $fragment)
+            $probe = substr_replace($probe, $fragment['token'], $fragment['start'], strlen($fragment['raw']));
+        $probeXp = new DOMXPath(self::html($probe)); $out = [];
+        foreach ($fragments as $fragment) {
+            $nodes = $probeXp->query('//code/text()[.="' . $fragment['token'] . '"]');
+            if ($nodes->length === 0) continue; // A lexical lookalike inside a comment or raw-text element.
+            if ($nodes->length !== 1) throw new RuntimeException('Inert PRE source receiver is ambiguous');
+            $node = $nodes->item(0);
+            if (!self::literalPreNode($node) || $probeXp->query('ancestor::textarea | ancestor::noscript | ancestor::template | ancestor::title | ancestor::xmp | ancestor::iframe | ancestor::noembed | ancestor::noframes | ancestor::plaintext', $node)->length) continue;
+            $path = $node->getNodePath(); $original = $xp->query($path);
+            if ($original->length !== 1 || !self::literalPreNode($original->item(0)) || isset($out[$path]))
+                throw new RuntimeException('Inert PRE source has no unique literal receiver');
+            $fragment['node'] = $original->item(0); $fragment['value'] = $fragment['node']->data;
+            $out[$path] = $fragment;
+        }
+        return $out;
+    }
+
+    /** All braces must come from numeric references, with the same decoded bytes as the real receiver. */
+    private static function inertBraceSource(array $fragment): bool
+    {
+        if (!isset($fragment['raw'], $fragment['value'])) return false;
+        $rest = preg_replace('/&#(?:0*12[35]|x0*7[bd]);/i', '', $fragment['raw']);
+        $rest = html_entity_decode($rest, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return strpbrk($rest, '{}') === false
+            && html_entity_decode($fragment['raw'], ENT_QUOTES | ENT_HTML5, 'UTF-8') === $fragment['value'];
+    }
+
+    /** Resolve a candidate against the actual current column, including nested JSON-HTML. No map flag grants it. */
+    public static function inertLiteralBraceSlot(array $row, array $slot): bool
+    {
+        if (!self::literalPreSlot($slot)) return false;
+        try {
+            $html = $row[$slot['column']] ?? null;
+            if (isset($slot['jsonPath'])) {
+                $html = json_decode($html, true, 512, JSON_THROW_ON_ERROR);
+                if (isset($slot['nestedJson'])) $html = json_decode($html[$slot['nestedJson']], true, 512, JSON_THROW_ON_ERROR);
+                foreach ($slot['jsonPath'] as $key) $html = is_array($html) ? ($html[$key] ?? null) : null;
+            }
+            if (!is_string($html)) return false;
+            $xp = new DOMXPath(self::html($html)); $nodes = $xp->query($slot['xpath']);
+            if (!$nodes || $nodes->length !== 1 || !self::literalPreNode($nodes->item(0))) return false;
+            $sources = self::inertPreSources($html, $xp, $html);
+            return self::inertBraceSource($sources[$nodes->item(0)->getNodePath()] ?? []);
+        } catch (Throwable $error) { return false; }
+    }
+
+    private static function domPatch(string $html, array $changes): string
+    {
         $doc = self::html($html); $xp = new DOMXPath($doc);
+        $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
+        $inert = self::inertPreSources($html, $xp, $seen);
         foreach ($changes as $change) {
             $nodes = $xp->query($change['xpath']);
             if ($nodes === false || $nodes->length !== 1) throw new RuntimeException('HTML slot is missing or ambiguous');
             $node = $nodes->item(0);
+            self::checkCodeNode($node, ['type' => 'text', 'xpath' => $change['xpath']]);
             if ($node instanceof DOMElement) { self::writeUnit($xp, $node, (string) $change['value']); continue; }
             if (!($node instanceof DOMText) && !($node instanceof DOMAttr)) throw new RuntimeException('HTML slot is not a scalar');
             $value = $change['value'];
+            if (self::literalPreNode($node) && IdentityTokens::hasDirective((string) $value)
+                && !self::inertBraceSource($inert[$node->getNodePath()] ?? []))
+                throw new RuntimeException('Literal brace content needs an inert source receiver');
             // An attribute's value set from PHP is read as markup: `&` starts an entity reference, and
             // a bare one (`?a=1&b=2`, "Sales & Marketing") emptied the attribute on libxml 2.9 and was
             // dropped on 2.13. So every `&` that does not begin a complete reference is written as
@@ -153,10 +309,39 @@ final class ContentSlots
             // `&#38;`, `&copy;`) is decoded as before, so a value that already spells `&amp;` is not
             // escaped twice; a name with no `;` (`&copy=2`, `&lang=en`) is text.
             if ($node instanceof DOMAttr) $value = preg_replace('/&(?!(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#x[0-9A-Fa-f]+);)/', '&amp;', (string) $value);
-            $node->nodeValue = $value;
+            // HTML parsers normalize CR LF and lone CR to LF (libxml 2.14+ does, older ones kept CR), so a
+            // literal PRE value is written with LF breaks and reads back the same on every libxml.
+            if (self::literalPreNode($node)) $node->data = self::lineBreaks((string) $value);
+            else $node->nodeValue = $value;
         }
-        $seen = $html; foreach ($changes as $change) $seen .= "\n" . $change['value'];
-        return self::saved($doc, $xp, $seen);
+        $restore = [];
+        foreach ($inert as $fragment) {
+            $node = $fragment['node'];
+            if (!self::literalPreNode($node) || !$xp->query('ancestor::*[@id="contract-root"]', $node)->length) continue;
+            $raw = $fragment['raw'];
+            if ($node->data !== $fragment['value']) {
+                if (!self::inertBraceSource($fragment)) continue;
+                $raw = strtr(htmlspecialchars($node->data, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'), ['{' => '&#123;', '}' => '&#125;']);
+            }
+            $node->data = $fragment['token']; $restore[$fragment['token']] = $raw;
+        }
+        $saved = self::saved($doc, $xp, $seen);
+        foreach ($restore as $token => $raw)
+            if (substr_count($saved, $token) !== 1) throw new RuntimeException('HTML write lost an inert PRE source receiver');
+        if ($restore !== []) $saved = strtr($saved, $restore);
+        $readback = null;
+        foreach ($changes as $change) if (self::literalPreSlot(['type' => 'text', 'xpath' => $change['xpath']])) {
+            $readback = $readback ?? new DOMXPath(self::html($saved));
+            $nodes = $readback->query($change['xpath']);
+            if (!$nodes || $nodes->length !== 1 || !self::literalPreNode($nodes->item(0))
+                || self::slotText($nodes->item(0)) !== self::lineBreaks((string) $change['value']))
+                throw new RuntimeException('Literal PRE text did not read back exactly');
+        }
+        return $saved;
+    }
+    private static function lineBreaks(string $text): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", $text);
     }
     private static function saved(DOMDocument $doc, DOMXPath $xp, string $seen): string
     {

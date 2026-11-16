@@ -115,3 +115,58 @@ check('contract: the next inspect reads the new values back, the untouched sente
     $wuAfter['slotValues'], ['hero.heading' => 'Fictional boxing club', 'hero.lead' => 'Call us today',
         'hero.phone' => 'tel:+000-0199', 'hero.kicker' => 'Train with us']);
 array_map('unlink', glob($wuDir . '/*.json')); rmdir($wuDir);
+
+
+// ---- Mixed CODE regression: removing the same-value guard must lose this sentence's order.
+$wuSavedCode = '<li><strong>Recovery</strong> — a broken dashboard is one <code>git revert</code> away from working again.</li>';
+$wuSavedWords = 'Recovery — a broken dashboard is one away from working again.';
+$wuSame = $wuWrite($wuSavedCode, '/html/body/div/li', $wuSavedWords);
+check('same CODE words preserve original strong, CODE position and surrounding spaces', $wuSame, $wuSavedCode);
+check('same CODE words still read as the exact editable scalar', $wuRead($wuSame, '/html/body/div/li'), $wuSavedWords);
+$wuNodes = (new DOMXPath(ContentSlots::html($wuSame)))->query('/html/body/div/li/node()');
+$wuOrder = [];
+foreach ($wuNodes as $wuNode) $wuOrder[] = [$wuNode->nodeName, $wuNode->textContent];
+check('same CODE words retain the original DOM children in order', $wuOrder,
+    [['strong', 'Recovery'], ['#text', ' — a broken dashboard is one '], ['code', 'git revert'], ['#text', ' away from working again.']]);
+
+// Literal mismatches must keep the old changed-prose path, never infer a CODE anchor.
+foreach ([
+    ['Changed wording is unsupported', 'Replacement sentence.', '<li>Replacement sentence.<code>git revert</code></li>'],
+    ['Extra internal whitespace is unequal', 'Recovery  — a broken dashboard is one away from working again.', '<li>Recovery  — a broken dashboard is one away from working again.<code>git revert</code></li>'],
+    ['Leading request space is unequal', ' Recovery — a broken dashboard is one away from working again.', '<li> Recovery — a broken dashboard is one away from working again.<code>git revert</code></li>'],
+    ['Trailing request space is unequal', 'Recovery — a broken dashboard is one away from working again. ', '<li>Recovery — a broken dashboard is one away from working again. <code>git revert</code></li>'],
+    ['Notation stays literal', '((strong))Recovery((/strong)) — a broken dashboard is one away from working again.', '<li>((strong))Recovery((/strong)) — a broken dashboard is one away from working again.<code>git revert</code></li>'],
+    ['HTML stays literal', '<strong>Recovery</strong>', '<li>&lt;strong&gt;Recovery&lt;/strong&gt;<code>git revert</code></li>'],
+    ['Empty request keeps empty marker', '', '<li><!--emptied-slot--><code>git revert</code></li>'],
+] as [$wuName, $wuValue, $wuWant]) {
+    check('same CODE guard excludes: ' . $wuName, $wuWrite($wuSavedCode, '/html/body/div/li', $wuValue), $wuWant);
+}
+$wuNested = '<li>Outer <strong>label</strong><p>Inner <code>x</code> tail</p></li>';
+check('nested-unit CODE does not preserve outer emphasis', $wuWrite($wuNested, '/html/body/div/li', 'Outer label'),
+    '<li>Outer label<p>Inner <code>x</code> tail</p></li>');
+check('the nested unit owns its own CODE and preserves its own sentence', $wuWrite($wuNested, '/html/body/div/li/p', 'Inner tail'), $wuNested);
+check('no CODE means same words still remove old emphasis', $wuWrite('<p>Same <strong>words</strong></p>', '/html/body/div/p', 'Same words'), '<p>Same words</p>');
+check('CODE-only empty projection never gains an empty marker', $wuWrite('<li><code>x</code></li>', '/html/body/div/li', ''), '<li><code>x</code></li>');
+check('CODE-only unit accepts a new literal scalar by its existing append path', $wuWrite('<li><code>x</code></li>', '/html/body/div/li', 'Words'), '<li><code>x</code>Words</li>');
+check('CODE-only whitespace request is not normalized into empty equality', $wuWrite('<li><code>x</code></li>', '/html/body/div/li', ' '), '<li><code>x</code> </li>');
+check('fragment with its own CODE preserves its same-word DOM', $wuWrite('<strong>Run</strong> <code>x</code> now', '/html/body/div', 'Run now'), '<strong>Run</strong> <code>x</code> now');
+check('same-word unit with CODE preserves directive and script owners',
+    $wuWrite('<li><b>Keep</b> <code>x</code> now {loadposition side}<script>var x=1;</script></li>', '/html/body/div/li', 'Keep'),
+    '<li><b>Keep</b> <code>x</code> now {loadposition side}<script>var x=1;</script></li>');
+check('changed-word unit leaves directive, script and CODE owners intact',
+    $wuWrite('<li><b>Keep</b> <code>x</code> now {loadposition side}<script>var x=1;</script></li>', '/html/body/div/li', 'Change'),
+    '<li>Change <code>x</code> now {loadposition side}<script>var x=1;</script></li>');
+$wuOwners = '<ul>' . $wuSavedCode . '<li>Sibling <em>kept</em></li></ul><a href="/old">Link</a><img src="old.png" alt="Old" title="Title">';
+check('same-word CODE unit leaves siblings and scalar owners addressable',
+    ContentSlots::htmlPatch($wuOwners, [
+        ['xpath' => '/html/body/div/ul/li[1]', 'value' => $wuSavedWords],
+        ['xpath' => '/html/body/div/a/@href', 'value' => '/new?a=1&b=2'],
+        ['xpath' => '/html/body/div/img/@src', 'value' => 'new.png'],
+        ['xpath' => '/html/body/div/img/@alt', 'value' => 'New & clear'],
+        ['xpath' => '/html/body/div/img/@title', 'value' => 'New title'],
+    ]), '<ul>' . $wuSavedCode . '<li>Sibling <em>kept</em></li></ul><a href="/new?a=1&amp;b=2">Link</a><img src="new.png" alt="New &amp; clear" title="New title">');
+foreach (['/html/body/div/missing', '/html/body/div/p'] as $wuBadPath) {
+    try { $wuWrite('<p>One</p><p>Two</p>', $wuBadPath, 'x'); $wuRefusal = false; }
+    catch (RuntimeException $wuError) { $wuRefusal = true; }
+    check('same CODE guard retains missing/ambiguous refusal: ' . $wuBadPath, $wuRefusal, true);
+}

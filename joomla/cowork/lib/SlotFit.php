@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/ContentSlots.php';
 /**
  * Slot fit (TCH ADR 0039): what a slot of a newer content map says about the SHAPE of what goes in it,
  * measured at capture from the rendered demo. A picture says its kind (photo, icon, cut-out...), whether
@@ -131,7 +132,7 @@ final class SlotFit
      * not a limit: an inline label grows with its words. A line limit is at least the demo's own line count, as a value
      * counts them. Without a sample, every limit stands as measured.
      */
-    public static function checkText(array $fit, string $key, string $value, callable $refuse, ?string $sample = null): void
+    public static function checkText(array $fit, string $key, string $value, callable $refuse, ?string $sample = null, bool $literalPre = false): void
     {
         if (($fit['measured'] ?? null) !== true) return;
         $limit = $fit['maxCharacters'] ?? null;
@@ -139,8 +140,8 @@ final class SlotFit
             $all = array_filter($fit['maxChars'], 'is_int');
             $limit = $all ? min($all) : null;
         }
-        if (is_int($limit) && $sample !== null && $limit <= self::visibleLength($sample) + self::DEMO_BOX_SLACK) $limit = null;
-        $seen = is_int($limit) && $limit > 0 ? self::seenLength($value) : 0;
+        if (is_int($limit) && $sample !== null && $limit <= ($literalPre ? mb_strlen($sample) : self::visibleLength($sample)) + self::DEMO_BOX_SLACK) $limit = null;
+        $seen = is_int($limit) && $limit > 0 ? ($literalPre ? mb_strlen($value) : self::seenLength($value)) : 0;
         if (is_int($limit) && $limit > 0 && $seen > $limit)
             throw $refuse('SLOT_TOO_LONG', 'Content too long for its box: rewrite it shorter, at most ' . $limit . ' characters, keeping its meaning (never cut it or add an ellipsis): ' . $key,
                 ['limit' => $limit, 'actual' => $seen]);
@@ -171,6 +172,7 @@ final class SlotFit
      */
     public static function slotLength(array $slot, string $value): int
     {
+        if (ContentSlots::literalPreSlot($slot)) return mb_strlen($value);
         if (($slot['type'] ?? null) !== 'text' || !is_string($slot['column'] ?? null)
             || in_array($slot['column'], self::FIXED_WIDTH_COLUMNS, true)) return mb_strlen($value);
         return self::seenLength($value);

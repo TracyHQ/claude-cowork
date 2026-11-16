@@ -57,6 +57,20 @@ final class LeafCodec
         return $out;
     }
 
+    /** Existing quote-aware HTML tokens, with original byte offsets; no DOM serialization. */
+    public static function htmlTags(string $raw): array
+    {
+        preg_match_all(self::TAG, $raw, $tags, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
+        return $tags;
+    }
+
+    /** One existing attribute span, not a markup writer; duplicates fail closed. */
+    public static function htmlAttributeSpan(string $raw, string $address): ?array
+    {
+        $found = array_values(array_filter(self::segments($raw, 'html'), static fn(array $s): bool => $s['attr'] !== null && $s['address'] === $address));
+        return count($found) === 1 ? $found[0] : null;
+    }
+
     public static function get(string $raw, string $path): string
     {
         return self::read($raw, self::steps($path), 0);

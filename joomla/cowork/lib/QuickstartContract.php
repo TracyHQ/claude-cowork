@@ -81,6 +81,11 @@ final class QuickstartContract
      * @var array<string,array<string,string>>|null
      */
     private ?array $linkLayouts = null;
+    /** Receiver-reviewed article audio layouts; independent of the shipped ACM review. */
+    private array $audioLayouts = [];
+    /** Recomputed from actual rows and source bytes on every inspect, never from slot/caller flags. */
+    private array $audioHideable = [];
+    private array $audioReceiverProved = [];
     /** @var array<string,string> slot key => how the review judged it ('measured', 'unmeasured', 'withRow'): {@see loadHideable} */
     private array $hideable = [];
     /** What `lib/slot-corrections.json` says of this contract's slots; null when nothing applies. */
@@ -181,6 +186,7 @@ final class QuickstartContract
         // contract that ships no list of what its demo is.
         $this->syncSourceRelabel();
         $this->linkLayouts = self::loadLinkLayouts($lib . '/link-layouts.json');
+        $this->audioLayouts = self::loadAudioLayouts($lib . '/link-layouts.json');
         $this->loadHideable($lib . '/hideable-slots.json', $directory . '/content-map.json');
         $this->corrections = SlotCorrections::load($lib . '/slot-corrections.json', (string)($this->manifest['id'] ?? ''), $directory . '/content-map.json');
         $trimFile = $directory . '/demo-trim-map.json';
@@ -315,8 +321,8 @@ final class QuickstartContract
         return $this->baseEntities;
     }
     private ?array $slotsByEntity = null;
-    /** What the agent is told about role and group; guidance only, no write rule reads either field. */
-    public const ROLE_GUIDANCE = 'Slots carry a role (the kind of content, for example offering.price) and a group (the card or item the slot belongs to). When the customer names a kind of content, such as the price of a plan, find the slots with that role inside the matching group, and change every slot of one card together so the card stays consistent. Roles are guidance only: the write rules (requiresEvidence, empty-state refusals, length limits) apply exactly as they do to a slot without a role.';
+    /** Role guidance; audio additionally requires its exact trusted V3 article/row address and reviewed receiver. */
+    public const ROLE_GUIDANCE = 'Slots carry a role (the kind of content, for example offering.price) and a group (the card or item the slot belongs to). When the customer names a kind of content, such as the price of a plan, find the slots with that role inside the matching group, and change every slot of one card together so the card stays consistent. Roles do not waive evidence, empty-state or length rules. A V3 business.audio source additionally requires its exact article/track address and reviewed receiver; its URL is media content, never a CTA.';
 
     private function slotsFor(string $key): array {
         if ($this->slotsByEntity === null) {
@@ -507,12 +513,14 @@ final class QuickstartContract
                 if(!is_string($value))throw new RuntimeException('Content slot is not text');
                 $nodes=(new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
                 if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+                ContentSlots::checkCodeNode($nodes->item(0), $slot);
                 return ContentSlots::slotText($nodes->item(0));
             }
         }
         elseif(isset($slot['xpath'])) {
             $nodes=($parsed['dom'][$column] ??= new DOMXPath(ContentSlots::html($value)))->query($slot['xpath']);
             if(!$nodes || $nodes->length!==1)throw new RuntimeException('Content slot is missing or ambiguous');
+            ContentSlots::checkCodeNode($nodes->item(0), $slot);
             return ContentSlots::slotText($nodes->item(0));
         }
         if(!is_string($value))throw new RuntimeException('Content slot is not text');
@@ -958,6 +966,7 @@ final class QuickstartContract
         $inspect=Timing::begin();
         $this->drift = [];
         $this->layoutHashes = [];
+        $this->audioHideable = []; $this->audioReceiverProved = [];
         $this->files();
         $binding=$this->store->load();
         if($binding && $binding['contractHash']!==$this->contractHash())throw new RuntimeException('Installed content contract changed');
@@ -1170,7 +1179,12 @@ final class QuickstartContract
             $slot['current']=$this->currentValue($rows[$key],$slot,$parsed);
             $empty=$this->emptyLinkOf($rows[$key],$slot,$parsed);
             if($empty!==null)$slot['emptyLink']=$empty;
-            if(isset($this->hideable[$slot['key']])&&!self::addressMoves($slot))$slot['canHide']=$this->hideable[$slot['key']];
+            if(self::audioCandidate($slot)) {
+                unset($slot['canHide']);
+                if($this->audioSlot($slot)&&$meta['kind']==='article'&&$this->audioRow($rows[$key],$slot)&&$this->audioReceiver($source,$rows[$key])) {
+                    $this->audioHideable[$slot['key']]=true; $slot['canHide']=true;
+                }
+            } elseif(isset($this->hideable[$slot['key']])&&!self::addressMoves($slot))$slot['canHide']=$this->hideable[$slot['key']];
             $row=$this->rowOf($key,$slot);
             if($row!==null)$slot['row']=$row['id'];
             $slots[]=$slot;
@@ -1224,10 +1238,10 @@ final class QuickstartContract
      * Throws the slot's FIRST problem as a ContractProblem; the message is the one this rule has
      * always said, the code and numbers are what an agent acts on.
      */
-    private function checkValue(array $slot, string $value, array $params): void {
+    private function checkValue(array $slot, string $value, array $params, array $row = []): void {
         $key=$slot['key'];
         $refuse=fn(string $code,string $message,array $extra=[])=>new ContractProblem($code,$message,$key,null,$extra);
-        if (!empty($slot['requiresEvidence']) && $value!==$slot['sample']) {
+        if ((!empty($slot['requiresEvidence']) || self::audioCandidate($slot)) && $value!==$slot['sample']) {
             $evidence=$params['evidence'][$key]??null;
             if(!is_string($evidence)||trim($evidence)===''||strlen($evidence)>8000)throw $refuse('SLOT_EVIDENCE_REQUIRED','Customer evidence required: '.$key);
         }
@@ -1238,10 +1252,16 @@ final class QuickstartContract
             if(trim($value)==='' && trim($slot['sample'])!=='')throw $refuse('SLOT_EMPTY_STATE','Content cannot remove an occupied slot: '.$key);
             if(trim($value)!=='' && trim($slot['sample'])==='' && empty($slot['opensEmpty']))throw $refuse('SLOT_EMPTY_STATE','Content cannot activate an empty slot: '.$key);
         }
-        if(preg_match('/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
-        if(IdentityTokens::hasDirective($value))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
+        $literalPre = ContentSlots::literalPreSlot($slot); // inspect already validated the current row's DOM.
+        if(preg_match($literalPre ? '/[\x00-\x08\x0b\x0c\x0e-\x1f]/u' : '/[<>\x00-\x08\x0b\x0c\x0e-\x1f]/u',$value))throw $refuse('SLOT_NOT_CONTENT','Markup and control characters are not content: '.$key);
+        if(IdentityTokens::hasDirective($value) && !ContentSlots::inertLiteralBraceSlot($row,$slot))throw $refuse('SLOT_NOT_CONTENT','Joomla plugin directives are not content: '.$key);
         // A slot a correction opened holds an alt its template prints unescaped: a double quote would close the attribute.
         if(!empty($slot['opensEmpty'])&&strpos($value,'"')!==false)throw $refuse('SLOT_NOT_CONTENT','A double quote breaks this picture\'s alt: rewrite it without one: '.$key);
+        if(self::audioCandidate($slot)) {
+            if(!$this->audioSlot($slot)||!$this->audioRow($row,$slot)||!isset($this->audioHideable[$key]))throw $refuse('SLOT_AUDIO_INVALID','Audio source has no exact article/track owner: '.$key);
+            if(strlen($value)>min(2048,(int)$slot['maxCharacters']))throw $refuse('SLOT_TOO_LONG','Audio source address is too long: '.$key);
+            $this->checkAudioSource($value,$refuse); return;
+        }
         // An imported site stores links and pictures in whatever form it grew; a quickstart's rules below
         // were written for the forms its own profile ships, and stay exactly as they are. A derived
         // slot's length limit is sized from its old words, which says nothing about a link or a file
@@ -1256,7 +1276,7 @@ final class QuickstartContract
         // Slot fit (ADR 0039), only on a slot that carries one and never against its own demo value.
         $fit=SlotFit::of($slot);
         if($fit!==null&&SlotFit::restores($slot,$value))$fit=null;
-        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse,(string)$slot['sample']);
+        if($fit!==null&&$slot['type']==='text')SlotFit::checkText($fit,$key,$value,$refuse,(string)$slot['sample'],$literalPre);
         if($slot['type']==='url' && (strpos($value,'//')===0 || strpos($value,'\\')!==false))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='url'&&$value!==''&&!preg_match('~^(https://[^\s]+|mailto:[^\s]+|tel:[+0-9 ()-]+|index\.php\?Itemid=[0-9]+|/[a-zA-Z0-9/_?&=.%#-]*|#[a-zA-Z0-9_-]+)$~D',$value))throw $refuse('SLOT_LINK_UNSUPPORTED','Unsupported CTA URL: '.$key);
         if($slot['type']==='image'&&$value!=='') {
@@ -1273,6 +1293,126 @@ final class QuickstartContract
             if($fit!==null&&SlotFit::checkPicture($fit,$key,$after,$before,$this->root.'/'.$value,$refuse,(string)$slot['sample']))return;
             if($before&&abs($before[0]/$before[1]-$after[0]/$after[1])>0.02)throw $refuse('SLOT_IMAGE_INVALID','Image aspect ratio does not match its slot');
         }
+    }
+
+    private static function audioCandidate(array $slot): bool {
+        return ($slot['role']??null)==='business.audio'||(is_array($slot['jsonPath']??null)&&array_slice($slot['jsonPath'],0,2)===['ctm_audio','audio-src']);
+    }
+
+    /** Roles alone never change a write rule: the trusted V3 address, entity and original row must all agree. */
+    private function audioSlot(array $slot): bool {
+        $path=$slot['jsonPath']??null; $entity=$slot['entity']??''; $group=$slot['group']??[];
+        $index=is_array($path)?($path[2]??null):null;
+        // Object keys stay strings in capture pointers; only their canonical bounded integer identity is shared.
+        $validIndex=is_int($index)?$index>=0:(is_string($index)&&preg_match('/^(0|[1-9][0-9]*)$/D',$index)&&(string)(int)$index===$index);
+        return !$this->derivedMode&&($this->map['roleVocabularyVersion']??null)==='place-content-roles/3'
+            &&($this->baseEntities()[$entity]['kind']??null)==='article'&&preg_match('/^article-[1-9][0-9]*$/D',$entity)
+            &&($slot['type']??null)==='url'&&($slot['role']??null)==='business.audio'&&($slot['column']??null)==='attribs'
+            &&($slot['leaf']??null)===null
+            &&!isset($slot['nestedJson'])&&!isset($slot['xpath'])&&is_array($path)&&count($path)===3
+            &&array_slice($path,0,2)===['ctm_audio','audio-src']&&$validIndex
+            &&($group['id']??null)===$entity.'.audio.'.$index&&($group['item']??null)===(int)$index&&($group['kind']??null)==='business';
+    }
+
+    private function audioRow(array $row, array $slot): bool {
+        $params=json_decode((string)($row['attribs']??''),true); $index=$slot['jsonPath'][2];
+        return is_array($params)&&array_key_exists('article_layout',$params)&&in_array($params['article_layout'],['','default','_:default','ja_symphony:default'],true)
+            &&is_array($params['ctm_audio']['audio-src']??null)&&is_string($params['ctm_audio']['audio-src'][$index]??null)
+            &&is_string($params['ctm_audio']['audio-title'][$index]??'')&&json_encode($params['ctm_audio']['audio-title'][$index]??'')!==false;
+    }
+
+    /** Syntax is shared with the reviewed player; local media must also exist, stay inside its library and be MPEG audio. */
+    private function checkAudioSource(string $value, callable $refuse): void {
+        $invalid=fn()=> $refuse('SLOT_AUDIO_INVALID','Expected an evidenced HTTPS MP3 or an existing local MPEG audio file');
+        if($value===''||preg_match('/[\x00-\x20\x7f\\\\<>"`{}|^]/',$value)||preg_match('/%(?![0-9a-f]{2})/i',$value))throw $invalid();
+        $url=parse_url($value);
+        if($url===false||isset($url['user'])||isset($url['pass'])||isset($url['fragment']))throw $invalid();
+        $path=$url['path']??''; $decoded=rawurldecode($path);
+        if(!preg_match('/\.mp3\z/i',$path)||preg_match('/%(?:2f|5c|25)/i',$path)||preg_match('/[\x00-\x20\x7f\\\\?#]/',$decoded))throw $invalid();
+        foreach(explode('/',ltrim($decoded,'/')) as $segment)if(in_array($segment,['','.','..'],true))throw $invalid();
+        if(isset($url['scheme'])) {
+            if(strtolower($url['scheme'])!=='https'||!filter_var($value,FILTER_VALIDATE_URL))throw $invalid();
+            return; // Customer evidence is provenance, never a remote existence/playback probe.
+        }
+        if(isset($url['host'])||isset($url['port'])||strpos($value,'//')===0)throw $invalid();
+        // Installation-rooted values are accepted only against Joomla's actual site base.
+        if(class_exists('Joomla\\CMS\\Uri\\Uri')) {
+            $base=rtrim((string)\Joomla\CMS\Uri\Uri::root(true),'/');
+            if($base!==''&&strpos($decoded,$base.'/')===0)$decoded=substr($decoded,strlen($base));
+        }
+        $path=ltrim($decoded,'/');
+        if(!preg_match('~^(images|media)/~D',$path,$match))throw $invalid();
+        $root=realpath($this->root); $media=$root===false?false:realpath($root.'/'.$match[1]);
+        $file=$root===false?false:realpath($root.'/'.$path);
+        if(!$root||!$media||$media!==$root.'/'.$match[1]||!$file||$file!==$root.'/'.$path||strpos($file,$media.DIRECTORY_SEPARATOR)!==0||!is_file($file))throw $invalid();
+        if(!class_exists('finfo'))throw $invalid();
+        $mime=(new finfo(FILEINFO_MIME_TYPE))->file($file);
+        if(!in_array($mime,['audio/mpeg','audio/mp3'],true))throw $invalid();
+    }
+
+    private static function loadAudioLayouts(string $file): array {
+        if(!is_file($file))return [];
+        $data=json_decode((string)file_get_contents($file),true); $out=[];
+        foreach(is_array($data['audioLayouts']??null)?$data['audioLayouts']:[] as $hash=>$review) {
+            if(!is_string($hash)||!preg_match('/^[a-f0-9]{64}$/D',$hash)||!is_array($review)||($review['template']??null)!=='ja_symphony'
+                ||($review['path']??null)!=='templates/ja_symphony/html/layouts/joomla/content/audio.php'
+                ||($review['fields']??null)!==['ctm_audio.audio-src'=>'hidden']||!is_array($review['files']??null)
+                ||!isset($review['files']['templates/ja_symphony/html/com_content/article/default.php']))continue;
+            $valid=true;
+            foreach($review['files'] as $path=>$pin)if(!is_string($path)||!preg_match('~^(templates/ja_symphony/|libraries/src/Layout/)[A-Za-z0-9_./-]+$~D',$path)||strpos($path,'..')!==false||!is_string($pin)||!preg_match('/^[a-f0-9]{64}$/D',$pin)){$valid=false;break;}
+            if($valid)$out[$hash]=$review;
+        }
+        return $out;
+    }
+
+    /** Conservative ordinary Joomla/T4 source selection: unknown styles, alternate layouts or competing overrides close hiding. */
+    private function audioReceiver(ContractRows $source, array $row): bool {
+        $id=(int)($row['id']??0); if($id<=0)return false;
+        if(isset($this->audioReceiverProved[$id]))return $this->audioReceiverProved[$id];
+        $this->audioReceiverProved[$id]=false;
+        $root=realpath($this->root); if(!$root)return false;
+        if(class_exists('Joomla\\CMS\\Layout\\LayoutHelper',false)&&\Joomla\CMS\Layout\LayoutHelper::$defaultBasePath!=='')return false;
+        $file='templates/ja_symphony/html/layouts/joomla/content/audio.php';
+        clearstatcache(); $full=$root.'/'.$file;
+        if(realpath($full)!==$full||!is_file($full))return false;
+        $hash=hash_file('sha256',$full); $review=$this->audioLayouts[$hash]??null;
+        if($review===null)return false;
+        foreach($review['files'] as $path=>$pin)if(realpath($root.'/'.$path)!==$root.'/'.$path||!is_file($root.'/'.$path)||!hash_equals($pin,(string)hash_file('sha256',$root.'/'.$path)))return false;
+        $styles=$source->all('templateStyle'); if(!$styles||count($styles)>1000)return false;
+        $siteStyles=[]; $selected=[];
+        foreach($styles as $style) {
+            if(!isset($style['client_id']))return false;
+            if((string)$style['client_id']!=='0')continue;
+            if(!isset($style['id'],$style['home']))return false;
+            $styleId=(int)$style['id']; if($styleId<=0)return false;
+            $siteStyles[$styleId]=$style;
+            if(!in_array((string)$style['home'],['','0'],true))$selected[$styleId]=true;
+        }
+        if(!$selected)return false;
+        $menus=$source->all('menuItem'); if(count($menus)>1000)return false;
+        foreach($menus as $menu) {
+            if(!isset($menu['client_id'],$menu['published']))return false;
+            if((string)$menu['client_id']!=='0'||(string)$menu['published']!=='1')continue;
+            $styleId=$menu['template_style_id']??null;
+            if(!is_scalar($styleId)||!preg_match('/^(0|[1-9][0-9]*)$/D',(string)$styleId)||(string)(int)$styleId!==(string)$styleId)return false;
+            if((int)$styleId>0)$selected[(int)$styleId]=true;
+            parse_str((string)parse_url((string)($menu['link']??''),PHP_URL_QUERY),$query);
+            if(($query['option']??null)!=='com_content'||($query['view']??null)!=='article')continue;
+            if(!is_scalar($query['id']??null)||!preg_match('/^[1-9][0-9]*$/D',(string)$query['id']))return false;
+            if((string)$query['id']!==(string)$id)continue;
+            // HtmlView gives a matching article menu priority; form/category query layouts never select this receiver.
+            $params=json_decode((string)($menu['params']??''),true);
+            if(!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true)
+                ||!in_array($query['layout']??'',['','default'],true))return false;
+        }
+        foreach(array_keys($selected) as $styleId) {
+            $style=$siteStyles[$styleId]??null; if($style===null)return false;
+            $params=json_decode((string)($style['params']??''),true);
+            if(($style['template']??null)!=='ja_symphony'||!is_array($params)||isset($params['ctm_audio'])||!in_array($params['article_layout']??'',['','default','_:default','ja_symphony:default'],true))return false;
+        }
+        foreach(['templates/*/local/html','templates/*/html/layouts/com_content/joomla/content/audio*.php','components/com_content/layouts/joomla/content/audio*.php','layouts/joomla/content/audio*.php'] as $pattern)if(glob($root.'/'.$pattern))return false;
+        foreach(glob($root.'/templates/*/html/layouts/joomla/content/audio*.php')?:[] as $path)if($path!==$full)return false;
+        return $this->audioReceiverProved[$id]=true;
     }
 
     /**
@@ -1361,6 +1501,7 @@ final class QuickstartContract
     private function hideRefusal(array $slot, array $hiding, array $current): ?string {
         $key=$slot['key'];
         // Nothing to take off: no write comes of it, whoever reviewed what.
+        if(self::audioCandidate($slot))return isset($this->audioHideable[$key])?null:'Audio cannot be emptied without its exact reviewed receiver and row: '.$key;
         if(trim((string)($current[$key]??'x'))==='')return null;
         if(self::addressMoves($slot))return 'This slot cannot be emptied: it is one text node or attribute, and its address would move: '.$key;
         if(!isset($this->hideable[$key]))return 'This slot cannot be emptied: the review for this contract does not list it: '.$key;
@@ -1493,7 +1634,7 @@ final class QuickstartContract
                 else $values[$key]='';
                 continue;
             }
-            try { $this->checkValue($slot,$value,$params); }
+            try { $this->checkValue($slot,$value,$params,$state['rows'][$slot['entity']]??[]); }
             catch (ContractProblem $problem) { $problem->contentId=$owner; $problems[]=$problem; continue; }
             $values[$key]=$this->derivedMode && $slot['type']==='image' && $value!=='' ? $this->storedImage($value,(string)($state['slotValues'][$key]??'')) : $value;
         }
