@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Php8Functions.php';
 require_once __DIR__ . '/LeafCodec.php';
 
 /** Existing SVG root aria-label only; source geometry is never DOM-serialized. */
