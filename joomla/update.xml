@@ -20,6 +20,26 @@
 <updates>
     <update>
         <name>Joomla Claude Cowork</name>
+        <description>Carries the hide review of the JA Diner j6 1.0.8 pictures in the modules its rebuilt template kit added (the gallery, the about page's blocks and the team).</description>
+        <element>pkg_claudecowork</element>
+        <type>package</type>
+        <client>site</client>
+        <version>0.24.97</version>
+        <infourl title="Release notes">https://github.com/TracyHQ/claude-cowork/releases/tag/joomla-v0.24.97</infourl>
+        <downloads>
+            <downloadurl type="full" format="zip">https://github.com/TracyHQ/claude-cowork/releases/download/joomla-v0.24.97/pkg_claudecowork-0.24.97.zip</downloadurl>
+        </downloads>
+        <sha256>e18597b07ebe00774662bfcfc9d21cf678b56637184b433b47e35c2e3d4087a7</sha256>
+        <tags>
+            <tag>stable</tag>
+        </tags>
+        <maintainer>Tracy</maintainer>
+        <maintainerurl>https://tracy.ai</maintainerurl>
+        <targetplatform name="joomla" version="(3|4|5|6)\.[0-9]+"/>
+        <php_minimum>7.4</php_minimum>
+    </update>
+    <update>
+        <name>Joomla Claude Cowork</name>
         <description>Carries the JA Diner j6 1.0.8 hide review on the stable line, links the footer and contact phones as tel: links, and lets a hide empty a contact's printed lines and social link addresses.</description>
         <element>pkg_claudecowork</element>
         <type>package</type>
